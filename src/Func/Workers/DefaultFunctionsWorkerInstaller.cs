@@ -108,7 +108,7 @@ internal sealed class DefaultFunctionsWorkerInstaller(
     private ContentWorkloadInfo CreateContentWorkloadInfo(WorkloadEntry entry)
     {
         string installDirectory = _workloadPaths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
-        string contentRoot = Path.GetFullPath(Path.Combine(installDirectory, "tools", "any"));
+        string contentRoot = WorkloadPackageLayout.GetContentRoot(installDirectory, entry.RuntimeIdentifier);
 
         return new ContentWorkloadInfo(
             entry.PackageId,

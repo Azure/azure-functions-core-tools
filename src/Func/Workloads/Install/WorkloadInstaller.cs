@@ -144,7 +144,6 @@ internal sealed class WorkloadInstaller(
                     selection.PackageId,
                     package.Identity.Version,
                     selection.RuntimeIdentifier,
-                    resolved.Source.Source,
                     WorkloadOwnershipKind.Logical,
                     logicalPackage,
                     cancellationToken)
@@ -411,12 +410,11 @@ internal sealed class WorkloadInstaller(
             }
 
             LogicalPackage newLogical = CreateLogicalPackage(pointer, pointerResolved.Source.Source);
-            WorkloadEntry? reusable = await FindReusableImplementationAsync(
+            WorkloadEntry? reusable = FindReusableImplementation(
+                installed,
                 selection.PackageId,
                 pointer.Identity.Version,
-                selection.RuntimeIdentifier,
-                pointerResolved.Source.Source,
-                cancellationToken);
+                selection.RuntimeIdentifier);
             if (reusable is not null)
             {
                 WorkloadEntry incoming = CopyForOwnership(reusable, WorkloadOwnershipKind.Logical, newLogical);
@@ -477,17 +475,6 @@ internal sealed class WorkloadInstaller(
         InspectedPackage? inspectedPackage = null)
     {
         string version = resolved.Version.ToNormalizedString();
-        IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
-        WorkloadEntry? destination = installed.FirstOrDefault(entry =>
-            string.Equals(entry.PackageId, resolved.PackageId, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(entry.PackageVersion, version, StringComparison.Ordinal));
-        if (destination is not null && !SourcesMatch(destination.Source, resolved.Source.Source))
-        {
-            throw new InvalidOperationException(
-                $"Package '{resolved.PackageId}' version '{version}' is already installed from source '{destination.Source}' and cannot be " +
-                $"replaced from source '{resolved.Source.Source}'. Remove the existing package ownership before updating from a different source.");
-        }
-
         bool ownsDownload = downloadedPath is null;
         string packagePath = downloadedPath ?? await DownloadToTempAsync(resolved, progress, cancellationToken);
         string finalPath = _paths.GetInstallDirectory(resolved.PackageId, version);
@@ -511,13 +498,10 @@ internal sealed class WorkloadInstaller(
 
             WorkloadMetadata metadata = _metadataReader.Read(stagingPath);
             EnsureMetadataMatchesInspection(package.Metadata, metadata, package.Identity.PackageId);
-            EnsureHostExecutableBit(stagingPath, package.Identity.PackageId);
+            EnsureHostExecutableBit(stagingPath, package.Identity.PackageId, metadata.RuntimeIdentifier);
             WorkloadEntry incoming = CreateEntry(package, resolved.Source.Source, ownership, logicalPackage);
 
-            if (Directory.Exists(finalPath))
-            {
-                TryDeleteDirectory(finalPath);
-            }
+            DeleteInstallDirectory(finalPath);
 
             MoveDirectory(stagingPath, finalPath);
             WorkloadOwnershipMoveResult moved = ownership == WorkloadOwnershipKind.Logical
@@ -573,69 +557,12 @@ internal sealed class WorkloadInstaller(
         WorkloadEntry? existing = installed.FirstOrDefault(e =>
             string.Equals(e.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(e.PackageVersion, version, StringComparison.Ordinal));
-        WorkloadEntry? currentLogicalOwner = null;
-        if (ownership == WorkloadOwnershipKind.Logical && logicalPackage is not null)
+        WorkloadEntry? currentLogicalOwner = ResolveCurrentLogicalOwner(installed, ownership, logicalPackage);
+        bool logicalOwnerMoves = LogicalOwnerMoves(currentLogicalOwner, packageId, version);
+
+        if (!force && existing is not null && IsExistingInstallationValid(existing, package.Metadata))
         {
-            WorkloadEntry[] logicalOwners = [.. installed.Where(e =>
-                e.LogicalPackage is not null
-                && string.Equals(e.LogicalPackage.PackageId, logicalPackage.PackageId, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(e.LogicalPackage.PackageVersion, logicalPackage.PackageVersion, StringComparison.Ordinal))];
-            if (logicalOwners.Length > 1)
-            {
-                throw new InvalidOperationException(
-                    $"Logical workload '{logicalPackage.PackageId}' version '{logicalPackage.PackageVersion}' is attached to multiple physical packages.");
-            }
-
-            currentLogicalOwner = logicalOwners.FirstOrDefault();
-        }
-
-        bool logicalOwnerMoves = currentLogicalOwner is not null
-            && (!string.Equals(currentLogicalOwner.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(currentLogicalOwner.PackageVersion, version, StringComparison.Ordinal));
-
-        if (ownership == WorkloadOwnershipKind.Logical
-            && existing is not null
-            && !SourcesMatch(existing.Source, source))
-        {
-            throw new InvalidOperationException(
-                $"Package '{packageId}' version '{version}' is already installed from source '{existing.Source}' and cannot be used by " +
-                $"pointer source '{source}'. Remove the existing package ownership before installing from a different source.");
-        }
-
-        if (!force
-            && existing is not null
-            && (ownership == WorkloadOwnershipKind.Explicit || SourcesMatch(existing.Source, source))
-            && IsExistingInstallationValid(existing, package.Metadata))
-        {
-            if (logicalOwnerMoves)
-            {
-                WorkloadEntry incoming = CopyForOwnership(existing, WorkloadOwnershipKind.Logical, logicalPackage);
-                WorkloadOwnershipMoveResult moved = await _store.MoveLogicalOwnershipAsync(
-                    currentLogicalOwner!.PackageId,
-                    currentLogicalOwner.PackageVersion,
-                    incoming,
-                    cancellationToken);
-                if (moved.PreviousEntryRemoved)
-                {
-                    TryDeleteDirectory(_paths.GetInstallDirectory(
-                        currentLogicalOwner.PackageId,
-                        currentLogicalOwner.PackageVersion));
-                }
-
-                return new WorkloadInstallResult(moved.Entry, false);
-            }
-
-            bool alreadyOwned = HasOwnership(existing, ownership);
-            if (alreadyOwned)
-            {
-                return new WorkloadInstallResult(existing, true);
-            }
-
-            WorkloadEntry attached = await _store.AddOwnershipAsync(
-                CopyForOwnership(existing, ownership, logicalPackage),
-                ownership,
-                cancellationToken);
-            return new WorkloadInstallResult(attached, false);
+            return await AttachOwnershipAsync(existing, ownership, logicalPackage, currentLogicalOwner, cancellationToken);
         }
 
         string stagingPath = installPath + ".staging-" + Guid.NewGuid().ToString("N");
@@ -653,16 +580,13 @@ internal sealed class WorkloadInstaller(
 
             WorkloadMetadata metadata = _metadataReader.Read(stagingPath);
             EnsureMetadataMatchesInspection(package.Metadata, metadata, packageId);
-            EnsureHostExecutableBit(stagingPath, packageId);
+            EnsureHostExecutableBit(stagingPath, packageId, metadata.RuntimeIdentifier);
             WorkloadEntry incoming = CreateEntry(package, source, ownership, logicalPackage);
             WorkloadEntry entry = existing is null
                 ? incoming
                 : MergeForReinstall(existing, incoming, ownership);
 
-            if (Directory.Exists(installPath))
-            {
-                TryDeleteDirectory(installPath);
-            }
+            DeleteInstallDirectory(installPath);
 
             MoveDirectory(stagingPath, installPath);
             movedToFinal = true;
@@ -728,24 +652,51 @@ internal sealed class WorkloadInstaller(
         string packageId,
         string version,
         string runtimeIdentifier,
-        string source,
         WorkloadOwnershipKind ownership,
         LogicalPackage logicalPackage,
         CancellationToken cancellationToken)
     {
-        WorkloadEntry? existing = await FindReusableImplementationAsync(
-            packageId,
-            version,
-            runtimeIdentifier,
-            source,
-            cancellationToken);
+        IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
+        WorkloadEntry? existing = FindReusableImplementation(installed, packageId, version, runtimeIdentifier);
         if (existing is null)
         {
             return null;
         }
 
-        bool alreadyOwned = HasOwnership(existing, ownership);
-        if (alreadyOwned)
+        WorkloadEntry? currentLogicalOwner = ResolveCurrentLogicalOwner(installed, ownership, logicalPackage);
+        return await AttachOwnershipAsync(existing, ownership, logicalPackage, currentLogicalOwner, cancellationToken);
+    }
+
+    /// <summary>
+    /// Attaches the requested ownership to an already-installed payload, moving an existing logical
+    /// owner off its previous physical package when the pointer now resolves elsewhere.
+    /// </summary>
+    private async Task<WorkloadInstallResult> AttachOwnershipAsync(
+        WorkloadEntry existing,
+        WorkloadOwnershipKind ownership,
+        LogicalPackage? logicalPackage,
+        WorkloadEntry? currentLogicalOwner,
+        CancellationToken cancellationToken)
+    {
+        if (LogicalOwnerMoves(currentLogicalOwner, existing.PackageId, existing.PackageVersion))
+        {
+            WorkloadEntry incoming = CopyForOwnership(existing, WorkloadOwnershipKind.Logical, logicalPackage);
+            WorkloadOwnershipMoveResult moved = await _store.MoveLogicalOwnershipAsync(
+                currentLogicalOwner!.PackageId,
+                currentLogicalOwner.PackageVersion,
+                incoming,
+                cancellationToken);
+            if (moved.PreviousEntryRemoved)
+            {
+                TryDeleteDirectory(_paths.GetInstallDirectory(
+                    currentLogicalOwner.PackageId,
+                    currentLogicalOwner.PackageVersion));
+            }
+
+            return new WorkloadInstallResult(moved.Entry, false);
+        }
+
+        if (HasOwnership(existing, ownership))
         {
             return new WorkloadInstallResult(existing, true);
         }
@@ -757,19 +708,47 @@ internal sealed class WorkloadInstaller(
         return new WorkloadInstallResult(attached, false);
     }
 
-    private async Task<WorkloadEntry?> FindReusableImplementationAsync(
+    /// <summary>
+    /// Finds the physical package that currently owns the given logical pointer, if any.
+    /// </summary>
+    private static WorkloadEntry? ResolveCurrentLogicalOwner(
+        IReadOnlyList<WorkloadEntry> installed,
+        WorkloadOwnershipKind ownership,
+        LogicalPackage? logicalPackage)
+    {
+        if (ownership != WorkloadOwnershipKind.Logical || logicalPackage is null)
+        {
+            return null;
+        }
+
+        WorkloadEntry[] logicalOwners = [.. installed.Where(e =>
+            e.LogicalPackage is not null
+            && string.Equals(e.LogicalPackage.PackageId, logicalPackage.PackageId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(e.LogicalPackage.PackageVersion, logicalPackage.PackageVersion, StringComparison.Ordinal))];
+        if (logicalOwners.Length > 1)
+        {
+            throw new InvalidOperationException(
+                $"Logical workload '{logicalPackage.PackageId}' version '{logicalPackage.PackageVersion}' is attached to multiple physical packages.");
+        }
+
+        return logicalOwners.FirstOrDefault();
+    }
+
+    private static bool LogicalOwnerMoves(WorkloadEntry? currentLogicalOwner, string packageId, string version)
+        => currentLogicalOwner is not null
+            && (!string.Equals(currentLogicalOwner.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(currentLogicalOwner.PackageVersion, version, StringComparison.Ordinal));
+
+    private WorkloadEntry? FindReusableImplementation(
+        IReadOnlyList<WorkloadEntry> installed,
         string packageId,
         string version,
-        string runtimeIdentifier,
-        string source,
-        CancellationToken cancellationToken)
+        string runtimeIdentifier)
     {
-        IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         WorkloadEntry? existing = installed.FirstOrDefault(e =>
             string.Equals(e.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(e.PackageVersion, version, StringComparison.Ordinal)
-            && string.Equals(e.RuntimeIdentifier, runtimeIdentifier, StringComparison.Ordinal)
-            && SourcesMatch(e.Source, source));
+            && string.Equals(e.RuntimeIdentifier, runtimeIdentifier, StringComparison.Ordinal));
         if (existing is null)
         {
             return null;
@@ -812,7 +791,7 @@ internal sealed class WorkloadInstaller(
         try
         {
             Directory.CreateDirectory(inspectionDirectory);
-            await ExtractPackageAsync(reader, inspectionDirectory, cancellationToken);
+            await ExtractMetadataOnlyAsync(reader, inspectionDirectory, cancellationToken);
             WorkloadMetadata metadata = _metadataReader.Read(inspectionDirectory);
             IReadOnlyList<string> files = [.. await reader.GetFilesAsync(cancellationToken)];
             PackageRole role = ValidatePackage(identity, metadata, files);
@@ -997,17 +976,21 @@ internal sealed class WorkloadInstaller(
         string runtimeIdentifier)
     {
         string directory = Path.GetDirectoryName(pointerPath)!;
-        foreach (string candidate in Directory.EnumerateFiles(directory, "*.nupkg", SearchOption.TopDirectoryOnly))
+        string expectedFileName = $"{packageId}.{version}.nupkg";
+
+        // Probe the conventional file name first so an unrelated or corrupt sibling neither slows the
+        // lookup down nor aborts the install.
+        IOrderedEnumerable<string> candidates = Directory
+            .EnumerateFiles(directory, "*.nupkg", SearchOption.TopDirectoryOnly)
+            .OrderByDescending(c => string.Equals(Path.GetFileName(c), expectedFileName, StringComparison.OrdinalIgnoreCase));
+        foreach (string candidate in candidates)
         {
             if (string.Equals(candidate, pointerPath, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            using PackageArchiveReader reader = OpenPackage(candidate);
-            NuspecReader nuspec = reader.NuspecReader;
-            if (string.Equals(nuspec.GetId(), packageId, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(nuspec.GetVersion().ToNormalizedString(), version, StringComparison.Ordinal))
+            if (MatchesPackageIdentity(candidate, packageId, version))
             {
                 return candidate;
             }
@@ -1016,6 +999,22 @@ internal sealed class WorkloadInstaller(
         throw new FileNotFoundException(
             $"Local RID pointer '{Path.GetFileName(pointerPath)}' requires implementation '{packageId}' {version} for RID " +
             $"'{runtimeIdentifier}' in directory '{directory}'. No configured feed was searched.");
+    }
+
+    private static bool MatchesPackageIdentity(string packagePath, string packageId, string version)
+    {
+        try
+        {
+            using PackageArchiveReader reader = OpenPackage(packagePath);
+            NuspecReader nuspec = reader.NuspecReader;
+            return string.Equals(nuspec.GetId(), packageId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(nuspec.GetVersion().ToNormalizedString(), version, StringComparison.Ordinal);
+        }
+        catch (Exception ex) when (ex is InvalidWorkloadException or IOException or UnauthorizedAccessException)
+        {
+            // An unreadable sibling cannot be the implementation we need; keep probing the directory.
+            return false;
+        }
     }
 
     private async Task<string> ResolveAliasOrIdAsync(
@@ -1330,9 +1329,6 @@ internal sealed class WorkloadInstaller(
         return Uri.TryCreate(source, UriKind.Absolute, out Uri? uri) && uri.IsFile;
     }
 
-    private static bool SourcesMatch(string left, string right)
-        => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
-
     private static IReadOnlyList<CatalogSearchResult> FilterByAlias(
         IReadOnlyList<CatalogSearchResult> hits,
         string alias)
@@ -1356,15 +1352,32 @@ internal sealed class WorkloadInstaller(
         }
     }
 
-    private static async Task ExtractPackageAsync(
+    private static Task ExtractPackageAsync(
         PackageArchiveReader reader,
         string destination,
+        CancellationToken cancellationToken)
+        => ExtractPackageFilesAsync(reader, destination, IsInstallablePackageFile, cancellationToken);
+
+    /// <summary>
+    /// Extracts only the workload manifest. Inspection happens before staging, so pulling the payload
+    /// out here would extract every package twice.
+    /// </summary>
+    private static Task ExtractMetadataOnlyAsync(
+        PackageArchiveReader reader,
+        string destination,
+        CancellationToken cancellationToken)
+        => ExtractPackageFilesAsync(reader, destination, IsMetadataFile, cancellationToken);
+
+    private static async Task ExtractPackageFilesAsync(
+        PackageArchiveReader reader,
+        string destination,
+        Func<string, bool> include,
         CancellationToken cancellationToken)
     {
         foreach (string packageFile in await reader.GetFilesAsync(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!IsInstallablePackageFile(packageFile))
+            if (!include(packageFile))
             {
                 continue;
             }
@@ -1379,12 +1392,14 @@ internal sealed class WorkloadInstaller(
         }
     }
 
-    private static bool IsInstallablePackageFile(string packageFile)
+    private static bool IsMetadataFile(string packageFile)
         => string.Equals(
             packageFile,
             WorkloadMetadataReader.MetadataFileName,
-            StringComparison.OrdinalIgnoreCase)
-            || IsPayloadFile(packageFile);
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsInstallablePackageFile(string packageFile)
+        => IsMetadataFile(packageFile) || IsPayloadFile(packageFile);
 
     private static bool IsPayloadFile(string packageFile)
         => packageFile.StartsWith("tools/", StringComparison.OrdinalIgnoreCase);
@@ -1417,7 +1432,7 @@ internal sealed class WorkloadInstaller(
         return values;
     }
 
-    private static void EnsureHostExecutableBit(string installPath, string packageId)
+    private static void EnsureHostExecutableBit(string installPath, string packageId, string? runtimeIdentifier)
     {
         if (OperatingSystem.IsWindows()
             || !packageId.StartsWith(HostWorkloadPackage.PackageIdPrefix, StringComparison.OrdinalIgnoreCase))
@@ -1426,9 +1441,7 @@ internal sealed class WorkloadInstaller(
         }
 
         string hostBinary = Path.Combine(
-            installPath,
-            "tools",
-            "any",
+            WorkloadPackageLayout.GetContentRoot(installPath, runtimeIdentifier),
             HostProcessStartInfoFactory.ExecutableBaseName);
         if (!File.Exists(hostBinary))
         {
@@ -1468,6 +1481,26 @@ internal sealed class WorkloadInstaller(
         catch
         {
             // Best-effort cleanup leaves registry ownership intact.
+        }
+    }
+
+    /// <summary>
+    /// Removes an install directory before a staged payload replaces it. Unlike best-effort cleanup this
+    /// must succeed: a partial delete would let the move merge the new payload into stale files.
+    /// </summary>
+    private static void DeleteInstallDirectory(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            return;
+        }
+
+        Directory.Delete(path, recursive: true);
+
+        // Windows can report a successful delete while the directory lingers until the last handle closes.
+        if (Directory.Exists(path))
+        {
+            throw new IOException($"Failed to remove the existing install directory '{path}'.");
         }
     }
 

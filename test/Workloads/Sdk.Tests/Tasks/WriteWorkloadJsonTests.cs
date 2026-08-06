@@ -207,8 +207,19 @@ public sealed class WriteWorkloadJsonTests : IDisposable
         task.InnerPackages =
         [
             CreateTaskItem("My.Package.win-x64", "win-x64"),
-            CreateTaskItem("My.Package.WIN-X64", "WIN-X64"),
+            CreateTaskItem("My.Package.win-x64", "win-x64"),
         ];
+
+        Assert.False(task.Execute());
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public void Execute_PointerWithNonLowercaseRuntimeIdentifier_Fails()
+    {
+        string outputPath = Path.Combine(_tempDir, "workload.json");
+        WriteWorkloadJson task = CreateTask(outputPath, kind: "rid-pointer");
+        task.InnerPackages = [CreateTaskItem("My.Package.WIN-X64", "WIN-X64")];
 
         Assert.False(task.Execute());
         Assert.False(File.Exists(outputPath));

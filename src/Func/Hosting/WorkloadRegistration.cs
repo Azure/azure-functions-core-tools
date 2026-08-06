@@ -203,7 +203,7 @@ internal static class WorkloadRegistration
                     e.PackageVersion,
                     e.Aliases,
                     installDirectory,
-                    Path.GetFullPath(Path.Combine(installDirectory, "tools", "any")),
+                    WorkloadPackageLayout.GetContentRoot(installDirectory, e.RuntimeIdentifier),
                     GetDisplayName(e),
                     e.Description ?? string.Empty);
             })];

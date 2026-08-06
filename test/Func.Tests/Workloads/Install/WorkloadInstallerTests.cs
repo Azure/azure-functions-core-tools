@@ -702,10 +702,8 @@ public sealed class WorkloadInstallerTests : IDisposable
     [Fact]
     public async Task InstallFromCatalog_LegacyRidAliasesRemainAmbiguous()
     {
-        // When an alias spans multiple per-RID packs (host, python worker),
-        // the resolver should pick the variant tagged with the current
-        // runtime identifier instead of throwing ambiguity.
-        string currentRid = WorkloadRuntimeIdentifier.Current.ToLowerInvariant();
+        // Legacy per-RID packs carry no pointer package, so an alias spanning several
+        // of them stays ambiguous: the current runtime identifier no longer disambiguates.
         var source = new PackageSource("https://example/v3/index.json", "test");
 
         _catalog.SearchAsync(
@@ -728,17 +726,11 @@ public sealed class WorkloadInstallerTests : IDisposable
     [Fact]
     public async Task InstallFromCatalog_LegacyRidAliasesDoNotUseCurrentRidFallback()
     {
-        // If the alias only matches per-RID packs and none of them target the
-        // current runtime (e.g. python on win-arm64), surface a clear "no
-        // package for this RID" message listing what is published instead of
-        // a generic "package not found" or alias ambiguity error.
+        // Legacy per-RID packs are ambiguous regardless of the host runtime identifier:
+        // there is no current-RID fallback to silently pick a winner.
+        const string ridA = "fake-rid-a";
+        const string ridB = "fake-rid-b";
         var source = new PackageSource("https://example/v3/index.json", "test");
-
-        // Use two RIDs that definitely aren't the current host so we exercise
-        // the "no pack for current RID" branch on every test environment.
-        string currentRid = WorkloadRuntimeIdentifier.Current.ToLowerInvariant();
-        string ridA = currentRid == "fake-rid-a" ? "fake-rid-c" : "fake-rid-a";
-        string ridB = currentRid == "fake-rid-b" ? "fake-rid-d" : "fake-rid-b";
 
         _catalog.SearchAsync(
                 Arg.Is<CatalogSearchQuery>(q => q.Filter == "python-worker"),
@@ -764,8 +756,7 @@ public sealed class WorkloadInstallerTests : IDisposable
     public async Task InstallFromCatalog_AliasResolution_StillAmbiguous_WhenMatchesLackRidTag()
     {
         // Two unrelated packages declaring the same alias without any `rid:`
-        // tag must still throw ambiguity. RID disambiguation only kicks in
-        // when every match is RID-tagged.
+        // tag must throw ambiguity, the same as RID-tagged matches.
         var source = new PackageSource("https://example/v3/index.json", "test");
 
         _catalog.SearchAsync(
@@ -909,6 +900,141 @@ public sealed class WorkloadInstallerTests : IDisposable
     }
 
     [Fact]
+    public async Task InstallFromCatalog_PointerReusingInstalledImplementation_MovesLogicalOwnershipOffOtherRid()
+    {
+        const string pointerId = "example.workload";
+        const string implementationId = "example.workload.win-x64";
+        const string otherImplementationId = "example.workload.linux-x64";
+        const string version = "2.3.4";
+        string pointerPath = BuildPointerNupkg(
+            pointerId,
+            version,
+            """{ "win-x64": "example.workload.win-x64" }""");
+        var source = new PackageSource("https://example.test/v3/index.json", "pointer-source");
+        var pointerResolved = new ResolvedPackage(pointerId, NuGetVersion.Parse(version), source);
+
+        // The current-RID implementation is already on disk, so the installer takes the reuse fast
+        // path while the pointer is still attached to a different RID's payload.
+        InstallImplementationOnDisk(implementationId, version, "win-x64");
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = implementationId,
+                PackageVersion = version,
+                RuntimeIdentifier = "win-x64",
+                Source = source.Source,
+                IsExplicitlyInstalled = true,
+            },
+            new WorkloadEntry
+            {
+                PackageId = otherImplementationId,
+                PackageVersion = version,
+                RuntimeIdentifier = "linux-x64",
+                Source = source.Source,
+                IsExplicitlyInstalled = false,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = pointerId,
+                    PackageVersion = version,
+                    Source = source.Source,
+                },
+            },
+        ]);
+        _catalog.ResolveLatestVersionAsync(
+                pointerId,
+                Arg.Any<bool>(),
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<bool>(),
+                Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(pointerResolved);
+        _catalog.DownloadAsync(pointerResolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(pointerPath));
+
+        WorkloadInstaller installer = NewInstaller(metadataReader: new WorkloadMetadataReader());
+        WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
+            pointerId,
+            version: null,
+            source: null,
+            includePrerelease: false,
+            exact: true,
+            force: false);
+
+        result.Entry.PackageId.Should().Be(implementationId);
+        await _store.Received(1).MoveLogicalOwnershipAsync(
+            otherImplementationId,
+            version,
+            Arg.Is<WorkloadEntry>(entry =>
+                entry.PackageId == implementationId
+                && entry.LogicalPackage!.PackageId == pointerId),
+            Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().AddOwnershipAsync(
+            Arg.Any<WorkloadEntry>(),
+            WorkloadOwnershipKind.Logical,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallFromCatalog_PointerReusesPayloadInstalledFromAnotherSource()
+    {
+        const string pointerId = "example.workload";
+        const string implementationId = "example.workload.win-x64";
+        const string version = "2.3.4";
+        string pointerPath = BuildPointerNupkg(
+            pointerId,
+            version,
+            """{ "win-x64": "example.workload.win-x64" }""");
+        var pointerSource = new PackageSource("https://pointer.test/v3/index.json", "pointer-source");
+        var pointerResolved = new ResolvedPackage(pointerId, NuGetVersion.Parse(version), pointerSource);
+
+        // Installed identity is id + version, as with the NuGet global packages folder, so a payload
+        // installed from a different feed is reused rather than rejected.
+        InstallImplementationOnDisk(implementationId, version, "win-x64");
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = implementationId,
+                PackageVersion = version,
+                RuntimeIdentifier = "win-x64",
+                Source = "https://other.test/v3/index.json",
+                IsExplicitlyInstalled = true,
+            },
+        ]);
+        _catalog.ResolveLatestVersionAsync(
+                pointerId,
+                Arg.Any<bool>(),
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<bool>(),
+                Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(pointerResolved);
+        _catalog.DownloadAsync(pointerResolved, Arg.Any<CancellationToken>())
+            .Returns(_ => File.OpenRead(pointerPath));
+
+        WorkloadInstaller installer = NewInstaller(metadataReader: new WorkloadMetadataReader());
+        WorkloadInstallResult result = await installer.InstallFromCatalogAsync(
+            pointerId,
+            version: null,
+            source: null,
+            includePrerelease: false,
+            exact: true,
+            force: false);
+
+        result.Entry.PackageId.Should().Be(implementationId);
+        await _store.Received(1).AddOwnershipAsync(
+            Arg.Is<WorkloadEntry>(entry => entry.LogicalPackage!.PackageId == pointerId),
+            WorkloadOwnershipKind.Logical,
+            Arg.Any<CancellationToken>());
+        await _catalog.DidNotReceive().ResolveVersionAsync(
+            Arg.Any<string>(),
+            Arg.Any<NuGetVersion>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task InstallFromCatalog_PointerWithoutCurrentRidListsSupportedRids()
     {
         string pointerPath = BuildPointerNupkg(
@@ -990,10 +1116,8 @@ public sealed class WorkloadInstallerTests : IDisposable
         Assert.Contains(resolved.Source.Source, ex.Message);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task InstallFromCatalog_ImplementationFromDifferentSourceOrForced_IsNotReused(bool force)
+    [Fact]
+    public async Task InstallFromCatalog_ForcedInstall_DoesNotReuseInstalledImplementation()
     {
         const string pointerId = "example.workload";
         const string implementationId = "example.workload.win-x64";
@@ -1023,7 +1147,7 @@ public sealed class WorkloadInstallerTests : IDisposable
                 PackageVersion = version,
                 Kind = WorkloadKind.Content,
                 RuntimeIdentifier = "win-x64",
-                Source = "https://different.test/v3/index.json",
+                Source = pointerSource.Source,
                 IsExplicitlyInstalled = true,
             },
         ]);
@@ -1052,7 +1176,7 @@ public sealed class WorkloadInstallerTests : IDisposable
                 source: null,
                 includePrerelease: false,
                 exact: true,
-                force));
+                force: true));
 
         await _catalog.Received(1).ResolveVersionAsync(
             implementationId,
@@ -1151,48 +1275,6 @@ public sealed class WorkloadInstallerTests : IDisposable
                 Source = source.Source,
             },
         };
-    }
-
-    [Fact]
-    public async Task UpdateAsync_DoesNotReplaceDestinationInstalledFromDifferentSource()
-    {
-        WorkloadEntry current = ExistingEntry("test.workload", "1.0.0");
-        WorkloadEntry destination = new()
-        {
-            PackageId = "test.workload",
-            PackageVersion = "2.0.0",
-            Source = "https://different.test/v3/index.json",
-            IsExplicitlyInstalled = false,
-            LogicalPackage = new LogicalPackage
-            {
-                PackageId = "test.pointer",
-                PackageVersion = "2.0.0",
-            },
-        };
-        ResolvedPackage resolved = NewResolved("test.workload", "2.0.0");
-        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([current, destination]);
-        _catalog.ResolveLatestVersionAsync(
-                "test.workload",
-                false,
-                Arg.Any<NuGetVersion?>(),
-                false,
-                null,
-                Arg.Any<CancellationToken>())
-            .Returns(resolved);
-
-        WorkloadInstaller installer = NewInstaller();
-        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => installer.UpdateAsync("test.workload", null, null, false, allowMajor: false));
-
-        Assert.Contains("different source", exception.Message);
-        await _catalog.DidNotReceive().DownloadAsync(
-            Arg.Any<ResolvedPackage>(),
-            Arg.Any<CancellationToken>());
-        await _store.DidNotReceive().MoveExplicitOwnershipAsync(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<WorkloadEntry>(),
-            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -1309,7 +1391,7 @@ public sealed class WorkloadInstallerTests : IDisposable
     }
 
     [Fact]
-    public async Task InstallFromPackage_LocalPointer_DoesNotReusePhysicalPackageFromDifferentSource()
+    public async Task InstallFromPackage_LocalPointer_ReusesPhysicalPackageFromDifferentSource()
     {
         const string pointerId = "example.workload";
         const string implementationId = "example.workload.win-x64";
@@ -1319,6 +1401,7 @@ public sealed class WorkloadInstallerTests : IDisposable
             version,
             """{ "win-x64": "example.workload.win-x64" }""");
         _ = BuildRidImplementationNupkg(implementationId, version, "win-x64");
+        InstallImplementationOnDisk(implementationId, version, "win-x64");
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
         [
             new WorkloadEntry
@@ -1332,16 +1415,12 @@ public sealed class WorkloadInstallerTests : IDisposable
         ]);
 
         WorkloadInstaller installer = NewInstaller(metadataReader: new WorkloadMetadataReader());
-        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => installer.InstallFromPackageAsync(pointerPath));
+        WorkloadInstallResult result = await installer.InstallFromPackageAsync(pointerPath);
 
-        Assert.Contains("different source", exception.Message);
-        await _store.DidNotReceive().AddOwnershipAsync(
-            Arg.Any<WorkloadEntry>(),
-            Arg.Any<WorkloadOwnershipKind>(),
-            Arg.Any<CancellationToken>());
-        await _store.DidNotReceive().SaveWorkloadAsync(
-            Arg.Any<WorkloadEntry>(),
+        Assert.Equal(implementationId, result.Entry.PackageId);
+        await _store.Received(1).AddOwnershipAsync(
+            Arg.Is<WorkloadEntry>(entry => entry.LogicalPackage!.PackageId == pointerId),
+            WorkloadOwnershipKind.Logical,
             Arg.Any<CancellationToken>());
     }
 
@@ -1585,6 +1664,21 @@ public sealed class WorkloadInstallerTests : IDisposable
             tags: $"kind:content rid:{runtimeIdentifier}",
             packageType: packageType,
             extraFiles: [(WriteTempFile("workload.json", manifest), "workload.json")]);
+    }
+
+    private void InstallImplementationOnDisk(string packageId, string version, string runtimeIdentifier)
+    {
+        string installDirectory = _paths.GetInstallDirectory(packageId, version);
+        Directory.CreateDirectory(installDirectory);
+        File.WriteAllText(
+            Path.Combine(installDirectory, "workload.json"),
+            $$"""
+            {
+              "$schema": "{{WorkloadManifestSchema.PackageManifestV1Schema}}",
+              "kind": "content",
+              "runtimeIdentifier": "{{runtimeIdentifier}}"
+            }
+            """);
     }
 
     private string WriteTempFile(string name, string contents)

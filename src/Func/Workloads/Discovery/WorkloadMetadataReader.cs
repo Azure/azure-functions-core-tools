@@ -172,16 +172,16 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
         HashSet<string> runtimeIdentifiers = new(StringComparer.OrdinalIgnoreCase);
         foreach ((string runtimeIdentifier, string packageId) in metadata.Packages)
         {
-            if (!runtimeIdentifiers.Add(runtimeIdentifier))
-            {
-                throw new InvalidWorkloadException(
-                    $"'{metadataPath}' defines runtime identifier '{runtimeIdentifier}' more than once.");
-            }
-
             if (!IsNormalizedRuntimeIdentifier(runtimeIdentifier))
             {
                 throw new InvalidWorkloadException(
                     $"'{metadataPath}' has invalid packages key '{runtimeIdentifier}'. Runtime identifiers must be lowercase.");
+            }
+
+            if (!runtimeIdentifiers.Add(runtimeIdentifier))
+            {
+                throw new InvalidWorkloadException(
+                    $"'{metadataPath}' defines runtime identifier '{runtimeIdentifier}' more than once.");
             }
 
             if (string.IsNullOrWhiteSpace(packageId))

@@ -252,7 +252,7 @@ public class WorkloadInstallCommandTests
     }
 
     [Fact]
-    public async Task Install_BrokenInstall_AppendsForceHint()
+    public async Task Install_BrokenInstall_SurfacesInstallerMessageAsUserError()
     {
         _installer.InstallFromCatalogAsync(
                 Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
@@ -263,7 +263,6 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload")).Should().ThrowAsync<GracefulException>()).Which;
         ex.Message.Should().Contain("missing from the registry");
-        ex.Message.Should().Contain("--force");
         ex.IsUserError.Should().BeTrue();
     }
 

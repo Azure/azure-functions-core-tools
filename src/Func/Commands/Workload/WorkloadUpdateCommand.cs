@@ -299,6 +299,15 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             return;
         }
 
+        // A RID pivot can land on the same version, where "from X to X" would read as a no-op.
+        if (string.Equals(result.PreviousVersion, version, StringComparison.Ordinal)
+            && !string.IsNullOrEmpty(result.Entry.RuntimeIdentifier))
+        {
+            _interaction.WriteSuccess(
+                $"Updated workload '{display}' to runtime identifier '{result.Entry.RuntimeIdentifier}' (version {version} unchanged).");
+            return;
+        }
+
         _interaction.WriteSuccess(
             $"Updated workload '{display}' from {result.PreviousVersion} to {version}.");
     }
@@ -350,8 +359,13 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             }
         }
 
+        // A physical package owned by a pointer is updated through that pointer. Adding it again as an
+        // explicit target would re-resolve and replace the payload the logical update just staged.
+        HashSet<string> logicallyOwned = new(
+            installed.Where(e => e.LogicalPackage is not null).Select(e => e.PackageId),
+            StringComparer.OrdinalIgnoreCase);
         HashSet<string> explicitIds = new(StringComparer.OrdinalIgnoreCase);
-        foreach (WorkloadEntry entry in installed.Where(e => e.IsExplicitlyInstalled))
+        foreach (WorkloadEntry entry in installed.Where(e => e.IsExplicitlyInstalled && !logicallyOwned.Contains(e.PackageId)))
         {
             if (explicitIds.Add(entry.PackageId))
             {
@@ -363,5 +377,4 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
     }
 
     private sealed record UpdateTarget(string PackageId, WorkloadOwnershipKind Ownership);
-
 }

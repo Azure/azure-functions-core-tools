@@ -167,9 +167,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         }
         catch (InvalidOperationException ex)
         {
-            throw new GracefulException(
-                $"{ex.Message} Pass --force to repair the install.",
-                isUserError: true);
+            throw new GracefulException(ex.Message, isUserError: true);
         }
     }
 

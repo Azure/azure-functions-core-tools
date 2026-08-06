@@ -227,6 +227,57 @@ public class WorkloadStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task GetWorkloadsAsync_ExplicitFalseIsPreserved()
+    {
+        Directory.CreateDirectory(_tempHome);
+        await File.WriteAllTextAsync(
+            _paths.WorkloadRegistryPath,
+            $$"""
+            {
+              "$schema": "{{WorkloadManifestSchema.RegistryV1Schema}}",
+              "workloads": [
+                {
+                  "packageId": "pkg.win-x64",
+                  "packageVersion": "1.0.0",
+                  "runtimeIdentifier": "win-x64",
+                  "isExplicitlyInstalled": false,
+                  "logicalPackage": {
+                    "packageId": "pkg",
+                    "packageVersion": "1.0.0"
+                  },
+                  "installRefCount": 1
+                }
+              ],
+              "metas": []
+            }
+            """);
+
+        WorkloadEntry entry = Assert.Single(await _store.GetWorkloadsAsync());
+
+        Assert.False(entry.IsExplicitlyInstalled);
+        Assert.NotNull(entry.LogicalPackage);
+    }
+
+    [Fact]
+    public async Task AddOwnershipAsync_ThrowsWhenRowAlreadyHasDifferentLogicalOwner()
+    {
+        await _store.SaveWorkloadAsync(NewPointerEntry("pkg.win-x64", "1.0.0"));
+        WorkloadEntry conflicting = new()
+        {
+            PackageId = "pkg.win-x64",
+            PackageVersion = "1.0.0",
+            Kind = WorkloadKind.Content,
+            RuntimeIdentifier = "win-x64",
+            IsExplicitlyInstalled = false,
+            LogicalPackage = new LogicalPackage { PackageId = "other.pkg", PackageVersion = "1.0.0" },
+            InstallRefCount = 1,
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _store.AddOwnershipAsync(conflicting, WorkloadOwnershipKind.Logical));
+    }
+
+    [Fact]
     public async Task AddOwnershipAsync_AttachesLogicalOwnershipIdempotently()
     {
         await _store.SaveWorkloadAsync(NewEntry("pkg.win-x64", "1.0.0"));

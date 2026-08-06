@@ -137,6 +137,7 @@ Set `RuntimeIdentifiers` when a workload's payload differs by platform. The Work
 - The pointer keeps the project package ID, uses package type `FuncCliWorkload`, and contains a `kind: rid-pointer` manifest whose `packages` map selects the implementation for each RID.
 - Each implementation uses the package ID `<pointer-package-id>.<rid>`, package type `FuncCliWorkloadRidPackage`, and retains the authored `workload` or `content` kind.
 - The SDK writes `runtimeIdentifier` into every implementation manifest and adds the matching `rid:<rid>` package tag. Do not author either value independently.
+- Implementation payloads ship under `tools/<rid>/` rather than `tools/any/`; the CLI derives the content root from the manifest's `runtimeIdentifier`.
 - Publish the pointer and every implementation at the same exact version and to the same feed. The CLI resolves only the mapped package ID at the pointer's exact version from the source that supplied the pointer.
 
 Users install, update, uninstall, and list the pointer identity. The CLI records the selected physical implementation and RID as ownership details; `func workload list --json` exposes both logical and physical package IDs.

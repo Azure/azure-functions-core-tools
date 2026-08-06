@@ -221,7 +221,7 @@ public class WorkloadMetadataReaderTests : IDisposable
     }
 
     [Fact]
-    public void Read_Throws_WhenRidPointerHasCaseInsensitiveDuplicateRuntimeIdentifiers()
+    public void Read_Throws_WhenRidPointerHasNonLowercaseRuntimeIdentifier()
     {
         WriteMetadata(
             $$"""
@@ -237,7 +237,7 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         InvalidWorkloadException ex = Assert.Throws<InvalidWorkloadException>(() => _reader.Read(_tempDir));
 
-        Assert.Contains("more than once", ex.Message);
+        Assert.Contains("must be lowercase", ex.Message);
     }
 
     [Fact]

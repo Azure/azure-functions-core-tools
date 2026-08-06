@@ -105,7 +105,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
             entry.PackageVersion,
             entry.Aliases,
             installDirectory,
-            Path.GetFullPath(Path.Combine(installDirectory, "tools", "any")),
+            WorkloadPackageLayout.GetContentRoot(installDirectory, entry.RuntimeIdentifier),
             string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.PackageId : entry.DisplayName,
             entry.Description ?? string.Empty);
     }

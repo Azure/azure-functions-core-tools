@@ -273,9 +273,8 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
     private static WorkloadEntry NormalizeNewEntry(WorkloadEntry entry, WorkloadOwnershipKind ownership)
     {
         bool explicitOwner = ownership == WorkloadOwnershipKind.Explicit || entry.IsExplicitlyInstalled;
-        LogicalPackage? logicalPackage = ownership == WorkloadOwnershipKind.Logical ? entry.LogicalPackage : entry.LogicalPackage;
-        int ownerCount = (explicitOwner ? 1 : 0) + (logicalPackage is null ? 0 : 1);
-        return CopyWithOwnership(entry, explicitOwner, logicalPackage, Math.Max(ownerCount, entry.InstallRefCount));
+        int ownerCount = (explicitOwner ? 1 : 0) + (entry.LogicalPackage is null ? 0 : 1);
+        return CopyWithOwnership(entry, explicitOwner, entry.LogicalPackage, Math.Max(ownerCount, entry.InstallRefCount));
     }
 
     private static WorkloadEntry MergeOwnership(WorkloadEntry current, WorkloadEntry incoming, WorkloadOwnershipKind ownership)
@@ -291,8 +290,10 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
                 $"'{current.LogicalPackage.PackageId}' version '{current.LogicalPackage.PackageVersion}'.");
         }
 
+        // Payload metadata comes from the incoming entry: the caller may have just replaced the payload
+        // on disk, and a legacy row would otherwise keep stale values such as a missing runtime identifier.
         return CopyWithOwnership(
-            current,
+            incoming,
             current.IsExplicitlyInstalled || ownership == WorkloadOwnershipKind.Explicit,
             current.LogicalPackage ?? incoming.LogicalPackage,
             current.InstallRefCount + (attachExplicit ? 1 : 0) + (attachLogical ? 1 : 0));
