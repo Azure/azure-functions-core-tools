@@ -47,7 +47,8 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             && workerId is not null)
         {
             // Block auto-install if neither the stack name nor the workload id match any supported runtime.
-            ValidateSupportedRuntime(context, project.StackName, workerId.Value, project.StackDisplayName);
+            // workerId.Value is the workload identifier (e.g. "python", "dotnet") which may differ from WorkerRuntime.
+            ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: workerId.Value, project.StackDisplayName);
             result = await TryInstallAndResolveWorkerAsync(context, workerId, workerVersionRanges, notResolved.Failure, cancellationToken);
         }
 
@@ -57,7 +58,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             throw CreateWorkerResolutionException(failedResult.Failure, context);
         }
 
-        ValidateSupportedRuntime(context, project.StackName, resolved.Worker.WorkerRuntime, project.StackDisplayName);
+        ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: resolved.Worker.WorkerRuntime, project.StackDisplayName);
         context.State.Worker = resolved.Worker;
 
         string completionMessage = string.IsNullOrWhiteSpace(resolved.Worker.Version)
@@ -205,14 +206,14 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
 
     /// <summary>
     /// Checks whether the profile supports the runtime by matching against both the stack name
-    /// and the worker runtime name. Some stacks differ between the two (e.g. Go stack = "go"
-    /// but worker runtime = "native"; DotNet stack = "dotnet" but worker runtime = "dotnet-isolated").
-    /// A match on either is sufficient.
+    /// and the runtime identifier (workload id or worker runtime name). Some stacks differ between
+    /// the two (e.g. Go stack = "go" but worker runtime = "native"; DotNet stack = "dotnet" but
+    /// worker runtime = "dotnet-isolated"). A match on either is sufficient.
     /// </summary>
     private static void ValidateSupportedRuntime(
         StartInitializationStepContext context,
         string stackName,
-        string workerRuntimeName,
+        string runtimeIdentifier,
         string stackDisplayName)
     {
         if (context.State.ResolvedProfile is not { SupportedRuntimes: { } supportedRuntimes } profile)
@@ -222,7 +223,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
 
         if (supportedRuntimes.Any(runtime =>
             string.Equals(runtime, stackName, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(runtime, workerRuntimeName, StringComparison.OrdinalIgnoreCase)))
+            || string.Equals(runtime, runtimeIdentifier, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }

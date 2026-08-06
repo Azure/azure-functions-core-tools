@@ -28,7 +28,7 @@
         "python",
         "java",
         "powershell",
-        "dotnet",
+        "dotnet-isolated",
         "custom"
       ]
     },
@@ -54,7 +54,7 @@
         "python",
         "java",
         "powershell",
-        "dotnet",
+        "dotnet-isolated",
         "custom"
       ]
     },
@@ -76,7 +76,7 @@
         "node",
         "java",
         "powershell",
-        "dotnet",
+        "dotnet-isolated",
         "custom"
       ]
     },
@@ -98,7 +98,7 @@
         "node",
         "java",
         "powershell",
-        "dotnet",
+        "dotnet-isolated",
         "custom"
       ]
     },
@@ -124,7 +124,7 @@
         "python",
         "java",
         "powershell",
-        "dotnet",
+        "dotnet-isolated",
         "custom"
       ]
     }

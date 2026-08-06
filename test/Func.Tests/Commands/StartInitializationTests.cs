@@ -513,7 +513,7 @@ public class StartInitializationTests : IDisposable
             VersionRange.Parse("[1.8.1, 4.1048.200)"),
             workerRanges,
             ExtensionBundleVersionRange: null,
-            SupportedRuntimes: ["node", "java", "powershell", "dotnet", "custom"],
+            SupportedRuntimes: ["node", "java", "powershell", "dotnet-isolated", "custom"],
             Notes: null);
         HostWorkloadResolution hostResolution = new HostWorkloadResolution.Installed(
             CreateHostWorkload("4.1000.0"),
@@ -534,7 +534,7 @@ public class StartInitializationTests : IDisposable
         GracefulException ex = (await FluentActions.Awaiting(() => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
         ex.Message.Should().Contain("does not support the 'Python' stack");
-        ex.Message.Should().Contain("node, java, powershell, dotnet, custom");
+        ex.Message.Should().Contain("node, java, powershell, dotnet-isolated, custom");
         await workloadInstaller.DidNotReceive().InstallFromCatalogAsync(
             Arg.Any<string>(),
             Arg.Any<NuGetVersion?>(),
@@ -1448,39 +1448,26 @@ public class StartInitializationTests : IDisposable
         }
     }
 
-    private sealed class TestFunctionsProject : FunctionsProject
+    private sealed class TestFunctionsProject(
+        WorkingDirectory workingDirectory,
+        string stackName,
+        string stackDisplayName,
+        bool supportsExtensionBundles,
+        FunctionsWorkerReference? workerReference = null) : FunctionsProject
     {
-        private readonly WorkingDirectory _workingDirectory;
-        private readonly string _stackName;
-        private readonly string _stackDisplayName;
-        private readonly bool _supportsExtensionBundles;
-        private readonly FunctionsWorkerReference _workerReference;
-
-        public TestFunctionsProject(
-            WorkingDirectory workingDirectory,
-            string stackName,
-            string stackDisplayName,
-            bool supportsExtensionBundles,
-            FunctionsWorkerReference? workerReference = null)
-        {
-            _workingDirectory = workingDirectory;
-            _stackName = stackName;
-            _stackDisplayName = stackDisplayName;
-            _supportsExtensionBundles = supportsExtensionBundles;
-            _workerReference = workerReference ?? FunctionsWorkerReference.FromWorkload(stackName);
-        }
+        private readonly FunctionsWorkerReference _workerReference = workerReference ?? FunctionsWorkerReference.FromWorkload(stackName);
 
         public List<FunctionsProjectHostRunContext> PreparedContexts { get; } = [];
 
         public Action<FunctionsProjectHostRunContext>? PrepareAction { get; set; }
 
-        public override WorkingDirectory WorkingDirectory => _workingDirectory;
+        public override WorkingDirectory WorkingDirectory => workingDirectory;
 
-        public override string StackName => _stackName;
+        public override string StackName => stackName;
 
-        public override string StackDisplayName => _stackDisplayName;
+        public override string StackDisplayName => stackDisplayName;
 
-        public override bool SupportsExtensionBundles => _supportsExtensionBundles;
+        public override bool SupportsExtensionBundles => supportsExtensionBundles;
 
         public override FunctionsWorkerReference WorkerReference => _workerReference;
 
