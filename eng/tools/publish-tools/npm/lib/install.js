@@ -88,22 +88,31 @@ https.get(options, response => {
 
     if (response.statusCode === 200) {
         const installPath = getPath();
-        const downloadPath = installPath + '/' + fileName;
+        // Extract to a short temp path first to avoid Windows MAX_PATH (260-char) issues
+        // that arise with deeply nested package manager store paths (e.g. pnpm v11).
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'azure-functions-core-tools-'));
+        const downloadPath = path.join(tmpDir, fileName);
         response.on('data', data => bar.tick(data.length));
-        if (!fs.existsSync(installPath)) {
-            fs.mkdirSync(installPath);
-        }
         const file = fs.createWriteStream(downloadPath);
         response.pipe(file);
         file.on('finish', function() {
             file.close(() => {
                 extract(file.path, {
-                    dir: installPath
+                    dir: tmpDir
                 }).then(() => {
+                    if (!fs.existsSync(installPath)) {
+                        fs.mkdirSync(installPath, { recursive: true });
+                    }
+                    // Move extracted contents from the temp dir to the final install path.
+                    for (const entry of fs.readdirSync(tmpDir)) {
+                        if (entry === fileName) continue;
+                        fs.cpSync(path.join(tmpDir, entry), path.join(installPath, entry), { recursive: true });
+                    }
+                    rimrafSync(tmpDir);
+
                     try {
                         fs.closeSync(fs.openSync(`${installPath}/telemetryDefaultOn.sentinel`, 'w'));
                         console.log(telemetryInfo);
-                        fs.unlinkSync(downloadPath);
                     }
                     catch (err) {
                         // That's alright.
@@ -122,6 +131,7 @@ https.get(options, response => {
                         }
                     }
                 }).catch(err => {
+                    rimrafSync(tmpDir);
                     console.error(chalk.red('Error extracting zip file: ' + err.message));
                     process.exit(1);
                 });
