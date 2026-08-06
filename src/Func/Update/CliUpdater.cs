@@ -29,15 +29,17 @@ internal sealed partial class CliUpdater(
     {
         ArgumentNullException.ThrowIfNull(release);
 
-        string installDir = GetInstallDirectory();
+        string binaryPath = GetBinaryPath();
+        string installDir = Path.GetDirectoryName(binaryPath)!;
+        string backupPath = binaryPath + OldFileSuffix;
 
-        // Stage the extraction on the same volume as the install directory so
-        // Directory.Move / File.Move never crosses volume boundaries.
+        // Stage the download on the same volume as the install directory so
+        // File.Move never crosses volume boundaries.
         string tempWorkDir = _fileSystem.CreateTempDirectory(installDir);
         string archiveExtension = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "zip" : "tar.gz";
         string archivePath = Path.Combine(tempWorkDir, $"func-update.{archiveExtension}");
         string extractDir = _fileSystem.CreateTempDirectory(installDir);
-        List<string> copiedFiles = [];
+        bool swapped = false;
 
         try
         {
@@ -59,20 +61,36 @@ internal sealed partial class CliUpdater(
                     isUserError: true);
             }
 
-            // On Windows a running process holds its own exe and dlls locked,
-            // so we can't move or delete the install directory. Instead, rename
-            // existing files in-place (func.exe → func.exe.old) and copy the
-            // new files into the same directory.
-            copiedFiles = SwapInPlace(installDir, extractDir);
+            string binaryName = Path.GetFileName(binaryPath);
+            string extractedBinary = Path.Combine(extractDir, binaryName);
+
+            if (!_fileSystem.FileExists(extractedBinary))
+            {
+                throw new GracefulException(
+                    $"The downloaded archive for func {release.Version} does not contain '{binaryName}'.",
+                    isUserError: true);
+            }
+
+            // Rename the running binary out of the way, then copy the new one in.
+            // On Windows, renaming a running executable is allowed by the NT kernel.
+            _fileSystem.MoveFile(binaryPath, backupPath, overwrite: true);
+            _fileSystem.CopyFile(extractedBinary, binaryPath);
+            swapped = true;
 
             await VerifyAsync(release, installDir, cancellationToken);
 
-            CleanupOldFiles(installDir);
+            // Best-effort removal of the backup; on Windows the running exe may
+            // still be locked, in which case it gets cleaned up on next launch.
+            TryDeleteFile(backupPath);
             Log.InstalledSuccessfully(_logger, release.Version);
         }
         catch (Exception)
         {
-            TryRollbackInPlace(installDir, copiedFiles);
+            if (swapped)
+            {
+                TryRollback(binaryPath, backupPath);
+            }
+
             throw;
         }
         finally
@@ -82,116 +100,26 @@ internal sealed partial class CliUpdater(
         }
     }
 
-    private List<string> SwapInPlace(string installDir, string extractDir)
+    private void TryRollback(string binaryPath, string backupPath)
     {
-        // Rename every existing file in the install directory to .old
-        IReadOnlyList<string> existingFiles = _fileSystem.GetFiles(installDir);
-        foreach (string file in existingFiles)
-        {
-            // Skip any leftover .old files from a previous failed update
-            if (file.EndsWith(OldFileSuffix, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            string oldPath = file + OldFileSuffix;
-
-            // Use overwrite so stale .old files left behind by a previous update
-            // (e.g. the running exe was locked and couldn't be deleted) don't
-            // block the rename.
-            _fileSystem.MoveFile(file, oldPath, overwrite: true);
-        }
-
-        // Copy all new files from the extract directory into the install directory
-        // and track which files were introduced for rollback purposes.
-        IReadOnlyList<string> newFiles = _fileSystem.GetFiles(extractDir);
-        List<string> copiedFiles = new(newFiles.Count);
-        foreach (string newFile in newFiles)
-        {
-            string relativePath = Path.GetRelativePath(extractDir, newFile);
-            copiedFiles.Add(Path.Combine(installDir, relativePath));
-        }
-
-        _fileSystem.CopyDirectory(extractDir, installDir);
-        return copiedFiles;
-    }
-
-    private void CleanupOldFiles(string installDir)
-    {
-        // Best-effort removal of .old files after successful verification.
-        IReadOnlyList<string> files = _fileSystem.GetFiles(installDir);
-        foreach (string file in files)
-        {
-            if (file.EndsWith(OldFileSuffix, StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    _fileSystem.DeleteFile(file);
-                }
-                catch (Exception ex)
-                {
-                    // Locked files (e.g. the running exe) can't be deleted yet;
-                    // they'll be cleaned up on the next launch or update.
-                    Log.CouldNotRemoveOldFile(_logger, ex, file);
-                }
-            }
-        }
-    }
-
-    private void TryRollbackInPlace(string installDir, IReadOnlyList<string> copiedFiles)
-    {
-        // Restore .old files and remove new files that were introduced by the
-        // update. Best-effort per-file so a single locked file doesn't prevent
-        // the rest from being restored.
-        bool anyRestored = false;
-
-        // Remove files that were copied in during the update. This handles
-        // both files that replaced an existing file and entirely new files
-        // that have no .old counterpart.
-        foreach (string file in copiedFiles)
-        {
-            try
-            {
-                if (_fileSystem.FileExists(file))
-                {
-                    _fileSystem.DeleteFile(file);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.RollbackCouldNotRemoveNewFile(_logger, ex, file);
-            }
-        }
-
-        // Restore .old files to their original paths
         try
         {
-            IReadOnlyList<string> files = _fileSystem.GetFiles(installDir);
-            foreach (string file in files)
+            // Remove the new binary if it was copied in
+            if (_fileSystem.FileExists(binaryPath))
             {
-                if (file.EndsWith(OldFileSuffix, StringComparison.OrdinalIgnoreCase))
-                {
-                    string originalPath = file[..^OldFileSuffix.Length];
-                    try
-                    {
-                        _fileSystem.MoveFile(file, originalPath);
-                        anyRestored = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.RollbackCouldNotRestoreFile(_logger, ex, file);
-                    }
-                }
+                _fileSystem.DeleteFile(binaryPath);
+            }
+
+            // Restore the backup
+            if (_fileSystem.FileExists(backupPath))
+            {
+                _fileSystem.MoveFile(backupPath, binaryPath);
+                Log.PreviousVersionRestored(_logger);
             }
         }
         catch (Exception ex)
         {
-            Log.RollbackFailed(_logger, ex, installDir);
-        }
-
-        if (anyRestored)
-        {
-            Log.PreviousVersionRestored(_logger);
+            Log.RollbackFailed(_logger, ex, Path.GetDirectoryName(binaryPath)!);
         }
     }
 
@@ -264,7 +192,7 @@ internal sealed partial class CliUpdater(
         }
     }
 
-    private string GetInstallDirectory()
+    private string GetBinaryPath()
     {
         string? processPath = _environment.ProcessPath;
         if (string.IsNullOrEmpty(processPath))
@@ -272,13 +200,7 @@ internal sealed partial class CliUpdater(
             throw new GracefulException("Could not determine the current func installation path.", isUserError: true);
         }
 
-        string? dir = Path.GetDirectoryName(processPath);
-        if (string.IsNullOrEmpty(dir))
-        {
-            throw new GracefulException("Could not determine the func installation directory.", isUserError: true);
-        }
-
-        return dir;
+        return processPath;
     }
 
     private static bool VersionOutputMatches(string output, string expectedVersion)
@@ -314,6 +236,23 @@ internal sealed partial class CliUpdater(
         }
     }
 
+    private void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (_fileSystem.FileExists(path))
+            {
+                _fileSystem.DeleteFile(path);
+            }
+        }
+        catch (Exception ex)
+        {
+            // On Windows the running exe may be locked; it'll be overwritten
+            // on the next update via MoveFile with overwrite: true.
+            Log.CouldNotRemoveOldFile(_logger, ex, path);
+        }
+    }
+
     private void TryDeleteDirectory(string path)
     {
         // Best-effort cleanup; swallowed so temp-dir failures don't mask the real outcome.
@@ -343,12 +282,6 @@ internal sealed partial class CliUpdater(
 
         [LoggerMessage(LogLevel.Debug, "Could not remove {File}; it will be cleaned up on next launch.")]
         public static partial void CouldNotRemoveOldFile(ILogger logger, Exception ex, string file);
-
-        [LoggerMessage(LogLevel.Debug, "Rollback: could not remove new file {File}.")]
-        public static partial void RollbackCouldNotRemoveNewFile(ILogger logger, Exception ex, string file);
-
-        [LoggerMessage(LogLevel.Debug, "Rollback: could not restore {File}.")]
-        public static partial void RollbackCouldNotRestoreFile(ILogger logger, Exception ex, string file);
 
         [LoggerMessage(LogLevel.Error, "Rollback failed. The installation at {InstallDir} may be in an inconsistent state.")]
         public static partial void RollbackFailed(ILogger logger, Exception ex, string installDir);

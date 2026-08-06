@@ -20,8 +20,10 @@ public sealed class CliUpdaterTests
     // separators match on every platform (/ on Linux/macOS, \ on Windows).
     private static readonly string _fakeProcessPath = Path.GetFullPath(Path.Combine("/fake", "install", "func"));
     private static readonly string _fakeInstallDir = Path.GetDirectoryName(_fakeProcessPath)!;
+    private static readonly string _fakeBackupPath = _fakeProcessPath + ".old";
     private static readonly string _fakeTempWorkDir = Path.GetFullPath(Path.Combine(_fakeInstallDir, ".func-update-work"));
     private static readonly string _fakeExtractDir = Path.GetFullPath(Path.Combine(_fakeInstallDir, ".func-update-extract"));
+    private static readonly string _fakeExtractedBinary = Path.Combine(_fakeExtractDir, Path.GetFileName(_fakeProcessPath));
 
     private static readonly Release _stableRelease = new(
         SemVersion.Parse("5.1.0", SemVersionStyles.Strict),
@@ -37,19 +39,14 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("5.1.0\n"));
 
-        string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
-        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile]);
-
-        // SwapInPlace reads extract dir to track copied files
-        string newFile = Path.Combine(_fakeExtractDir, "func.exe");
-        fileSystem.GetFiles(_fakeExtractDir).Returns([newFile]);
+        fileSystem.FileExists(_fakeExtractedBinary).Returns(true);
 
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
 
-        // Assert: existing files renamed to .old with overwrite, new files copied in
-        fileSystem.Received(1).MoveFile(existingFile, existingFile + ".old", true);
-        fileSystem.Received(1).CopyDirectory(_fakeExtractDir, _fakeInstallDir);
+        // Assert: binary renamed to .old, new binary copied in
+        fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
+        fileSystem.Received(1).CopyFile(_fakeExtractedBinary, _fakeProcessPath);
 
         // Verify was run
         await processRunner.Received(1).RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>());
@@ -80,15 +77,10 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("4.0.0\n")); // wrong version
 
-        string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
-        string oldFile = existingFile + ".old";
-        string extractedFile = Path.Combine(_fakeExtractDir, "func.exe");
-
-        // First GetFiles(_fakeInstallDir) during SwapInPlace returns existing files;
-        // second GetFiles(_fakeInstallDir) during rollback returns the .old files.
-        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile], [oldFile]);
-        fileSystem.GetFiles(_fakeExtractDir).Returns([extractedFile]);
-        fileSystem.FileExists(existingFile).Returns(true);
+        fileSystem.FileExists(_fakeExtractedBinary).Returns(true);
+        // After swap, rollback checks for the new and backup files
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
+        fileSystem.FileExists(_fakeBackupPath).Returns(true);
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
@@ -96,33 +88,30 @@ public sealed class CliUpdaterTests
 
         Assert.Contains("Verification failed", ex.Message, StringComparison.OrdinalIgnoreCase);
 
-        // Rollback: .old files restored, new files removed
-        fileSystem.Received(1).DeleteFile(existingFile);
-        fileSystem.Received(1).MoveFile(oldFile, existingFile);
+        // Rollback: new binary removed, backup restored
+        fileSystem.Received(1).DeleteFile(_fakeProcessPath);
+        fileSystem.Received(1).MoveFile(_fakeBackupPath, _fakeProcessPath);
     }
 
     [Fact]
-    public async Task UpdateAsync_SwapRenameFileFails_RollsBackAndRethrows()
+    public async Task UpdateAsync_SwapRenameFileFails_DoesNotRollbackAndRethrows()
     {
         // Arrange
         (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
-        string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
-        string oldFile = existingFile + ".old";
-        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile], [oldFile]);
-        fileSystem.GetFiles(_fakeExtractDir).Returns([Path.Combine(_fakeExtractDir, "func.exe")]);
+        fileSystem.FileExists(_fakeExtractedBinary).Returns(true);
 
         // The rename throws to simulate a locked file scenario
-        fileSystem.When(fs => fs.MoveFile(existingFile, oldFile, true))
+        fileSystem.When(fs => fs.MoveFile(_fakeProcessPath, _fakeBackupPath, true))
             .Throw(new IOException("access denied"));
 
         // Act + Assert
         await Assert.ThrowsAsync<IOException>(
             () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
 
-        // Rollback attempted: restore .old → original
-        fileSystem.Received(1).MoveFile(oldFile, existingFile);
+        // Swap never completed, so rollback should NOT attempt to move backup
+        fileSystem.DidNotReceive().MoveFile(_fakeBackupPath, _fakeProcessPath);
     }
 
     [Fact]
@@ -159,9 +148,7 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("5.1.0\n"));
 
-        string existingFile = Path.Combine(_fakeInstallDir, "func.exe");
-        fileSystem.GetFiles(_fakeInstallDir).Returns([existingFile]);
-        fileSystem.GetFiles(_fakeExtractDir).Returns([Path.Combine(_fakeExtractDir, "func.exe")]);
+        fileSystem.FileExists(_fakeExtractedBinary).Returns(true);
 
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
