@@ -11,4 +11,4 @@ internal sealed record HostProcessStartContext(
     ContentWorkloadInfo HostWorkload,
     FunctionsProjectHostRunContext HostRunContext,
     StartCommandOptions Options,
-    string? JsonOutputFilePath = null);
+    IHostOutputInterceptor? OutputInterceptor = null);

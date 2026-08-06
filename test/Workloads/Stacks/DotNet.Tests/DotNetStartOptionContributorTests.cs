@@ -68,7 +68,7 @@ public class DotNetStartOptionContributorTests
         configuration.EnvironmentVariables.Should().NotContainKey(
             DotNetStartOptionContributor.StartupHooksEnvironmentVariable);
         configuration.StartupNotice.Should().Be(DotNetStartOptionContributor.DebuggerWaitNotice);
-        configuration.JsonOutputFilePath.Should().BeNull();
+        configuration.OutputInterceptor.Should().NotBeNull();
     }
 
     [Fact]
@@ -86,11 +86,11 @@ public class DotNetStartOptionContributorTests
         configuration.EnvironmentVariables.Should().NotContainKey(
             DotNetStartOptionContributor.DebuggerWaitEnvironmentVariable);
         configuration.StartupNotice.Should().BeNull();
-        configuration.JsonOutputFilePath.Should().BeNull();
+        configuration.OutputInterceptor.Should().NotBeNull();
     }
 
     [Fact]
-    public void Configure_WithJsonOutputFile_ImpliesJsonOutputAndCapturesPath()
+    public void Configure_WithJsonOutputFile_ImpliesJsonOutputAndCreatesInterceptor()
     {
         (DotNetStartOptionContributor contributor, RootCommand root) = CreateContributor();
         ParseResult parseResult = root.Parse(["--json-output-file", "out.json"]);
@@ -101,6 +101,7 @@ public class DotNetStartOptionContributorTests
             DotNetStartOptionContributor.JsonOutputEnvironmentVariable, bool.TrueString);
         configuration.EnvironmentVariables.Should().ContainKey(
             DotNetStartOptionContributor.DeferredStartupHooksEnvironmentVariable);
-        configuration.JsonOutputFilePath.Should().Be("out.json");
+        configuration.OutputInterceptor.Should().NotBeNull()
+            .And.BeOfType<DotNetHostOutputInterceptor>();
     }
 }

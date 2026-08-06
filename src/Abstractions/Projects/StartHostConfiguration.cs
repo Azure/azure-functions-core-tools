@@ -31,10 +31,11 @@ public sealed record StartHostConfiguration
         = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// When set, the CLI mirrors the host process's raw (JSON) standard output to this file path.
-    /// <c>null</c> disables file capture.
+    /// An optional interceptor that inspects raw stdout lines from the host process before they
+    /// enter the log pipeline. Lines the interceptor consumes are suppressed from rendering.
+    /// The CLI disposes this when the host event stream shuts down.
     /// </summary>
-    public string? JsonOutputFilePath { get; init; }
+    public IHostOutputInterceptor? OutputInterceptor { get; init; }
 
     /// <summary>
     /// An optional message the CLI shows the user before the host starts (e.g. a note that the
