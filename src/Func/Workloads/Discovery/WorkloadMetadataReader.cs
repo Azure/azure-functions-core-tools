@@ -90,19 +90,42 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
         {
             case WorkloadKind.Workload:
                 ValidateWorkloadEntryPoint(metadata, metadataPath);
+                ValidateNoPackages(metadata, metadataPath);
+                ValidateRuntimeIdentifier(metadata, metadataPath);
                 return metadata;
 
             case WorkloadKind.Content:
-            case WorkloadKind.Meta:
-                // entryPoint is meaningless for content/meta packages — reject
-                // it at author time instead of silently ignoring the field.
                 if (metadata.EntryPoint is not null)
                 {
                     throw new InvalidWorkloadException(
-                        $"'{metadataPath}' declares kind '{metadata.Kind.ToString().ToLowerInvariant()}' " +
+                        $"'{metadataPath}' declares kind 'content' " +
                         "but also defines an entryPoint. Remove the entryPoint or change the kind to 'workload'.");
                 }
 
+                ValidateNoPackages(metadata, metadataPath);
+                ValidateRuntimeIdentifier(metadata, metadataPath);
+                return metadata;
+
+            case WorkloadKind.Meta:
+                ValidateNoEntryPoint(metadata, metadataPath, "meta");
+                ValidateNoPackages(metadata, metadataPath);
+                if (metadata.RuntimeIdentifier is not null)
+                {
+                    throw new InvalidWorkloadException(
+                        $"'{metadataPath}' declares kind 'meta' but also defines runtimeIdentifier.");
+                }
+
+                return metadata;
+
+            case WorkloadKind.RidPointer:
+                ValidateNoEntryPoint(metadata, metadataPath, "rid-pointer");
+                if (metadata.RuntimeIdentifier is not null)
+                {
+                    throw new InvalidWorkloadException(
+                        $"'{metadataPath}' declares kind 'rid-pointer' but also defines runtimeIdentifier.");
+                }
+
+                ValidatePointerPackages(metadata, metadataPath);
                 return metadata;
 
             default:
@@ -110,6 +133,72 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                     $"'{metadataPath}' has unrecognized kind '{metadata.Kind}'.");
         }
     }
+
+    private static void ValidateNoEntryPoint(WorkloadMetadata metadata, string metadataPath, string kind)
+    {
+        if (metadata.EntryPoint is not null)
+        {
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' declares kind '{kind}' but also defines an entryPoint.");
+        }
+    }
+
+    private static void ValidateNoPackages(WorkloadMetadata metadata, string metadataPath)
+    {
+        if (metadata.Packages is not null)
+        {
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' declares kind '{GetWireKind(metadata.Kind)}' but also defines packages.");
+        }
+    }
+
+    private static void ValidateRuntimeIdentifier(WorkloadMetadata metadata, string metadataPath)
+    {
+        if (metadata.RuntimeIdentifier is not null && !IsNormalizedRuntimeIdentifier(metadata.RuntimeIdentifier))
+        {
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' has invalid runtimeIdentifier '{metadata.RuntimeIdentifier}'. Runtime identifiers must be lowercase.");
+        }
+    }
+
+    private static void ValidatePointerPackages(WorkloadMetadata metadata, string metadataPath)
+    {
+        if (metadata.Packages is null || metadata.Packages.Count == 0)
+        {
+            throw new InvalidWorkloadException(
+                $"'{metadataPath}' declares kind 'rid-pointer' but does not define a non-empty packages map.");
+        }
+
+        HashSet<string> runtimeIdentifiers = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((string runtimeIdentifier, string packageId) in metadata.Packages)
+        {
+            if (!IsNormalizedRuntimeIdentifier(runtimeIdentifier))
+            {
+                throw new InvalidWorkloadException(
+                    $"'{metadataPath}' has invalid packages key '{runtimeIdentifier}'. Runtime identifiers must be lowercase.");
+            }
+
+            if (!runtimeIdentifiers.Add(runtimeIdentifier))
+            {
+                throw new InvalidWorkloadException(
+                    $"'{metadataPath}' defines runtime identifier '{runtimeIdentifier}' more than once.");
+            }
+
+            if (string.IsNullOrWhiteSpace(packageId))
+            {
+                throw new InvalidWorkloadException(
+                    $"'{metadataPath}' has an empty implementation package id for runtime identifier '{runtimeIdentifier}'.");
+            }
+        }
+    }
+
+    private static bool IsNormalizedRuntimeIdentifier(string value)
+        => !string.IsNullOrWhiteSpace(value)
+            && string.Equals(value, value.Trim(), StringComparison.Ordinal)
+            && string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
+
+    private static string GetWireKind(WorkloadKind kind)
+        => kind == WorkloadKind.RidPointer ? "rid-pointer" : kind.ToString().ToLowerInvariant();
 
     private static void ValidateWorkloadEntryPoint(WorkloadMetadata metadata, string metadataPath)
     {

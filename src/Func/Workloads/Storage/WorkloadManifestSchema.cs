@@ -8,9 +8,7 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// </summary>
 /// <remarks>
 /// Each manifest carries its schema identity in the top-level <c>$schema</c>
-/// property. Breaking changes ship under a new versioned URL so older and
-/// newer CLIs can coexist on disk. The registry and per-package manifest
-/// version independently.
+/// property. The registry and per-package manifest version independently.
 /// </remarks>
 internal static class WorkloadManifestSchema
 {
@@ -59,4 +57,3 @@ internal static class WorkloadManifestSchema
         => !string.IsNullOrEmpty(schema)
            && SupportedPackageManifestSchemas.Contains(schema, StringComparer.Ordinal);
 }
-

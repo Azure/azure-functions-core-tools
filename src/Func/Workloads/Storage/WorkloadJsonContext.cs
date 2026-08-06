@@ -25,9 +25,34 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 internal sealed partial class WorkloadJsonContext : JsonSerializerContext;
 
 /// <summary>
-/// Serializes <see cref="WorkloadKind"/> as a lowercase string
-/// (<c>"workload"</c> / <c>"content"</c> / <c>"meta"</c>). The default
-/// <see cref="JsonStringEnumConverter{TEnum}"/> would emit PascalCase.
+/// Serializes <see cref="WorkloadKind"/> using the workload manifest's wire values.
 /// </summary>
-internal sealed class WorkloadKindJsonConverter() : JsonStringEnumConverter<WorkloadKind>(JsonNamingPolicy.CamelCase);
+internal sealed class WorkloadKindJsonConverter : JsonConverter<WorkloadKind>
+{
+    public override WorkloadKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        string? value = reader.GetString();
+        return value switch
+        {
+            "workload" => WorkloadKind.Workload,
+            "content" => WorkloadKind.Content,
+            "meta" => WorkloadKind.Meta,
+            "rid-pointer" => WorkloadKind.RidPointer,
+            _ => throw new JsonException($"Unknown workload kind '{value}'."),
+        };
+    }
 
+    public override void Write(Utf8JsonWriter writer, WorkloadKind value, JsonSerializerOptions options)
+    {
+        string wireValue = value switch
+        {
+            WorkloadKind.Workload => "workload",
+            WorkloadKind.Content => "content",
+            WorkloadKind.Meta => "meta",
+            WorkloadKind.RidPointer => "rid-pointer",
+            _ => throw new JsonException($"Unknown workload kind '{value}'."),
+        };
+
+        writer.WriteStringValue(wireValue);
+    }
+}
