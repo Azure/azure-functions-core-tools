@@ -37,12 +37,12 @@ public class WorkloadHintRendererTests
     [Fact]
     public void Render_NoMatchingStack_UnknownStack_ShowsFullSetupMenu()
     {
-        // Arrange
+        // Arrange — no installed stacks to filter, so all known stacks appear
         var hint = new WorkloadHint(
             WorkloadHintKind.NoMatchingStack,
             "initialize a project",
             "ruby",
-            ["dotnet"]);
+            []);
 
         // Act
         _renderer.Render(hint);
@@ -53,6 +53,25 @@ public class WorkloadHintRendererTests
         _interaction.AllOutput.Should().Contain("func setup --features node");
         _interaction.AllOutput.Should().Contain("func setup --features python");
         _interaction.AllOutput.Should().Contain("func workload search");
+    }
+
+    [Fact]
+    public void Render_NoMatchingStack_UnknownStack_FiltersInstalledFromMenu()
+    {
+        // Arrange — dotnet is installed, so it shouldn't appear in the setup menu
+        var hint = new WorkloadHint(
+            WorkloadHintKind.NoMatchingStack,
+            "initialize a project",
+            "ruby",
+            ["dotnet"]);
+
+        // Act
+        _renderer.Render(hint);
+
+        // Assert
+        _interaction.AllOutput.Should().NotContain("func setup --features dotnet");
+        _interaction.AllOutput.Should().Contain("func setup --features node");
+        _interaction.AllOutput.Should().Contain("func setup --features python");
     }
 
     [Fact]
