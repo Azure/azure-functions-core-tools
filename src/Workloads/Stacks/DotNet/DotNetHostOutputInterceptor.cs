@@ -11,9 +11,9 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// <summary>
 /// Intercepts structured JSON host output lines that carry .NET worker debug information
 /// (worker PID, JSON log payloads). In v5, the host wraps all output in structured JSON records
-/// with <c>source: "azure-functions-cli-host"</c>. This interceptor looks for messages containing
-/// the worker PID pattern and writes the PID in the <c>{"processId":N}</c> format that
-/// Visual Studio expects for debugger attachment.
+/// with <c>source: "azure-functions-cli-host"</c>. This interceptor extracts the worker PID and
+/// writes it in the same format the worker's startup hook emits via the <c>azfuncjsonlog:</c>
+/// protocol, so consumers (VS, VS Code) see the same <c>workerProcessId</c> field v4 produced.
 /// </summary>
 internal sealed partial class DotNetHostOutputInterceptor : IHostOutputInterceptor
 {
@@ -86,11 +86,13 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
             }
 
             // Extract worker PID from the human-readable debug message.
-            // Write the PID to the file but return false so the message still renders in the console.
+            // Write in the same format the worker's startup hook uses via azfuncjsonlog: so
+            // consumers (VS, VS Code) see the workerProcessId field they expect.
+            // Return false so the message still renders in the console.
             Match match = WorkerPidRegex().Match(message);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int pid))
             {
-                _writer?.WriteLine($"{{\"processId\":{pid}}}");
+                _writer?.WriteLine($"{{ \"name\":\"dotnet-worker-startup\", \"workerProcessId\" : {pid} }}");
                 _pidCaptured = true;
                 return false;
             }
