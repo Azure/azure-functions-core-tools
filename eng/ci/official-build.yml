@@ -68,3 +68,4 @@ extends:
           parameters:
             projects: Azure.Functions.Cli.slnx
             sign: ${{ variables.sign }}
+            build_args: -p:TelemetryInstrumentationKey="$(TELEMETRY_INSTRUMENTATION_KEY)"
