@@ -197,6 +197,34 @@ public sealed class CliUpdaterTests
     }
 
     [Fact]
+    public async Task UpdateAsync_CopyFileFails_RollsBackAlreadyRenamedFile()
+    {
+        // Arrange — MoveFile succeeds (original renamed to .old) but CopyFile
+        // throws (e.g. disk full). The entry is tracked before CopyFile so
+        // rollback knows to restore the backup.
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
+        fileSystem.FileExists(_fakeBackupPath).Returns(true);
+
+        fileSystem.When(fs => fs.CopyFile(_fakeExtractedBinary, _fakeProcessPath))
+            .Throw(new IOException("disk full"));
+
+        // Act + Assert
+        await Assert.ThrowsAsync<IOException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        // The original was renamed to .old successfully
+        fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
+
+        // Rollback should restore it: delete the (non-existent) new file attempt,
+        // then move .old back to the original path
+        fileSystem.Received(1).MoveFile(_fakeBackupPath, _fakeProcessPath);
+    }
+
+    [Fact]
     public async Task UpdateAsync_EmptyArchive_ThrowsGraceful()
     {
         // Arrange
@@ -210,6 +238,28 @@ public sealed class CliUpdaterTests
             () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
 
         Assert.Contains("empty", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PathTraversal_ThrowsGracefulBeforeSwap()
+    {
+        // Arrange — simulate an extracted file that escapes the extract directory
+        string maliciousPath = Path.GetFullPath(Path.Combine(_fakeExtractDir, "..", "etc", "crontab"));
+
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+
+        fileSystem.GetFiles(_fakeExtractDir).Returns([maliciousPath]);
+
+        // Act + Assert
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.Contains("escapes the install directory", ex.Message, StringComparison.OrdinalIgnoreCase);
+
+        // No file operations should have been attempted
+        fileSystem.DidNotReceive().MoveFile(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
+        fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

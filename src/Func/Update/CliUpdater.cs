@@ -78,6 +78,18 @@ internal sealed partial class CliUpdater(
             foreach (string extractedPath in extractedFiles)
             {
                 string relativePath = Path.GetRelativePath(extractDir.Path, extractedPath);
+
+                // Defense-in-depth against zip-slip: reject any path that escapes
+                // the install directory. .NET's extraction APIs already prevent
+                // this, but we validate as a second layer.
+                if (relativePath.StartsWith("..", StringComparison.Ordinal))
+                {
+                    throw new GracefulException(
+                        $"The archive contains a path that escapes the install directory: '{relativePath}'. " +
+                        "This may indicate a corrupted or tampered archive.",
+                        isUserError: true);
+                }
+
                 string targetPath = Path.Combine(installDir, relativePath);
                 string backupPath = targetPath + OldFileSuffix;
 
@@ -93,8 +105,10 @@ internal sealed partial class CliUpdater(
                     _fileSystem.MoveFile(targetPath, backupPath, overwrite: true);
                 }
 
-                _fileSystem.CopyFile(extractedPath, targetPath);
+                // Track before CopyFile so rollback can restore the backup even
+                // if the copy fails (e.g. disk full).
                 swappedFiles.Add((targetPath, backupPath));
+                _fileSystem.CopyFile(extractedPath, targetPath);
             }
 
             await VerifyAsync(release, installDir, cancellationToken);
@@ -121,9 +135,11 @@ internal sealed partial class CliUpdater(
 
     private void TryRollback(List<(string TargetPath, string BackupPath)> swappedFiles, string installDir)
     {
-        try
+        bool anyFailed = false;
+
+        foreach ((string targetPath, string backupPath) in swappedFiles)
         {
-            foreach ((string targetPath, string backupPath) in swappedFiles)
+            try
             {
                 // Remove the new file that was copied in
                 if (_fileSystem.FileExists(targetPath))
@@ -137,12 +153,20 @@ internal sealed partial class CliUpdater(
                     _fileSystem.MoveFile(backupPath, targetPath);
                 }
             }
-
-            Log.PreviousVersionRestored(_logger);
+            catch (Exception ex)
+            {
+                anyFailed = true;
+                Log.RollbackFileFailed(_logger, ex, targetPath);
+            }
         }
-        catch (Exception ex)
+
+        if (anyFailed)
         {
-            Log.RollbackFailed(_logger, ex, installDir);
+            Log.RollbackFailed(_logger, installDir);
+        }
+        else
+        {
+            Log.PreviousVersionRestored(_logger);
         }
     }
 
@@ -293,8 +317,11 @@ internal sealed partial class CliUpdater(
         [LoggerMessage(LogLevel.Debug, "Could not remove {File}; it will be cleaned up on next launch.")]
         public static partial void CouldNotRemoveOldFile(ILogger logger, Exception ex, string file);
 
-        [LoggerMessage(LogLevel.Error, "Rollback failed. The installation at {InstallDir} may be in an inconsistent state.")]
-        public static partial void RollbackFailed(ILogger logger, Exception ex, string installDir);
+        [LoggerMessage(LogLevel.Error, "The installation at {InstallDir} may be in an inconsistent state. Some files could not be rolled back.")]
+        public static partial void RollbackFailed(ILogger logger, string installDir);
+
+        [LoggerMessage(LogLevel.Error, "Could not restore {File} during rollback.")]
+        public static partial void RollbackFileFailed(ILogger logger, Exception ex, string file);
 
         [LoggerMessage(LogLevel.Information, "Previous version restored.")]
         public static partial void PreviousVersionRestored(ILogger logger);
