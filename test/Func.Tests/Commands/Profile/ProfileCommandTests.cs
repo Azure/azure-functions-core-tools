@@ -321,7 +321,7 @@ public sealed class ProfileCommandTests : IDisposable
     private string ProjectConfigPath()
         => Path.Combine(_tempDir, ".func", "config.json");
 
-    private sealed class FakeProfileFileSystem : IProfileFileSystem
+    private sealed class FakeProfileFileSystem : IFileSystem
     {
         private readonly Dictionary<string, string> _files = new(StringComparer.OrdinalIgnoreCase);
 
@@ -339,7 +339,7 @@ public sealed class ProfileCommandTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task DeleteIfExistsAsync(string path)
+        public Task DeleteFileIfExistsAsync(string path)
         {
             _files.Remove(path);
             return Task.CompletedTask;
@@ -353,6 +353,25 @@ public sealed class ProfileCommandTests : IDisposable
 
         public bool Exists(string path)
             => _files.ContainsKey(path);
+
+        // ── IFileSystem members not used by profile tests ───────────────────
+        public bool FileExists(string path) => _files.ContainsKey(path);
+        public Task SaveStreamToFileAsync(string filePath, Stream content, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public void MoveFile(string sourcePath, string destinationPath, bool overwrite = false) => throw new NotImplementedException();
+        public void CopyFile(string sourcePath, string destinationPath) => throw new NotImplementedException();
+        public void DeleteFile(string path) => _files.Remove(path);
+        public bool DirectoryExists(string path) => throw new NotImplementedException();
+        public void CreateDirectory(string path) => throw new NotImplementedException();
+        public string CreateTempDirectory() => throw new NotImplementedException();
+        public string CreateTempDirectory(string siblingPath) => throw new NotImplementedException();
+        public void CopyDirectory(string sourcePath, string destinationPath) => throw new NotImplementedException();
+        public void DeleteDirectory(string path) => throw new NotImplementedException();
+        public IReadOnlyList<string> GetFiles(string directoryPath) => throw new NotImplementedException();
+        public void ExtractZip(string zipPath, string destinationDirectory) => throw new NotImplementedException();
+
+        public void ExtractTarGz(string tarGzPath, string destinationDirectory) => throw new NotImplementedException();
+
+        public Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     private sealed class FakeProfileSource(
