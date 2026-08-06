@@ -56,6 +56,49 @@ public class WorkloadLoaderTests
     }
 
     [Fact]
+    public void Load_InvalidWorkloadForDifferentRid_IncludesUpdateGuidance()
+    {
+        var runtimeIdentifierProvider = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
+        runtimeIdentifierProvider.Current.Returns("linux-x64");
+        var loader = new WorkloadLoader(StubPaths(), runtimeIdentifierProvider);
+        WorkloadEntry entry = FixtureEntry(
+            FixturePackageId,
+            assemblyFileOverride: "DoesNotExist.dll",
+            runtimeIdentifier: "win-x64",
+            logicalPackage: new LogicalPackage
+            {
+                PackageId = "Fixture.Pointer",
+                PackageVersion = "1.0.0",
+            });
+
+        InvalidWorkloadException ex = FluentActions.Invoking(() => loader.Load([entry]))
+            .Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().Contain("targets runtime identifier 'win-x64'");
+        ex.Message.Should().Contain("this machine uses 'linux-x64'");
+        ex.Message.Should().Contain("func workload update Fixture.Pointer");
+        ex.InnerException.Should().BeOfType<InvalidWorkloadException>();
+    }
+
+    [Fact]
+    public void Load_InvalidWorkloadForCurrentRid_DoesNotIncludeUpdateGuidance()
+    {
+        var runtimeIdentifierProvider = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
+        runtimeIdentifierProvider.Current.Returns("win-x64");
+        var loader = new WorkloadLoader(StubPaths(), runtimeIdentifierProvider);
+        WorkloadEntry entry = FixtureEntry(
+            FixturePackageId,
+            assemblyFileOverride: "DoesNotExist.dll",
+            runtimeIdentifier: "win-x64");
+
+        InvalidWorkloadException ex = FluentActions.Invoking(() => loader.Load([entry]))
+            .Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().NotContain("func workload update");
+        ex.InnerException.Should().BeNull();
+    }
+
+    [Fact]
     public void Load_Throws_WhenTypeNotFoundInAssembly()
     {
         var loader = new WorkloadLoader(StubPaths());
@@ -334,10 +377,14 @@ public class WorkloadLoaderTests
     private static WorkloadEntry FixtureEntry(
         string packageId,
         string? assemblyFileOverride = null,
-        string? typeNameOverride = null) => new()
+        string? typeNameOverride = null,
+        string? runtimeIdentifier = null,
+        LogicalPackage? logicalPackage = null) => new()
         {
             PackageId = packageId,
             PackageVersion = "1.0.0",
+            RuntimeIdentifier = runtimeIdentifier,
+            LogicalPackage = logicalPackage,
             EntryPoint = new EntryPointSpec
             {
                 AssemblyPath = assemblyFileOverride ?? FixtureAssemblyFile,
