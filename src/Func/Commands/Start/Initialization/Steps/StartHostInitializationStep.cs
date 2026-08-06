@@ -44,11 +44,22 @@ internal sealed class StartHostInitializationStep(IHostProcessRunner hostProcess
             ContentWorkloadInfo hostWorkload = context.State.HostWorkload ?? throw new InvalidOperationException("Host workload was not resolved.");
             FunctionsProject project = context.State.Project ?? throw new InvalidOperationException("Functions project was not resolved.");
 
-            string? jsonOutputFilePath = context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration)
-                ? stackConfiguration.JsonOutputFilePath
+            IHostOutputInterceptor? outputInterceptor = context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration)
+                ? stackConfiguration.OutputInterceptor
                 : null;
 
-            var startContext = new HostProcessStartContext(hostWorkload, hostRunContext, context.Options, jsonOutputFilePath);
+            // Dispose interceptors for non-matching stacks so we don't leak file handles
+            // opened by workloads that don't apply to this project.
+            foreach (KeyValuePair<string, StartHostConfiguration> entry in context.Options.StackHostConfigurations)
+            {
+                if (!string.Equals(entry.Key, project.StackName, StringComparison.OrdinalIgnoreCase)
+                    && entry.Value.OutputInterceptor is not null)
+                {
+                    await entry.Value.OutputInterceptor.DisposeAsync();
+                }
+            }
+
+            var startContext = new HostProcessStartContext(hostWorkload, hostRunContext, context.Options, outputInterceptor);
             context.State.EventStream = await _hostProcessRunner.StartAsync(startContext, cancellationToken);
         }
 

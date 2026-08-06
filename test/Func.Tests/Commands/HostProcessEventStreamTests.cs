@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -97,24 +98,45 @@ public class HostProcessEventStreamTests
     }
 
     [Fact]
-    public async Task ReadAsync_WithRawStdoutWriter_TeesStdoutLinesOnly()
+    public async Task ReadAsync_WithOutputInterceptor_InterceptsMatchingLinesAndSuppressesFromStream()
     {
-        var process = new CompletedHostProcess(stdout: "json-line-1\njson-line-2", stderr: "err-line", exitCode: 0);
-        var rawWriter = new StringWriter();
+        var process = new CompletedHostProcess(stdout: "azfuncjsonlog:{\"processId\":1234}\nnormal-line", stderr: "err-line", exitCode: 0);
+        var interceptor = new TestInterceptor("azfuncjsonlog:");
         var stream = new HostProcessEventStream(
             process,
             new LineHostProcessOutputParser(),
             CreateLaunchInfo(),
             TimeSpan.FromMilliseconds(1),
             timeProvider: null,
-            rawStdoutWriter: rawWriter);
+            outputInterceptor: interceptor);
 
-        await ReadAllAsync(stream);
+        HostLogEntry[] entries = await ReadAllAsync(stream);
         await stream.WaitForExitAsync(CancellationToken.None);
 
-        string[] teed = rawWriter.ToString()
-            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        teed.Should().Equal("json-line-1", "json-line-2");
+        // The intercepted line should not appear in the log stream
+        entries.Select(e => e.Message).Should().NotContain("azfuncjsonlog:{\"processId\":1234}");
+        // The normal line should still appear
+        entries.Select(e => e.Message).Should().Contain("normal-line");
+        // The interceptor should have captured the line
+        interceptor.Intercepted.Should().Equal("azfuncjsonlog:{\"processId\":1234}");
+    }
+
+    private sealed class TestInterceptor(string prefix) : IHostOutputInterceptor
+    {
+        public List<string> Intercepted { get; } = [];
+
+        public bool TryIntercept(string line)
+        {
+            if (line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                Intercepted.Add(line);
+                return true;
+            }
+
+            return false;
+        }
+
+        public ValueTask DisposeAsync() => default;
     }
 
     private static async Task<HostLogEntry[]> ReadAllAsync(IHostEventStream stream)

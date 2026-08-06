@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.ComponentModel;
-using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Events;
 
@@ -40,9 +39,6 @@ internal sealed class DefaultHostProcessRunner(
                 isUserError: true);
         }
 
-        // Open the JSON output file before launching so a bad path fails fast without a leaked process.
-        TextWriter? rawStdoutWriter = CreateJsonOutputWriter(context.JsonOutputFilePath);
-
         IHostProcess process = _processFactory.Create(launchInfo.StartInfo);
         try
         {
@@ -50,41 +46,11 @@ internal sealed class DefaultHostProcessRunner(
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
-            rawStdoutWriter?.Dispose();
             throw CreateStartFailure(launchInfo, ex);
         }
-        catch
-        {
-            rawStdoutWriter?.Dispose();
-            throw;
-        }
 
-        IHostEventStream stream = new HostProcessEventStream(process, _outputParser, launchInfo, _shutdownTimeout, _timeProvider, rawStdoutWriter);
+        IHostEventStream stream = new HostProcessEventStream(process, _outputParser, launchInfo, _shutdownTimeout, _timeProvider, context.OutputInterceptor);
         return Task.FromResult(stream);
-    }
-
-    private static TextWriter? CreateJsonOutputWriter(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return null;
-        }
-
-        try
-        {
-            var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-            return new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
-            {
-                AutoFlush = true,
-            };
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
-        {
-            throw new GracefulException(
-                $"Could not open JSON output file '{path}': {ex.Message}",
-                isUserError: true,
-                verboseMessage: ex.ToString());
-        }
     }
 
     private static GracefulException CreateStartFailure(HostProcessLaunchInfo launchInfo, Exception exception)

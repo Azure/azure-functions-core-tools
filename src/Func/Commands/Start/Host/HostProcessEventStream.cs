@@ -4,6 +4,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Host;
@@ -14,7 +15,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
     private readonly IHostProcessOutputParser _parser;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _shutdownTimeout;
-    private readonly TextWriter? _rawStdoutWriter;
+    private readonly IHostOutputInterceptor? _outputInterceptor;
     private readonly Channel<HostLogEntry> _channel;
     private readonly Task<int> _exitTask;
     private readonly Task _stdoutTask;
@@ -28,14 +29,14 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         HostProcessLaunchInfo launchInfo,
         TimeSpan shutdownTimeout,
         TimeProvider? timeProvider = null,
-        TextWriter? rawStdoutWriter = null)
+        IHostOutputInterceptor? outputInterceptor = null)
     {
         _process = process ?? throw new ArgumentNullException(nameof(process));
         _parser = parser ?? throw new ArgumentNullException(nameof(parser));
         ArgumentNullException.ThrowIfNull(launchInfo);
         _timeProvider = timeProvider ?? TimeProvider.System;
         _shutdownTimeout = shutdownTimeout;
-        _rawStdoutWriter = rawStdoutWriter;
+        _outputInterceptor = outputInterceptor;
         _channel = Channel.CreateUnbounded<HostLogEntry>(
             new UnboundedChannelOptions
             {
@@ -112,7 +113,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
             }
         }
 
-        // Always await _exitTask to ensure stdout/stderr drain and resources (process + writer) are released.
+        // Always await _exitTask to ensure stdout/stderr drain and resources (process + interceptor) are released.
         try
         {
             await _exitTask;
@@ -144,15 +145,15 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
 
     private async Task ReadLinesAsync(TextReader reader, string streamName)
     {
-        bool teeRawOutput = _rawStdoutWriter is not null
+        bool canIntercept = _outputInterceptor is not null
             && string.Equals(streamName, HostProcessStreamNames.StandardOutput, StringComparison.Ordinal);
 
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
         {
-            if (teeRawOutput)
+            if (canIntercept && _outputInterceptor!.TryIntercept(line))
             {
-                await _rawStdoutWriter!.WriteLineAsync(line);
+                continue;
             }
 
             HostLogEntry entry = _parser.ParseLine(streamName, line, _timeProvider.GetUtcNow());
@@ -178,15 +179,10 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         finally
         {
             await _process.DisposeAsync();
-            await DisposeRawStdoutWriterAsync();
-        }
-    }
-
-    private async ValueTask DisposeRawStdoutWriterAsync()
-    {
-        if (_rawStdoutWriter is not null)
-        {
-            await _rawStdoutWriter.DisposeAsync();
+            if (_outputInterceptor is not null)
+            {
+                await _outputInterceptor.DisposeAsync();
+            }
         }
     }
 }

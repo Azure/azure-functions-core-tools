@@ -45,31 +45,36 @@ internal sealed class DotNetStartOptionContributor : IStartHostOptionContributor
         Description = "Emit JSON line output from the .NET worker when applicable."
     };
 
-public Option<string?> JsonOutputFileOption { get; } = new("--json-output-file")
-{
-    Description = "Path to a file that receives the JSON output (implies --enable-json-output)."
-};
+    public Option<string?> JsonOutputFileOption { get; } = new("--json-output-file")
+    {
+        Description = "Path to a file that receives the JSON output (implies --enable-json-output)."
+    };
+
+    // Canonical option instances returned by the registry. Set after GetStartOptions is called.
+    private Option<bool> _debugOption = null!;
+    private Option<bool> _jsonOutputOption = null!;
+    private Option<string?> _jsonOutputFileOption = null!;
 
     public IReadOnlyList<Option> GetStartOptions(StartOptionRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
 
-        registry.GetOrAdd(DotNetIsolatedDebugOption);
-        registry.GetOrAdd(EnableJsonOutputOption);
-        registry.GetOrAdd(JsonOutputFileOption);
+        _debugOption = registry.GetOrAdd(DotNetIsolatedDebugOption);
+        _jsonOutputOption = registry.GetOrAdd(EnableJsonOutputOption);
+        _jsonOutputFileOption = registry.GetOrAdd(JsonOutputFileOption);
 
-        return [DotNetIsolatedDebugOption, EnableJsonOutputOption, JsonOutputFileOption];
+        return [_debugOption, _jsonOutputOption, _jsonOutputFileOption];
     }
 
     public StartHostConfiguration Configure(ParseResult parseResult)
     {
         ArgumentNullException.ThrowIfNull(parseResult);
 
-        bool debug = parseResult.GetValue(DotNetIsolatedDebugOption);
-        string? jsonOutputFile = parseResult.GetValue(JsonOutputFileOption);
+        bool debug = parseResult.GetValue(_debugOption);
+        string? jsonOutputFile = parseResult.GetValue(_jsonOutputFileOption);
 
         // A JSON output file only makes sense alongside JSON output, so requesting one turns it on.
-        bool jsonOutput = parseResult.GetValue(EnableJsonOutputOption) || !string.IsNullOrWhiteSpace(jsonOutputFile);
+        bool jsonOutput = parseResult.GetValue(_jsonOutputOption) || !string.IsNullOrWhiteSpace(jsonOutputFile);
 
         if (!debug && !jsonOutput)
         {
@@ -95,7 +100,7 @@ public Option<string?> JsonOutputFileOption { get; } = new("--json-output-file")
         return new StartHostConfiguration
         {
             EnvironmentVariables = environmentVariables,
-            JsonOutputFilePath = string.IsNullOrWhiteSpace(jsonOutputFile) ? null : jsonOutputFile,
+            OutputInterceptor = new DotNetHostOutputInterceptor(jsonOutputFile),
             StartupNotice = debug ? DebuggerWaitNotice : null,
         };
     }
