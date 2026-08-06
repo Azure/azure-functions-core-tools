@@ -107,6 +107,17 @@ public class WorkloadStoreTests : IDisposable
             PackageId = "Azure.Functions.Cli.Workloads.Dotnet",
             PackageVersion = "1.0.0",
             Aliases = ["dotnet", "dotnet-isolated"],
+            RuntimeIdentifier = "linux-x64",
+            IsExplicitlyInstalled = false,
+            LogicalPackage = new LogicalPackage
+            {
+                PackageId = "Azure.Functions.Cli.Workloads.Dotnet",
+                PackageVersion = "1.0.0",
+                Aliases = ["dotnet"],
+                DisplayName = "Azure Functions .NET workload",
+                Description = "Logical package.",
+                Source = "https://example.test/v3/index.json",
+            },
             EntryPoint = new EntryPointSpec
             {
                 AssemblyPath = "lib/net10.0/Foo.dll",
@@ -120,6 +131,10 @@ public class WorkloadStoreTests : IDisposable
         actual.PackageId.Should().Be(entry.PackageId);
         actual.PackageVersion.Should().Be(entry.PackageVersion);
         actual.Aliases.Should().Equal(entry.Aliases);
+        actual.RuntimeIdentifier.Should().Be("linux-x64");
+        actual.IsExplicitlyInstalled.Should().BeFalse();
+        actual.LogicalPackage!.PackageId.Should().Be(entry.LogicalPackage.PackageId);
+        actual.LogicalPackage.Source.Should().Be(entry.LogicalPackage.Source);
         actual.EntryPoint!.AssemblyPath.Should().Be(entry.EntryPoint!.AssemblyPath);
         actual.EntryPoint.Type.Should().Be(entry.EntryPoint.Type);
     }
@@ -184,12 +199,198 @@ public class WorkloadStoreTests : IDisposable
         Directory.GetFiles(_tempHome, "*.json.tmp").Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task GetWorkloadsAsync_LegacyEntryDefaultsToExplicitOwnership()
+    {
+        Directory.CreateDirectory(_tempHome);
+        await File.WriteAllTextAsync(
+            _paths.WorkloadRegistryPath,
+            $$"""
+            {
+              "$schema": "{{WorkloadManifestSchema.RegistryV1Schema}}",
+              "workloads": [
+                {
+                  "packageId": "legacy.package",
+                  "packageVersion": "1.0.0",
+                  "installRefCount": 1
+                }
+              ],
+              "metas": []
+            }
+            """);
+
+        WorkloadEntry entry = (await _store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
+
+        entry.IsExplicitlyInstalled.Should().BeTrue();
+        entry.LogicalPackage.Should().BeNull();
+        entry.RuntimeIdentifier.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetWorkloadsAsync_ExplicitFalseIsPreserved()
+    {
+        Directory.CreateDirectory(_tempHome);
+        await File.WriteAllTextAsync(
+            _paths.WorkloadRegistryPath,
+            $$"""
+            {
+              "$schema": "{{WorkloadManifestSchema.RegistryV1Schema}}",
+              "workloads": [
+                {
+                  "packageId": "pkg.win-x64",
+                  "packageVersion": "1.0.0",
+                  "runtimeIdentifier": "win-x64",
+                  "isExplicitlyInstalled": false,
+                  "logicalPackage": {
+                    "packageId": "pkg",
+                    "packageVersion": "1.0.0"
+                  },
+                  "installRefCount": 1
+                }
+              ],
+              "metas": []
+            }
+            """);
+
+        WorkloadEntry entry = (await _store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
+
+        entry.IsExplicitlyInstalled.Should().BeFalse();
+        entry.LogicalPackage.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task AddOwnershipAsync_ThrowsWhenRowAlreadyHasDifferentLogicalOwner()
+    {
+        await _store.SaveWorkloadAsync(NewPointerEntry("pkg.win-x64", "1.0.0"));
+        WorkloadEntry conflicting = new()
+        {
+            PackageId = "pkg.win-x64",
+            PackageVersion = "1.0.0",
+            Kind = WorkloadKind.Content,
+            RuntimeIdentifier = "win-x64",
+            IsExplicitlyInstalled = false,
+            LogicalPackage = new LogicalPackage { PackageId = "other.pkg", PackageVersion = "1.0.0" },
+            InstallRefCount = 1,
+        };
+
+        await FluentActions.Awaiting(() => _store.AddOwnershipAsync(conflicting, WorkloadOwnershipKind.Logical))
+            .Should().ThrowExactlyAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task AddOwnershipAsync_AttachesLogicalOwnershipIdempotently()
+    {
+        await _store.SaveWorkloadAsync(NewEntry("pkg.win-x64", "1.0.0"));
+        WorkloadEntry pointerEntry = NewPointerEntry("pkg.win-x64", "1.0.0");
+
+        WorkloadEntry first = await _store.AddOwnershipAsync(pointerEntry, WorkloadOwnershipKind.Logical);
+        WorkloadEntry second = await _store.AddOwnershipAsync(pointerEntry, WorkloadOwnershipKind.Logical);
+
+        first.IsExplicitlyInstalled.Should().BeTrue();
+        first.LogicalPackage.Should().NotBeNull();
+        first.InstallRefCount.Should().Be(2);
+        second.InstallRefCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task RemoveOwnershipAsync_RemovesOnlyExplicitOwner()
+    {
+        WorkloadEntry pointerEntry = NewPointerEntry("pkg.win-x64", "1.0.0");
+        WorkloadEntry entry = new()
+        {
+            PackageId = pointerEntry.PackageId,
+            PackageVersion = pointerEntry.PackageVersion,
+            Kind = pointerEntry.Kind,
+            RuntimeIdentifier = pointerEntry.RuntimeIdentifier,
+            LogicalPackage = pointerEntry.LogicalPackage,
+            IsExplicitlyInstalled = true,
+            InstallRefCount = 2,
+        };
+        await _store.SaveWorkloadAsync(entry);
+
+        WorkloadOwnershipRemovalResult result = await _store.RemoveOwnershipAsync(
+            entry.PackageId,
+            entry.PackageVersion,
+            WorkloadOwnershipKind.Explicit);
+
+        result.OwnershipRemoved.Should().BeTrue();
+        result.EntryRemoved.Should().BeFalse();
+        result.Entry!.IsExplicitlyInstalled.Should().BeFalse();
+        result.Entry.LogicalPackage.Should().NotBeNull();
+        result.Entry.InstallRefCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task MoveLogicalOwnershipAsync_RetainsExplicitOldRow()
+    {
+        WorkloadEntry oldEntry = new()
+        {
+            PackageId = "pkg.win-x64",
+            PackageVersion = "1.0.0",
+            RuntimeIdentifier = "win-x64",
+            IsExplicitlyInstalled = true,
+            LogicalPackage = NewPointerEntry("pkg.win-x64", "1.0.0").LogicalPackage,
+            InstallRefCount = 2,
+        };
+        await _store.SaveWorkloadAsync(oldEntry);
+
+        WorkloadOwnershipMoveResult result = await _store.MoveLogicalOwnershipAsync(
+            oldEntry.PackageId,
+            oldEntry.PackageVersion,
+            NewPointerEntry("pkg.win-x64", "2.0.0"));
+
+        result.PreviousEntryRemoved.Should().BeFalse();
+        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync();
+        WorkloadEntry retained = entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Subject;
+        retained.IsExplicitlyInstalled.Should().BeTrue();
+        retained.LogicalPackage.Should().BeNull();
+        retained.InstallRefCount.Should().Be(1);
+        entries.Should().ContainSingle(e => e.PackageVersion == "2.0.0");
+    }
+
+    [Fact]
+    public void WorkloadKindJsonConverter_RoundTripsRidPointerWireValue()
+    {
+        string json = JsonSerializer.Serialize(
+            new WorkloadMetadata
+            {
+                Schema = WorkloadManifestSchema.PackageManifestV1Schema,
+                Kind = WorkloadKind.RidPointer,
+                Packages = new Dictionary<string, string> { ["win-x64"] = "pkg.win-x64" },
+            },
+            WorkloadJsonContext.Default.WorkloadMetadata);
+
+        json.Should().Contain("\"kind\":\"rid-pointer\"");
+        WorkloadMetadata actual = JsonSerializer.Deserialize(json, WorkloadJsonContext.Default.WorkloadMetadata)!;
+        actual.Kind.Should().Be(WorkloadKind.RidPointer);
+    }
+
     private static WorkloadEntry NewEntry(string packageId, string version, string entryAssembly = "x.dll")
         => new()
         {
             PackageId = packageId,
             PackageVersion = version,
             EntryPoint = new EntryPointSpec { AssemblyPath = entryAssembly, Type = "X" },
+        };
+
+    private static WorkloadEntry NewPointerEntry(string packageId, string version)
+        => new()
+        {
+            PackageId = packageId,
+            PackageVersion = version,
+            Kind = WorkloadKind.Content,
+            RuntimeIdentifier = "win-x64",
+            IsExplicitlyInstalled = false,
+            LogicalPackage = new LogicalPackage
+            {
+                PackageId = "pkg",
+                PackageVersion = version,
+                Aliases = ["pkg"],
+                DisplayName = "Package",
+                Description = "Logical package.",
+                Source = "https://example.test/v3/index.json",
+            },
+            InstallRefCount = 1,
         };
 
     private sealed class ThrowingSerializeStore(IWorkloadPaths paths) : WorkloadStore(paths)
