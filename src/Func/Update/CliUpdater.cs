@@ -35,10 +35,10 @@ internal sealed partial class CliUpdater(
 
         // Stage the download on the same volume as the install directory so
         // File.Move never crosses volume boundaries.
-        string tempWorkDir = _fileSystem.CreateTempDirectory(installDir);
+        using TempDirectory tempWorkDir = new(_fileSystem.CreateTempDirectory(installDir), _fileSystem);
         string archiveExtension = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "zip" : "tar.gz";
-        string archivePath = Path.Combine(tempWorkDir, $"func-update.{archiveExtension}");
-        string extractDir = _fileSystem.CreateTempDirectory(installDir);
+        string archivePath = Path.Combine(tempWorkDir.Path, $"func-update.{archiveExtension}");
+        using TempDirectory extractDir = new(_fileSystem.CreateTempDirectory(installDir), _fileSystem);
         bool swapped = false;
 
         try
@@ -51,7 +51,7 @@ internal sealed partial class CliUpdater(
             Log.ExtractingUpdatePackage(_logger);
             try
             {
-                ExtractArchive(archivePath, extractDir);
+                ExtractArchive(archivePath, extractDir.Path);
             }
             catch (InvalidDataException ex)
             {
@@ -62,7 +62,7 @@ internal sealed partial class CliUpdater(
             }
 
             string binaryName = Path.GetFileName(binaryPath);
-            string extractedBinary = Path.Combine(extractDir, binaryName);
+            string extractedBinary = Path.Combine(extractDir.Path, binaryName);
 
             if (!_fileSystem.FileExists(extractedBinary))
             {
@@ -92,11 +92,6 @@ internal sealed partial class CliUpdater(
             }
 
             throw;
-        }
-        finally
-        {
-            TryDeleteDirectory(tempWorkDir);
-            TryDeleteDirectory(extractDir);
         }
     }
 
@@ -253,22 +248,6 @@ internal sealed partial class CliUpdater(
         }
     }
 
-    private void TryDeleteDirectory(string path)
-    {
-        // Best-effort cleanup; swallowed so temp-dir failures don't mask the real outcome.
-        try
-        {
-            if (_fileSystem.DirectoryExists(path))
-            {
-                _fileSystem.DeleteDirectory(path);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.CouldNotRemoveTempDirectory(_logger, ex, path);
-        }
-    }
-
     private static partial class Log
     {
         [LoggerMessage(LogLevel.Information, "Downloading func {Version}.")]
@@ -294,8 +273,5 @@ internal sealed partial class CliUpdater(
 
         [LoggerMessage(LogLevel.Debug, "Checksum verified for {Version}.")]
         public static partial void ChecksumVerified(ILogger logger, object version);
-
-        [LoggerMessage(LogLevel.Warning, "Could not remove temporary directory {Path}.")]
-        public static partial void CouldNotRemoveTempDirectory(ILogger logger, Exception ex, string path);
     }
 }
