@@ -5,7 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
-namespace Azure.Functions.Cli.Commands.Start.Azurite.Processes;
+namespace Azure.Functions.Cli.Common;
 
 /// <inheritdoc cref="IProcessRunner" />
 internal sealed class ProcessRunner : IProcessRunner
@@ -31,6 +31,14 @@ internal sealed class ProcessRunner : IProcessRunner
         foreach (string arg in request.Arguments)
         {
             startInfo.ArgumentList.Add(arg);
+        }
+
+        if (request.EnvironmentVariables is not null)
+        {
+            foreach (KeyValuePair<string, string> kvp in request.EnvironmentVariables)
+            {
+                startInfo.Environment[kvp.Key] = kvp.Value;
+            }
         }
 
         using Process process = new() { StartInfo = startInfo };
