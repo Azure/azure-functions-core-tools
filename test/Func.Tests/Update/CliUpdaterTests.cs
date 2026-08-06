@@ -39,7 +39,8 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("5.1.0\n"));
 
-        fileSystem.FileExists(_fakeExtractedBinary).Returns(true);
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
 
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
@@ -68,7 +69,7 @@ public sealed class CliUpdaterTests
     }
 
     [Fact]
-    public async Task UpdateAsync_VerificationOutputMismatch_RollsBackAndThrowsGraceful()
+    public async Task UpdateAsync_VerificationOutputMismatch_RollsBackAllFilesAndThrowsGraceful()
     {
         // Arrange
         (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
@@ -77,8 +78,7 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("4.0.0\n")); // wrong version
 
-        fileSystem.FileExists(_fakeExtractedBinary).Returns(true);
-        // After swap, rollback checks for the new and backup files
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
         fileSystem.FileExists(_fakeProcessPath).Returns(true);
         fileSystem.FileExists(_fakeBackupPath).Returns(true);
 
@@ -100,7 +100,8 @@ public sealed class CliUpdaterTests
         (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
-        fileSystem.FileExists(_fakeExtractedBinary).Returns(true);
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
 
         // The rename throws to simulate a locked file scenario
         fileSystem.When(fs => fs.MoveFile(_fakeProcessPath, _fakeBackupPath, true))
@@ -110,7 +111,7 @@ public sealed class CliUpdaterTests
         await Assert.ThrowsAsync<IOException>(
             () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
 
-        // Swap never completed, so rollback should NOT attempt to move backup
+        // Swap never completed, so rollback should NOT attempt to restore backup
         fileSystem.DidNotReceive().MoveFile(_fakeBackupPath, _fakeProcessPath);
     }
 
@@ -148,13 +149,67 @@ public sealed class CliUpdaterTests
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
             .Returns(OkOutcome("5.1.0\n"));
 
-        fileSystem.FileExists(_fakeExtractedBinary).Returns(true);
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
 
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
 
         // Assert — ComputeSha256Async was never called
         await fileSystem.DidNotReceive().ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_MultipleFiles_SwapsAllAndRollsBackOnFailure()
+    {
+        // Arrange — archive contains two files (e.g. func + a native dependency)
+        string fakeLib = Path.Combine(_fakeExtractDir, "libgrpc.so");
+        string targetLib = Path.Combine(_fakeInstallDir, "libgrpc.so");
+        string backupLib = targetLib + ".old";
+
+        (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
+            .Returns(OkOutcome("4.0.0\n")); // wrong version — triggers rollback
+
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary, fakeLib]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
+        fileSystem.FileExists(targetLib).Returns(true);
+        fileSystem.FileExists(_fakeBackupPath).Returns(true);
+        fileSystem.FileExists(backupLib).Returns(true);
+
+        // Act + Assert
+        await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        // Both files were swapped
+        fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
+        fileSystem.Received(1).CopyFile(_fakeExtractedBinary, _fakeProcessPath);
+        fileSystem.Received(1).MoveFile(targetLib, backupLib, true);
+        fileSystem.Received(1).CopyFile(fakeLib, targetLib);
+
+        // Both files were rolled back
+        fileSystem.Received(1).DeleteFile(_fakeProcessPath);
+        fileSystem.Received(1).MoveFile(_fakeBackupPath, _fakeProcessPath);
+        fileSystem.Received(1).DeleteFile(targetLib);
+        fileSystem.Received(1).MoveFile(backupLib, targetLib);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_EmptyArchive_ThrowsGraceful()
+    {
+        // Arrange
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+
+        fileSystem.GetFiles(_fakeExtractDir).Returns([]);
+
+        // Act + Assert
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.Contains("empty", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

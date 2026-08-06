@@ -31,7 +31,6 @@ internal sealed partial class CliUpdater(
 
         string binaryPath = GetBinaryPath();
         string installDir = Path.GetDirectoryName(binaryPath)!;
-        string backupPath = binaryPath + OldFileSuffix;
 
         // Stage the download on the same volume as the install directory so
         // File.Move never crosses volume boundaries.
@@ -39,7 +38,9 @@ internal sealed partial class CliUpdater(
         string archiveExtension = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "zip" : "tar.gz";
         string archivePath = Path.Combine(tempWorkDir.Path, $"func-update.{archiveExtension}");
         using TempDirectory extractDir = new(_fileSystem.CreateTempDirectory(installDir), _fileSystem);
-        bool swapped = false;
+
+        // Tracks files that were successfully swapped so we can roll them back.
+        List<(string TargetPath, string BackupPath)> swappedFiles = [];
 
         try
         {
@@ -61,60 +62,87 @@ internal sealed partial class CliUpdater(
                     isUserError: true);
             }
 
-            string binaryName = Path.GetFileName(binaryPath);
-            string extractedBinary = Path.Combine(extractDir.Path, binaryName);
-
-            if (!_fileSystem.FileExists(extractedBinary))
+            IReadOnlyList<string> extractedFiles = _fileSystem.GetFiles(extractDir.Path);
+            if (extractedFiles.Count == 0)
             {
                 throw new GracefulException(
-                    $"The downloaded archive for func {release.Version} does not contain '{binaryName}'.",
+                    $"The downloaded archive for func {release.Version} is empty.",
                     isUserError: true);
             }
 
-            // Rename the running binary out of the way, then copy the new one in.
-            // On Windows, renaming a running executable is allowed by the NT kernel.
-            _fileSystem.MoveFile(binaryPath, backupPath, overwrite: true);
-            _fileSystem.CopyFile(extractedBinary, binaryPath);
-            swapped = true;
+            Log.UpdatingFiles(_logger, extractedFiles.Count);
+
+            // Rename each existing file to .old, then copy the new one in.
+            // On Windows, renaming running executables and loaded DLLs is allowed
+            // by the NT kernel (the file handle follows the inode, not the name).
+            foreach (string extractedPath in extractedFiles)
+            {
+                string relativePath = Path.GetRelativePath(extractDir.Path, extractedPath);
+                string targetPath = Path.Combine(installDir, relativePath);
+                string backupPath = targetPath + OldFileSuffix;
+
+                // Ensure the target subdirectory exists (archive may contain nested structure)
+                string? targetDir = Path.GetDirectoryName(targetPath);
+                if (targetDir is not null && !_fileSystem.DirectoryExists(targetDir))
+                {
+                    _fileSystem.CreateDirectory(targetDir);
+                }
+
+                if (_fileSystem.FileExists(targetPath))
+                {
+                    _fileSystem.MoveFile(targetPath, backupPath, overwrite: true);
+                }
+
+                _fileSystem.CopyFile(extractedPath, targetPath);
+                swappedFiles.Add((targetPath, backupPath));
+            }
 
             await VerifyAsync(release, installDir, cancellationToken);
 
-            // Best-effort removal of the backup; on Windows the running exe may
+            // Best-effort removal of backups; on Windows the running exe may
             // still be locked, in which case it gets cleaned up on next launch.
-            TryDeleteFile(backupPath);
+            foreach ((string _, string backupPath) in swappedFiles)
+            {
+                TryDeleteFile(backupPath);
+            }
+
             Log.InstalledSuccessfully(_logger, release.Version);
         }
         catch (Exception)
         {
-            if (swapped)
+            if (swappedFiles.Count > 0)
             {
-                TryRollback(binaryPath, backupPath);
+                TryRollback(swappedFiles, installDir);
             }
 
             throw;
         }
     }
 
-    private void TryRollback(string binaryPath, string backupPath)
+    private void TryRollback(List<(string TargetPath, string BackupPath)> swappedFiles, string installDir)
     {
         try
         {
-            // Remove the new binary if it was copied in
-            if (_fileSystem.FileExists(binaryPath))
+            foreach ((string targetPath, string backupPath) in swappedFiles)
             {
-                _fileSystem.DeleteFile(binaryPath);
+                // Remove the new file that was copied in
+                if (_fileSystem.FileExists(targetPath))
+                {
+                    _fileSystem.DeleteFile(targetPath);
+                }
+
+                // Restore the backup if one was created
+                if (_fileSystem.FileExists(backupPath))
+                {
+                    _fileSystem.MoveFile(backupPath, targetPath);
+                }
             }
 
-            // Restore the backup
-            if (_fileSystem.FileExists(backupPath))
-            {
-                _fileSystem.MoveFile(backupPath, binaryPath);
-                Log.PreviousVersionRestored(_logger);
-            }
+            Log.PreviousVersionRestored(_logger);
         }
         catch (Exception ex)
         {
-            Log.RollbackFailed(_logger, ex, Path.GetDirectoryName(binaryPath)!);
+            Log.RollbackFailed(_logger, ex, installDir);
         }
     }
 
@@ -255,6 +283,9 @@ internal sealed partial class CliUpdater(
 
         [LoggerMessage(LogLevel.Information, "Extracting update package.")]
         public static partial void ExtractingUpdatePackage(ILogger logger);
+
+        [LoggerMessage(LogLevel.Information, "Updating {Count} file(s).")]
+        public static partial void UpdatingFiles(ILogger logger, int count);
 
         [LoggerMessage(LogLevel.Information, "func {Version} installed successfully.")]
         public static partial void InstalledSuccessfully(ILogger logger, object version);
