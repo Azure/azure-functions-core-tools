@@ -16,33 +16,22 @@ internal interface INewCommandRunner
 /// Orchestrates the <c>func new</c> resolution, selection, validation, and
 /// application pipeline through focused template services.
 /// </summary>
-internal sealed class NewCommandRunner : INewCommandRunner
+internal sealed class NewCommandRunner(
+    INewCommandContextResolver contextResolver,
+    INewCommandBundleValidator bundleValidator,
+    INewCommandTemplateCatalog templateCatalog,
+    INewCommandTemplateSelector templateSelector,
+    INewCommandTemplateApplicator templateApplicator,
+    NewCommandRenderer renderer,
+    INewCommandResultRenderer resultRenderer) : INewCommandRunner
 {
-    private readonly INewCommandContextResolver _contextResolver;
-    private readonly INewCommandBundleValidator _bundleValidator;
-    private readonly INewCommandTemplateCatalog _templateCatalog;
-    private readonly INewCommandTemplateSelector _templateSelector;
-    private readonly INewCommandTemplateApplicator _templateApplicator;
-    private readonly NewCommandRenderer _renderer;
-    private readonly INewCommandResultRenderer _resultRenderer;
-
-    public NewCommandRunner(
-        INewCommandContextResolver contextResolver,
-        INewCommandBundleValidator bundleValidator,
-        INewCommandTemplateCatalog templateCatalog,
-        INewCommandTemplateSelector templateSelector,
-        INewCommandTemplateApplicator templateApplicator,
-        NewCommandRenderer renderer,
-        INewCommandResultRenderer resultRenderer)
-    {
-        _contextResolver = contextResolver ?? throw new ArgumentNullException(nameof(contextResolver));
-        _bundleValidator = bundleValidator ?? throw new ArgumentNullException(nameof(bundleValidator));
-        _templateCatalog = templateCatalog ?? throw new ArgumentNullException(nameof(templateCatalog));
-        _templateSelector = templateSelector ?? throw new ArgumentNullException(nameof(templateSelector));
-        _templateApplicator = templateApplicator ?? throw new ArgumentNullException(nameof(templateApplicator));
-        _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
-        _resultRenderer = resultRenderer ?? throw new ArgumentNullException(nameof(resultRenderer));
-    }
+    private readonly INewCommandContextResolver _contextResolver = contextResolver ?? throw new ArgumentNullException(nameof(contextResolver));
+    private readonly INewCommandBundleValidator _bundleValidator = bundleValidator ?? throw new ArgumentNullException(nameof(bundleValidator));
+    private readonly INewCommandTemplateCatalog _templateCatalog = templateCatalog ?? throw new ArgumentNullException(nameof(templateCatalog));
+    private readonly INewCommandTemplateSelector _templateSelector = templateSelector ?? throw new ArgumentNullException(nameof(templateSelector));
+    private readonly INewCommandTemplateApplicator _templateApplicator = templateApplicator ?? throw new ArgumentNullException(nameof(templateApplicator));
+    private readonly NewCommandRenderer _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
+    private readonly INewCommandResultRenderer _resultRenderer = resultRenderer ?? throw new ArgumentNullException(nameof(resultRenderer));
 
     public async Task<int> ExecuteAsync(NewInvocation invocation, CancellationToken cancellationToken)
     {
