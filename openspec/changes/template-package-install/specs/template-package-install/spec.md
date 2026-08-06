@@ -186,7 +186,7 @@ The CLI SHALL accept `--source <feed>` on template install and update commands a
 
 ### Requirement: Package types determine the owning command
 
-The CLI SHALL install a package through `func new install` only when it declares the `FuncTemplate` package type. The CLI SHALL install a package through `func workload install` only when it declares the `FuncCliWorkload` package type. A package declaring both types SHALL be rejected as ambiguous, and a package declaring neither type SHALL be rejected as unsupported.
+For NuGet packages, the CLI SHALL install a package through `func new install` only when it declares the `FuncTemplate` package type. The CLI SHALL install a NuGet package through `func workload install` only when it declares the `FuncCliWorkload` package type. A NuGet package declaring both types SHALL be rejected as ambiguous, and a NuGet package declaring neither type SHALL be rejected as unsupported. A folder install has no NuGet package-type metadata and SHALL instead be accepted only when Microsoft.TemplateEngine discovers at least one valid template from that folder.
 
 #### Scenario: Template package uses func new install
 
@@ -222,6 +222,18 @@ The CLI SHALL install a package through `func new install` only when it declares
 
 - **WHEN** a package declares neither `FuncTemplate` nor `FuncCliWorkload`
 - **THEN** the CLI exits non-zero and reports that the package is unsupported
+
+#### Scenario: Folder contains templates
+
+- **WHEN** a user installs a folder package
+- **AND** Microsoft.TemplateEngine discovers at least one valid template from that folder
+- **THEN** the folder is accepted without requiring NuGet package-type metadata
+
+#### Scenario: Folder contains no templates
+
+- **WHEN** a user installs a folder package
+- **AND** Microsoft.TemplateEngine discovers no valid templates from that folder
+- **THEN** the CLI exits non-zero and reports that the folder is not a template package
 
 ### Requirement: Same-source installation supports version replacement and is idempotent
 
