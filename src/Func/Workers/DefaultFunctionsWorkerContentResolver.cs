@@ -40,7 +40,10 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
 
         if (installedWorkers.Count == 0)
         {
-            _logger.LogDebug("[worker-resolve] No installed workloads found for worker '{WorkerId}'.", workerId.Value);
+            _logger.LogWarning(
+                "[worker-resolve] No installed workloads matched for worker '{WorkerId}'. "
+                + "The worker may be present on disk but not registered with the workload provider.",
+                workerId.Value);
             return NotInstalled(workerId);
         }
 
@@ -60,8 +63,8 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
             if (!SatisfiesConstraint(version, versionConstraint))
             {
                 _logger.LogDebug(
-                    "[worker-resolve] Skipping workload '{PackageId}' version '{Version}': does not satisfy constraint '{Constraint}'.",
-                    workload.PackageId, workload.PackageVersion, versionConstraint?.ToString() ?? "(none)");
+                    "[worker-resolve] Skipping workload '{PackageId}' version '{PackageVersion}': does not satisfy constraint '{Constraint}'.",
+                    workload.PackageId, version.ToNormalizedString(), versionConstraint?.ToString() ?? "(none)");
                 continue;
             }
 

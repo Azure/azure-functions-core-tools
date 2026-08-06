@@ -31,22 +31,29 @@ internal sealed class DefaultFunctionsWorkerResolver(
         cancellationToken.ThrowIfCancellationRequested();
 
         _activeWorkerConstraints.TryGetValue(workerId.Value, out VersionRange? constraint);
-        _logger.LogDebug(
-            "[worker-resolve] Resolving worker '{WorkerId}' with constraint '{Constraint}'.",
-            workerId.Value, constraint?.ToString() ?? "(none)");
 
-        IReadOnlyList<ContentWorkloadInfo> installedWorkers = GetWorkerWorkloads(workerId);
-        _logger.LogDebug(
-            "[worker-resolve] Workload search for '{WorkerId}' found {Count} candidate(s).",
-            workerId.Value, installedWorkers.Count);
+        string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
+        string alias = GetWorkerAlias(workerId);
+        IReadOnlyList<ContentWorkloadInfo> installedWorkers = GetWorkerWorkloads(workerId, packageId, alias);
+
+        if (installedWorkers.Count == 0)
+        {
+            IReadOnlyList<ContentWorkloadInfo> allWorkloads = _workloadProvider.GetContentWorkloads();
+            _logger.LogWarning(
+                "[worker-resolve] No workloads found for worker '{WorkerId}'. Searched package ID '{PackageId}' and alias '{Alias}'. "
+                + "Provider has {TotalCount} content workload(s): [{AllWorkloads}]",
+                workerId.Value,
+                packageId,
+                alias,
+                allWorkloads.Count,
+                string.Join(", ", allWorkloads.Select(w => $"{w.PackageId}@{w.PackageVersion} (aliases: {string.Join(";", w.Aliases)})")));
+        }
 
         return Task.FromResult(_workerContentResolver.ResolveWorker(workerId, installedWorkers, constraint, cancellationToken));
     }
 
-    private IReadOnlyList<ContentWorkloadInfo> GetWorkerWorkloads(FunctionsWorkerId workerId)
+    private IReadOnlyList<ContentWorkloadInfo> GetWorkerWorkloads(FunctionsWorkerId workerId, string packageId, string alias)
     {
-        string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
-        string alias = GetWorkerAlias(workerId);
         List<ContentWorkloadInfo> workloads = [];
         AddDistinct(workloads, _workloadProvider.GetContentWorkloadsByPackageId(packageId));
 
