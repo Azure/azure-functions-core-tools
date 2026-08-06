@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Common;
 using Microsoft.Extensions.Logging;
@@ -35,8 +34,7 @@ internal sealed partial class CliUpdater(
         // Stage the download on the same volume as the install directory so
         // File.Move never crosses volume boundaries.
         using TempDirectory tempWorkDir = new(_fileSystem.CreateTempDirectory(installDir), _fileSystem);
-        string archiveExtension = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "zip" : "tar.gz";
-        string archivePath = Path.Combine(tempWorkDir.Path, $"func-update.{archiveExtension}");
+        string archivePath = Path.Combine(tempWorkDir.Path, $"func-update.{Release.ArchiveExtension}");
         using TempDirectory extractDir = new(_fileSystem.CreateTempDirectory(installDir), _fileSystem);
 
         // Tracks files that were successfully swapped so we can roll them back.
@@ -114,7 +112,7 @@ internal sealed partial class CliUpdater(
             await VerifyAsync(release, installDir, cancellationToken);
 
             // Best-effort removal of backups; on Windows the running exe may
-            // still be locked, in which case it gets cleaned up on next launch.
+            // still be locked, in which case it gets overwritten on the next update.
             foreach ((string _, string backupPath) in swappedFiles)
             {
                 TryDeleteFile(backupPath);
@@ -314,7 +312,7 @@ internal sealed partial class CliUpdater(
         [LoggerMessage(LogLevel.Information, "func {Version} installed successfully.")]
         public static partial void InstalledSuccessfully(ILogger logger, object version);
 
-        [LoggerMessage(LogLevel.Debug, "Could not remove {File}; it will be cleaned up on next launch.")]
+        [LoggerMessage(LogLevel.Debug, "Could not remove {File}; it will be overwritten on the next update.")]
         public static partial void CouldNotRemoveOldFile(ILogger logger, Exception ex, string file);
 
         [LoggerMessage(LogLevel.Error, "The installation at {InstallDir} may be in an inconsistent state. Some files could not be rolled back.")]

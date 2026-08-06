@@ -5,9 +5,8 @@ namespace Azure.Functions.Cli.Common.Processes;
 
 /// <summary>
 /// Launches short-lived child processes for the CLI. Wraps
-/// <see cref="System.Diagnostics.Process"/> behind a substitutable seam so the
-/// rest of the Azurite discovery code can be unit-tested without spawning real
-/// processes.
+/// <see cref="System.Diagnostics.Process"/> behind a substitutable seam so
+/// callers can be unit-tested without spawning real processes.
 /// </summary>
 internal interface IProcessRunner
 {

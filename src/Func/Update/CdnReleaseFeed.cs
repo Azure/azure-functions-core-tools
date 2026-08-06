@@ -146,8 +146,7 @@ internal sealed partial class CdnReleaseFeed(
     private static Uri BuildDownloadUri(SemVersion version)
     {
         string rid = RuntimeInformation.RuntimeIdentifier;
-        string extension = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "zip" : "tar.gz";
-        return new Uri($"public/cli/v5/{version}/Azure.Functions.Cli.{rid}.{version}.{extension}", UriKind.Relative);
+        return new Uri($"public/cli/v5/{version}/Azure.Functions.Cli.{rid}.{version}.{Release.ArchiveExtension}", UriKind.Relative);
     }
 
     private static partial class Log
