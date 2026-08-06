@@ -2,9 +2,7 @@
 
 This guide walks through building a workload for the Azure Functions Core Tools v5 CLI. A workload is a NuGet package that the CLI loads at runtime to extend its behavior, most commonly to provide `func init` / `func new` support for a specific language stack (e.g. Node.js, Python, Java), but a workload can also contribute brand-new subcommands.
 
-> **Status**: the abstractions, DI host, and `func workload install` / `uninstall` commands described below are in the tree as of this PR. Workloads are installed from a local `.nupkg` on disk; NuGet feed acquisition lands in a follow-up.
->
-> **Spec**: this guide is the authoring view. The on-disk and on-feed layout, the `workload.json` schema, the `kind` discriminator (`workload` / `content` / `meta`), and the install pipeline are specified in [`docs/proposed/workload-package-layout.md`](./proposed/workload-package-layout.md). Consult that doc for the contract; this guide stays focused on the happy-path authoring experience for `kind: workload`.
+> **Spec**: this guide is the authoring view. The on-disk and on-feed layout, the `workload.json` schema, the `kind` discriminator (`workload` / `content` / `meta` / `rid-pointer`), and the install pipeline are specified in [`docs/proposed/workload-package-layout.md`](./proposed/workload-package-layout.md). Consult that doc for the contract; this guide stays focused on the happy-path authoring experience for `kind: workload`.
 
 ## Architecture
 
@@ -123,7 +121,28 @@ What each piece does:
 - `SuppressDependenciesWhenPacking=true` plus `PrivateAssets=all` / `ExcludeAssets=runtime` on the `Abstractions` reference keep the workload self-contained: the CLI provides Abstractions (and the other host-shared contract assemblies, see §9.2 of the layout spec) at runtime. The same `PrivateAssets=all` rule applies to **every** `<PackageReference>` you add later, not just `Abstractions`.
 - `NU5128`/`NU5100` are suppressed because we deliberately ship without `lib/` and place files under `tools/any/`.
 
-> **Pack scope today.** The csproj above packs only the workload assembly itself. That works for stubs and for workloads whose runtime closure is just the host-shared contracts. As soon as a workload pulls in a transitive managed dependency (e.g., `Newtonsoft.Json`), the long-term shape from the package-layout spec applies: the package must contain the publish output (workload `.dll`, `.deps.json`, optional `.pdb`, every transitive managed dep, and any `runtimes/<rid>/` assets the deps ship). The upcoming `Workload.Sdk` package will provide the publish-into-`tools/any/` target; until then, workloads with transitive deps need to wire that step manually. See `docs/proposed/workload-package-layout.md` §5 and §9.
+### Runtime-specific workload packages
+
+Set `RuntimeIdentifiers` when a workload's payload differs by platform. The Workload SDK then produces one user-facing pointer package and one implementation package per RID:
+
+```xml
+<PropertyGroup>
+  <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+  <PackAsWorkload>true</PackAsWorkload>
+  <WorkloadKind>content</WorkloadKind>
+  <WorkloadAlias>python-worker</WorkloadAlias>
+</PropertyGroup>
+```
+
+- The pointer keeps the project package ID, uses package type `FuncCliWorkload`, and contains a `kind: rid-pointer` manifest whose `packages` map selects the implementation for each RID.
+- Each implementation uses the package ID `<pointer-package-id>.<rid>`, package type `FuncCliWorkloadRidPackage`, and retains the authored `workload` or `content` kind.
+- The SDK writes `runtimeIdentifier` into every implementation manifest and adds the matching `rid:<rid>` package tag. Do not author either value independently.
+- Implementation payloads ship under `tools/<rid>/` rather than `tools/any/`; the CLI derives the content root from the manifest's `runtimeIdentifier`.
+- Publish the pointer and every implementation at the same exact version and to the same feed. The CLI resolves only the mapped package ID at the pointer's exact version from the source that supplied the pointer.
+
+Users install, update, uninstall, and list the pointer identity. The CLI records the selected physical implementation and RID as ownership details; `func workload list --json` exposes both logical and physical package IDs.
+
+> **Pack scope.** The package must contain the publish output (workload `.dll`, `.deps.json`, optional `.pdb`, every transitive managed dependency, and any `runtimes/<rid>/` assets the dependencies ship). Use the Workload SDK's `PackAsWorkload` targets rather than manually copying only the primary assembly when a workload has a runtime dependency closure.
 
 Add a sibling `Directory.Version.props` for the workload version:
 
