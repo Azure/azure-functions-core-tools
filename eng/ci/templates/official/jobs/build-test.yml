@@ -57,10 +57,20 @@ jobs:
     inputs:
       versionSpec: '18.x'
 
-  - pwsh: |
-      Import-Module ".\pipelineUtilities.psm1" -Force
-      Install-Dotnet
-    displayName: 'Install .NET 6.0 and 3.1'
+  - task: UseDotNet@2
+    displayName: 'Install .NET 3.1'
+    inputs:
+      version: '3.1.415'
+
+  - task: UseDotNet@2
+    displayName: 'Install .NET 6.0'
+    inputs:
+      version: '6.0.417'
+
+  - task: UseDotNet@2
+    displayName: 'Install .NET 8.0'
+    inputs:
+      version: '8.0.204'
 
   - task: NuGetToolInstaller@1
     inputs:
