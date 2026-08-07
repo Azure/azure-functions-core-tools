@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Start.Initialization;
+using Azure.Functions.Cli.Commands.Start;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
@@ -130,6 +131,28 @@ public class StartCommandTests : IDisposable
         optionNames.Should().Contain("--no-tui");
         optionNames.Should().Contain("--log-file");
         optionNames.Should().Contain("--demo");
+        optionNames.Should().Contain("--pause-on-error");
+    }
+
+    [Fact]
+    public void LegacyHostStartArguments_NormalizeToStartCommand()
+    {
+        string[] args = ["host", "start", "--pause-on-error", "--port", "7072"];
+
+        string[] normalized = LegacyStartArgumentNormalizer.Normalize(args);
+
+        normalized.Should().Equal("start", "--pause-on-error", "--port", "7072");
+    }
+
+    [Fact]
+    public void LegacyHostStartArguments_NormalizedCommandParsesWithoutErrors()
+    {
+        var root = TestParser.CreateRoot(_interaction);
+        string[] args = LegacyStartArgumentNormalizer.Normalize(["host", "start", "--pause-on-error", "--port", "7072"]);
+
+        ParseResult result = root.Parse(args);
+
+        result.Errors.Should().BeEmpty();
     }
 
     [Fact]

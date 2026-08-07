@@ -98,6 +98,13 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "Disable managed Azurite. The host will start without probing or starting a local emulator."
     };
 
+    // TODO: Either support the legacy behavior or evaluate remaining callers (including Visual Studio) and remove their usage.
+    public Option<bool> PauseOnErrorOption { get; } = new("--pause-on-error")
+    {
+        Description = "Legacy Visual Studio compatibility option.",
+        Hidden = true,
+    };
+
     // Demo-only knob: scales the number of functions DemoEventSource
     // generates so layout variants (full-table ≤8 vs. status-strip >8) can
     // be demoed without code changes. Hidden from --help; intended for
@@ -170,6 +177,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(DemoOption);
         Options.Add(DemoFunctionsOption);
         Options.Add(NoAzuriteOption);
+        Options.Add(PauseOnErrorOption);
 
         // Stack workloads (e.g. .NET) contribute their own start options. They are attached after
         // the built-ins so they group cleanly in --help, and appear only while the owning workload
