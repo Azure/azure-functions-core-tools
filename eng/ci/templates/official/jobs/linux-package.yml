@@ -8,6 +8,15 @@ jobs:
     os: linux
   steps:
   - template: ../../steps/install-linux-tools.yml
+  - task: NuGetAuthenticate@1
+    displayName: 'Authenticate NuGet'
+
+  - task: PipAuthenticate@1
+    displayName: 'Authenticate pip'
+    inputs:
+      artifactFeeds: 'public/upstream-public'
+      onlyAddExtraIndex: false
+
   # Bash v3
   # Run a Bash script on macOS, Linux, or Windows.
   - task: Bash@3
