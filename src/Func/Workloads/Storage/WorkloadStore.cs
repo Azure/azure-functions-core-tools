@@ -280,7 +280,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
     private static WorkloadEntry MergeOwnership(WorkloadEntry current, WorkloadEntry incoming, WorkloadOwnershipKind ownership)
     {
         bool attachExplicit = ownership == WorkloadOwnershipKind.Explicit && !current.IsExplicitlyInstalled;
-        bool attachLogical = ownership == WorkloadOwnershipKind.Logical && current.LogicalPackage is null;
+        bool attachLogical = current.LogicalPackage is null && incoming.LogicalPackage is not null;
         if (ownership == WorkloadOwnershipKind.Logical
             && current.LogicalPackage is not null
             && !SameLogicalOwner(current.LogicalPackage, incoming.LogicalPackage!))

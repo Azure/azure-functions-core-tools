@@ -293,6 +293,20 @@ public class WorkloadStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task AddOwnershipAsync_CountsLogicalOwnerAttachedWhileAddingExplicitOwnership()
+    {
+        await _store.SaveWorkloadAsync(NewEntry("pkg.win-x64", "1.0.0"));
+
+        WorkloadEntry merged = await _store.AddOwnershipAsync(
+            NewPointerEntry("pkg.win-x64", "1.0.0"),
+            WorkloadOwnershipKind.Explicit);
+
+        merged.IsExplicitlyInstalled.Should().BeTrue();
+        merged.LogicalPackage.Should().NotBeNull();
+        merged.InstallRefCount.Should().Be(2);
+    }
+
+    [Fact]
     public async Task RemoveOwnershipAsync_RemovesOnlyExplicitOwner()
     {
         WorkloadEntry pointerEntry = NewPointerEntry("pkg.win-x64", "1.0.0");
