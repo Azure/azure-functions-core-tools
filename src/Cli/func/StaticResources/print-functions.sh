@@ -19,7 +19,23 @@ echo ','
 echo '"functionsJson": {'
 
 if [ -f "functions.metadata" ]; then
-    sed -nzE 's/^\[(.+\n {4}"name": "([^"]+)".+)\]$/"\2": \1/p' functions.metadata
+    awk '
+    BEGIN { in_obj=0; name=""; obj=""; first=1 }
+    !in_obj && /^  \{$/ { in_obj=1; obj=$0"\n"; next }
+    in_obj && /^  \}[,]?$/ {
+        obj=obj"  }"
+        if (!first) printf ",\n"
+        printf "\"%s\": %s\n", name, obj
+        first=0; in_obj=0; name=""; obj=""
+        next
+    }
+    in_obj {
+        if (name=="" && /^    "name":/) {
+            tmp=$0; sub(/^[[:space:]]*"name":[[:space:]]*"/,"",tmp); sub(/".*$/,"",tmp); name=tmp
+        }
+        obj=obj$0"\n"
+    }
+    ' functions.metadata
 else
     first=1
     for d in */; do
