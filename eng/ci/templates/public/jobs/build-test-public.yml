@@ -47,6 +47,8 @@ jobs:
     displayName: 'Install .NET 8.0'
     inputs:
       version: '8.0.204'
+
+  - task: NuGetToolInstaller@1
     inputs:
       versionSpec:
     displayName: Install Nuget tool
