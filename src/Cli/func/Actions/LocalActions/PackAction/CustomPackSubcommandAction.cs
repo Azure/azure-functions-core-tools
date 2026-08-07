@@ -34,14 +34,37 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             {
                 dir =>
                 {
+                    var validateCustomHandlerTitle = "Validate Custom Handler Configuration";
+                    var hostJsonPath = Path.Combine(dir, Constants.HostJsonFileName);
+
+                    // host.json is optional. Without it there is no custom handler configuration
+                    // to validate, so surface a non-blocking warning instead of failing the pack.
+                    // Custom handler apps normally declare their executable via the
+                    // customHandler.description.defaultExecutablePath property in host.json, so when
+                    // host.json is absent the deployed app will not start unless that path is supplied
+                    // another way. Point the user at the equivalent application setting override.
+                    if (!FileSystemHelpers.FileExists(hostJsonPath))
+                    {
+                        var missingHostJsonWarning =
+                            $"No {Constants.HostJsonFileName} found. Skipping custom handler configuration validation. " +
+                            "Custom handler apps require the executable to be configured via the " +
+                            "customHandler.description.defaultExecutablePath property in host.json. " +
+                            "Without host.json, set the 'AzureFunctionsJobHost__customHandler__description__defaultExecutablePath' " +
+                            "application setting on the function app after deployment so the custom handler can start. " +
+                            "See https://aka.ms/custom-handler-host-json for details.";
+
+                        PackValidationHelper.DisplayValidationWarning(
+                            validateCustomHandlerTitle,
+                            missingHostJsonWarning);
+                        return;
+                    }
+
                     // Validate custom handler configuration and executable
                     try
                     {
-                        var hostJsonPath = Path.Combine(dir, Constants.HostJsonFileName);
                         var hostJsonContent = FileSystemHelpers.ReadAllTextFromFileAsync(hostJsonPath).Result;
                         var hostConfig = JObject.Parse(hostJsonContent);
                         var customHandler = hostConfig["customHandler"];
-                        var validateCustomHandlerTitle = "Validate Custom Handler Configuration";
                         var configWarning = "No custom handler configuration found in host.json. Please visit https://aka.ms/custom-handler-host-json" +
                                             " to view examples on how to configure the app.";
 

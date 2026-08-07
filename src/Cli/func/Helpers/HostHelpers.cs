@@ -14,7 +14,9 @@ namespace Azure.Functions.Cli.Helpers
             var file = !string.IsNullOrEmpty(path) ? Path.Combine(path, Constants.HostJsonFileName) : Constants.HostJsonFileName;
             if (!FileSystemHelpers.FileExists(file))
             {
-                throw new InvalidOperationException();
+                // host.json is optional. A project without one cannot declare a custom handler,
+                // so there is no executable to report.
+                return string.Empty;
             }
 
             var hostJson = JsonConvert.DeserializeObject<JToken>(await FileSystemHelpers.ReadAllTextFromFileAsync(file));
