@@ -56,7 +56,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
 
         IReadOnlyList<ListRow> rows = allVersions
             ? await BuildAllVersionsRowsAsync(cancellationToken)
-            : BuildLoadedRows();
+            : await BuildLoadedRowsAsync(cancellationToken);
 
         if (json)
         {
@@ -117,6 +117,13 @@ internal sealed class WorkloadListCommand : FuncCliCommand
             card.WriteHeading(DisplayNameOrPackageId(row));
             card.WriteField("Version", row.PackageVersion);
             card.WriteField("Package ID", row.PackageId);
+            card.WriteField("Implementation", $"{row.PhysicalPackageId} {row.PhysicalPackageVersion}");
+            if (!string.IsNullOrWhiteSpace(row.RuntimeIdentifier))
+            {
+                card.WriteField("Runtime Identifier", row.RuntimeIdentifier);
+            }
+
+            card.WriteField("Ownership", row.Ownership);
             card.WriteAliases(row.Aliases);
             card.WriteDescription(row.Description);
         }
@@ -193,45 +200,106 @@ internal sealed class WorkloadListCommand : FuncCliCommand
         _interaction.WriteHint($"{rows.Count} {Plural(rows.Count, "workload")} installed.");
     }
 
-    private IReadOnlyList<ListRow> BuildLoadedRows()
+    private async Task<IReadOnlyList<ListRow>> BuildLoadedRowsAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadInfo> workloads = _workloads.GetWorkloads();
-        return [.. workloads.Select(w => new ListRow(
-            w.PackageId,
-            w.PackageVersion,
-            w.Aliases,
-            w.DisplayName,
-            w.Description,
-            Loaded: null))];
+        IReadOnlyList<WorkloadEntry>? installed = await _store.GetWorkloadsAsync(cancellationToken);
+        if (installed is null || installed.Count == 0)
+        {
+            return [.. workloads.Select(CreateLegacyRow)];
+        }
+
+        HashSet<(string PackageId, string Version)> loadedKeys = new(
+            workloads.Select(w => (w.PackageId, w.PackageVersion)),
+            new PackageVersionKeyComparer());
+        Dictionary<(string PackageId, string Version), WorkloadInfo> loadedByKey = workloads.ToDictionary(
+            w => (w.PackageId, w.PackageVersion),
+            w => w,
+            new PackageVersionKeyComparer());
+        return [.. installed
+            .Where(e => loadedKeys.Contains((e.PackageId, e.PackageVersion)))
+            .Select(e => CreateRow(e, loaded: null, loadedByKey[(e.PackageId, e.PackageVersion)]))];
     }
 
     private async Task<IReadOnlyList<ListRow>> BuildAllVersionsRowsAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
+        IReadOnlyList<WorkloadEntry>? installed = await _store.GetWorkloadsAsync(cancellationToken);
+        if (installed is null || installed.Count == 0)
+        {
+            return [.. _workloads.GetWorkloads().Select(CreateLegacyRow)];
+        }
 
-        // Cross-reference runtime info so loaded versions use presentation
-        // from their instances; older and content entries use registry data.
-        Dictionary<(string PackageId, string Version), RuntimeWorkloadInfo> loadedByKey = _workloads
-            .GetRuntimeWorkloads()
+        Dictionary<(string PackageId, string Version), WorkloadInfo> loadedByKey = _workloads
+            .GetWorkloads()
             .ToDictionary(
                 w => (w.PackageId, w.PackageVersion),
                 w => w,
                 new PackageVersionKeyComparer());
 
         return [.. installed
-            .OrderBy(e => e.PackageId, StringComparer.OrdinalIgnoreCase)
-            .ThenByDescending(e => ParseVersion(e.PackageVersion))
             .Select(e =>
             {
-                bool loaded = loadedByKey.TryGetValue((e.PackageId, e.PackageVersion), out RuntimeWorkloadInfo? info);
-                return new ListRow(
-                    e.PackageId,
-                    e.PackageVersion,
-                    e.Aliases ?? [],
-                    info?.DisplayName ?? GetDisplayName(e),
-                    info?.Description ?? e.Description ?? string.Empty,
-                    Loaded: loaded);
-            })];
+                bool loaded = loadedByKey.TryGetValue((e.PackageId, e.PackageVersion), out WorkloadInfo? info);
+                return CreateRow(e, loaded, info);
+            })
+            .OrderBy(e => e.PackageId, StringComparer.OrdinalIgnoreCase)
+            .ThenByDescending(e => ParseVersion(e.PackageVersion))];
+    }
+
+    private static ListRow CreateRow(WorkloadEntry entry, bool? loaded, WorkloadInfo? loadedInfo)
+    {
+        LogicalPackage? logical = entry.LogicalPackage;
+        return new ListRow(
+            logical?.PackageId ?? entry.PackageId,
+            logical?.PackageVersion ?? entry.PackageVersion,
+            logical?.Aliases ?? entry.Aliases,
+            logical?.DisplayName ?? loadedInfo?.DisplayName ?? GetDisplayName(entry),
+            logical?.Description ?? loadedInfo?.Description ?? entry.Description,
+            entry.PackageId,
+            entry.PackageVersion,
+            entry.RuntimeIdentifier,
+            entry.IsExplicitlyInstalled,
+            entry.InstallRefCount,
+            DescribeOwnership(entry),
+            loaded);
+    }
+
+    private static ListRow CreateLegacyRow(WorkloadInfo workload)
+        => new(
+            workload.PackageId,
+            workload.PackageVersion,
+            workload.Aliases,
+            workload.DisplayName,
+            workload.Description,
+            workload.PackageId,
+            workload.PackageVersion,
+            RuntimeIdentifier: null,
+            IsExplicitlyInstalled: true,
+            InstallRefCount: 1,
+            Ownership: "explicit",
+            Loaded: null);
+
+    private static string DescribeOwnership(WorkloadEntry entry)
+    {
+        List<string> owners = [];
+        if (entry.IsExplicitlyInstalled)
+        {
+            owners.Add("explicit");
+        }
+
+        if (entry.LogicalPackage is not null)
+        {
+            owners.Add($"logical:{entry.LogicalPackage.PackageId}");
+        }
+
+        int knownOwnerCount = (entry.IsExplicitlyInstalled ? 1 : 0) + (entry.LogicalPackage is null ? 0 : 1);
+        int metaOwnerCount = Math.Max(0, entry.InstallRefCount - knownOwnerCount);
+        if (metaOwnerCount > 0)
+        {
+            owners.Add($"meta:{metaOwnerCount}");
+        }
+
+        return string.Join(", ", owners);
     }
 
     private static string PrimaryAlias(ListRow row)
@@ -241,7 +309,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
         => string.IsNullOrWhiteSpace(row.DisplayName) ? row.PackageId : row.DisplayName;
 
     private static string GetDisplayName(WorkloadEntry entry)
-        => string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.PackageId : entry.DisplayName;
+        => string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.LogicalPackage?.PackageId ?? entry.PackageId : entry.DisplayName;
 
     private static string GroupDisplayName(IGrouping<string, ListRow> group)
     {
@@ -276,6 +344,12 @@ internal sealed class WorkloadListCommand : FuncCliCommand
         IReadOnlyList<string> Aliases,
         string DisplayName,
         string Description,
+        string PhysicalPackageId,
+        string PhysicalPackageVersion,
+        string? RuntimeIdentifier,
+        bool IsExplicitlyInstalled,
+        int InstallRefCount,
+        string Ownership,
         bool? Loaded);
 
     private sealed class PackageVersionKeyComparer : IEqualityComparer<(string PackageId, string Version)>
