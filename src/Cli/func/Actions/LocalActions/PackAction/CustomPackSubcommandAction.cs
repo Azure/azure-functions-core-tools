@@ -45,14 +45,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                     // another way. Point the user at the equivalent application setting override.
                     if (!FileSystemHelpers.FileExists(hostJsonPath))
                     {
-                        PackValidationHelper.DisplayValidationWarning(
-                            validateCustomHandlerTitle,
+                        var missingHostJsonWarning =
                             $"No {Constants.HostJsonFileName} found. Skipping custom handler configuration validation. " +
                             "Custom handler apps require the executable to be configured via the " +
                             "customHandler.description.defaultExecutablePath property in host.json. " +
                             "Without host.json, set the 'AzureFunctionsJobHost__customHandler__description__defaultExecutablePath' " +
                             "application setting on the function app after deployment so the custom handler can start. " +
-                            "See https://aka.ms/custom-handler-host-json for details.");
+                            "See https://aka.ms/custom-handler-host-json for details.";
+
+                        PackValidationHelper.DisplayValidationWarning(
+                            validateCustomHandlerTitle,
+                            missingHostJsonWarning);
                         return;
                     }
 
