@@ -95,19 +95,13 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 return metadata;
 
             case WorkloadKind.Content:
-                if (metadata.EntryPoint is not null)
-                {
-                    throw new InvalidWorkloadException(
-                        $"'{metadataPath}' declares kind 'content' " +
-                        "but also defines an entryPoint. Remove the entryPoint or change the kind to 'workload'.");
-                }
-
+                ValidateNoEntryPoint(metadata, metadataPath);
                 ValidateNoPackages(metadata, metadataPath);
                 ValidateRuntimeIdentifier(metadata, metadataPath);
                 return metadata;
 
             case WorkloadKind.Meta:
-                ValidateNoEntryPoint(metadata, metadataPath, "meta");
+                ValidateNoEntryPoint(metadata, metadataPath);
                 ValidateNoPackages(metadata, metadataPath);
                 if (metadata.RuntimeIdentifier is not null)
                 {
@@ -118,7 +112,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 return metadata;
 
             case WorkloadKind.RidPointer:
-                ValidateNoEntryPoint(metadata, metadataPath, "rid-pointer");
+                ValidateNoEntryPoint(metadata, metadataPath);
                 if (metadata.RuntimeIdentifier is not null)
                 {
                     throw new InvalidWorkloadException(
@@ -134,12 +128,13 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
         }
     }
 
-    private static void ValidateNoEntryPoint(WorkloadMetadata metadata, string metadataPath, string kind)
+    private static void ValidateNoEntryPoint(WorkloadMetadata metadata, string metadataPath)
     {
         if (metadata.EntryPoint is not null)
         {
             throw new InvalidWorkloadException(
-                $"'{metadataPath}' declares kind '{kind}' but also defines an entryPoint.");
+                $"'{metadataPath}' declares kind '{metadata.Kind.ToWireValue()}' " +
+                "but also defines an entryPoint. Remove the entryPoint or change the kind to 'workload'.");
         }
     }
 
@@ -148,7 +143,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
         if (metadata.Packages is not null)
         {
             throw new InvalidWorkloadException(
-                $"'{metadataPath}' declares kind '{GetWireKind(metadata.Kind)}' but also defines packages.");
+                $"'{metadataPath}' declares kind '{metadata.Kind.ToWireValue()}' but also defines packages.");
         }
     }
 
@@ -196,9 +191,6 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
         => !string.IsNullOrWhiteSpace(value)
             && string.Equals(value, value.Trim(), StringComparison.Ordinal)
             && string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
-
-    private static string GetWireKind(WorkloadKind kind)
-        => kind == WorkloadKind.RidPointer ? "rid-pointer" : kind.ToString().ToLowerInvariant();
 
     private static void ValidateWorkloadEntryPoint(WorkloadMetadata metadata, string metadataPath)
     {

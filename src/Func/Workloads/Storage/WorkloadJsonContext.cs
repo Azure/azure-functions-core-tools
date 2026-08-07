@@ -30,27 +30,16 @@ internal sealed class WorkloadKindJsonConverter : JsonConverter<WorkloadKind>
     public override WorkloadKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         string? value = reader.GetString();
-        return value switch
+        if (!WorkloadKind.TryParseWireValue(value, out WorkloadKind kind))
         {
-            "workload" => WorkloadKind.Workload,
-            "content" => WorkloadKind.Content,
-            "meta" => WorkloadKind.Meta,
-            "rid-pointer" => WorkloadKind.RidPointer,
-            _ => throw new JsonException($"Unknown workload kind '{value}'."),
-        };
+            throw new JsonException($"Unknown workload kind '{value}'.");
+        }
+
+        return kind;
     }
 
     public override void Write(Utf8JsonWriter writer, WorkloadKind value, JsonSerializerOptions options)
     {
-        string wireValue = value switch
-        {
-            WorkloadKind.Workload => "workload",
-            WorkloadKind.Content => "content",
-            WorkloadKind.Meta => "meta",
-            WorkloadKind.RidPointer => "rid-pointer",
-            _ => throw new JsonException($"Unknown workload kind '{value}'."),
-        };
-
-        writer.WriteStringValue(wireValue);
+        writer.WriteStringValue(value.ToWireValue());
     }
 }
