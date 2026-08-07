@@ -5,7 +5,7 @@
   "consolidatedBuildId": "226050",
   "scripts": {
     "postinstall": "node lib/install.js",
-    "prepublishOnly": "node lib/copy-metadata.js"
+    "prepack": "node lib/copy-metadata.js"
   },
   "author": "Microsoft",
   "license": "MIT",
