@@ -7,4 +7,8 @@ using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Commands.Start.Host;
 
-internal sealed record HostProcessStartContext(ContentWorkloadInfo HostWorkload, FunctionsProjectHostRunContext HostRunContext, StartCommandOptions Options);
+internal sealed record HostProcessStartContext(
+    ContentWorkloadInfo HostWorkload,
+    FunctionsProjectHostRunContext HostRunContext,
+    StartCommandOptions Options,
+    IHostOutputInterceptor? OutputInterceptor = null);

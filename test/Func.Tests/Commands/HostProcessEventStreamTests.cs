@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -94,6 +95,48 @@ public class HostProcessEventStreamTests
         await stream.DisposeAsync();
 
         process.KillTreeCallCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ReadAsync_WithOutputInterceptor_InterceptsMatchingLinesAndSuppressesFromStream()
+    {
+        var process = new CompletedHostProcess(stdout: "azfuncjsonlog:{\"processId\":1234}\nnormal-line", stderr: "err-line", exitCode: 0);
+        var interceptor = new TestInterceptor("azfuncjsonlog:");
+        var stream = new HostProcessEventStream(
+            process,
+            new LineHostProcessOutputParser(),
+            CreateLaunchInfo(),
+            TimeSpan.FromMilliseconds(1),
+            timeProvider: null,
+            outputInterceptor: interceptor);
+
+        HostLogEntry[] entries = await ReadAllAsync(stream);
+        await stream.WaitForExitAsync(CancellationToken.None);
+
+        // The intercepted line should not appear in the log stream
+        entries.Select(e => e.Message).Should().NotContain("azfuncjsonlog:{\"processId\":1234}");
+        // The normal line should still appear
+        entries.Select(e => e.Message).Should().Contain("normal-line");
+        // The interceptor should have captured the line
+        interceptor.Intercepted.Should().Equal("azfuncjsonlog:{\"processId\":1234}");
+    }
+
+    private sealed class TestInterceptor(string prefix) : IHostOutputInterceptor
+    {
+        public List<string> Intercepted { get; } = [];
+
+        public bool TryIntercept(string line)
+        {
+            if (line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                Intercepted.Add(line);
+                return true;
+            }
+
+            return false;
+        }
+
+        public ValueTask DisposeAsync() => default;
     }
 
     private static async Task<HostLogEntry[]> ReadAllAsync(IHostEventStream stream)

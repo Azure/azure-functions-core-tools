@@ -46,6 +46,21 @@ public class DotNetWorkloadTests
     }
 
     [Fact]
+    public void Configure_RegistersStartOptionContributor()
+    {
+        ServiceCollection services = new();
+        FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
+        builder.Services.Returns(services);
+
+        new DotNetWorkload().Configure(builder);
+
+        ServiceProvider provider = services.BuildServiceProvider();
+        IStartHostOptionContributor contributor = provider.GetRequiredService<IStartHostOptionContributor>();
+        contributor.Should().BeOfType<DotNetStartOptionContributor>();
+        contributor.Stack.Should().Be("dotnet");
+    }
+
+    [Fact]
     public void Configure_NullBuilder_Throws()
     {
         FluentActions.Invoking(() => new DotNetWorkload().Configure(null!)).Should().ThrowExactly<ArgumentNullException>();
