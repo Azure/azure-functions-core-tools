@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.Extensions.DependencyInjection;
+using Azure.Functions.Cli.Templates.Engine;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -27,6 +28,8 @@ internal static class TemplatesServiceCollectionExtensions
         services.AddSingleton<TemplatePicker>();
         services.AddSingleton<NewCommandRenderer>();
         services.AddSingleton<NewCommandRunner>();
+        services.AddSingleton<IFuncTemplateEngineHostFactory, FuncTemplateEngineHostFactory>();
+        services.AddSingleton<IFuncTemplateEngineBootstrapper, FuncTemplateEngineBootstrapper>();
 
         return services;
     }
