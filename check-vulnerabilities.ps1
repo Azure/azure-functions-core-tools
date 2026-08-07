@@ -16,7 +16,7 @@ dotnet list $fullProjectPath package --include-transitive --vulnerable --format 
 
 # Parse JSON output
 $logContent = Get-Content $logFilePath -Raw | ConvertFrom-Json
-$topLevelPackages = $logContent.projects.frameworks.topLevelPackages
+$topLevelPackages = @($logContent.projects.frameworks.topLevelPackages | Where-Object { $_ -ne $null })
 
 # Load skip-cve.json
 $skipCveContent = Get-Content $skipCveFilePath -Raw | ConvertFrom-Json
