@@ -18,6 +18,8 @@ jobs:
   steps:
   - pwsh: . "tools/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
+    env:
+      NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
 
   - pwsh: |
       $simulateReleaseBuild = $null
@@ -66,6 +68,14 @@ jobs:
     inputs:
       versionSpec:
     displayName: Install Nuget tool
+
+  - task: npmAuthenticate@0
+    displayName: 'Authenticate npm'
+    inputs:
+      workingFile: '$(Build.SourcesDirectory)/.npmrc'
+
+  - task: NuGetAuthenticate@1
+    displayName: 'Authenticate NuGet'
 
   - task: AzureCLI@2
     displayName: Login via Azure CLI to acquire access token
