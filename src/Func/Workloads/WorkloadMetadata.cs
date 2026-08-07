@@ -31,6 +31,17 @@ internal sealed class WorkloadMetadata
     public EntryPointSpec? EntryPoint { get; init; }
 
     /// <summary>
+    /// Maps normalized runtime identifiers to exact implementation package ids.
+    /// Required only for <see cref="WorkloadKind.RidPointer"/>.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Packages { get; init; }
+
+    /// <summary>
+    /// Runtime identifier of a RID-specific workload or content implementation.
+    /// </summary>
+    public string? RuntimeIdentifier { get; init; }
+
+    /// <summary>
     /// Human-readable name for inventory and list output.
     /// </summary>
     public string DisplayName { get; init; } = string.Empty;
