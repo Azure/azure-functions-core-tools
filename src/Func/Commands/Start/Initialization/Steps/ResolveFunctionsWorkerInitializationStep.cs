@@ -27,8 +27,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
 
     private readonly IFunctionsWorkerInstaller _workerInstaller = workerInstaller ?? throw new ArgumentNullException(nameof(workerInstaller));
 
-    private readonly ILogger<ResolveFunctionsWorkerInitializationStep> _logger = logger
-        ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public override string Id => StepId;
 
@@ -51,17 +50,15 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             && TryGetInstallableWorker(notResolved.Failure, out FunctionsWorkerId? workerId)
             && workerId is not null)
         {
-            _logger.LogDebug(
-                "[worker-resolve] Initial resolution failed ({FailureType}): {Message}. Attempting install for '{WorkerId}'.",
-                notResolved.Failure.GetType().Name, notResolved.Failure.Message, workerId.Value);
+            Log.ResolutionFailedAttemptingInstall(_logger, notResolved.Failure.GetType().Name, notResolved.Failure.Message, workerId.Value);
             result = await TryInstallAndResolveWorkerAsync(context, workerId, workerVersionRanges, notResolved.Failure, cancellationToken);
         }
 
         if (result is not FunctionsWorkerResolutionResult.Resolved resolved)
         {
             var failedResult = (FunctionsWorkerResolutionResult.NotResolved)result;
-            _logger.LogWarning(
-                "[worker-resolve] Worker resolution failed. Profile: '{ProfileName}', worker version ranges: [{Ranges}], failure ({FailureType}): {Message}",
+            Log.WorkerResolutionFailed(
+                _logger,
                 context.State.ResolvedProfile?.Name ?? "(none)",
                 string.Join(", ", workerVersionRanges.Select(kvp => $"{kvp.Key}={kvp.Value}")),
                 failedResult.Failure.GetType().Name,

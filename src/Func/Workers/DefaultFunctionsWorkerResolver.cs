@@ -13,13 +13,13 @@ namespace Azure.Functions.Cli.Workers;
 internal sealed class DefaultFunctionsWorkerResolver(
     IWorkloadProvider workloadProvider,
     IFunctionsWorkerContentResolver workerContentResolver,
-    ILogger<DefaultFunctionsWorkerResolver> logger,
+    ILogger logger,
     IReadOnlyDictionary<string, VersionRange>? activeWorkerConstraints = null) : IFunctionsWorkerResolver
 {
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
     private readonly IFunctionsWorkerContentResolver _workerContentResolver = workerContentResolver
         ?? throw new ArgumentNullException(nameof(workerContentResolver));
-    private readonly ILogger<DefaultFunctionsWorkerResolver> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IReadOnlyDictionary<string, VersionRange> _activeWorkerConstraints =
         activeWorkerConstraints is null
             ? new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase)
@@ -39,9 +39,8 @@ internal sealed class DefaultFunctionsWorkerResolver(
         if (installedWorkers.Count == 0)
         {
             IReadOnlyList<ContentWorkloadInfo> allWorkloads = _workloadProvider.GetContentWorkloads();
-            _logger.LogWarning(
-                "[worker-resolve] No workloads found for worker '{WorkerId}'. Searched package ID '{PackageId}' and alias '{Alias}'. "
-                + "Provider has {TotalCount} content workload(s): [{AllWorkloads}]",
+            Log.WorkloadSearchEmpty(
+                _logger,
                 workerId.Value,
                 packageId,
                 alias,

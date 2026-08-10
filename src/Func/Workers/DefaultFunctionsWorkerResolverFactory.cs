@@ -18,7 +18,7 @@ internal sealed class DefaultFunctionsWorkerResolverFactory(
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
     private readonly IFunctionsWorkerContentResolver _workerContentResolver = workerContentResolver
         ?? throw new ArgumentNullException(nameof(workerContentResolver));
-    private readonly ILogger<DefaultFunctionsWorkerResolver> _resolverLogger = resolverLogger
+    private readonly ILogger _resolverLogger = resolverLogger
         ?? throw new ArgumentNullException(nameof(resolverLogger));
 
     public IFunctionsWorkerResolver Create(IReadOnlyDictionary<string, VersionRange> workerVersionRanges)

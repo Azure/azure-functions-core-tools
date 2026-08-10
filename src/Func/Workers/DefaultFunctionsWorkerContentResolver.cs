@@ -25,8 +25,7 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
     private readonly WorkloadCatalogOptions _catalogOptions = catalogOptions?.Value
         ?? throw new ArgumentNullException(nameof(catalogOptions));
 
-    private readonly ILogger<DefaultFunctionsWorkerContentResolver> _logger = logger
-        ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public FunctionsWorkerResolutionResult ResolveWorker(
         FunctionsWorkerId workerId,
@@ -40,10 +39,7 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
 
         if (installedWorkers.Count == 0)
         {
-            _logger.LogWarning(
-                "[worker-resolve] No installed workloads matched for worker '{WorkerId}'. "
-                + "The worker may be present on disk but not registered with the workload provider.",
-                workerId.Value);
+            Log.NoInstalledWorkloadsMatched(_logger, workerId.Value);
             return NotInstalled(workerId);
         }
 
@@ -54,17 +50,13 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
 
             if (!NuGetVersion.TryParse(workload.PackageVersion, out NuGetVersion? version))
             {
-                _logger.LogDebug(
-                    "[worker-resolve] Skipping workload '{PackageId}': version '{PackageVersion}' is not a valid NuGet version.",
-                    workload.PackageId, workload.PackageVersion);
+                Log.SkippingInvalidVersion(_logger, workload.PackageId, workload.PackageVersion);
                 continue;
             }
 
             if (!SatisfiesConstraint(version, versionConstraint))
             {
-                _logger.LogDebug(
-                    "[worker-resolve] Skipping workload '{PackageId}' version '{PackageVersion}': does not satisfy constraint '{Constraint}'.",
-                    workload.PackageId, version.ToNormalizedString(), versionConstraint?.ToString() ?? "(none)");
+                Log.SkippingConstraintMismatch(_logger, workload.PackageId, version.ToNormalizedString(), versionConstraint?.ToString() ?? "(none)");
                 continue;
             }
 
@@ -73,8 +65,8 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
 
         if (candidates.Count == 0)
         {
-            _logger.LogWarning(
-                "[worker-resolve] No installed workloads for '{WorkerId}' satisfy version constraint '{Constraint}'. Installed: [{Packages}]",
+            Log.NoCompatibleVersion(
+                _logger,
                 workerId.Value,
                 versionConstraint?.ToString() ?? "(none)",
                 string.Join(", ", installedWorkers.Select(w => $"{w.PackageId}@{w.PackageVersion}")));
@@ -88,9 +80,7 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
         string workerConfigPath = Path.Combine(selected.Workload.ContentRoot, WorkerConfigFileName);
         if (!_workerConfigFileSystem.FileExists(workerConfigPath))
         {
-            _logger.LogWarning(
-                "[worker-resolve] Selected workload '{PackageId}' version '{Version}' is missing worker config at '{ConfigPath}'.",
-                selected.Workload.PackageId, selected.Version.ToNormalizedString(), workerConfigPath);
+            Log.MissingWorkerConfig(_logger, selected.Workload.PackageId, selected.Version.ToNormalizedString(), workerConfigPath);
             return InvalidInstallation(workerId, selected, workerConfigPath);
         }
 
