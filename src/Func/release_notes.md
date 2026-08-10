@@ -7,4 +7,5 @@
 - Clarified the `func new` "missing language" hint to mention both scaffolding and adopting an existing project. (#5300)
 - Fix `func start` failing to resolve installed prerelease worker workloads against built-in profile ranges (e.g. `node [3.13.0]` now accepts `3.13.0-preview.1`). (#5286)
 - Fix `func new` printing the "Cannot determine language" error three times when `stack.language` is missing from `.func/config.json`. (#5306)
+- Remove `python` from `supportedRuntimes` and `workers` in `windows-consumption` and `windows-dedicated` built-in profiles, and remove `go` workers from non-Flex profiles, to match Azure production support. (#5293)
 

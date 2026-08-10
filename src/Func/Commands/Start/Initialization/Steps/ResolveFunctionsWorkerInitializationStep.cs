@@ -46,6 +46,9 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             && TryGetInstallableWorker(notResolved.Failure, out FunctionsWorkerId? workerId)
             && workerId is not null)
         {
+            // Block auto-install if neither the stack name nor the workload id match any supported runtime.
+            // workerId.Value is the workload identifier (e.g. "python", "dotnet") which may differ from WorkerRuntime.
+            ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: workerId.Value, project.StackDisplayName);
             result = await TryInstallAndResolveWorkerAsync(context, workerId, workerVersionRanges, notResolved.Failure, cancellationToken);
         }
 
@@ -55,7 +58,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             throw CreateWorkerResolutionException(failedResult.Failure, context);
         }
 
-        ValidateSupportedRuntime(context, resolved.Worker);
+        ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: resolved.Worker.WorkerRuntime, project.StackDisplayName);
         context.State.Worker = resolved.Worker;
 
         string completionMessage = string.IsNullOrWhiteSpace(resolved.Worker.Version)
@@ -201,19 +204,31 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             + $"{failure.Message} Run '{repairCommand}' to repair the install.";
     }
 
-    private static void ValidateSupportedRuntime(StartInitializationStepContext context, IFunctionsWorker worker)
+    /// <summary>
+    /// Checks whether the profile supports the runtime by matching against both the stack name
+    /// and the runtime identifier (workload id or worker runtime name). Some stacks differ between
+    /// the two (e.g. Go stack = "go" but worker runtime = "native"; DotNet stack = "dotnet" but
+    /// worker runtime = "dotnet-isolated"). A match on either is sufficient.
+    /// </summary>
+    private static void ValidateSupportedRuntime(
+        StartInitializationStepContext context,
+        string stackName,
+        string runtimeIdentifier,
+        string stackDisplayName)
     {
         if (context.State.ResolvedProfile is not { SupportedRuntimes: { } supportedRuntimes } profile)
         {
             return;
         }
 
-        if (supportedRuntimes.Any(runtime => string.Equals(runtime, worker.WorkerRuntime, StringComparison.OrdinalIgnoreCase)))
+        if (supportedRuntimes.Any(runtime =>
+            string.Equals(runtime, stackName, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(runtime, runtimeIdentifier, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
 
-        string message = $"Profile '{profile.Name}' does not support the detected runtime '{worker.WorkerRuntime}'. "
+        string message = $"Profile '{profile.Name}' does not support the '{stackDisplayName}' stack. "
             + $"Supported runtimes: {string.Join(", ", supportedRuntimes)}.";
         throw new GracefulException(message, isUserError: true);
     }
