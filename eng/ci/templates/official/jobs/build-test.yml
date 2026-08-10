@@ -57,10 +57,7 @@ jobs:
     inputs:
       versionSpec: '18.x'
 
-  - pwsh: |
-      Import-Module ".\pipelineUtilities.psm1" -Force
-      Install-Dotnet
-    displayName: 'Install .NET 6.0 and 3.1'
+  - template: ../../steps/install-dotnet.yml
 
   - task: NuGetToolInstaller@1
     inputs:

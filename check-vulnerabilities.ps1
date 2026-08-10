@@ -5,13 +5,14 @@ param (
 $logFilePath = "build.log"
 $skipCveFilePath = "skipPackagesCve.json"
 
-$cmd = "restore", "$projectPath"
+$fullProjectPath = Resolve-Path $projectPath
+
+$cmd = "restore", "$fullProjectPath"
 Write-Host "dotnet $cmd"
 dotnet $cmd | Tee-Object $logFilePath
 
-$cmd = "list", $projectPath, "package", "--include-transitive", "--vulnerable", "--format", "json"
-Write-Host "dotnet $cmd"
-dotnet $cmd | Tee-Object $logFilePath
+Write-Host "dotnet list $fullProjectPath package --include-transitive --vulnerable --format json --output-version 1"
+dotnet list $fullProjectPath package --include-transitive --vulnerable --format json --output-version 1 | Tee-Object $logFilePath
 
 # Parse JSON output
 $logContent = Get-Content $logFilePath -Raw | ConvertFrom-Json
