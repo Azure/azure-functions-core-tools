@@ -57,20 +57,7 @@ jobs:
     inputs:
       versionSpec: '18.x'
 
-  - task: UseDotNet@2
-    displayName: 'Install .NET 3.1'
-    inputs:
-      version: '3.1.415'
-
-  - task: UseDotNet@2
-    displayName: 'Install .NET 6.0'
-    inputs:
-      version: '6.0.417'
-
-  - task: UseDotNet@2
-    displayName: 'Install .NET 8.0'
-    inputs:
-      version: '8.0.204'
+  - template: ../../steps/install-dotnet.yml
 
   - task: NuGetToolInstaller@1
     inputs:
