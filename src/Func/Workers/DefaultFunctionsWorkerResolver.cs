@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads;
+using Microsoft.Extensions.Logging;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Workers;
@@ -12,11 +13,13 @@ namespace Azure.Functions.Cli.Workers;
 internal sealed class DefaultFunctionsWorkerResolver(
     IWorkloadProvider workloadProvider,
     IFunctionsWorkerContentResolver workerContentResolver,
+    ILogger logger,
     IReadOnlyDictionary<string, VersionRange>? activeWorkerConstraints = null) : IFunctionsWorkerResolver
 {
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
     private readonly IFunctionsWorkerContentResolver _workerContentResolver = workerContentResolver
         ?? throw new ArgumentNullException(nameof(workerContentResolver));
+    private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IReadOnlyDictionary<string, VersionRange> _activeWorkerConstraints =
         activeWorkerConstraints is null
             ? new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase)
@@ -29,14 +32,27 @@ internal sealed class DefaultFunctionsWorkerResolver(
 
         _activeWorkerConstraints.TryGetValue(workerId.Value, out VersionRange? constraint);
 
-        IReadOnlyList<ContentWorkloadInfo> installedWorkers = GetWorkerWorkloads(workerId);
+        string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
+        string alias = GetWorkerAlias(workerId);
+        IReadOnlyList<ContentWorkloadInfo> installedWorkers = GetWorkerWorkloads(workerId, packageId, alias);
+
+        if (installedWorkers.Count == 0)
+        {
+            IReadOnlyList<ContentWorkloadInfo> allWorkloads = _workloadProvider.GetContentWorkloads();
+            Log.WorkloadSearchEmpty(
+                _logger,
+                workerId.Value,
+                packageId,
+                alias,
+                allWorkloads.Count,
+                string.Join(", ", allWorkloads.Select(w => $"{w.PackageId}@{w.PackageVersion} (aliases: {string.Join(";", w.Aliases)})")));
+        }
+
         return Task.FromResult(_workerContentResolver.ResolveWorker(workerId, installedWorkers, constraint, cancellationToken));
     }
 
-    private IReadOnlyList<ContentWorkloadInfo> GetWorkerWorkloads(FunctionsWorkerId workerId)
+    private IReadOnlyList<ContentWorkloadInfo> GetWorkerWorkloads(FunctionsWorkerId workerId, string packageId, string alias)
     {
-        string packageId = FunctionsWorkerWorkloadPackages.GetPackageId(workerId);
-        string alias = GetWorkerAlias(workerId);
         List<ContentWorkloadInfo> workloads = [];
         AddDistinct(workloads, _workloadProvider.GetContentWorkloadsByPackageId(packageId));
 
