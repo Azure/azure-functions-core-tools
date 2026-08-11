@@ -11,30 +11,20 @@ namespace Azure.Functions.Cli.Tests.Commands;
 public class NewCommandTests
 {
     private readonly TestInteractionService _interaction;
-    private readonly NewCommandRunner _runner;
+    private readonly INewCommandRunner _runner;
+    private readonly INewCommandTemplateOptionProvider _templateOptions;
 
     public NewCommandTests()
     {
         _interaction = new TestInteractionService();
-        _runner = new NewCommandRunner(
-            _interaction,
-            Substitute.For<Cli.Projects.IFunctionsProjectResolver>(),
-            Substitute.For<Cli.Profiles.IProfileResolver>(),
-            Substitute.For<Microsoft.Extensions.Options.IOptionsMonitor<Cli.Configuration.StackOptions>>(),
-            System.Array.Empty<Cli.Projects.IProjectInitializer>(),
-            Substitute.For<IInstalledTemplatesWorkloads>(),
-            new TemplateEngineProviderRegistry([]),
-            new TemplateOptionHydrator(System.Array.Empty<Cli.Projects.IProjectInitializer>()),
-            new TemplatePicker(_interaction),
-            new NewCommandRenderer(_interaction),
-            Substitute.For<Cli.Bundles.IHostJsonBundleSectionReader>(),
-            Substitute.For<Cli.Bundles.IExtensionBundleResolver>());
+        _runner = Substitute.For<INewCommandRunner>();
+        _templateOptions = Substitute.For<INewCommandTemplateOptionProvider>();
     }
 
     [Fact]
     public void NewCommand_HasExpectedOptions()
     {
-        var cmd = new NewCommand(_runner);
+        var cmd = new NewCommand(_runner, _templateOptions);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         optionNames.Should().Contain("--name");
@@ -56,7 +46,7 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_HasPathArgument()
     {
-        var cmd = new NewCommand(_runner);
+        var cmd = new NewCommand(_runner, _templateOptions);
         cmd.Arguments.Should().ContainSingle();
         cmd.Arguments[0].Name.Should().Be("path");
     }

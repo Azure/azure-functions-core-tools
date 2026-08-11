@@ -10,7 +10,12 @@ namespace Azure.Functions.Cli.Templates;
 /// <c>content/templates-workload.json</c> shipped by Node and Python
 /// templates content workloads (templates-workload-spec.md §4.4.4, §5.2).
 /// </summary>
-internal static class TemplatesWorkloadManifestReader
+internal interface ITemplatesWorkloadManifestReader
+{
+    public string? GetMinBundleVersion(string installDirectory);
+}
+
+internal sealed class TemplatesWorkloadManifestReader : ITemplatesWorkloadManifestReader
 {
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -25,7 +30,7 @@ internal static class TemplatesWorkloadManifestReader
     /// key isn't present. Missing manifest is treated as "no min-bundle
     /// constraint" — the §4.8.2 gate is a no-op in that case.
     /// </summary>
-    public static string? GetMinBundleVersion(string installDirectory)
+    public string? GetMinBundleVersion(string installDirectory)
     {
         if (string.IsNullOrWhiteSpace(installDirectory))
         {
