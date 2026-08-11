@@ -185,13 +185,15 @@ namespace Build
 
         public static readonly string SignTestDir = "SignTest";
        
-        public static string DotnetIsolatedItemTemplates => config($"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}", "DOTNET_ISOLATED_ITEM_TEMPLATES_URL");
+        private static readonly string NuGetFeedBaseUrl = config("https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/nuget/v3/flat2", "NUGET_FEED_BASE_URL");
 
-        public static string DotnetIsolatedProjectTemplates => config($"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}", "DOTNET_ISOLATED_PROJECT_TEMPLATES_URL");
+        public static string DotnetIsolatedItemTemplates => $"{NuGetFeedBaseUrl}/microsoft.azure.functions.worker.itemtemplates/{DotnetIsolatedItemTemplatesVersion}/microsoft.azure.functions.worker.itemtemplates.{DotnetIsolatedItemTemplatesVersion}.nupkg";
 
-        public static string DotnetItemTemplates => config($"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{DotnetItemTemplatesVersion}", "DOTNET_ITEM_TEMPLATES_URL");
+        public static string DotnetIsolatedProjectTemplates => $"{NuGetFeedBaseUrl}/microsoft.azure.functions.worker.projecttemplates/{DotnetIsolatedProjectTemplatesVersion}/microsoft.azure.functions.worker.projecttemplates.{DotnetIsolatedProjectTemplatesVersion}.nupkg";
 
-        public static string DotnetProjectTemplates => config($"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}", "DOTNET_PROJECT_TEMPLATES_URL");
+        public static string DotnetItemTemplates => $"{NuGetFeedBaseUrl}/microsoft.azure.webjobs.itemtemplates/{DotnetItemTemplatesVersion}/microsoft.azure.webjobs.itemtemplates.{DotnetItemTemplatesVersion}.nupkg";
+
+        public static string DotnetProjectTemplates => $"{NuGetFeedBaseUrl}/microsoft.azure.webjobs.projecttemplates/{DotnetProjectTemplatesVersion}/microsoft.azure.webjobs.projecttemplates.{DotnetProjectTemplatesVersion}.nupkg";
 
         public static string TemplatesJsonZip => config($"https://cdn.functions.azure.com/public/TemplatesApi/{TemplateJsonVersion}.zip", "TEMPLATES_JSON_ZIP_URL");
 
