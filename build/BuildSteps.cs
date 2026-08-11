@@ -148,33 +148,6 @@ namespace Build
                                 (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
         }
 
-        public static void AddDistLib()
-        {
-            var distLibDir = Path.Combine(Settings.OutputDir, "distlib");
-            var distLibWhl = Path.Combine(Settings.OutputDir, $"distlib-{Settings.DistLibVersion}-py2.py3-none-any.whl");
-
-            if (!File.Exists(distLibWhl))
-            {
-                using (var client = new WebClient())
-                {
-                    client.DownloadFile(Settings.DistLibUrl, distLibWhl);
-                }
-            }
-
-            // Wheel files are zip archives; extract the distlib package directory
-            ZipFile.ExtractToDirectory(distLibWhl, distLibDir);
-
-            foreach (var runtime in Settings.TargetRuntimes)
-            {
-                var dist = Path.Combine(Settings.OutputDir, runtime, "tools", "python", "packapp", "distlib");
-                Directory.CreateDirectory(dist);
-                FileHelpers.RecursiveCopy(Path.Combine(distLibDir, "distlib"), dist);
-            }
-
-            File.Delete(distLibWhl);
-            Directory.Delete(distLibDir, recursive: true);
-        }
-
         public static void AddTemplatesNupkgs()
         {
             var templatesPath = Path.Combine(Settings.OutputDir, "nupkg-templates");
@@ -183,21 +156,39 @@ namespace Build
             Directory.CreateDirectory(templatesPath);
             Directory.CreateDirectory(isolatedTemplatesPath);
 
+            // Restore template packages through NuGet so the Azure Artifacts credential provider handles auth.
+            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempDir);
+            var packagesConfigPath = Path.Combine(tempDir, "packages.config");
+            var packagesDir = Path.Combine(tempDir, "packages");
+            var nugetConfigPath = Path.GetFullPath("../NuGet.Config");
+
+            var packagesConfig = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<packages>
+  <package id=""Microsoft.Azure.Functions.Worker.ItemTemplates"" version=""{Settings.DotnetIsolatedItemTemplatesVersion}"" />
+  <package id=""Microsoft.Azure.Functions.Worker.ProjectTemplates"" version=""{Settings.DotnetIsolatedProjectTemplatesVersion}"" />
+  <package id=""Microsoft.Azure.WebJobs.ItemTemplates"" version=""{Settings.DotnetItemTemplatesVersion}"" />
+  <package id=""Microsoft.Azure.WebJobs.ProjectTemplates"" version=""{Settings.DotnetProjectTemplatesVersion}"" />
+</packages>";
+            File.WriteAllText(packagesConfigPath, packagesConfig);
+
+            Shell.Run("nuget", $"restore \"{packagesConfigPath}\" -PackagesDirectory \"{packagesDir}\" -ConfigFile \"{nugetConfigPath}\" -PackageSaveMode nupkg -DirectDownload -NonInteractive");
+
+            // Copy restored nupkgs to expected locations
             // If any of these names / paths change, we need to make sure our tooling partners (in particular VS and VS Mac) are notified
             // and we are sure it doesn't break them.
-            using (var client = new WebClient())
+            var templatePackages = new[]
             {
-                DownloadIfNotExists(client, Settings.DotnetIsolatedItemTemplates,
-                    Path.Combine(isolatedTemplatesPath, $"itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg"));
+                (Id: "Microsoft.Azure.Functions.Worker.ItemTemplates", Version: Settings.DotnetIsolatedItemTemplatesVersion, Dest: Path.Combine(isolatedTemplatesPath, $"itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg")),
+                (Id: "Microsoft.Azure.Functions.Worker.ProjectTemplates", Version: Settings.DotnetIsolatedProjectTemplatesVersion, Dest: Path.Combine(isolatedTemplatesPath, $"projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg")),
+                (Id: "Microsoft.Azure.WebJobs.ItemTemplates", Version: Settings.DotnetItemTemplatesVersion, Dest: Path.Combine(templatesPath, $"itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg")),
+                (Id: "Microsoft.Azure.WebJobs.ProjectTemplates", Version: Settings.DotnetProjectTemplatesVersion, Dest: Path.Combine(templatesPath, $"projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg")),
+            };
 
-                DownloadIfNotExists(client, Settings.DotnetIsolatedProjectTemplates,
-                    Path.Combine(isolatedTemplatesPath, $"projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg"));
-
-                DownloadIfNotExists(client, Settings.DotnetItemTemplates,
-                    Path.Combine(templatesPath, $"itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg"));
-
-                DownloadIfNotExists(client, Settings.DotnetProjectTemplates,
-                    Path.Combine(templatesPath, $"projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg"));
+            foreach (var pkg in templatePackages)
+            {
+                var nupkgPath = Path.Combine(packagesDir, $"{pkg.Id}.{pkg.Version}", $"{pkg.Id}.{pkg.Version}.nupkg");
+                File.Copy(nupkgPath, pkg.Dest, overwrite: true);
             }
 
             foreach (var runtime in Settings.TargetRuntimes)
@@ -206,6 +197,7 @@ namespace Build
             }
 
             Directory.Delete(templatesPath, recursive: true);
+            Directory.Delete(tempDir, recursive: true);
         }
 
         public static void AddTemplatesJson()
@@ -363,54 +355,6 @@ namespace Build
                     throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
                 }
             }
-        }
-
-        public static void TestSignedArtifacts()
-        {
-            string[] zipFiles = Directory.GetFiles(Settings.OutputDir, "*.zip");
-
-            foreach (var zipFilePath in zipFiles)
-            {
-                if (zipFilePath.Contains("osx"))
-                {
-                    // sigcheck.exe does not work for mac signatures
-                    return;
-                }
-
-                bool isSignedRuntime = Settings.SignInfo.RuntimesToSign.Any(r => zipFilePath.Contains(r));
-                if (isSignedRuntime)
-                {
-                    string targetDir = Path.Combine(Settings.OutputDir, "PostSignTest", Path.GetFileNameWithoutExtension(zipFilePath));
-                    Directory.CreateDirectory(targetDir);
-                    ZipFile.ExtractToDirectory(zipFilePath, targetDir);
-
-                    var unSignedPackages = GetUnsignedBinaries(targetDir);
-                    if (unSignedPackages.Count() != 0)
-                    {
-                        var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
-                        ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
-                        throw new Exception($"Signature verification failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
-                    }
-                }
-            }
-        }
-
-        public static List<string> GetUnsignedBinaries(string targetDir)
-        {
-            // Use PowerShell Get-AuthenticodeSignature instead of external sigcheck.exe
-            var script = $@"Get-ChildItem -Path '{targetDir}' -Recurse -File | " +
-                "Where-Object { $_.Extension -match '\\.(dll|exe)$' } | " +
-                "ForEach-Object { $sig = Get-AuthenticodeSignature $_.FullName; if ($sig.Status -ne 'Valid') { $_.FullName } }";
-
-            var output = Shell.GetOutput("powershell", $"-NoProfile -NonInteractive -Command \"{script}\"", ignoreExitCode: true);
-            var unSignedPackages = output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).ToList();
-
-            // Filter out the extensions we didn't want to sign
-            unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
-
-            // Filter out files we don't want to verify
-            unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.SkipSigcheckTest.Any(ext => file.EndsWith(ext))).ToList();
-            return unSignedPackages;
         }
 
         private static void CreateZipFromArtifact(string artifactSourcePath, string zipPath)
