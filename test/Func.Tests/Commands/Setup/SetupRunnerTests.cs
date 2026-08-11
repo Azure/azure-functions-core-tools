@@ -731,8 +731,7 @@ public sealed class SetupRunnerTests : IDisposable
         SetupRunner runner = new(
             interactive,
             _store,
-            catalog,
-            _installer,
+            new SetupDependencyInstaller(interactive, _store, catalog, _installer),
             _profileCatalog,
             new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
             new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
@@ -805,8 +804,7 @@ public sealed class SetupRunnerTests : IDisposable
         SetupRunner runner = new(
             interactive,
             _store,
-            catalog,
-            _installer,
+            new SetupDependencyInstaller(interactive, _store, catalog, _installer),
             _profileCatalog,
             new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
             new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
@@ -847,8 +845,7 @@ public sealed class SetupRunnerTests : IDisposable
         SetupRunner runner = new(
             _interaction,
             _store,
-            catalog,
-            _installer,
+            new SetupDependencyInstaller(_interaction, _store, catalog, _installer),
             _profileCatalog,
             new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
             new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
@@ -869,8 +866,7 @@ public sealed class SetupRunnerTests : IDisposable
         => new(
             _interaction,
             _store,
-            catalog,
-            _installer,
+            new SetupDependencyInstaller(_interaction, _store, catalog, _installer),
             profileCatalog ?? _profileCatalog,
             new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
             new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),

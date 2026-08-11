@@ -47,6 +47,7 @@ internal static class BuiltInCommands
         services.AddSingleton<FuncCliCommand, ProfileCommand>();
 
         // Setup command and dependencies
+        services.AddSingleton<ISetupDependencyInstaller, SetupDependencyInstaller>();
         services.AddSingleton<ISetupRunner, SetupRunner>();
         services.AddSingleton<FuncCliCommand, SetupCommand>();
 
