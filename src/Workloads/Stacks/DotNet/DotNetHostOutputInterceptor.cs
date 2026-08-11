@@ -55,6 +55,9 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
         return false;
     }
 
+    // The host emits tooling log records under this category.
+    private const string ToolingConsoleLogCategory = "Host.Function.ToolingConsoleLog";
+
     private bool TryInterceptStructuredRecord(string line)
     {
         try
@@ -65,6 +68,13 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
             if (root.ValueKind != JsonValueKind.Object
                 || !root.TryGetProperty("message", out JsonElement messageElement)
                 || messageElement.ValueKind != JsonValueKind.String)
+            {
+                return false;
+            }
+
+            // Only process records from the tooling console log category.
+            if (!root.TryGetProperty("category", out JsonElement categoryElement)
+                || !string.Equals(categoryElement.GetString(), ToolingConsoleLogCategory, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
