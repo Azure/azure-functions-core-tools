@@ -169,7 +169,7 @@ namespace Build
 
         public static string MinifiedVersionPrefix = "min.";
 
-        public const string DistLibVersion = "0.3.0";
+        public const string DistLibVersion = "0.3.1";
 
         public static string DistLibPyPIFeedUrl => config("https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/pypi/simple/", "DISTLIB_PYPI_FEED_URL");
 
