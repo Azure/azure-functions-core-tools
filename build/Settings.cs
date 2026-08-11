@@ -227,7 +227,6 @@ namespace Build
             public static readonly string ToMacSign = "Mac";
             public static readonly string[] RuntimesToSign = new string[] { "min.win-arm64", "min.win-x86", "min.win-x64", "osx-arm64", "osx-x64" };
             public static readonly string[] FilterExtensionsSign = new[] { ".json", "json.sha256", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
-            public static string SigcheckDownloadURL => config("https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe", "SIGCHECK_DOWNLOAD_URL");
 
             public static readonly string[] SkipSigcheckTest = new[] {
                 "aspnetcorev2_inprocess.dll",

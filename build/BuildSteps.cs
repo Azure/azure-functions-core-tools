@@ -386,7 +386,7 @@ namespace Build
                     {
                         var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
                         ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
-                        throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
+                        throw new Exception($"Signature verification failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
                     }
                 }
             }
@@ -394,48 +394,13 @@ namespace Build
 
         public static List<string> GetUnsignedBinaries(string targetDir)
         {
-            // Download sigcheck.exe
-            var sigcheckPath = Path.Combine(Settings.OutputDir, "sigcheck.exe");
-            if (!File.Exists(sigcheckPath))
-            {
-                using (var client = new WebClient())
-                {
-                    client.DownloadFile(Settings.SignInfo.SigcheckDownloadURL, sigcheckPath);
-                }
-            }
+            // Use PowerShell Get-AuthenticodeSignature instead of external sigcheck.exe
+            var script = $@"Get-ChildItem -Path '{targetDir}' -Recurse -File | " +
+                "Where-Object { $_.Extension -match '\\.(dll|exe)$' } | " +
+                "ForEach-Object { $sig = Get-AuthenticodeSignature $_.FullName; if ($sig.Status -ne 'Valid') { $_.FullName } }";
 
-            // https://peter.hahndorf.eu/blog/post/2010/03/07/WorkAroundSysinternalsLicensePopups
-            // Can't use sigcheck without signing the License Agreement
-            Console.WriteLine("Signing EULA");
-            Console.WriteLine(Shell.GetOutput("reg.exe", "ADD HKCU\\Software\\Sysinternals /v EulaAccepted /t REG_DWORD /d 1 /f"));
-            Console.WriteLine(Shell.GetOutput("reg.exe", "ADD HKU\\.DEFAULT\\Software\\Sysinternals /v EulaAccepted /t REG_DWORD /d 1 /f"));
-
-            // sigcheck.exe will exit with error codes if unsigned binaries present
-            var csvOutputLines = Shell.GetOutput(sigcheckPath, $" -s -u -c -q {targetDir}", ignoreExitCode: true).Split(Environment.NewLine);
-
-            // CSV separators can differ between languages and regions.
-            var csvSep = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ListSeparator;
-            var unSignedPackages = new List<string>();
-
-            foreach (var line in csvOutputLines)
-            {
-                // Some lines contain sigcheck header info and we filter them out by making sure
-                // there's at least six commas in each valid line.
-                if (line.Split(csvSep).Length - 1 > 6)
-                {
-                    // Package name is the first element in each line.
-                    var fileName = line.Split(csvSep)[0].Trim('"');
-                    unSignedPackages.Add(fileName);
-                }
-            }
-
-            if (unSignedPackages.Count() < 1)
-            {
-                throw new Exception("Something went wrong while testing for signed packages. There must be a few unsigned allowed binaries");
-            }
-
-            // The first element is simply the column heading
-            unSignedPackages = unSignedPackages.Skip(1).ToList();
+            var output = Shell.GetOutput("powershell", $"-NoProfile -NonInteractive -Command \"{script}\"", ignoreExitCode: true);
+            var unSignedPackages = output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).ToList();
 
             // Filter out the extensions we didn't want to sign
             unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
