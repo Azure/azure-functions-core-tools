@@ -17,26 +17,37 @@ internal interface ISetupDependencyPlanBuilder
     /// ranges).
     /// </summary>
     public Task<SetupDependencyPlan> BuildDependencyPlanAsync(
-        DirectoryInfo workingDirectory,
+        SetupCommandOptions options,
         SetupFeaturePlan featurePlan,
         SetupProfileScope profileScope,
         CancellationToken cancellationToken);
 }
 
 internal sealed class SetupDependencyPlanBuilder(
-    IHostJsonBundleSectionReader hostJsonBundleSectionReader) : ISetupDependencyPlanBuilder
+    IHostJsonBundleSectionReader hostJsonBundleSectionReader,
+    ISetupStackCatalog stackCatalog) : ISetupDependencyPlanBuilder
 {
     private readonly IHostJsonBundleSectionReader _hostJsonBundleSectionReader = hostJsonBundleSectionReader ?? throw new ArgumentNullException(nameof(hostJsonBundleSectionReader));
+    private readonly ISetupStackCatalog _stackCatalog = stackCatalog ?? throw new ArgumentNullException(nameof(stackCatalog));
 
     public async Task<SetupDependencyPlan> BuildDependencyPlanAsync(
-        DirectoryInfo workingDirectory,
+        SetupCommandOptions options,
         SetupFeaturePlan featurePlan,
         SetupProfileScope profileScope,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(workingDirectory);
+        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(featurePlan);
         ArgumentNullException.ThrowIfNull(profileScope);
+
+        DirectoryInfo workingDirectory = options.WorkingDirectory;
+
+        // Only pay for catalog discovery when a runtime feature could map to a
+        // stack or templates package. `func setup --features host` must not hit
+        // the catalog at all.
+        SetupStackSnapshot stacks = featurePlan.RuntimeFeatures.Count > 0
+            ? await _stackCatalog.GetStacksAsync(options.Source, options.IncludePrerelease, cancellationToken)
+            : SetupDependency.BuiltInStackSnapshot;
 
         List<SetupDependency> dependencies = [];
         List<SetupDependencyResult> failures = [];
@@ -67,17 +78,17 @@ internal sealed class SetupDependencyPlanBuilder(
                 dependencies.Add(SetupDependency.Worker(runtimeFeature.Name, workerRange));
             }
 
-            if (SetupDependency.SupportsStack(runtimeFeature.Name))
+            if (stacks.StackPackageId(runtimeFeature.Name) is { } stackPackageId)
             {
-                dependencies.Add(SetupDependency.Stack(runtimeFeature.Name));
+                dependencies.Add(SetupDependency.Stack(runtimeFeature.Name, stackPackageId));
             }
 
-            if (SetupDependency.SupportsTemplates(runtimeFeature.Name))
+            if (stacks.TemplatesPackageId(runtimeFeature.Name) is { } templatesPackageId)
             {
                 // Script stacks ship per-channel templates that track the bundle
                 // channel; dotnet templates don't use bundles, so they stay channel-less.
                 BundleChannel? templatesChannel = SetupRuntimes.IsDotNetRuntime(runtimeFeature.Name) ? null : bundleChannel;
-                dependencies.Add(SetupDependency.Templates(runtimeFeature.Name, templatesChannel));
+                dependencies.Add(SetupDependency.Templates(runtimeFeature.Name, templatesPackageId, templatesChannel));
             }
         }
 

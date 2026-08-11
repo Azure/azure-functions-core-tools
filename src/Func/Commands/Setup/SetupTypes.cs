@@ -41,10 +41,9 @@ internal sealed record SetupDependency(
     private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
     private const string TemplatesPackagePrefix = "Azure.Functions.Cli.Workloads.Templates.";
 
-    // TODO: this should not be hardcoded in the CLI; discover the stack package
-    // from the catalog (e.g. via an `alias:stack-<name>` tag) so new stacks don't
-    // require a CLI release. Stacks not in this set (java, powershell, custom)
-    // skip silently today.
+    // Offline fallback only. The published set is discovered from the catalog's
+    // `kind:workload` / `alias:` tags (see ISetupStackCatalog); this list keeps
+    // setup working when the feed is unreachable.
     private static readonly HashSet<string> _stacks = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet" };
 
     // Stacks that publish a templates content workload (Azure.Functions.Cli.Workloads.Templates.*).
@@ -52,6 +51,14 @@ internal sealed record SetupDependency(
     private static readonly HashSet<string> _templates = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "dotnet" };
 
     public static IReadOnlyList<string> Stacks => [.. _stacks];
+
+    /// <summary>
+    /// The built-in stack and templates packages, used when catalog discovery
+    /// is unavailable.
+    /// </summary>
+    public static SetupStackSnapshot BuiltInStackSnapshot { get; } = new(
+        _stacks.ToDictionary(stack => stack, stack => StackPackagePrefix + StackPackageSuffix(stack), StringComparer.OrdinalIgnoreCase),
+        _templates.ToDictionary(stack => stack, stack => TemplatesPackagePrefix + StackPackageSuffix(stack), StringComparer.OrdinalIgnoreCase));
 
     // Workload search alias for the channel-fallback hint. Only the channeled
     // dependency kinds (bundle, templates) need one.
@@ -105,11 +112,14 @@ internal sealed record SetupDependency(
             Channel: channel);
 
     public static SetupDependency Stack(string stack)
+        => Stack(stack, StackPackagePrefix + StackPackageSuffix(stack));
+
+    public static SetupDependency Stack(string stack, string packageId)
         => new(
             SetupDependencyKind.Stack,
             stack,
             $"{stack} stack",
-            StackPackagePrefix + StackPackageSuffix(stack),
+            packageId,
             VersionRange: null,
             RangeText: null,
             ResolvedPackageId: null);
@@ -118,11 +128,14 @@ internal sealed record SetupDependency(
         => !string.IsNullOrWhiteSpace(stack) && _stacks.Contains(stack.Trim());
 
     public static SetupDependency Templates(string stack, BundleChannel? channel)
+        => Templates(stack, TemplatesPackagePrefix + StackPackageSuffix(stack), channel);
+
+    public static SetupDependency Templates(string stack, string packageId, BundleChannel? channel)
         => new(
             SetupDependencyKind.Templates,
             stack,
             $"{stack} templates",
-            TemplatesPackagePrefix + StackPackageSuffix(stack),
+            packageId,
             VersionRange: null,
             RangeText: null,
             ResolvedPackageId: null,

@@ -24,11 +24,13 @@ internal interface ISetupFeatureResolver
 internal sealed class SetupFeatureResolver(
     IInteractionService interaction,
     IWorkloadStore workloadStore,
-    ICliConfigurationProvider configurationProvider) : ISetupFeatureResolver
+    ICliConfigurationProvider configurationProvider,
+    ISetupStackCatalog stackCatalog) : ISetupFeatureResolver
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IWorkloadStore _workloadStore = workloadStore ?? throw new ArgumentNullException(nameof(workloadStore));
     private readonly ICliConfigurationProvider _configurationProvider = configurationProvider ?? throw new ArgumentNullException(nameof(configurationProvider));
+    private readonly ISetupStackCatalog _stackCatalog = stackCatalog ?? throw new ArgumentNullException(nameof(stackCatalog));
 
     public async Task<SetupFeaturePlan?> ResolveFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
@@ -127,7 +129,7 @@ internal sealed class SetupFeatureResolver(
 
         if (!options.NonInteractive && _interaction.IsInteractive)
         {
-            StackChoicesResult choices = await BuildStackChoicesAsync(cancellationToken);
+            StackChoicesResult choices = await BuildStackChoicesAsync(options, cancellationToken);
 
             // Render installed stacks as static "fake checkbox" lines above
             // the prompt so they're visible in context but cannot be toggled
@@ -164,9 +166,10 @@ internal sealed class SetupFeatureResolver(
         return ["runtime"];
     }
 
-    private async Task<StackChoicesResult> BuildStackChoicesAsync(CancellationToken cancellationToken)
+    private async Task<StackChoicesResult> BuildStackChoicesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
-        IReadOnlyList<string> stacks = SetupDependency.Stacks;
+        SetupStackSnapshot snapshot = await _stackCatalog.GetStacksAsync(options.Source, options.IncludePrerelease, cancellationToken);
+        IReadOnlyList<string> stacks = snapshot.StackNames;
         HashSet<string> installedStackPackageIds;
         try
         {
@@ -191,7 +194,7 @@ internal sealed class SetupFeatureResolver(
         List<string> installedStacks = [];
         foreach (string stack in stacks.OrderBy(static stack => stack, StringComparer.OrdinalIgnoreCase))
         {
-            if (installedStackPackageIds.Contains(SetupDependency.Stack(stack).PackageId))
+            if (snapshot.StackPackageId(stack) is { } packageId && installedStackPackageIds.Contains(packageId))
             {
                 installedStacks.Add(stack);
             }
