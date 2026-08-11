@@ -171,7 +171,7 @@ namespace Build
 
         public const string DistLibVersion = "distlib-0.3.0";
 
-        public const string DistLibUrl = "https://github.com/vsajip/distlib/archive/0.3.0.zip";
+        public static string DistLibUrl => config("https://github.com/vsajip/distlib/archive/0.3.0.zip", "DISTLIB_URL");
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
@@ -185,15 +185,15 @@ namespace Build
 
         public static readonly string SignTestDir = "SignTest";
        
-        public static readonly string DotnetIsolatedItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}";
+        public static string DotnetIsolatedItemTemplates => config($"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ItemTemplates/{DotnetIsolatedItemTemplatesVersion}", "DOTNET_ISOLATED_ITEM_TEMPLATES_URL");
 
-        public static readonly string DotnetIsolatedProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}";
+        public static string DotnetIsolatedProjectTemplates => config($"https://www.nuget.org/api/v2/package/Microsoft.Azure.Functions.Worker.ProjectTemplates/{DotnetIsolatedProjectTemplatesVersion}", "DOTNET_ISOLATED_PROJECT_TEMPLATES_URL");
 
-        public static readonly string DotnetItemTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{DotnetItemTemplatesVersion}";
+        public static string DotnetItemTemplates => config($"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ItemTemplates/{DotnetItemTemplatesVersion}", "DOTNET_ITEM_TEMPLATES_URL");
 
-        public static readonly string DotnetProjectTemplates = $"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}";
+        public static string DotnetProjectTemplates => config($"https://www.nuget.org/api/v2/package/Microsoft.Azure.WebJobs.ProjectTemplates/{DotnetProjectTemplatesVersion}", "DOTNET_PROJECT_TEMPLATES_URL");
 
-        public static readonly string TemplatesJsonZip = $"https://cdn.functions.azure.com/public/TemplatesApi/{TemplateJsonVersion}.zip";
+        public static string TemplatesJsonZip => config($"https://cdn.functions.azure.com/public/TemplatesApi/{TemplateJsonVersion}.zip", "TEMPLATES_JSON_ZIP_URL");
 
         public static readonly string TelemetryKeyToReplace = "00000000-0000-0000-0000-000000000000";
 
@@ -225,7 +225,7 @@ namespace Build
             public static readonly string ToMacSign = "Mac";
             public static readonly string[] RuntimesToSign = new string[] { "min.win-arm64", "min.win-x86", "min.win-x64", "osx-arm64", "osx-x64" };
             public static readonly string[] FilterExtensionsSign = new[] { ".json", "json.sha256", ".spec", ".cfg", ".pdb", ".config", ".nupkg", ".py", ".md" };
-            public static readonly string SigcheckDownloadURL = "https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe";
+            public static string SigcheckDownloadURL => config("https://functionsbay.blob.core.windows.net/public/tools/sigcheck64.exe", "SIGCHECK_DOWNLOAD_URL");
 
             public static readonly string[] SkipSigcheckTest = new[] {
                 "aspnetcorev2_inprocess.dll",

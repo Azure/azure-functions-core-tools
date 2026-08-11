@@ -20,6 +20,14 @@ namespace Build
         private static IntegrationTestBuildManifest _integrationManifest;
         private static string _targetFramework = string.Empty;
 
+        private static void DownloadIfNotExists(WebClient client, string url, string destinationPath)
+        {
+            if (!File.Exists(destinationPath))
+            {
+                client.DownloadFile(url, destinationPath);
+            }
+        }
+
         public static void Clean()
         {
             Directory.Delete(Settings.OutputDir, recursive: true);
@@ -144,9 +152,12 @@ namespace Build
         {
             var distLibDir = Path.Combine(Settings.OutputDir, "distlib");
             var distLibZip = Path.Combine(Settings.OutputDir, "distlib.zip");
-            using (var client = new WebClient())
+            if (!File.Exists(distLibZip))
             {
-                client.DownloadFile(Settings.DistLibUrl, distLibZip);
+                using (var client = new WebClient())
+                {
+                    client.DownloadFile(Settings.DistLibUrl, distLibZip);
+                }
             }
 
             ZipFile.ExtractToDirectory(distLibZip, distLibDir);
@@ -170,20 +181,20 @@ namespace Build
             Directory.CreateDirectory(templatesPath);
             Directory.CreateDirectory(isolatedTemplatesPath);
 
+            // If any of these names / paths change, we need to make sure our tooling partners (in particular VS and VS Mac) are notified
+            // and we are sure it doesn't break them.
             using (var client = new WebClient())
             {
-                // If any of these names / paths change, we need to make sure our tooling partners (in particular VS and VS Mac) are notified
-                // and we are sure it doesn't break them.
-                client.DownloadFile(Settings.DotnetIsolatedItemTemplates,
+                DownloadIfNotExists(client, Settings.DotnetIsolatedItemTemplates,
                     Path.Combine(isolatedTemplatesPath, $"itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg"));
 
-                client.DownloadFile(Settings.DotnetIsolatedProjectTemplates,
+                DownloadIfNotExists(client, Settings.DotnetIsolatedProjectTemplates,
                     Path.Combine(isolatedTemplatesPath, $"projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg"));
 
-                client.DownloadFile(Settings.DotnetItemTemplates,
+                DownloadIfNotExists(client, Settings.DotnetItemTemplates,
                     Path.Combine(templatesPath, $"itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg"));
 
-                client.DownloadFile(Settings.DotnetProjectTemplates,
+                DownloadIfNotExists(client, Settings.DotnetProjectTemplates,
                     Path.Combine(templatesPath, $"projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg"));
             }
 
@@ -198,13 +209,13 @@ namespace Build
         public static void AddTemplatesJson()
         {
             var tempDirectoryPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            FileHelpers.EnsureDirectoryExists(tempDirectoryPath);
+            var zipFilePath = Path.Combine(tempDirectoryPath, "templates.zip");
             using (var client = new WebClient())
             {
-                FileHelpers.EnsureDirectoryExists(tempDirectoryPath);
-                var zipFilePath = Path.Combine(tempDirectoryPath, "templates.zip");
-                client.DownloadFile(Settings.TemplatesJsonZip, zipFilePath);
-                FileHelpers.ExtractZipToDirectory(zipFilePath, tempDirectoryPath);
+                DownloadIfNotExists(client, Settings.TemplatesJsonZip, zipFilePath);
             }
+            FileHelpers.ExtractZipToDirectory(zipFilePath, tempDirectoryPath);
 
             string templatesJsonPath = Path.Combine(tempDirectoryPath, "templates", "templates.json");
             if (File.Exists(templatesJsonPath))
