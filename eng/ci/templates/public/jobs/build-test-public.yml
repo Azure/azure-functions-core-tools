@@ -15,11 +15,10 @@ jobs:
     devops_buildNumber: $[counter(format(''), 1500)]
     DEVOPS_REPO_BRANCH: $[coalesce(variables['System.PullRequest.TargetBranch'], variables['Build.SourceBranchName'])]
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
+    NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
   steps:
   - pwsh: . "tools/start-emulators.ps1" -NoWait
     displayName: "Start emulators (NoWait)"
-    env:
-      NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
   - pwsh: |
       $isIntegrationBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
