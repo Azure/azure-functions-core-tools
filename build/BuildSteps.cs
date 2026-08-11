@@ -151,25 +151,24 @@ namespace Build
         public static void AddDistLib()
         {
             var distLibDir = Path.Combine(Settings.OutputDir, "distlib");
-            var distLibZip = Path.Combine(Settings.OutputDir, "distlib.zip");
-            if (!File.Exists(distLibZip))
+            var distLibWhl = Path.Combine(Settings.OutputDir, $"distlib-{Settings.DistLibVersion}-py2.py3-none-any.whl");
+
+            if (!File.Exists(distLibWhl))
             {
-                using (var client = new WebClient())
-                {
-                    client.DownloadFile(Settings.DistLibUrl, distLibZip);
-                }
+                Shell.Run("pip", $"download distlib=={Settings.DistLibVersion} --no-deps --only-binary=:all: -d \"{Settings.OutputDir}\" --index-url \"{Settings.DistLibPyPIFeedUrl}\"");
             }
 
-            ZipFile.ExtractToDirectory(distLibZip, distLibDir);
+            // Wheel files are zip archives; extract the distlib package directory
+            ZipFile.ExtractToDirectory(distLibWhl, distLibDir);
 
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 var dist = Path.Combine(Settings.OutputDir, runtime, "tools", "python", "packapp", "distlib");
                 Directory.CreateDirectory(dist);
-                FileHelpers.RecursiveCopy(Path.Combine(distLibDir, Directory.GetDirectories(distLibDir).First(), "distlib"), dist);
+                FileHelpers.RecursiveCopy(Path.Combine(distLibDir, "distlib"), dist);
             }
 
-            File.Delete(distLibZip);
+            File.Delete(distLibWhl);
             Directory.Delete(distLibDir, recursive: true);
         }
 

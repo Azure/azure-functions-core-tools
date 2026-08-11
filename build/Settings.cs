@@ -169,9 +169,9 @@ namespace Build
 
         public static string MinifiedVersionPrefix = "min.";
 
-        public const string DistLibVersion = "distlib-0.3.0";
+        public const string DistLibVersion = "0.3.0";
 
-        public static string DistLibUrl => config("https://github.com/vsajip/distlib/archive/0.3.0.zip", "DISTLIB_URL");
+        public static string DistLibPyPIFeedUrl => config("https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/pypi/simple/", "DISTLIB_PYPI_FEED_URL");
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
