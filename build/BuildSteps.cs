@@ -357,6 +357,29 @@ namespace Build
             }
         }
 
+        private static List<string> GetUnsignedBinaries(string targetDir)
+        {
+            var signable = new[] { ".dll", ".exe" };
+            var files = Directory.EnumerateFiles(targetDir, "*.*", SearchOption.AllDirectories)
+                .Where(f => signable.Contains(Path.GetExtension(f).ToLowerInvariant()));
+
+            var unSignedPackages = new List<string>();
+            foreach (var file in files)
+            {
+                try
+                {
+                    System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(file);
+                }
+                catch
+                {
+                    unSignedPackages.Add(file);
+                }
+            }
+
+            unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
+            return unSignedPackages;
+        }
+
         private static void CreateZipFromArtifact(string artifactSourcePath, string zipPath)
         {
             if (!Directory.Exists(artifactSourcePath))
