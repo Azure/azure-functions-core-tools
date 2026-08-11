@@ -20,23 +20,17 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
     // v4 prefix — the startup hook may still emit these on some host versions.
     internal const string JsonLogPrefix = "azfuncjsonlog:";
 
-    // Pattern for the worker PID message the host emits via Host.Function.Console category.
-    [GeneratedRegex(@"\(PID:\s*(\d+)\)", RegexOptions.Compiled)]
+    // Matches the full worker debug message: "Azure Functions .NET Worker (PID: 12345) initialized in debug mode."
+    [GeneratedRegex(@"Azure Functions \.NET Worker \(PID:\s*(\d+)\) initialized in debug mode", RegexOptions.Compiled)]
     private static partial Regex WorkerPidRegex();
 
-    private readonly TextWriter? _writer;
+    private readonly string? _outputFilePath;
+    private TextWriter? _writer;
     private bool _pidCaptured;
 
     internal DotNetHostOutputInterceptor(string? outputFilePath)
     {
-        if (!string.IsNullOrWhiteSpace(outputFilePath))
-        {
-            var stream = new FileStream(outputFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, bufferSize: 4096, useAsync: true);
-            _writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
-            {
-                AutoFlush = true,
-            };
-        }
+        _outputFilePath = string.IsNullOrWhiteSpace(outputFilePath) ? null : outputFilePath;
     }
 
     public bool TryIntercept(string line)
@@ -45,8 +39,11 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
         if (line.StartsWith(JsonLogPrefix, StringComparison.OrdinalIgnoreCase))
         {
             string payload = line[JsonLogPrefix.Length..];
-            _writer?.WriteLine(payload);
-            return true;
+            WriteToDisk(payload);
+            _pidCaptured = true;
+
+            // When there is no output file, don't suppress — let the line flow to console.
+            return _writer is not null;
         }
 
         // v5 path: structured JSON record from the host.
@@ -81,8 +78,12 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
             // Check for v4-style azfuncjsonlog prefix embedded in the message field.
             if (message.StartsWith(JsonLogPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                _writer?.WriteLine(message[JsonLogPrefix.Length..]);
-                return true;
+                string payload = message[JsonLogPrefix.Length..];
+                WriteToDisk(payload);
+                _pidCaptured = true;
+
+                // Suppress only when we have a file consumer; otherwise let it render.
+                return _writer is not null;
             }
 
             // Extract worker PID from the human-readable debug message.
@@ -92,7 +93,7 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
             Match match = WorkerPidRegex().Match(message);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int pid))
             {
-                _writer?.WriteLine($"{{ \"name\":\"dotnet-worker-startup\", \"workerProcessId\" : {pid} }}");
+                WriteToDisk($"{{ \"name\":\"dotnet-worker-startup\", \"workerProcessId\" : {pid} }}");
                 _pidCaptured = true;
                 return false;
             }
@@ -103,6 +104,27 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
         }
 
         return false;
+    }
+
+    private void WriteToDisk(string payload)
+    {
+        if (_outputFilePath is null)
+        {
+            return;
+        }
+
+        // Lazy-create the file on first write so we never leave an empty file when
+        // dotnet-isolated isn't the active stack.
+        if (_writer is null)
+        {
+            var stream = new FileStream(_outputFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, bufferSize: 4096, useAsync: true);
+            _writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
+            {
+                AutoFlush = true,
+            };
+        }
+
+        _writer.WriteLine(payload);
     }
 
     public async ValueTask DisposeAsync()

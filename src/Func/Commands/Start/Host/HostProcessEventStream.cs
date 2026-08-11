@@ -151,9 +151,19 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
         {
-            if (canIntercept && _outputInterceptor!.TryIntercept(line))
+            if (canIntercept)
             {
-                continue;
+                try
+                {
+                    if (_outputInterceptor!.TryIntercept(line))
+                    {
+                        continue;
+                    }
+                }
+                catch (Exception)
+                {
+                    // Interceptor failure must not crash the event loop — let the line through.
+                }
             }
 
             HostLogEntry entry = _parser.ParseLine(streamName, line, _timeProvider.GetUtcNow());
