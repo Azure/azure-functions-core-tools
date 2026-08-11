@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using Azure.Functions.Cli.Workloads.Catalog;
+using NuGet.Protocol.Core.Types;
 
 namespace Azure.Functions.Cli.Commands.Setup;
 
@@ -49,6 +50,12 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
     private const string StackKind = "workload";
     private const string TemplatesAliasSuffix = "-templates";
 
+    private const int PageSize = 100;
+
+    // Upper bound on the pages walked, so a feed that always returns a full
+    // page can't spin forever. Well above the ~21 workloads published today.
+    private const int MaxDiscoveredPackages = 1000;
+
     private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
     private readonly ConcurrentDictionary<string, SetupStackSnapshot> _cache = new(StringComparer.Ordinal);
 
@@ -67,21 +74,47 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
 
     private async Task<SetupStackSnapshot> DiscoverAsync(string? source, bool includePrerelease, CancellationToken cancellationToken)
     {
-        IReadOnlyList<CatalogSearchResult> results;
+        List<CatalogSearchResult> results = [];
         try
         {
-            results = await _workloadCatalog.SearchAsync(
-                new CatalogSearchQuery { IncludePrerelease = includePrerelease, Source = source },
-                cancellationToken);
+            // An empty filter is deliberate: the catalog pairs it with
+            // packageType=FuncCliWorkload, which nuget.org honours, so this
+            // returns the full workload set (measured 2026-08-11: 21 of 21 hits
+            // were workloads). Narrowing to a term such as the shared
+            // `func-workload` tag returns fewer rows and drops stacks.
+            for (int skip = 0; skip < MaxDiscoveredPackages; skip += PageSize)
+            {
+                IReadOnlyList<CatalogSearchResult> page = await _workloadCatalog.SearchAsync(
+                    new CatalogSearchQuery
+                    {
+                        IncludePrerelease = includePrerelease,
+                        Skip = skip,
+                        Take = PageSize,
+                        Source = source,
+                    },
+                    cancellationToken);
+
+                results.AddRange(page);
+                if (page.Count < PageSize)
+                {
+                    break;
+                }
+            }
         }
         catch (OperationCanceledException)
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception ex) when (
+            ex is ArgumentException
+            or InvalidOperationException
+            or IOException
+            or HttpRequestException
+            or FatalProtocolException)
         {
-            // Offline, unreachable feed, or an auth failure. Setup still needs to
-            // work against already-installed workloads, so use the built-in list.
+            // Offline, unreachable feed, or a malformed response. Setup still
+            // needs to work against already-installed workloads, so use the
+            // built-in list. Anything else is a bug and should surface.
             return SetupDependency.BuiltInStackSnapshot;
         }
 

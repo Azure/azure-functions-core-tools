@@ -119,6 +119,39 @@ public class SetupStackCatalogTests
         await _catalog.Received(1).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task GetStacksAsync_UnexpectedException_Propagates()
+    {
+        // Only transport/protocol failures fall back. A programming defect must
+        // stay visible instead of being silently cached as "offline".
+        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<CatalogSearchResult>>(_ => throw new NullReferenceException("bug"));
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        await FluentActions
+            .Awaiting(() => stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None))
+            .Should().ThrowAsync<NullReferenceException>();
+    }
+
+    [Fact]
+    public async Task GetStacksAsync_PagesUntilShortPage()
+    {
+        // A full first page means there may be more; discovery must not stop at
+        // the default page size and silently truncate the stack list.
+        CatalogSearchResult[] fullPage = [.. Enumerable.Range(0, 100)
+            .Select(i => Result($"azure.functions.cli.workloads.filler{i}", [$"filler{i}"], kind: "content"))];
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
+            .Returns(fullPage);
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>())
+            .Returns([Result("azure.functions.cli.workloads.java", ["java"], kind: "workload")]);
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
+
+        snapshot.SupportsStack("java").Should().BeTrue();
+        await _catalog.Received(2).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+    }
+
     private static CatalogSearchResult Result(string packageId, string[] aliases, string kind)
         => new(
             packageId,
