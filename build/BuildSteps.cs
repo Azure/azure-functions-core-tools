@@ -155,7 +155,10 @@ namespace Build
 
             if (!File.Exists(distLibWhl))
             {
-                Shell.Run("pip", $"download distlib=={Settings.DistLibVersion} --no-deps --only-binary=:all: -d \"{Settings.OutputDir}\" --index-url \"{Settings.DistLibPyPIFeedUrl}\"");
+                using (var client = new WebClient())
+                {
+                    client.DownloadFile(Settings.DistLibUrl, distLibWhl);
+                }
             }
 
             // Wheel files are zip archives; extract the distlib package directory

@@ -171,7 +171,7 @@ namespace Build
 
         public const string DistLibVersion = "0.3.1";
 
-        public static string DistLibPyPIFeedUrl => config("https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/pypi/simple/", "DISTLIB_PYPI_FEED_URL");
+        public static string DistLibUrl => config($"https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/pypi/download/distlib/{DistLibVersion}/distlib-{DistLibVersion}-py2.py3-none-any.whl", "DISTLIB_URL");
 
         public static readonly string OutputDir = Path.Combine(Path.GetFullPath(".."), "artifacts");
 
