@@ -37,11 +37,8 @@ internal interface IWorkloadInstaller
     /// The install directory exists without a matching registry entry and
     /// <paramref name="force"/> is <c>false</c>.
     /// </exception>
-    public Task<WorkloadInstallResult> InstallFromPackageAsync(
-        string nupkgPath,
-        bool force = false,
-        IProgress<WorkloadInstallProgress>? progress = null,
-        CancellationToken cancellationToken = default);
+    public Task<WorkloadInstallResult> InstallFromPackageAsync(string nupkgPath, bool force = false,
+        IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Resolves <paramref name="packageId"/> against the configured catalog,
@@ -78,15 +75,8 @@ internal interface IWorkloadInstaller
     /// The alias matches multiple packages and <paramref name="exact"/> is
     /// <c>false</c>.
     /// </exception>
-    public Task<WorkloadInstallResult> InstallFromCatalogAsync(
-        string packageId,
-        NuGetVersion? version,
-        string? source,
-        bool? includePrerelease,
-        bool exact,
-        bool force,
-        IProgress<WorkloadInstallProgress>? progress = null,
-        CancellationToken cancellationToken = default);
+    public Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
+        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// In-place version swap for an installed workload (spec §6.4). Stages
@@ -113,23 +103,11 @@ internal interface IWorkloadInstaller
     /// <paramref name="packageId"/> is not installed, or
     /// <paramref name="targetInstalledVersion"/> is not present.
     /// </exception>
-    public Task<WorkloadUpdateResult> UpdateAsync(
-        string packageId,
-        NuGetVersion? targetInstalledVersion,
-        string? source,
-        bool? includePrerelease,
-        bool allowMajor,
-        IProgress<WorkloadInstallProgress>? progress = null,
-        CancellationToken cancellationToken = default);
+    public Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
+        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default);
 
-    public Task<WorkloadUpdateResult> UpdateAsync(
-        string packageId,
-        NuGetVersion? targetInstalledVersion,
-        string? source,
-        bool? includePrerelease,
-        bool allowMajor,
-        WorkloadOwnershipKind ownership,
-        IProgress<WorkloadInstallProgress>? progress = null,
+    public Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
+        bool? includePrerelease, bool allowMajor, WorkloadOwnershipKind ownership, IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -137,14 +115,8 @@ internal interface IWorkloadInstaller
     /// (<paramref name="packageId"/>, <paramref name="version"/>). Returns
     /// <c>true</c> when an entry was removed, <c>false</c> when none existed.
     /// </summary>
-    public Task<bool> UninstallAsync(
-        string packageId,
-        string version,
-        CancellationToken cancellationToken = default);
+    public Task<bool> UninstallAsync(string packageId, string version, CancellationToken cancellationToken = default);
 
-    public Task<bool> UninstallAsync(
-        string packageId,
-        string version,
-        WorkloadOwnershipKind ownership,
-        CancellationToken cancellationToken = default);
+    public Task<bool> UninstallAsync(string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default);
 }
