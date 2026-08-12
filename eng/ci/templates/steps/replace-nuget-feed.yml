@@ -19,23 +19,32 @@ steps:
       exit 1
     }
 
-    $upstreamUrl = 'https://pkgs.dev.azure.com/azfunc/internal/_packaging/upstream/nuget/v3/index.json'
+    $internalUpstreamUrl = 'https://pkgs.dev.azure.com/azfunc/internal/_packaging/upstream/nuget/v3/index.json'
 
-    $nugetOrg = $sources.add | Where-Object { $_.key -eq 'nuget.org' }
-    if ($null -eq $nugetOrg) {
-      Write-Host "##[warning]No <add key='nuget.org' .../> entry found in $path; nothing to replace."
+    $publicUpstream = $sources.add | Where-Object { $_.key -eq 'upstream-public' }
+    if ($null -eq $publicUpstream) {
+      Write-Host "##[warning]No <add key='upstream-public' .../> entry found in $path; nothing to replace."
       exit 0
     }
 
     $upstream = $xml.CreateElement('add')
     $upstream.SetAttribute('key', 'upstream')
-    $upstream.SetAttribute('value', $upstreamUrl)
-    [void]$sources.ReplaceChild($upstream, $nugetOrg)
+    $upstream.SetAttribute('value', $internalUpstreamUrl)
+    [void]$sources.ReplaceChild($upstream, $publicUpstream)
+
+    # Update packageSourceMapping to match the renamed source
+    $mapping = $xml.configuration.packageSourceMapping
+    if ($null -ne $mapping) {
+      $mappingSource = $mapping.SelectSingleNode("packageSource[@key='upstream-public']")
+      if ($null -ne $mappingSource) {
+        $mappingSource.SetAttribute('key', 'upstream')
+      }
+    }
 
     $xml.Save($path)
-    Write-Host "Replaced 'nuget.org' with 'upstream' feed in $path"
+    Write-Host "Replaced 'upstream-public' with internal 'upstream' feed in $path"
     Get-Content -LiteralPath $path
-  displayName: Replace nuget.org with internal upstream feed
+  displayName: Replace upstream-public with internal upstream feed
 
 - task: NuGetAuthenticate@1
   displayName: Authenticate to internal NuGet feeds
