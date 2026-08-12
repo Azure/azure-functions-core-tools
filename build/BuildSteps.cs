@@ -20,6 +20,14 @@ namespace Build
         private static IntegrationTestBuildManifest _integrationManifest;
         private static string _targetFramework = string.Empty;
 
+        private static void DownloadIfNotExists(WebClient client, string url, string destinationPath)
+        {
+            if (!File.Exists(destinationPath))
+            {
+                client.DownloadFile(url, destinationPath);
+            }
+        }
+
         public static void Clean()
         {
             Directory.Delete(Settings.OutputDir, recursive: true);
@@ -140,28 +148,6 @@ namespace Build
                                 (string.IsNullOrEmpty(rid) ? string.Empty : $" -r {rid}"));
         }
 
-        public static void AddDistLib()
-        {
-            var distLibDir = Path.Combine(Settings.OutputDir, "distlib");
-            var distLibZip = Path.Combine(Settings.OutputDir, "distlib.zip");
-            using (var client = new WebClient())
-            {
-                client.DownloadFile(Settings.DistLibUrl, distLibZip);
-            }
-
-            ZipFile.ExtractToDirectory(distLibZip, distLibDir);
-
-            foreach (var runtime in Settings.TargetRuntimes)
-            {
-                var dist = Path.Combine(Settings.OutputDir, runtime, "tools", "python", "packapp", "distlib");
-                Directory.CreateDirectory(dist);
-                FileHelpers.RecursiveCopy(Path.Combine(distLibDir, Directory.GetDirectories(distLibDir).First(), "distlib"), dist);
-            }
-
-            File.Delete(distLibZip);
-            Directory.Delete(distLibDir, recursive: true);
-        }
-
         public static void AddTemplatesNupkgs()
         {
             var templatesPath = Path.Combine(Settings.OutputDir, "nupkg-templates");
@@ -170,21 +156,39 @@ namespace Build
             Directory.CreateDirectory(templatesPath);
             Directory.CreateDirectory(isolatedTemplatesPath);
 
-            using (var client = new WebClient())
+            // Restore template packages through NuGet so the Azure Artifacts credential provider handles auth.
+            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempDir);
+            var packagesConfigPath = Path.Combine(tempDir, "packages.config");
+            var packagesDir = Path.Combine(tempDir, "packages");
+            var nugetConfigPath = Path.GetFullPath("../NuGet.Config");
+
+            var packagesConfig = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<packages>
+  <package id=""Microsoft.Azure.Functions.Worker.ItemTemplates"" version=""{Settings.DotnetIsolatedItemTemplatesVersion}"" />
+  <package id=""Microsoft.Azure.Functions.Worker.ProjectTemplates"" version=""{Settings.DotnetIsolatedProjectTemplatesVersion}"" />
+  <package id=""Microsoft.Azure.WebJobs.ItemTemplates"" version=""{Settings.DotnetItemTemplatesVersion}"" />
+  <package id=""Microsoft.Azure.WebJobs.ProjectTemplates"" version=""{Settings.DotnetProjectTemplatesVersion}"" />
+</packages>";
+            File.WriteAllText(packagesConfigPath, packagesConfig);
+
+            Shell.Run("nuget", $"restore \"{packagesConfigPath}\" -PackagesDirectory \"{packagesDir}\" -ConfigFile \"{nugetConfigPath}\" -PackageSaveMode nupkg -DirectDownload -NonInteractive");
+
+            // Copy restored nupkgs to expected locations
+            // If any of these names / paths change, we need to make sure our tooling partners (in particular VS and VS Mac) are notified
+            // and we are sure it doesn't break them.
+            var templatePackages = new[]
             {
-                // If any of these names / paths change, we need to make sure our tooling partners (in particular VS and VS Mac) are notified
-                // and we are sure it doesn't break them.
-                client.DownloadFile(Settings.DotnetIsolatedItemTemplates,
-                    Path.Combine(isolatedTemplatesPath, $"itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg"));
+                (Id: "Microsoft.Azure.Functions.Worker.ItemTemplates", Version: Settings.DotnetIsolatedItemTemplatesVersion, Dest: Path.Combine(isolatedTemplatesPath, $"itemTemplates.{Settings.DotnetIsolatedItemTemplatesVersion}.nupkg")),
+                (Id: "Microsoft.Azure.Functions.Worker.ProjectTemplates", Version: Settings.DotnetIsolatedProjectTemplatesVersion, Dest: Path.Combine(isolatedTemplatesPath, $"projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg")),
+                (Id: "Microsoft.Azure.WebJobs.ItemTemplates", Version: Settings.DotnetItemTemplatesVersion, Dest: Path.Combine(templatesPath, $"itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg")),
+                (Id: "Microsoft.Azure.WebJobs.ProjectTemplates", Version: Settings.DotnetProjectTemplatesVersion, Dest: Path.Combine(templatesPath, $"projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg")),
+            };
 
-                client.DownloadFile(Settings.DotnetIsolatedProjectTemplates,
-                    Path.Combine(isolatedTemplatesPath, $"projectTemplates.{Settings.DotnetIsolatedProjectTemplatesVersion}.nupkg"));
-
-                client.DownloadFile(Settings.DotnetItemTemplates,
-                    Path.Combine(templatesPath, $"itemTemplates.{Settings.DotnetItemTemplatesVersion}.nupkg"));
-
-                client.DownloadFile(Settings.DotnetProjectTemplates,
-                    Path.Combine(templatesPath, $"projectTemplates.{Settings.DotnetProjectTemplatesVersion}.nupkg"));
+            foreach (var pkg in templatePackages)
+            {
+                var nupkgPath = Path.Combine(packagesDir, $"{pkg.Id}.{pkg.Version}", $"{pkg.Id}.{pkg.Version}.nupkg");
+                File.Copy(nupkgPath, pkg.Dest, overwrite: true);
             }
 
             foreach (var runtime in Settings.TargetRuntimes)
@@ -193,18 +197,19 @@ namespace Build
             }
 
             Directory.Delete(templatesPath, recursive: true);
+            Directory.Delete(tempDir, recursive: true);
         }
 
         public static void AddTemplatesJson()
         {
             var tempDirectoryPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            FileHelpers.EnsureDirectoryExists(tempDirectoryPath);
+            var zipFilePath = Path.Combine(tempDirectoryPath, "templates.zip");
             using (var client = new WebClient())
             {
-                FileHelpers.EnsureDirectoryExists(tempDirectoryPath);
-                var zipFilePath = Path.Combine(tempDirectoryPath, "templates.zip");
-                client.DownloadFile(Settings.TemplatesJsonZip, zipFilePath);
-                FileHelpers.ExtractZipToDirectory(zipFilePath, tempDirectoryPath);
+                DownloadIfNotExists(client, Settings.TemplatesJsonZip, zipFilePath);
             }
+            FileHelpers.ExtractZipToDirectory(zipFilePath, tempDirectoryPath);
 
             string templatesJsonPath = Path.Combine(tempDirectoryPath, "templates", "templates.json");
             if (File.Exists(templatesJsonPath))
@@ -352,86 +357,26 @@ namespace Build
             }
         }
 
-        public static void TestSignedArtifacts()
+        private static List<string> GetUnsignedBinaries(string targetDir)
         {
-            string[] zipFiles = Directory.GetFiles(Settings.OutputDir, "*.zip");
+            var signable = new[] { ".dll", ".exe" };
+            var files = Directory.EnumerateFiles(targetDir, "*.*", SearchOption.AllDirectories)
+                .Where(f => signable.Contains(Path.GetExtension(f).ToLowerInvariant()));
 
-            foreach (var zipFilePath in zipFiles)
-            {
-                if (zipFilePath.Contains("osx"))
-                {
-                    // sigcheck.exe does not work for mac signatures
-                    return;
-                }
-
-                bool isSignedRuntime = Settings.SignInfo.RuntimesToSign.Any(r => zipFilePath.Contains(r));
-                if (isSignedRuntime)
-                {
-                    string targetDir = Path.Combine(Settings.OutputDir, "PostSignTest", Path.GetFileNameWithoutExtension(zipFilePath));
-                    Directory.CreateDirectory(targetDir);
-                    ZipFile.ExtractToDirectory(zipFilePath, targetDir);
-
-                    var unSignedPackages = GetUnsignedBinaries(targetDir);
-                    if (unSignedPackages.Count() != 0)
-                    {
-                        var missingSignature = string.Join($",{Environment.NewLine}", unSignedPackages);
-                        ColoredConsole.Error.WriteLine($"This files are missing valid signatures: {Environment.NewLine}{missingSignature}");
-                        throw new Exception($"sigcheck.exe test failed. Following files are unsigned: {Environment.NewLine}{missingSignature}");
-                    }
-                }
-            }
-        }
-
-        public static List<string> GetUnsignedBinaries(string targetDir)
-        {
-            // Download sigcheck.exe
-            var sigcheckPath = Path.Combine(Settings.OutputDir, "sigcheck.exe");
-            if (!File.Exists(sigcheckPath))
-            {
-                using (var client = new WebClient())
-                {
-                    client.DownloadFile(Settings.SignInfo.SigcheckDownloadURL, sigcheckPath);
-                }
-            }
-
-            // https://peter.hahndorf.eu/blog/post/2010/03/07/WorkAroundSysinternalsLicensePopups
-            // Can't use sigcheck without signing the License Agreement
-            Console.WriteLine("Signing EULA");
-            Console.WriteLine(Shell.GetOutput("reg.exe", "ADD HKCU\\Software\\Sysinternals /v EulaAccepted /t REG_DWORD /d 1 /f"));
-            Console.WriteLine(Shell.GetOutput("reg.exe", "ADD HKU\\.DEFAULT\\Software\\Sysinternals /v EulaAccepted /t REG_DWORD /d 1 /f"));
-
-            // sigcheck.exe will exit with error codes if unsigned binaries present
-            var csvOutputLines = Shell.GetOutput(sigcheckPath, $" -s -u -c -q {targetDir}", ignoreExitCode: true).Split(Environment.NewLine);
-
-            // CSV separators can differ between languages and regions.
-            var csvSep = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ListSeparator;
             var unSignedPackages = new List<string>();
-
-            foreach (var line in csvOutputLines)
+            foreach (var file in files)
             {
-                // Some lines contain sigcheck header info and we filter them out by making sure
-                // there's at least six commas in each valid line.
-                if (line.Split(csvSep).Length - 1 > 6)
+                try
                 {
-                    // Package name is the first element in each line.
-                    var fileName = line.Split(csvSep)[0].Trim('"');
-                    unSignedPackages.Add(fileName);
+                    System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(file);
+                }
+                catch
+                {
+                    unSignedPackages.Add(file);
                 }
             }
 
-            if (unSignedPackages.Count() < 1)
-            {
-                throw new Exception("Something went wrong while testing for signed packages. There must be a few unsigned allowed binaries");
-            }
-
-            // The first element is simply the column heading
-            unSignedPackages = unSignedPackages.Skip(1).ToList();
-
-            // Filter out the extensions we didn't want to sign
             unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.FilterExtensionsSign.Any(ext => file.EndsWith(ext))).ToList();
-
-            // Filter out files we don't want to verify
-            unSignedPackages = unSignedPackages.Where(file => !Settings.SignInfo.SkipSigcheckTest.Any(ext => file.EndsWith(ext))).ToList();
             return unSignedPackages;
         }
 

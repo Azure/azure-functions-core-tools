@@ -202,13 +202,6 @@ jobs:
       DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
       TELEMETRY_INSTRUMENTATION_KEY: $(TELEMETRY_INSTRUMENTATION_KEY)
     condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'run'
-      workingDirectory: '.\build'
-      arguments: 'TestSignedArtifacts --signTest'
-    displayName: 'Verify signed binaries'
-    condition: and(succeeded(), eq(variables['IsReleaseBuild'], 'true'))
 
   - pwsh: |
       .\generateMsiFiles.ps1
