@@ -37,8 +37,6 @@ internal sealed class WorkloadRegistry
 /// </summary>
 internal sealed class WorkloadEntry
 {
-    private bool? _isExplicitlyInstalled;
-
     /// <summary>
     /// NuGet package id (e.g. <c>"Azure.Functions.Cli.Workloads.Dotnet"</c>).
     /// Matched case-insensitively.
@@ -86,22 +84,11 @@ internal sealed class WorkloadEntry
     public string? RuntimeIdentifier { get; init; }
 
     /// <summary>
-    /// Whether this physical package has an explicit install owner. Defaults
-    /// to true so registry rows written by older CLIs retain their ownership.
+    /// Whether this physical package lacks an explicit install owner. Defaults
+    /// to false so registry rows written by older CLIs retain their ownership.
     /// </summary>
-    [JsonIgnore]
-    public bool IsExplicitlyInstalled
-    {
-        get => _isExplicitlyInstalled ?? true;
-        init => _isExplicitlyInstalled = value;
-    }
-
-    [JsonPropertyName("isExplicitlyInstalled")]
-    public bool? PersistedIsExplicitlyInstalled
-    {
-        get => _isExplicitlyInstalled;
-        init => _isExplicitlyInstalled = value;
-    }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsImplicitlyInstalled { get; init; }
 
     /// <summary>
     /// Logical pointer package that selected this implementation, or null when

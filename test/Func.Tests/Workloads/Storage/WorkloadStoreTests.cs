@@ -108,7 +108,7 @@ public class WorkloadStoreTests : IDisposable
             PackageVersion = "1.0.0",
             Aliases = ["dotnet", "dotnet-isolated"],
             RuntimeIdentifier = "linux-x64",
-            IsExplicitlyInstalled = false,
+            IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
                 PackageId = "Azure.Functions.Cli.Workloads.Dotnet",
@@ -132,7 +132,7 @@ public class WorkloadStoreTests : IDisposable
         actual.PackageVersion.Should().Be(entry.PackageVersion);
         actual.Aliases.Should().Equal(entry.Aliases);
         actual.RuntimeIdentifier.Should().Be("linux-x64");
-        actual.IsExplicitlyInstalled.Should().BeFalse();
+        actual.IsImplicitlyInstalled.Should().BeTrue();
         actual.LogicalPackage!.PackageId.Should().Be(entry.LogicalPackage.PackageId);
         actual.LogicalPackage.Source.Should().Be(entry.LogicalPackage.Source);
         actual.EntryPoint!.AssemblyPath.Should().Be(entry.EntryPoint!.AssemblyPath);
@@ -159,6 +159,21 @@ public class WorkloadStoreTests : IDisposable
             element.TryGetProperty("packageId", out _).Should().BeTrue();
             element.TryGetProperty("packageVersion", out _).Should().BeTrue();
         }
+    }
+
+    [Fact]
+    public async Task PersistedJson_WritesOnlyImplicitOwnership()
+    {
+        await _store.SaveWorkloadAsync(NewEntry("explicit.pkg", "1.0.0"));
+        await _store.SaveWorkloadAsync(NewPointerEntry("implicit.pkg", "1.0.0"));
+
+        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(_paths.WorkloadRegistryPath));
+        JsonElement workloads = doc.RootElement.GetProperty("workloads");
+        JsonElement explicitEntry = workloads.EnumerateArray().Single(e => e.GetProperty("packageId").GetString() == "explicit.pkg");
+        JsonElement implicitEntry = workloads.EnumerateArray().Single(e => e.GetProperty("packageId").GetString() == "implicit.pkg");
+
+        explicitEntry.TryGetProperty("isImplicitlyInstalled", out _).Should().BeFalse();
+        implicitEntry.GetProperty("isImplicitlyInstalled").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
@@ -221,13 +236,13 @@ public class WorkloadStoreTests : IDisposable
 
         WorkloadEntry entry = (await _store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
 
-        entry.IsExplicitlyInstalled.Should().BeTrue();
+        entry.IsImplicitlyInstalled.Should().BeFalse();
         entry.LogicalPackage.Should().BeNull();
         entry.RuntimeIdentifier.Should().BeNull();
     }
 
     [Fact]
-    public async Task GetWorkloadsAsync_ExplicitFalseIsPreserved()
+    public async Task GetWorkloadsAsync_ImplicitTrueIsPreserved()
     {
         Directory.CreateDirectory(_tempHome);
         await File.WriteAllTextAsync(
@@ -240,7 +255,7 @@ public class WorkloadStoreTests : IDisposable
                   "packageId": "pkg.win-x64",
                   "packageVersion": "1.0.0",
                   "runtimeIdentifier": "win-x64",
-                  "isExplicitlyInstalled": false,
+                  "isImplicitlyInstalled": true,
                   "logicalPackage": {
                     "packageId": "pkg",
                     "packageVersion": "1.0.0"
@@ -254,7 +269,7 @@ public class WorkloadStoreTests : IDisposable
 
         WorkloadEntry entry = (await _store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
 
-        entry.IsExplicitlyInstalled.Should().BeFalse();
+        entry.IsImplicitlyInstalled.Should().BeTrue();
         entry.LogicalPackage.Should().NotBeNull();
     }
 
@@ -268,7 +283,7 @@ public class WorkloadStoreTests : IDisposable
             PackageVersion = "1.0.0",
             Kind = WorkloadKind.Content,
             RuntimeIdentifier = "win-x64",
-            IsExplicitlyInstalled = false,
+            IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage { PackageId = "other.pkg", PackageVersion = "1.0.0" },
             InstallRefCount = 1,
         };
@@ -286,7 +301,7 @@ public class WorkloadStoreTests : IDisposable
         WorkloadEntry first = await _store.AddOwnershipAsync(pointerEntry, WorkloadOwnershipKind.Logical);
         WorkloadEntry second = await _store.AddOwnershipAsync(pointerEntry, WorkloadOwnershipKind.Logical);
 
-        first.IsExplicitlyInstalled.Should().BeTrue();
+        first.IsImplicitlyInstalled.Should().BeFalse();
         first.LogicalPackage.Should().NotBeNull();
         first.InstallRefCount.Should().Be(2);
         second.InstallRefCount.Should().Be(2);
@@ -297,11 +312,9 @@ public class WorkloadStoreTests : IDisposable
     {
         await _store.SaveWorkloadAsync(NewEntry("pkg.win-x64", "1.0.0"));
 
-        WorkloadEntry merged = await _store.AddOwnershipAsync(
-            NewPointerEntry("pkg.win-x64", "1.0.0"),
-            WorkloadOwnershipKind.Explicit);
+        WorkloadEntry merged = await _store.AddOwnershipAsync(NewPointerEntry("pkg.win-x64", "1.0.0"), WorkloadOwnershipKind.Explicit);
 
-        merged.IsExplicitlyInstalled.Should().BeTrue();
+        merged.IsImplicitlyInstalled.Should().BeFalse();
         merged.LogicalPackage.Should().NotBeNull();
         merged.InstallRefCount.Should().Be(2);
     }
@@ -317,19 +330,16 @@ public class WorkloadStoreTests : IDisposable
             Kind = pointerEntry.Kind,
             RuntimeIdentifier = pointerEntry.RuntimeIdentifier,
             LogicalPackage = pointerEntry.LogicalPackage,
-            IsExplicitlyInstalled = true,
             InstallRefCount = 2,
         };
         await _store.SaveWorkloadAsync(entry);
 
         WorkloadOwnershipRemovalResult result = await _store.RemoveOwnershipAsync(
-            entry.PackageId,
-            entry.PackageVersion,
-            WorkloadOwnershipKind.Explicit);
+            entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit);
 
         result.OwnershipRemoved.Should().BeTrue();
         result.EntryRemoved.Should().BeFalse();
-        result.Entry!.IsExplicitlyInstalled.Should().BeFalse();
+        result.Entry!.IsImplicitlyInstalled.Should().BeTrue();
         result.Entry.LogicalPackage.Should().NotBeNull();
         result.Entry.InstallRefCount.Should().Be(1);
     }
@@ -342,24 +352,80 @@ public class WorkloadStoreTests : IDisposable
             PackageId = "pkg.win-x64",
             PackageVersion = "1.0.0",
             RuntimeIdentifier = "win-x64",
-            IsExplicitlyInstalled = true,
             LogicalPackage = NewPointerEntry("pkg.win-x64", "1.0.0").LogicalPackage,
             InstallRefCount = 2,
         };
         await _store.SaveWorkloadAsync(oldEntry);
 
         WorkloadOwnershipMoveResult result = await _store.MoveLogicalOwnershipAsync(
-            oldEntry.PackageId,
-            oldEntry.PackageVersion,
-            NewPointerEntry("pkg.win-x64", "2.0.0"));
+            oldEntry.PackageId, oldEntry.PackageVersion, NewPointerEntry("pkg.win-x64", "2.0.0"));
 
         result.PreviousEntryRemoved.Should().BeFalse();
         IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync();
         WorkloadEntry retained = entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Subject;
-        retained.IsExplicitlyInstalled.Should().BeTrue();
+        retained.IsImplicitlyInstalled.Should().BeFalse();
         retained.LogicalPackage.Should().BeNull();
         retained.InstallRefCount.Should().Be(1);
         entries.Should().ContainSingle(e => e.PackageVersion == "2.0.0");
+    }
+
+    [Fact]
+    public async Task MoveLogicalOwnershipAsync_RemovesOldRow_WhenLogicalOwnershipIsFinalOwner()
+    {
+        WorkloadEntry oldEntry = NewPointerEntry("pkg.win-x64", "1.0.0");
+        await _store.SaveWorkloadAsync(oldEntry);
+
+        WorkloadOwnershipMoveResult result = await _store.MoveLogicalOwnershipAsync(
+            oldEntry.PackageId, oldEntry.PackageVersion, NewPointerEntry("pkg.win-x64", "2.0.0"));
+
+        result.PreviousEntryRemoved.Should().BeTrue();
+        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync();
+        WorkloadEntry moved = entries.Should().ContainSingle().Subject;
+        moved.PackageVersion.Should().Be("2.0.0");
+        moved.IsImplicitlyInstalled.Should().BeTrue();
+        moved.LogicalPackage.Should().NotBeNull();
+        moved.InstallRefCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task MoveExplicitOwnershipAsync_RetainsLogicalOldRow()
+    {
+        WorkloadEntry oldEntry = new()
+        {
+            PackageId = "pkg.win-x64",
+            PackageVersion = "1.0.0",
+            RuntimeIdentifier = "win-x64",
+            LogicalPackage = NewPointerEntry("pkg.win-x64", "1.0.0").LogicalPackage,
+            InstallRefCount = 2,
+        };
+        await _store.SaveWorkloadAsync(oldEntry);
+
+        WorkloadOwnershipMoveResult result = await _store.MoveExplicitOwnershipAsync(
+            oldEntry.PackageId, oldEntry.PackageVersion, NewEntry("pkg.win-x64", "2.0.0"));
+
+        result.PreviousEntryRemoved.Should().BeFalse();
+        IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync();
+        WorkloadEntry retained = entries.Should().ContainSingle(e => e.PackageVersion == "1.0.0").Subject;
+        retained.IsImplicitlyInstalled.Should().BeTrue();
+        retained.LogicalPackage.Should().NotBeNull();
+        retained.InstallRefCount.Should().Be(1);
+        WorkloadEntry moved = entries.Should().ContainSingle(e => e.PackageVersion == "2.0.0").Subject;
+        moved.IsImplicitlyInstalled.Should().BeFalse();
+        moved.InstallRefCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task MoveLogicalOwnershipAsync_WritesRegistryOnce()
+    {
+        var store = new CountingSerializeStore(_paths);
+        WorkloadEntry oldEntry = NewPointerEntry("pkg.win-x64", "1.0.0");
+        await store.SaveWorkloadAsync(oldEntry);
+        store.ResetSerializeCount();
+
+        await store.MoveLogicalOwnershipAsync(
+            oldEntry.PackageId, oldEntry.PackageVersion, NewPointerEntry("pkg.win-x64", "2.0.0"));
+
+        store.SerializeCount.Should().Be(1);
     }
 
     [Fact]
@@ -394,7 +460,7 @@ public class WorkloadStoreTests : IDisposable
             PackageVersion = version,
             Kind = WorkloadKind.Content,
             RuntimeIdentifier = "win-x64",
-            IsExplicitlyInstalled = false,
+            IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
                 PackageId = "pkg",
@@ -411,5 +477,19 @@ public class WorkloadStoreTests : IDisposable
     {
         internal override Task SerializeAsync(Stream stream, WorkloadRegistry registry, CancellationToken cancellationToken)
             => throw new InvalidOperationException("boom");
+    }
+
+    private sealed class CountingSerializeStore(IWorkloadPaths paths) : WorkloadStore(paths)
+    {
+        public int SerializeCount { get; private set; }
+
+        public void ResetSerializeCount()
+            => SerializeCount = 0;
+
+        internal override Task SerializeAsync(Stream stream, WorkloadRegistry registry, CancellationToken cancellationToken)
+        {
+            SerializeCount++;
+            return base.SerializeAsync(stream, registry, cancellationToken);
+        }
     }
 }
