@@ -7,6 +7,8 @@ using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using NuGet.Packaging;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Install;
 
@@ -70,6 +72,72 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task TryReuseImplementationAsync_AttachingOwnership_PreservesAllEntryFields()
+    {
+        LogicalPackage logicalPackage = Logical("example.pointer", "1.0.0");
+        WorkloadEntry existing = CompleteEntry();
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([existing]);
+        string installPath = _paths.GetInstallDirectory(existing.PackageId, existing.PackageVersion);
+        Directory.CreateDirectory(installPath);
+        _metadataReader.Read(installPath).Returns(Metadata(existing.RuntimeIdentifier!));
+        _store.AddOwnershipAsync(Arg.Any<WorkloadEntry>(), WorkloadOwnershipKind.Logical, Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<WorkloadEntry>());
+
+        WorkloadInstallResult? result = await _deploymentService.TryReuseImplementationAsync(
+            existing.PackageId, existing.PackageVersion, existing.RuntimeIdentifier!, logicalPackage);
+
+        result.Should().NotBeNull();
+        result!.Entry.Should().BeEquivalentTo(CompleteEntry(logicalPackage));
+    }
+
+    [Fact]
+    public async Task InstallAsync_ForcedReinstall_PreservesIncomingFieldsAndExistingOwnership()
+    {
+        LogicalPackage logicalPackage = Logical("example.pointer", "1.0.0");
+        WorkloadEntry existing = CompleteEntry(logicalPackage);
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([existing]);
+        EntryPointSpec entryPoint = new() { AssemblyPath = "New.dll", Type = "New.Type" };
+        WorkloadMetadata metadata = new()
+        {
+            Schema = WorkloadManifestSchema.PackageManifestV1Schema,
+            Kind = WorkloadKind.Workload,
+            EntryPoint = entryPoint,
+            RuntimeIdentifier = "win-x64",
+            DisplayName = "New display name",
+            Description = "New description.",
+        };
+        _metadataReader.Read(Arg.Any<string>()).Returns(metadata);
+        const string packageId = "example.workload.win-x64";
+        const string version = "1.0.0";
+        const string source = "https://new.example.test/v3/index.json";
+        WorkloadPackageIdentity identity = new(
+            packageId, version, [WorkloadPackageTypes.RuntimeIdentifierPackage], ["new-alias"], ["win-x64"], "Nuspec title", "Nuspec description");
+        InspectedWorkloadPackage package = new(
+            BuildPackage(packageId, version), identity, metadata, WorkloadPackageRole.RuntimeIdentifierImplementation);
+
+        WorkloadInstallResult result = await _deploymentService.InstallAsync(
+            package, source, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true);
+
+        WorkloadEntry expected = new()
+        {
+            PackageId = packageId,
+            PackageVersion = version,
+            Kind = WorkloadKind.Workload,
+            Aliases = ["new-alias"],
+            DisplayName = metadata.DisplayName,
+            Description = metadata.Description,
+            Source = source,
+            RuntimeIdentifier = metadata.RuntimeIdentifier,
+            IsImplicitlyInstalled = false,
+            LogicalPackage = logicalPackage,
+            InstallRefCount = existing.InstallRefCount + 1,
+            EntryPoint = entryPoint,
+        };
+        result.Entry.Should().BeEquivalentTo(expected);
+        await _store.Received(1).SaveWorkloadAsync(result.Entry, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task TryReuseImplementationAsync_InvalidInstalledMetadata_DoesNotReuse()
     {
         WorkloadEntry reusable = Entry("example.workload.win-x64", "1.0.0", runtimeIdentifier: "win-x64");
@@ -125,12 +193,52 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             LogicalPackage = logicalPackage,
         };
 
+    private static WorkloadEntry CompleteEntry(LogicalPackage? logicalPackage = null)
+        => new()
+        {
+            PackageId = "example.workload.win-x64",
+            PackageVersion = "1.0.0",
+            Kind = WorkloadKind.Workload,
+            Aliases = ["example", "sample"],
+            DisplayName = "Existing display name",
+            Description = "Existing description.",
+            Source = "https://old.example.test/v3/index.json",
+            RuntimeIdentifier = "win-x64",
+            IsImplicitlyInstalled = true,
+            LogicalPackage = logicalPackage,
+            InstallRefCount = 2,
+            EntryPoint = new EntryPointSpec { AssemblyPath = "Existing.dll", Type = "Existing.Type" },
+        };
+
     private static LogicalPackage Logical(string packageId, string version)
         => new()
         {
             PackageId = packageId,
             PackageVersion = version,
+            Aliases = ["pointer"],
+            DisplayName = "Pointer display name",
+            Description = "Pointer description.",
+            Source = "https://pointer.example.test/v3/index.json",
         };
+
+    private string BuildPackage(string packageId, string version)
+    {
+        string manifestPath = Path.Combine(_root, $"workload-{Guid.NewGuid():N}.json");
+        File.WriteAllText(manifestPath, "{}");
+        var builder = new PackageBuilder
+        {
+            Id = packageId,
+            Version = NuGetVersion.Parse(version),
+            Description = "Test package.",
+        };
+        builder.Authors.Add("test");
+        builder.Files.Add(new PhysicalPackageFile { SourcePath = manifestPath, TargetPath = "workload.json" });
+
+        string packagePath = Path.Combine(_root, $"{packageId}.{version}.nupkg");
+        using FileStream stream = File.Create(packagePath);
+        builder.Save(stream);
+        return packagePath;
+    }
 
     private static WorkloadMetadata Metadata(string runtimeIdentifier)
         => new()
