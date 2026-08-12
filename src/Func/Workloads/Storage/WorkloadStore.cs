@@ -60,10 +60,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         return true;
     }
 
-    public async Task ReplaceWorkloadAsync(
-        string oldPackageId,
-        string oldVersion,
-        WorkloadEntry newEntry,
+    public async Task ReplaceWorkloadAsync(string oldPackageId, string oldVersion, WorkloadEntry newEntry,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(oldPackageId);
@@ -93,6 +90,119 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         await WriteRegistryAsync(registry, cancellationToken);
     }
 
+    public async Task<WorkloadEntry> AddOwnershipAsync(WorkloadEntry entry, WorkloadOwnershipKind ownership,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateEntry(entry);
+        ValidateOwnership(entry, ownership);
+
+        WorkloadRegistry registry = await ReadRegistryAsync(cancellationToken);
+        WorkloadEntry merged = AddOwnershipCore(registry, entry, ownership);
+        await WriteRegistryAsync(registry, cancellationToken);
+        return merged;
+    }
+
+    public async Task<WorkloadOwnershipRemovalResult> RemoveOwnershipAsync(string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+
+        WorkloadRegistry registry = await ReadRegistryAsync(cancellationToken);
+        WorkloadOwnershipRemovalResult result = RemoveOwnershipCore(registry, packageId, version, ownership);
+        if (!result.OwnershipRemoved)
+        {
+            return result;
+        }
+
+        await WriteRegistryAsync(registry, cancellationToken);
+        return result;
+    }
+
+    public async Task<WorkloadOwnershipMoveResult> MoveLogicalOwnershipAsync(string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken = default)
+        => await MoveOwnershipAsync(oldPackageId, oldVersion, newEntry, WorkloadOwnershipKind.Logical, cancellationToken);
+
+    public async Task<WorkloadOwnershipMoveResult> MoveExplicitOwnershipAsync(string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken = default)
+        => await MoveOwnershipAsync(oldPackageId, oldVersion, newEntry, WorkloadOwnershipKind.Explicit, cancellationToken);
+
+    private async Task<WorkloadOwnershipMoveResult> MoveOwnershipAsync(string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(oldPackageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(oldVersion);
+        ValidateEntry(newEntry);
+        ValidateOwnership(newEntry, ownership);
+
+        WorkloadRegistry registry = await ReadRegistryAsync(cancellationToken);
+        WorkloadOwnershipRemovalResult removal = RemoveOwnershipCore(registry, oldPackageId, oldVersion, ownership);
+        if (!removal.OwnershipRemoved)
+        {
+            throw new InvalidOperationException(
+                $"{ownership} ownership for workload '{oldPackageId}' version '{oldVersion}' is not installed.");
+        }
+
+        WorkloadEntry merged = AddOwnershipCore(registry, newEntry, ownership);
+        await WriteRegistryAsync(registry, cancellationToken);
+        return new WorkloadOwnershipMoveResult(merged, removal.EntryRemoved);
+    }
+
+    private static WorkloadEntry AddOwnershipCore(WorkloadRegistry registry, WorkloadEntry entry, WorkloadOwnershipKind ownership)
+    {
+        int index = FindIndex(registry, entry.PackageId, entry.PackageVersion);
+        WorkloadEntry merged = index < 0
+            ? NormalizeNewEntry(entry, ownership)
+            : MergeOwnership(registry.Workloads[index], entry, ownership);
+
+        if (index < 0)
+        {
+            registry.Workloads.Add(merged);
+        }
+        else
+        {
+            registry.Workloads[index] = merged;
+        }
+
+        return merged;
+    }
+
+    private static WorkloadOwnershipRemovalResult RemoveOwnershipCore(
+        WorkloadRegistry registry, string packageId, string version, WorkloadOwnershipKind ownership)
+    {
+        int index = FindIndex(registry, packageId, version);
+        if (index < 0)
+        {
+            return new WorkloadOwnershipRemovalResult(false, false, null);
+        }
+
+        WorkloadEntry current = registry.Workloads[index];
+        bool hasOwnership = ownership switch
+        {
+            WorkloadOwnershipKind.Explicit => !current.IsImplicitlyInstalled,
+            WorkloadOwnershipKind.Logical => current.LogicalPackage is not null,
+            _ => throw new ArgumentOutOfRangeException(nameof(ownership)),
+        };
+
+        if (!hasOwnership)
+        {
+            return new WorkloadOwnershipRemovalResult(false, false, current);
+        }
+
+        int remainingReferences = current.InstallRefCount - 1;
+        if (remainingReferences <= 0)
+        {
+            registry.Workloads.RemoveAt(index);
+            return new WorkloadOwnershipRemovalResult(true, true, null);
+        }
+
+        WorkloadEntry updated = CopyWithOwnership(
+            current, isImplicitlyInstalled: ownership == WorkloadOwnershipKind.Explicit || current.IsImplicitlyInstalled,
+            logicalPackage: ownership == WorkloadOwnershipKind.Logical ? null : current.LogicalPackage, installRefCount: remainingReferences);
+        registry.Workloads[index] = updated;
+        return new WorkloadOwnershipRemovalResult(true, false, updated);
+    }
+
     private static int FindIndex(WorkloadRegistry registry, string packageId, string version)
     {
         for (int i = 0; i < registry.Workloads.Count; i++)
@@ -107,6 +217,72 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
 
         return -1;
     }
+
+    private static void ValidateEntry(WorkloadEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentException.ThrowIfNullOrWhiteSpace(entry.PackageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(entry.PackageVersion);
+    }
+
+    private static void ValidateOwnership(WorkloadEntry entry, WorkloadOwnershipKind ownership)
+    {
+        if (ownership == WorkloadOwnershipKind.Logical && entry.LogicalPackage is null)
+        {
+            throw new ArgumentException("Logical ownership requires logical package metadata.", nameof(entry));
+        }
+    }
+
+    private static WorkloadEntry NormalizeNewEntry(WorkloadEntry entry, WorkloadOwnershipKind ownership)
+    {
+        bool explicitOwner = ownership == WorkloadOwnershipKind.Explicit || !entry.IsImplicitlyInstalled;
+        int ownerCount = (explicitOwner ? 1 : 0) + (entry.LogicalPackage is null ? 0 : 1);
+        return CopyWithOwnership(entry, !explicitOwner, entry.LogicalPackage, Math.Max(ownerCount, entry.InstallRefCount));
+    }
+
+    private static WorkloadEntry MergeOwnership(WorkloadEntry current, WorkloadEntry incoming, WorkloadOwnershipKind ownership)
+    {
+        bool attachExplicit = ownership == WorkloadOwnershipKind.Explicit && current.IsImplicitlyInstalled;
+        bool attachLogical = current.LogicalPackage is null && incoming.LogicalPackage is not null;
+        if (ownership == WorkloadOwnershipKind.Logical
+            && current.LogicalPackage is not null
+            && !SameLogicalOwner(current.LogicalPackage, incoming.LogicalPackage!))
+        {
+            throw new InvalidOperationException(
+                $"Physical workload '{current.PackageId}' version '{current.PackageVersion}' is already owned by logical package " +
+                $"'{current.LogicalPackage.PackageId}' version '{current.LogicalPackage.PackageVersion}'.");
+        }
+
+        // Payload metadata comes from the incoming entry: the caller may have just replaced the payload
+        // on disk, and a legacy row would otherwise keep stale values such as a missing runtime identifier.
+        return CopyWithOwnership(
+            incoming,
+            current.IsImplicitlyInstalled && ownership != WorkloadOwnershipKind.Explicit,
+            current.LogicalPackage ?? incoming.LogicalPackage,
+            current.InstallRefCount + (attachExplicit ? 1 : 0) + (attachLogical ? 1 : 0));
+    }
+
+    private static bool SameLogicalOwner(LogicalPackage left, LogicalPackage right)
+        => string.Equals(left.PackageId, right.PackageId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(left.PackageVersion, right.PackageVersion, StringComparison.Ordinal);
+
+    private static WorkloadEntry CopyWithOwnership(
+        WorkloadEntry entry, bool isImplicitlyInstalled, LogicalPackage? logicalPackage, int installRefCount)
+        => new()
+        {
+            PackageId = entry.PackageId,
+            PackageVersion = entry.PackageVersion,
+            Kind = entry.Kind,
+            Aliases = entry.Aliases,
+            DisplayName = entry.DisplayName,
+            Description = entry.Description,
+            Source = entry.Source,
+            RuntimeIdentifier = entry.RuntimeIdentifier,
+            IsImplicitlyInstalled = isImplicitlyInstalled,
+            LogicalPackage = logicalPackage,
+            InstallRefCount = installRefCount,
+            EntryPoint = entry.EntryPoint,
+        };
 
     private async Task<WorkloadRegistry> ReadRegistryAsync(CancellationToken cancellationToken)
     {

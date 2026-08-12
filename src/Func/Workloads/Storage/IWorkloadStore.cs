@@ -46,9 +46,32 @@ internal interface IWorkloadStore
     /// (spec §6.4 step 4) to avoid leaving the registry in a half-swapped
     /// state if the process dies mid-write.
     /// </summary>
-    public Task ReplaceWorkloadAsync(
-        string oldPackageId,
-        string oldVersion,
-        WorkloadEntry newEntry,
+    public Task ReplaceWorkloadAsync(string oldPackageId, string oldVersion, WorkloadEntry newEntry,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically attaches explicit or logical ownership to an existing physical
+    /// row, or inserts <paramref name="entry"/> when it is not installed.
+    /// </summary>
+    public Task<WorkloadEntry> AddOwnershipAsync(WorkloadEntry entry, WorkloadOwnershipKind ownership,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically removes only the requested ownership and deletes the physical
+    /// row when its final owner is removed.
+    /// </summary>
+    public Task<WorkloadOwnershipRemovalResult> RemoveOwnershipAsync(string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically moves logical pointer ownership from one physical row to another.
+    /// </summary>
+    public Task<WorkloadOwnershipMoveResult> MoveLogicalOwnershipAsync(string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically moves explicit ownership from one physical row to another.
+    /// </summary>
+    public Task<WorkloadOwnershipMoveResult> MoveExplicitOwnershipAsync(string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken = default);
 }
