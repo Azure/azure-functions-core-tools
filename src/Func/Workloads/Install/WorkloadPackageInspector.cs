@@ -97,7 +97,7 @@ internal sealed class WorkloadPackageInspector(IWorkloadMetadataReader metadataR
         if (metadata.Kind == WorkloadKind.RidPointer)
         {
             RequirePackageType(identity, standardType, WorkloadPackageTypes.Workload);
-            if (identity.RuntimeIdentifierTags.Count > 0)
+            if (identity.RuntimeIdentifiers.Count > 0)
             {
                 throw new InvalidWorkloadException($"RID pointer package '{identity.PackageId}' cannot declare a rid: tag.");
             }
@@ -130,7 +130,7 @@ internal sealed class WorkloadPackageInspector(IWorkloadMetadataReader metadataR
         }
 
         RequirePackageType(identity, standardType, WorkloadPackageTypes.Workload);
-        if (metadata.RuntimeIdentifier is not null || identity.RuntimeIdentifierTags.Count > 0)
+        if (metadata.RuntimeIdentifier is not null || identity.RuntimeIdentifiers.Count > 0)
         {
             throw new InvalidWorkloadException(
                 $"Package '{identity.PackageId}' uses RID implementation metadata but does not declare package type " +

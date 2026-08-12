@@ -11,7 +11,7 @@ internal enum WorkloadPackageRole
 }
 
 internal sealed record WorkloadPackageIdentity(string PackageId, string Version, IReadOnlyList<string> PackageTypes,
-    IReadOnlyList<string> Aliases, IReadOnlyList<string> RuntimeIdentifierTags, string? Title, string? Description);
+    IReadOnlyList<string> Aliases, IReadOnlyList<string> RuntimeIdentifiers, string? Title, string? Description);
 
 internal sealed record InspectedWorkloadPackage(string Path, WorkloadPackageIdentity Identity, WorkloadMetadata Metadata, WorkloadPackageRole Role);
 

@@ -17,13 +17,13 @@ internal sealed class WorkloadRidPackageSelector(IWorkloadRuntimeIdentifierProvi
         ArgumentException.ThrowIfNullOrWhiteSpace(manifestRuntimeIdentifier);
 
         string currentRuntimeIdentifier = CurrentRuntimeIdentifier;
-        if (identity.RuntimeIdentifierTags.Count != 1)
+        if (identity.RuntimeIdentifiers.Count != 1)
         {
             throw new InvalidWorkloadException(
                 $"RID implementation package '{identity.PackageId}' must declare exactly one rid:<rid> tag.");
         }
 
-        string tagRuntimeIdentifier = identity.RuntimeIdentifierTags[0];
+        string tagRuntimeIdentifier = identity.RuntimeIdentifiers[0];
         string expectedSuffix = "." + manifestRuntimeIdentifier;
         if (!string.Equals(tagRuntimeIdentifier, manifestRuntimeIdentifier, StringComparison.Ordinal)
             || !identity.PackageId.EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase)

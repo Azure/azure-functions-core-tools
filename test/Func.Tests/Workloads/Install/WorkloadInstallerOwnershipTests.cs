@@ -176,7 +176,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
                 PackageId = "example.workload.win-x64",
                 PackageVersion = "1.0.0",
                 RuntimeIdentifier = "win-x64",
-                IsExplicitlyInstalled = false,
+                IsImplicitlyInstalled = true,
                 LogicalPackage = new LogicalPackage
                 {
                     PackageId = "example.workload",
@@ -225,7 +225,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
                 PackageVersion = version,
                 RuntimeIdentifier = "win-x64",
                 Source = source.Source,
-                IsExplicitlyInstalled = true,
+                IsImplicitlyInstalled = false,
             },
             new WorkloadEntry
             {
@@ -233,7 +233,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
                 PackageVersion = version,
                 RuntimeIdentifier = "linux-x64",
                 Source = source.Source,
-                IsExplicitlyInstalled = false,
+                IsImplicitlyInstalled = true,
                 LogicalPackage = new LogicalPackage
                 {
                     PackageId = pointerId,
@@ -292,7 +292,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
                 PackageVersion = version,
                 RuntimeIdentifier = "win-x64",
                 Source = "https://other.test/v3/index.json",
-                IsExplicitlyInstalled = true,
+                IsImplicitlyInstalled = false,
             },
         ]);
         _catalog.ResolveLatestVersionAsync(
@@ -354,7 +354,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
                 Kind = WorkloadKind.Content,
                 RuntimeIdentifier = "win-x64",
                 Source = pointerSource.Source,
-                IsExplicitlyInstalled = true,
+                IsImplicitlyInstalled = false,
             },
         ]);
         _catalog.ResolveLatestVersionAsync(
@@ -407,7 +407,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
                 PackageId = "example.workload.linux-x64",
                 PackageVersion = version,
                 RuntimeIdentifier = "linux-x64",
-                IsExplicitlyInstalled = false,
+                IsImplicitlyInstalled = true,
                 LogicalPackage = new LogicalPackage
                 {
                     PackageId = pointerId,
@@ -453,7 +453,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
                 PackageVersion = version,
                 RuntimeIdentifier = "win-x64",
                 Source = "https://different.test/v3/index.json",
-                IsExplicitlyInstalled = true,
+                IsImplicitlyInstalled = false,
             },
         ]);
 

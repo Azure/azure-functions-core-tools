@@ -119,7 +119,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         {
             PackageId = packageId,
             PackageVersion = version,
-            IsExplicitlyInstalled = explicitlyInstalled,
+            IsImplicitlyInstalled = !explicitlyInstalled,
             InstallRefCount = 1,
             RuntimeIdentifier = runtimeIdentifier,
             LogicalPackage = logicalPackage,

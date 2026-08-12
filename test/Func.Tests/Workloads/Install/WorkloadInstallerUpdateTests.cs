@@ -172,7 +172,7 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
                 PackageId = "example.workload.win-x64",
                 PackageVersion = "1.0.0",
                 RuntimeIdentifier = "win-x64",
-                IsExplicitlyInstalled = false,
+                IsImplicitlyInstalled = true,
                 LogicalPackage = new LogicalPackage
                 {
                     PackageId = pointerId,
@@ -230,7 +230,7 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
             PackageVersion = version,
             RuntimeIdentifier = "win-x64",
             Source = source.Source,
-            IsExplicitlyInstalled = false,
+            IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
                 PackageId = pointerId,
@@ -250,7 +250,7 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
             PackageVersion = "2.0.0",
             RuntimeIdentifier = "incompatible-rid",
             Source = "https://example.test/v3/index.json",
-            IsExplicitlyInstalled = false,
+            IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
                 PackageId = pointerId,

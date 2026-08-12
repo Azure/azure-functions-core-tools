@@ -38,7 +38,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
 
         List<WorkloadEntry> explicitMatches = [.. installed.Where(entry =>
-            entry.IsExplicitlyInstalled
+            !entry.IsImplicitlyInstalled
             && string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase))];
         if (explicitMatches.Count == 0)
         {
@@ -58,7 +58,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(entry.PackageVersion, version, StringComparison.Ordinal));
         if (existing is null
-            || !existing.IsExplicitlyInstalled
+            || existing.IsImplicitlyInstalled
             || !Directory.Exists(_paths.GetInstallDirectory(existing.PackageId, existing.PackageVersion)))
         {
             return null;
@@ -368,7 +368,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             Kind = package.Metadata.Kind,
             Source = source,
             RuntimeIdentifier = package.Metadata.RuntimeIdentifier,
-            IsExplicitlyInstalled = ownership == WorkloadOwnershipKind.Explicit,
+            IsImplicitlyInstalled = ownership != WorkloadOwnershipKind.Explicit,
             LogicalPackage = logicalPackage,
             InstallRefCount = 1,
         };
@@ -385,14 +385,14 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             Kind = entry.Kind,
             Source = entry.Source,
             RuntimeIdentifier = entry.RuntimeIdentifier,
-            IsExplicitlyInstalled = ownership == WorkloadOwnershipKind.Explicit || entry.IsExplicitlyInstalled,
+            IsImplicitlyInstalled = ownership != WorkloadOwnershipKind.Explicit && entry.IsImplicitlyInstalled,
             LogicalPackage = entry.LogicalPackage ?? logicalPackage,
             InstallRefCount = entry.InstallRefCount,
         };
 
     private static WorkloadEntry MergeForReinstall(WorkloadEntry existing, WorkloadEntry incoming, WorkloadOwnershipKind ownership)
     {
-        bool addExplicit = ownership == WorkloadOwnershipKind.Explicit && !existing.IsExplicitlyInstalled;
+        bool addExplicit = ownership == WorkloadOwnershipKind.Explicit && existing.IsImplicitlyInstalled;
         bool addLogical = ownership == WorkloadOwnershipKind.Logical && existing.LogicalPackage is null;
         return new WorkloadEntry
         {
@@ -405,7 +405,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             Kind = incoming.Kind,
             Source = incoming.Source,
             RuntimeIdentifier = incoming.RuntimeIdentifier,
-            IsExplicitlyInstalled = existing.IsExplicitlyInstalled || incoming.IsExplicitlyInstalled,
+            IsImplicitlyInstalled = existing.IsImplicitlyInstalled && incoming.IsImplicitlyInstalled,
             LogicalPackage = existing.LogicalPackage ?? incoming.LogicalPackage,
             InstallRefCount = existing.InstallRefCount + (addExplicit ? 1 : 0) + (addLogical ? 1 : 0),
         };
@@ -433,7 +433,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
     private static bool HasOwnership(WorkloadEntry entry, WorkloadOwnershipKind ownership)
         => ownership == WorkloadOwnershipKind.Explicit
-            ? entry.IsExplicitlyInstalled
+            ? !entry.IsImplicitlyInstalled
             : entry.LogicalPackage is not null;
 
     private static WorkloadEntry ResolveUpdateTarget(string packageId, NuGetVersion? targetInstalledVersion,

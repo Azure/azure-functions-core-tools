@@ -351,7 +351,7 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
 
         result.Entry.PackageId.Should().Be(implementationId);
         result.Entry.RuntimeIdentifier.Should().Be("win-x64");
-        result.Entry.IsExplicitlyInstalled.Should().BeFalse();
+        result.Entry.IsImplicitlyInstalled.Should().BeTrue();
         result.Entry.LogicalPackage!.PackageId.Should().Be(pointerId);
         result.Entry.LogicalPackage.PackageVersion.Should().Be(version);
         await _catalog.Received(1).ResolveVersionAsync(
