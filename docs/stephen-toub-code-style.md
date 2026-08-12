@@ -16,7 +16,7 @@ The sample emphasizes recent .NET runtime and library work, with older ASP.NET C
 Confidence labels used below:
 
 - **Explicit**: Toub directly stated the preference in review.
-- **Observed**: the pattern appears in code he authored.
+- **Observed**: The pattern appears in code he authored.
 - **Inferred**: the pattern recurs across evidence, but he did not state it as a general rule.
 
 ## Short reusable checklist
@@ -122,7 +122,7 @@ Examples include deleting a rare wildcard special case ([review](https://github.
 - Replace bespoke awaiters with `ConfigureAwaitOptions` when the framework provides the needed semantics ([ASP.NET Core PR 48722](https://github.com/dotnet/aspnetcore/pull/48722)).
 - Use `SearchValues<T>` for repeated matching instead of ad hoc scans ([character review](https://github.com/dotnet/runtime/pull/123041#discussion_r2677524711), [string review](https://github.com/dotnet/runtime/pull/123922#discussion_r2766266624)).
 - Use span slicing instead of allocating substrings ([review](https://github.com/dotnet/runtime/pull/123922#discussion_r2766267914)).
-- Prefer an idiomatic scope or `try/finally` when it makes resource release obviously once-only ([review](https://github.com/dotnet/runtime/pull/127462#discussion_r3153587521)).
+- Prefer an idiomatic scope or `try/finally` when it makes once-only resource release obvious ([review](https://github.com/dotnet/runtime/pull/127462#discussion_r3153587521)).
 
 ### Avoid exceptions for expected control flow
 
