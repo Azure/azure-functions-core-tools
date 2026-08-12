@@ -45,6 +45,3 @@ steps:
     Write-Host "Replaced 'upstream-public' with internal 'upstream' feed in $path"
     Get-Content -LiteralPath $path
   displayName: Replace upstream-public with internal upstream feed
-
-- task: NuGetAuthenticate@1
-  displayName: Authenticate to internal NuGet feeds

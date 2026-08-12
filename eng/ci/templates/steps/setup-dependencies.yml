@@ -21,6 +21,9 @@ steps:
       packageType: sdk
       version: 9.x
 
+- task: NuGetAuthenticate@1
+  displayName: Authenticate to NuGet feeds
+
 - ${{ if eq(variables['System.TeamProject'], 'internal') }}:
   - template: /eng/ci/templates/steps/replace-nuget-feed.yml@self
     parameters:
