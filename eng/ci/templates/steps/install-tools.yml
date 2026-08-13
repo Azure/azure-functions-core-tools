@@ -10,6 +10,12 @@ steps:
     addToPath: true
   displayName: 'Install Python 3.10'
 
+- task: PipAuthenticate@1
+  displayName: 'Authenticate pip'
+  inputs:
+    artifactFeeds: 'public/upstream-public'
+    onlyAddExtraIndex: false
+
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec:
