@@ -254,7 +254,7 @@ public class WorkloadUninstallCommandTests
                 PackageId = "Test.Workload.win-x64",
                 PackageVersion = "1.0.0",
                 RuntimeIdentifier = "win-x64",
-                IsExplicitlyInstalled = true,
+                IsImplicitlyInstalled = false,
                 LogicalPackage = new LogicalPackage
                 {
                     PackageId = "Test.Workload",

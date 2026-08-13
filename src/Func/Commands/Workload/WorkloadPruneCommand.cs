@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -120,7 +121,7 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
                 e.LogicalPackage.Aliases,
                 WorkloadOwnershipKind.Logical))];
         IReadOnlyList<PruneCandidate> explicitPackages = [.. installed
-            .Where(e => e.IsExplicitlyInstalled)
+            .Where(e => !e.IsImplicitlyInstalled)
             .Select(e => new PruneCandidate(
                 e.PackageId,
                 e.PackageVersion,
@@ -138,13 +139,30 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
                 string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase))))];
         if (logicalMatches.Count > 0)
         {
-            return logicalMatches;
+            return EnsureUnambiguousTarget(identifier, logicalMatches);
         }
 
-        return [.. explicitPackages.Where(e =>
+        IReadOnlyList<PruneCandidate> explicitMatches = [.. explicitPackages.Where(e =>
             string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
             || (!exact && e.Aliases.Any(a =>
                 string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase))))];
+        return EnsureUnambiguousTarget(identifier, explicitMatches);
+    }
+
+    private static IReadOnlyList<PruneCandidate> EnsureUnambiguousTarget(string identifier, IReadOnlyList<PruneCandidate> matches)
+    {
+        string[] packageIds = [.. matches
+            .Select(match => match.PackageId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (packageIds.Length > 1)
+        {
+            throw new GracefulException(
+                $"Alias '{identifier}' matches multiple installed workloads ({string.Join(", ", packageIds)}). " +
+                "Pass the workload ID instead.",
+                isUserError: true);
+        }
+
+        return matches;
     }
 
     private static NuGetVersion ParseVersion(string raw) =>

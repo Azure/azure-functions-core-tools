@@ -270,6 +270,86 @@ public class WorkloadUpdateCommandTests
     }
 
     [Fact]
+    public async Task Update_All_DualOwnedPackage_UpdatesLogicalAndExplicitOwnership()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "test.workload.win-x64",
+                PackageVersion = "1.0.0",
+                RuntimeIdentifier = "win-x64",
+                IsImplicitlyInstalled = false,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "test.workload",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["test"],
+                },
+                InstallRefCount = 2,
+            },
+        ]);
+        _installer.UpdateAsync(
+                "test.workload",
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool?>(),
+                Arg.Any<bool>(),
+                WorkloadOwnershipKind.Logical,
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new WorkloadUpdateResult(
+                new WorkloadEntry
+                {
+                    PackageId = "test.workload.win-x64",
+                    PackageVersion = "1.1.0",
+                    IsImplicitlyInstalled = true,
+                    LogicalPackage = new LogicalPackage
+                    {
+                        PackageId = "test.workload",
+                        PackageVersion = "1.1.0",
+                        Aliases = ["test"],
+                    },
+                },
+                "1.0.0",
+                NoUpdateAvailable: false));
+        _installer.UpdateAsync(
+                "test.workload.win-x64",
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool?>(),
+                Arg.Any<bool>(),
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new WorkloadUpdateResult(
+                new WorkloadEntry { PackageId = "test.workload.win-x64", PackageVersion = "1.1.0" },
+                "1.0.0",
+                NoUpdateAvailable: false));
+        var cmd = new WorkloadUpdateCommand(_interaction, _installer, _store, _testCatalogOptions);
+
+        int exit = await InvokeAsync(cmd, "--all");
+
+        exit.Should().Be(0);
+        await _installer.Received(1).UpdateAsync(
+            "test.workload",
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool?>(),
+            Arg.Any<bool>(),
+            WorkloadOwnershipKind.Logical,
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+        await _installer.Received(1).UpdateAsync(
+            "test.workload.win-x64",
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool?>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Update_All_PerIdFailureDoesNotStopOthers_ReturnsNonZero()
     {
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new WorkloadEntry[]
@@ -362,7 +442,7 @@ public class WorkloadUpdateCommandTests
                 PackageId = "test.workload.win-x64",
                 PackageVersion = "1.0.0",
                 RuntimeIdentifier = "win-x64",
-                IsExplicitlyInstalled = false,
+                IsImplicitlyInstalled = true,
                 LogicalPackage = new LogicalPackage
                 {
                     PackageId = "test.workload",
@@ -386,7 +466,7 @@ public class WorkloadUpdateCommandTests
                     PackageId = "test.workload.win-x64",
                     PackageVersion = "1.1.0",
                     RuntimeIdentifier = "win-x64",
-                    IsExplicitlyInstalled = false,
+                    IsImplicitlyInstalled = true,
                     LogicalPackage = new LogicalPackage
                     {
                         PackageId = "test.workload",

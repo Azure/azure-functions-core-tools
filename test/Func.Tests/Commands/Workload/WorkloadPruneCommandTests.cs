@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands.Workload;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using NSubstitute;
@@ -116,6 +117,71 @@ public class WorkloadPruneCommandTests
     }
 
     [Fact]
+    public async Task Prune_AmbiguousExplicitAlias_ThrowsWithoutRemoving()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry { PackageId = "Pkg.A", PackageVersion = "1.0.0", Aliases = ["shared"] },
+            new WorkloadEntry { PackageId = "Pkg.B", PackageVersion = "1.0.0", Aliases = ["shared"] },
+        ]);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+
+        GracefulException ex = (await FluentActions.Awaiting(
+            () => InvokeAsync(cmd, "shared")).Should().ThrowExactlyAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Contain("matches multiple installed workloads");
+        ex.Message.Should().Contain("Pkg.A");
+        ex.Message.Should().Contain("Pkg.B");
+        await _installer.DidNotReceive().UninstallAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Prune_AmbiguousLogicalAlias_ThrowsWithoutRemoving()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "Pkg.A.win-x64",
+                PackageVersion = "1.0.0",
+                IsImplicitlyInstalled = true,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "Pkg.A",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["shared"],
+                },
+            },
+            new WorkloadEntry
+            {
+                PackageId = "Pkg.B.win-x64",
+                PackageVersion = "1.0.0",
+                IsImplicitlyInstalled = true,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "Pkg.B",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["shared"],
+                },
+            },
+        ]);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+
+        GracefulException ex = (await FluentActions.Awaiting(
+            () => InvokeAsync(cmd, "shared")).Should().ThrowExactlyAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Contain("matches multiple installed workloads");
+        ex.Message.Should().Contain("Pkg.A");
+        ex.Message.Should().Contain("Pkg.B");
+        await _installer.DidNotReceive().UninstallAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            WorkloadOwnershipKind.Logical,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Prune_Exact_DoesNotMatchAlias()
     {
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(new[]
@@ -167,7 +233,7 @@ public class WorkloadPruneCommandTests
         {
             PackageId = physicalPackageId,
             PackageVersion = version,
-            IsExplicitlyInstalled = false,
+            IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
                 PackageId = "Pkg.Pointer",

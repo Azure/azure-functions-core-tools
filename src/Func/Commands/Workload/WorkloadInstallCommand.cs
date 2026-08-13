@@ -199,19 +199,38 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        // Same matching rules as uninstall/update: by package id always,
-        // by alias unless --exact. We don't need to enforce uniqueness
-        // here; if any version matches we prompt.
-        WorkloadEntry? match = installed.FirstOrDefault(e =>
+        IReadOnlyList<WorkloadEntry> logicalMatches = [.. installed.Where(e =>
             e.LogicalPackage is not null
             && (string.Equals(e.LogicalPackage.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
                 || (!exact && e.LogicalPackage.Aliases.Any(a =>
-                    string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))));
-        match ??= installed.FirstOrDefault(e =>
-            e.IsExplicitlyInstalled
-            && (string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
-                || (!exact && e.Aliases.Any(a =>
-                    string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))));
+                    string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))];
+        string[] logicalIds = [.. logicalMatches
+            .Select(e => e.LogicalPackage!.PackageId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (logicalIds.Length > 1)
+        {
+            throw CreateAmbiguousInstalledAlias(identifier, logicalIds);
+        }
+
+        WorkloadEntry? match = logicalMatches.FirstOrDefault();
+        LogicalPackage? logical = match?.LogicalPackage;
+        if (match is null)
+        {
+            IReadOnlyList<WorkloadEntry> explicitMatches = [.. installed.Where(e =>
+                !e.IsImplicitlyInstalled
+                && (string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
+                    || (!exact && e.Aliases.Any(a =>
+                        string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))];
+            string[] explicitIds = [.. explicitMatches
+                .Select(e => e.PackageId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)];
+            if (explicitIds.Length > 1)
+            {
+                throw CreateAmbiguousInstalledAlias(identifier, explicitIds);
+            }
+
+            match = explicitMatches.FirstOrDefault();
+        }
 
         if (match is null)
         {
@@ -220,15 +239,14 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
         // Prefer the first alias for user-facing messages; fall back to the
         // canonical package id when no alias is published.
-        LogicalPackage? logical = match.LogicalPackage;
         IReadOnlyList<string> aliases = logical?.Aliases ?? match.Aliases;
         string display = aliases.Count > 0 ? aliases[0] : logical?.PackageId ?? match.PackageId;
         string installedVersion = logical?.PackageVersion ?? match.PackageVersion;
+        string updateIdentifier = logical?.PackageId ?? match.PackageId;
         string prompt = $"'{display}' is already installed at {installedVersion}. Update instead?";
 
         if (!_interaction.IsInteractive)
         {
-            string updateIdentifier = logical?.PackageId ?? display;
             _interaction.WriteHint(
                 $"'{display}' is already installed at {installedVersion}. " +
                 $"Run 'func workload update {updateIdentifier}' to upgrade, or pass --force to install side-by-side.");
@@ -243,8 +261,14 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        return await DispatchToUpdateAsync(logical?.PackageId ?? match.PackageId, source, includePrerelease, cancellationToken);
+        return await DispatchToUpdateAsync(updateIdentifier, source, includePrerelease, cancellationToken);
     }
+
+    private static GracefulException CreateAmbiguousInstalledAlias(string identifier, IReadOnlyList<string> packageIds)
+        => new(
+            $"Alias '{identifier}' matches multiple installed workloads ({string.Join(", ", packageIds)}). " +
+            "Pass the workload ID instead.",
+            isUserError: true);
 
     // Delegate to the `func workload update` command (Parse + InvokeAsync) so
     // confirm-yes goes through exactly the same flow the user would hit if they

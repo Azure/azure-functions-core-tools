@@ -258,7 +258,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
             entry.PackageId,
             entry.PackageVersion,
             entry.RuntimeIdentifier,
-            entry.IsExplicitlyInstalled,
+            !entry.IsImplicitlyInstalled,
             entry.InstallRefCount,
             DescribeOwnership(entry),
             loaded);
@@ -282,7 +282,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
     private static string DescribeOwnership(WorkloadEntry entry)
     {
         List<string> owners = [];
-        if (entry.IsExplicitlyInstalled)
+        if (!entry.IsImplicitlyInstalled)
         {
             owners.Add("explicit");
         }
@@ -292,7 +292,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
             owners.Add($"logical:{entry.LogicalPackage.PackageId}");
         }
 
-        int knownOwnerCount = (entry.IsExplicitlyInstalled ? 1 : 0) + (entry.LogicalPackage is null ? 0 : 1);
+        int knownOwnerCount = (!entry.IsImplicitlyInstalled ? 1 : 0) + (entry.LogicalPackage is null ? 0 : 1);
         int metaOwnerCount = Math.Max(0, entry.InstallRefCount - knownOwnerCount);
         if (metaOwnerCount > 0)
         {

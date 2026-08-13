@@ -141,7 +141,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
         }
 
         return [.. installed
-            .Where(w => w.IsExplicitlyInstalled
+            .Where(w => !w.IsImplicitlyInstalled
                 && (string.Equals(w.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
                     || (!exact && w.Aliases.Any(a =>
                         string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))

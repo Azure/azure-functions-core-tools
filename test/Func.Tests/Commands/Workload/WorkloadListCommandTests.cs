@@ -303,7 +303,7 @@ public class WorkloadListCommandTests
             PackageVersion = "2.0.0",
             Aliases = ["pointer"],
             RuntimeIdentifier = "win-x64",
-            IsExplicitlyInstalled = false,
+            IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
                 PackageId = "Pkg.Pointer",

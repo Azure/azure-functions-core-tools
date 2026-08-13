@@ -165,7 +165,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         }
 
         string[] matchedIds = [.. installed
-            .Where(e => e.IsExplicitlyInstalled
+            .Where(e => !e.IsImplicitlyInstalled
                 && (string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
                     || (!exact && e.Aliases.Any(a =>
                         string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))
@@ -359,13 +359,9 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             }
         }
 
-        // A physical package owned by a pointer is updated through that pointer. Adding it again as an
-        // explicit target would re-resolve and replace the payload the logical update just staged.
-        HashSet<string> logicallyOwned = new(
-            installed.Where(e => e.LogicalPackage is not null).Select(e => e.PackageId),
-            StringComparer.OrdinalIgnoreCase);
+        // Logical and explicit ownership can coexist on one physical package and must move independently.
         HashSet<string> explicitIds = new(StringComparer.OrdinalIgnoreCase);
-        foreach (WorkloadEntry entry in installed.Where(e => e.IsExplicitlyInstalled && !logicallyOwned.Contains(e.PackageId)))
+        foreach (WorkloadEntry entry in installed.Where(e => !e.IsImplicitlyInstalled))
         {
             if (explicitIds.Add(entry.PackageId))
             {
