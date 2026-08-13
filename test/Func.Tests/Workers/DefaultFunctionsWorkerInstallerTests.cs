@@ -123,7 +123,7 @@ public class DefaultFunctionsWorkerInstallerTests
             Aliases = ["node-worker"],
             DisplayName = WorkerPackageId,
             Description = string.Empty,
-            IsExplicitlyInstalled = false,
+            IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
                 PackageId = WorkerPackageId,

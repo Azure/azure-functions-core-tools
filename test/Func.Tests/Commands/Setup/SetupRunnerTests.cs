@@ -920,7 +920,7 @@ public sealed class SetupRunnerTests : IDisposable
             PackageId = $"{pointerPackageId}.{runtimeIdentifier}",
             PackageVersion = version,
             RuntimeIdentifier = runtimeIdentifier,
-            IsExplicitlyInstalled = false,
+            IsImplicitlyInstalled = true,
             LogicalPackage = new LogicalPackage
             {
                 PackageId = pointerPackageId,
