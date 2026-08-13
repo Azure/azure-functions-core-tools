@@ -1,7 +1,5 @@
 # Azure.Functions.Cli.Workloads.Java
 
-## 1.0.0-preview.2
-
 ## 1.0.0-preview.1
 
 - Initial release of the Java stack workload: `func init --stack java`
