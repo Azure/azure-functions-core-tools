@@ -14,9 +14,9 @@ using NuGet.Versioning;
 namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
-/// <c>func workload update [&lt;id&gt;]</c>. In-place atomic version
-/// swap per spec §6.4. Not side-by-side: use <c>install --force</c> for
-/// SxS. Pass <c>--all</c> to update every installed workload.
+/// <c>func workload update [&lt;id&gt;]</c>. Moves the selected explicit or
+/// logical ownership to the resolved package version. Pass <c>--all</c> to
+/// update every installed workload identity.
 /// </summary>
 internal sealed class WorkloadUpdateCommand : FuncCliCommand
 {
@@ -132,10 +132,10 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             return await UpdateAllAsync(source, includePrerelease, allowMajor, cancellationToken);
         }
 
-        string packageId = await ResolveInstalledPackageIdAsync(identifier!, exact, cancellationToken);
+        UpdateTarget target = await ResolveInstalledTargetAsync(identifier!, exact, cancellationToken);
 
         return await UpdateOneAsync(
-            packageId,
+            target,
             string.IsNullOrEmpty(versionText) ? null : NuGetVersion.Parse(versionText),
             source,
             includePrerelease,
@@ -143,36 +143,47 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             cancellationToken);
     }
 
-    private async Task<string> ResolveInstalledPackageIdAsync(string identifier, bool exact, CancellationToken cancellationToken)
+    private async Task<UpdateTarget> ResolveInstalledTargetAsync(string identifier, bool exact, CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
 
-        bool MatchesId(WorkloadEntry e) =>
-            string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase);
+        string[] logicalIds = [.. installed
+            .Where(e => e.LogicalPackage is not null
+                && (string.Equals(e.LogicalPackage.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
+                    || (!exact && e.LogicalPackage.Aliases.Any(a =>
+                        string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))
+            .Select(e => e.LogicalPackage!.PackageId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (logicalIds.Length > 1)
+        {
+            throw CreateAmbiguousInstalledAlias(identifier, logicalIds);
+        }
 
-        bool MatchesAlias(WorkloadEntry e) =>
-            !exact && (e.Aliases?.Any(a => string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)) ?? false);
+        if (logicalIds.Length == 1)
+        {
+            return new UpdateTarget(logicalIds[0], WorkloadOwnershipKind.Logical);
+        }
 
         string[] matchedIds = [.. installed
-            .Where(e => MatchesId(e) || MatchesAlias(e))
+            .Where(e => !e.IsImplicitlyInstalled
+                && (string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
+                    || (!exact && e.Aliases.Any(a =>
+                        string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))
             .Select(e => e.PackageId)
             .Distinct(StringComparer.OrdinalIgnoreCase)];
 
         if (matchedIds.Length > 1)
         {
-            throw new GracefulException(
-                $"Alias '{identifier}' matches multiple installed workloads ({string.Join(", ", matchedIds)}). " +
-                "Pass the workload ID instead.",
-                isUserError: true);
+            throw CreateAmbiguousInstalledAlias(identifier, matchedIds);
         }
 
-        // Defer the "not installed" error to UpdateAsync so messaging stays
-        // consistent with the --version path that's also resolved there.
-        return matchedIds.Length == 1 ? matchedIds[0] : identifier;
+        return new UpdateTarget(
+            matchedIds.Length == 1 ? matchedIds[0] : identifier,
+            WorkloadOwnershipKind.Explicit);
     }
 
     private async Task<int> UpdateOneAsync(
-        string packageId,
+        UpdateTarget target,
         NuGetVersion? targetVersion,
         string? source,
         bool? includePrerelease,
@@ -182,9 +193,13 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         try
         {
             WorkloadUpdateResult result = await _interaction.RunWithProgressAsync(
-                $"Updating workload '{packageId}'",
-                async (ctx, ct) => await _installer.UpdateAsync(
-                    packageId, targetVersion, source, includePrerelease, allowMajor,
+                $"Updating workload '{target.PackageId}'",
+                async (ctx, ct) => await UpdateTargetAsync(
+                    target,
+                    targetVersion,
+                    source,
+                    includePrerelease,
+                    allowMajor,
                     new WorkloadInstallProgressAdapter(ctx),
                     ct),
                 cancellationToken);
@@ -213,25 +228,23 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
     private async Task<int> UpdateAllAsync(string? source, bool? includePrerelease, bool allowMajor, CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
-        IReadOnlyList<string> packageIds = [.. installed
-            .Select(e => e.PackageId)
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        IReadOnlyList<UpdateTarget> targets = BuildUpdateAllTargets(installed);
 
-        if (packageIds.Count == 0)
+        if (targets.Count == 0)
         {
             _interaction.WriteHint("No workloads installed.");
             return 0;
         }
 
         bool anyFailed = false;
-        foreach (string packageId in packageIds)
+        foreach (UpdateTarget target in targets)
         {
             try
             {
                 WorkloadUpdateResult result = await _interaction.RunWithProgressAsync(
-                    $"Updating workload '{packageId}'",
-                    async (ctx, ct) => await _installer.UpdateAsync(
-                        packageId,
+                    $"Updating workload '{target.PackageId}'",
+                    async (ctx, ct) => await UpdateTargetAsync(
+                        target,
                         targetInstalledVersion: null,
                         source,
                         includePrerelease,
@@ -251,7 +264,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 // the message and keep going; the final exit code reflects
                 // whether any failed.
                 anyFailed = true;
-                _interaction.WriteError($"Update failed for '{packageId}': {ex.Message}");
+                _interaction.WriteError($"Update failed for '{target.PackageId}': {ex.Message}");
             }
         }
 
@@ -263,7 +276,12 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         // Prefer the published alias for user-facing messages so the output
         // matches the token the user typed; fall back to the package id when
         // no alias is published.
-        string display = result.Entry.Aliases.Count > 0 ? result.Entry.Aliases[0] : result.Entry.PackageId;
+        LogicalPackage? logical = result.Entry.LogicalPackage;
+        IReadOnlyList<string> aliases = logical?.Aliases ?? result.Entry.Aliases;
+        string display = aliases.Count > 0
+            ? aliases[0]
+            : logical?.PackageId ?? result.Entry.PackageId;
+        string version = logical?.PackageVersion ?? result.Entry.PackageVersion;
 
         if (result.NoCandidateOnSource)
         {
@@ -277,14 +295,82 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         {
             _interaction.WriteWarning(
                 $"Workload '{display}' is already at the latest available version " +
-                $"({result.Entry.PackageVersion}).");
+                $"({version}).");
+            return;
+        }
+
+        // A RID pivot can land on the same version, where "from X to X" would read as a no-op.
+        if (string.Equals(result.PreviousVersion, version, StringComparison.Ordinal)
+            && !string.IsNullOrEmpty(result.Entry.RuntimeIdentifier))
+        {
+            _interaction.WriteSuccess(
+                $"Updated workload '{display}' to runtime identifier '{result.Entry.RuntimeIdentifier}' (version {version} unchanged).");
             return;
         }
 
         _interaction.WriteSuccess(
-            $"Updated workload '{display}' from {result.PreviousVersion} to {result.Entry.PackageVersion}.");
+            $"Updated workload '{display}' from {result.PreviousVersion} to {version}.");
     }
 
     private bool EffectivePrerelease(bool? userOverride) => userOverride ?? _catalogOptions.IncludePrerelease;
 
+    private Task<WorkloadUpdateResult> UpdateTargetAsync(
+        UpdateTarget target,
+        NuGetVersion? targetInstalledVersion,
+        string? source,
+        bool? includePrerelease,
+        bool allowMajor,
+        IProgress<WorkloadInstallProgress>? progress,
+        CancellationToken cancellationToken)
+        => target.Ownership == WorkloadOwnershipKind.Logical
+            ? _installer.UpdateAsync(
+                target.PackageId,
+                targetInstalledVersion,
+                source,
+                includePrerelease,
+                allowMajor,
+                WorkloadOwnershipKind.Logical,
+                progress,
+                cancellationToken)
+            : _installer.UpdateAsync(
+                target.PackageId,
+                targetInstalledVersion,
+                source,
+                includePrerelease,
+                allowMajor,
+                progress,
+                cancellationToken);
+
+    private static GracefulException CreateAmbiguousInstalledAlias(string identifier, IReadOnlyList<string> packageIds)
+        => new(
+            $"Alias '{identifier}' matches multiple installed workloads ({string.Join(", ", packageIds)}). " +
+            "Pass the workload ID instead.",
+            isUserError: true);
+
+    private static IReadOnlyList<UpdateTarget> BuildUpdateAllTargets(IReadOnlyList<WorkloadEntry> installed)
+    {
+        List<UpdateTarget> targets = [];
+        HashSet<string> logicalIds = new(StringComparer.OrdinalIgnoreCase);
+        foreach (WorkloadEntry entry in installed.Where(e => e.LogicalPackage is not null))
+        {
+            if (logicalIds.Add(entry.LogicalPackage!.PackageId))
+            {
+                targets.Add(new UpdateTarget(entry.LogicalPackage.PackageId, WorkloadOwnershipKind.Logical));
+            }
+        }
+
+        // Logical and explicit ownership can coexist on one physical package and must move independently.
+        HashSet<string> explicitIds = new(StringComparer.OrdinalIgnoreCase);
+        foreach (WorkloadEntry entry in installed.Where(e => !e.IsImplicitlyInstalled))
+        {
+            if (explicitIds.Add(entry.PackageId))
+            {
+                targets.Add(new UpdateTarget(entry.PackageId, WorkloadOwnershipKind.Explicit));
+            }
+        }
+
+        return targets;
+    }
+
+    private sealed record UpdateTarget(string PackageId, WorkloadOwnershipKind Ownership);
 }

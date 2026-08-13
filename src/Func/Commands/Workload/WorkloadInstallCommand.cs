@@ -167,9 +167,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         }
         catch (InvalidOperationException ex)
         {
-            throw new GracefulException(
-                $"{ex.Message} Pass --force to repair the install.",
-                isUserError: true);
+            throw new GracefulException(ex.Message, isUserError: true);
         }
     }
 
@@ -201,12 +199,38 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        // Same matching rules as uninstall/update: by package id always,
-        // by alias unless --exact. We don't need to enforce uniqueness
-        // here; if any version matches we prompt.
-        WorkloadEntry? match = installed.FirstOrDefault(e =>
-            string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
-            || (!exact && (e.Aliases?.Any(a => string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)) ?? false)));
+        IReadOnlyList<WorkloadEntry> logicalMatches = [.. installed.Where(e =>
+            e.LogicalPackage is not null
+            && (string.Equals(e.LogicalPackage.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
+                || (!exact && e.LogicalPackage.Aliases.Any(a =>
+                    string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))];
+        string[] logicalIds = [.. logicalMatches
+            .Select(e => e.LogicalPackage!.PackageId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (logicalIds.Length > 1)
+        {
+            throw CreateAmbiguousInstalledAlias(identifier, logicalIds);
+        }
+
+        WorkloadEntry? match = logicalMatches.FirstOrDefault();
+        LogicalPackage? logical = match?.LogicalPackage;
+        if (match is null)
+        {
+            IReadOnlyList<WorkloadEntry> explicitMatches = [.. installed.Where(e =>
+                !e.IsImplicitlyInstalled
+                && (string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
+                    || (!exact && e.Aliases.Any(a =>
+                        string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))];
+            string[] explicitIds = [.. explicitMatches
+                .Select(e => e.PackageId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)];
+            if (explicitIds.Length > 1)
+            {
+                throw CreateAmbiguousInstalledAlias(identifier, explicitIds);
+            }
+
+            match = explicitMatches.FirstOrDefault();
+        }
 
         if (match is null)
         {
@@ -215,14 +239,17 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
         // Prefer the first alias for user-facing messages; fall back to the
         // canonical package id when no alias is published.
-        string display = match.Aliases.Count > 0 ? match.Aliases[0] : match.PackageId;
-        string prompt = $"'{display}' is already installed at {match.PackageVersion}. Update instead?";
+        IReadOnlyList<string> aliases = logical?.Aliases ?? match.Aliases;
+        string display = aliases.Count > 0 ? aliases[0] : logical?.PackageId ?? match.PackageId;
+        string installedVersion = logical?.PackageVersion ?? match.PackageVersion;
+        string updateIdentifier = logical?.PackageId ?? match.PackageId;
+        string prompt = $"'{display}' is already installed at {installedVersion}. Update instead?";
 
         if (!_interaction.IsInteractive)
         {
             _interaction.WriteHint(
-                $"'{display}' is already installed at {match.PackageVersion}. " +
-                $"Run 'func workload update {display}' to upgrade, or pass --force to install side-by-side.");
+                $"'{display}' is already installed at {installedVersion}. " +
+                $"Run 'func workload update {updateIdentifier}' to upgrade, or pass --force to install side-by-side.");
             return 1;
         }
 
@@ -234,8 +261,14 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        return await DispatchToUpdateAsync(match.PackageId, source, includePrerelease, cancellationToken);
+        return await DispatchToUpdateAsync(updateIdentifier, source, includePrerelease, cancellationToken);
     }
+
+    private static GracefulException CreateAmbiguousInstalledAlias(string identifier, IReadOnlyList<string> packageIds)
+        => new(
+            $"Alias '{identifier}' matches multiple installed workloads ({string.Join(", ", packageIds)}). " +
+            "Pass the workload ID instead.",
+            isUserError: true);
 
     // Delegate to the `func workload update` command (Parse + InvokeAsync) so
     // confirm-yes goes through exactly the same flow the user would hit if they
@@ -266,14 +299,18 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
     private static string BuildSuccessMessage(WorkloadInstallResult result)
     {
         WorkloadEntry entry = result.Entry;
+        LogicalPackage? logical = entry.LogicalPackage;
+        string packageId = logical?.PackageId ?? entry.PackageId;
+        string packageVersion = logical?.PackageVersion ?? entry.PackageVersion;
+        IReadOnlyList<string> aliases = logical?.Aliases ?? entry.Aliases;
         string verb = result.AlreadyInstalled
-            ? $"Workload '{entry.PackageId}' version '{entry.PackageVersion}' is already installed"
-            : $"Installed workload '{entry.PackageId}' version '{entry.PackageVersion}'";
+            ? $"Workload '{packageId}' version '{packageVersion}' is already installed"
+            : $"Installed workload '{packageId}' version '{packageVersion}'";
 
         return entry.Kind switch
         {
-            WorkloadKind.Workload when entry.Aliases.Count > 0
-                => $"{verb} (aliases: {string.Join(", ", entry.Aliases)}).",
+            WorkloadKind.Workload when aliases.Count > 0
+                => $"{verb} (aliases: {string.Join(", ", aliases)}).",
             WorkloadKind.Content
                 => $"{verb} (content at '{entry.Source}').",
             _ => $"{verb}.",

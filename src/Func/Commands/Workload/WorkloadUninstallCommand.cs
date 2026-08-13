@@ -76,9 +76,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
         bool exact = parseResult.GetValue(ExactOption);
 
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
-        List<WorkloadEntry> matches = [.. installed
-            .Where(w => string.Equals(w.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
-                || (!exact && (w.Aliases?.Any(a => string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)) ?? false)))];
+        IReadOnlyList<UninstallCandidate> matches = ResolveCandidates(identifier, installed, exact);
 
         if (matches.Count == 0)
         {
@@ -87,7 +85,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
         }
 
         string[] distinctPackageIds = [.. matches
-            .Select(m => m.PackageId)
+            .Select(m => m.OwnerPackageId)
             .Distinct(StringComparer.OrdinalIgnoreCase)];
 
         if (distinctPackageIds.Length > 1)
@@ -99,26 +97,65 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
         }
 
         string packageId = distinctPackageIds[0];
-        IReadOnlyList<WorkloadEntry> toRemove = ResolveVersionsToRemove(packageId, version, all, matches);
+        IReadOnlyList<UninstallCandidate> toRemove = ResolveVersionsToRemove(packageId, version, all, matches);
 
-        foreach (WorkloadEntry candidate in toRemove)
+        foreach (UninstallCandidate candidate in toRemove)
         {
-            bool removed = await _installer.UninstallAsync(candidate.PackageId, candidate.PackageVersion, cancellationToken);
+            bool removed = candidate.Ownership == WorkloadOwnershipKind.Logical
+                ? await _installer.UninstallAsync(
+                    candidate.OwnerPackageId,
+                    candidate.OwnerPackageVersion,
+                    WorkloadOwnershipKind.Logical,
+                    cancellationToken: cancellationToken)
+                : await _installer.UninstallAsync(
+                    candidate.OwnerPackageId,
+                    candidate.OwnerPackageVersion,
+                    cancellationToken: cancellationToken);
             if (removed)
             {
                 _interaction.WriteSuccess(
-                    $"Uninstalled workload '{candidate.PackageId}' version '{candidate.PackageVersion}'.");
+                    $"Uninstalled workload '{candidate.OwnerPackageId}' version '{candidate.OwnerPackageVersion}'.");
             }
         }
 
         return 0;
     }
 
-    private static IReadOnlyList<WorkloadEntry> ResolveVersionsToRemove(
+    private static IReadOnlyList<UninstallCandidate> ResolveCandidates(
+        string identifier,
+        IReadOnlyList<WorkloadEntry> installed,
+        bool exact)
+    {
+        List<UninstallCandidate> logicalMatches = [.. installed
+            .Where(w => w.LogicalPackage is not null
+                && (string.Equals(w.LogicalPackage.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
+                    || (!exact && w.LogicalPackage.Aliases.Any(a =>
+                        string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))
+            .Select(w => new UninstallCandidate(
+                w.LogicalPackage!.PackageId,
+                w.LogicalPackage.PackageVersion,
+                WorkloadOwnershipKind.Logical))];
+        if (logicalMatches.Count > 0)
+        {
+            return logicalMatches;
+        }
+
+        return [.. installed
+            .Where(w => !w.IsImplicitlyInstalled
+                && (string.Equals(w.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
+                    || (!exact && w.Aliases.Any(a =>
+                        string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)))))
+            .Select(w => new UninstallCandidate(
+                w.PackageId,
+                w.PackageVersion,
+                WorkloadOwnershipKind.Explicit))];
+    }
+
+    private static IReadOnlyList<UninstallCandidate> ResolveVersionsToRemove(
         string packageId,
         string? version,
         bool all,
-        IReadOnlyList<WorkloadEntry> matches)
+        IReadOnlyList<UninstallCandidate> matches)
     {
         if (all)
         {
@@ -127,12 +164,12 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
         if (!string.IsNullOrEmpty(version))
         {
-            WorkloadEntry? match = matches.FirstOrDefault(
-                m => string.Equals(m.PackageVersion, version, StringComparison.Ordinal));
+            UninstallCandidate? match = matches.FirstOrDefault(
+                m => string.Equals(m.OwnerPackageVersion, version, StringComparison.Ordinal));
 
             if (match is null)
             {
-                string available = string.Join(", ", matches.Select(m => m.PackageVersion));
+                string available = string.Join(", ", matches.Select(m => m.OwnerPackageVersion));
                 throw new GracefulException(
                     $"Workload '{packageId}' version '{version}' is not installed. " +
                     $"Installed versions: {available}.",
@@ -144,7 +181,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
         if (matches.Count > 1)
         {
-            string available = string.Join(", ", matches.Select(m => m.PackageVersion));
+            string available = string.Join(", ", matches.Select(m => m.OwnerPackageVersion));
             throw new GracefulException(
                 $"Multiple versions of '{packageId}' are installed ({available}). " +
                 "Pass --version <v> or --all-versions.",
@@ -153,4 +190,9 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
         return matches;
     }
+
+    private sealed record UninstallCandidate(
+        string OwnerPackageId,
+        string OwnerPackageVersion,
+        WorkloadOwnershipKind Ownership);
 }
