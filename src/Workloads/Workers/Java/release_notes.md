@@ -1,5 +1,7 @@
 # Azure.Functions.Cli.Workloads.Workers.Java
 
+## 2.19.4-preview.2
+
 ## 2.19.4
 
 - Initial release of the Java worker workload. Ships the
