@@ -15,14 +15,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
     {
         [Fact]
         [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.Node)]
-        public void FuncNew_TimerTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
+        public async Task FuncNew_TimerTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully()
         {
             var testName = nameof(FuncNew_TimerTrigger_WithAuthLevelFunction_NodeV3_CreatesSuccessfully);
 
             // Initialize function app with Node.js runtime and model version v3
-            new FuncInitCommand(FuncPath, testName, Log)
-                .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["--worker-runtime", "node", "-m", "v3"]);
+            await FuncInitWithRetryAsync(testName, new[] { "--worker-runtime", "node", "-m", "v3" });
 
             // Create a new Timer Trigger function with authlevel = function
             var result = new FuncNewCommand(FuncPath, testName, Log)
