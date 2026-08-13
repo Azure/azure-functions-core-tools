@@ -80,7 +80,8 @@ internal sealed class DefaultFunctionsWorkerInstaller(
         CancellationToken cancellationToken)
     {
         WorkloadEntry entry = result.Entry;
-        if (!string.Equals(entry.PackageId, expectedPackageId, StringComparison.OrdinalIgnoreCase))
+        string installedPackageId = entry.LogicalPackage?.PackageId ?? entry.PackageId;
+        if (!string.Equals(installedPackageId, expectedPackageId, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidWorkloadException(
                 $"Expected worker workload package '{expectedPackageId}' but installed package '{entry.PackageId}'.");
@@ -107,7 +108,7 @@ internal sealed class DefaultFunctionsWorkerInstaller(
     private ContentWorkloadInfo CreateContentWorkloadInfo(WorkloadEntry entry)
     {
         string installDirectory = _workloadPaths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
-        string contentRoot = Path.GetFullPath(Path.Combine(installDirectory, "tools", "any"));
+        string contentRoot = WorkloadPackageLayout.GetContentRoot(installDirectory, entry.RuntimeIdentifier);
 
         return new ContentWorkloadInfo(
             entry.PackageId,
