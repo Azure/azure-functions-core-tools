@@ -53,8 +53,24 @@ design with the respective release owners.
 Each channel has its own **registry** — a single `registry.json` file on CDN
 containing all SKU profiles for that channel (see [§5](#5-cdn-layout-and-cli-resolution)).
 
+> **Design choice: separate registries vs. schema nesting.** We considered
+> embedding channel information inside the schema (e.g. `"flex": { "public":
+> {...}, "non-public": {...} }` or grouping profiles under `"public"` / `"non-public"`
+> top-level keys). We chose **separate CDN endpoints per channel** instead
+> because: (1) no schema change needed — each registry uses the same flat
+> `profiles` structure, (2) each registry is independently cacheable and
+> updateable, (3) simpler read-modify-write with no cross-channel concurrency.
+> See [discussion](https://github.com/Azure/azure-functions-core-tools/commit/bc2e4159f31aabacc173db9efad68a0717d02ec4#commitcomment-195140123).
+
 - **Q:** Which SKUs support App Service N−1 channels today? Has this been
   extended to Flex?
+- **Q:** How should a preview channel be represented? The version range already
+  supports prerelease versions (e.g. `[4.1048.100-preview, 4.1049.0)`), so
+  preview can be expressed via a custom profile that extends a built-in with a
+  preview range. Alternatively, should there be a dedicated built-in preview
+  profile (e.g. `flex-preview` with `status: "preview"`) in the default
+  registry, or a separate preview endpoint? See
+  [discussion](https://github.com/Azure/azure-functions-core-tools/commit/bc2e4159f31aabacc173db9efad68a0717d02ec4#commitcomment-195141638).
 
 ## 4. Release flow
 
@@ -248,7 +264,12 @@ version information comes from the pool config (Linux) or repo inspection
 (Windows), not from `host.official` / `create-host-package`.
 
 - **Q:** Can profiles support per-stack granularity so a SKU can release
-  bundles/host for all stacks except one held back?
+  bundles/host for all stacks except one held back? For example, if only Python
+  is released at a newer host version for Flex while other languages remain on
+  the previous version, the current schema (`host.version` is a single range)
+  cannot express this. The per-worker `workers` map handles worker workload
+  version differences, but not host version differences per stack. See
+  [discussion](https://github.com/Azure/azure-functions-core-tools/commit/bc2e4159f31aabacc173db9efad68a0717d02ec4#commitcomment-195140427).
 
 ### Extension bundles
 
@@ -305,6 +326,7 @@ reasonably fresh without manual intervention.
 | 4 | Per-stack granularity in profiles? | Open — not frequent but a possibility that stacks are held back. |
 | 5 | CDN registry naming and CLI resolution convention (how does CLI know which registry to fetch for a given profile?) | Partially resolved — default registry defined, slow/N−1 need finalization. |
 | 6 | Workload promotion mechanism (NuGet push, feed view promotion, or re-queue existing pipeline)? | Open |
+| 7 | Preview channel representation — dedicated built-in profile, separate CDN endpoint, or custom-profile convention only? | Open — [discussion](https://github.com/Azure/azure-functions-core-tools/commit/bc2e4159f31aabacc173db9efad68a0717d02ec4#commitcomment-195141638) |
 
 ## Related docs
 
