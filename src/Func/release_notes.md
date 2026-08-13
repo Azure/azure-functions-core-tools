@@ -1,3 +1,5 @@
+## 5.0.0-preview.3
+
 # Azure Functions CLI 5.0.0
 
 #### Changes
