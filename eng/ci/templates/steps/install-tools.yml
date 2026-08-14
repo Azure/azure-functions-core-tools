@@ -4,6 +4,12 @@ steps:
     versionSpec: '18.x'
   displayName: 'Install Node 18.x'
 
+# Set PIP_INDEX_URL before UsePythonVersion so that the pip upgrade inside
+# its setup.sh goes through the ADO upstream feed instead of pypi.org.
+- script: |
+    echo "##vso[task.setvariable variable=PIP_INDEX_URL]https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/pypi/simple/"
+  displayName: 'Route pip through ADO feed'
+
 - task: UsePythonVersion@0
   inputs:
     versionSpec: '3.10'
