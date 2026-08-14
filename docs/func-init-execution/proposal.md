@@ -10,9 +10,9 @@
 - Preserve existing-project detection and metadata-only adoption/healing without invoking project templates. Replace initializer-based stack metadata with `IProjectStack`, always persist canonical stack and language, make configuration-write failures fatal, and reject `--template` on these paths unless `--force` selects reinitialization.
 - Reuse the same strict candidate parsing, reserved-alias handling, required-value prompting, precedence ordering, dry-run behavior, and non-interactive policy specified for `func new`.
 - Create a prospective immutable project context from the selected target directory, stack, and language before constructing one command-scoped `Templater`.
-- Make project-template invocation also generate CLI-owned `.func/config.json`, include that file in creation effects, and always persist canonical stack and language.
+- Require project templates to declare trusted Functions project configuration actions that reference resolved primary outputs and supply canonical stack and language; use those actions to generate CLI-owned `.func/config.json`.
 - Preserve destructive `--force` behavior by clearing target content except `.git`, including those planned deletions in dry-run output.
-- Run project-template post-actions by default after project and CLI configuration generation.
+- Run mandatory project configuration actions after scaffolding and before ordinary project-template post-actions.
 - **BREAKING** Replace workload-facing `IProjectInitializer` with metadata-only `IProjectStack`; workload-specific init options move to project-template symbols and workloads no longer scaffold project files directly.
 
 ## Capabilities
@@ -30,6 +30,7 @@ None.
 - Reworks `InitCommand` orchestration, stack and language selection, workload registration, project creation, dry-run rendering, and project configuration persistence.
 - Replaces `IProjectInitializer`, `InitContext`, `IInitOptionRegistry`, and workload-owned project scaffolding with `IProjectStack` metadata and TemplateEngine project templates.
 - Depends on `template-engine-integration` for context-free catalog metadata, `TemplateType.Project` resolution, command-scoped `Templater`, projected parameters, immutable groups, and self-invoking `ResolvedTemplate`.
+- Depends on `template-engine-post-actions` for the trusted Functions project configuration action, projected action metadata, resolved primary-output references, and dry-run behavior.
 - Depends on the strict parser and alias behavior designed in `func-new-execution`.
 - Requires project template packages for every supported installed stack and language.
-- Does not define a new post-action authorization policy; project-template post-actions run by default for this initial behavior.
+- Does not define a new authorization policy for ordinary post-actions; mandatory project configuration actions cannot be skipped or marked continue-on-error.

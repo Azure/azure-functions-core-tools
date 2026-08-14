@@ -4,7 +4,7 @@ See `proposal.md` for motivation and `specs/func-init-execution/spec.md` for the
 
 `InitCommand` currently owns project-state detection, adoption and healing, stack and language prompts, destructive cleanup, CLI configuration writes, bundle warnings, workload option registration, and direct dispatch to `IProjectInitializer.InitializeAsync`. `IProjectInitializer` combines discoverable stack metadata with stack-specific command options and filesystem behavior. Implementations either write project files directly or launch another template CLI, so project creation does not share the func TemplateEngine environment or package registry.
 
-The `template-engine-integration` change supplies command-scoped `Templater`, context-aware constraints, immutable `TemplateGroup`, projected parameter metadata, and self-invoking `ResolvedTemplate`. The `func-new-execution` change supplies the strict two-stage parser and alias rules that both template commands need. Unlike `func new`, init cannot resolve an existing project before selecting a template: it must first join installed stack metadata with context-free project-template metadata and only then construct a prospective project context.
+The `template-engine-integration` change supplies command-scoped `Templater`, context-aware constraints, immutable `TemplateGroup`, projected parameter metadata, and self-invoking `ResolvedTemplate`. The `template-engine-post-actions` change supplies the trusted Functions project configuration action and resolved action metadata. The `func-new-execution` change supplies the strict two-stage parser and alias rules that both template commands need. Unlike `func new`, init cannot resolve an existing project before selecting a template: it must first join installed stack metadata with context-free project-template metadata and only then construct a prospective project context.
 
 ## Goals / Non-Goals
 
@@ -14,7 +14,7 @@ The `template-engine-integration` change supplies command-scoped `Templater`, co
 - Support equivalent stack-first, language-first, template-first, and fully explicit selection.
 - Create exactly one context-bearing `Templater` after stack and language are known.
 - Preserve adoption and healing without forcing project templates into existing-project workflows.
-- Make project-template invocation produce complete project and CLI configuration effects.
+- Make project-template invocation expose enough resolved primary-output and configuration-action metadata to finalize CLI project configuration.
 - Share template argument semantics with `func new` rather than maintaining a second dynamic parser.
 - Keep expected ambiguity, incompatibility, and missing-package states explicit and testable.
 
@@ -23,7 +23,7 @@ The `template-engine-integration` change supplies command-scoped `Templater`, co
 - Define a new policy for approving or suppressing template post-actions.
 - Resolve extension bundle identity or version before a new project's `host.json` exists.
 - Preserve workload-owned project scaffolding as a fallback when templates are unavailable.
-- Require one specific implementation for generating `.func/config.json`.
+- Define the trusted action identifier or serialized argument shape owned by `template-engine-post-actions`.
 - Make project-template plus CLI configuration writes transactionally atomic across unexpected filesystem failures.
 - Change the adoption and healing outcomes beyond moving them to shared stack metadata and configuration services.
 
@@ -185,50 +185,60 @@ After authoritative context resolution, the runner applies language, candidate a
 
 Required visible template symbols are prompted only when unresolved. Optional values use template defaults. Hidden required symbols without defaults are authoring failures.
 
-### Project `ResolvedTemplate` owns CLI configuration effects
+### Configuration actions define CLI project finalization
 
-`ResolvedTemplate.InvokeAsync` remains the only template execution entry point. Its internal invocation plan depends on template type:
+`ResolvedTemplate.InvokeAsync` remains the only TemplateEngine creation entry point, but `.func/config.json` is not produced by a hidden companion template or synthesized second creation operation. Each generated Functions project is represented by one mandatory trusted configuration action:
 
 ```text
-Item
-  `- selected template
-
-Project
-  |- selected project template
-  `- CLI project configuration step
+FunctionsProjectConfiguration
+|- PrimaryOutputReference
+|- Stack
+`- Language
 ```
 
-The project configuration step emits `.func/config.json` containing both canonical stack and canonical language. The file is reserved: project template preflight fails if the selected template also targets that path.
-
-The implementation may use:
-
-1. a hidden embedded companion template invoked in the same engine session; or
-2. direct CLI serialization and atomic writing with equivalent synthesized creation effects.
-
-Both implementations must provide identical dry-run, conflict, cancellation, result, and failure behavior. This choice is deliberately deferred because it does not change command or integration contracts.
-
-Internally, project and configuration effects can be represented by a `CompositeCreationEffects` adapter implementing both the legacy `ICreationEffects` required by the pinned Edge API and current `ICreationEffects2`. The integration then projects the composite into the func-owned `TemplateInvocationResult`; raw TemplateEngine types do not cross into commands.
-
-The configuration step has no post-actions or primary outputs. Composite creation results preserve the project template's primary outputs and post-actions.
-
-### Project invocation preflights both effect sources
-
-Dry-run evaluates the project template and configuration step without writing either source, validates reserved-path overlap, and returns their combined effects.
-
-Actual project invocation performs the same combined preflight before writes:
+The referenced primary output is a file located directly in the Functions project root. TemplateEngine resolves its final relative path after source targets, `sourceName`, explicit renames, symbol `fileRename`, and conditions:
 
 ```text
-preflight project effects
-preflight configuration effects
-validate combined paths and destructive changes
+project root = parent(resolved primary output)
+config path  = project root/.func/config.json
+```
+
+The action carries canonical stack and language. For the initial single-stack/language selection model, every active action value must agree with the selected canonical candidate. The exact action ID, serialized argument schema, rename propagation, and TemplateEngine projection belong to `template-engine-post-actions`.
+
+Project template content cannot create or modify `.func/config.json` directly. The trusted action is template-declared topology but CLI-owned behavior: Func validates the declaration, computes the destination, and serializes the current CLI configuration schema.
+
+**Alternative considered:** add stack and language properties to `primaryOutputs`. TemplateEngine discards unknown properties from its public primary-output result, forcing Func to parse and correlate raw template JSON. It is rejected.
+
+**Alternative considered:** retain a hidden companion template or direct synthetic creation step. That duplicates topology outside the authored template, assumes one target root, and turns configuration into an unrelated second effect source. It is rejected.
+
+### Configuration declarations and effects are preflighted
+
+After candidate parameters are complete, init resolves active configuration actions and primary outputs during TemplateEngine effects evaluation. Before target modification, preflight rejects:
+
+- no active trusted configuration action;
+- optional or continue-on-error configuration behavior;
+- a missing, ambiguous, inactive, or non-file primary-output reference;
+- a resolved primary output outside the target;
+- empty, non-canonical, or candidate-incompatible stack/language;
+- duplicate resolved project roots;
+- project template file effects targeting `.func/config.json`;
+- configuration output collisions with any other planned effect.
+
+Dry-run projects one planned `.func/config.json` write for each active action without executing the action. It preserves resolved primary outputs and reports ordinary post-actions separately.
+
+Actual execution is ordered:
+
+```text
+preflight template, actions, and combined paths
 create project template
-create CLI configuration
-return composite result
+for each configuration action in declared order:
+  verify resolved primary-output file exists
+  derive its parent project root
+  atomically write .func/config.json
+run ordinary post-actions in declared order
 ```
 
-Preflight prevents a third-party template from creating `.func/config.json` before the collision is discovered. It cannot make two sequential writes transactionally atomic. If configuration still fails after project creation because of an unexpected filesystem error, the command reports partial initialization and does not delete generated project files.
-
-Post-actions are returned by invocation and run by `func init` only after project and configuration creation succeed. They run by default in declared order. Dry-run reports but never executes them.
+Configuration actions are mandatory and do not participate in future ordinary-action consent policy. If a configuration write fails after project creation, init stops remaining finalization and ordinary post-actions, reports partial initialization, and preserves generated files and successful prior writes.
 
 ### Force cleanup is an ordered command effect
 
@@ -239,8 +249,8 @@ Cleanup is command policy outside `ResolvedTemplate`. Dry-run prepends planned c
 ```text
 Prepare   delete existing non-git content
 Template  create or modify project files
-Finalize  create .func/config.json
-Post      report post-actions
+Finalize  execute required configuration actions
+Post      report ordinary post-actions
 ```
 
 The func-owned preview preserves phase and source so deletion followed by recreation is not flattened into misleading independent output. TemplateEngine effects remain unchanged internally; the init renderer composes cleanup and invocation results.
@@ -249,11 +259,11 @@ The func-owned preview preserves phase and source so deletion followed by recrea
 
 ### Config persistence is mandatory
 
-`.func/config.json` is required CLI state, not a best-effort hint. Init reports success only after it is generated. Both stack and language are always written, replacing the current single-language omission behavior and preventing a later stack expansion from turning an initialized project into a partial state.
+`.func/config.json` is required CLI state, not a best-effort hint. Init reports success only after every active configuration action succeeds. Both stack and language are always written, replacing the current single-language omission behavior and preventing a later stack expansion from turning an initialized project into a partial state.
 
 Adoption and healing use the same canonical configuration serialization rules but remain command-owned because no project `ResolvedTemplate` exists on those paths.
 
-Actual configuration writes must be atomic at the file level. A temporary sibling and replace/move avoids truncated JSON, regardless of whether the final project invocation implementation uses an embedded template or direct serialization.
+Actual configuration writes must be atomic at the file level. A temporary sibling and replace/move avoids truncated JSON.
 
 ### Expected outcomes remain command-renderable
 
@@ -282,7 +292,7 @@ Known outcomes are rendered through `IInteractionService` or wrapped at the comm
 - **[Template-first selection needs metadata before context]** -> Keep catalog descriptors context-free and perform authoritative resolution again through one final context-bound `Templater`.
 - **[Language is the only stack compatibility axis]** -> Preserve every matching stack owner and add func-specific metadata only if real overlapping-language incompatibility emerges.
 - **[Every stack now depends on installed project templates]** -> Provide explicit package guidance and migrate default project template packages before removing initializer fallback.
-- **[Project and configuration writes are sequential]** -> Preflight both, reserve `.func/config.json`, use a trusted configuration step, and report partial completion without destructive rollback.
+- **[Project creation and configuration finalization are sequential]** -> Preflight every action and combined path, use atomic writes, and report partial completion without destructive rollback.
 - **[Actual invocation evaluates effects more than once]** -> Prefer correctness and combined preflight; optimize only if TemplateEngine exposes a safe reusable creation plan.
 - **[Force dry-run evaluates against files that actual cleanup removes]** -> Preserve ordered cleanup effects and reconcile template changes following planned deletions in the func-owned renderer.
 - **[Post-actions run without a new approval policy]** -> Keep this as explicit initial behavior and isolate execution so a future policy can change without altering template selection.
@@ -291,7 +301,7 @@ Known outcomes are rendered through `IInteractionService` or wrapped at the comm
 ## Migration Plan
 
 1. Add context-free project-template metadata and `TemplateType.Project` resolution to the template integration.
-2. Add project configuration effects to project-type `ResolvedTemplate` invocation while preserving item behavior.
+2. Add trusted project configuration action projection, primary-output resolution, and planned configuration effects while preserving item behavior.
 3. Introduce `IProjectStack` and migrate stack registrations, aliases, and tests from `IProjectInitializer`.
 4. Package and install project templates covering every supported stack and canonical language.
 5. Introduce init candidate matrix construction and explicit stack/language/template filtering.
@@ -302,7 +312,3 @@ Known outcomes are rendered through `IInteractionService` or wrapped at the comm
 10. Update help, documentation, package guidance, and dry-run rendering.
 
 During migration, the new path can be exercised with template-backed test stacks before switching production stack registrations. The final switch must remove initializer fallback atomically so missing template packages fail consistently rather than changing scaffolding engines. Rollback restores workload initializer registration and the previous init runner; installed template packages and the shared func template hive remain compatible.
-
-## Open Questions
-
-- Whether `.func/config.json` is produced by a hidden embedded companion template or equivalent direct CLI generation is intentionally deferred to implementation. Both must satisfy the same project invocation and composite-effects contract.

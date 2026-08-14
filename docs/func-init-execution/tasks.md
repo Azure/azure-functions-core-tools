@@ -4,12 +4,12 @@
 - [ ] 1.2 Add project-type listing and reference resolution that exposes identity, aliases, group identity, language, precedence, visibility, and package origin.
 - [ ] 1.3 Validate required project-template language tags and retain diagnostics for missing or unsupported language metadata.
 - [ ] 1.4 Ensure package install, update, and uninstall invalidate context-free catalog snapshots.
-- [ ] 1.5 Extend project-type `ResolvedTemplate` invocation with a CLI configuration step while leaving item-type invocation unchanged.
-- [ ] 1.6 Implement `.func/config.json` generation using either an embedded companion template or equivalent direct generation with synthesized effects.
-- [ ] 1.7 Add composite creation-effects adaptation for project and CLI configuration file changes while keeping TemplateEngine types internal.
-- [ ] 1.8 Preflight project and configuration effects together and reject project templates that target the reserved `.func/config.json` path.
-- [ ] 1.9 Preserve project-template primary outputs and post-actions in the composite invocation result.
-- [ ] 1.10 Add focused integration tests for project dry-run, create, overlap rejection, configuration failure, and unchanged item-template behavior.
+- [ ] 1.5 Consume the trusted Functions project configuration action contract and project its metadata without exposing TemplateEngine action types to commands.
+- [ ] 1.6 Resolve active configuration actions against final primary-output paths after conditions and file renames.
+- [ ] 1.7 Add planned CLI-owned `.func/config.json` effects for project configuration actions while leaving item-template effects unchanged.
+- [ ] 1.8 Preflight action identity, mandatory failure semantics, canonical stack/language, primary-output references, target containment, unique project roots, and output collisions.
+- [ ] 1.9 Preserve resolved primary outputs and separate mandatory configuration actions from ordinary post-actions in invocation results.
+- [ ] 1.10 Add focused integration tests for action projection, renamed primary outputs, dry-run, creation, overlap rejection, configuration failure, and unchanged item-template behavior.
 
 ## 2. Project Stack Contract
 
@@ -34,7 +34,7 @@
 - [ ] 3.6 Create PowerShell project-template variants with required language tags and applicable project symbols.
 - [ ] 3.7 Move common bundle channel and no-bundle options from workload registrations into project-template symbols.
 - [ ] 3.8 Add `func.host.json` aliases, descriptions, choices, required status, and visibility for every migrated project-template parameter.
-- [ ] 3.9 Ensure no project template contains or generates `.func/config.json`.
+- [ ] 3.9 Ensure every project template declares a primary output and mandatory trusted configuration action and does not contain `.func/config.json` directly.
 - [ ] 3.10 Add template authoring and instantiation tests for every canonical stack-language combination.
 - [ ] 3.11 Ensure setup or package bootstrap flows make default project templates available for each installed stack.
 
@@ -94,21 +94,21 @@
 
 - [ ] 9.1 Plan deletion of all target content except `.git` for forced reinitialization.
 - [ ] 9.2 Confirm destructive cleanup interactively and treat non-interactive `--force` as explicit authorization.
-- [ ] 9.3 Complete stack, language, template, parsing, and combined effect preflight before deleting target content.
+- [ ] 9.3 Complete stack, language, template, parsing, primary-output, configuration-action, and combined effect preflight before deleting target content.
 - [ ] 9.4 Invoke the selected project `ResolvedTemplate` with target path, canonical symbols, name, conflict policy, and create or dry-run mode.
-- [ ] 9.5 Combine forced cleanup, project-template, CLI configuration, and post-action effects in deterministic execution order.
+- [ ] 9.5 Combine forced cleanup, project-template, configuration-finalization, and ordinary post-action effects in deterministic execution order.
 - [ ] 9.6 Reconcile dry-run changes following planned cleanup so deletion and recreation are represented accurately.
-- [ ] 9.7 Ensure dry-run creates no directories, writes no project or configuration files, and executes no post-actions.
-- [ ] 9.8 Run project-template post-actions by default only after project and CLI configuration generation succeed.
-- [ ] 9.9 Report partial initialization without deleting generated project files if configuration generation fails after project creation.
-- [ ] 9.10 Dispose the command-scoped `Templater` and propagate cancellation through preflight, creation, configuration, and post-actions.
+- [ ] 9.7 Ensure dry-run creates no directories, writes no project or configuration files, and executes no configuration or ordinary post-actions.
+- [ ] 9.8 Execute mandatory configuration actions in declared order after scaffolding and run ordinary post-actions only after all configuration succeeds.
+- [ ] 9.9 Report partial initialization without deleting generated files or successful prior configurations if a configuration action fails.
+- [ ] 9.10 Dispose the command-scoped `Templater` and propagate cancellation through preflight, creation, configuration finalization, and ordinary post-actions.
 
 ## 10. Rendering and Outcomes
 
 - [ ] 10.1 Add func-owned init outcomes for no stacks, duplicate stacks, incompatibility, wrong template type, missing packages, ambiguity, invalid arguments, and restricted templates.
 - [ ] 10.2 Render stack, language, and template prompts using canonical values and user-facing display labels.
 - [ ] 10.3 Render no-template guidance with the selected stack and language and a `func new install` next action.
-- [ ] 10.4 Render ordered plain dry-run effects for cleanup, project files, `.func/config.json`, and post-actions.
+- [ ] 10.4 Render ordered plain dry-run effects for cleanup, project files, action-planned `.func/config.json`, and ordinary post-actions.
 - [ ] 10.5 Render the same dry-run and creation data through stable JSON output.
 - [ ] 10.6 Render declined cleanup, successful adoption, successful healing, successful creation, and partial initialization distinctly.
 - [ ] 10.7 Wrap only documented user failures at the command boundary and allow unexpected defects to retain stack traces.
@@ -134,10 +134,10 @@
 - [ ] 12.6 Test shared template parsing, alias collisions, invalid input, missing required values, canonical mappings, and precedence timing.
 - [ ] 12.7 Test prospective stack and language host bindings and unavailable bundle defaults.
 - [ ] 12.8 Test empty, initialized, adoptable, healable, forced, and declined-force state paths.
-- [ ] 12.9 Test `.func/config.json` always contains canonical stack and language and is never owned by project templates.
-- [ ] 12.10 Test combined project and configuration effects for dry-run and actual invocation.
+- [ ] 12.9 Test configuration actions always persist canonical stack and language and project template content never owns `.func/config.json`.
+- [ ] 12.10 Test resolved primary-output paths and action-planned configuration effects for dry-run and actual invocation.
 - [ ] 12.11 Test forced dry-run cleanup ordering, `.git` preservation, overlap rejection, and unchanged filesystem.
-- [ ] 12.12 Test default post-action execution, dry-run suppression, configuration-failure suppression, and cancellation.
+- [ ] 12.12 Test mandatory configuration ordering, default ordinary post-action execution, dry-run suppression, configuration-failure suppression, and cancellation.
 - [ ] 12.13 Test missing applicable templates never fall back to workload scaffolding.
 - [ ] 12.14 Add end-to-end initialization coverage for every in-repository stack-language project template.
 
@@ -145,7 +145,7 @@
 
 - [ ] 13.1 Update `func init --help` for project-template selection, non-interactive behavior, dry-run, and template-specific options.
 - [ ] 13.2 Document installed stack and project-template requirements, language-tag authoring, and `func new install` guidance.
-- [ ] 13.3 Document `.func/config.json` ownership, mandatory canonical stack and language, and reserved template output path.
+- [ ] 13.3 Document the primary-output/configuration-action authoring contract, CLI ownership of `.func/config.json`, and mandatory canonical stack and language.
 - [ ] 13.4 Document destructive force behavior and ordered dry-run effects.
 - [ ] 13.5 Document the breaking `IProjectInitializer` to `IProjectStack` workload migration.
 - [ ] 13.6 Run targeted abstraction, workload, init command, template integration, parser, renderer, and project-template tests.
