@@ -43,7 +43,7 @@
 
   <PropertyGroup>
     <VersionPrefix>1.0.1</VersionPrefix>
-    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel).2</VersionSuffix>
+    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel).1</VersionSuffix>
 
     <SourceBundleVersion Condition="'$(SourceBundleVersion)' == ''">$(BundleVersion)</SourceBundleVersion>
     <MinBundleVersionRange Condition="'$(MinBundleVersionRange)' == ''">[4.0.0,)</MinBundleVersionRange>
