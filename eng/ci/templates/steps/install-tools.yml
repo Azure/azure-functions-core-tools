@@ -4,23 +4,20 @@ steps:
     versionSpec: '18.x'
   displayName: 'Install Node 18.x'
 
-# Set PIP_INDEX_URL before UsePythonVersion so that the pip upgrade inside
-# its setup.sh goes through the ADO upstream feed instead of pypi.org.
-- script: |
-    echo "##vso[task.setvariable variable=PIP_INDEX_URL]https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/pypi/simple/"
-  displayName: 'Route pip through ADO feed'
+# PipAuthenticate must run before UsePythonVersion because UsePythonVersion's
+# setup.sh upgrades pip from pypi.org. PipAuthenticate sets PIP_INDEX_URL to
+# route through the ADO feed, preventing CFS violations. It only needs Node.
+- task: PipAuthenticate@1
+  displayName: 'Authenticate pip'
+  inputs:
+    artifactFeeds: 'public/upstream-public'
+    onlyAddExtraIndex: false
 
 - task: UsePythonVersion@0
   inputs:
     versionSpec: '3.10'
     addToPath: true
   displayName: 'Install Python 3.10'
-
-- task: PipAuthenticate@1
-  displayName: 'Authenticate pip'
-  inputs:
-    artifactFeeds: 'public/upstream-public'
-    onlyAddExtraIndex: false
 
 - task: NuGetToolInstaller@1
   inputs:
