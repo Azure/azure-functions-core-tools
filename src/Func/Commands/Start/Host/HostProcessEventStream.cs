@@ -9,13 +9,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Host;
 
-internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStreamLifecycle
+internal sealed partial class HostProcessEventStream : IHostEventStream, IHostEventStreamLifecycle
 {
     private readonly IHostProcess _process;
     private readonly IHostProcessOutputParser _parser;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _shutdownTimeout;
     private readonly IHostOutputInterceptor? _outputInterceptor;
+    private readonly ILogger? _logger;
     private readonly Channel<HostLogEntry> _channel;
     private readonly Task<int> _exitTask;
     private readonly Task _stdoutTask;
@@ -29,7 +30,8 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         HostProcessLaunchInfo launchInfo,
         TimeSpan shutdownTimeout,
         TimeProvider? timeProvider = null,
-        IHostOutputInterceptor? outputInterceptor = null)
+        IHostOutputInterceptor? outputInterceptor = null,
+        ILogger? logger = null)
     {
         _process = process ?? throw new ArgumentNullException(nameof(process));
         _parser = parser ?? throw new ArgumentNullException(nameof(parser));
@@ -37,6 +39,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         _timeProvider = timeProvider ?? TimeProvider.System;
         _shutdownTimeout = shutdownTimeout;
         _outputInterceptor = outputInterceptor;
+        _logger = logger;
         _channel = Channel.CreateUnbounded<HostLogEntry>(
             new UnboundedChannelOptions
             {
@@ -160,9 +163,13 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
                         continue;
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     // Interceptor failure must not crash the event loop — let the line through.
+                    if (_logger is not null)
+                    {
+                        LogInterceptorFailure(_logger, ex);
+                    }
                 }
             }
 
@@ -195,4 +202,7 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Output interceptor failed to process line; continuing without interception.")]
+    private static partial void LogInterceptorFailure(ILogger logger, Exception ex);
 }
