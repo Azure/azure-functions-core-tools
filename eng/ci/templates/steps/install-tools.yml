@@ -4,6 +4,15 @@ steps:
     versionSpec: '18.x'
   displayName: 'Install Node 18.x'
 
+# PipAuthenticate must run before UsePythonVersion because UsePythonVersion's
+# setup.sh upgrades pip from pypi.org. PipAuthenticate sets PIP_INDEX_URL to
+# route through the ADO feed, preventing CFS violations. It only needs Node.
+- task: PipAuthenticate@1
+  displayName: 'Authenticate pip'
+  inputs:
+    artifactFeeds: 'public/upstream-public'
+    onlyAddExtraIndex: false
+
 - task: UsePythonVersion@0
   inputs:
     versionSpec: '3.10'
