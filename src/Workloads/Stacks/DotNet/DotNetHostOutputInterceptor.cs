@@ -47,7 +47,7 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
         }
 
         // v5 path: structured JSON record from the host.
-        if (!_pidCaptured && line.Length > 0 && line[0] == '{')
+        if (line.Length > 0 && line[0] == '{')
         {
             return TryInterceptStructuredRecord(line);
         }
@@ -96,16 +96,17 @@ internal sealed partial class DotNetHostOutputInterceptor : IHostOutputIntercept
                 return _writer is not null;
             }
 
-            // Extract worker PID from the human-readable debug message.
-            // Write in the same format the worker's startup hook uses via azfuncjsonlog: so
-            // consumers (VS, VS Code) see the workerProcessId field they expect.
-            // Return false so the message still renders in the console.
-            Match match = WorkerPidRegex().Match(message);
-            if (match.Success && int.TryParse(match.Groups[1].Value, out int pid))
+            // Extract worker PID from the human-readable debug message as a fallback.
+            // Only fires when no genuine azfuncjsonlog PID event was received yet.
+            if (!_pidCaptured)
             {
-                WriteToDisk($"{{ \"name\":\"dotnet-worker-startup\", \"workerProcessId\" : {pid} }}");
-                _pidCaptured = true;
-                return false;
+                Match match = WorkerPidRegex().Match(message);
+                if (match.Success && int.TryParse(match.Groups[1].Value, out int pid))
+                {
+                    WriteToDisk($"{{ \"name\":\"dotnet-worker-startup\", \"workerProcessId\" : {pid} }}");
+                    _pidCaptured = true;
+                    return false;
+                }
             }
         }
         catch (JsonException)
