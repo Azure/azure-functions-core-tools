@@ -89,6 +89,7 @@ jobs:
     env:
       linuxBuildNumber: $(DefaultArtifactVersion)
       consolidatedBuildId: $(ConsolidatedBuildId)
+      PIP_INDEX_URL: $(PIP_INDEX_URL)
 
   - task: Bash@3
     displayName: "Validate DEB architectures"
