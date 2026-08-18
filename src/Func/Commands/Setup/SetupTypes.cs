@@ -74,7 +74,7 @@ internal sealed record SetupDependency(
             SetupDependencyKind.Host,
             "host",
             "host",
-            HostWorkloadPackage.CurrentPackageId,
+            HostWorkloadPackage.PackageId,
             versionRange,
             SetupRuntimes.RangeText(versionRange),
             ResolvedPackageId: null);
@@ -157,7 +157,7 @@ internal sealed record SetupDependency(
 
     private static string WorkerPackageId(string runtime)
         => string.Equals(runtime, "python", StringComparison.OrdinalIgnoreCase)
-            ? PythonWorkerWorkloadPackage.CurrentPackageId
+            ? PythonWorkerWorkloadPackage.PackageId
             : WorkerPackagePrefix + runtime;
 }
 
