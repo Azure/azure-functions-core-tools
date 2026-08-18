@@ -111,7 +111,11 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
 
                 // Stop on an empty page, not a short one: the catalog filters
                 // hits client-side, so a full raw page can arrive here with only
-                // a handful of workloads and more still to come.
+                // a handful of workloads and more still to come. A feed that
+                // ignores packageType can still filter a whole page to nothing
+                // and cut discovery short; terminating on server page metadata
+                // needs a wider catalog change, tracked by #5562. The built-in
+                // fallback covers that case in the meantime.
                 if (page.Count == 0)
                 {
                     break;
@@ -164,11 +168,19 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
             templates.Remove(alias);
         }
 
+        if (stacks.Count > 0)
+        {
+            return new SetupStackSnapshot(stacks, templates, ambiguous);
+        }
+
         // An empty result usually means the query failed silently rather than
         // "no stacks exist", so prefer the built-in list over offering nothing.
-        return stacks.Count == 0
+        // Conflicting claims still travel with it, otherwise a feed where every
+        // alias collides would empty the map and get the built-in ids waved
+        // through as if nothing were wrong.
+        return ambiguous.Count == 0
             ? SetupDependency.BuiltInStackSnapshot
-            : new SetupStackSnapshot(stacks, templates, ambiguous);
+            : SetupDependency.BuiltInStackSnapshot with { AmbiguousAliases = ambiguous };
     }
 
     /// <summary>

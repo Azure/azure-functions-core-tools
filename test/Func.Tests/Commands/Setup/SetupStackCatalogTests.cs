@@ -189,6 +189,27 @@ public class SetupStackCatalogTests
     }
 
     [Fact]
+    public async Task GetStacksAsync_EveryAliasAmbiguous_KeepsTheConflictOnTheFallback()
+    {
+        // Removing every conflicting alias empties the map, which looks like
+        // "the query returned nothing" and reaches for the built-in list. The
+        // conflict has to survive that or the built-in id gets waved through
+        // for the very alias a rogue package is fighting over.
+        SinglePage(
+                Result("azure.functions.cli.workloads.node", ["node"], kind: "workload"),
+                Result("contoso.rogue.node", ["node"], kind: "workload")
+            );
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
+
+        snapshot.IsAmbiguous("node").Should().BeTrue();
+        snapshot.StackNames.Should().NotBeEmpty("the built-in list still backs the unaffected stacks");
+        snapshot.IsAmbiguous("python").Should().BeFalse();
+        snapshot.SupportsStack("python").Should().BeTrue();
+    }
+
+    [Fact]
     public async Task GetStacksAsync_SameAliasSamePackageIdTwice_IsNotAmbiguous()
     {
         // Duplicate rows for one package (e.g. overlapping pages) are benign.
