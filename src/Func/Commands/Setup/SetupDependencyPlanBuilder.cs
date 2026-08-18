@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Workloads;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Setup;
@@ -13,8 +12,7 @@ internal interface ISetupDependencyPlanBuilder
     /// <summary>
     /// Expands a feature plan into the concrete dependencies to install for one
     /// profile scope, plus the failures detected while planning (unsupported
-    /// runtime for the profile, unsupported worker RID, non-overlapping bundle
-    /// ranges).
+    /// runtime for the profile, non-overlapping bundle ranges).
     /// </summary>
     public Task<SetupDependencyPlan> BuildDependencyPlanAsync(
         SetupCommandOptions options,

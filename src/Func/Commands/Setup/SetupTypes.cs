@@ -50,8 +50,6 @@ internal sealed record SetupDependency(
     // Go has no templates package today, so it is intentionally absent.
     private static readonly HashSet<string> _templates = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "dotnet" };
 
-    public static IReadOnlyList<string> Stacks => [.. _stacks];
-
     /// <summary>
     /// The built-in stack and templates packages, used when catalog discovery
     /// is unavailable.
@@ -111,9 +109,6 @@ internal sealed record SetupDependency(
             ResolvedPackageId: null,
             Channel: channel);
 
-    public static SetupDependency Stack(string stack)
-        => Stack(stack, StackPackagePrefix + StackPackageSuffix(stack));
-
     public static SetupDependency Stack(string stack, string packageId)
         => new(
             SetupDependencyKind.Stack,
@@ -123,12 +118,6 @@ internal sealed record SetupDependency(
             VersionRange: null,
             RangeText: null,
             ResolvedPackageId: null);
-
-    public static bool SupportsStack(string stack)
-        => !string.IsNullOrWhiteSpace(stack) && _stacks.Contains(stack.Trim());
-
-    public static SetupDependency Templates(string stack, BundleChannel? channel)
-        => Templates(stack, TemplatesPackagePrefix + StackPackageSuffix(stack), channel);
 
     public static SetupDependency Templates(string stack, string packageId, BundleChannel? channel)
         => new(
@@ -141,9 +130,6 @@ internal sealed record SetupDependency(
             ResolvedPackageId: null,
             Optional: true,
             Channel: channel);
-
-    public static bool SupportsTemplates(string stack)
-        => !string.IsNullOrWhiteSpace(stack) && _templates.Contains(stack.Trim());
 
     private static string StackPackageSuffix(string stack)
         => stack.Trim().ToLowerInvariant() switch

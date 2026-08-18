@@ -113,10 +113,28 @@ public class SetupStackCatalogTests
             .Returns([Result("azure.functions.cli.workloads.node", ["node"], kind: "workload")]);
         SetupStackCatalog stackCatalog = new(_catalog);
 
+        // Same key twice hits the cache; each distinct key discovers again.
         await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
         await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
+        await stackCatalog.GetStacksAsync(source: null, includePrerelease: true, CancellationToken.None);
+        await stackCatalog.GetStacksAsync(source: "https://other.test/v3/index.json", includePrerelease: false, CancellationToken.None);
 
-        await _catalog.Received(1).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+        await _catalog.Received(3).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetStacksAsync_ForwardsSourceAndPrereleaseToTheQuery()
+    {
+        const string source = "https://example.test/v3/index.json";
+        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+            .Returns([Result("azure.functions.cli.workloads.node", ["node"], kind: "workload")]);
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        await stackCatalog.GetStacksAsync(source, includePrerelease: true, CancellationToken.None);
+
+        await _catalog.Received(1).SearchAsync(
+            Arg.Is<CatalogSearchQuery>(q => q.Source == source && q.IncludePrerelease == true),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

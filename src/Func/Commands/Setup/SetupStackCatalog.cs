@@ -30,17 +30,15 @@ internal sealed record SetupStackSnapshot(
 {
     public IReadOnlyList<string> StackNames => [.. StackPackageIds.Keys];
 
-    public bool SupportsStack(string stack)
-        => !string.IsNullOrWhiteSpace(stack) && StackPackageIds.ContainsKey(stack.Trim());
+    public bool SupportsStack(string stack) => StackPackageId(stack) is not null;
 
-    public bool SupportsTemplates(string stack)
-        => !string.IsNullOrWhiteSpace(stack) && TemplatesPackageIds.ContainsKey(stack.Trim());
+    public bool SupportsTemplates(string stack) => TemplatesPackageId(stack) is not null;
 
     public string? StackPackageId(string stack)
-        => StackPackageIds.TryGetValue(stack.Trim(), out string? id) ? id : null;
+        => !string.IsNullOrWhiteSpace(stack) && StackPackageIds.TryGetValue(stack.Trim(), out string? id) ? id : null;
 
     public string? TemplatesPackageId(string stack)
-        => TemplatesPackageIds.TryGetValue(stack.Trim(), out string? id) ? id : null;
+        => !string.IsNullOrWhiteSpace(stack) && TemplatesPackageIds.TryGetValue(stack.Trim(), out string? id) ? id : null;
 }
 
 internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISetupStackCatalog
@@ -67,6 +65,8 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
             return cached;
         }
 
+        // Fallback snapshots are cached too, so one unreachable feed doesn't make
+        // every subsequent profile scope re-pay the timeout.
         SetupStackSnapshot snapshot = await DiscoverAsync(source, includePrerelease, cancellationToken);
         _cache[cacheKey] = snapshot;
         return snapshot;
