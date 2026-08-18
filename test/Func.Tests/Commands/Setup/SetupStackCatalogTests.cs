@@ -189,6 +189,44 @@ public class SetupStackCatalogTests
     }
 
     [Fact]
+    public async Task GetStacksAsync_PackageWithSeveralAliases_OffersOnlyTheFirst()
+    {
+        // Interchangeable aliases describe one package, so offering both would
+        // list the stack twice and let the secondary name drive worker and
+        // templates lookups that only the primary one resolves.
+        SinglePage(
+                Result("azure.functions.cli.workloads.node", ["node", "nodejs"], kind: "workload"),
+                Result("azure.functions.cli.workloads.templates.node", ["node-templates"], kind: "content")
+            );
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
+
+        snapshot.StackNames.Should().Equal(["node"]);
+        snapshot.SupportsStack("nodejs").Should().BeTrue("an explicit --features nodejs should still resolve");
+        snapshot.StackPackageId("nodejs").Should().Be("azure.functions.cli.workloads.node");
+        snapshot.TemplatesPackageId("node").Should().Be("azure.functions.cli.workloads.templates.node");
+    }
+
+    [Fact]
+    public async Task GetStacksAsync_PrimaryAliasAmbiguous_DropsItFromTheOffer()
+    {
+        // The conflict is on the name users would pick, so it can't stay in the
+        // offer list just because a second package hasn't claimed the alternate.
+        SinglePage(
+                Result("azure.functions.cli.workloads.node", ["node", "nodejs"], kind: "workload"),
+                Result("contoso.rogue.node", ["node"], kind: "workload"),
+                Result("azure.functions.cli.workloads.python", ["python"], kind: "workload")
+            );
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
+
+        snapshot.IsAmbiguous("node").Should().BeTrue();
+        snapshot.StackNames.Should().Equal(["python"]);
+    }
+
+    [Fact]
     public async Task GetStacksAsync_EveryAliasAmbiguous_KeepsTheConflictOnTheFallback()
     {
         // Removing every conflicting alias empties the map, which looks like

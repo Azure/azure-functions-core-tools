@@ -24,19 +24,26 @@ internal interface ISetupStackCatalog
 /// <summary>
 /// Stack names to package ids, resolved from <c>kind:</c> and <c>alias:</c> workload tags.
 /// </summary>
-/// <param name="StackPackageIds">Stack name to the package that declares it.</param>
+/// <param name="StackPackageIds">Stack name to the package that declares it. Includes secondary aliases.</param>
 /// <param name="TemplatesPackageIds">Stack name to its templates content package.</param>
 /// <param name="AmbiguousAliases">
 /// Aliases claimed by more than one package. These are excluded from the maps
 /// above rather than resolved arbitrarily, so a mis-tagged or hostile feed
 /// can't decide which package <c>func setup</c> installs.
 /// </param>
+/// <param name="PrimaryStackNames">
+/// One name per stack package, used for anything a user picks from. A package
+/// may publish several interchangeable aliases; offering all of them would list
+/// the same stack twice and let a secondary name drive worker and templates
+/// lookups that only the primary one resolves. Null falls back to every key.
+/// </param>
 internal sealed record SetupStackSnapshot(
     IReadOnlyDictionary<string, string> StackPackageIds,
     IReadOnlyDictionary<string, string> TemplatesPackageIds,
-    IReadOnlySet<string>? AmbiguousAliases = null)
+    IReadOnlySet<string>? AmbiguousAliases = null,
+    IReadOnlyList<string>? PrimaryStackNames = null)
 {
-    public IReadOnlyList<string> StackNames => [.. StackPackageIds.Keys];
+    public IReadOnlyList<string> StackNames => PrimaryStackNames ?? [.. StackPackageIds.Keys];
 
     public bool SupportsStack(string stack) => StackPackageId(stack) is not null;
 
@@ -142,14 +149,24 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
         Dictionary<string, string> stacks = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, string> templates = new(StringComparer.OrdinalIgnoreCase);
         HashSet<string> ambiguous = new(StringComparer.OrdinalIgnoreCase);
+        List<string> primary = [];
 
         foreach (CatalogSearchResult result in results)
         {
-            foreach (string alias in result.Aliases)
+            bool isStack = string.Equals(result.Kind, StackKind, StringComparison.OrdinalIgnoreCase);
+
+            for (int i = 0; i < result.Aliases.Count; i++)
             {
-                if (string.Equals(result.Kind, StackKind, StringComparison.OrdinalIgnoreCase))
+                string alias = result.Aliases[i];
+                if (isStack)
                 {
-                    Claim(stacks, ambiguous, alias, result.PackageId);
+                    // Aliases are interchangeable for install, but only the first
+                    // is offered as a stack; the rest stay resolvable so an
+                    // explicit --features nodejs still finds the package.
+                    if (Claim(stacks, ambiguous, alias, result.PackageId) && i == 0)
+                    {
+                        primary.Add(alias);
+                    }
                 }
                 else if (alias.EndsWith(TemplatesAliasSuffix, StringComparison.OrdinalIgnoreCase))
                 {
@@ -168,9 +185,11 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
             templates.Remove(alias);
         }
 
+        primary.RemoveAll(ambiguous.Contains);
+
         if (stacks.Count > 0)
         {
-            return new SetupStackSnapshot(stacks, templates, ambiguous);
+            return new SetupStackSnapshot(stacks, templates, ambiguous, primary);
         }
 
         // An empty result usually means the query failed silently rather than
@@ -189,7 +208,8 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
     /// <see cref="WorkloadPackageSource"/> applies to alias installs, rather
     /// than letting catalog ordering decide.
     /// </summary>
-    private static void Claim(
+    /// <returns><c>true</c> when the alias was recorded for the first time.</returns>
+    private static bool Claim(
         Dictionary<string, string> map,
         HashSet<string> ambiguous,
         string alias,
@@ -202,9 +222,10 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
                 ambiguous.Add(alias);
             }
 
-            return;
+            return false;
         }
 
         map[alias] = packageId;
+        return true;
     }
 }
