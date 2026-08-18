@@ -4,16 +4,19 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Azure.Functions.Cli.Hosting.Events;
+using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Host;
 
-internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStreamLifecycle
+internal sealed partial class HostProcessEventStream : IHostEventStream, IHostEventStreamLifecycle
 {
     private readonly IHostProcess _process;
     private readonly IHostProcessOutputParser _parser;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _shutdownTimeout;
+    private readonly IHostOutputInterceptor? _outputInterceptor;
+    private readonly ILogger? _logger;
     private readonly Channel<HostLogEntry> _channel;
     private readonly Task<int> _exitTask;
     private readonly Task _stdoutTask;
@@ -26,13 +29,17 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         IHostProcessOutputParser parser,
         HostProcessLaunchInfo launchInfo,
         TimeSpan shutdownTimeout,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IHostOutputInterceptor? outputInterceptor = null,
+        ILogger? logger = null)
     {
         _process = process ?? throw new ArgumentNullException(nameof(process));
         _parser = parser ?? throw new ArgumentNullException(nameof(parser));
         ArgumentNullException.ThrowIfNull(launchInfo);
         _timeProvider = timeProvider ?? TimeProvider.System;
         _shutdownTimeout = shutdownTimeout;
+        _outputInterceptor = outputInterceptor;
+        _logger = logger;
         _channel = Channel.CreateUnbounded<HostLogEntry>(
             new UnboundedChannelOptions
             {
@@ -107,16 +114,16 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
             {
                 // Process already gone.
             }
+        }
 
-            // _exitTask drains stdout/stderr and disposes _process in its finally block.
-            try
-            {
-                await _exitTask;
-            }
-            catch
-            {
-                // _exitTask may fault after KillTree; we only need it to finish, not succeed.
-            }
+        // Always await _exitTask to ensure stdout/stderr drain and resources (process + interceptor) are released.
+        try
+        {
+            await _exitTask;
+        }
+        catch
+        {
+            // _exitTask may fault after KillTree; we only need it to finish, not succeed.
         }
     }
 
@@ -141,9 +148,31 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
 
     private async Task ReadLinesAsync(TextReader reader, string streamName)
     {
+        bool canIntercept = _outputInterceptor is not null
+            && string.Equals(streamName, HostProcessStreamNames.StandardOutput, StringComparison.Ordinal);
+
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
         {
+            if (canIntercept)
+            {
+                try
+                {
+                    if (_outputInterceptor!.TryIntercept(line))
+                    {
+                        continue;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Interceptor failure must not crash the event loop — let the line through.
+                    if (_logger is not null)
+                    {
+                        LogInterceptorFailure(_logger, ex);
+                    }
+                }
+            }
+
             HostLogEntry entry = _parser.ParseLine(streamName, line, _timeProvider.GetUtcNow());
             await _channel.Writer.WriteAsync(entry);
         }
@@ -167,6 +196,13 @@ internal sealed class HostProcessEventStream : IHostEventStream, IHostEventStrea
         finally
         {
             await _process.DisposeAsync();
+            if (_outputInterceptor is not null)
+            {
+                await _outputInterceptor.DisposeAsync();
+            }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Output interceptor failed to process line; continuing without interception.")]
+    private static partial void LogInterceptorFailure(ILogger logger, Exception ex);
 }

@@ -42,7 +42,25 @@ internal sealed class StartHostInitializationStep(IHostProcessRunner hostProcess
         else
         {
             ContentWorkloadInfo hostWorkload = context.State.HostWorkload ?? throw new InvalidOperationException("Host workload was not resolved.");
-            context.State.EventStream = await _hostProcessRunner.StartAsync(new HostProcessStartContext(hostWorkload, hostRunContext, context.Options), cancellationToken);
+            FunctionsProject project = context.State.Project ?? throw new InvalidOperationException("Functions project was not resolved.");
+
+            IHostOutputInterceptor? outputInterceptor = context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration)
+                ? stackConfiguration.OutputInterceptor
+                : null;
+
+            // Dispose interceptors for non-matching stacks so we don't leak file handles
+            // opened by workloads that don't apply to this project.
+            foreach (KeyValuePair<string, StartHostConfiguration> entry in context.Options.StackHostConfigurations)
+            {
+                if (!string.Equals(entry.Key, project.StackName, StringComparison.OrdinalIgnoreCase)
+                    && entry.Value.OutputInterceptor is not null)
+                {
+                    await entry.Value.OutputInterceptor.DisposeAsync();
+                }
+            }
+
+            var startContext = new HostProcessStartContext(hostWorkload, hostRunContext, context.Options, outputInterceptor);
+            context.State.EventStream = await _hostProcessRunner.StartAsync(startContext, cancellationToken);
         }
 
         return StartInitializationStepResult.Completed("Host process started");

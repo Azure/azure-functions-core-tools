@@ -98,6 +98,13 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "Disable managed Azurite. The host will start without probing or starting a local emulator."
     };
 
+    // TODO: Either support the legacy behavior or evaluate remaining callers (including Visual Studio) and remove their usage.
+    public Option<bool> PauseOnErrorOption { get; } = new("--pause-on-error")
+    {
+        Description = "Legacy Visual Studio compatibility option.",
+        Hidden = true,
+    };
+
     // Demo-only knob: scales the number of functions DemoEventSource
     // generates so layout variants (full-table ≤8 vs. status-strip >8) can
     // be demoed without code changes. Hidden from --help; intended for
@@ -116,6 +123,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
     private readonly IPlatform _platform;
     private readonly StartDashboardEventStreamFactory _eventStreamFactory;
     private readonly IOptionsMonitor<HostStartupOptions> _hostStartupOptions;
+    private readonly IReadOnlyList<IStartHostOptionContributor> _startOptionContributors;
 
     public StartCommand(
         IInteractionService interaction,
@@ -125,6 +133,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         IOptionsMonitor<HostStartupOptions> hostStartupOptions,
         CompactDashboardShortcutLabels shortcutLabels,
         IPlatform platform,
+        IEnumerable<IStartHostOptionContributor>? startOptionContributors = null,
         StartDashboardEventStreamFactory? eventStreamFactory = null)
         : base("run", "Launch the Azure Functions host runtime.")
     {
@@ -150,6 +159,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         _platform = platform;
         _eventStreamFactory = eventStreamFactory ?? new StartDashboardEventStreamFactory();
         _hostStartupOptions = hostStartupOptions;
+        _startOptionContributors = [.. startOptionContributors ?? []];
 
         AddPathArgument();
         Options.Add(PortOption);
@@ -167,6 +177,17 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(DemoOption);
         Options.Add(DemoFunctionsOption);
         Options.Add(NoAzuriteOption);
+        Options.Add(PauseOnErrorOption);
+
+        // Stack workloads (e.g. .NET) contribute their own start options. They are attached after
+        // the built-ins so they group cleanly in --help, and appear only while the owning workload
+        // is installed. The registry de-dupes by name so a shared option is shown once.
+        var registry = new StartOptionRegistry(this);
+        foreach (IStartHostOptionContributor contributor in _startOptionContributors)
+        {
+            registry.SetActiveStack(contributor.Stack);
+            contributor.GetStartOptions(registry);
+        }
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
@@ -346,7 +367,19 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
                 Environment.GetEnvironmentVariable("FUNC_DEMO_FUNCTIONS")),
             ParseSpeedMultiplier(Environment.GetEnvironmentVariable("FUNC_DEMO_SPEED")),
             ParseAutoExit(Environment.GetEnvironmentVariable("FUNC_DEMO_AUTOEXIT")),
-            parseResult.GetValue(NoAzuriteOption));
+            parseResult.GetValue(NoAzuriteOption),
+            BuildStackHostConfigurations(parseResult));
+
+    private IReadOnlyDictionary<string, StartHostConfiguration> BuildStackHostConfigurations(ParseResult parseResult)
+    {
+        var configurations = new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase);
+        foreach (IStartHostOptionContributor contributor in _startOptionContributors)
+        {
+            configurations[contributor.Stack] = contributor.Configure(parseResult);
+        }
+
+        return configurations;
+    }
 
     private static string[] ParseCors(string? cors)
         => string.IsNullOrWhiteSpace(cors)
