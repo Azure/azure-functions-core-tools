@@ -362,8 +362,8 @@ public sealed class ProfileCommandTests : IDisposable
         public void DeleteFile(string path) => _files.Remove(path);
         public bool DirectoryExists(string path) => throw new NotImplementedException();
         public void CreateDirectory(string path) => throw new NotImplementedException();
-        public string CreateTempDirectory() => throw new NotImplementedException();
-        public string CreateTempDirectory(string siblingPath) => throw new NotImplementedException();
+        public TempDirectory CreateTempDirectory() => throw new NotImplementedException();
+        public TempDirectory CreateTempDirectory(string parentDirectory) => throw new NotImplementedException();
         public void CopyDirectory(string sourcePath, string destinationPath) => throw new NotImplementedException();
         public void DeleteDirectory(string path) => throw new NotImplementedException();
         public IReadOnlyList<string> GetFiles(string directoryPath) => throw new NotImplementedException();

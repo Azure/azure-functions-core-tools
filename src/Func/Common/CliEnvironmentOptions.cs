@@ -10,8 +10,8 @@ namespace Azure.Functions.Cli.Common;
 internal sealed class CliEnvironmentOptions
 {
     /// <summary>
-    /// Full path of the running executable, or <c>null</c> when the platform
-    /// cannot determine it.
+    /// Full path of the running executable. Defaults to
+    /// <see cref="Environment.ProcessPath"/>.
     /// </summary>
-    public string? ProcessPath { get; set; }
+    public string ProcessPath { get; set; } = Environment.ProcessPath ?? string.Empty;
 }

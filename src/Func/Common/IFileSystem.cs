@@ -70,18 +70,16 @@ internal interface IFileSystem
 
     /// <summary>
     /// Creates a new, uniquely-named temporary directory under the system temp
-    /// path and returns its full path.
+    /// path and returns it as an <see cref="IDisposable"/> handle.
     /// </summary>
-    public string CreateTempDirectory();
+    public TempDirectory CreateTempDirectory();
 
     /// <summary>
-    /// Creates a new, uniquely-named temporary directory on the same volume as
-    /// <paramref name="siblingPath"/> and returns its path. When
-    /// <paramref name="siblingPath"/> is an existing directory, the temp dir is
-    /// created inside it; when it is a file path, the temp dir is created
-    /// alongside the file.
+    /// Creates a new, uniquely-named temporary directory under
+    /// <paramref name="parentDirectory"/> and returns it as an
+    /// <see cref="IDisposable"/> handle.
     /// </summary>
-    public string CreateTempDirectory(string siblingPath);
+    public TempDirectory CreateTempDirectory(string parentDirectory);
 
     /// <summary>
     /// Recursively copies all files and subdirectories from

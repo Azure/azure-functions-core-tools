@@ -33,9 +33,9 @@ internal sealed partial class CliUpdater(
 
         // Stage the download on the same volume as the install directory so
         // File.Move never crosses volume boundaries.
-        using TempDirectory tempWorkDir = new(_fileSystem.CreateTempDirectory(installDir), _fileSystem);
+        using TempDirectory tempWorkDir = _fileSystem.CreateTempDirectory(installDir);
         string archivePath = Path.Combine(tempWorkDir.Path, $"func-update.{Release.ArchiveExtension}");
-        using TempDirectory extractDir = new(_fileSystem.CreateTempDirectory(installDir), _fileSystem);
+        using TempDirectory extractDir = _fileSystem.CreateTempDirectory(installDir);
 
         // Tracks files that were successfully swapped so we can roll them back.
         List<(string TargetPath, string BackupPath)> swappedFiles = [];
@@ -213,7 +213,7 @@ internal sealed partial class CliUpdater(
             throw new GracefulException(
                 $"Checksum mismatch for func {release.Version}. " +
                 $"Expected '{release.Sha256Checksum}' but got '{actual}'. " +
-                "The download may be corrupt or tampered with. Try running 'func update' again.",
+                "Try running 'func update' again.",
                 isUserError: true);
         }
 
@@ -225,7 +225,7 @@ internal sealed partial class CliUpdater(
         string expectedVersion = release.Version.ToString();
 
         ProcessOutcome outcome = await _processRunner.RunAsync(
-            new ProcessRunRequest(_environment.ProcessPath!, ["--version"], installDir, TimeSpan.FromSeconds(30)),
+            new ProcessRunRequest(_environment.ProcessPath, ["--version"], installDir, TimeSpan.FromSeconds(30)),
             cancellationToken);
 
         if (outcome.ExitCode is not 0 || !VersionOutputMatches(outcome.StandardOutput, expectedVersion))
@@ -239,7 +239,7 @@ internal sealed partial class CliUpdater(
 
     private string GetBinaryPath()
     {
-        string? processPath = _environment.ProcessPath;
+        string processPath = _environment.ProcessPath;
         if (string.IsNullOrEmpty(processPath))
         {
             throw new GracefulException("Could not determine the current func installation path.", isUserError: true);

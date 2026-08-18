@@ -271,7 +271,10 @@ public sealed class CliUpdaterTests
         var environment = new CliEnvironmentOptions { ProcessPath = _fakeProcessPath };
         IProcessRunner processRunner = Substitute.For<IProcessRunner>();
 
-        fileSystem.CreateTempDirectory(Arg.Any<string>()).Returns(_fakeTempWorkDir, _fakeExtractDir);
+        fileSystem.CreateTempDirectory(Arg.Any<string>())
+            .Returns(
+                new TempDirectory(_fakeTempWorkDir, fileSystem),
+                new TempDirectory(_fakeExtractDir, fileSystem));
 
         var client = new HttpClient(httpHandler, disposeHandler: false)
         {

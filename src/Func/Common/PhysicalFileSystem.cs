@@ -76,28 +76,18 @@ internal sealed class PhysicalFileSystem : IFileSystem
 
     public void CreateDirectory(string path) => Directory.CreateDirectory(path);
 
-    public string CreateTempDirectory()
+    public TempDirectory CreateTempDirectory()
     {
         string path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(path);
-        return path;
+        return new TempDirectory(path, this);
     }
 
-    public string CreateTempDirectory(string siblingPath)
+    public TempDirectory CreateTempDirectory(string parentDirectory)
     {
-        string fullPath = Path.GetFullPath(siblingPath);
-        string parentDir = Directory.Exists(fullPath)
-            ? fullPath
-            : Path.GetDirectoryName(fullPath) ?? string.Empty;
-
-        if (string.IsNullOrEmpty(parentDir))
-        {
-            return CreateTempDirectory();
-        }
-
-        string path = Path.Combine(parentDir, ".func-update-" + Path.GetRandomFileName());
+        string path = Path.Combine(parentDirectory, Path.GetRandomFileName());
         Directory.CreateDirectory(path);
-        return path;
+        return new TempDirectory(path, this);
     }
 
     public void CopyDirectory(string sourcePath, string destinationPath)
