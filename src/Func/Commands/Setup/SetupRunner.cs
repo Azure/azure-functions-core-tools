@@ -32,7 +32,7 @@ internal sealed class SetupRunner(
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var renderer = new SetupRenderer(_interaction, options.OutputMode);
+        SetupRenderer renderer = new(_interaction, options.OutputMode);
         if (options.IncludePrerelease && options.OutputMode != SetupOutputMode.Json)
         {
             _interaction.WriteHint(WorkloadInstallCommand.PrereleasePreviewHint);
