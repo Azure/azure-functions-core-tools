@@ -5,9 +5,11 @@ using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Commands.Setup;
 
@@ -203,8 +205,73 @@ public class SetupStackDiscoveryWiringTests
             .Which.Message.Should().Contain("More than one workload package on this feed claims");
     }
 
-    private void WithDiscoveredStacks(
-        Dictionary<string, string> stacks,
+    [Fact]
+    public async Task PlanBuilder_SecondaryAlias_PlansAgainstThePrimaryName()
+    {
+        // Worker ids are built by concatenation and templates are keyed by the
+        // primary name, so planning "nodejs" verbatim asks for Workers.nodejs
+        // and skips templates entirely.
+        _stackCatalog.GetStacksAsync(Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(new SetupStackSnapshot(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["node"] = "contoso.workloads.node" },
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["node"] = "contoso.workloads.templates.node" },
+                AmbiguousAliases: null,
+                SecondaryAliases: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["nodejs"] = "node" }));
+        SetupDependencyPlanBuilder builder = new(_bundleReader, _stackCatalog);
+
+        SetupDependencyPlan plan = await builder.BuildDependencyPlanAsync(
+            Options(["nodejs"]),
+            FeaturePlan("nodejs"),
+            SetupProfileScope.Unconstrained,
+            CancellationToken.None);
+
+        plan.Failures.Should().BeEmpty();
+        plan.Dependencies.Should().ContainSingle(d => d.Kind == SetupDependencyKind.Stack)
+            .Which.PackageId.Should().Be("contoso.workloads.node");
+        plan.Dependencies.Should().ContainSingle(d => d.Kind == SetupDependencyKind.Templates)
+            .Which.PackageId.Should().Be("contoso.workloads.templates.node");
+        plan.Dependencies.Should().ContainSingle(d => d.Kind == SetupDependencyKind.Worker)
+            .Which.PackageId.Should().EndWith("node");
+    }
+
+    [Fact]
+    public async Task PlanBuilder_SecondaryAlias_IsCheckedAgainstTheProfileByPrimaryName()
+    {
+        // The profile lists canonical runtimes, so an alternate spelling has to
+        // fold before the support check or a legitimate stack reads unsupported.
+        _stackCatalog.GetStacksAsync(Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(new SetupStackSnapshot(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["node"] = "contoso.workloads.node" },
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                AmbiguousAliases: null,
+                SecondaryAliases: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["nodejs"] = "node" }));
+        SetupDependencyPlanBuilder builder = new(_bundleReader, _stackCatalog);
+        SetupProfileScope scope = ProfileSupporting("node");
+
+        SetupDependencyPlan plan = await builder.BuildDependencyPlanAsync(
+            Options(["nodejs"]),
+            FeaturePlan("nodejs"),
+            scope,
+            CancellationToken.None);
+
+        plan.Failures.Should().BeEmpty();
+        plan.Dependencies.Should().Contain(d => d.Kind == SetupDependencyKind.Stack);
+    }
+
+    private static SetupProfileScope ProfileSupporting(params string[] runtimes)
+        => new(new ResolvedProfile(
+            "test",
+            new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"),
+            Sku: null,
+            ProfileStatus.Stable,
+            DeprecationUrl: null,
+            VersionRange.All,
+            new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase),
+            ExtensionBundleVersionRange: null,
+            runtimes,
+            Notes: null));
+
+    private void WithDiscoveredStacks(        Dictionary<string, string> stacks,
         Dictionary<string, string>? templates = null)
     {
         _stackCatalog.GetStacksAsync(Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())

@@ -203,9 +203,32 @@ public class SetupStackCatalogTests
         SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
 
         snapshot.StackNames.Should().Equal(["node"]);
+        snapshot.CanonicalStackName("nodejs").Should().Be("node");
         snapshot.SupportsStack("nodejs").Should().BeTrue("an explicit --features nodejs should still resolve");
         snapshot.StackPackageId("nodejs").Should().Be("azure.functions.cli.workloads.node");
+        snapshot.TemplatesPackageId("nodejs").Should().Be(
+            "azure.functions.cli.workloads.templates.node",
+            "templates are keyed by the primary name, so the alternate has to fold onto it");
         snapshot.TemplatesPackageId("node").Should().Be("azure.functions.cli.workloads.templates.node");
+    }
+
+    [Fact]
+    public async Task GetStacksAsync_SecondaryAliasContested_LeavesItUnresolved()
+    {
+        // A rogue package grabbing the alternate spelling shouldn't fold onto
+        // the real stack, and shouldn't quietly resolve to itself either.
+        SinglePage(
+                Result("azure.functions.cli.workloads.node", ["node", "nodejs"], kind: "workload"),
+                Result("contoso.rogue.nodejs", ["nodejs"], kind: "workload")
+            );
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
+
+        snapshot.IsAmbiguous("nodejs").Should().BeTrue();
+        snapshot.CanonicalStackName("nodejs").Should().Be("nodejs");
+        snapshot.SupportsStack("nodejs").Should().BeFalse();
+        snapshot.StackNames.Should().Equal(["node"], "the primary name is uncontested");
     }
 
     [Fact]

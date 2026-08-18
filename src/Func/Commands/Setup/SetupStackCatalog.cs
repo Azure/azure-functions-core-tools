@@ -24,36 +24,51 @@ internal interface ISetupStackCatalog
 /// <summary>
 /// Stack names to package ids, resolved from <c>kind:</c> and <c>alias:</c> workload tags.
 /// </summary>
-/// <param name="StackPackageIds">Stack name to the package that declares it. Includes secondary aliases.</param>
-/// <param name="TemplatesPackageIds">Stack name to its templates content package.</param>
+/// <param name="StackPackageIds">Primary stack name to the package that declares it.</param>
+/// <param name="TemplatesPackageIds">Primary stack name to its templates content package.</param>
 /// <param name="AmbiguousAliases">
 /// Aliases claimed by more than one package. These are excluded from the maps
 /// above rather than resolved arbitrarily, so a mis-tagged or hostile feed
 /// can't decide which package <c>func setup</c> installs.
 /// </param>
-/// <param name="PrimaryStackNames">
-/// One name per stack package, used for anything a user picks from. A package
-/// may publish several interchangeable aliases; offering all of them would list
-/// the same stack twice and let a secondary name drive worker and templates
-/// lookups that only the primary one resolves. Null falls back to every key.
+/// <param name="SecondaryAliases">
+/// Alternate alias to the primary name for the same package. A package may
+/// publish several interchangeable aliases, but only the first names the stack:
+/// worker ids, templates, and profile runtimes are all keyed off that one, so
+/// every other spelling has to fold into it before anything is planned.
 /// </param>
 internal sealed record SetupStackSnapshot(
     IReadOnlyDictionary<string, string> StackPackageIds,
     IReadOnlyDictionary<string, string> TemplatesPackageIds,
     IReadOnlySet<string>? AmbiguousAliases = null,
-    IReadOnlyList<string>? PrimaryStackNames = null)
+    IReadOnlyDictionary<string, string>? SecondaryAliases = null)
 {
-    public IReadOnlyList<string> StackNames => PrimaryStackNames ?? [.. StackPackageIds.Keys];
+    public IReadOnlyList<string> StackNames => [.. StackPackageIds.Keys];
 
     public bool SupportsStack(string stack) => StackPackageId(stack) is not null;
 
     public bool SupportsTemplates(string stack) => TemplatesPackageId(stack) is not null;
 
+    /// <summary>
+    /// Folds an alternate alias onto the name the rest of setup plans against.
+    /// Returns the input trimmed when it is already primary or unknown.
+    /// </summary>
+    public string CanonicalStackName(string stack)
+    {
+        if (string.IsNullOrWhiteSpace(stack))
+        {
+            return stack;
+        }
+
+        string trimmed = stack.Trim();
+        return SecondaryAliases is { } aliases && aliases.TryGetValue(trimmed, out string? primary) ? primary : trimmed;
+    }
+
     public string? StackPackageId(string stack)
-        => !string.IsNullOrWhiteSpace(stack) && StackPackageIds.TryGetValue(stack.Trim(), out string? id) ? id : null;
+        => !string.IsNullOrWhiteSpace(stack) && StackPackageIds.TryGetValue(CanonicalStackName(stack), out string? id) ? id : null;
 
     public string? TemplatesPackageId(string stack)
-        => !string.IsNullOrWhiteSpace(stack) && TemplatesPackageIds.TryGetValue(stack.Trim(), out string? id) ? id : null;
+        => !string.IsNullOrWhiteSpace(stack) && TemplatesPackageIds.TryGetValue(CanonicalStackName(stack), out string? id) ? id : null;
 
     public bool IsAmbiguous(string alias)
         => AmbiguousAliases is { } ambiguous
@@ -146,27 +161,22 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
             return SetupDependency.BuiltInStackSnapshot;
         }
 
-        Dictionary<string, string> stacks = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> claims = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, string> templates = new(StringComparer.OrdinalIgnoreCase);
         HashSet<string> ambiguous = new(StringComparer.OrdinalIgnoreCase);
-        List<string> primary = [];
 
+        // Every alias competes for ownership, so conflicts have to be settled
+        // before deciding which name is primary. A rogue package claiming
+        // another's alternate spelling is the same attack as claiming its main one.
         foreach (CatalogSearchResult result in results)
         {
             bool isStack = string.Equals(result.Kind, StackKind, StringComparison.OrdinalIgnoreCase);
 
-            for (int i = 0; i < result.Aliases.Count; i++)
+            foreach (string alias in result.Aliases)
             {
-                string alias = result.Aliases[i];
                 if (isStack)
                 {
-                    // Aliases are interchangeable for install, but only the first
-                    // is offered as a stack; the rest stay resolvable so an
-                    // explicit --features nodejs still finds the package.
-                    if (Claim(stacks, ambiguous, alias, result.PackageId) && i == 0)
-                    {
-                        primary.Add(alias);
-                    }
+                    Claim(claims, ambiguous, alias, result.PackageId);
                 }
                 else if (alias.EndsWith(TemplatesAliasSuffix, StringComparison.OrdinalIgnoreCase))
                 {
@@ -179,17 +189,42 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
             }
         }
 
+        Dictionary<string, string> stacks = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> secondary = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (CatalogSearchResult result in results)
+        {
+            if (!string.Equals(result.Kind, StackKind, StringComparison.OrdinalIgnoreCase)
+                || result.Aliases.Count == 0)
+            {
+                continue;
+            }
+
+            string primary = result.Aliases[0];
+            if (ambiguous.Contains(primary) || !OwnedBy(claims, primary, result.PackageId))
+            {
+                continue;
+            }
+
+            stacks[primary] = result.PackageId;
+
+            foreach (string alias in result.Aliases.Skip(1))
+            {
+                if (!ambiguous.Contains(alias) && OwnedBy(claims, alias, result.PackageId))
+                {
+                    secondary[alias] = primary;
+                }
+            }
+        }
+
         foreach (string alias in ambiguous)
         {
-            stacks.Remove(alias);
             templates.Remove(alias);
         }
 
-        primary.RemoveAll(ambiguous.Contains);
-
         if (stacks.Count > 0)
         {
-            return new SetupStackSnapshot(stacks, templates, ambiguous, primary);
+            return new SetupStackSnapshot(stacks, templates, ambiguous, secondary);
         }
 
         // An empty result usually means the query failed silently rather than
@@ -228,4 +263,8 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
         map[alias] = packageId;
         return true;
     }
+
+    private static bool OwnedBy(Dictionary<string, string> claims, string alias, string packageId)
+        => claims.TryGetValue(alias, out string? owner)
+            && string.Equals(owner, packageId, StringComparison.OrdinalIgnoreCase);
 }

@@ -55,8 +55,13 @@ internal sealed class SetupDependencyPlanBuilder(
 
         dependencies.Add(SetupDependency.Host(profileScope.Profile?.HostVersionRange));
 
-        foreach (SetupRuntimeFeature runtimeFeature in featurePlan.RuntimeFeatures)
+        foreach (SetupRuntimeFeature feature in featurePlan.RuntimeFeatures)
         {
+            // A package can publish several interchangeable aliases, but worker
+            // ids, templates, and profile runtimes are all keyed off the primary
+            // one. Fold before planning or an alternate spelling half-installs.
+            SetupRuntimeFeature runtimeFeature = Canonicalize(feature, stacks);
+
             if (profileScope.Profile?.SupportedRuntimes is { } supportedRuntimes
                 && !supportedRuntimes.Any(runtime => string.Equals(runtime, runtimeFeature.ProfileRuntime, StringComparison.OrdinalIgnoreCase)))
             {
@@ -117,6 +122,29 @@ internal sealed class SetupDependencyPlanBuilder(
         }
 
         return new SetupDependencyPlan(dependencies, failures);
+    }
+
+    /// <summary>
+    /// Rewrites an alternate stack alias to the primary name the package
+    /// publishes it under. Leaves the feature alone when it is already primary,
+    /// unknown, or contested, so those keep their existing failure paths.
+    /// </summary>
+    private static SetupRuntimeFeature Canonicalize(SetupRuntimeFeature feature, SetupStackSnapshot stacks)
+    {
+        string canonical = stacks.CanonicalStackName(feature.Name);
+        if (string.Equals(canonical, feature.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return feature;
+        }
+
+        // Runtimes whose profile name is deliberately different from the feature
+        // name (dotnet) never carry a secondary alias, so this only ever moves
+        // the pair that the feature resolver set to the same value.
+        string profileRuntime = string.Equals(feature.ProfileRuntime, feature.Name, StringComparison.OrdinalIgnoreCase)
+            ? canonical
+            : feature.ProfileRuntime;
+
+        return feature with { Name = canonical, ProfileRuntime = profileRuntime };
     }
 
     private static BundleChannel ResolveBundleChannel(HostJsonBundleSection? hostJsonBundle)
