@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Commands.Start.Azurite.Launching;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
 using Azure.Functions.Cli.Commands.Start.Azurite.Processes;
+using Azure.Functions.Cli.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -70,7 +71,6 @@ internal static class AzuriteServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton<IAzuriteHostEnvironment, AzuriteHostEnvironment>();
-        services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<IAzuriteExecutableLocator, AzuriteExecutableLocator>();
         services.TryAddSingleton<IDockerAvailabilityProbe, DockerAvailabilityProbe>();
         services.TryAddSingleton<IPortOwnershipStrategy>(
