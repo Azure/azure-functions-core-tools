@@ -24,9 +24,17 @@ internal interface ISetupStackCatalog
 /// <summary>
 /// Stack names to package ids, resolved from <c>kind:</c> and <c>alias:</c> workload tags.
 /// </summary>
+/// <param name="StackPackageIds">Stack name to the package that declares it.</param>
+/// <param name="TemplatesPackageIds">Stack name to its templates content package.</param>
+/// <param name="AmbiguousAliases">
+/// Aliases claimed by more than one package. These are excluded from the maps
+/// above rather than resolved arbitrarily, so a mis-tagged or hostile feed
+/// can't decide which package <c>func setup</c> installs.
+/// </param>
 internal sealed record SetupStackSnapshot(
     IReadOnlyDictionary<string, string> StackPackageIds,
-    IReadOnlyDictionary<string, string> TemplatesPackageIds)
+    IReadOnlyDictionary<string, string> TemplatesPackageIds,
+    IReadOnlySet<string>? AmbiguousAliases = null)
 {
     public IReadOnlyList<string> StackNames => [.. StackPackageIds.Keys];
 
@@ -39,6 +47,11 @@ internal sealed record SetupStackSnapshot(
 
     public string? TemplatesPackageId(string stack)
         => !string.IsNullOrWhiteSpace(stack) && TemplatesPackageIds.TryGetValue(stack.Trim(), out string? id) ? id : null;
+
+    public bool IsAmbiguous(string alias)
+        => AmbiguousAliases is { } ambiguous
+            && !string.IsNullOrWhiteSpace(alias)
+            && ambiguous.Contains(alias.Trim());
 }
 
 internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISetupStackCatalog
@@ -95,7 +108,11 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
                     cancellationToken);
 
                 results.AddRange(page);
-                if (page.Count < PageSize)
+
+                // Stop on an empty page, not a short one: the catalog filters
+                // hits client-side, so a full raw page can arrive here with only
+                // a handful of workloads and more still to come.
+                if (page.Count == 0)
                 {
                     break;
                 }
@@ -120,6 +137,7 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
 
         Dictionary<string, string> stacks = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, string> templates = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> ambiguous = new(StringComparer.OrdinalIgnoreCase);
 
         foreach (CatalogSearchResult result in results)
         {
@@ -127,23 +145,54 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
             {
                 if (string.Equals(result.Kind, StackKind, StringComparison.OrdinalIgnoreCase))
                 {
-                    stacks.TryAdd(alias, result.PackageId);
+                    Claim(stacks, ambiguous, alias, result.PackageId);
                 }
                 else if (alias.EndsWith(TemplatesAliasSuffix, StringComparison.OrdinalIgnoreCase))
                 {
                     string stackName = alias[..^TemplatesAliasSuffix.Length];
                     if (stackName.Length > 0)
                     {
-                        templates.TryAdd(stackName, result.PackageId);
+                        Claim(templates, ambiguous, stackName, result.PackageId);
                     }
                 }
             }
+        }
+
+        foreach (string alias in ambiguous)
+        {
+            stacks.Remove(alias);
+            templates.Remove(alias);
         }
 
         // An empty result usually means the query failed silently rather than
         // "no stacks exist", so prefer the built-in list over offering nothing.
         return stacks.Count == 0
             ? SetupDependency.BuiltInStackSnapshot
-            : new SetupStackSnapshot(stacks, templates);
+            : new SetupStackSnapshot(stacks, templates, ambiguous);
+    }
+
+    /// <summary>
+    /// Records an alias claim, flagging it as ambiguous when a second package
+    /// claims the same alias with a different id. Mirrors the rejection
+    /// <see cref="WorkloadPackageSource"/> applies to alias installs, rather
+    /// than letting catalog ordering decide.
+    /// </summary>
+    private static void Claim(
+        Dictionary<string, string> map,
+        HashSet<string> ambiguous,
+        string alias,
+        string packageId)
+    {
+        if (map.TryGetValue(alias, out string? existing))
+        {
+            if (!string.Equals(existing, packageId, StringComparison.OrdinalIgnoreCase))
+            {
+                ambiguous.Add(alias);
+            }
+
+            return;
+        }
+
+        map[alias] = packageId;
     }
 }

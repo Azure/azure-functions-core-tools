@@ -181,6 +181,28 @@ public class SetupStackDiscoveryWiringTests
         }
     }
 
+    [Fact]
+    public async Task PlanBuilder_AmbiguousAlias_FailsInsteadOfInstallingAnArbitraryPackage()
+    {
+        _stackCatalog.GetStacksAsync(Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(new SetupStackSnapshot(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "node" }));
+        SetupDependencyPlanBuilder builder = new(_bundleReader, _stackCatalog);
+
+        SetupDependencyPlan plan = await builder.BuildDependencyPlanAsync(
+            Options(["node"]),
+            FeaturePlan("node"),
+            SetupProfileScope.Unconstrained,
+            CancellationToken.None);
+
+        plan.Dependencies.Should().NotContain(d => d.Kind == SetupDependencyKind.Stack);
+        plan.Dependencies.Should().NotContain(d => d.Kind == SetupDependencyKind.Worker);
+        plan.Failures.Should().ContainSingle()
+            .Which.Message.Should().Contain("More than one workload package on this feed claims");
+    }
+
     private void WithDiscoveredStacks(
         Dictionary<string, string> stacks,
         Dictionary<string, string>? templates = null)

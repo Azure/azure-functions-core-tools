@@ -16,13 +16,12 @@ public class SetupStackCatalogTests
     [Fact]
     public async Task GetStacksAsync_DiscoversStacksFromKindWorkloadTag()
     {
-        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
-            .Returns([
+        SinglePage(
                 Result("azure.functions.cli.workloads.node", ["node"], kind: "workload"),
                 Result("azure.functions.cli.workloads.java", ["java"], kind: "workload"),
                 Result("azure.functions.cli.workloads.host", ["host"], kind: "content"),
-                Result("azure.functions.cli.workloads.workers.node", ["node-worker"], kind: "content"),
-            ]);
+                Result("azure.functions.cli.workloads.workers.node", ["node-worker"], kind: "content")
+            );
         SetupStackCatalog stackCatalog = new(_catalog);
 
         SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
@@ -41,11 +40,10 @@ public class SetupStackCatalogTests
         SetupDependency.BuiltInStackSnapshot.SupportsStack("java").Should().BeFalse();
         SetupDependency.BuiltInStackSnapshot.SupportsStack("powershell").Should().BeFalse();
 
-        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
-            .Returns([
+        SinglePage(
                 Result("azure.functions.cli.workloads.java", ["java"], kind: "workload"),
-                Result("azure.functions.cli.workloads.powershell", ["powershell"], kind: "workload"),
-            ]);
+                Result("azure.functions.cli.workloads.powershell", ["powershell"], kind: "workload")
+            );
         SetupStackCatalog stackCatalog = new(_catalog);
 
         SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
@@ -57,11 +55,10 @@ public class SetupStackCatalogTests
     [Fact]
     public async Task GetStacksAsync_MapsTemplatesAliasBackToStackName()
     {
-        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
-            .Returns([
+        SinglePage(
                 Result("azure.functions.cli.workloads.node", ["node"], kind: "workload"),
-                Result("azure.functions.cli.workloads.templates.node", ["node-templates"], kind: "content"),
-            ]);
+                Result("azure.functions.cli.workloads.templates.node", ["node-templates"], kind: "content")
+            );
         SetupStackCatalog stackCatalog = new(_catalog);
 
         SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
@@ -109,31 +106,31 @@ public class SetupStackCatalogTests
     [Fact]
     public async Task GetStacksAsync_CachesPerSourceAndPrereleaseCombination()
     {
-        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
-            .Returns([Result("azure.functions.cli.workloads.node", ["node"], kind: "workload")]);
+        SinglePage(Result("azure.functions.cli.workloads.node", ["node"], kind: "workload"));
         SetupStackCatalog stackCatalog = new(_catalog);
 
         // Same key twice hits the cache; each distinct key discovers again.
+        // One discovery costs two requests: the data page plus the empty page
+        // that ends the walk.
         await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
         await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
         await stackCatalog.GetStacksAsync(source: null, includePrerelease: true, CancellationToken.None);
         await stackCatalog.GetStacksAsync(source: "https://other.test/v3/index.json", includePrerelease: false, CancellationToken.None);
 
-        await _catalog.Received(3).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+        await _catalog.Received(6).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task GetStacksAsync_ForwardsSourceAndPrereleaseToTheQuery()
     {
         const string source = "https://example.test/v3/index.json";
-        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
-            .Returns([Result("azure.functions.cli.workloads.node", ["node"], kind: "workload")]);
+        SinglePage(Result("azure.functions.cli.workloads.node", ["node"], kind: "workload"));
         SetupStackCatalog stackCatalog = new(_catalog);
 
         await stackCatalog.GetStacksAsync(source, includePrerelease: true, CancellationToken.None);
 
         await _catalog.Received(1).SearchAsync(
-            Arg.Is<CatalogSearchQuery>(q => q.Source == source && q.IncludePrerelease == true),
+            Arg.Is<CatalogSearchQuery>(q => q.Skip == 0 && q.Source == source && q.IncludePrerelease == true),
             Arg.Any<CancellationToken>());
     }
 
@@ -152,12 +149,14 @@ public class SetupStackCatalogTests
     }
 
     [Fact]
-    public async Task GetStacksAsync_PagesUntilShortPage()
+    public async Task GetStacksAsync_FullFirstPage_KeepsPagingUntilEmpty()
     {
         // A full first page means there may be more; discovery must not stop at
         // the default page size and silently truncate the stack list.
         CatalogSearchResult[] fullPage = [.. Enumerable.Range(0, 100)
             .Select(i => Result($"azure.functions.cli.workloads.filler{i}", [$"filler{i}"], kind: "content"))];
+        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+            .Returns([]);
         _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
             .Returns(fullPage);
         _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>())
@@ -167,7 +166,74 @@ public class SetupStackCatalogTests
         SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
 
         snapshot.SupportsStack("java").Should().BeTrue();
-        await _catalog.Received(2).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+        await _catalog.Received(3).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetStacksAsync_TwoPackagesClaimSameAlias_ExcludesItAsAmbiguous()
+    {
+        // Catalog ordering must not decide which package a stack alias installs.
+        SinglePage(
+                Result("azure.functions.cli.workloads.node", ["node"], kind: "workload"),
+                Result("contoso.rogue.node", ["node"], kind: "workload"),
+                Result("azure.functions.cli.workloads.python", ["python"], kind: "workload")
+            );
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
+
+        snapshot.IsAmbiguous("node").Should().BeTrue();
+        snapshot.SupportsStack("node").Should().BeFalse();
+        snapshot.StackPackageId("node").Should().BeNull();
+        snapshot.SupportsStack("python").Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetStacksAsync_SameAliasSamePackageIdTwice_IsNotAmbiguous()
+    {
+        // Duplicate rows for one package (e.g. overlapping pages) are benign.
+        SinglePage(
+                Result("azure.functions.cli.workloads.node", ["node"], kind: "workload"),
+                Result("azure.functions.cli.workloads.node", ["node"], kind: "workload")
+            );
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
+
+        snapshot.IsAmbiguous("node").Should().BeFalse();
+        snapshot.StackPackageId("node").Should().Be("azure.functions.cli.workloads.node");
+    }
+
+    [Fact]
+    public async Task GetStacksAsync_ShortPageOfFilteredHits_KeepsPaging()
+    {
+        // page.Count is post-filter, so a feed that ignores packageType can
+        // return a full raw page that arrives here with only a few workloads.
+        // Stopping on a short page would miss stacks on later pages.
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
+            .Returns([Result("azure.functions.cli.workloads.node", ["node"], kind: "workload")]);
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>())
+            .Returns([Result("azure.functions.cli.workloads.java", ["java"], kind: "workload")]);
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip >= 200), Arg.Any<CancellationToken>())
+            .Returns([]);
+        SetupStackCatalog stackCatalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
+
+        snapshot.SupportsStack("node").Should().BeTrue();
+        snapshot.SupportsStack("java").Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Stubs a feed that returns everything on the first page and nothing after,
+    /// which is what a real finite feed looks like to the paging loop.
+    /// </summary>
+    private void SinglePage(params CatalogSearchResult[] results)
+    {
+        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
+            .Returns(results);
     }
 
     private static CatalogSearchResult Result(string packageId, string[] aliases, string kind)

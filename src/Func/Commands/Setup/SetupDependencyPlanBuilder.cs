@@ -69,6 +69,16 @@ internal sealed class SetupDependencyPlanBuilder(
                 continue;
             }
 
+            if (stacks.IsAmbiguous(runtimeFeature.Name))
+            {
+                failures.Add(SetupDependencyResult.Failed(
+                    SetupDependency.Runtime(runtimeFeature.Name),
+                    $"More than one workload package on this feed claims the '{runtimeFeature.Name}' stack. "
+                    + "Install it explicitly with 'func workload install <package-id>', "
+                    + "or point --source at a feed that publishes it once."));
+                continue;
+            }
+
             if (runtimeFeature.InstallWorker)
             {
                 VersionRange? workerRange = null;
