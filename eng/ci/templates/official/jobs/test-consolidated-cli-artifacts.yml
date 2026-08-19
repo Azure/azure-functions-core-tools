@@ -26,6 +26,9 @@ jobs:
       image: 1es-windows-2022
       os: windows
 
+  variables:
+    NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
+
   steps:
   - checkout: self
 
@@ -33,6 +36,8 @@ jobs:
 
   - task: NuGetAuthenticate@1
     displayName: 'Authenticate NuGet'
+
+  - template: /eng/ci/templates/steps/authenticate-e2e-dependencies.yml@self
 
   # For win-x86, we need to install x86 .NET 10 runtime. The install-tools.yml installs x64 versions.
   # The x86 func CLI spawns x86 worker processes that look for .NET in 'C:\Program Files (x86)\dotnet\'.
