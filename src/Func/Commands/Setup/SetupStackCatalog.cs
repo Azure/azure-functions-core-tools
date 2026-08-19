@@ -133,11 +133,11 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
 
                 // Stop on an empty page, not a short one: the catalog filters
                 // hits client-side, so a full raw page can arrive here with only
-                // a handful of workloads and more still to come. A feed that
-                // ignores packageType can still filter a whole page to nothing
-                // and cut discovery short; terminating on server page metadata
-                // needs a wider catalog change, tracked by #5562. The built-in
-                // fallback covers that case in the meantime.
+                // a handful of workloads and more still to come. This still
+                // reads a filtered count, so a feed that both ignores
+                // packageType and reports packageTypes per hit could filter a
+                // whole page away and cut discovery short. The built-in
+                // fallback covers that.
                 if (page.Count == 0)
                 {
                     break;
