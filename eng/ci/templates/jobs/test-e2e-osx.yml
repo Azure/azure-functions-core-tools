@@ -29,22 +29,22 @@ jobs:
         languageWorker: 'Go'
         runtime: 'osx-x64'
 
+  variables:
+    NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
+
   steps:
   - template: /eng/ci/templates/steps/authenticate-e2e-dependencies.yml@self
-
-  - pwsh: ./eng/scripts/start-emulators.ps1
-    displayName: 'Start emulators (NoWait)'
-    env:
-      NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
 
   - script: |
       sudo chown -R $(id -u):$(id -g) ~/.npm
       npm install -g @azure/functions --userconfig "$(Build.SourcesDirectory)/.npmrc"
     displayName: 'Install @azure/functions'
-    env:
-      NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
 
   - template: /eng/ci/templates/steps/install-tools.yml@self
+
+  - script: |
+      npx --yes azurite --silent --inMemoryPersistence </dev/null >/dev/null 2>&1 &
+    displayName: 'Start azurite'
 
   # On macOS, GoTool@0 (in install-tools.yml) is skipped because it only
   # ships an amd64 Go binary, which can't run on Apple Silicon agents.
