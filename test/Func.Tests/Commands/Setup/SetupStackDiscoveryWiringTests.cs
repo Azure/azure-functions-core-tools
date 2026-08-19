@@ -235,6 +235,36 @@ public class SetupStackDiscoveryWiringTests
     }
 
     [Fact]
+    public async Task PlanBuilder_BothSpellingsOfOneStack_PlansItOnce()
+    {
+        // The feature resolver dedupes on the requested spelling, so --features
+        // node,nodejs survives as two entries that fold onto the same runtime.
+        _stackCatalog.GetStacksAsync(Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(new SetupStackSnapshot(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["node"] = "contoso.workloads.node" },
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["node"] = "contoso.workloads.templates.node" },
+                AmbiguousAliases: null,
+                SecondaryAliases: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["nodejs"] = "node" }));
+        SetupDependencyPlanBuilder builder = new(_bundleReader, _stackCatalog);
+        SetupFeaturePlan featurePlan = new(
+            ["node", "nodejs"],
+            [new SetupRuntimeFeature("node", "node", InstallWorker: true), new SetupRuntimeFeature("nodejs", "nodejs", InstallWorker: true)],
+            ["node", "nodejs"],
+            IncludeExtensionBundle: false);
+
+        SetupDependencyPlan plan = await builder.BuildDependencyPlanAsync(
+            Options(["node", "nodejs"]),
+            featurePlan,
+            SetupProfileScope.Unconstrained,
+            CancellationToken.None);
+
+        plan.Failures.Should().BeEmpty();
+        plan.Dependencies.Should().ContainSingle(d => d.Kind == SetupDependencyKind.Stack);
+        plan.Dependencies.Should().ContainSingle(d => d.Kind == SetupDependencyKind.Templates);
+        plan.Dependencies.Should().ContainSingle(d => d.Kind == SetupDependencyKind.Worker);
+    }
+
+    [Fact]
     public async Task PlanBuilder_SecondaryAlias_IsCheckedAgainstTheProfileByPrimaryName()
     {
         // The profile lists canonical runtimes, so an alternate spelling has to

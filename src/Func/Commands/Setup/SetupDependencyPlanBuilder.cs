@@ -55,12 +55,21 @@ internal sealed class SetupDependencyPlanBuilder(
 
         dependencies.Add(SetupDependency.Host(profileScope.Profile?.HostVersionRange));
 
+        HashSet<string> plannedRuntimes = new(StringComparer.OrdinalIgnoreCase);
+
         foreach (SetupRuntimeFeature feature in featurePlan.RuntimeFeatures)
         {
             // A package can publish several interchangeable aliases, but worker
             // ids, templates, and profile runtimes are all keyed off the primary
             // one. Fold before planning or an alternate spelling half-installs.
             SetupRuntimeFeature runtimeFeature = Canonicalize(feature, stacks);
+
+            // The feature resolver dedupes on the requested spelling, so folding
+            // can leave two entries pointing at one runtime.
+            if (!plannedRuntimes.Add(runtimeFeature.Name))
+            {
+                continue;
+            }
 
             if (profileScope.Profile?.SupportedRuntimes is { } supportedRuntimes
                 && !supportedRuntimes.Any(runtime => string.Equals(runtime, runtimeFeature.ProfileRuntime, StringComparison.OrdinalIgnoreCase)))
