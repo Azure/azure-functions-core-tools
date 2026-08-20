@@ -5,13 +5,13 @@ Azure-Samples quickstart repositories are independently released source reposito
 ## What Changes
 
 - Establish `https://dev.azure.com/azfunc/internal/_git/func-templates` as the control-plane repository for Azure-Samples template packaging.
-- Add PR-reviewed onboarding sources under `src/Quickstarts/*.yaml` and a shared JSON Schema at `src/Schema/quickstart.schema.json`.
-- Add `eng/ci/validate-onboarding.yaml` to validate every onboarding file and enforce repository-wide uniqueness.
+- Add PR-reviewed onboarding sources under `src/Quickstarts/*.yaml` plus centrally owned onboarding and synthesis-descriptor schemas under `src/Schema/`.
+- Add `eng/ci/validate-onboarding.yaml` to validate every onboarding file and enforce repository-wide onboarding uniqueness.
 - Add `eng/ci/publish-releases.yaml` to scan onboarded GitHub repositories daily for eligible releases.
 - Require published releases to use `v` followed by SemVer 2.0, support prereleases only through explicit opt-in, and use a required minimum version as the initial backfill boundary.
 - Build packages from the exact commit referenced by each eligible release tag without executing repository-controlled code.
-- Preserve and dry-run a valid authored root `.template.config/template.json` when onboarding omits `template`, or synthesize a project template with one required `.func/config.json` finalization action per declared `template.projects` entry.
-- Exclude `.git`, `.github`, generated build output, credentials, and unsafe links from package content.
+- Preserve and dry-run a valid authored root `.template.config/template.json`, or synthesize a project template from the release-owned `.github/azure-functions-template.yaml` descriptor with one required `.func/config.json` finalization action per declared project.
+- Read the synthesis descriptor before excluding `.git`, `.github`, generated build output, credentials, and unsafe links from package content.
 - Require an MIT or Apache-2.0 license detected from the release commit or declared through a reviewed override.
 - Create NuGet packages under the `Azure.Functions.Templates.` prefix with package type `FuncTemplate`, source repository metadata, commit provenance, and a release-notes link to the GitHub release.
 - Publish validated packages to an Azure Artifacts staging feed, request one approval for the successful packages in the pipeline run, and promote those exact package artifacts to NuGet.org.

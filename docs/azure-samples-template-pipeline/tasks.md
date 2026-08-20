@@ -7,21 +7,21 @@
 
 ## 2. Onboarding Schema and Loading
 
-- [ ] 2.1 Author `src/Schema/quickstart.schema.json` for schema version 1 with strict properties, optional synthesis-only `template`, required non-empty `template.projects` when present, project fields, defaults, formats, package prefix, repository owner, and license allowlist.
+- [ ] 2.1 Author `src/Schema/quickstart.schema.json` for schema version 1 with strict onboarding properties, defaults, formats, package prefix, repository owner, and license allowlist, and reject template metadata or project topology.
 - [ ] 2.2 Implement non-recursive ordinal scanning of `src/Quickstarts/*.yaml` and combine zero-or-more entries from each file into one logical manifest.
 - [ ] 2.3 Implement schema validation with file, entry, property, and source-location diagnostics.
-- [ ] 2.4 Resolve defaults for enablement, prerelease policy, synthesis-only template identity, short name, display name, description, and license.
-- [ ] 2.5 Implement deterministic repository-name title casing and canonical GitHub repository URL construction.
-- [ ] 2.6 Enforce case-insensitive global uniqueness for onboarding ID, repository, package ID, synthesized effective template values, and authored identity and short names resolved during source-aware validation.
-- [ ] 2.7 Add unit tests for authored and synthesized entry shapes, valid project roots, missing or empty projects, malformed YAML, unknown fields, invalid formats, defaults, title casing, and every global collision.
+- [ ] 2.4 Resolve defaults for enablement, prerelease policy, and license.
+- [ ] 2.5 Implement canonical GitHub repository URL construction.
+- [ ] 2.6 Enforce case-insensitive global uniqueness for onboarding ID, repository, and package ID.
+- [ ] 2.7 Add unit tests for minimal entries, rejected template fields, malformed YAML, unknown fields, invalid formats, defaults, and every onboarding collision.
 
 ## 3. Pull Request Validation
 
 - [ ] 3.1 Add a validation command that parses every onboarding source and applies schema and repository-wide rules atomically.
-- [ ] 3.2 Add source-aware validation that acquires each enabled entry's latest eligible published release and resolves authored-versus-synthesized template ownership.
+- [ ] 3.2 Keep onboarding validation independent of source-release availability and repository-owned template definitions.
 - [ ] 3.3 Create `eng/ci/validate-onboarding.yaml` as the required PR pipeline.
-- [ ] 3.4 Load and dry-run every resolved project template, validate configuration actions and effective identities, and fail the complete PR result when any entry is unavailable or invalid.
-- [ ] 3.5 Add pipeline fixtures proving malformed YAML, no eligible validation release, conflicting identities, dual or missing template ownership, and one failed dry-run fail the complete validation result.
+- [ ] 3.4 Validate all onboarding files and central identities atomically without acquiring source repositories.
+- [ ] 3.5 Add pipeline fixtures proving malformed YAML, invalid entries, rejected template fields, and conflicting onboarding identities fail the complete validation result.
 
 ## 4. GitHub Release Discovery
 
@@ -50,15 +50,16 @@
 
 ## 7. Template Configuration
 
-- [ ] 7.1 Detect only the root `.template.config/template.json` as an authored template configuration.
-- [ ] 7.2 Reject onboarding `template` when authored configuration exists, and reject generation when neither authored configuration nor `template.projects` exists.
-- [ ] 7.3 Preserve authored configuration byte-for-byte and validate TemplateEngine loading, dry-run, identity, short names, project type, required configuration finalization actions, resolved primary outputs, and safety policy.
-- [ ] 7.4 Validate each synthesized project root for normalized relative syntax, case-insensitive uniqueness, non-overlap, excluded paths, and a regular direct-child `host.json`.
-- [ ] 7.5 Validate canonical stack and language compatibility for every synthesized project.
-- [ ] 7.6 Synthesize project `template.json` from effective metadata, adding each project `host.json` as a primary output and one mandatory trusted configuration finalization action per project.
-- [ ] 7.7 Omit parameter symbols, replacements, and ordinary post-actions from synthesized configuration; emit a singular language tag only for homogeneous project topology.
-- [ ] 7.8 Validate synthesized configuration through the same TemplateEngine load, dry-run, action, output-path, and safety path as authored configuration.
-- [ ] 7.9 Add tests for valid authored configuration, byte preservation, dual and missing ownership, invalid actions, unsafe authored behavior, root and nested synthesized projects, path attacks, overlapping roots, missing host files, mixed stacks and languages, metadata derivation, and dry-run failures.
+- [ ] 7.1 Detect only root `.template.config/template.json` and `.github/azure-functions-template.yaml` as template sources.
+- [ ] 7.2 Reject releases containing both recognized sources or neither source, without allowing onboarding to select a mode or alternate path.
+- [ ] 7.3 Author the strict centrally owned schema for `.github/azure-functions-template.yaml`, requiring schema version, identity, short name, name, description, and non-empty projects.
+- [ ] 7.4 Preserve authored configuration byte-for-byte and validate TemplateEngine loading, dry-run, identity, short names, project type, required configuration finalization actions, resolved primary outputs, and safety policy.
+- [ ] 7.5 Parse the synthesis descriptor before filtering `.github`, then validate each project root for normalized relative syntax, case-insensitive uniqueness, non-overlap, excluded paths, and a regular direct-child `host.json`.
+- [ ] 7.6 Validate canonical stack and language compatibility for every synthesized project.
+- [ ] 7.7 Synthesize project `template.json` from descriptor metadata, adding each project `host.json` as a primary output and one mandatory trusted configuration finalization action per project.
+- [ ] 7.8 Omit parameter symbols, replacements, and ordinary post-actions from synthesized configuration; emit a singular language tag only for homogeneous project topology.
+- [ ] 7.9 Validate synthesized configuration through the same TemplateEngine load, dry-run, action, output-path, and safety path as authored configuration.
+- [ ] 7.10 Add tests for valid authored configuration, byte preservation, dual and missing ownership, malformed descriptors, invalid actions, unsafe authored behavior, root and nested synthesized projects, path attacks, overlapping roots, missing host files, mixed stacks and languages, descriptor metadata, filtering, and dry-run failures.
 
 ## 8. NuGet Package Construction and Validation
 
@@ -98,7 +99,7 @@
 
 ## 12. Deployment and Documentation
 
-- [ ] 12.1 Document mutually exclusive authored and synthesized onboarding, `template.projects`, derived metadata and actions, release conventions, license policy, and source-aware PR validation diagnostics.
+- [ ] 12.1 Document mutually exclusive authored and synthesized source modes, `.github/azure-functions-template.yaml`, generated actions, release conventions, license policy, and publication diagnostics.
 - [ ] 12.2 Document publication states, the shared approval gate, manual recovery, immutable conflicts, and central operational ownership.
 - [ ] 12.3 Provision GitHub read access, Azure Artifacts staging, NuGet.org prefix ownership and credentials, concurrency controls, approval environment, and notifications with least privilege.
 - [ ] 12.4 Run a no-publication canary against representative authored and synthesized repositories and inspect the resulting packages.

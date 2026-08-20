@@ -6,13 +6,13 @@ Defines how Azure-Samples quickstart releases are onboarded, converted into safe
 
 ### Requirement: The func-templates repository owns the packaging control plane
 
-The system SHALL use the `func-templates` repository in the `internal` project of the `azfunc` Azure DevOps organization as the source of truth for quickstart onboarding and release automation. It SHALL keep onboarding YAML under `src/Quickstarts/`, the onboarding JSON Schema at `src/Schema/quickstart.schema.json`, and pipeline definitions under `eng/ci/`.
+The system SHALL use the `func-templates` repository in the `internal` project of the `azfunc` Azure DevOps organization as the source of truth for quickstart onboarding and release automation. It SHALL keep onboarding YAML under `src/Quickstarts/`, the onboarding JSON Schema at `src/Schema/quickstart.schema.json`, the source synthesis-descriptor JSON Schema at `src/Schema/azure-functions-template.schema.json`, and pipeline definitions under `eng/ci/`.
 
 #### Scenario: Repository layout is validated
 
 - **WHEN** the control-plane repository is validated
 - **THEN** onboarding sources are read from `src/Quickstarts/*.yaml`
-- **AND** the schema is read from `src/Schema/quickstart.schema.json`
+- **AND** the schemas are read from `src/Schema/quickstart.schema.json` and `src/Schema/azure-functions-template.schema.json`
 - **AND** `eng/ci/validate-onboarding.yaml` and `eng/ci/publish-releases.yaml` define the validation and publication pipelines
 
 ### Requirement: Onboarding is PR-reviewed YAML
@@ -50,7 +50,7 @@ Every onboarding file SHALL validate against `src/Schema/quickstart.schema.json`
 
 ### Requirement: Each onboarding entry has stable package and release identity
 
-Each entry SHALL require a stable `id`, an `Azure-Samples/<repository>` slug, a `packageId` beginning with `Azure.Functions.Templates.`, and `release.minimumVersion`. `enabled` SHALL default to `true`, and `release.includePrerelease` SHALL default to `false`. The `template` section SHALL be optional for structurally valid onboarding, but when present it SHALL require a non-empty `projects` array.
+Each entry SHALL require a stable `id`, an `Azure-Samples/<repository>` slug, a `packageId` beginning with `Azure.Functions.Templates.`, and `release.minimumVersion`. `enabled` SHALL default to `true`, and `release.includePrerelease` SHALL default to `false`. Onboarding entries MUST NOT contain template metadata or project topology.
 
 #### Scenario: Minimal entry is accepted
 
@@ -72,52 +72,23 @@ Each entry SHALL require a stable `id`, an `Azure-Samples/<repository>` slug, a 
 - **WHEN** an entry has `enabled: false`
 - **THEN** scheduled release discovery skips that entry without removing previously published packages
 
-#### Scenario: Synthesis section omits projects
+#### Scenario: Onboarding contains template metadata
 
-- **WHEN** an entry contains `template` without a non-empty `projects` array
-- **THEN** schema validation fails
+- **WHEN** an onboarding entry contains a `template` property or project path
+- **THEN** schema validation fails because the release snapshot owns template definition
 
-### Requirement: Effective identities are globally unique
+### Requirement: Onboarding identities are globally unique
 
-The system SHALL enforce case-insensitive uniqueness across all onboarding files for onboarding ID, repository slug, package ID, effective template identity, and every effective template short name. It SHALL resolve synthesized template values from YAML defaults and authored values by loading source template configuration. Moving an unchanged entry between files MUST NOT change its effective values.
+The system SHALL enforce case-insensitive uniqueness across all onboarding files for onboarding ID, repository slug, and package ID. Moving an unchanged entry between files MUST NOT change its effective values.
 
 #### Scenario: Duplicate value exists in another file
 
 - **WHEN** two entries resolve to the same globally unique value ignoring case
 - **THEN** PR validation fails and identifies both entries
 
-#### Scenario: Derived value collides
-
-- **WHEN** an omitted template identity or short name resolves to a value used by another entry
-- **THEN** PR validation fails before publication
-
-#### Scenario: Authored identity collides
-
-- **WHEN** source-aware validation loads an authored template whose identity or short name collides with another onboarded template
-- **THEN** validation fails and identifies both entries
-
-### Requirement: Optional template metadata has deterministic defaults
-
-When `template` is present for synthesis, the system SHALL resolve `template.identity` from the explicit YAML value or the package ID, `template.shortName` from the explicit YAML value or repository name, `template.name` from the explicit YAML value or a deterministic title-casing of the repository name, and `template.description` from the explicit YAML value or the GitHub repository description. Name derivation SHALL split the repository name on hyphen, underscore, and period, uppercase the first character of each token, and join the tokens with spaces. The system SHALL fail synthesis when no non-empty description can be resolved.
-
-#### Scenario: Minimal metadata is derived
-
-- **WHEN** an entry omits optional template metadata
-- **THEN** identity, short name, name, and description are resolved using the documented defaults
-
-#### Scenario: Explicit metadata overrides a default
-
-- **WHEN** an entry supplies an optional template metadata value
-- **THEN** the supplied value is used instead of its derived default
-
-#### Scenario: Repository has no description
-
-- **WHEN** neither YAML nor GitHub provides a non-empty repository description
-- **THEN** package construction fails with guidance to add a YAML description
-
 ### Requirement: PR validation is atomic
 
-`eng/ci/validate-onboarding.yaml` SHALL parse and validate every onboarding file, resolve effective values, and apply repository-wide invariants before accepting a PR. It SHALL perform source-aware TemplateEngine loading and dry-run validation for every enabled onboarding entry against its latest eligible published release. A malformed file, unavailable validation release, invalid entry, invalid template, or dry-run failure SHALL fail the complete validation run.
+`eng/ci/validate-onboarding.yaml` SHALL parse and validate every onboarding file and apply repository-wide onboarding invariants before accepting a PR. A malformed file, invalid entry, or central identity collision SHALL fail the complete validation run. Onboarding validation SHALL NOT require acquiring a source release or validating repository-owned template definitions.
 
 #### Scenario: One file is malformed
 
@@ -126,18 +97,14 @@ When `template` is present for synthesis, the system SHALL resolve `template.ide
 
 #### Scenario: All files and global invariants are valid
 
-- **WHEN** every scanned file passes schema, repository-wide, source-aware, and TemplateEngine dry-run validation
+- **WHEN** every scanned file passes schema and repository-wide onboarding validation
 - **THEN** PR validation succeeds
 
-#### Scenario: Onboarded authored template fails dry-run
-
-- **WHEN** an enabled entry's latest eligible release contains an authored template that cannot complete TemplateEngine dry-run validation
-- **THEN** PR validation fails and identifies the onboarding entry and release
-
-#### Scenario: Entry has no eligible validation release
+#### Scenario: Source repository has no eligible release
 
 - **WHEN** an enabled entry has no published release satisfying its release policy
-- **THEN** PR validation fails because its source template cannot be validated
+- **THEN** onboarding validation can succeed
+- **AND** scheduled discovery finds no release candidate for that entry
 
 ### Requirement: Scheduled discovery scans GitHub releases
 
@@ -206,12 +173,13 @@ The pipeline SHALL resolve the release tag to an exact commit SHA and package th
 
 ### Requirement: Source repositories are treated as untrusted content
 
-The packaging process SHALL NOT execute build scripts, package-manager scripts, repository pipeline definitions, or other code from the source repository. It SHALL stage a content snapshot and SHALL exclude `.git`, `.github`, generated build output, dependency caches, credentials detected by configured scanning, and links that escape the staged root.
+The packaging process SHALL NOT execute build scripts, package-manager scripts, repository pipeline definitions, or other code from the source repository. It MAY parse the fixed `.github/azure-functions-template.yaml` synthesis descriptor before filtering. It SHALL exclude `.git`, `.github`, generated build output, dependency caches, credentials detected by configured scanning, and links that escape the staged root.
 
 #### Scenario: Repository contains workflow definitions
 
 - **WHEN** a release snapshot contains `.github`
-- **THEN** `.github` is absent from the template package
+- **THEN** the pipeline consumes any synthesis descriptor before filtering
+- **AND** `.github` is absent from the template package
 
 #### Scenario: Repository contains an escaping link
 
@@ -226,28 +194,28 @@ The packaging process SHALL NOT execute build scripts, package-manager scripts, 
 
 ### Requirement: Authored and synthesized template ownership is exclusive
 
-For each staged release snapshot, the pipeline SHALL accept exactly one template source. When a root `.template.config/template.json` exists, the onboarding entry MUST omit `template`. When the authored file is absent, the onboarding entry SHALL contain `template.projects`. The pipeline SHALL fail package generation when both sources are present or both sources are absent.
+For each release snapshot, the pipeline SHALL accept exactly one template source: root `.template.config/template.json` or `.github/azure-functions-template.yaml`. The pipeline SHALL fail package generation when both sources are present or both sources are absent. Onboarding MUST NOT select the mode or point to another path.
 
-#### Scenario: Authored configuration and YAML template section are present
+#### Scenario: Authored configuration and synthesis descriptor are present
 
 - **WHEN** the release snapshot contains root `.template.config/template.json`
-- **AND** onboarding contains `template`
+- **AND** the release snapshot contains `.github/azure-functions-template.yaml`
 - **THEN** package generation fails with a redundant template ownership diagnostic
 
 #### Scenario: Neither template source is present
 
 - **WHEN** the release snapshot lacks root `.template.config/template.json`
-- **AND** onboarding omits `template`
+- **AND** the release snapshot lacks `.github/azure-functions-template.yaml`
 - **THEN** package generation fails without creating a template configuration
 
 #### Scenario: Exactly one template source is present
 
-- **WHEN** the release snapshot and onboarding select exactly one template source
+- **WHEN** the release snapshot contains exactly one recognized template source
 - **THEN** package generation continues with that source
 
 ### Requirement: Authored template configuration is preserved and dry-run
 
-When the release snapshot contains root `.template.config/template.json` and onboarding omits `template`, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
+When the release snapshot contains root `.template.config/template.json` and no synthesis descriptor, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
 
 #### Scenario: Valid authored template exists
 
@@ -266,7 +234,12 @@ When the release snapshot contains root `.template.config/template.json` and onb
 
 ### Requirement: Synthesized project declarations are safe and complete
 
-Each `template.projects` entry SHALL require `root`, `stack`, and `language`. `root` SHALL be `.` or a normalized `/`-separated repository-relative path. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots. The declared stack and language SHALL be canonical and compatible. The filtered release snapshot SHALL contain a regular `host.json` directly under each declared root.
+The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion: 1`, reject unknown properties, and require non-empty `identity`, `shortName`, `name`, `description`, and `projects`. Each project SHALL require `root`, `stack`, and `language`. `root` SHALL be `.` or a normalized `/`-separated repository-relative path. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots. The declared stack and language SHALL be canonical and compatible. The filtered release snapshot SHALL contain a regular `host.json` directly under each declared root.
+
+#### Scenario: Descriptor metadata is incomplete
+
+- **WHEN** the synthesis descriptor omits required template metadata or contains an unknown property
+- **THEN** package generation fails and identifies the descriptor property
 
 #### Scenario: Root project is declared
 
@@ -293,14 +266,14 @@ Each `template.projects` entry SHALL require `root`, `stack`, and `language`. `r
 - **WHEN** a declared canonical stack does not recognize the declared canonical language
 - **THEN** validation fails before template synthesis
 
-### Requirement: Missing authored template configuration is synthesized
+### Requirement: Source descriptor is synthesized into template configuration
 
-When the release snapshot does not contain root `.template.config/template.json` and onboarding contains `template.projects`, the pipeline SHALL synthesize template configuration in staging using the effective onboarding metadata. The synthesized template SHALL have project type and SHALL treat the complete filtered release snapshot as template content. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying the declared canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions.
+When the release snapshot contains `.github/azure-functions-template.yaml` and does not contain root `.template.config/template.json`, the pipeline SHALL synthesize template configuration in staging using the descriptor's identity, short name, name, description, and projects. The synthesized template SHALL have project type and SHALL treat the complete filtered release snapshot as template content. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying the declared canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions.
 
 #### Scenario: Repository has no template configuration
 
 - **WHEN** the release snapshot lacks root `.template.config/template.json`
-- **AND** onboarding defines valid `template.projects`
+- **AND** the release snapshot contains a valid `.github/azure-functions-template.yaml`
 - **THEN** the pipeline adds a minimal synthesized project template to staging
 
 #### Scenario: Synthesized template is validated

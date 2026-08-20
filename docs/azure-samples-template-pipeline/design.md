@@ -13,7 +13,8 @@ https://dev.azure.com/azfunc/internal/_git/func-templates
 |   +-- Quickstarts/
 |   |   `-- *.yaml
 |   `-- Schema/
-|       `-- quickstart.schema.json
+|       +-- quickstart.schema.json
+|       `-- azure-functions-template.schema.json
 `-- eng/
     `-- ci/
         +-- validate-onboarding.yaml
@@ -62,34 +63,36 @@ quickstarts:
       minimumVersion: 1.0.0
       includePrerelease: false
 
-    template:
-      identity: Azure.Functions.Templates.PythonOpenAIChat
-      shortName: functions-python-openai-chat
-      name: Azure Functions Python OpenAI Chat
-      description: Create an Azure Functions application using Azure OpenAI.
-      projects:
-        - root: .
-          stack: python
-          language: Python
-
     licenseExpression: MIT
 ```
 
-`schemaVersion`, `quickstarts`, `id`, `repository`, `packageId`, and `release.minimumVersion` are always required. The `template` section is optional at schema validation time because its presence is mutually exclusive with an authored root `.template.config/template.json` in the release snapshot. When `template` is present, `projects` is required and contains at least one Functions project.
+`schemaVersion`, `quickstarts`, `id`, `repository`, `packageId`, and `release.minimumVersion` are always required. Onboarding contains no template metadata or project paths.
 
-Defaults and optional synthesis values are resolved before source-aware validation:
+Onboarding defaults are resolved before validation:
 
 ```text
 enabled                    -> true
 release.includePrerelease  -> false
-template.identity          -> packageId
-template.shortName         -> repository name
-template.name              -> title-cased repository name
-template.description       -> GitHub repository description
 licenseExpression          -> detection from release commit
 ```
 
-Each synthesized project declares:
+The exact release snapshot owns synthesis metadata in `.github/azure-functions-template.yaml`:
+
+```yaml
+schemaVersion: 1
+
+identity: Azure.Functions.Templates.PythonOpenAIChat
+shortName: functions-python-openai-chat
+name: Azure Functions Python OpenAI Chat
+description: Create an Azure Functions application using Azure OpenAI.
+
+projects:
+  - root: .
+    stack: python
+    language: Python
+```
+
+Every field other than `schemaVersion` belongs to the template definition rather than onboarding. The descriptor requires non-empty `identity`, `shortName`, `name`, `description`, and `projects`. Each project declares:
 
 ```text
 root      repository-relative Functions project root
@@ -99,7 +102,7 @@ language  canonical language recognized by that stack
 
 The root project uses `.`. Other roots use normalized `/`-separated relative paths. Roots cannot be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap through ancestor/descendant nesting. The staged release must contain a regular `host.json` directly under every declared root.
 
-The JSON Schema owns structural validation and rejects unknown fields. A repository-wide validator owns cross-file uniqueness, effective-value collisions, GitHub slug restrictions, SemVer validation, package-prefix policy, project path safety, and canonical stack/language pairs.
+The onboarding JSON Schema owns control-plane structure and rejects unknown fields. A separate centrally owned descriptor schema validates `.github/azure-functions-template.yaml`. Repository-wide onboarding validation owns central identity collisions, GitHub slug restrictions, SemVer validation, package-prefix policy, and license policy. Release packaging owns descriptor metadata, project path safety, canonical stack/language pairs, and TemplateEngine validation against the exact tagged content.
 
 Files are scanned non-recursively in ordinal filename order. The order exists only for deterministic diagnostics; it does not establish precedence. Duplicate values are errors rather than last-write-wins behavior.
 
@@ -111,11 +114,11 @@ Files are scanned non-recursively in ordinal filename order. The order exists on
 
 The onboarding `id` is an internal operational key. `packageId` is explicitly reviewed and must use the reserved `Azure.Functions.Templates.` prefix. Neither is derived from mutable GitHub metadata.
 
-Repository, package ID, onboarding ID, effective template identity, and effective short names are unique case-insensitively. Synthesized identities and short names are resolved from YAML defaults. Authored identities and short names are resolved by loading the authored template during source-aware validation. Repository uniqueness intentionally limits one package to one repository in the initial design. A future need for multiple packaging scopes requires an explicit schema revision rather than duplicate entries.
-
-Template identity defaults to package ID, and short name defaults to the configured repository name. The display name transformation is mechanical: split on `-`, `_`, and `.`, capitalize the first character of each token, and join with spaces. YAML overrides preserve brand-specific casing.
+Repository, package ID, and onboarding ID are unique case-insensitively. Repository uniqueness intentionally limits one package to one repository in the initial design. A future need for multiple packaging scopes requires an explicit schema revision rather than duplicate entries.
 
 **Alternative considered:** derive package ID from repository name. Repository renames, normalization collisions, and NuGet namespace ownership would make package identity unstable. It is rejected.
+
+**Alternative considered:** keep synthesized template metadata or project paths in onboarding. That makes repository structure and template presentation depend on a separately versioned control-plane file. It is rejected so the release commit atomically owns its content and synthesis descriptor.
 
 ### The minimum version is the backfill boundary
 
@@ -163,7 +166,7 @@ This design does not use Azure Pipeline artifacts as state because their lifetim
 
 The pipeline acquires the exact release-tag snapshot into an isolated staging directory. Central packaging tooling performs copying, metadata generation, TemplateEngine validation, NuGet packing, and archive inspection. It does not invoke source build instructions or package managers.
 
-The content filter removes:
+Before filtering, the pipeline reads at most the known `.github/azure-functions-template.yaml` descriptor needed to select and validate synthesis mode. The content filter then removes:
 
 - `.git`;
 - `.github`;
@@ -177,25 +180,23 @@ Git submodules and Git LFS are outside the initial design and are not initialize
 
 ### Authored and synthesized template modes are mutually exclusive
 
-The staged release snapshot selects exactly one template source:
+The exact release snapshot selects exactly one template source:
 
 ```text
 root .template.config/template.json exists
-  + onboarding template section absent
   -> preserve and validate authored template
 
-root .template.config/template.json absent
-  + onboarding template.projects present
+root .github/azure-functions-template.yaml exists
   -> synthesize template configuration
 
 both present
   -> fail: redundant and conflicting ownership
 
-both absent
+neither present
   -> fail: no template can be generated
 ```
 
-The root location remains a convention; onboarding does not point to arbitrary template configuration paths. Supporting a list of paths would imply multiple templates per package and ambiguous content roots, which are outside the initial design.
+Both locations are fixed conventions; onboarding does not point to arbitrary template configuration or descriptor paths. Supporting lists of paths would imply multiple templates per package and ambiguous content roots, which are outside the initial design.
 
 A root authored configuration is preserved byte-for-byte. The central validator loads and dry-runs it through Microsoft.TemplateEngine and requires:
 
@@ -206,21 +207,21 @@ A root authored configuration is preserved byte-for-byte. The central validator 
 - no direct `.func/config.json` template content;
 - no behavior rejected by the centrally defined safety policy.
 
-The authored file owns project topology, parameters, conditions, primary outputs, and post-actions. YAML does not duplicate or assert those details. An invalid authored configuration fails packaging and is never rewritten or replaced with synthesis.
+The authored file owns template metadata, project topology, parameters, conditions, primary outputs, and post-actions. The synthesis descriptor MUST NOT coexist with it. An invalid authored configuration fails packaging and is never rewritten or replaced with synthesis.
 
-When the authored file is absent, `template.projects` is the reviewed project topology. For each project, the packager:
+When the authored file is absent, `.github/azure-functions-template.yaml` supplies the complete synthesized template metadata and project topology. For each project, the packager:
 
 1. Requires `<root>/host.json` in the filtered release snapshot.
 2. Adds `<root>/host.json` as a primary output.
 3. Adds one mandatory trusted configuration finalization action referencing that primary output and carrying the declared canonical stack and language.
 
-The generated template uses effective identity, short name, name, and description metadata, sets `tags.type` to `project`, and treats the complete filtered snapshot as content. It defines no parameter symbols, replacements, or ordinary post-actions. It emits a singular language tag only when all declared projects have the same language; mixed-language topology is represented exclusively by the configuration actions.
+The generated template uses the descriptor's identity, short name, name, and description, sets `tags.type` to `project`, and treats the complete filtered snapshot as content. It defines no parameter symbols, replacements, or ordinary post-actions. It emits a singular language tag only when all declared projects have the same language; mixed-language topology is represented exclusively by the configuration actions.
 
-Both modes pass the same TemplateEngine load, dry-run, action, output-path, and package safety validation. `validate-onboarding.yaml` performs source-aware validation across enabled onboarding entries so authored template metadata and dry-run behavior are checked centrally; release generation repeats validation against the exact tagged commit.
+Both modes pass the same TemplateEngine load, dry-run, action, output-path, and package safety validation during release packaging. Onboarding PR validation does not acquire source releases or validate repository-owned template definitions.
 
 **Alternative considered:** inject generated actions into an authored file. This changes source-owned behavior without a source PR and cannot safely reproduce authored conditions or rename behavior. It is rejected.
 
-**Alternative considered:** require `projects` as an assertion for authored templates. That duplicates topology across repositories and the control plane. It is rejected.
+**Alternative considered:** require the synthesis descriptor alongside authored templates as a topology assertion. That duplicates source-owned topology and creates conflicting authorities. It is rejected.
 
 ### License detection is pinned to release content
 
@@ -248,7 +249,7 @@ The central packager generates package metadata:
 | ID | onboarding `packageId` |
 | Version | release tag without `v` |
 | Package type | `FuncTemplate` |
-| Description | effective YAML/GitHub description |
+| Description | effective authored or synthesized template description |
 | License | effective SPDX expression |
 | Project URL | canonical GitHub repository URL |
 | Repository type | `git` |
@@ -291,7 +292,7 @@ Every run reports discovered, staged, promoted, already-complete, skipped, and f
 
 ## Risks / Trade-offs
 
-- **[Mutable GitHub repository descriptions can alter a not-yet-staged rebuild]** -> The first successfully staged package becomes authoritative; teams can pin wording in YAML when stability matters.
+- **[A release contains an invalid synthesis descriptor]** -> Fail that release before staging and report descriptor diagnostics; source-repository pre-release validation can be added later without changing package semantics.
 - **[Moved tags undermine release immutability]** -> Compare the resolved commit with feed metadata and reject conflicts rather than repackaging.
 - **[A malicious repository can contain hostile files]** -> Never execute repository code, isolate staging, scan content, reject escaping links, and inspect the final archive.
 - **[GitHub license detection can be incomplete]** -> Inspect the release license file and allow a reviewed expression override while retaining the file requirement.
