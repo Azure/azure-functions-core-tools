@@ -30,6 +30,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfileDotnet10Isolated => GetValue("Dockerfile.dotnet10Isolated");
 
+        public static Task<string> DockerfileDotnet11Isolated => GetValue("Dockerfile.dotnet11Isolated");
+
         public static Task<string> DockerfileJava8 => GetValue("Dockerfile.java8");
 
         public static Task<string> DockerfileJava11 => GetValue("Dockerfile.java11");
