@@ -930,8 +930,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 var flexSkus = await GetFlexSkus(functionApp, WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime), new AzureHelperService(AccessToken, ManagementURL));
                 if (!flexSkus.Any(s => s.FunctionAppConfigProperties.Runtime.Version == _requiredNetFrameworkVersion))
                 {
-                    var versions = string.Join(", ", flexSkus.Select(s => s.FunctionAppConfigProperties.Runtime.Version));
-                    throw new CliException($"You are deploying .NET Isolated {_requiredNetFrameworkVersion} to Flex consumption. Flex consumpton supports .NET {versions}. Please upgrade your app to an appropriate .NET version and try the deployment again.");
+                    // Allow deployment if the app's runtime config already accepts this version
+                    if (functionApp.FunctionAppConfig?.Runtime?.Version != _requiredNetFrameworkVersion)
+                    {
+                        var versions = string.Join(", ", flexSkus.Select(s => s.FunctionAppConfigProperties.Runtime.Version));
+                        throw new CliException($"You are deploying .NET Isolated {_requiredNetFrameworkVersion} to Flex consumption. Flex consumpton supports .NET {versions}. Please upgrade your app to an appropriate .NET version and try the deployment again.");
+                    }
                 }
             }
 
