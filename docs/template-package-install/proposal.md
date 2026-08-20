@@ -4,13 +4,10 @@ Template packages and func workloads require different lifecycle semantics and o
 
 ## What Changes
 
-- Add `func new install <package>` as the canonical template-package install command.
-- Add `func new --install <package>` as an equivalent convenience form.
+- Add `func new install <package>` as the template-package install command.
 - Add `--source <feed>` to template install commands for an explicit NuGet feed override.
-- Add `func new uninstall <package>` as the canonical template-package uninstall command.
-- Add `func new --uninstall <package>` as an equivalent convenience form.
-- Add `func new update <package>` as the canonical command for updating an installed template package.
-- Add `func new --update <package>` as an equivalent convenience form.
+- Add `func new uninstall <package>` as the template-package uninstall command.
+- Add `func new update <package>` as the command for updating an installed template package.
 - Allow `--source <feed>` on template update commands for an explicit NuGet feed override.
 - Delegate package-expression parsing, acquisition, and source identity to Microsoft.TemplateEngine.
 - Initially support Microsoft.TemplateEngine's folder and NuGet feed install sources.

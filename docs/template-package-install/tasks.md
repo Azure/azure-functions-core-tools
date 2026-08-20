@@ -57,13 +57,13 @@
 
 - [ ] 7.1 Add `NewInstallCommand`, `NewUpdateCommand`, and `NewUninstallCommand` with required package arguments and one-line help descriptions.
 - [ ] 7.2 Register the nested commands as concrete singletons in `BuiltInCommands` and attach them to `NewCommand` without exposing them as top-level commands.
-- [ ] 7.3 Add string-valued `--install`, `--update`, and `--uninstall` convenience options plus `--source` routing on the parent `NewCommand`.
-- [ ] 7.4 Add validators for mutually exclusive lifecycle operations, incompatible execution/list inputs, invalid source combinations, unsupported force combinations, and missing package values.
-- [ ] 7.5 Ensure lifecycle forms bypass template-specific stage-B argument parsing and do not extend `NewCommandArgPreparer`.
+- [ ] 7.3 Add applicable `--source` and `--force` options directly to the nested lifecycle commands.
+- [ ] 7.4 Add validators for invalid source combinations, unsupported force combinations, and missing package values.
+- [ ] 7.5 Ensure lifecycle subcommands bypass template-specific stage-B argument parsing and do not extend `NewCommandArgPreparer`.
 - [ ] 7.6 Add `TemplatePackageCommandRunner` that resolves operation kind and source, creates one lifecycle `Templater`, and calls the matching func-owned method.
 - [ ] 7.7 Add `TemplatePackageCommandRenderer` using `IInteractionService` for installed, replaced, already-installed, updated, no-update, uninstalled, and next-action output.
 - [ ] 7.8 Catch only documented lifecycle domain exceptions at the command boundary and wrap them in `GracefulException` with inner exceptions preserved.
-- [ ] 7.9 Add command tests proving canonical and convenience forms have identical validation, output, exit codes, source behavior, cancellation, and lifecycle results.
+- [ ] 7.9 Add command tests covering subcommand validation, output, exit codes, source behavior, cancellation, and lifecycle results.
 
 ## 8. Reciprocal Workload Guidance
 
@@ -74,7 +74,7 @@
 
 ## 9. Documentation and Verification
 
-- [ ] 9.1 Document canonical and convenience lifecycle commands, source precedence, package ownership, downgrade behavior, and forced cross-source replacement.
+- [ ] 9.1 Document lifecycle subcommands, source precedence, package ownership, downgrade behavior, and forced cross-source replacement.
 - [ ] 9.2 Update template authoring documentation to require `FuncTemplate` for NuGet packages and explain folder validation by template discovery.
 - [ ] 9.3 Run targeted templater, package lifecycle, `func new`, and workload installation tests.
 - [ ] 9.4 Restore, build, and test the complete solution in Release configuration with warnings treated as errors.

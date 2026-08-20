@@ -6,42 +6,32 @@ Defines how users install, update, and uninstall template packages through `func
 
 ### Requirement: func new owns template package installation
 
-The CLI SHALL expose `func new install <package>` as the canonical command for installing a template package. The CLI SHALL also accept `func new --install <package>` as an equivalent convenience form with the same validation, installation behavior, output, and exit code.
+The CLI SHALL expose `func new install <package>` as the command for installing a template package.
 
-#### Scenario: Install through the canonical subcommand
+#### Scenario: Install through the subcommand
 
 - **WHEN** a user runs `func new install <package>`
 - **THEN** the CLI installs the requested template package into the func template store
 
-#### Scenario: Install through the option form
+#### Scenario: Force is accepted by the install subcommand
 
-- **WHEN** a user runs `func new --install <package>`
-- **THEN** the CLI performs the same operation as `func new install <package>`
+- **WHEN** a user appends `--force` to `func new install <package>`
+- **THEN** the CLI applies the forced-replacement policy
 
-#### Scenario: Force is accepted by both forms
+#### Scenario: Source is accepted by the install subcommand
 
-- **WHEN** a user appends `--force` to either template install form
-- **THEN** the CLI applies the same forced-replacement policy for both forms
-
-#### Scenario: Source is accepted by both forms
-
-- **WHEN** a user appends `--source <feed>` to either template install form
+- **WHEN** a user appends `--source <feed>` to `func new install <package>`
 - **THEN** the CLI uses the specified feed for NuGet package resolution
 
 ### Requirement: func new owns template package uninstallation
 
-The CLI SHALL expose `func new uninstall <package>` as the canonical command for uninstalling a template package. The CLI SHALL also accept `func new --uninstall <package>` as an equivalent convenience form with the same validation, uninstall behavior, output, and exit code.
+The CLI SHALL expose `func new uninstall <package>` as the command for uninstalling a template package.
 
-#### Scenario: Uninstall through the canonical subcommand
+#### Scenario: Uninstall through the subcommand
 
 - **WHEN** a user runs `func new uninstall <package>` for an installed template package
 - **THEN** the CLI uninstalls the requested package from the func template store
 - **AND** templates provided by that package are no longer available through `func new`
-
-#### Scenario: Uninstall through the option form
-
-- **WHEN** a user runs `func new --uninstall <package>`
-- **THEN** the CLI performs the same operation as `func new uninstall <package>`
 
 ### Requirement: TemplateEngine owns uninstall request semantics
 
@@ -54,36 +44,31 @@ The CLI SHALL use Microsoft.TemplateEngine's installed-package identity and pack
 
 #### Scenario: Workload packages are unaffected
 
-- **WHEN** a user invokes either template uninstall form
+- **WHEN** a user invokes `func new uninstall <package>`
 - **THEN** packages managed by `func workload` remain unchanged
 
 ### Requirement: func new owns template package updates
 
-The CLI SHALL expose `func new update <package>` as the canonical command for updating one installed template package. The CLI SHALL also accept `func new --update <package>` as an equivalent convenience form with the same validation, update behavior, output, and exit code.
+The CLI SHALL expose `func new update <package>` as the command for updating one installed template package.
 
-#### Scenario: Update through the canonical subcommand
+#### Scenario: Update through the subcommand
 
 - **WHEN** a user runs `func new update <package>`
 - **THEN** the CLI checks the specified installed template package for a newer version and applies an available update
-
-#### Scenario: Update through the option form
-
-- **WHEN** a user runs `func new --update <package>`
-- **THEN** the CLI performs the same operation as `func new update <package>`
 
 #### Scenario: Update targets one package
 
 - **WHEN** a user updates one installed template package
 - **THEN** other installed template packages remain unchanged
 
-#### Scenario: Source is accepted by both update forms
+#### Scenario: Source is accepted by the update subcommand
 
-- **WHEN** a user appends `--source <feed>` to either template update form
+- **WHEN** a user appends `--source <feed>` to `func new update <package>`
 - **THEN** the CLI uses the specified feed to resolve an update for that package
 
 #### Scenario: No updates are available
 
-- **WHEN** a user runs either template update form
+- **WHEN** a user runs `func new update <package>`
 - **AND** the specified template package has no newer available version
 - **THEN** the command succeeds without changing the installed template package
 
@@ -99,7 +84,7 @@ The CLI SHALL use Microsoft.TemplateEngine's installed-package identity, source 
 
 #### Scenario: Workload packages are unaffected by update
 
-- **WHEN** a user invokes either template update form
+- **WHEN** a user invokes `func new update <package>`
 - **THEN** packages managed by `func workload` remain unchanged
 
 ### Requirement: TemplateEngine owns install request semantics

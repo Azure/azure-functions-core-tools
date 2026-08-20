@@ -20,7 +20,7 @@ Microsoft.TemplateEngine 10.0.301 provides a global `IManagedTemplatePackageProv
 
 - Add package lifecycle behavior without creating a second TemplateEngine bootstrap path.
 - Keep TemplateEngine package providers, installers, requests, and results behind `Templater`.
-- Make canonical subcommands and convenience options use one typed orchestration path.
+- Make all lifecycle subcommands use one typed orchestration path.
 - Reuse existing feed configuration and NuGet package inspection infrastructure.
 - Preserve the existing installation exactly when replacement fails.
 - Keep lifecycle operations independent of project, stack, language, and bundle resolution.
@@ -63,7 +63,7 @@ Lifecycle commands create `TemplateEngineContext` with the resolved command dire
 
 **Alternative considered:** add a separate `TemplatePackageService` that bootstraps its own host and settings. This risks a different hive, component set, or cache policy from listing and execution. It is rejected.
 
-### Canonical commands and convenience options share one orchestrator
+### Lifecycle operations are nested subcommands
 
 Three concrete nested commands are added:
 
@@ -75,22 +75,11 @@ NewUninstallCommand  -> func new uninstall <package>
 
 `BuiltInCommands` registers these concrete types as singletons. `NewCommand` receives them and adds them to `Subcommands`, following the existing `WorkloadCommand` registration pattern.
 
-The parent `NewCommand` also adds string-valued `--install`, `--update`, and `--uninstall` options plus the lifecycle `--source` option. Its handler detects a lifecycle option before entering the execution/listing path and creates the same typed request used by the corresponding nested command.
+The nested commands own their applicable `--source` and `--force` options. Command validators reject `--source` where package acquisition is not performed, unsupported force combinations, and missing or whitespace package expressions.
 
-A command validator rejects:
+Lifecycle subcommands delegate to `TemplatePackageCommandRunner`. They are recognized during stage A and bypass the template-specific reparsing described by `template-engine-integration`. `NewCommandArgPreparer` is not extended with lifecycle behavior and will eventually be replaced by that change's strict parsing design.
 
-- more than one lifecycle option;
-- lifecycle options combined with lifecycle subcommands;
-- lifecycle options combined with template execution or listing inputs;
-- `--source` without install or update;
-- `--force` with update or uninstall;
-- a missing or whitespace package expression.
-
-Both forms delegate to `TemplatePackageCommandRunner`; they do not parse and invoke one another through `System.CommandLine`. This preserves one behavior and rendering path without fabricating a second parse result.
-
-Lifecycle subcommands and options are recognized during stage A and bypass the template-specific reparsing described by `template-engine-integration`. `NewCommandArgPreparer` is not extended with lifecycle behavior and will eventually be replaced by that change's strict parsing design.
-
-**Alternative considered:** rewrite convenience options into subcommand tokens before parsing. This couples argv mutation to parser ordering and makes diagnostics harder to attribute. It is rejected.
+**Alternative considered:** add legacy option aliases on the parent command. The aliases overload template execution parsing, complicate diagnostics, and preserve a form that func does not need for compatibility. They are rejected in favor of subcommands only.
 
 ### The command layer owns orchestration and rendering
 
@@ -279,7 +268,7 @@ Cancellation is passed through staging, source resolution, provider operations, 
 2. Extract shared package-type classification while preserving existing workload behavior.
 3. Add func-owned package requests, results, source descriptors, staging, and hive transaction primitives.
 4. Add `Templater` lifecycle methods and focused isolated-hive tests.
-5. Add lifecycle runner, renderer, nested commands, convenience options, validators, and DI registrations.
+5. Add lifecycle runner, renderer, nested commands, validators, and DI registrations.
 6. Add reciprocal wrong-command guidance to workload installation.
 7. Remove direct test and product access to `Templater.PackageManager` after callers migrate to func-owned methods.
 
