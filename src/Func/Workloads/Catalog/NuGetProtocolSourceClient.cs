@@ -148,12 +148,11 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
 
     /// <summary>
     /// Parses the V3 search response and applies a defensive client-side
-    /// filter on each hit's <c>packageTypes</c> array. nuget.org honours
-    /// <c>packageType=</c> only when the query string is non-empty; an
-    /// unfiltered <c>func workload search</c> otherwise leaks arbitrary
-    /// matches like <c>Azure.Functions.Cli.Abstractions</c> (see
-    /// azure-functions-core-tools#5198). Hits that omit <c>packageTypes</c>
-    /// are kept, since some V3 feeds don't surface the field.
+    /// filter on each hit's <c>packageTypes</c> array. The filter is belt and
+    /// braces for feeds that ignore <c>packageType=</c>; nuget.org applies it
+    /// server-side even for an empty query (re-measured 2026-08-19: 21 of 21
+    /// hits were workloads). Hits that omit <c>packageTypes</c> are kept, since
+    /// some V3 feeds don't surface the field.
     /// </summary>
     internal static IReadOnlyList<CatalogSearchResult> ParseV3Hits(JObject response, PackageSource source)
     {
