@@ -36,5 +36,36 @@ namespace Azure.Functions.Cli.Helpers
                 return GetFunctionAppRootDirectory(parent, searchFiles);
             }
         }
+
+        // host.json is no longer strictly required in a Functions project (the runtime synthesizes a
+        // default when it is missing), so publish/pack must be able to locate the project root without
+        // it. Callers that have already resolved the worker runtime use this to build a marker list that
+        // combines the common Functions project files with a runtime-specific project marker. This is
+        // intentionally scoped to publish/pack and is not applied to the default root detection used by
+        // other commands (e.g. func start, func init), whose behavior remains host.json based.
+        public static List<string> GetProjectRootSearchFiles(WorkerRuntime workerRuntime)
+        {
+            var searchFiles = new List<string>
+            {
+                ScriptConstants.HostMetadataFileName,
+                Constants.LocalSettingsJsonFileName,
+                Constants.FuncIgnoreFile,
+            };
+
+            switch (workerRuntime)
+            {
+                case WorkerRuntime.Python:
+                    searchFiles.Add(Constants.PySteinFunctionAppPy);
+                    break;
+                case WorkerRuntime.Node:
+                    searchFiles.Add(Constants.PackageJsonFileName);
+                    break;
+                case WorkerRuntime.Go:
+                    searchFiles.Add(GoHelpers.GoModFileName);
+                    break;
+            }
+
+            return searchFiles;
+        }
     }
 }

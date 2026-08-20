@@ -295,17 +295,22 @@ namespace Azure.Functions.Cli.Helpers
         internal static IEnumerable<string> GetPackFiles(string functionAppRoot)
         {
             functionAppRoot ??= Environment.CurrentDirectory;
-            return new[]
+
+            // host.json is optional; only include it in the allowlist when it exists.
+            var hostJsonPath = Path.Combine(functionAppRoot, Constants.HostJsonFileName);
+            if (FileSystemHelpers.FileExists(hostJsonPath))
             {
-                Path.Combine(functionAppRoot, Constants.HostJsonFileName),
-                Path.Combine(functionAppRoot, GoBinDir, GoBinaryName),
-            };
+                yield return hostJsonPath;
+            }
+
+            yield return Path.Combine(functionAppRoot, GoBinDir, GoBinaryName);
         }
 
         /// <summary>
-        /// Verifies the function app root has the files required to build/publish a Go app
-        /// (<c>host.json</c> and <c>go.mod</c>) by routing through <see cref="PackValidationHelper"/>
-        /// so <c>func pack</c> and <c>func publish</c> share the same validation flow and messages.
+        /// Verifies the function app root has the files required to build/publish a Go app.
+        /// <c>go.mod</c> is required; <c>host.json</c> is optional (a warning is emitted when it
+        /// is absent). Routes through <see cref="PackValidationHelper"/> so <c>func pack</c> and
+        /// <c>func publish</c> share the same validation flow and messages.
         /// Throws <see cref="CliException"/> on failure.
         /// </summary>
         internal static void AssertGoFunctionAppLayout(string functionAppRoot)
