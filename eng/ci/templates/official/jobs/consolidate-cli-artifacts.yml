@@ -53,11 +53,26 @@ jobs:
     displayName: 'Authenticate NuGet'
 
   - task: DotNetCoreCLI@2
+    displayName: "Restore ArtifactAssembler"
+    inputs:
+      command: 'restore'
+      projects: "$(Build.SourcesDirectory)/src/ArtifactAssembler/ArtifactAssembler.csproj"
+      feedsToUse: 'config'
+      nugetConfigPath: '$(Build.SourcesDirectory)/NuGet.Config'
+
+  - task: DotNetCoreCLI@2
+    displayName: "Build ArtifactAssembler"
+    inputs:
+      command: 'build'
+      projects: "$(Build.SourcesDirectory)/src/ArtifactAssembler/ArtifactAssembler.csproj"
+      arguments: '--no-restore -c release'
+
+  - task: DotNetCoreCLI@2
     displayName: "Run ArtifactAssembler"
     inputs:
       command: run
       projects: "$(Build.SourcesDirectory)/src/ArtifactAssembler/ArtifactAssembler.csproj"
-      arguments: '-c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
+      arguments: '--no-build -c release -- "Azure.Functions.Cli.${{ parameters.arch }}"'
       workingDirectory: '$(Pipeline.Workspace)'
     env:
       # Directory names containing the artifacts
