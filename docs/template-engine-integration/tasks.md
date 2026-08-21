@@ -16,8 +16,7 @@
 
 - [ ] 3.1 Centralize constraint evaluation so listing and resolution share one fail-closed representation of eligible, restricted, not-evaluated, and failed constraints.
 - [ ] 3.2 Update `Templater.ListAsync` to return every installed template with current-context eligibility and diagnostics.
-- [ ] 3.3 Update the extension bundle constraint to read exact bundle identity and version from the renamed func host parameters.
-- [ ] 3.4 Add tests for mixed eligible and restricted catalogs, unevaluable constraints, exact context values, and listing templates hidden by host metadata.
+- [ ] 3.3 Add tests for mixed eligible and restricted catalogs, unevaluable constraints, exact context values, and listing templates hidden by host metadata.
 
 ## 4. Template Group Resolution
 
