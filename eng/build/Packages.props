@@ -3,7 +3,7 @@
   <!-- abstractions -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
@@ -17,6 +17,13 @@
     <PackageVersion Include="System.CommandLine" Version="2.0.6" />
     <PackageVersion Include="System.Reflection.MetadataLoadContext" Version="10.0.9" />
     <PackageVersion Include="System.Text.Json" Version="10.0.9" />
+  </ItemGroup>
+
+  <!-- template engine -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.TemplateEngine.Abstractions" Version="10.0.301" />
+    <PackageVersion Include="Microsoft.TemplateEngine.Edge" Version="10.0.301" />
+    <PackageVersion Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" Version="10.0.301" />
   </ItemGroup>
 
   <!-- telemetry -->
