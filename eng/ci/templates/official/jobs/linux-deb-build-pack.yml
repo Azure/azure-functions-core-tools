@@ -58,6 +58,12 @@ jobs:
         # Set version as the build number
         Write-Host "##vso[build.updatebuildnumber]$($metadata.defaultArtifactVersion)"
 
+  - task: PipAuthenticate@1
+    displayName: 'Authenticate pip'
+    inputs:
+      artifactFeeds: 'public/upstream-public'
+      onlyAddExtraIndex: false
+
   - task: Bash@3
     displayName: 'Build DEB package'
     inputs:

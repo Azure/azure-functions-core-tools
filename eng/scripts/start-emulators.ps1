@@ -8,6 +8,7 @@ param(
 )
 
 $DebugPreference = 'Continue'
+$npmConfigPath = Join-Path $PSScriptRoot '..\..\.npmrc'
 
 Write-Host "Skip Storage Emulator: $SkipStorageEmulator"
 
@@ -51,14 +52,14 @@ if (!$SkipStorageEmulator)
     {
         if ($IsWindows -or $assumeWindows)
         {
-            npm install -g azurite
+            npm install -g azurite --userconfig $npmConfigPath
             Start-Process azurite.cmd -ArgumentList "--silent --skipApiVersionCheck"
         }
         else
         {
-            sudo npm install -g azurite
-            sudo mkdir azurite
-            sudo azurite --silent --skipApiVersionCheck --location azurite --debug azurite\debug.log &
+            sudo npm install -g azurite --userconfig $npmConfigPath
+            sudo mkdir -p azurite
+            Start-Process -FilePath "sudo" -ArgumentList "azurite","--silent","--skipApiVersionCheck","--location","azurite","--debug","azurite/debug.log"
         }
 
         $startedStorage = $true
@@ -82,10 +83,18 @@ if ($NoWait -eq $true)
 if (!$SkipStorageEmulator -and $startedStorage -eq $true)
 {
     Write-Host "---Waiting for Storage emulator to be running---"
+    $maxRetries = 24  # 24 * 5s = 2 minutes
+    $retryCount = 0
     $storageEmulatorRunning = IsStorageEmulatorRunning
     while ($storageEmulatorRunning -eq $false)
     {
-        Write-Host "Storage emulator not ready."
+        $retryCount++
+        if ($retryCount -ge $maxRetries)
+        {
+            Write-Error "Storage emulator failed to start within 2 minutes."
+            exit 1
+        }
+        Write-Host "Storage emulator not ready. Attempt $retryCount/$maxRetries"
         Start-Sleep -Seconds 5
         $storageEmulatorRunning = IsStorageEmulatorRunning
     }

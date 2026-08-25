@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Abstractions;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -590,6 +591,61 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             {
                 Environment.SetEnvironmentVariable(envVar, original);
             }
+        }
+
+        [Fact]
+        public void ParseArgs_NoAddressAndNoConfig_DefaultsToLoopback()
+        {
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetHostStartSettings()).Returns(new HostStartSettings());
+
+            var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
+            action.ParseArgs(Array.Empty<string>());
+
+            action.Address.Should().Be("127.0.0.1");
+            action.ResolveBindAddress().Should().Be(IPAddress.Loopback);
+        }
+
+        [Fact]
+        public void ParseArgs_ExplicitAddress_OverridesDefault()
+        {
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetHostStartSettings()).Returns(new HostStartSettings());
+
+            var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
+            action.ParseArgs(["--address", "0.0.0.0"]);
+
+            action.Address.Should().Be("0.0.0.0");
+            action.ResolveBindAddress().Should().Be(IPAddress.Any);
+        }
+
+        [Fact]
+        public void ParseArgs_ConfigAddress_UsedWhenNoFlag()
+        {
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetHostStartSettings())
+                .Returns(new HostStartSettings { LocalHttpAddress = "0.0.0.0" });
+
+            var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>());
+            action.ParseArgs(Array.Empty<string>());
+
+            action.Address.Should().Be("0.0.0.0");
+            action.ResolveBindAddress().Should().Be(IPAddress.Any);
+        }
+
+        [Fact]
+        public void ResolveBindAddress_InvalidAddress_ThrowsCliException()
+        {
+            var secretsManager = new Mock<ISecretsManager>();
+            secretsManager.Setup(s => s.GetHostStartSettings()).Returns(new HostStartSettings());
+
+            var action = new StartHostAction(secretsManager.Object, Mock.Of<IProcessManager>())
+            {
+                Address = "not-an-ip"
+            };
+
+            Action act = () => action.ResolveBindAddress();
+            act.Should().Throw<CliException>().WithMessage("*not-an-ip*");
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using AwesomeAssertions;
@@ -156,6 +156,73 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncNew
 
             // Step 3: Assertions
             result.Should().HaveStdOutContaining("The function \"testfunc\" was created successfully from the \"httptrigger\" template.");
+        }
+
+        [Fact]
+        public async Task FuncNew_JavaScript_DurableOrchestrator_AddsDurableFunctionsDependency()
+        {
+            var testName = nameof(FuncNew_JavaScript_DurableOrchestrator_AddsDurableFunctionsDependency);
+
+            // Initialize a Node.js v4 (default) JavaScript function app
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "--language", "javascript" });
+
+            // Create a Durable Functions orchestrator. Run in offline mode so the assertion
+            // validates the package.json update without requiring a real 'npm install'.
+            var result = new FuncNewCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .WithEnvironmentVariable("FUNCTIONS_CORE_TOOLS_OFFLINE", "true")
+                .Execute([".", "--template", "DurableFunctionsOrchestrator", "--name", "durableHello"]);
+
+            result.Should().ExitWith(0);
+            result.Should().HaveStdOutContaining("The function \"durableHello\" was created successfully");
+            result.Should().HaveStdOutContaining("Added 'durable-functions' to package.json.");
+
+            var packageJson = await File.ReadAllTextAsync(Path.Combine(WorkingDirectory, "package.json"));
+            packageJson.Should().Contain("durable-functions");
+        }
+
+        [Fact]
+        public async Task FuncNew_TypeScript_DurableEntity_AddsDurableFunctionsDependency()
+        {
+            var testName = nameof(FuncNew_TypeScript_DurableEntity_AddsDurableFunctionsDependency);
+
+            // Initialize a Node.js v4 (default) TypeScript function app
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "--language", "typescript" });
+
+            // Create a Durable Functions entity. Run in offline mode so the assertion
+            // validates the package.json update without requiring a real 'npm install'.
+            var result = new FuncNewCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .WithEnvironmentVariable("FUNCTIONS_CORE_TOOLS_OFFLINE", "true")
+                .Execute([".", "--template", "DurableFunctionsEntity", "--name", "counter"]);
+
+            result.Should().ExitWith(0);
+            result.Should().HaveStdOutContaining("The function \"counter\" was created successfully");
+            result.Should().HaveStdOutContaining("Added 'durable-functions' to package.json.");
+
+            var packageJson = await File.ReadAllTextAsync(Path.Combine(WorkingDirectory, "package.json"));
+            packageJson.Should().Contain("durable-functions");
+        }
+
+        [Fact]
+        public async Task FuncNew_JavaScript_HttpTrigger_DoesNotAddDurableFunctionsDependency()
+        {
+            var testName = nameof(FuncNew_JavaScript_HttpTrigger_DoesNotAddDurableFunctionsDependency);
+
+            // Initialize a Node.js v4 (default) JavaScript function app
+            await FuncInitWithRetryAsync(testName, new[] { ".", "--worker-runtime", "node", "--language", "javascript" });
+
+            // A non-durable template must not pull in the durable-functions dependency
+            var result = new FuncNewCommand(FuncPath, testName, Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .WithEnvironmentVariable("FUNCTIONS_CORE_TOOLS_OFFLINE", "true")
+                .Execute([".", "--template", "HttpTrigger", "--name", "myHttp"]);
+
+            result.Should().ExitWith(0);
+            result.Should().NotHaveStdOutContaining("Added 'durable-functions' to package.json.");
+
+            var packageJson = await File.ReadAllTextAsync(Path.Combine(WorkingDirectory, "package.json"));
+            packageJson.Should().NotContain("durable-functions");
         }
     }
 }

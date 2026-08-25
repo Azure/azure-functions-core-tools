@@ -9,6 +9,9 @@ jobs:
   steps:
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
+  - task: NuGetAuthenticate@1
+    displayName: 'Authenticate NuGet'
+
   # Building the solution gets us the latest version of the CLI and sets the Build.BuildNumber
   - task: DotnetCoreCLI@2
     displayName: Build sln
@@ -136,6 +139,9 @@ jobs:
       includePreviewVersions: true
     displayName: Install .NET 10
 
+  - task: NuGetAuthenticate@1
+    displayName: 'Authenticate NuGet'
+
   - task: DotnetCoreCLI@2
     displayName: Dotnet Publish (linux-x64)
     inputs:
@@ -181,6 +187,12 @@ jobs:
       artifact: func-host-linux
       path: $(Build.SourcesDirectory)/func-host-linux
 
+  - task: PipAuthenticate@1
+    displayName: 'Authenticate pip'
+    inputs:
+      artifactFeeds: 'public/upstream-public'
+      onlyAddExtraIndex: false
+
   - task: Bash@3
     inputs:
       targetType: 'inline'  # Specify 'filePath' if you want to use an external script file.
@@ -188,7 +200,7 @@ jobs:
         cd publish-scripts
         python3 -m venv publish-env
         source publish-env/bin/activate
-        sudo pip install -r requirements.txt
+        pip install -r requirements.txt
         sudo apt-get install fakeroot
         export PATH="$PATH:/mnt/vss/_work/_tasks/EsrpCodeSigning_7e3c371a-7f9c-4791-b1ce-742f18ad3a9b/5.1.4/net462"
       bashEnvValue: '~/.profile'  # Set value for BASH_ENV environment variable

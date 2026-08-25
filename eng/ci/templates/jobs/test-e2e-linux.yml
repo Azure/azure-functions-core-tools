@@ -29,21 +29,19 @@ jobs:
         languageWorker: 'Go'
         runtime: 'linux-x64'
 
+  variables:
+    NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
+
   steps:
   - template: /eng/ci/templates/steps/install-tools.yml@self
 
-  # The 1es-ubuntu-24.04-min image doesn't ship npm. NodeTool@0 in install-tools.yml
-  # installs Node into the agent user's tool cache, but start-emulators.ps1 runs
-  # `sudo npm install -g azurite` and sudo's PATH doesn't include the tool cache.
-  # Install npm system-wide via apt so azurite can be installed and launched as root.
-  - bash: |
-      sudo apt-get update
-      sudo apt-get install -y npm
-      npm --version
-    displayName: 'Install npm'
+  - template: /eng/ci/templates/steps/authenticate-e2e-dependencies.yml@self
 
-  - pwsh: ./eng/scripts/start-emulators.ps1
-    displayName: 'Start emulators (NoWait)'
+  - script: |
+      npx --yes azurite --silent --inMemoryPersistence </dev/null >/dev/null 2>&1 &
+    displayName: 'Start azurite'
+
+  - template: /eng/ci/templates/steps/restore-nuget.yml@self
 
   - pwsh: |
       dotnet publish src/Cli/func/Azure.Functions.Cli.csproj `

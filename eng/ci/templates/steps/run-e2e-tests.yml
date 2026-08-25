@@ -64,6 +64,7 @@ steps:
     FUNC_PATH: $(FUNC_PATH)
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     DURABLE_FUNCTION_PATH: $(DURABLE_FUNCTION_PATH)
+    NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
 
 - task: 1ES.PublishPipelineArtifact@1
   condition: succeededOrFailed()

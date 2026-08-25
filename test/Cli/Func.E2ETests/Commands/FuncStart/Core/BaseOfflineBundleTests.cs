@@ -3,7 +3,6 @@
 
 using AwesomeAssertions;
 using Azure.Functions.Cli.E2ETests.Fixtures;
-using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Azure.Functions.Cli.TestFramework.Helpers;
@@ -17,8 +16,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
     /// </summary>
     public static class BaseOfflineBundleTests
     {
-        private const string DefaultBundleId = "Microsoft.Azure.Functions.ExtensionBundle";
-
         /// <summary>
         /// Runs func start with --offline when extension bundles have already been cached
         /// (from the fixture's initialization). The host should start successfully
@@ -44,36 +41,24 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
         }
 
         /// <summary>
-        /// Runs func start with --offline after temporarily moving the cached extension bundles.
+        /// Runs func start with --offline while pointing the bundle download path to an
+        /// empty directory so no cached bundles are found. This avoids moving the shared
+        /// global bundle cache, which causes race conditions with parallel tests that
+        /// also rely on the cache (e.g. tests using FUNCTIONS_CORE_TOOLS_OFFLINE).
         /// The host should fail to start and emit an error indicating that no cached
         /// version is available and bundles must be pre-cached for offline use.
-        /// The cached bundles are restored after the test completes to avoid long re-download times.
         /// </summary>
         public static void RunOfflineWithoutCachedBundlesTest(BaseFunctionAppFixture fixture, string language, string testName)
         {
             int port = ProcessHelper.GetAvailablePort();
 
-            // Temporarily move the cached bundles so they appear absent during the test
-            var defaultBundlePath = ExtensionBundleHelper.GetBundleDownloadPath(DefaultBundleId);
-            var backupPath = defaultBundlePath + "_backup";
-            bool movedCache = false;
-
-            if (Directory.Exists(defaultBundlePath))
-            {
-                try
-                {
-                    Directory.Move(defaultBundlePath, backupPath);
-                    movedCache = true;
-                }
-                catch
-                {
-                    // Best effort; test will still validate behavior
-                }
-            }
+            // Use an isolated empty directory so the process sees no cached bundles,
+            // without disturbing the shared cache used by other parallel tests.
+            var emptyBundlePath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(emptyBundlePath);
 
             try
             {
-                // Start with --offline; bundles should NOT be available
                 var funcStartCommand = new FuncStartCommand(fixture.FuncPath, testName, fixture.Log);
 
                 funcStartCommand.ProcessStartedHandler = async (process) =>
@@ -86,28 +71,20 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncStart.Core
                 var result = funcStartCommand
                     .WithWorkingDirectory(fixture.WorkingDirectory)
                     .WithEnvironmentVariable(Common.Constants.FunctionsWorkerRuntime, language)
+                    .WithEnvironmentVariable(Common.Constants.ExtensionBundleDownloadPath, emptyBundlePath)
                     .Execute(["--offline", "--verbose", "--port", port.ToString()]);
 
                 result.Should().HaveStdErrContaining("Running in offline mode but no cached version of extension bundle");
             }
             finally
             {
-                // Restore the cached bundles so subsequent tests don't need to re-download
-                if (movedCache && Directory.Exists(backupPath))
+                try
                 {
-                    try
-                    {
-                        if (Directory.Exists(defaultBundlePath))
-                        {
-                            Directory.Delete(defaultBundlePath, recursive: true);
-                        }
-
-                        Directory.Move(backupPath, defaultBundlePath);
-                    }
-                    catch
-                    {
-                        // Best effort restore
-                    }
+                    Directory.Delete(emptyBundlePath, recursive: true);
+                }
+                catch
+                {
+                    // Best effort cleanup
                 }
             }
         }
