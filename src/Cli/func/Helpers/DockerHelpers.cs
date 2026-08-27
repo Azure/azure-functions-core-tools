@@ -25,12 +25,38 @@ namespace Azure.Functions.Cli.Helpers
 
         public static Task KillContainer(string containerId, bool ignoreError = false, bool showProgress = true) => RunDockerCommand($"kill {containerId}", containerId, ignoreError, showProgress);
 
-        public static async Task<string> DockerRun(string image, string entryPoint = null, string command = null)
+        public static async Task<string> DockerRun(string image, string entryPoint = null, string command = null, IEnumerable<string> environmentVariables = null)
         {
-            command = command ?? string.Empty;
-            var args = $"run --rm -d -it {(entryPoint != null ? $"--entrypoint {entryPoint}" : string.Empty)} {image} {command}";
+            var args = GetDockerRunArguments(image, entryPoint, command, environmentVariables);
             (var output, _, _) = await RunDockerCommand(args, showProgress: false);
             return output.ToString().Trim();
+        }
+
+        internal static string GetDockerRunArguments(string image, string entryPoint = null, string command = null, IEnumerable<string> environmentVariables = null)
+        {
+            var args = new List<string> { "run", "--rm", "-d", "-it" };
+
+            foreach (string environmentVariable in environmentVariables ?? [])
+            {
+                if (!string.IsNullOrWhiteSpace(environmentVariable))
+                {
+                    args.Add($"--env {environmentVariable}");
+                }
+            }
+
+            if (entryPoint != null)
+            {
+                args.Add($"--entrypoint {entryPoint}");
+            }
+
+            args.Add(image);
+
+            if (command != null)
+            {
+                args.Add(command);
+            }
+
+            return string.Join(" ", args);
         }
 
         internal static async Task<bool> VerifyDockerAccess()

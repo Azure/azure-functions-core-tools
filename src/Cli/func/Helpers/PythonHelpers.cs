@@ -507,7 +507,10 @@ namespace Azure.Functions.Cli.Helpers
             {
                 if (string.IsNullOrEmpty(dockerRunSetting))
                 {
-                    containerId = await DockerHelpers.DockerRun(dockerImage, command: "sleep infinity");
+                    containerId = await DockerHelpers.DockerRun(
+                        dockerImage,
+                        command: "sleep infinity",
+                        environmentVariables: ["PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL"]);
                 }
                 else
                 {
