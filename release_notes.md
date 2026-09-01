@@ -9,3 +9,5 @@
 
 #### Changes
 - Make host.json optional across func publish, and pack
+
+- Fixed Python native dependency builds to inherit authenticated pip indexes in Docker containers (#5574)
