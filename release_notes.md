@@ -8,3 +8,5 @@
   - Host Runtime Version: 4.51.100 (includes 4.851.100, 4.651.100)
 
 #### Changes
+
+- Fixed Python native dependency builds to inherit authenticated pip indexes in Docker containers (#5574)
