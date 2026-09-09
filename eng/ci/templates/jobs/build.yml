@@ -105,7 +105,7 @@ jobs:
           Contents: |
             install.ps1
             install.sh
-          TargetFolder: $(drop_cli)
+          TargetFolder: $(publish_dir)
 
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       - template: ci/sign-files.yml@eng
