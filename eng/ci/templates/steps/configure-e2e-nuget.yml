@@ -1,0 +1,29 @@
+steps:
+- pwsh: |
+    if ($IsWindows) {
+      $userConfigDirectory = Join-Path $env:APPDATA 'NuGet'
+    } else {
+      $userConfigDirectory = Join-Path $HOME '.nuget/NuGet'
+    }
+
+    New-Item -ItemType Directory -Force -Path $userConfigDirectory | Out-Null
+    $userConfigPath = Join-Path $userConfigDirectory 'NuGet.Config'
+    [xml]$nugetConfig = Get-Content '$(Build.SourcesDirectory)/NuGet.Config' -Raw
+
+    # Source mapping is repository-specific and can block restores for generated projects.
+    $packageSourceMapping = $nugetConfig.configuration.packageSourceMapping
+    if ($null -ne $packageSourceMapping) {
+      $nugetConfig.configuration.RemoveChild($packageSourceMapping) | Out-Null
+    }
+
+    if (Test-Path $userConfigPath) {
+      [xml]$existingConfig = Get-Content $userConfigPath -Raw
+      $packageSourceCredentials = $existingConfig.configuration.packageSourceCredentials
+      if ($null -ne $packageSourceCredentials) {
+        $importedCredentials = $nugetConfig.ImportNode($packageSourceCredentials, $true)
+        $nugetConfig.configuration.AppendChild($importedCredentials) | Out-Null
+      }
+    }
+
+    $nugetConfig.Save($userConfigPath)
+  displayName: 'Configure NuGet for temporary E2E projects'

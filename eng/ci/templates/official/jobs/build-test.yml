@@ -73,6 +73,8 @@ jobs:
   - task: NuGetAuthenticate@1
     displayName: 'Authenticate NuGet'
 
+  - template: ../../steps/configure-e2e-nuget.yml
+
   - task: AzureCLI@2
     displayName: Login via Azure CLI to acquire access token
     inputs:
