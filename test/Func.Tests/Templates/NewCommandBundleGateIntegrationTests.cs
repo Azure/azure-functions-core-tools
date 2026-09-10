@@ -89,7 +89,7 @@ public sealed class NewCommandBundleGateIntegrationTests : IDisposable
         }
 
         Snapshot(workingDirectory).Should().BeEquivalentTo(before);
-    if (expectedGateExit == 0)
+        if (expectedGateExit == 0)
         {
             await provider.Received(1).ListTemplatesAsync(Arg.Any<TemplateListContext>(), CancellationToken.None);
         }
