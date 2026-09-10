@@ -63,7 +63,7 @@ public sealed class NewCommandBundleGateIntegrationTests : IDisposable
 
     [Theory]
     [MemberData(nameof(NewCommandBundleValidatorTests.ResolutionOutcomes), MemberType = typeof(NewCommandBundleValidatorTests))]
-    public async Task ExecuteAsync_ResolutionOutcome_GatesTemplateDiscoveryAndWrites(ExtensionBundleResolution resolution, int expectedExit)
+    public async Task ExecuteAsync_ResolutionOutcome_GatesTemplateDiscoveryAndWrites(ExtensionBundleResolution resolution, int expectedGateExit)
     {
         var workingDirectory = CreateFixture("[4.0.0,5.0.0)", "[4.0.0,)");
         var resolver = Substitute.For<IExtensionBundleResolver>();
@@ -75,7 +75,7 @@ public sealed class NewCommandBundleGateIntegrationTests : IDisposable
         var runner = CreateRunner(workingDirectory, resolver, provider);
         var before = Snapshot(workingDirectory);
 
-        if (expectedExit == -1)
+        if (expectedGateExit == -1)
         {
             Func<Task> act = () => runner.ExecuteAsync(Invocation(workingDirectory), CancellationToken.None);
             await act.Should().ThrowAsync<InvalidOperationException>()
@@ -89,7 +89,7 @@ public sealed class NewCommandBundleGateIntegrationTests : IDisposable
         }
 
         Snapshot(workingDirectory).Should().BeEquivalentTo(before);
-        if (expectedExit == 0)
+    if (expectedGateExit == 0)
         {
             await provider.Received(1).ListTemplatesAsync(Arg.Any<TemplateListContext>(), CancellationToken.None);
         }
