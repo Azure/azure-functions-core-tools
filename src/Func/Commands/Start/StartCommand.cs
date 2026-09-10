@@ -204,7 +204,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         mode = OutputModeResolver.ApplyTerminalSafetyFallback(mode, _interaction, out bool downgraded);
         if (downgraded)
         {
-            _interaction.WriteWarning("stdout is not an interactive terminal; falling back to --output=plain.");
+            _interaction.WriteWarning("The console does not support interactive input and ANSI output; falling back to --output=plain.");
         }
 
         HostStartupOptions hostStartupOptions = GetHostStartupOptions(workingDirectory.Info);

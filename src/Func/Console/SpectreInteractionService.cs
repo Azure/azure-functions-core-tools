@@ -30,7 +30,12 @@ internal class SpectreInteractionService : IInteractionService
 
     public ITheme Theme => _theme;
 
-    public bool IsInteractive => AnsiConsole.Profile.Capabilities.Interactive;
+    // Commands combine stdout rendering with stderr selection prompts.
+    public bool IsInteractive => _stdout.Profile.Capabilities.Interactive
+        && _stdout.Profile.Capabilities.Ansi
+        && CanSelect;
+
+    private bool CanSelect => _stderr.Profile.Capabilities.Interactive && _stderr.Profile.Capabilities.Ansi;
 
     public void WriteLine(string text) => _stdout.WriteLine(text);
 
@@ -294,7 +299,8 @@ internal class SpectreInteractionService : IInteractionService
 
     public async Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)
     {
-        if (!IsInteractive)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_stdout.Profile.Capabilities.Interactive)
         {
             return defaultValue;
         }
@@ -305,8 +311,9 @@ internal class SpectreInteractionService : IInteractionService
 
     public async Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var choiceList = choices.ToList();
-        if (!IsInteractive || choiceList.Count == 0)
+        if (!CanSelect || choiceList.Count == 0)
         {
             return choiceList.FirstOrDefault() ?? string.Empty;
         }
@@ -323,8 +330,9 @@ internal class SpectreInteractionService : IInteractionService
 
     public async Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<MultiSelectionChoice> choices, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var choiceList = choices.ToList();
-        if (!IsInteractive || choiceList.Count == 0)
+        if (!CanSelect || choiceList.Count == 0)
         {
             return [];
         }
@@ -344,7 +352,8 @@ internal class SpectreInteractionService : IInteractionService
 
     public async Task<string> PromptForInputAsync(string prompt, string? defaultValue = null, CancellationToken cancellationToken = default)
     {
-        if (!IsInteractive)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_stderr.Profile.Capabilities.Interactive)
         {
             return defaultValue ?? string.Empty;
         }
