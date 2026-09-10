@@ -70,6 +70,8 @@ public sealed class NewCommandBundleGateIntegrationTests : IDisposable
         resolver.ResolveAsync(Arg.Any<ExtensionBundleProjectContext>(), Arg.Any<CancellationToken>()).Returns(resolution);
         var provider = Substitute.For<ITemplateEngineProvider>();
         provider.EngineId.Returns(EngineIds.V2);
+        provider.ListTemplatesAsync(Arg.Any<TemplateListContext>(), Arg.Any<CancellationToken>())
+            .Returns([]);
         var runner = CreateRunner(workingDirectory, resolver, provider);
         var before = Snapshot(workingDirectory);
 
