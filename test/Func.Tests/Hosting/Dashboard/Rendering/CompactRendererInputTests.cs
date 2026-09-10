@@ -17,6 +17,19 @@ public class CompactRendererInputTests
 {
     private static readonly TimeSpan _testTimeout = TimeSpan.FromSeconds(5);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NewConsole_WhenCiEnvironmentIsPresent_PreservesRequestedCapabilities(bool interactive)
+    {
+        using var writer = new StringWriter();
+
+        var console = NewConsole(writer, interactive, new Dictionary<string, string> { ["TF_BUILD"] = "true" });
+
+        console.Profile.Capabilities.Interactive.Should().Be(interactive);
+        console.Profile.Capabilities.Ansi.Should().BeTrue();
+    }
+
     [Fact]
     public async Task OnStartAsync_WhenInjectedConsoleIsNonInteractive_DoesNotReadDefaultInput()
     {
@@ -228,13 +241,16 @@ public class CompactRendererInputTests
         await input.Received(1).ReadKeyAsync(true, Arg.Any<CancellationToken>());
     }
 
-    private static IAnsiConsole NewConsole(StringWriter writer, bool interactive)
+    private static IAnsiConsole NewConsole(StringWriter writer, bool interactive, Dictionary<string, string>? environmentVariables = null)
     {
         var console = AnsiConsole.Create(new AnsiConsoleSettings
         {
             Ansi = AnsiSupport.Yes,
             ColorSystem = ColorSystemSupport.NoColors,
             Interactive = interactive ? InteractionSupport.Yes : InteractionSupport.No,
+            // CI enrichers otherwise override the explicitly requested input capability.
+            Enrichment = new ProfileEnrichment { UseDefaultEnrichers = false },
+            EnvironmentVariables = environmentVariables,
             Out = new AnsiConsoleOutput(writer),
         });
         console.Profile.Width = 120;
