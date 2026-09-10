@@ -27,3 +27,27 @@ steps:
 
     $nugetConfig.Save($userConfigPath)
   displayName: 'Configure NuGet for temporary E2E projects'
+
+- pwsh: |
+    $hive = Join-Path '$(Agent.TempDirectory)' 'functions-template-update-check'
+
+    try {
+      dotnet new install 'Microsoft.Azure.WebJobs.ProjectTemplates::4.0.3038' `
+        --debug:custom-hive $hive `
+        --verbosity quiet
+      if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install the Functions project template from CFS."
+      }
+
+      dotnet new update --check-only `
+        --debug:custom-hive $hive `
+        --diagnostics
+      if ($LASTEXITCODE -ne 0) {
+        throw "Failed to check the Functions project template for updates through CFS."
+      }
+    }
+    finally {
+      Remove-Item $hive -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  displayName: 'Verify template update check through CFS'
+  timeoutInMinutes: 5
