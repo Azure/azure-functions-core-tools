@@ -720,6 +720,8 @@ for the project's resolved bundle version and compares:
 | Resolved bundle version ∈ `minBundleVersion` range | Continue. |
 | Resolved bundle version ∉ range (too old) | Fail with `MinBundleVersionTooOld(installedBundle, requiredRange, templatesWorkloadVersion)`. Exit 1. |
 | `IExtensionBundleResolver` returns `WorkloadMissing` / `EmptyIntersection` (no bundle resolvable at all) | Fail with `MissingExtensionBundle(stack, suggestedBundleId)`. Exit 1. |
+| `IExtensionBundleResolver` returns `NoCompatibleInstall` (including malformed project ranges) | Render the resolution's `Hint` and exit 1 without scaffolding. |
+| Unexpected resolution variant (including the template-engine `NotResolved` placeholder) | Throw `InvalidOperationException` without scaffolding. |
 
 The min-bundle check is fail-fast at the pipeline stage in §6, **before**
 template hydration and **before** scaffolding. Catching the mismatch
