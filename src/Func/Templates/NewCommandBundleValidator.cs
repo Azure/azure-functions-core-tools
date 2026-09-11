@@ -65,6 +65,10 @@ internal sealed class NewCommandBundleValidator(
 
                 return 0;
 
+            case ExtensionBundleResolution.NoCompatibleInstall none:
+                _interaction.WriteError(none.Hint);
+                return 1;
+
             case ExtensionBundleResolution.WorkloadMissing:
             case ExtensionBundleResolution.EmptyIntersection:
                 _interaction.WriteError("The project requires an extension bundle but none is resolvable.");
@@ -77,7 +81,7 @@ internal sealed class NewCommandBundleValidator(
                 return 1;
 
             default:
-                return 0;
+                throw new InvalidOperationException($"Unknown resolution variant: {resolution.GetType().Name}");
         }
     }
 
