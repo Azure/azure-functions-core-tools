@@ -41,6 +41,7 @@ namespace Azure.Functions.Cli.Common
         public const string PythonDockerImageSkipPull = "FUNCTIONS_PYTHON_DOCKER_SKIP_PULL";
         public const string PythonDockerRunCommand = "FUNCTIONS_PYTHON_DOCKER_RUN_COMMAND";
         public const string FunctionsCoreToolsEnvironment = "FUNCTIONS_CORETOOLS_ENVIRONMENT";
+        public const string SkipDotnetNewUpdateCheck = "FUNCTIONS_CORE_TOOLS_SKIP_DOTNET_NEW_UPDATE_CHECK";
         public const string EnablePersistenceChannelDebugSetting = "FUNCTIONS_CORE_TOOLS_ENABLE_PERSISTENCE_CHANNEL_DEBUG_OUTPUT";
         public const string TelemetryOptOutVariable = "FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT";
         public const string TelemetryInstrumentationKey = "00000000-0000-0000-0000-000000000000";
