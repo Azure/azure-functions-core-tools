@@ -49,6 +49,9 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                 Directory.CreateDirectory(workingDirectory);
             }
 
+            string nugetConfigPath = Path.Combine(workingDirectory, "NuGet.Config");
+            File.Copy(Path.Combine(Directory.GetCurrentDirectory(), "NuGet.Config"), nugetConfigPath);
+
             try
             {
                 await InternalRun(workingDirectory, runConfigurations, output, startHost);
@@ -60,6 +63,10 @@ namespace Azure.Functions.Cli.Tests.E2E.Helpers
                     if (cleanupDirectory)
                     {
                         Directory.Delete(workingDirectory, recursive: true);
+                    }
+                    else
+                    {
+                        File.Delete(nugetConfigPath);
                     }
                 }
                 catch { }
