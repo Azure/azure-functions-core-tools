@@ -238,6 +238,7 @@ namespace Build
                 ? Path.Combine(Settings.OutputDir, "win-x86", "func.exe")
                 : Path.Combine(Settings.OutputDir, "linux-x64", "func");
             Environment.SetEnvironmentVariable("FUNC_PATH", funcPath);
+            Environment.SetEnvironmentVariable("FUNCTIONS_CORE_TOOLS_SKIP_DOTNET_NEW_UPDATE_CHECK", "1");
 
             string durableStorageConnectionVar = "DURABLE_STORAGE_CONNECTION";
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(durableStorageConnectionVar)))

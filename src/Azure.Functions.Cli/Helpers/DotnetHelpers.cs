@@ -76,7 +76,10 @@ namespace Azure.Functions.Cli.Helpers
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                     : string.Empty;
-                var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
+                var skipUpdateCheck = EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.SkipDotnetNewUpdateCheck)
+                    ? "--no-update-check"
+                    : string.Empty;
+                var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)} {skipUpdateCheck}");
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {
