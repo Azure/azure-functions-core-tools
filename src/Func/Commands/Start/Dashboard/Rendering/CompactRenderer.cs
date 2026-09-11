@@ -89,7 +89,7 @@ internal sealed class CompactRenderer(
         _console.Cursor.Hide();
         _liveTask = Task.Run(() => RunLiveLoopInTerminalModeAsync(_liveCts.Token));
 
-        if (_interaction.IsInteractive)
+        if (_interaction.IsInteractive && _console.Profile.Capabilities.Interactive)
         {
             _inputTask = Task.Run(() => RunInputLoopAsync(_liveCts.Token), cancellationToken);
         }

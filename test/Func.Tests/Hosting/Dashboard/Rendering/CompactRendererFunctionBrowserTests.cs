@@ -564,6 +564,7 @@ public class CompactRendererFunctionBrowserTests
     public async Task OnStartAsync_WhenMacOSAndAlternateBufferSupported_UsesAlternateScreen()
     {
         (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: true, ansi: true, alternateBuffer: true);
+        await using var rendererLifetime = renderer;
 
         await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
@@ -580,6 +581,7 @@ public class CompactRendererFunctionBrowserTests
     public async Task OnStartAsync_WhenNotMacOS_DoesNotUseAlternateScreen()
     {
         (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: false, ansi: true, alternateBuffer: true);
+        await using var rendererLifetime = renderer;
 
         await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
@@ -593,6 +595,7 @@ public class CompactRendererFunctionBrowserTests
     public async Task OnStartAsync_WhenMacOSWithoutAlternateBuffer_DoesNotUseAlternateScreen()
     {
         (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: true, ansi: true, alternateBuffer: false);
+        await using var rendererLifetime = renderer;
 
         await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
@@ -621,7 +624,11 @@ public class CompactRendererFunctionBrowserTests
         console.Profile.Capabilities.Ansi = ansi;
         console.Profile.Capabilities.AlternateBuffer = alternateBuffer;
 
-        IInteractionService interaction = new SpectreInteractionService(new DefaultTheme(), console, console);
+        var interaction = Substitute.For<IInteractionService>();
+        interaction.Theme.Returns(new DefaultTheme());
+        interaction.IsInteractive.Returns(false);
+        interaction.When(service => service.WriteLine(Arg.Any<string>())).Do(call => console.WriteLine(call.Arg<string>()));
+        interaction.When(service => service.WriteBlankLine()).Do(_ => console.WriteLine());
         IPlatform platform = Substitute.For<IPlatform>();
         platform.IsMacOS.Returns(isMacOS);
         CompactDashboardShortcutLabels shortcutLabels = new(platform);
