@@ -21,6 +21,7 @@ echo '"functionsJson": {'
 if [ -f "functions.metadata" ]; then
     awk '
     BEGIN { in_obj=0; name=""; obj=""; first=1 }
+    { sub(/\r$/, "") }
     !in_obj && /^  \{$/ { in_obj=1; obj=$0"\n"; next }
     in_obj && /^  \}[,]?$/ {
         obj=obj"  }"
