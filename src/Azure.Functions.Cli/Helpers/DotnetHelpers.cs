@@ -76,7 +76,8 @@ namespace Azure.Functions.Cli.Helpers
                 var connectionString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\""
                     : string.Empty;
-                var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)}");
+                var skipUpdateCheck = GetSkipUpdateCheckArgument();
+                var exe = new Executable("dotnet", $"new func {frameworkString} --AzureFunctionsVersion v4 --name {Name} {connectionString} {(force ? "--force" : string.Empty)} {skipUpdateCheck}");
                 var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                 if (exitCode != 0)
                 {
@@ -92,7 +93,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 // In .NET 6.0, the 'dotnet new' command requires the short name.
                 string templateShortName = GetTemplateShortName(templateName);
-                string exeCommandArguments = $"new {templateShortName} --name {functionName} --namespace {namespaceStr} --language {language}";
+                string exeCommandArguments = $"new {templateShortName} --name {functionName} --namespace {namespaceStr} --language {language} {GetSkipUpdateCheckArgument()}";
                 if (httpAuthorizationLevel != null)
                 {
                     if (templateName.Equals(Constants.HttpTriggerTemplateName, StringComparison.OrdinalIgnoreCase))
@@ -147,6 +148,11 @@ namespace Azure.Functions.Cli.Helpers
             "daprtopictrigger" => "daprTopicTrigger",
             _ => throw new ArgumentException($"Unknown template '{templateName}'", nameof(templateName))
         };
+
+        private static string GetSkipUpdateCheckArgument() =>
+            EnvironmentHelper.GetEnvironmentVariableAsBool(Constants.SkipDotnetNewUpdateCheck)
+                ? "--no-update-check"
+                : string.Empty;
 
         internal static IEnumerable<string> GetTemplates(WorkerRuntime workerRuntime)
         {
