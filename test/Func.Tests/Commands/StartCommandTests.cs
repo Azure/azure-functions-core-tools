@@ -204,8 +204,10 @@ public class StartCommandTests : IDisposable
         ex.Message.Should().Contain("bogus");
     }
 
-    [Fact]
-    public async Task StartCommand_RunsInitializationBeforeDashboardPipeline()
+    [Theory]
+    [InlineData("plain")]
+    [InlineData("compact")]
+    public async Task StartCommand_RunsInitializationBeforeDashboardPipeline(string outputMode)
     {
         var source = new InMemoryHostEventStream();
         source.Complete();
@@ -222,7 +224,7 @@ public class StartCommandTests : IDisposable
             services.AddSingleton(_initializationRunner);
         });
         var root = Parser.CreateCommand(services);
-        string commandLine = $"start \"{_tempDir}\" --output=plain --profile flex --host-version 4.900.0 --offline "
+        string commandLine = $"start \"{_tempDir}\" --output={outputMode} --profile flex --host-version 4.900.0 --offline "
             + "--no-build --enable-auth --port 9090 --functions HttpTrigger "
             + "--cors http://localhost,http://example --cors-credentials";
         var result = root.Parse(commandLine);
@@ -230,6 +232,10 @@ public class StartCommandTests : IDisposable
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
         exitCode.Should().Be(0);
+        string[] expectedWarnings = outputMode == "compact"
+            ? ["WARNING: Interactive input or ANSI output is unavailable; falling back to --output=plain."]
+            : [];
+        _interaction.Lines.Where(line => line.StartsWith("WARNING:", StringComparison.Ordinal)).Should().Equal(expectedWarnings);
         await _initializationRunner.Received(1).RunAsync(
             Arg.Is<StartInitializationContext>(context =>
                 context.Options.WorkingDirectory.Info.FullName == new DirectoryInfo(_tempDir).FullName

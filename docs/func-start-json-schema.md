@@ -296,7 +296,7 @@ actionable `recommendation` when one applies.
   "timestamp": "2026-05-11T07:20:14.000Z",
   "code": "renderer_downgrade",
   "level": "warning",
-  "message": "stdout is not an interactive terminal; falling back to --output=plain.",
+  "message": "Interactive input or ANSI output is unavailable; falling back to --output=plain.",
   "recommendation": "Re-run with --output=plain to silence this notice, or with --output=json for programmatic use."
 }
 ```
