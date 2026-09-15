@@ -104,9 +104,8 @@ public sealed class NuGetProtocolSourceClientTests
     [Fact]
     public void ParseV3Hits_FiltersHitsLackingFuncCliWorkloadPackageType()
     {
-        // nuget.org ignores `packageType=` when q is empty, so an unfiltered
-        // `func workload search` leaks arbitrary packages (issue #5198).
-        // Defensive filter keeps hits that omit packageTypes (some feeds
+        // Guards against feeds that ignore `packageType=` and hand back
+        // arbitrary packages. Keeps hits that omit packageTypes (some feeds
         // don't include the field) but drops hits that declare other types.
         var response = JObject.Parse("""
             {
