@@ -57,5 +57,8 @@ namespace Azure.Functions.Cli.Kubernetes.Models.Kubernetes
     {
         [JsonProperty("ip")]
         public string Ip { get; set; }
+
+        [JsonProperty("hostname")]
+        public string Hostname { get; set; }
     }
 }
