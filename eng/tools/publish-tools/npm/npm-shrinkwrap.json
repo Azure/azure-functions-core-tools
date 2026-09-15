@@ -91,8 +91,8 @@
     },
     "node_modules/chalk": {
       "version": "6.0.0",
-      "resolved": "https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/npm/registry/chalk/-/chalk-6.0.0.tgz",
-      "integrity": "sha1-o7roQ7yEVPQe9m7z/VhNzzTdgF0=",
+      "resolved": "https://registry.npmjs.org/chalk/-/chalk-6.0.0.tgz",
+      "integrity": "sha512-2uNTXIuTTxk7ciZgAU1BQcgnchcG0xXnrs6jzkQfj9SsRa9M2s5zE8WT96hS6KmG4MzWHSrvH43DF1m4XRkrFg==",
       "license": "MIT",
       "engines": {
         "node": ">=22"
