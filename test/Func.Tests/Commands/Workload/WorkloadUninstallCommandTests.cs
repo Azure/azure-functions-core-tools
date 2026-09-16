@@ -244,6 +244,48 @@ public class WorkloadUninstallCommandTests
         await _installer.Received(1).UninstallAsync("First.Workload", "1.0.0", Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Uninstall_LogicalPackageId_RemovesOnlyLogicalOwnership()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload.win-x64",
+                PackageVersion = "1.0.0",
+                RuntimeIdentifier = "win-x64",
+                IsImplicitlyInstalled = false,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "Test.Workload",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["test"],
+                },
+                InstallRefCount = 2,
+            },
+        ]);
+        _installer.UninstallAsync(
+                "Test.Workload",
+                "1.0.0",
+                WorkloadOwnershipKind.Logical,
+                Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var cmd = NewCommand();
+        int exit = await InvokeAsync(cmd, "Test.Workload", "--exact");
+
+        exit.Should().Be(0);
+        await _installer.Received(1).UninstallAsync(
+            "Test.Workload",
+            "1.0.0",
+            WorkloadOwnershipKind.Logical,
+            Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().UninstallAsync(
+            "Test.Workload.win-x64",
+            "1.0.0",
+            Arg.Any<CancellationToken>());
+    }
+
     private WorkloadUninstallCommand NewCommand() => new(_interaction, _installer, _store);
 
     private void StubInstalled(params (string PackageId, string Version)[] entries)

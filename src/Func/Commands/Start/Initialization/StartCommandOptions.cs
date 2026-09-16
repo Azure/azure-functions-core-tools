@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -27,4 +28,13 @@ internal sealed record StartCommandOptions(
     int DemoFunctionCount,
     double DemoSpeedMultiplier,
     bool DemoAutoExit,
-    bool NoAzurite = false);
+    bool NoAzurite = false,
+    IReadOnlyDictionary<string, StartHostConfiguration>? StackHostConfigurations = null)
+{
+    /// <summary>
+    /// Host run adjustments contributed per stack by installed workloads, keyed by stack id.
+    /// The entry matching the resolved project's stack is applied during host startup.
+    /// </summary>
+    public IReadOnlyDictionary<string, StartHostConfiguration> StackHostConfigurations { get; init; }
+        = StackHostConfigurations ?? new Dictionary<string, StartHostConfiguration>(StringComparer.OrdinalIgnoreCase);
+}

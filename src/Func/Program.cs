@@ -5,6 +5,7 @@ using System.CommandLine;
 using System.Diagnostics;
 using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Start;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
@@ -78,6 +79,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         aliasNudge = host.Services.GetRequiredService<FuncAliasNudge>();
 
         rootCommand = Parser.CreateCommand(host.Services);
+        string[] normalizedArgs = LegacyStartArgumentNormalizer.Normalize(args);
 
         // Pre-parse hydration for `func new -t <id>`: the user can pass
         // per-template options (e.g. --auth-level) that NewCommand learns
@@ -85,11 +87,11 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         // Attach them to NewCommand BEFORE the parser sees argv so SCL
         // treats them as known options instead of erroring out via
         // PathArgument's unrecognized-token guard.
-        NewCommandArgPreparer.PrepareIfFuncNew(args, host.Services, rootCommand);
+        NewCommandArgPreparer.PrepareIfFuncNew(normalizedArgs, host.Services, rootCommand);
 
         // Disable POSIX bundling so single-dash typos like `-name` surface as unrecognized options.
         var parserConfiguration = new ParserConfiguration { EnablePosixBundling = false };
-        commandParseResult = rootCommand.Parse(args, parserConfiguration);
+        commandParseResult = rootCommand.Parse(normalizedArgs, parserConfiguration);
         commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
         activity?.SetCommandName(commandName);
 

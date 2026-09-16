@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Start.Initialization;
+using Azure.Functions.Cli.Commands.Start;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
@@ -45,6 +46,68 @@ public class StartCommandTests : IDisposable
     }
 
     [Fact]
+    public void StartCommand_RegistersContributedStackOptions()
+    {
+        var cmd = new StartCommand(
+            _interaction, _palette, _cliVersionProvider,
+            _initializationRunner,
+            Substitute.For<IOptionsMonitor<HostStartupOptions>>(),
+            _shortcutLabels,
+            _platform,
+            startOptionContributors: [new FakeStartHostOptionContributor()]);
+
+        cmd.Options.Select(o => o.Name).Should().Contain("--fake-stack-option");
+    }
+
+    [Fact]
+    public void StartOptionRegistry_ThrowsWhenContributorCollidesWithBuiltInOption()
+    {
+        var command = new RootCommand();
+        var builtIn = new Option<int>("--port");
+        command.Options.Add(builtIn);
+
+        var registry = new StartOptionRegistry(command);
+        registry.SetActiveStack("bad-workload");
+
+        // Same name but different type triggers a collision error.
+        Action act = () => registry.GetOrAdd(new Option<string>("--port"));
+
+        act.Should().Throw<InvalidOperationException>()
+            .And.Message.Should().Contain("bad-workload");
+    }
+
+    [Fact]
+    public void StartOptionRegistry_ReturnsBuiltInWhenContributorRegistersMatchingType()
+    {
+        var command = new RootCommand();
+        var builtIn = new Option<int>("--port");
+        command.Options.Add(builtIn);
+
+        var registry = new StartOptionRegistry(command);
+        registry.SetActiveStack("workload");
+
+        // Same name and same type de-dupes to the existing built-in instance.
+        Option<int> result = registry.GetOrAdd(new Option<int>("--port"));
+
+        result.Should().BeSameAs(builtIn);
+    }
+
+    private sealed class FakeStartHostOptionContributor : IStartHostOptionContributor
+    {
+        public string Stack => "fake";
+
+        public Option<bool> Option { get; } = new("--fake-stack-option");
+
+        public IReadOnlyList<Option> GetStartOptions(StartOptionRegistry registry)
+        {
+            registry.GetOrAdd(Option);
+            return [Option];
+        }
+
+        public StartHostConfiguration Configure(ParseResult parseResult) => StartHostConfiguration.Empty;
+    }
+
+    [Fact]
     public void StartCommand_HasExpectedOptions()
     {
         var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider,
@@ -68,6 +131,28 @@ public class StartCommandTests : IDisposable
         optionNames.Should().Contain("--no-tui");
         optionNames.Should().Contain("--log-file");
         optionNames.Should().Contain("--demo");
+        optionNames.Should().Contain("--pause-on-error");
+    }
+
+    [Fact]
+    public void LegacyHostStartArguments_NormalizeToStartCommand()
+    {
+        string[] args = ["host", "start", "--pause-on-error", "--port", "7072"];
+
+        string[] normalized = LegacyStartArgumentNormalizer.Normalize(args);
+
+        normalized.Should().Equal("start", "--pause-on-error", "--port", "7072");
+    }
+
+    [Fact]
+    public void LegacyHostStartArguments_NormalizedCommandParsesWithoutErrors()
+    {
+        var root = TestParser.CreateRoot(_interaction);
+        string[] args = LegacyStartArgumentNormalizer.Normalize(["host", "start", "--pause-on-error", "--port", "7072"]);
+
+        ParseResult result = root.Parse(args);
+
+        result.Errors.Should().BeEmpty();
     }
 
     [Fact]

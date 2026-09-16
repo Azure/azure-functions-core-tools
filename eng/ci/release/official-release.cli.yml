@@ -56,3 +56,11 @@ extends:
       - template: /eng/ci/templates/jobs/stage-cli-artifacts.yml@self
         parameters:
           sign: true
+
+    - stage: PublishCdn
+      displayName: Publish CLI to CDN
+      dependsOn: Release
+      jobs:
+      - template: /ci/release-cdn-artifacts.yml@eng
+        parameters:
+          version: $(Build.BuildNumber)

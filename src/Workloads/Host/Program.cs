@@ -14,6 +14,7 @@ internal static class Program
     public static async Task<int> Main(string[] args)
     {
         SetHostEnvironmentVariables();
+        ApplyDeferredWorkerEnvironment();
 
         if (OperatingSystem.IsWindows())
         {
@@ -65,6 +66,44 @@ internal static class Program
     {
         Environment.SetEnvironmentVariable("AzureFunctionsJobHost__Logging__Console__IsEnabled", "false");
         Environment.SetEnvironmentVariable("FUNCTIONS_CORETOOLS_ENVIRONMENT", "true");
+    }
+
+    // Contract with the CLI (see StartHostConfiguration.DeferredWorkerEnvironmentPrefix). Some worker
+    // environment variables (e.g. DOTNET_STARTUP_HOOKS) are evaluated by the host's own runtime
+    // before Main runs and would crash it trying to load worker-only assets. The CLI can't set
+    // those on this host process, so it prefixes each one with this marker; we strip the marker
+    // and re-emit the real variable here, post-boot, so only worker child processes inherit it.
+    // Prefixing the target name keeps the host generic: it never learns which variables these are.
+    internal const string DeferredWorkerEnvironmentPrefix = "FUNCTIONS_CORETOOLS_DEFER_ENV__";
+
+    private static void ApplyDeferredWorkerEnvironment()
+    {
+        foreach ((string name, string value) in ReadDeferredWorkerEnvironment(Environment.GetEnvironmentVariables()))
+        {
+            Environment.SetEnvironmentVariable(name, value);
+        }
+    }
+
+    /// <summary>
+    /// Extracts the deferred worker environment variables from a set of environment variables,
+    /// yielding each target name (prefix stripped) and its value. The deferred value replaces any
+    /// existing value for the same target; a workload that needs to preserve a base value composes
+    /// the full value on its side, since the host is intentionally value-agnostic.
+    /// </summary>
+    internal static IEnumerable<(string Name, string Value)> ReadDeferredWorkerEnvironment(System.Collections.IDictionary environment)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+
+        foreach (System.Collections.DictionaryEntry entry in environment)
+        {
+            if (entry.Key is string key
+                && key.StartsWith(DeferredWorkerEnvironmentPrefix, StringComparison.Ordinal)
+                && key.Length > DeferredWorkerEnvironmentPrefix.Length
+                && entry.Value is string value)
+            {
+                yield return (key[DeferredWorkerEnvironmentPrefix.Length..], value);
+            }
+        }
     }
 
     internal static Task StartStandardInputClosedMonitorAsync(TextReader standardInput, CancellationTokenSource shutdownTokenSource)

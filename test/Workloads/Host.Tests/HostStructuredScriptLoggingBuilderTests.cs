@@ -16,6 +16,7 @@ public sealed class HostStructuredScriptLoggingBuilderTests
     private const string SharedMemoryWarningCategory =
         "Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer.MemoryMappedFileAccessor";
     private const string SystemTraceMiddlewareCategory = "Microsoft.Azure.WebJobs.Script.WebHost.Middleware.SystemTraceMiddleware";
+    private const string ToolingConsoleLogCategory = "Host.Function.ToolingConsoleLog";
     private const string OptionsLoggingCategory = "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService";
 
     [Fact]
@@ -58,6 +59,8 @@ public sealed class HostStructuredScriptLoggingBuilderTests
     [Theory]
     [InlineData(SystemTraceMiddlewareCategory, LogLevel.Information, false)]
     [InlineData(SystemTraceMiddlewareCategory, LogLevel.Warning, true)]
+    [InlineData(ToolingConsoleLogCategory, LogLevel.Debug, false)]
+    [InlineData(ToolingConsoleLogCategory, LogLevel.Information, true)]
     [InlineData("Host.Startup", LogLevel.Information, false)]
     [InlineData("Host.Startup", LogLevel.Warning, true)]
     [InlineData("Function.HttpTrigger1.User", LogLevel.Debug, false)]

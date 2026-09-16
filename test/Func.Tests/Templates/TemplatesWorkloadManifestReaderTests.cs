@@ -8,6 +8,7 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public class TemplatesWorkloadManifestReaderTests : IDisposable
 {
     private readonly string _installDir;
+    private readonly TemplatesWorkloadManifestReader _reader = new();
 
     public TemplatesWorkloadManifestReaderTests()
     {
@@ -23,7 +24,7 @@ public class TemplatesWorkloadManifestReaderTests : IDisposable
     [Fact]
     public void Missing_File_Returns_Null()
     {
-        TemplatesWorkloadManifestReader.GetMinBundleVersion(_installDir).Should().BeNull();
+        _reader.GetMinBundleVersion(_installDir).Should().BeNull();
     }
 
     [Fact]
@@ -35,7 +36,7 @@ public class TemplatesWorkloadManifestReaderTests : IDisposable
             Path.Combine(contentDir, "templates-workload.json"),
             """{ "minBundleVersion": "[4.0.0, )" }""");
 
-        TemplatesWorkloadManifestReader.GetMinBundleVersion(_installDir).Should().Be("[4.0.0, )");
+        _reader.GetMinBundleVersion(_installDir).Should().Be("[4.0.0, )");
     }
 
     [Fact]
@@ -47,7 +48,7 @@ public class TemplatesWorkloadManifestReaderTests : IDisposable
             Path.Combine(contentDir, "templates-workload.json"),
             """{ "somethingElse": "ignored" }""");
 
-        TemplatesWorkloadManifestReader.GetMinBundleVersion(_installDir).Should().BeNull();
+        _reader.GetMinBundleVersion(_installDir).Should().BeNull();
     }
 
     [Fact]
@@ -57,6 +58,6 @@ public class TemplatesWorkloadManifestReaderTests : IDisposable
         Directory.CreateDirectory(contentDir);
         File.WriteAllText(Path.Combine(contentDir, "templates-workload.json"), "{ not json");
 
-        TemplatesWorkloadManifestReader.GetMinBundleVersion(_installDir).Should().BeNull();
+        _reader.GetMinBundleVersion(_installDir).Should().BeNull();
     }
 }

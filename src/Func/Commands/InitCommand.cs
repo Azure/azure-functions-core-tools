@@ -751,8 +751,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         if (!string.IsNullOrEmpty(requestedStack))
         {
-            IProjectInitializer? match = _initializers.FirstOrDefault(i =>
-                string.Equals(i.Stack, requestedStack, StringComparison.OrdinalIgnoreCase));
+            IProjectInitializer? match = FindInitializerForCandidate(requestedStack);
             if (match is not null)
             {
                 return match;

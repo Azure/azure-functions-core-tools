@@ -5,6 +5,7 @@ namespace Azure.Functions.Cli.Workloads;
 
 internal static class HostWorkloadPackage
 {
+    internal const string PackageId = "Azure.Functions.Cli.Workloads.Host";
     internal const string PackageIdPrefix = "Azure.Functions.Cli.Workloads.Host.";
 
     public static string CurrentPackageId => FromRuntimeIdentifier(CurrentRuntimeIdentifier);

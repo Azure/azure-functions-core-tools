@@ -4,6 +4,7 @@
 using System.ComponentModel;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Events;
+using Microsoft.Extensions.Logging;
 
 namespace Azure.Functions.Cli.Commands.Start.Host;
 
@@ -12,6 +13,7 @@ internal sealed class DefaultHostProcessRunner(
     IHostPortAvailability portAvailability,
     IHostProcessFactory processFactory,
     IHostProcessOutputParser outputParser,
+    ILogger<DefaultHostProcessRunner> logger,
     TimeProvider? timeProvider = null) : IHostProcessRunner
 {
     private static readonly TimeSpan _shutdownTimeout = TimeSpan.FromSeconds(5);
@@ -24,6 +26,8 @@ internal sealed class DefaultHostProcessRunner(
         ?? throw new ArgumentNullException(nameof(processFactory));
     private readonly IHostProcessOutputParser _outputParser = outputParser
         ?? throw new ArgumentNullException(nameof(outputParser));
+    private readonly ILogger _logger = logger
+        ?? throw new ArgumentNullException(nameof(logger));
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     public Task<IHostEventStream> StartAsync(HostProcessStartContext context, CancellationToken cancellationToken)
@@ -44,16 +48,12 @@ internal sealed class DefaultHostProcessRunner(
         {
             process.Start();
         }
-        catch (Win32Exception ex)
-        {
-            throw CreateStartFailure(launchInfo, ex);
-        }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
             throw CreateStartFailure(launchInfo, ex);
         }
 
-        IHostEventStream stream = new HostProcessEventStream(process, _outputParser, launchInfo, _shutdownTimeout, _timeProvider);
+        IHostEventStream stream = new HostProcessEventStream(process, _outputParser, launchInfo, _shutdownTimeout, _timeProvider, context.OutputInterceptor, _logger);
         return Task.FromResult(stream);
     }
 

@@ -19,20 +19,6 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
         interaction ?? throw new ArgumentNullException(nameof(interaction));
 
     /// <summary>
-    /// Renders the "no template providers registered" hint surfaced when no
-    /// engine project has been wired into DI yet. Terminal output of both
-    /// commands until engine-driven output paths replace it.
-    /// </summary>
-    public void RenderNoEnginesRegistered()
-    {
-        _interaction.WriteError("No templates available.");
-        _interaction.WriteLine(l => l
-            .Muted("Install a templates workload: ")
-            .Code("func workload install Azure.Functions.Cli.Workloads.Templates.<stack>")
-            .Muted("."));
-    }
-
-    /// <summary>
     /// Renders the warning surfaced when the project's bundle channel
     /// (preview / experimental) has no matching installed templates workload
     /// and the runner has fallen back to the stable workload (issue #5369).
@@ -108,9 +94,7 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
 
     /// <summary>
     /// Renders the plain-text catalogue for <c>func new --list</c>.
-    /// Surfaces an empty header for the resolved stack so the integration
-    /// path is exercised when no engines are registered; the populated
-    /// catalogue lands once engines exist.
+    /// Defensively renders an empty hint when called without templates.
     /// </summary>
     public void RenderCatalogue(string stack, string? language, IReadOnlyList<FunctionTemplateInfo> templates)
     {

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,7 +15,7 @@ internal sealed class RemoteProfileSource(
     HttpClient httpClient,
     IOptions<RemoteProfileOptions> options,
     ProfileDocumentParser parser,
-    IProfileFileSystem fileSystem,
+    IFileSystem fileSystem,
     CliConfigurationPathsOptions configurationPaths,
     ILogger<RemoteProfileSource> logger) : IProfileSource
 {
@@ -31,7 +32,7 @@ internal sealed class RemoteProfileSource(
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     private readonly RemoteProfileOptions _options = (options ?? throw new ArgumentNullException(nameof(options))).Value;
     private readonly ProfileDocumentParser _parser = parser ?? throw new ArgumentNullException(nameof(parser));
-    private readonly IProfileFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
     private readonly ILogger<RemoteProfileSource> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -119,9 +120,9 @@ internal sealed class RemoteProfileSource(
     {
         try
         {
-            _fileSystem.DeleteIfExistsAsync(cachePath).GetAwaiter().GetResult();
-            _fileSystem.DeleteIfExistsAsync(cacheChecksumPath).GetAwaiter().GetResult();
-            _fileSystem.DeleteIfExistsAsync(cacheMetaPath).GetAwaiter().GetResult();
+            _fileSystem.DeleteFileIfExistsAsync(cachePath).GetAwaiter().GetResult();
+            _fileSystem.DeleteFileIfExistsAsync(cacheChecksumPath).GetAwaiter().GetResult();
+            _fileSystem.DeleteFileIfExistsAsync(cacheMetaPath).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {

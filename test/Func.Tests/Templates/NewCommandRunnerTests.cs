@@ -16,6 +16,88 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public class NewCommandRunnerTests
 {
     [Fact]
+    public async Task ExecuteAsync_Success_InvokesPipelineInOrderAndForwardsCancellationToken()
+    {
+        List<string> calls = [];
+        using CancellationTokenSource cancellation = new();
+        WorkingDirectory workingDirectory = new(new DirectoryInfo(Path.GetTempPath()), WasExplicit: false);
+        NewInvocation invocation = new(
+            workingDirectory,
+            RequestedTemplate: "HttpTrigger",
+            RequestedFunctionName: "MyFunction",
+            Force: false,
+            NonInteractive: true);
+        NewCommandResolvedContext context = new(
+            workingDirectory,
+            "node",
+            "javascript",
+            new InstalledTemplatesWorkload("node", "1.0.0", "install"),
+            BundleId: null,
+            BundleChannel.Unknown,
+            UsedStableFallback: false);
+        FunctionTemplateInfo template = new(
+            "HttpTrigger",
+            "node",
+            EngineIds.V2,
+            "HTTP trigger",
+            Description: null,
+            DefaultFunctionName: "HttpTrigger",
+            Languages: ["javascript"],
+            new TemplateMetadata([], RequiresExtensionBundle: false, MinBundleVersion: null));
+        TemplateApplicationResult applyResult = new TemplateApplicationResult.Created(["Function.js"]);
+
+        INewCommandContextResolver contextResolver = Substitute.For<INewCommandContextResolver>();
+        contextResolver.ResolveAsync(invocation, cancellation.Token).Returns(_ =>
+        {
+            calls.Add("resolve");
+            return Task.FromResult(NewCommandResolutionResult.Succeed(context));
+        });
+        INewCommandBundleValidator bundleValidator = Substitute.For<INewCommandBundleValidator>();
+        bundleValidator.ValidateAsync(context, cancellation.Token).Returns(_ =>
+        {
+            calls.Add("validate");
+            return Task.FromResult(0);
+        });
+        INewCommandTemplateCatalog templateCatalog = Substitute.For<INewCommandTemplateCatalog>();
+        templateCatalog.ListAsync(context, cancellation.Token).Returns(_ =>
+        {
+            calls.Add("catalog");
+            return Task.FromResult<IReadOnlyList<FunctionTemplateInfo>>([template]);
+        });
+        INewCommandTemplateSelector templateSelector = Substitute.For<INewCommandTemplateSelector>();
+        templateSelector.SelectAsync(invocation, Arg.Any<IReadOnlyList<FunctionTemplateInfo>>(), cancellation.Token).Returns(_ =>
+        {
+            calls.Add("select");
+            return Task.FromResult<FunctionTemplateInfo?>(template);
+        });
+        INewCommandTemplateApplicator templateApplicator = Substitute.For<INewCommandTemplateApplicator>();
+        templateApplicator.ApplyAsync(invocation, context, template, cancellation.Token).Returns(_ =>
+        {
+            calls.Add("apply");
+            return Task.FromResult(applyResult);
+        });
+        INewCommandResultRenderer resultRenderer = Substitute.For<INewCommandResultRenderer>();
+        resultRenderer.RenderApplyResult(template, applyResult).Returns(_ =>
+        {
+            calls.Add("render");
+            return 0;
+        });
+        TestInteractionService interaction = new();
+        NewCommandRunner runner = new(
+            contextResolver,
+            bundleValidator,
+            templateCatalog,
+            templateSelector,
+            templateApplicator,
+            new NewCommandRenderer(interaction),
+            resultRenderer);
+
+        int exitCode = await runner.ExecuteAsync(invocation, cancellation.Token);
+
+        exitCode.Should().Be(0);
+        calls.Should().Equal("resolve", "validate", "catalog", "select", "apply", "render");
+    }
+    [Fact]
     public async Task ExecuteAsync_MissingLanguageOnMultiLanguageStack_RendersErrorExactlyOnce()
     {
         // Repro of https://github.com/Azure/azure-functions-core-tools/issues/5304:
@@ -149,19 +231,24 @@ public class NewCommandRunnerTests
         // (initializer has > 1 SupportedLanguages or no entry), so the
         // single-language fallback in ResolveLanguage cannot fire and the
         // missing-language branch is taken.
+        ITemplateEngineProviderRegistry engineProviders = new TemplateEngineProviderRegistry([]);
+        TemplateOptionHydrator optionHydrator = new([]);
+        NewCommandRenderer renderer = new(interaction);
         return new NewCommandRunner(
-            interaction,
-            projectResolver,
-            profileResolver,
-            stackOptions,
-            projectInitializers: Array.Empty<IProjectInitializer>(),
-            installedTemplates,
-            new TemplateEngineProviderRegistry([]),
-            new TemplateOptionHydrator(Array.Empty<IProjectInitializer>()),
-            new TemplatePicker(interaction),
-            new NewCommandRenderer(interaction),
-            Substitute.For<IHostJsonBundleSectionReader>(),
-            Substitute.For<IExtensionBundleResolver>());
+            new NewCommandContextResolver(
+                interaction,
+                projectResolver,
+                profileResolver,
+                stackOptions,
+                projectInitializers: [],
+                installedTemplates,
+                Substitute.For<IHostJsonBundleSectionReader>()),
+            Substitute.For<INewCommandBundleValidator>(),
+            new NewCommandTemplateCatalog(engineProviders),
+            new NewCommandTemplateSelector(interaction, new TemplatePicker(interaction)),
+            new NewCommandTemplateApplicator(engineProviders, optionHydrator),
+            renderer,
+            new NewCommandResultRenderer(interaction, renderer));
     }
 
     private static NewCommandRunner BuildRunnerForChannelFallback(
@@ -190,19 +277,24 @@ public class NewCommandRunnerTests
             .ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
             .Returns(new HostJsonBundleSection(bundleId, "[4.*, 5.0.0)"));
 
+        ITemplateEngineProviderRegistry engineProviders = new TemplateEngineProviderRegistry([]);
+        TemplateOptionHydrator optionHydrator = new([]);
+        NewCommandRenderer renderer = new(interaction);
         return new NewCommandRunner(
-            interaction,
-            projectResolver,
-            profileResolver,
-            stackOptions,
-            projectInitializers: Array.Empty<IProjectInitializer>(),
-            installedTemplates,
-            new TemplateEngineProviderRegistry([]),
-            new TemplateOptionHydrator(Array.Empty<IProjectInitializer>()),
-            new TemplatePicker(interaction),
-            new NewCommandRenderer(interaction),
-            hostJsonReader,
-            Substitute.For<IExtensionBundleResolver>());
+            new NewCommandContextResolver(
+                interaction,
+                projectResolver,
+                profileResolver,
+                stackOptions,
+                projectInitializers: [],
+                installedTemplates,
+                hostJsonReader),
+            Substitute.For<INewCommandBundleValidator>(),
+            new NewCommandTemplateCatalog(engineProviders),
+            new NewCommandTemplateSelector(interaction, new TemplatePicker(interaction)),
+            new NewCommandTemplateApplicator(engineProviders, optionHydrator),
+            renderer,
+            new NewCommandResultRenderer(interaction, renderer));
     }
 
     private sealed class FakeDotNetProject(WorkingDirectory workingDirectory) : FunctionsProject

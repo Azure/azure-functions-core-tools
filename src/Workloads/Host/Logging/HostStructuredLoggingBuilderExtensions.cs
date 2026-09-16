@@ -13,6 +13,7 @@ internal static class HostStructuredLoggingBuilderExtensions
 {
     private const LogLevel DefaultSystemMinimumLogLevel = LogLevel.Warning;
     private const LogLevel DefaultUserMinimumLogLevel = LogLevel.Information;
+    private const string ToolingConsoleLogCategory = "Host.Function.ToolingConsoleLog";
 
     private static readonly CategoryLogLevelFilter[] _categoryLogLevelFilters =
     [
@@ -86,6 +87,7 @@ internal static class HostStructuredLoggingBuilderExtensions
     private static bool IsUserLogCategory(string category)
         => LogCategories.IsFunctionUserCategory(category)
             || LogCategories.IsFunctionCategory(category)
+            || string.Equals(category, ToolingConsoleLogCategory, StringComparison.OrdinalIgnoreCase)
             || string.Equals(category, WorkerConstants.ConsoleLogCategoryName, StringComparison.OrdinalIgnoreCase);
 
     private readonly record struct CategoryLogLevelFilter(string CategoryPrefix, LogLevel MinimumLogLevel)

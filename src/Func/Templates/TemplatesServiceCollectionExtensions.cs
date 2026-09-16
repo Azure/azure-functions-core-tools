@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.Extensions.DependencyInjection;
+using Azure.Functions.Cli.Templates.Engine;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -23,10 +24,18 @@ internal static class TemplatesServiceCollectionExtensions
 
         services.AddSingleton<IInstalledTemplatesWorkloads, InstalledTemplatesWorkloads>();
         services.AddSingleton<ITemplateEngineProviderRegistry, TemplateEngineProviderRegistry>();
+        services.AddSingleton<INewCommandContextResolver, NewCommandContextResolver>();
+        services.AddSingleton<ITemplatesWorkloadManifestReader, TemplatesWorkloadManifestReader>();
+        services.AddSingleton<INewCommandBundleValidator, NewCommandBundleValidator>();
         services.AddSingleton<TemplateOptionHydrator>();
+        services.AddSingleton<INewCommandTemplateCatalog, NewCommandTemplateCatalog>();
+        services.AddSingleton<INewCommandTemplateApplicator, NewCommandTemplateApplicator>();
+        services.AddSingleton<INewCommandTemplateOptionProvider, NewCommandTemplateOptionProvider>();
         services.AddSingleton<TemplatePicker>();
+        services.AddSingleton<INewCommandTemplateSelector, NewCommandTemplateSelector>();
         services.AddSingleton<NewCommandRenderer>();
-        services.AddSingleton<NewCommandRunner>();
+        services.AddSingleton<INewCommandResultRenderer, NewCommandResultRenderer>();
+        services.AddSingleton<INewCommandRunner, NewCommandRunner>();
 
         return services;
     }

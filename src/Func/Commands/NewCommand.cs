@@ -12,9 +12,7 @@ namespace Azure.Functions.Cli.Commands;
 /// <c>func new</c> — scaffolds a new function from an installed templates
 /// content workload, or lists available templates when <c>--list</c> is
 /// supplied. Wires the command surface and delegates to
-/// <see cref="NewCommandRunner"/>, which currently terminates at
-/// the engine-dispatch step until <see cref="ITemplateEngineProvider"/>
-/// implementations exist.
+/// <see cref="INewCommandRunner"/> and the template option provider.
 /// </summary>
 internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwareHelpProvider
 {
@@ -48,7 +46,8 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         Description = "Output mode (plain | json). Defaults to plain.",
     };
 
-    private readonly NewCommandRunner _runner;
+    private readonly INewCommandRunner _runner;
+    private readonly INewCommandTemplateOptionProvider _templateOptions;
     private readonly HashSet<string> _builtInOptionNames;
     private readonly Dictionary<string, string> _optionNameToPromptId = new(StringComparer.OrdinalIgnoreCase);
 
@@ -58,10 +57,11 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     // GetTemplateHelpInfo) to title the "Template Options (<id>)" section.
     private string? _attachedTemplateId;
 
-    public NewCommand(NewCommandRunner runner)
+    public NewCommand(INewCommandRunner runner, INewCommandTemplateOptionProvider templateOptions)
         : base("new", "Create a new function from a template.")
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        _templateOptions = templateOptions ?? throw new ArgumentNullException(nameof(templateOptions));
 
         AddPathArgument();
         Options.Add(NameOption);
@@ -195,7 +195,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
                 Force: false,
                 NonInteractive: true);
 
-            hydrated = _runner.HydrateOptionsForTemplateAsync(invocation, templateId, CancellationToken.None)
+            hydrated = _templateOptions.HydrateOptionsForTemplateAsync(invocation, templateId, CancellationToken.None)
                 .GetAwaiter().GetResult();
         }
         catch
@@ -283,7 +283,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         IReadOnlyList<HydratedTemplateOption>? hydrated;
         try
         {
-            hydrated = _runner.HydrateOptionsForTemplateWithIdsAsync(invocation, templateId, CancellationToken.None)
+            hydrated = _templateOptions.HydrateOptionsForTemplateWithIdsAsync(invocation, templateId, CancellationToken.None)
                 .GetAwaiter().GetResult();
         }
         catch
@@ -381,7 +381,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         IReadOnlyList<Option>? hydrated;
         try
         {
-            hydrated = _runner.HydrateOptionsForTemplateAsync(invocation, templateId, CancellationToken.None)
+            hydrated = _templateOptions.HydrateOptionsForTemplateAsync(invocation, templateId, CancellationToken.None)
                 .GetAwaiter().GetResult();
         }
         catch

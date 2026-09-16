@@ -127,6 +127,166 @@ public class WorkloadMetadataReaderTests : IDisposable
         metadata.EntryPoint.Should().BeNull();
     }
 
+    [Fact]
+    public void Read_ReturnsRidPointerMetadata()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "rid-pointer",
+              "packages": {
+                "linux-x64": "Example.Workload.linux-x64",
+                "win-x64": "Example.Workload.win-x64"
+              }
+            }
+            """);
+
+        WorkloadMetadata metadata = _reader.Read(_tempDir);
+
+        metadata.Kind.Should().Be(WorkloadKind.RidPointer);
+        metadata.Packages!["win-x64"].Should().Be("Example.Workload.win-x64");
+        metadata.RuntimeIdentifier.Should().BeNull();
+    }
+
+    [Fact]
+    public void Read_ReturnsRidImplementationMetadata()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "content",
+              "runtimeIdentifier": "linux-arm64"
+            }
+            """);
+
+        WorkloadMetadata metadata = _reader.Read(_tempDir);
+
+        metadata.RuntimeIdentifier.Should().Be("linux-arm64");
+        metadata.Packages.Should().BeNull();
+    }
+
+    [Fact]
+    public void Read_Throws_WhenRidPointerPackagesAreMissing()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "rid-pointer"
+            }
+            """);
+
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().Contain("non-empty packages");
+    }
+
+    [Fact]
+    public void Read_Throws_WhenRidPointerPackagesAreEmpty()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "rid-pointer",
+              "packages": {}
+            }
+            """);
+
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().Contain("non-empty packages");
+    }
+
+    [Fact]
+    public void Read_Throws_WhenRidPointerRuntimeIdentifierIsUppercase()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "rid-pointer",
+              "packages": {
+                "WIN-X64": "Example.Workload.win-x64"
+              }
+            }
+            """);
+
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().Contain("WIN-X64");
+        ex.Message.Should().Contain("lowercase");
+    }
+
+    [Fact]
+    public void Read_Throws_WhenRidPointerHasNonLowercaseRuntimeIdentifier()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "rid-pointer",
+              "packages": {
+                "win-x64": "Example.Workload.win-x64",
+                "WIN-X64": "Example.Workload.win-x64"
+              }
+            }
+            """);
+
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().Contain("must be lowercase");
+    }
+
+    [Fact]
+    public void Read_Throws_WhenOrdinaryWorkloadDefinesPackages()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "workload",
+              "entryPoint": {
+                "assemblyPath": "Foo.dll",
+                "type": "Foo.MyWorkload"
+              },
+              "packages": {
+                "win-x64": "Example.Workload.win-x64"
+              }
+            }
+            """);
+
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().Contain("packages");
+    }
+
+    [Fact]
+    public void Read_Throws_WhenRidPointerDefinesEntryPointOrRuntimeIdentifier()
+    {
+        WriteMetadata(
+            $$"""
+            {
+              "$schema": "{{SchemaUrl}}",
+              "kind": "rid-pointer",
+              "entryPoint": {
+                "assemblyPath": "Foo.dll",
+                "type": "Foo.MyWorkload"
+              },
+              "runtimeIdentifier": "win-x64",
+              "packages": {
+                "win-x64": "Example.Workload.win-x64"
+              }
+            }
+            """);
+
+        InvalidWorkloadException ex = FluentActions.Invoking(() => _reader.Read(_tempDir)).Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().Contain("entryPoint");
+    }
+
     [Theory]
     [InlineData("content")]
     [InlineData("meta")]

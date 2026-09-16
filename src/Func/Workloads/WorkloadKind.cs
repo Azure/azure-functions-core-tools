@@ -4,10 +4,8 @@
 namespace Azure.Functions.Cli.Workloads;
 
 /// <summary>
-/// Discriminator for the three shapes a workload package can take, declared
-/// in <c>workload.json</c>'s <c>kind</c> field
-/// (workload-package-layout §5.4). Determines whether the loader activates
-/// the package, skips it, or treats it as install-time-only.
+/// Discriminator for workload package shapes declared in
+/// <c>workload.json</c>'s <c>kind</c> field.
 /// </summary>
 internal enum WorkloadKind
 {
@@ -31,4 +29,10 @@ internal enum WorkloadKind
     /// loader never activates it.
     /// </summary>
     Meta = 2,
+
+    /// <summary>
+    /// Carries no payload. Maps supported runtime identifiers to exact
+    /// implementation package ids for install and update resolution.
+    /// </summary>
+    RidPointer = 3,
 }

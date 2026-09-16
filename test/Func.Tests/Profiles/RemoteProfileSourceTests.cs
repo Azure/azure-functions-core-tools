@@ -4,6 +4,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Profiles;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -292,7 +293,7 @@ public class RemoteProfileSourceTests
         }
     }
 
-    private sealed class InMemoryProfileFileSystem : IProfileFileSystem
+    private sealed class InMemoryProfileFileSystem : IFileSystem
     {
         public Dictionary<string, string> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -307,10 +308,29 @@ public class RemoteProfileSourceTests
             return Task.CompletedTask;
         }
 
-        public Task DeleteIfExistsAsync(string path)
+        public Task DeleteFileIfExistsAsync(string path)
         {
             Files.Remove(path);
             return Task.CompletedTask;
         }
+
+        // ── IFileSystem members not used by remote profile tests ────────────
+        public bool FileExists(string path) => Files.ContainsKey(path);
+        public Task SaveStreamToFileAsync(string filePath, Stream content, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public void MoveFile(string sourcePath, string destinationPath, bool overwrite = false) => throw new NotImplementedException();
+        public void CopyFile(string sourcePath, string destinationPath) => throw new NotImplementedException();
+        public void DeleteFile(string path) => Files.Remove(path);
+        public bool DirectoryExists(string path) => throw new NotImplementedException();
+        public void CreateDirectory(string path) => throw new NotImplementedException();
+        public TempDirectory CreateTempDirectory() => throw new NotImplementedException();
+        public TempDirectory CreateTempDirectory(string parentDirectory) => throw new NotImplementedException();
+        public void CopyDirectory(string sourcePath, string destinationPath) => throw new NotImplementedException();
+        public void DeleteDirectory(string path) => throw new NotImplementedException();
+        public IReadOnlyList<string> GetFiles(string directoryPath) => throw new NotImplementedException();
+        public void ExtractZip(string zipPath, string destinationDirectory) => throw new NotImplementedException();
+
+        public void ExtractTarGz(string tarGzPath, string destinationDirectory) => throw new NotImplementedException();
+
+        public Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }

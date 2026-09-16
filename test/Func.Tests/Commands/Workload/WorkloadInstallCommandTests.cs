@@ -83,6 +83,177 @@ public class WorkloadInstallCommandTests
     }
 
     [Fact]
+    public async Task Install_AlreadyInstalledExplicitDualOwnedPackage_UpdatesPhysicalIdentity()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload.win-x64",
+                PackageVersion = "1.0.0",
+                Aliases = ["implementation"],
+                RuntimeIdentifier = "win-x64",
+                IsImplicitlyInstalled = false,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "Test.Workload",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["test"],
+                },
+                InstallRefCount = 2,
+            },
+        ]);
+        _installer.UpdateAsync(
+                "Test.Workload.win-x64",
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool?>(),
+                Arg.Any<bool>(),
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new WorkloadUpdateResult(
+                new WorkloadEntry { PackageId = "Test.Workload.win-x64", PackageVersion = "1.1.0" },
+                "1.0.0",
+                NoUpdateAvailable: false));
+        _installer.UpdateAsync(
+                "Test.Workload",
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool?>(),
+                Arg.Any<bool>(),
+                WorkloadOwnershipKind.Logical,
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new WorkloadUpdateResult(
+                new WorkloadEntry
+                {
+                    PackageId = "Test.Workload.win-x64",
+                    PackageVersion = "1.1.0",
+                    IsImplicitlyInstalled = true,
+                    LogicalPackage = new LogicalPackage
+                    {
+                        PackageId = "Test.Workload",
+                        PackageVersion = "1.1.0",
+                        Aliases = ["test"],
+                    },
+                },
+                "1.0.0",
+                NoUpdateAvailable: false));
+        var interaction = new InteractiveTestInteractionService();
+        var update = new WorkloadUpdateCommand(interaction, _installer, _store, _testCatalogOptions);
+        var cmd = new WorkloadInstallCommand(interaction, _installer, _store, update, _testCatalogOptions);
+
+        int exit = await InvokeAsync(cmd, "Test.Workload.win-x64", "--exact");
+
+        exit.Should().Be(0);
+        await _installer.Received(1).UpdateAsync(
+            "Test.Workload.win-x64",
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool?>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().UpdateAsync(
+            "Test.Workload",
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool?>(),
+            Arg.Any<bool>(),
+            WorkloadOwnershipKind.Logical,
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Install_AmbiguousInstalledLogicalAlias_ThrowsBeforeInstalling()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "First.Workload.win-x64",
+                PackageVersion = "1.0.0",
+                IsImplicitlyInstalled = true,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "First.Workload",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["shared"],
+                },
+            },
+            new WorkloadEntry
+            {
+                PackageId = "Second.Workload.win-x64",
+                PackageVersion = "1.0.0",
+                IsImplicitlyInstalled = true,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "Second.Workload",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["shared"],
+                },
+            },
+        ]);
+        var cmd = NewInstall();
+
+        GracefulException ex = (await FluentActions.Awaiting(
+            () => InvokeAsync(cmd, "shared")).Should().ThrowExactlyAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Contain("matches multiple installed workloads");
+        ex.Message.Should().Contain("First.Workload");
+        ex.Message.Should().Contain("Second.Workload");
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Any<string>(),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Install_AmbiguousInstalledExplicitAlias_ThrowsBeforeInstalling()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "First.Workload",
+                PackageVersion = "1.0.0",
+                Aliases = ["shared"],
+                IsImplicitlyInstalled = false,
+            },
+            new WorkloadEntry
+            {
+                PackageId = "Second.Workload",
+                PackageVersion = "1.0.0",
+                Aliases = ["shared"],
+                IsImplicitlyInstalled = false,
+            },
+        ]);
+        var cmd = NewInstall();
+
+        GracefulException ex = (await FluentActions.Awaiting(
+            () => InvokeAsync(cmd, "shared")).Should().ThrowExactlyAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Contain("matches multiple installed workloads");
+        ex.Message.Should().Contain("First.Workload");
+        ex.Message.Should().Contain("Second.Workload");
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Any<string>(),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Install_ShortAliases_VAndF_Forward()
     {
         StubCatalogResult();
@@ -252,7 +423,7 @@ public class WorkloadInstallCommandTests
     }
 
     [Fact]
-    public async Task Install_BrokenInstall_AppendsForceHint()
+    public async Task Install_BrokenInstall_SurfacesInstallerMessageAsUserError()
     {
         _installer.InstallFromCatalogAsync(
                 Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
@@ -263,7 +434,6 @@ public class WorkloadInstallCommandTests
         var cmd = NewInstall();
         GracefulException ex = (await FluentActions.Awaiting(() => InvokeAsync(cmd, "Test.Workload")).Should().ThrowAsync<GracefulException>()).Which;
         ex.Message.Should().Contain("missing from the registry");
-        ex.Message.Should().Contain("--force");
         ex.IsUserError.Should().BeTrue();
     }
 
@@ -354,7 +524,7 @@ public class WorkloadInstallCommandTests
             Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
         _interaction.Lines.Should().Contain(l =>
-            l.StartsWith("HINT:") && l.Contains("func workload update test"));
+            l.StartsWith("HINT:") && l.Contains("func workload update Test.Workload"));
     }
 
     [Fact]
@@ -375,7 +545,40 @@ public class WorkloadInstallCommandTests
 
         exit.Should().Be(1);
         _interaction.Lines.Should().Contain(l =>
-            l.StartsWith("HINT:") && l.Contains("alias1") && l.Contains("1.2.3"));
+            l.StartsWith("HINT:")
+            && l.Contains("alias1")
+            && l.Contains("1.2.3")
+            && l.Contains("func workload update Test.Workload"));
+    }
+
+    [Fact]
+    public async Task Install_AlreadyInstalledLogicalAlias_HintsPointerIdentity()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload.win-x64",
+                PackageVersion = "1.2.3",
+                RuntimeIdentifier = "win-x64",
+                IsImplicitlyInstalled = true,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "Test.Workload",
+                    PackageVersion = "1.2.3",
+                    Aliases = ["test"],
+                },
+            },
+        ]);
+
+        var cmd = NewInstall();
+        int exit = await InvokeAsync(cmd, "test");
+
+        exit.Should().Be(1);
+        _interaction.Lines.Should().Contain(line =>
+            line.StartsWith("HINT:", StringComparison.Ordinal)
+            && line.Contains("func workload update Test.Workload", StringComparison.Ordinal)
+            && line.Contains("1.2.3", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -419,6 +622,41 @@ public class WorkloadInstallCommandTests
         exit.Should().Be(0);
         await _installer.Received(1).InstallFromCatalogAsync(
             "alias1", null, null, (bool?)null, true, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Install_PhysicalPackageWithOnlyLogicalOwnership_AddsExplicitOwnership()
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "Test.Workload.win-x64",
+                PackageVersion = "1.0.0",
+                IsImplicitlyInstalled = true,
+                LogicalPackage = new LogicalPackage
+                {
+                    PackageId = "Test.Workload",
+                    PackageVersion = "1.0.0",
+                    Aliases = ["test"],
+                },
+            },
+        ]);
+        StubCatalogResult(packageId: "Test.Workload.win-x64");
+
+        var cmd = NewInstall();
+        int exit = await InvokeAsync(cmd, "Test.Workload.win-x64", "--exact");
+
+        exit.Should().Be(0);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            "Test.Workload.win-x64",
+            null,
+            null,
+            (bool?)null,
+            true,
+            false,
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -503,6 +741,11 @@ public class WorkloadInstallCommandTests
         root.Subcommands.Add(cmd);
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
         return root.Parse(new[] { cmd.Name }.Concat(args).ToArray()).InvokeAsync(config);
+    }
+
+    private sealed class InteractiveTestInteractionService : TestInteractionService
+    {
+        public override bool IsInteractive => true;
     }
 }
 

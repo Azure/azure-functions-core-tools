@@ -88,7 +88,7 @@ public sealed class CdnReleaseFeedTests
 
         latest.DownloadUrl.ToString().Should().Contain("5.1.0");
         latest.DownloadUrl.ToString().Should().Contain("Azure.Functions.Cli.");
-        latest.DownloadUrl.ToString().Should().EndWith(".zip");
+        latest.DownloadUrl.ToString().Should().MatchRegex(@"\.(zip|tar\.gz)$");
     }
 
     [Fact]

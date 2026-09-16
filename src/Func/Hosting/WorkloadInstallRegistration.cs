@@ -17,6 +17,10 @@ internal static class WorkloadInstallRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddSingleton<WorkloadRidPackageSelector>();
+        services.AddSingleton<IWorkloadPackageInspector, WorkloadPackageInspector>();
+        services.AddSingleton<IWorkloadPackageSource, WorkloadPackageSource>();
+        services.AddSingleton<IWorkloadDeploymentService, WorkloadDeploymentService>();
         services.AddSingleton<IWorkloadInstaller, WorkloadInstaller>();
 
         return services;

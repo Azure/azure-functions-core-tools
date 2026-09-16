@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
+using Microsoft.Extensions.Logging;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
@@ -16,7 +17,8 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// </summary>
 internal sealed class ResolveFunctionsWorkerInitializationStep(
     IFunctionsWorkerResolverFactory workerResolverFactory,
-    IFunctionsWorkerInstaller workerInstaller) : FuncStartInitializationStep
+    IFunctionsWorkerInstaller workerInstaller,
+    ILogger<ResolveFunctionsWorkerInitializationStep> logger) : FuncStartInitializationStep
 {
     public const string StepId = "resolve_worker";
 
@@ -24,6 +26,8 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         ?? throw new ArgumentNullException(nameof(workerResolverFactory));
 
     private readonly IFunctionsWorkerInstaller _workerInstaller = workerInstaller ?? throw new ArgumentNullException(nameof(workerInstaller));
+
+    private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public override string Id => StepId;
 
@@ -49,12 +53,20 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             // Block auto-install if neither the stack name nor the workload id match any supported runtime.
             // workerId.Value is the workload identifier (e.g. "python", "dotnet") which may differ from WorkerRuntime.
             ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: workerId.Value, project.StackDisplayName);
+
+            Log.ResolutionFailedAttemptingInstall(_logger, notResolved.Failure.GetType().Name, notResolved.Failure.Message, workerId.Value);
             result = await TryInstallAndResolveWorkerAsync(context, workerId, workerVersionRanges, notResolved.Failure, cancellationToken);
         }
 
         if (result is not FunctionsWorkerResolutionResult.Resolved resolved)
         {
             var failedResult = (FunctionsWorkerResolutionResult.NotResolved)result;
+            Log.WorkerResolutionFailed(
+                _logger,
+                context.State.ResolvedProfile?.Name ?? "(none)",
+                string.Join(", ", workerVersionRanges.Select(kvp => $"{kvp.Key}={kvp.Value}")),
+                failedResult.Failure.GetType().Name,
+                failedResult.Failure.Message);
             throw CreateWorkerResolutionException(failedResult.Failure, context);
         }
 

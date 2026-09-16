@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -57,23 +58,20 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
             return 0;
         }
 
-        IReadOnlyList<WorkloadEntry> scoped = ScopeToTarget(installed, identifier, exact);
+        IReadOnlyList<PruneCandidate> scoped = ScopeToTarget(installed, identifier, exact);
         if (scoped.Count == 0)
         {
             _interaction.WriteWarning($"Workload '{identifier}' is not installed; nothing to prune.");
             return 0;
         }
 
-        // Group by canonical package id so an alias that maps to one
-        // package doesn't accidentally prune another. Within each group
-        // keep the highest installable semver and remove the rest.
-        IEnumerable<IGrouping<string, WorkloadEntry>> byPackageId = scoped
-            .GroupBy(e => e.PackageId, StringComparer.OrdinalIgnoreCase);
+        IEnumerable<IGrouping<string, PruneCandidate>> byPackageId = scoped
+            .GroupBy(e => $"{e.Ownership}:{e.PackageId}", StringComparer.OrdinalIgnoreCase);
 
         int removedCount = 0;
-        foreach (IGrouping<string, WorkloadEntry> group in byPackageId)
+        foreach (IGrouping<string, PruneCandidate> group in byPackageId)
         {
-            List<WorkloadEntry> ordered = [.. group.OrderByDescending(e => ParseVersion(e.PackageVersion))];
+            List<PruneCandidate> ordered = [.. group.OrderByDescending(e => ParseVersion(e.PackageVersion))];
             if (ordered.Count <= 1)
             {
                 continue;
@@ -82,9 +80,17 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
             // Skip ordered[0] (the highest version), uninstall the rest.
             for (int i = 1; i < ordered.Count; i++)
             {
-                WorkloadEntry candidate = ordered[i];
-                bool removed = await _installer.UninstallAsync(
-                    candidate.PackageId, candidate.PackageVersion, cancellationToken);
+                PruneCandidate candidate = ordered[i];
+                bool removed = candidate.Ownership == WorkloadOwnershipKind.Logical
+                    ? await _installer.UninstallAsync(
+                        candidate.PackageId,
+                        candidate.PackageVersion,
+                        WorkloadOwnershipKind.Logical,
+                        cancellationToken)
+                    : await _installer.UninstallAsync(
+                        candidate.PackageId,
+                        candidate.PackageVersion,
+                        cancellationToken);
                 if (removed)
                 {
                     removedCount++;
@@ -102,18 +108,69 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
         return 0;
     }
 
-    private static IReadOnlyList<WorkloadEntry> ScopeToTarget(IReadOnlyList<WorkloadEntry> installed, string? identifier, bool exact)
+    private static IReadOnlyList<PruneCandidate> ScopeToTarget(
+        IReadOnlyList<WorkloadEntry> installed,
+        string? identifier,
+        bool exact)
     {
+        IReadOnlyList<PruneCandidate> logical = [.. installed
+            .Where(e => e.LogicalPackage is not null)
+            .Select(e => new PruneCandidate(
+                e.LogicalPackage!.PackageId,
+                e.LogicalPackage.PackageVersion,
+                e.LogicalPackage.Aliases,
+                WorkloadOwnershipKind.Logical))];
+        IReadOnlyList<PruneCandidate> explicitPackages = [.. installed
+            .Where(e => !e.IsImplicitlyInstalled)
+            .Select(e => new PruneCandidate(
+                e.PackageId,
+                e.PackageVersion,
+                e.Aliases,
+                WorkloadOwnershipKind.Explicit))];
+
         if (string.IsNullOrWhiteSpace(identifier))
         {
-            return installed;
+            return [.. logical, .. explicitPackages];
         }
 
-        return [.. installed.Where(e =>
+        IReadOnlyList<PruneCandidate> logicalMatches = [.. logical.Where(e =>
             string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
-            || (!exact && (e.Aliases?.Any(a => string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase)) ?? false)))];
+            || (!exact && e.Aliases.Any(a =>
+                string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase))))];
+        if (logicalMatches.Count > 0)
+        {
+            return EnsureUnambiguousTarget(identifier, logicalMatches);
+        }
+
+        IReadOnlyList<PruneCandidate> explicitMatches = [.. explicitPackages.Where(e =>
+            string.Equals(e.PackageId, identifier, StringComparison.OrdinalIgnoreCase)
+            || (!exact && e.Aliases.Any(a =>
+                string.Equals(a, identifier, StringComparison.OrdinalIgnoreCase))))];
+        return EnsureUnambiguousTarget(identifier, explicitMatches);
+    }
+
+    private static IReadOnlyList<PruneCandidate> EnsureUnambiguousTarget(string identifier, IReadOnlyList<PruneCandidate> matches)
+    {
+        string[] packageIds = [.. matches
+            .Select(match => match.PackageId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (packageIds.Length > 1)
+        {
+            throw new GracefulException(
+                $"Alias '{identifier}' matches multiple installed workloads ({string.Join(", ", packageIds)}). " +
+                "Pass the workload ID instead.",
+                isUserError: true);
+        }
+
+        return matches;
     }
 
     private static NuGetVersion ParseVersion(string raw) =>
         NuGetVersion.TryParse(raw, out NuGetVersion? v) ? v : new NuGetVersion(0, 0, 0);
+
+    private sealed record PruneCandidate(
+        string PackageId,
+        string PackageVersion,
+        IReadOnlyList<string> Aliases,
+        WorkloadOwnershipKind Ownership);
 }

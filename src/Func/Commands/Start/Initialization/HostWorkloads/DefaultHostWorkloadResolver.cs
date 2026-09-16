@@ -89,7 +89,7 @@ internal sealed class DefaultHostWorkloadResolver(
         return new HostWorkloadResolution.InstallRequired(
             version,
             $"No installed host workload found for {version}",
-            HostWorkloadPackage.CurrentPackageId);
+            HostWorkloadPackage.PackageId);
     }
 
     private IReadOnlyList<InstalledHostCandidate> GetInstalledHostCandidates()
@@ -97,7 +97,7 @@ internal sealed class DefaultHostWorkloadResolver(
         List<InstalledHostCandidate> candidates = [];
         foreach (ContentWorkloadInfo workload in _workloadProvider.GetContentWorkloads())
         {
-            if (!string.Equals(workload.PackageId, HostWorkloadPackage.CurrentPackageId, StringComparison.OrdinalIgnoreCase)
+            if (!workload.PackageId.StartsWith(HostWorkloadPackage.PackageIdPrefix, StringComparison.OrdinalIgnoreCase)
                 || !NuGetVersion.TryParse(workload.PackageVersion, out NuGetVersion? version))
             {
                 continue;
@@ -116,7 +116,7 @@ internal sealed class DefaultHostWorkloadResolver(
 
     private async Task<ResolvedPackage> ResolveLatestInstallPackageAsync(VersionRange? range, CancellationToken cancellationToken)
     {
-        string packageId = HostWorkloadPackage.CurrentPackageId;
+        string packageId = HostWorkloadPackage.PackageId;
         ResolvedPackage? package = range is null
             ? await _workloadCatalog.ResolveLatestVersionAsync(
                 packageId, includePrerelease: null, currentVersion: null, allowMajor: true, source: null, cancellationToken)

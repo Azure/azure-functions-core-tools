@@ -11,11 +11,9 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// shapes. Keeps the JSON path reflection-free (AOT/trim-friendly).
 /// </summary>
 /// <remarks>
-/// We use a custom <see cref="JsonStringEnumConverter{T}"/> instead of
-/// <c>UseStringEnumConverter = true</c> because the source generator's
-/// generated converter does not apply <see cref="JsonNamingPolicy.CamelCase"/>
-/// to enum value names; it would emit <c>"Workload"</c> rather than the
-/// schema-required <c>"workload"</c>.
+/// The manifest's <c>kind</c> wire values are not derivable from a naming policy
+/// (<c>rid-pointer</c> is hyphenated), so <see cref="WorkloadKindJsonConverter"/>
+/// maps them explicitly instead of using <c>UseStringEnumConverter</c>.
 /// </remarks>
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -25,9 +23,23 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 internal sealed partial class WorkloadJsonContext : JsonSerializerContext;
 
 /// <summary>
-/// Serializes <see cref="WorkloadKind"/> as a lowercase string
-/// (<c>"workload"</c> / <c>"content"</c> / <c>"meta"</c>). The default
-/// <see cref="JsonStringEnumConverter{TEnum}"/> would emit PascalCase.
+/// Serializes <see cref="WorkloadKind"/> using the workload manifest's wire values.
 /// </summary>
-internal sealed class WorkloadKindJsonConverter() : JsonStringEnumConverter<WorkloadKind>(JsonNamingPolicy.CamelCase);
+internal sealed class WorkloadKindJsonConverter : JsonConverter<WorkloadKind>
+{
+    public override WorkloadKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        string? value = reader.GetString();
+        if (!WorkloadKind.TryParseWireValue(value, out WorkloadKind kind))
+        {
+            throw new JsonException($"Unknown workload kind '{value}'.");
+        }
 
+        return kind;
+    }
+
+    public override void Write(Utf8JsonWriter writer, WorkloadKind value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToWireValue());
+    }
+}

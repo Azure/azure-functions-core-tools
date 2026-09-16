@@ -42,24 +42,34 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
     {
         _interaction.WriteWarning("No stacks installed.");
         _interaction.WriteBlankLine();
-        _interaction.WriteHint($"Set up a stack to {hint.ActionDescription}:");
-        _interaction.WriteBlankLine();
-
-        IEnumerable<DefinitionItem> items = KnownInstallableWorkloads.LanguageMap.Select(static kvp =>
-            new DefinitionItem($"func setup --features {kvp.Key}", string.Join(", ", kvp.Value)));
-        _interaction.WriteDefinitionList(items);
-
-        _interaction.WriteBlankLine();
-        _interaction.WriteLine(l => l
-            .Muted("Run ")
-            .Command("func workload search")
-            .Muted(" to discover available stacks."));
+        WriteSetupMenu(hint.ActionDescription, []);
     }
 
     private void RenderNoMatchingStack(WorkloadHint hint)
     {
         _interaction.WriteError($"No installed stack matches '{hint.RequestedStack}'.");
         WriteInstalledStacks(hint.InstalledStacks);
+
+        _interaction.WriteBlankLine();
+
+        if (hint.RequestedStack is not null
+            && KnownInstallableWorkloads.LanguageMap.ContainsKey(hint.RequestedStack))
+        {
+            _interaction.WriteHint("Install it with:");
+            _interaction.WriteLine(l => l
+                .Muted("  ")
+                .Command($"func setup --features {hint.RequestedStack}"));
+        }
+        else
+        {
+            WriteSetupMenu(hint.ActionDescription, hint.InstalledStacks);
+        }
+
+        _interaction.WriteBlankLine();
+        _interaction.WriteLine(l => l
+            .Muted("Run ")
+            .Command("func workload search")
+            .Muted(" to discover available stacks."));
     }
 
     private void RenderAmbiguousStackChoice(WorkloadHint hint)
@@ -90,5 +100,24 @@ internal sealed class WorkloadHintRenderer(IInteractionService interaction) : IW
                 .Muted("  ")
                 .Code(stack));
         }
+    }
+
+    private void WriteSetupMenu(string actionDescription, IReadOnlyList<string> installedStacks)
+    {
+        IEnumerable<KeyValuePair<string, string[]>> candidates = KnownInstallableWorkloads.LanguageMap
+            .Where(kvp => !installedStacks.Contains(kvp.Key, StringComparer.OrdinalIgnoreCase));
+
+        _interaction.WriteHint($"Set up a stack to {actionDescription}:");
+        _interaction.WriteBlankLine();
+
+        IEnumerable<DefinitionItem> items = candidates.Select(static kvp =>
+            new DefinitionItem($"func setup --features {kvp.Key}", string.Join(", ", kvp.Value)));
+        _interaction.WriteDefinitionList(items);
+
+        _interaction.WriteBlankLine();
+        _interaction.WriteLine(l => l
+            .Muted("Run ")
+            .Command("func workload search")
+            .Muted(" to discover available stacks."));
     }
 }

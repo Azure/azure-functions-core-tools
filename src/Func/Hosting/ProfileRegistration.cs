@@ -21,7 +21,7 @@ internal static class ProfileRegistration
 
         services.TryAddSingleton<CliConfigurationPathsOptions>();
         services.AddSingleton<ProfileDocumentParser>();
-        services.AddSingleton<IProfileFileSystem, ProfileFileSystem>();
+        services.TryAddSingleton<IFileSystem, PhysicalFileSystem>();
         services.AddSingleton<IProfileSource, ProjectProfileSource>();
         services.AddSingleton<IProfileSource, UserProfileSource>();
 

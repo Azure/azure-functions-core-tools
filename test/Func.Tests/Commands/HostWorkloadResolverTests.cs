@@ -18,6 +18,7 @@ namespace Azure.Functions.Cli.Tests.Commands;
 public class HostWorkloadResolverTests
 {
     private static readonly string _hostPackageId = HostWorkloadPackage.CurrentPackageId;
+    private static readonly string _hostPointerPackageId = HostWorkloadPackage.PackageId;
 
     private readonly IWorkloadProvider _workloadProvider = Substitute.For<IWorkloadProvider>();
     private readonly IWorkloadCatalog _workloadCatalog = Substitute.For<IWorkloadCatalog>();
@@ -122,15 +123,15 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution.InstallRequired installRequired = result.Should().BeOfType<HostWorkloadResolution.InstallRequired>().Subject;
         installRequired.HostVersion.Should().Be("4.1000.0");
-        installRequired.PackageId.Should().Be(_hostPackageId);
+        installRequired.PackageId.Should().Be(_hostPointerPackageId);
     }
 
     [Fact]
     public async Task ResolveAsync_NoInstalledHost_ReturnsInstallRequired()
     {
-        ResolvedPackage resolved = CreateResolvedPackage(_hostPackageId, "4.1048.199");
+        ResolvedPackage resolved = CreateResolvedPackage(_hostPointerPackageId, "4.1048.199");
         _workloadCatalog.ResolveLatestVersionInRangeAsync(
-                _hostPackageId,
+                _hostPointerPackageId,
                 Arg.Any<VersionRange>(),
                 (bool?)null,
                 null,
@@ -146,7 +147,7 @@ public class HostWorkloadResolverTests
 
         HostWorkloadResolution.InstallRequired installRequired = result.Should().BeOfType<HostWorkloadResolution.InstallRequired>().Subject;
         installRequired.HostVersion.Should().Be("4.1048.199");
-        installRequired.PackageId.Should().Be(_hostPackageId);
+        installRequired.PackageId.Should().Be(_hostPointerPackageId);
     }
 
     [Fact]
@@ -178,7 +179,7 @@ public class HostWorkloadResolverTests
         HostWorkloadResolution resolution = new HostWorkloadResolution.InstallRequired(
             "4.1000.0",
             "No compatible host installed",
-            _hostPackageId);
+            _hostPointerPackageId);
         resolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(resolution);
         var step = new ValidateHostWorkloadInitializationStep(
@@ -201,7 +202,7 @@ public class HostWorkloadResolverTests
         HostWorkloadResolution resolution = new HostWorkloadResolution.InstallRequired(
             "4.1000.0",
             "No compatible host installed",
-            _hostPackageId);
+            _hostPointerPackageId);
         resolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(resolution);
         var step = new ValidateHostWorkloadInitializationStep(

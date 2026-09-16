@@ -392,6 +392,27 @@ public class InitCommandTests
     }
 
     [Fact]
+    public async Task InitCommand_StackAlias_ResolvesToCanonicalInitializer()
+    {
+        // --stack dotnet-isolated (an alias) should resolve to the dotnet
+        // initializer via WorkerRuntimeAliases rather than firing NoMatchingStack.
+        var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        try
+        {
+            var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
+            int exitCode = await RunInitAsync(newDir, dotnet, language: null, stack: "dotnet-isolated");
+
+            exitCode.Should().Be(0);
+            dotnet.WasInvoked.Should().BeTrue();
+            _hintRenderer.Hints.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
     public async Task InitCommand_SingleWorkload_NoStack_AutoSelectsAndRuns()
     {
         var newDir = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");

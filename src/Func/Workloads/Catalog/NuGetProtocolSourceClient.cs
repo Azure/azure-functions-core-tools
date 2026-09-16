@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Globalization;
-using Azure.Functions.Cli.Workloads.Install;
 using Newtonsoft.Json.Linq;
 using NuGet.Common;
 using NuGet.Protocol;
@@ -20,8 +19,6 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 /// </summary>
 internal class NuGetProtocolSourceClient(SourceRepository repository)
 {
-    private const string FuncCliWorkloadPackageType = "FuncCliWorkload";
-
     // SearchFilter.PackageTypes is serialised by NuGet.Client as
     // 'packageTypeFilter=', which nuget.org silently ignores (verified via
     // probe-nuget-package-type-filter.ps1). The wiki-spec parameter
@@ -57,11 +54,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         FindPackageByIdResource findResource = await _repository.GetResourceAsync<FindPackageByIdResource>(cancellationToken);
         using var cache = new SourceCacheContext();
 
-        IEnumerable<NuGetVersion> versions = await findResource.GetAllVersionsAsync(
-            packageId,
-            cache,
-            NullLogger.Instance,
-            cancellationToken);
+        IEnumerable<NuGetVersion> versions = await findResource.GetAllVersionsAsync(packageId, cache, NullLogger.Instance, cancellationToken);
 
         return versions?.ToList() ?? [];
     }
@@ -82,12 +75,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         try
         {
             bool copied = await findResource.CopyNupkgToStreamAsync(
-                packageId,
-                version,
-                fileStream,
-                cache,
-                NullLogger.Instance,
-                cancellationToken);
+                packageId, version, fileStream, cache, NullLogger.Instance, cancellationToken);
 
             if (!copied)
             {
@@ -115,9 +103,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     {
         HttpSourceResource httpSourceResource = await _repository.GetResourceAsync<HttpSourceResource>(cancellationToken);
         return await httpSourceResource.HttpSource.GetJObjectAsync(
-            new HttpSourceRequest(searchUri, NullLogger.Instance),
-            NullLogger.Instance,
-            cancellationToken);
+            new HttpSourceRequest(searchUri, NullLogger.Instance), NullLogger.Instance, cancellationToken);
     }
 
     /// <summary>
@@ -154,7 +140,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
             "take=" + take.ToString(CultureInfo.InvariantCulture),
             "prerelease=" + (query.IncludePrerelease ?? false).ToString(CultureInfo.InvariantCulture).ToLowerInvariant(),
             "semVerLevel=2.0.0",
-            $"{PackageTypeQueryParam}=" + Uri.EscapeDataString(FuncCliWorkloadPackageType),
+            $"{PackageTypeQueryParam}=" + Uri.EscapeDataString(WorkloadPackageTypes.Workload),
         };
 
         return new Uri(baseUrl + (baseUrl.Contains('?') ? "&" : "?") + string.Join("&", qs));
@@ -198,7 +184,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
                 LatestVersion: version,
                 Title: (string?)hit["title"],
                 Description: (string?)hit["description"],
-                Aliases: ParseAliases(tagsString),
+                Aliases: WorkloadPackageTags.ParseValues(tagsString, WorkloadPackageTags.AliasPrefix),
                 Source: source)
             {
                 Kind = ParseKind(tagsString),
@@ -228,63 +214,17 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         return null;
     }
 
-    private static IReadOnlyList<string> ParseAliases(string? tags)
-    {
-        if (string.IsNullOrWhiteSpace(tags))
-        {
-            return [];
-        }
-
-        var aliases = new List<string>();
-        foreach (string token in tags.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (token.StartsWith(WorkloadInstaller.AliasTagPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                string alias = token[WorkloadInstaller.AliasTagPrefix.Length..].Trim();
-                if (alias.Length > 0)
-                {
-                    aliases.Add(alias.ToLowerInvariant());
-                }
-            }
-        }
-
-        return aliases;
-    }
-
     // Last kind:<value> tag wins if a package is mis-tagged with more than one;
     // returning null when the tag is absent means callers can distinguish
     // "not declared" from a typo'd value.
     private static string? ParseKind(string? tags)
-        => ParseLastTagValue(tags, WorkloadInstaller.KindTagPrefix);
+        => WorkloadPackageTags.ParseLastValue(tags, WorkloadPackageTags.KindPrefix);
 
     // Last rid:<value> tag wins, same as kind. Per-RID workload packs (host,
     // python worker) carry exactly one `rid:` tag matching the runtime they
     // target; single-RID packs omit it.
     private static string? ParseRid(string? tags)
-        => ParseLastTagValue(tags, WorkloadInstaller.RidTagPrefix);
-
-    private static string? ParseLastTagValue(string? tags, string prefix)
-    {
-        if (string.IsNullOrWhiteSpace(tags))
-        {
-            return null;
-        }
-
-        string? lastValue = null;
-        foreach (string token in tags.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (token.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                string value = token[prefix.Length..].Trim();
-                if (value.Length > 0)
-                {
-                    lastValue = value.ToLowerInvariant();
-                }
-            }
-        }
-
-        return lastValue;
-    }
+        => WorkloadPackageTags.ParseLastValue(tags, WorkloadPackageTags.RuntimeIdentifierPrefix);
 
     // Hits without a `packageTypes` array fall through (kept): V3 search
     // responses don't guarantee the field, and dropping silent hits would
@@ -303,7 +243,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         {
             string? name = (string?)entry["name"] ?? (entry as JValue)?.Value as string;
             if (!string.IsNullOrEmpty(name)
-                && string.Equals(name, FuncCliWorkloadPackageType, StringComparison.OrdinalIgnoreCase))
+                && string.Equals(name, WorkloadPackageTypes.Workload, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 
 namespace Azure.Functions.Cli.Profiles;
@@ -8,12 +9,12 @@ namespace Azure.Functions.Cli.Profiles;
 /// <summary>
 /// Loads project-level profiles from <c>.func/profiles.json</c>.
 /// </summary>
-internal sealed class ProjectProfileSource(ProfileDocumentParser parser, IProfileFileSystem fileSystem) : IProfileSource
+internal sealed class ProjectProfileSource(ProfileDocumentParser parser, IFileSystem fileSystem) : IProfileSource
 {
     public const string ProfilesFileName = "profiles.json";
 
     private readonly ProfileDocumentParser _parser = parser ?? throw new ArgumentNullException(nameof(parser));
-    private readonly IProfileFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public async Task<ProfileSourceSnapshot> LoadAsync(ProfileSourceContext context, CancellationToken cancellationToken)
     {

@@ -12,6 +12,8 @@ namespace Azure.Functions.Cli.Common;
 /// </summary>
 internal sealed class AssemblyCliVersionProvider : ICliVersionProvider
 {
+    public static readonly AssemblyCliVersionProvider Instance = new();
+
     public AssemblyCliVersionProvider()
     {
         var assembly = Assembly.GetExecutingAssembly();

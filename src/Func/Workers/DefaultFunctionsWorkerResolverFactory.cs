@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads;
+using Microsoft.Extensions.Logging;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Workers;
@@ -11,11 +12,14 @@ namespace Azure.Functions.Cli.Workers;
 /// </summary>
 internal sealed class DefaultFunctionsWorkerResolverFactory(
     IWorkloadProvider workloadProvider,
-    IFunctionsWorkerContentResolver workerContentResolver) : IFunctionsWorkerResolverFactory
+    IFunctionsWorkerContentResolver workerContentResolver,
+    ILogger<DefaultFunctionsWorkerResolver> resolverLogger) : IFunctionsWorkerResolverFactory
 {
     private readonly IWorkloadProvider _workloadProvider = workloadProvider ?? throw new ArgumentNullException(nameof(workloadProvider));
     private readonly IFunctionsWorkerContentResolver _workerContentResolver = workerContentResolver
         ?? throw new ArgumentNullException(nameof(workerContentResolver));
+    private readonly ILogger _resolverLogger = resolverLogger
+        ?? throw new ArgumentNullException(nameof(resolverLogger));
 
     public IFunctionsWorkerResolver Create(IReadOnlyDictionary<string, VersionRange> workerVersionRanges)
     {
@@ -24,6 +28,7 @@ internal sealed class DefaultFunctionsWorkerResolverFactory(
         return new DefaultFunctionsWorkerResolver(
             _workloadProvider,
             _workerContentResolver,
+            _resolverLogger,
             workerVersionRanges);
     }
 }

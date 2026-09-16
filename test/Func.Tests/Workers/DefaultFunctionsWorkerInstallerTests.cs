@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NuGet.Configuration;
@@ -111,6 +112,47 @@ public class DefaultFunctionsWorkerInstallerTests
     }
 
     [Fact]
+    public async Task InstallAsync_RidPointerImplementationReturnsWorker()
+    {
+        var workerId = new FunctionsWorkerId(WorkerRuntime);
+        WorkloadEntry entry = new()
+        {
+            PackageId = $"{WorkerPackageId}.win-x64",
+            PackageVersion = "3.14.0",
+            Kind = WorkloadKind.Content,
+            Aliases = ["node-worker"],
+            DisplayName = WorkerPackageId,
+            Description = string.Empty,
+            IsImplicitlyInstalled = true,
+            LogicalPackage = new LogicalPackage
+            {
+                PackageId = WorkerPackageId,
+                PackageVersion = "3.14.0",
+            },
+        };
+        _workloadInstaller.InstallFromCatalogAsync(
+                Arg.Any<string>(),
+                Arg.Any<NuGetVersion?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new WorkloadInstallResult(entry, AlreadyInstalled: false));
+        DefaultFunctionsWorkerInstaller installer = CreateInstaller();
+
+        FunctionsWorkerInstallResult result = await installer.InstallAsync(
+            workerId,
+            new Dictionary<string, VersionRange>(),
+            CancellationToken.None);
+
+        result.Worker.WorkerRuntime.Should().Be(WorkerRuntime);
+        result.Worker.WorkerConfigPath.Should()
+            .Be(Path.Combine(GetInstallDirectory("3.14.0", entry.PackageId), "tools", "any", "worker.config.json"));
+    }
+
+    [Fact]
     public async Task InstallAsync_NoPackageInProfileRange_ThrowsWorkloadPackageNotFound()
     {
         var workerId = new FunctionsWorkerId(WorkerRuntime);
@@ -175,7 +217,7 @@ public class DefaultFunctionsWorkerInstallerTests
     [Fact]
     public void Ctor_NullDependencies_Throw()
     {
-        var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem, Options.Create(new WorkloadCatalogOptions()));
+        var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem, Options.Create(new WorkloadCatalogOptions()), NullLogger<DefaultFunctionsWorkerContentResolver>.Instance);
 
         FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(null!, _workloadInstaller, _workloadPaths, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
         FluentActions.Invoking(() => new DefaultFunctionsWorkerInstaller(_workloadCatalog, null!, _workloadPaths, contentResolver)).Should().ThrowExactly<ArgumentNullException>();
@@ -185,14 +227,17 @@ public class DefaultFunctionsWorkerInstallerTests
 
     private DefaultFunctionsWorkerInstaller CreateInstaller()
     {
-        var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem, Options.Create(new WorkloadCatalogOptions()));
+        var contentResolver = new DefaultFunctionsWorkerContentResolver(_fileSystem, Options.Create(new WorkloadCatalogOptions()), NullLogger<DefaultFunctionsWorkerContentResolver>.Instance);
         return new DefaultFunctionsWorkerInstaller(_workloadCatalog, _workloadInstaller, _workloadPaths, contentResolver);
     }
 
-    private static WorkloadEntry CreateWorkerEntry(string packageVersion, WorkloadKind kind = WorkloadKind.Content)
+    private static WorkloadEntry CreateWorkerEntry(
+        string packageVersion,
+        WorkloadKind kind = WorkloadKind.Content,
+        string packageId = WorkerPackageId)
         => new()
         {
-            PackageId = WorkerPackageId,
+            PackageId = packageId,
             PackageVersion = packageVersion,
             Kind = kind,
             Aliases = ["node-worker"],
@@ -200,5 +245,6 @@ public class DefaultFunctionsWorkerInstallerTests
             Description = string.Empty,
         };
 
-    private static string GetInstallDirectory(string packageVersion) => Path.Combine(Path.GetTempPath(), "workloads", WorkerPackageId, packageVersion);
+    private static string GetInstallDirectory(string packageVersion, string packageId = WorkerPackageId)
+        => Path.Combine(Path.GetTempPath(), "workloads", packageId, packageVersion);
 }

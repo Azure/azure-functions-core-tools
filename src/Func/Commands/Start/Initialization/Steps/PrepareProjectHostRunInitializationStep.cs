@@ -48,6 +48,14 @@ internal sealed class PrepareProjectHostRunInitializationStep(
 
         Dictionary<string, string> environmentVariables = BuildEnvironmentVariables(context, project, worker);
 
+        // Emit stack-specific startup notices through the structured renderer so JSON mode
+        // is not corrupted by plain-text writes.
+        if (context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration)
+            && !string.IsNullOrWhiteSpace(stackConfiguration.StartupNotice))
+        {
+            await context.ReportLogAsync(stackConfiguration.StartupNotice, FunctionsProjectReportSeverity.Info, cancellationToken);
+        }
+
         var hostRunContext = new FunctionsProjectHostRunContext(
             project.WorkingDirectory.Info,
             worker.WorkerRuntime,
@@ -99,6 +107,16 @@ internal sealed class PrepareProjectHostRunInitializationStep(
         foreach ((string name, string value) in context.State.BundleEnvVarsForHost)
         {
             environmentVariables[name] = value;
+        }
+
+        // Stack-specific host adjustments (e.g. .NET worker debug wait / JSON output) sit on top:
+        // the user asked for them explicitly on the command line, so they win over inherited values.
+        if (context.Options.StackHostConfigurations.TryGetValue(project.StackName, out StartHostConfiguration? stackConfiguration))
+        {
+            foreach ((string name, string value) in stackConfiguration.EnvironmentVariables)
+            {
+                environmentVariables[name] = value;
+            }
         }
 
         return environmentVariables;

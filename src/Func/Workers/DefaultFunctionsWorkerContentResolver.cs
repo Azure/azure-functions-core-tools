@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NuGet.Versioning;
 
@@ -13,7 +14,8 @@ namespace Azure.Functions.Cli.Workers;
 /// </summary>
 internal sealed class DefaultFunctionsWorkerContentResolver(
     IWorkerConfigFileSystem workerConfigFileSystem,
-    IOptions<WorkloadCatalogOptions> catalogOptions) : IFunctionsWorkerContentResolver
+    IOptions<WorkloadCatalogOptions> catalogOptions,
+    ILogger<DefaultFunctionsWorkerContentResolver> logger) : IFunctionsWorkerContentResolver
 {
     private const string WorkerConfigFileName = "worker.config.json";
 
@@ -22,6 +24,8 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
 
     private readonly WorkloadCatalogOptions _catalogOptions = catalogOptions?.Value
         ?? throw new ArgumentNullException(nameof(catalogOptions));
+
+    private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public FunctionsWorkerResolutionResult ResolveWorker(
         FunctionsWorkerId workerId,
@@ -35,6 +39,7 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
 
         if (installedWorkers.Count == 0)
         {
+            Log.NoInstalledWorkloadsMatched(_logger, workerId.Value);
             return NotInstalled(workerId);
         }
 
@@ -43,9 +48,15 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!NuGetVersion.TryParse(workload.PackageVersion, out NuGetVersion? version)
-                || !SatisfiesConstraint(version, versionConstraint))
+            if (!NuGetVersion.TryParse(workload.PackageVersion, out NuGetVersion? version))
             {
+                Log.SkippingInvalidVersion(_logger, workload.PackageId, workload.PackageVersion);
+                continue;
+            }
+
+            if (!SatisfiesConstraint(version, versionConstraint))
+            {
+                Log.SkippingConstraintMismatch(_logger, workload.PackageId, version.ToNormalizedString(), versionConstraint?.ToString() ?? "(none)");
                 continue;
             }
 
@@ -54,6 +65,11 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
 
         if (candidates.Count == 0)
         {
+            Log.NoCompatibleVersion(
+                _logger,
+                workerId.Value,
+                versionConstraint?.ToString() ?? "(none)",
+                string.Join(", ", installedWorkers.Select(w => $"{w.PackageId}@{w.PackageVersion}")));
             return MissingCompatibleVersion(workerId, versionConstraint);
         }
 
@@ -64,6 +80,7 @@ internal sealed class DefaultFunctionsWorkerContentResolver(
         string workerConfigPath = Path.Combine(selected.Workload.ContentRoot, WorkerConfigFileName);
         if (!_workerConfigFileSystem.FileExists(workerConfigPath))
         {
+            Log.MissingWorkerConfig(_logger, selected.Workload.PackageId, selected.Version.ToNormalizedString(), workerConfigPath);
             return InvalidInstallation(workerId, selected, workerConfigPath);
         }
 

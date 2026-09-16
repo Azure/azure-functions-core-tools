@@ -36,17 +36,9 @@ public sealed class PythonWorkerWorkloadPackageTests
         PythonWorkerWorkloadPackage.CurrentPackageId.Should().StartWith(PythonWorkerWorkloadPackage.PackageIdPrefix);
     }
 
-    [Theory]
-    [InlineData("win-x64", true)]
-    [InlineData("linux-x64", true)]
-    [InlineData("linux-arm64", true)]
-    [InlineData("osx-x64", true)]
-    [InlineData("osx-arm64", true)]
-    [InlineData("WIN-X64", true)]
-    [InlineData("win-arm64", false)]
-    [InlineData("freebsd-x64", false)]
-    public void IsSupported_MatchesPublishedRids(string runtimeIdentifier, bool expected)
+    [Fact]
+    public void PackageId_IsRidPointerPackageId()
     {
-        PythonWorkerWorkloadPackage.IsSupported(runtimeIdentifier).Should().Be(expected);
+        PythonWorkerWorkloadPackage.PackageId.Should().Be("Azure.Functions.Cli.Workloads.Workers.Python");
     }
 }

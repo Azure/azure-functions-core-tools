@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NuGet.Versioning;
@@ -250,25 +251,25 @@ public class DefaultFunctionsWorkerResolverTests
     [Fact]
     public void Ctor_NullWorkloadProvider_Throws()
     {
-        FluentActions.Invoking(() => new DefaultFunctionsWorkerResolver(null!, CreateContentResolver())).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerResolver(null!, CreateContentResolver(), NullLogger<DefaultFunctionsWorkerResolver>.Instance)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Ctor_NullContentResolver_Throws()
     {
-        FluentActions.Invoking(() => new DefaultFunctionsWorkerResolver(_workloads, null!)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerResolver(_workloads, null!, NullLogger<DefaultFunctionsWorkerResolver>.Instance)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void ContentResolverCtor_NullWorkerConfigFileSystem_Throws()
     {
-        FluentActions.Invoking(() => new DefaultFunctionsWorkerContentResolver(null!, Options.Create(new WorkloadCatalogOptions()))).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerContentResolver(null!, Options.Create(new WorkloadCatalogOptions()), NullLogger<DefaultFunctionsWorkerContentResolver>.Instance)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void ContentResolverCtor_NullCatalogOptions_Throws()
     {
-        FluentActions.Invoking(() => new DefaultFunctionsWorkerContentResolver(_fileSystem, null!)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DefaultFunctionsWorkerContentResolver(_fileSystem, null!, NullLogger<DefaultFunctionsWorkerContentResolver>.Instance)).Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -325,10 +326,10 @@ public class DefaultFunctionsWorkerResolverTests
     private DefaultFunctionsWorkerResolver CreateResolver(
         IReadOnlyDictionary<string, VersionRange>? workerVersionRanges = null,
         bool includePrerelease = false)
-        => new(_workloads, CreateContentResolver(includePrerelease), workerVersionRanges);
+        => new(_workloads, CreateContentResolver(includePrerelease), NullLogger<DefaultFunctionsWorkerResolver>.Instance, workerVersionRanges);
 
     private DefaultFunctionsWorkerContentResolver CreateContentResolver(bool includePrerelease = false)
-        => new(_fileSystem, Options.Create(new WorkloadCatalogOptions { IncludePrerelease = includePrerelease }));
+        => new(_fileSystem, Options.Create(new WorkloadCatalogOptions { IncludePrerelease = includePrerelease }), NullLogger<DefaultFunctionsWorkerContentResolver>.Instance);
 
     private static ContentWorkloadInfo CreateContentWorkload(string packageId, string packageVersion, IReadOnlyList<string>? aliases = null)
     {
