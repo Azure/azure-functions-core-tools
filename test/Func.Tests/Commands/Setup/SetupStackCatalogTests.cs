@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Workloads.Catalog;
 using NSubstitute;
 using NuGet.Configuration;
+using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Commands.Setup;
@@ -89,6 +90,107 @@ public class SetupStackCatalogTests
         SetupStackSnapshot snapshot = await stackCatalog.GetStacksAsync(source: null, includePrerelease: false, CancellationToken.None);
 
         snapshot.StackNames.Should().BeEquivalentTo(SetupDependency.BuiltInStackSnapshot.StackNames);
+    }
+
+    [Theory]
+    [InlineData("http")]
+    [InlineData("io")]
+    [InlineData("protocol")]
+    [InlineData("argument")]
+    [InlineData("invalid-operation")]
+    public async Task GetStacksAsync_LaterPageFails_PreservesObservedConflictsOnCachedFallback(string failure)
+    {
+        Exception exception = failure switch
+        {
+            "http" => new HttpRequestException("offline"),
+            "io" => new IOException("offline"),
+            "protocol" => new FatalProtocolException("invalid response"),
+            "argument" => new ArgumentException("invalid response"),
+            "invalid-operation" => new InvalidOperationException("invalid response"),
+            _ => throw new ArgumentOutOfRangeException(nameof(failure)),
+        };
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
+            .Returns([
+                Result("contoso.node", ["node", "nodejs"], kind: "workload"),
+                Result("contoso.other-node", ["node"], kind: "content"),
+                Result("contoso.java", ["java"], kind: "workload"),
+                Result("contoso.go-templates", ["go-templates"], kind: "content"),
+                Result("contoso.other-go-templates", ["go-templates"], kind: "content"),
+            ]);
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<CatalogSearchResult>>(_ => throw exception);
+        SetupStackCatalog catalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await catalog.GetStacksAsync(null, false, CancellationToken.None);
+        SetupStackSnapshot cached = await catalog.GetStacksAsync(null, false, CancellationToken.None);
+
+        snapshot.IsAmbiguous("node").Should().BeTrue();
+        snapshot.IsAmbiguous("go").Should().BeTrue();
+        snapshot.IsAmbiguous("go-templates").Should().BeTrue();
+        snapshot.CanonicalStackName("nodejs").Should().Be("node");
+        snapshot.StackPackageId("nodejs").Should().BeNull();
+        snapshot.TemplatesPackageId("nodejs").Should().BeNull();
+        snapshot.StackNames.Should().BeEquivalentTo(["python", "dotnet"]);
+        snapshot.SupportsStack("java").Should().BeFalse("a failed search must retain the built-in fallback policy");
+        snapshot.StackPackageId("python").Should().Be(SetupDependency.BuiltInStackSnapshot.StackPackageId("python"));
+        cached.Should().BeSameAs(snapshot);
+        await _catalog.Received(2).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetStacksAsync_LaterPageFailsWithoutConflicts_UsesBuiltInFallback()
+    {
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
+            .Returns([Result("contoso.java", ["java"], kind: "workload")]);
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<CatalogSearchResult>>(_ => throw new HttpRequestException("offline"));
+        SetupStackCatalog catalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await catalog.GetStacksAsync(null, false, CancellationToken.None);
+
+        snapshot.Should().BeSameAs(SetupDependency.BuiltInStackSnapshot);
+    }
+
+    [Fact]
+    public async Task GetStacksAsync_LaterPageFails_UncontestedAlternateCannotRedirectABuiltInStack()
+    {
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
+            .Returns([
+                Result("contoso.java", ["java", "node"], kind: "workload"),
+                Result("contoso.go-templates", ["go-templates"], kind: "content"),
+                Result("contoso.other-go-templates", ["go-templates"], kind: "content"),
+            ]);
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<CatalogSearchResult>>(_ => throw new HttpRequestException("offline"));
+        SetupStackCatalog catalog = new(_catalog);
+
+        SetupStackSnapshot snapshot = await catalog.GetStacksAsync(null, false, CancellationToken.None);
+
+        snapshot.IsAmbiguous("go").Should().BeTrue();
+        snapshot.CanonicalStackName("node").Should().Be("node");
+        snapshot.StackPackageId("node").Should().Be(SetupDependency.BuiltInStackSnapshot.StackPackageId("node"));
+        snapshot.SupportsStack("java").Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetStacksAsync_LaterPageCancellationOrBug_PropagatesWithoutCaching(bool canceled)
+    {
+        Exception exception = canceled ? new OperationCanceledException() : new NullReferenceException("bug");
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
+            .Returns([Result("contoso.java", ["java"], kind: "workload")]);
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<CatalogSearchResult>>(_ => throw exception);
+        SetupStackCatalog catalog = new(_catalog);
+
+        Exception? observed = await Record.ExceptionAsync(() => catalog.GetStacksAsync(null, false, CancellationToken.None));
+
+        observed.Should().BeSameAs(exception);
+        _catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>()).Returns([]);
+        SetupStackSnapshot retried = await catalog.GetStacksAsync(null, false, CancellationToken.None);
+        retried.StackNames.Should().Equal(["java"]);
+        await _catalog.Received(2).SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>());
     }
 
     [Fact]

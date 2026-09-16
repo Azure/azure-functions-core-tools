@@ -78,6 +78,12 @@ internal sealed class SetupFeatureResolver(
             {
                 stacks ??= await _stackCatalog.GetStacksAsync(options.Source, options.IncludePrerelease, cancellationToken);
                 feature = stacks.CanonicalStackName(feature);
+                if (IsResolverKeyword(feature))
+                {
+                    throw new SetupConfigurationException(
+                        $"Stack alias '{rawFeature}' resolves to reserved setup feature '{feature}'. "
+                        + "Install the package explicitly with 'func workload install <package-id>'.");
+                }
             }
 
             switch (feature)

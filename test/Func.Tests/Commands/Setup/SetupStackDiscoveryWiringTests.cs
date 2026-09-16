@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Profiles;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
@@ -22,6 +23,78 @@ public class SetupStackDiscoveryWiringTests
 {
     private readonly ISetupStackCatalog _stackCatalog = Substitute.For<ISetupStackCatalog>();
     private readonly IHostJsonBundleSectionReader _bundleReader = Substitute.For<IHostJsonBundleSectionReader>();
+
+    [Theory]
+    [InlineData("host", true)]
+    [InlineData("runtime", true)]
+    [InlineData(".net", true)]
+    [InlineData("dotnet-inprocess", true)]
+    [InlineData("dotnet-isolated", true)]
+    [InlineData("host", false)]
+    [InlineData("runtime", false)]
+    [InlineData(".net", false)]
+    [InlineData("dotnet-inprocess", false)]
+    [InlineData("dotnet-isolated", false)]
+    public async Task FeatureResolver_AlternateOfReservedPrimary_RefusesInsteadOfDispatchingBuiltInFeature(string primary, bool pageFails)
+    {
+        var catalog = Substitute.For<IWorkloadCatalog>();
+        var source = new NuGet.Configuration.PackageSource("https://example.test/v3/index.json");
+        catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
+            .Returns([
+                new CatalogSearchResult("contoso.stack", new NuGetVersion("1.0.0"), null, null, [primary, "node"], source)
+                {
+                    Kind = "workload",
+                },
+                new CatalogSearchResult("contoso.conflict", new NuGetVersion("1.0.0"), null, null, [primary], source)
+                {
+                    Kind = "content",
+                },
+            ]);
+        catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<CatalogSearchResult>>(_ => pageFails ? throw new HttpRequestException("offline") : []);
+        SetupStackCatalog stacks = new(catalog);
+        SetupFeatureResolver resolver = new(new TestInteractionService(), Substitute.For<IWorkloadStore>(),
+            Substitute.For<ICliConfigurationProvider>(), stacks);
+
+        await FluentActions.Awaiting(() => resolver.ResolveFeaturesAsync(Options(["node"]), CancellationToken.None))
+            .Should().ThrowAsync<SetupConfigurationException>().WithMessage("*reserved setup feature*");
+    }
+
+    [Theory]
+    [InlineData("node")]
+    [InlineData("nodejs")]
+    public async Task Discovery_LaterPageFails_RefusesTheObservedContestedStackAndItsAlternate(string feature)
+    {
+        var catalog = Substitute.For<IWorkloadCatalog>();
+        var source = new NuGet.Configuration.PackageSource("https://example.test/v3/index.json");
+        catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 0), Arg.Any<CancellationToken>())
+            .Returns([
+                new CatalogSearchResult("contoso.node", new NuGetVersion("1.0.0"), null, null, ["node", "nodejs"], source)
+                {
+                    Kind = "workload",
+                },
+                new CatalogSearchResult("contoso.other-node", new NuGetVersion("1.0.0"), null, null, ["node"], source)
+                {
+                    Kind = "content",
+                },
+            ]);
+        catalog.SearchAsync(Arg.Is<CatalogSearchQuery>(q => q.Skip == 100), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<CatalogSearchResult>>(_ => throw new HttpRequestException("offline"));
+        SetupStackCatalog stacks = new(catalog);
+        SetupFeatureResolver resolver = new(new TestInteractionService(), Substitute.For<IWorkloadStore>(),
+            Substitute.For<ICliConfigurationProvider>(), stacks);
+        SetupDependencyPlanBuilder builder = new(_bundleReader, stacks);
+
+        SetupFeaturePlan? features = await resolver.ResolveFeaturesAsync(Options([feature]), CancellationToken.None);
+        SetupDependencyPlan plan = await builder.BuildDependencyPlanAsync(
+            Options([feature]), features!, SetupProfileScope.Unconstrained, CancellationToken.None);
+
+        features!.Features.Should().Equal(["node"]);
+        plan.Failures.Should().ContainSingle().Which.Message.Should().Contain("More than one workload package");
+        plan.Dependencies.Should().NotContain(d =>
+            d.Kind == SetupDependencyKind.Worker || d.Kind == SetupDependencyKind.Stack || d.Kind == SetupDependencyKind.Templates);
+        await catalog.Received(2).SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
+    }
 
     [Fact]
     public async Task PlanBuilder_UsesDiscoveredPackageId_NotTheBuiltInOne()
@@ -407,35 +480,17 @@ public class SetupStackDiscoveryWiringTests
         offered.Should().NotContain(["runtime", "host"]);
     }
 
-    /// <summary>
-    /// Every name the resolver reserves, plus <c>dotnet</c>, which reaches the
-    /// same built-in arm but is deliberately still offerable. Driven off the
-    /// production array so the two can't drift.
-    /// </summary>
-    public static TheoryData<string> FeatureWords
-    {
-        get
-        {
-            TheoryData<string> data = [];
-            foreach (string keyword in SetupFeatureResolver.ResolverKeywords)
-            {
-                data.Add(keyword);
-            }
-
-            data.Add(SetupRuntimes.DotNetFeature);
-            return data;
-        }
-    }
-
     [Theory]
-    [MemberData(nameof(FeatureWords))]
-    public async Task FeatureResolver_StackNamedAfterAFeatureWord_IsEitherWithheldOrActuallyPlanned(string name)
+    [InlineData("host", false)]
+    [InlineData("runtime", false)]
+    [InlineData(".net", false)]
+    [InlineData("dotnet-inprocess", false)]
+    [InlineData("dotnet-isolated", false)]
+    [InlineData("dotnet", true)]
+    public async Task FeatureResolver_StackNamedAfterAFeatureWord_HonorsItsOfferContract(string name, bool shouldOffer)
     {
-        // Every name the switch dispatches on has to land on one side of this:
-        // withheld from the prompt, or offered and genuinely planned. Showing a
-        // package and then installing something else is the failure. Asserting
-        // the invariant rather than a keyword list maintained by hand, since
-        // that list is what went wrong.
+        // These expected CLI semantics are independent of the production keyword
+        // collection so omitting a reserved name cannot also remove its test case.
         const string packageId = "contoso.workloads.thing";
         WithDiscoveredStacks(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [name] = packageId });
         IWorkloadStore store = Substitute.For<IWorkloadStore>();
@@ -450,8 +505,10 @@ public class SetupStackDiscoveryWiringTests
         bool offered = interaction.MultiSelectionChoices
             .SelectMany(static choices => choices)
             .Any(choice => string.Equals(choice.Value, name, StringComparison.OrdinalIgnoreCase));
-        if (!offered)
+        offered.Should().Be(shouldOffer);
+        if (!shouldOffer)
         {
+            featurePlan.Should().BeNull();
             return;
         }
 

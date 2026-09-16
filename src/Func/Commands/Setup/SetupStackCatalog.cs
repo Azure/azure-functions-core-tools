@@ -15,8 +15,8 @@ internal interface ISetupStackCatalog
 {
     /// <summary>
     /// Returns the published stack and templates packages keyed by stack name.
-    /// Falls back to the built-in list when the catalog cannot be reached, so
-    /// offline setup keeps working exactly as it did before.
+    /// Falls back to the built-in list when discovery fails, retaining any
+    /// alias conflicts already observed. Discovery is bounded and best-effort.
     /// </summary>
     public Task<SetupStackSnapshot> GetStacksAsync(string? source, bool includePrerelease, CancellationToken cancellationToken);
 }
@@ -108,15 +108,13 @@ internal sealed record SetupStackSnapshot(
 
 internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISetupStackCatalog
 {
-    // Mirrors the `kind:workload` PackageTag that stack csprojs emit; every other
-    // workload shape (host, bundles, workers, templates) packs as `kind:content`.
+    // Mirrors the `kind:workload` PackageTag emitted by stack csprojs.
     private const string StackKind = "workload";
     private const string TemplatesAliasSuffix = "-templates";
 
     private const int PageSize = 100;
 
-    // Upper bound on the pages walked, so a feed that always returns a full
-    // page can't spin forever. Well above the ~21 workloads published today.
+    // Bound the requests even when a feed never returns an empty page.
     private const int MaxDiscoveredPackages = 1000;
 
     private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
@@ -140,13 +138,12 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
     private async Task<SetupStackSnapshot> DiscoverAsync(string? source, bool includePrerelease, CancellationToken cancellationToken)
     {
         List<CatalogSearchResult> results = [];
+        bool useBuiltInFallback = false;
         try
         {
             // An empty filter is deliberate: the catalog pairs it with
-            // packageType=FuncCliWorkload, which nuget.org honours, so this
-            // returns the full workload set (measured 2026-08-11: 21 of 21 hits
-            // were workloads). Narrowing to a term such as the shared
-            // `func-workload` tag returns fewer rows and drops stacks.
+            // packageType=FuncCliWorkload. Narrowing to a text term such as
+            // `func-workload` excludes stacks that do not carry that tag.
             for (int skip = 0; skip < MaxDiscoveredPackages; skip += PageSize)
             {
                 IReadOnlyList<CatalogSearchResult> page = await _workloadCatalog.SearchAsync(
@@ -166,8 +163,8 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
                 // a handful of workloads and more still to come. This still
                 // reads a filtered count, so a feed that both ignores
                 // packageType and reports packageTypes per hit could filter a
-                // whole page away and cut discovery short. The built-in
-                // fallback covers that.
+                // whole page away and cut discovery short. A partial stack map
+                // does not trigger fallback; neither path recovers unseen claims.
                 if (page.Count == 0)
                 {
                     break;
@@ -185,10 +182,9 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
             or HttpRequestException
             or FatalProtocolException)
         {
-            // Offline, unreachable feed, or a malformed response. Setup still
-            // needs to work against already-installed workloads, so use the
-            // built-in list. Anything else is a bug and should surface.
-            return SetupDependency.BuiltInStackSnapshot;
+            // Keep the offline fallback, but process the pages already received
+            // so a later failure cannot erase known alias conflicts.
+            useBuiltInFallback = true;
         }
 
         Dictionary<string, string> claims = new(StringComparer.OrdinalIgnoreCase);
@@ -259,19 +255,23 @@ internal sealed class SetupStackCatalog(IWorkloadCatalog workloadCatalog) : ISet
             templates.Remove(alias);
         }
 
-        if (stacks.Count > 0)
+        if (!useBuiltInFallback && stacks.Count > 0)
         {
             return new SetupStackSnapshot(stacks, templates, ambiguous, secondary);
         }
 
-        // An empty result usually means the query failed silently rather than
-        // "no stacks exist", so prefer the built-in list over offering nothing.
-        // Conflicting claims and the alias mappings ride along, otherwise a feed
-        // where every alias collides would empty the map and get the built-in
-        // ids waved through as if nothing were wrong.
+        // Empty or failed discovery uses built-in ids. Observed conflicts and
+        // their alternate spellings must still be refused on that fallback.
+        // Uncontested aliases from partial results must not redirect built-in names.
         return ambiguous.Count == 0
             ? SetupDependency.BuiltInStackSnapshot
-            : SetupDependency.BuiltInStackSnapshot with { AmbiguousAliases = ambiguous, SecondaryAliases = secondary };
+            : SetupDependency.BuiltInStackSnapshot with
+            {
+                AmbiguousAliases = ambiguous,
+                SecondaryAliases = secondary
+                    .Where(pair => ambiguous.Contains(pair.Value))
+                    .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
+            };
     }
 
     /// <summary>
