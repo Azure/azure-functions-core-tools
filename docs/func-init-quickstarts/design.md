@@ -271,9 +271,9 @@ The Azure-Samples packaging pipeline must produce templates that include:
 - one trusted configuration action per Functions project;
 - canonical stack and language action values.
 
-For a repository lacking authored template configuration, reviewed onboarding `template.projects` metadata can declare one or more static Functions project roots with canonical stack and language. The packager uses each root `host.json` as a primary output and adds the corresponding configuration action.
+For a repository lacking authored template configuration, the repository-owned `.github/azure-functions-template.yaml` synthesis descriptor can declare one or more static Functions project roots with canonical stack and language. The packager uses each root `host.json` as a primary output and adds the corresponding configuration action.
 
-Parameterized or conditional project topology cannot be expressed by pipeline onboarding metadata and requires authored template configuration and project actions. Authored root `.template.config/template.json` and onboarding `template` metadata are mutually exclusive. The packaging pipeline loads and dry-runs either resulting template through the same validation path.
+Parameterized or conditional project topology cannot be expressed by the synthesis descriptor and requires authored template configuration and project actions. Authored root `.template.config/template.json` and `.github/azure-functions-template.yaml` are mutually exclusive. The packaging pipeline loads and dry-runs either resulting template through the same validation path.
 
 ## Risks / Trade-offs
 
