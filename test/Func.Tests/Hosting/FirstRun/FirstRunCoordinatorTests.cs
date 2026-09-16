@@ -370,6 +370,14 @@ public sealed class FirstRunCoordinatorTests
             return Task.FromResult(ConfirmResponse);
         }
 
+        public Task<bool> ConfirmAsync(string prompt, bool defaultValue, bool whenInputUnavailable, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return IsInteractive
+                ? ConfirmAsync(prompt, defaultValue, cancellationToken)
+                : Task.FromResult(whenInputUnavailable);
+        }
+
         public Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)
             => Task.FromResult(string.Empty);
 

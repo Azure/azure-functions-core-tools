@@ -291,6 +291,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 return 1;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             ClearDirectory(workingDirectory.Info);
         }
 
@@ -431,10 +432,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             : "The programming language. Supported values: " + string.Join(", ", languages) + ".";
     }
 
-    // Warns about the destructive side of --force and (in interactive mode)
-    // asks for confirmation. Non-interactive callers proceed without
-    // prompting, on the theory that --force is itself an explicit opt-in.
-    // Returns false only when the user declined the interactive prompt.
+    // --force authorizes deletion when input is unavailable, but a prompt
+    // still defaults to No whenever confirmation can read an answer.
     private async Task<bool> ConfirmClearDirectoryAsync(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
     {
         if (!DirectoryGuard.HasNonGitContent(workingDirectory))
@@ -445,12 +444,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _interaction.WriteWarning(
             $"--force will delete all files in '{workingDirectory.FullName}' (except .git) before initializing.");
 
-        if (!_interaction.IsInteractive)
-        {
-            return true;
-        }
-
-        return await _interaction.ConfirmAsync("Continue?", defaultValue: false, cancellationToken);
+        return await _interaction.ConfirmAsync("Continue?", defaultValue: false, whenInputUnavailable: true, cancellationToken);
     }
 
     // Wipes everything in the working directory before a --force re-init so

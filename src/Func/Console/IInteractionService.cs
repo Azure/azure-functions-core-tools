@@ -116,6 +116,12 @@ internal interface IInteractionService
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Prompts on stdout with <paramref name="defaultValue"/> for an empty answer, or returns
+    /// <paramref name="whenInputUnavailable"/> when input is unavailable. Does not require ANSI; cancellation and input errors propagate.
+    /// </summary>
+    public Task<bool> ConfirmAsync(string prompt, bool defaultValue, bool whenInputUnavailable, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Prompts on stderr to select from a list of choices. Returns the first choice
     /// (or an empty string for no choices) when stderr lacks input or ANSI support.
     /// Throws <see cref="OperationCanceledException"/> on cancellation.

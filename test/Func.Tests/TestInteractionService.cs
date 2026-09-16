@@ -126,10 +126,13 @@ internal class TestInteractionService : IInteractionService
     }
 
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)
+        => ConfirmAsync(prompt, defaultValue, whenInputUnavailable: defaultValue, cancellationToken);
+
+    public Task<bool> ConfirmAsync(string prompt, bool defaultValue, bool whenInputUnavailable, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _lines.Add($"CONFIRM: {prompt} (default: {defaultValue})");
-        return Task.FromResult(defaultValue);
+        return Task.FromResult(IsInteractive ? defaultValue : whenInputUnavailable);
     }
 
     public Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)

@@ -297,12 +297,15 @@ internal class SpectreInteractionService : IInteractionService
         }
     }
 
-    public async Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)
+    public Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)
+        => ConfirmAsync(prompt, defaultValue, whenInputUnavailable: defaultValue, cancellationToken);
+
+    public async Task<bool> ConfirmAsync(string prompt, bool defaultValue, bool whenInputUnavailable, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!_stdout.Profile.Capabilities.Interactive)
         {
-            return defaultValue;
+            return whenInputUnavailable;
         }
 
         return await new ConfirmationPrompt(prompt) { DefaultValue = defaultValue }

@@ -183,7 +183,8 @@ interaction.WriteLine(l => l
 
 | Method | Returns | Non-Interactive Behavior |
 |--------|---------|------------------------|
-| `Confirm(prompt, default)` | `bool` | Returns `defaultValue` |
+| `ConfirmAsync(prompt, defaultValue, cancellationToken)` | `bool` | Returns `defaultValue` when stdout input is unavailable |
+| `ConfirmAsync(prompt, defaultValue, whenInputUnavailable, cancellationToken)` | `bool` | Returns `whenInputUnavailable`; an empty interactive answer still uses `defaultValue` |
 | `PromptForSelection(title, choices)` | `string` | Returns first choice |
 | `PromptForInput(prompt, defaultValue)` | `string` | Returns `defaultValue` |
 | `ShowStatusAsync<T>(message, action)` | `T` | Runs action, prints status text |
@@ -192,9 +193,11 @@ interaction.WriteLine(l => l
 
 `RunWithProgressAsync` exposes an `IProgressContext` to the action, which long-running operations can use to update the description, set/report numeric progress, or increment. The Spectre implementation renders a live progress bar; in non-interactive mode each description change is written as a separate line so logs remain readable.
 
+Confirmation prompts use stdout input and do not require ANSI or stderr capabilities. Init and quickstart use an interactive default of No and an unavailable-input fallback of Yes only for explicit `--force` operations. Cancellation and input errors propagate rather than approving the operation.
+
 ### `IsInteractive` Property
 
-Returns `true` when the console supports prompts (not redirected, not CI). Commands should check this before offering interactive flows.
+Returns `true` when both injected output consoles support input and ANSI. This is the conservative gate for flows combining stdout rendering and stderr selection prompts, not a universal prompt capability or permission to perform an operation. Individual prompt methods check their target console. Destructive confirmations use the explicit unavailable-input fallback instead of treating `IsInteractive == false` as approval.
 
 ## Workload System
 

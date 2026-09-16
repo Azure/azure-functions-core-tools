@@ -167,6 +167,55 @@ public class SpectreInteractionServiceTests
         stdout.Reads.Should().Be(input ? 1 : 0);
     }
 
+    public static IEnumerable<object[]> ConfirmationDefaults()
+    {
+        foreach (object[] capabilities in Capabilities())
+        foreach (bool defaultValue in new[] { false, true })
+        foreach (bool whenInputUnavailable in new[] { false, true })
+        {
+            yield return [.. capabilities, defaultValue, whenInputUnavailable];
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ConfirmationDefaults))]
+    public async Task ConfirmAsync_SeparateFallback_DoesNotChangeEnterDefaultOrLegacyOverload(
+        bool input, bool stdoutAnsi, bool stderrAnsi, bool noColor, bool defaultValue, bool whenInputUnavailable)
+    {
+        using var stdout = new BufferedConsole(input, stdoutAnsi, noColor);
+        using var stderr = new BufferedConsole(!input, stderrAnsi, noColor);
+        stdout.Enqueue(ConsoleKey.Enter);
+        stdout.Enqueue(ConsoleKey.Enter);
+        IInteractionService service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+
+        bool result = await service.ConfirmAsync("Continue?", defaultValue, whenInputUnavailable, CancellationToken.None);
+        bool legacyResult = await service.ConfirmAsync("Continue?", defaultValue, CancellationToken.None);
+
+        result.Should().Be(input ? defaultValue : whenInputUnavailable);
+        legacyResult.Should().Be(defaultValue);
+        stdout.Reads.Should().Be(input ? 2 : 0);
+        stderr.Reads.Should().Be(0);
+        stderr.Output.Should().BeEmpty();
+        if (input) stdout.Output.Should().Contain("Continue?");
+        else stdout.Output.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConfirmAsync_InputFailure_DoesNotReturnUnavailableFallback(bool whenInputUnavailable)
+    {
+        using var stdout = new BufferedConsole(true, false);
+        using var stderr = new BufferedConsole(false, false);
+        var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+
+        await FluentActions.Awaiting(() => service.ConfirmAsync("Continue?", false, whenInputUnavailable, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>().WithMessage("*scripted input*");
+
+        stdout.Reads.Should().Be(1);
+        stderr.Reads.Should().Be(0);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -230,7 +279,7 @@ public class SpectreInteractionServiceTests
         object?[] arguments = [.. method.GetParameters().Select(parameter => parameter.ParameterType switch
         {
             Type t when t == typeof(string) => (object)"Pick",
-            Type t when t == typeof(bool) => false,
+            Type t when t == typeof(bool) => parameter.Name == "whenInputUnavailable",
             Type t when t == typeof(CancellationToken) => CancellationToken.None,
             Type t when t == typeof(IEnumerable<string>) => new[] { "first", "second" },
             Type t when t == typeof(IEnumerable<MultiSelectionChoice>) => new[] { new MultiSelectionChoice("first") },
@@ -254,7 +303,7 @@ public class SpectreInteractionServiceTests
         object?[] arguments = [.. method.GetParameters().Select(parameter => parameter.ParameterType switch
         {
             Type t when t == typeof(string) => (object)"Pick",
-            Type t when t == typeof(bool) => false,
+            Type t when t == typeof(bool) => parameter.Name == "whenInputUnavailable",
             Type t when t == typeof(CancellationToken) => cancellation.Token,
             Type t when t == typeof(IEnumerable<string>) => Array.Empty<string>(),
             Type t when t == typeof(IEnumerable<MultiSelectionChoice>) => Array.Empty<MultiSelectionChoice>(),
