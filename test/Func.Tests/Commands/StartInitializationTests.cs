@@ -450,6 +450,57 @@ public class StartInitializationTests : IDisposable
     }
 
     [Fact]
+    public async Task DemoRunner_ProfiledMissingGoWorker_AllowsNativeRuntimeBeforeInstall()
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(_tempDir),
+            stackName: "go",
+            stackDisplayName: "Go",
+            workerReference: FunctionsWorkerReference.FromWorkload("go", workerRuntime: "native"));
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found go.mod"));
+        var workerId = new FunctionsWorkerId("go");
+        FunctionsWorkerResolutionFailure failure = CreateNotInstalledWorkerFailure("go");
+        IFunctionsWorkerResolver workerResolver = Substitute.For<IFunctionsWorkerResolver>();
+        workerResolver.ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>())
+            .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
+        IFunctionsWorkerResolverFactory workerResolverFactory = CreateWorkerResolverFactory(workerResolver);
+        var workerRange = VersionRange.Parse("[1.0.0]");
+        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["go"] = workerRange,
+        };
+        IFunctionsWorker installedWorker = CreateWorker("go", "native");
+        IFunctionsWorkerInstaller workerInstaller = Substitute.For<IFunctionsWorkerInstaller>();
+        WorkloadInstallResult workloadInstallResult = new(CreateWorkerEntry(FunctionsWorkerWorkloadPackages.GetPackageId(workerId), "1.0.0"), AlreadyInstalled: false);
+        workerInstaller.InstallAsync(workerId, Arg.Any<IReadOnlyDictionary<string, VersionRange>>(), Arg.Any<CancellationToken>())
+            .Returns(new FunctionsWorkerInstallResult(installedWorker, workloadInstallResult));
+        var runner = CreateRunner(
+            projectResolver,
+            CreateResolvedProfile(workerRanges, ["native"]),
+            CreateInstalledHostWorkloadResolver(),
+            workerInstaller: workerInstaller,
+            workerResolverFactory: workerResolverFactory,
+            hostProcessRunner: CreateSuccessfulHostProcessRunner());
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        StartInitializationResult result = await runner.RunAsync(
+            context,
+            new RecordingStartInitializationRenderer(),
+            CancellationToken.None);
+
+        result.Worker.WorkerRuntime.Should().Be("native");
+        await workerInstaller.Received(1)
+            .InstallAsync(workerId, Arg.Any<IReadOnlyDictionary<string, VersionRange>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task DemoRunner_ProfileRejectsUnsupportedDetectedRuntime()
     {
         IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
@@ -1294,7 +1345,9 @@ public class StartInitializationTests : IDisposable
         return hostWorkloadResolver;
     }
 
-    private static ProfileResolution CreateResolvedProfile(IReadOnlyDictionary<string, VersionRange> workerVersionRanges)
+    private static ProfileResolution CreateResolvedProfile(
+        IReadOnlyDictionary<string, VersionRange> workerVersionRanges,
+        IReadOnlyList<string>? supportedRuntimes = null)
     {
         var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
         var profile = new ResolvedProfile(
@@ -1306,7 +1359,7 @@ public class StartInitializationTests : IDisposable
             VersionRange.Parse("[1.8.1, 4.1048.200)"),
             workerVersionRanges,
             ExtensionBundleVersionRange: null,
-            SupportedRuntimes: ["node"],
+            SupportedRuntimes: supportedRuntimes ?? ["node"],
             Notes: null);
         return new ProfileResolution.Resolved(profile, []);
     }

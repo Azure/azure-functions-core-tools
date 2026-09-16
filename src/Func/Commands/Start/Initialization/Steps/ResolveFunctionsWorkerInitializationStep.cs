@@ -50,9 +50,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             && TryGetInstallableWorker(notResolved.Failure, out FunctionsWorkerId? workerId)
             && workerId is not null)
         {
-            // Block auto-install if neither the stack name nor the workload id match any supported runtime.
-            // workerId.Value is the workload identifier (e.g. "python", "dotnet") which may differ from WorkerRuntime.
-            ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: workerId.Value, project.StackDisplayName);
+            ValidateSupportedRuntime(context, project.StackName, project.WorkerReference.WorkerRuntime, project.StackDisplayName);
 
             Log.ResolutionFailedAttemptingInstall(_logger, notResolved.Failure.GetType().Name, notResolved.Failure.Message, workerId.Value);
             result = await TryInstallAndResolveWorkerAsync(context, workerId, workerVersionRanges, notResolved.Failure, cancellationToken);
