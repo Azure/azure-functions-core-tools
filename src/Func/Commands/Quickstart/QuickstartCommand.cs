@@ -174,6 +174,7 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
                 return 1;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             DirectoryGuard.ClearExceptGit(workingDirectory.Info);
         }
 
@@ -292,12 +293,7 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
         _interaction.WriteWarning(
             $"--force will delete all files in '{workingDirectory.FullName}' (except .git) before scaffolding.");
 
-        if (!_interaction.IsInteractive)
-        {
-            return true;
-        }
-
-        return await _interaction.ConfirmAsync("Continue?", defaultValue: false, cancellationToken);
+        return await _interaction.ConfirmAsync("Continue?", defaultValue: false, whenInputUnavailable: true, cancellationToken);
     }
 
     private static string BuildLanguageOptionDescription(IReadOnlyList<IQuickstartProvider> providers)

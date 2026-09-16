@@ -16,8 +16,8 @@ namespace Azure.Functions.Cli.Console;
 /// helpers or compose with <see cref="WriteLine(Action{InlineLine})"/>.
 /// </para>
 /// <para>
-/// Output routing: <see cref="WriteError"/> and <see cref="WriteWarning"/> go to
-/// stderr; all other output goes to stdout.
+/// Errors, warnings, status, progress, selection prompts, and text prompts go to
+/// stderr. Confirmation prompts and other output go to stdout.
 /// </para>
 /// </remarks>
 internal interface IInteractionService
@@ -25,7 +25,10 @@ internal interface IInteractionService
     /// <summary>Active visual theme. Exposed so callers can use ad-hoc styles where needed.</summary>
     public ITheme Theme { get; }
 
-    /// <summary>True when the console supports interactive prompts (not redirected, not CI).</summary>
+    /// <summary>
+    /// True when both output consoles support input and ANSI, so commands can combine
+    /// stdout rendering with stderr selection prompts. Individual prompts check their target console.
+    /// </summary>
     public bool IsInteractive { get; }
 
     /// <summary>Writes a single line of unstyled text to stdout.</summary>
@@ -107,22 +110,28 @@ internal interface IInteractionService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Prompts the user with a yes/no confirmation. Returns <paramref name="defaultValue"/>
-    /// in non-interactive mode. Throws <see cref="OperationCanceledException"/> on Ctrl+C.
+    /// Prompts on stdout for yes/no confirmation, without requiring ANSI. Returns
+    /// <paramref name="defaultValue"/> when input is unavailable. Throws <see cref="OperationCanceledException"/> on cancellation.
     /// </summary>
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Prompts the user to select from a list of choices. Returns the first choice in
-    /// non-interactive mode. Throws <see cref="OperationCanceledException"/> on Ctrl+C.
+    /// Prompts on stdout with <paramref name="defaultValue"/> for an empty answer, or returns
+    /// <paramref name="whenInputUnavailable"/> when input is unavailable. Does not require ANSI; cancellation and input errors propagate.
+    /// </summary>
+    public Task<bool> ConfirmAsync(string prompt, bool defaultValue, bool whenInputUnavailable, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Prompts on stderr to select from a list of choices. Returns the first choice
+    /// (or an empty string for no choices) when stderr lacks input or ANSI support.
+    /// Throws <see cref="OperationCanceledException"/> on cancellation.
     /// </summary>
     public Task<string> PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Prompts the user to select one or more values from a list of choices, using
-    /// SPACE to toggle and ENTER to confirm. Selection is optional: pressing ENTER
-    /// with nothing selected returns an empty list. Returns an empty list in
-    /// non-interactive mode. Throws <see cref="OperationCanceledException"/> on Ctrl+C.
+    /// Prompts on stderr to select one or more values, using SPACE to toggle and ENTER
+    /// to confirm. Requires a selection. Returns an empty list for no choices or when
+    /// stderr lacks input or ANSI support. Throws <see cref="OperationCanceledException"/> on cancellation.
     /// </summary>
     public Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken = default);
 
@@ -130,16 +139,15 @@ internal interface IInteractionService
     /// Prompts the user to select one or more values from a list of labelled choices.
     /// Each <see cref="MultiSelectionChoice"/> carries a <see cref="MultiSelectionChoice.Label"/>
     /// shown to the user and a <see cref="MultiSelectionChoice.Value"/> returned in the
-    /// result. Selection is optional: pressing ENTER with nothing selected returns
-    /// an empty list. Returns an empty list in non-interactive mode. Throws
-    /// <see cref="OperationCanceledException"/> on Ctrl+C.
+    /// result. Requires a selection. Returns an empty list for no choices or when
+    /// stderr lacks input or ANSI support. Throws <see cref="OperationCanceledException"/> on cancellation.
     /// </summary>
     public Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(string title, IEnumerable<MultiSelectionChoice> choices, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Prompts the user for free-form text with an optional default. Returns
-    /// <paramref name="defaultValue"/> in non-interactive mode. Throws
-    /// <see cref="OperationCanceledException"/> on Ctrl+C.
+    /// Prompts on stderr for free-form text without requiring ANSI. Returns
+    /// <paramref name="defaultValue"/> (or an empty string) when input is unavailable.
+    /// Throws <see cref="OperationCanceledException"/> on cancellation.
     /// </summary>
     public Task<string> PromptForInputAsync(string prompt, string? defaultValue = null, CancellationToken cancellationToken = default);
 }
