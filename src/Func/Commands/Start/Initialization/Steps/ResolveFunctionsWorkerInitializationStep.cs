@@ -40,6 +40,8 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         ArgumentNullException.ThrowIfNull(context);
 
         FunctionsProject project = context.State.Project ?? throw new InvalidOperationException("Functions project was not resolved.");
+        ValidateSupportedRuntime(context, project.StackName, project.WorkerReference.WorkerRuntime, project.StackDisplayName);
+
         IReadOnlyDictionary<string, VersionRange> workerVersionRanges =
             context.State.ResolvedProfile?.WorkerVersionRanges
             ?? new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase);
@@ -50,8 +52,6 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             && TryGetInstallableWorker(notResolved.Failure, out FunctionsWorkerId? workerId)
             && workerId is not null)
         {
-            ValidateSupportedRuntime(context, project.StackName, project.WorkerReference.WorkerRuntime, project.StackDisplayName);
-
             Log.ResolutionFailedAttemptingInstall(_logger, notResolved.Failure.GetType().Name, notResolved.Failure.Message, workerId.Value);
             result = await TryInstallAndResolveWorkerAsync(
                 context,
@@ -229,10 +229,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
     }
 
     /// <summary>
-    /// Checks whether the profile supports the runtime by matching against both the stack name
-    /// and the runtime identifier (workload id or worker runtime name). Some stacks differ between
-    /// the two (e.g. Go stack = "go" but worker runtime = "native"; DotNet stack = "dotnet" but
-    /// worker runtime = "dotnet-isolated"). A match on either is sufficient.
+    /// Accepts a profile match on either the stack name or the worker runtime name.
     /// </summary>
     private static void ValidateSupportedRuntime(
         StartInitializationStepContext context,

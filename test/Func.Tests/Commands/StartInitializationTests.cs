@@ -449,8 +449,10 @@ public class StartInitializationTests : IDisposable
             .InstallAsync(workerId, Arg.Is<IReadOnlyDictionary<string, VersionRange>>(ranges => HasWorkerRange(ranges, workerRange)), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task DemoRunner_ProfiledMissingGoWorker_AllowsNativeRuntimeBeforeInstall()
+    [Theory]
+    [InlineData("native")]
+    [InlineData("go")]
+    public async Task DemoRunner_ProfiledMissingGoWorker_AllowsStackOrRuntimeBeforeInstall(string supportedRuntime)
     {
         IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
         TestFunctionsProject project = CreateProject(
@@ -478,7 +480,7 @@ public class StartInitializationTests : IDisposable
             .Returns(new FunctionsWorkerInstallResult(installedWorker, workloadInstallResult));
         var runner = CreateRunner(
             projectResolver,
-            CreateResolvedProfile(workerRanges, ["native"]),
+            CreateResolvedProfile(workerRanges, [supportedRuntime]),
             CreateInstalledHostWorkloadResolver(),
             workerInstaller: workerInstaller,
             workerResolverFactory: workerResolverFactory,
@@ -496,6 +498,9 @@ public class StartInitializationTests : IDisposable
             CancellationToken.None);
 
         result.Worker.WorkerRuntime.Should().Be("native");
+        result.Worker.Id.Should().Be(installedWorker.Id);
+        result.Worker.WorkerConfigPath.Should().Be(installedWorker.WorkerConfigPath);
+        result.Worker.Version.Should().Be(installedWorker.Version);
         await workerInstaller.Received(1)
             .InstallAsync(workerId, Arg.Any<IReadOnlyDictionary<string, VersionRange>>(), Arg.Any<CancellationToken>());
     }
@@ -543,8 +548,10 @@ public class StartInitializationTests : IDisposable
         ex.Message.Should().Contain("does not support the 'Node.js' stack");
     }
 
-    [Fact]
-    public async Task DemoRunner_ProfileRejectsUnsupportedStack_BeforeWorkerInstall()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DemoRunner_ProfileRejectsUnsupportedStack_BeforeWorkerResolutionAndInstall(bool invalidInstallation)
     {
         IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
         TestFunctionsProject project = CreateProject(
@@ -573,8 +580,21 @@ public class StartInitializationTests : IDisposable
         IHostWorkloadResolver hostWorkloadResolver = Substitute.For<IHostWorkloadResolver>();
         hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(hostResolution);
-        IWorkloadInstaller workloadInstaller = CreateSuccessfulInstaller();
-        var runner = CreateRunner(projectResolver, new ProfileResolution.Resolved(profile, []), hostWorkloadResolver, workloadInstaller: workloadInstaller);
+        var workerId = new FunctionsWorkerId("python");
+        FunctionsWorkerResolutionFailure failure = invalidInstallation
+            ? FunctionsWorkerResolutionFailures.InvalidInstallation(
+                workerId, FunctionsWorkerWorkloadPackages.GetPackageId(workerId), "4.43.0", "worker.config.json", "Missing worker configuration.")
+            : CreateNotInstalledWorkerFailure("python");
+        IFunctionsWorkerResolver workerResolver = Substitute.For<IFunctionsWorkerResolver>();
+        workerResolver.ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>())
+            .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
+        IFunctionsWorkerInstaller workerInstaller = Substitute.For<IFunctionsWorkerInstaller>();
+        var runner = CreateRunner(
+            projectResolver,
+            new ProfileResolution.Resolved(profile, []),
+            hostWorkloadResolver,
+            workerResolverFactory: CreateWorkerResolverFactory(workerResolver),
+            workerInstaller: workerInstaller);
         StartInitializationContext context = CreateContext(
             WorkingDirectory.FromExplicit(_tempDir),
             cliVersion: "5.0.0-test",
@@ -586,14 +606,10 @@ public class StartInitializationTests : IDisposable
 
         ex.Message.Should().Contain("does not support the 'Python' stack");
         ex.Message.Should().Contain("node, java, powershell, dotnet-isolated, custom");
-        await workloadInstaller.DidNotReceive().InstallFromCatalogAsync(
-            Arg.Any<string>(),
-            Arg.Any<NuGetVersion?>(),
-            Arg.Any<string?>(),
-            Arg.Any<bool?>(),
-            Arg.Any<bool>(),
-            Arg.Any<bool>(),
-            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+        await workerResolver.DidNotReceive().ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>());
+        await workerInstaller.DidNotReceive().InstallAsync(
+            Arg.Any<FunctionsWorkerId>(),
+            Arg.Any<IReadOnlyDictionary<string, VersionRange>>(),
             Arg.Any<CancellationToken>());
     }
 
