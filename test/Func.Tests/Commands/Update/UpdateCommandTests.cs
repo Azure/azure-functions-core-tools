@@ -26,7 +26,7 @@ public sealed class UpdateCommandTests
     {
         var harness = new Harness();
         harness.InstallMethodDetector.Detect().Returns(
-            new InstallMethod(InstallMethodKind.Homebrew, "Homebrew", "brew upgrade azure-functions-core-tools"));
+            new InstallMethod(InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update."));
 
         int exitCode = await harness.InvokeAsync();
 
@@ -54,6 +54,45 @@ public sealed class UpdateCommandTests
             l.StartsWith("SUCCESS:", StringComparison.Ordinal)
             && l.Contains("up to date", StringComparison.OrdinalIgnoreCase));
         await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CurrentVersionIsNewerWithoutPin_DoesNotDowngrade()
+    {
+        var harness = new Harness();
+        harness.VersionProvider.Version.Returns("5.3.0-preview.1");
+        harness.ReleaseFeed
+            .GetLatestAsync(false, Arg.Any<CancellationToken>())
+            .Returns(_newerRelease);
+
+        int exitCode = await harness.InvokeAsync("--yes");
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains(harness.Interaction.Lines, l =>
+            l.StartsWith("SUCCESS:", StringComparison.Ordinal)
+            && l.Contains("newer", StringComparison.OrdinalIgnoreCase)
+            && l.Contains("No update was performed", StringComparison.Ordinal));
+        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PinnedOlderVersion_PerformsExplicitDowngrade()
+    {
+        var harness = new Harness();
+        harness.VersionProvider.Version.Returns("5.3.0");
+        harness.ReleaseFeed
+            .GetVersionAsync(Arg.Is<SemVersion>(v => v == _newerRelease.Version), Arg.Any<CancellationToken>())
+            .Returns(_newerRelease);
+
+        int exitCode = await harness.InvokeAsync("--version", "5.2.0", "--yes");
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains(harness.Interaction.Lines, l =>
+            l.StartsWith("Downgrading Azure Functions CLI:", StringComparison.Ordinal));
+        await harness.Updater.Received(1).UpdateAsync(
+            Arg.Is<Release>(r => r.Version == _newerRelease.Version),
+            Arg.Any<IProgress<UpdateProgress>?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -114,7 +153,7 @@ public sealed class UpdateCommandTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_UpdateAvailable_NonInteractive_WithoutYes_ThrowsGraceful()
+    public async Task ExecuteAsync_UpdateAvailable_InputUnavailable_DeclinesUpdate()
     {
         var harness = new Harness(isInteractive: false);
         harness.VersionProvider.Version.Returns("5.1.0");
@@ -122,10 +161,11 @@ public sealed class UpdateCommandTests
             .GetLatestAsync(false, Arg.Any<CancellationToken>())
             .Returns(_newerRelease);
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(() => harness.InvokeAsync());
+        int exitCode = await harness.InvokeAsync();
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("--yes", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(0, exitCode);
+        Assert.Contains(harness.Interaction.Lines, l => l.Contains("cancelled", StringComparison.OrdinalIgnoreCase));
+        await harness.Updater.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
     }
 
     [Fact]
@@ -188,7 +228,7 @@ public sealed class UpdateCommandTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_UpdaterThrowsInvalidOperation_WrapsAsGraceful()
+    public async Task ExecuteAsync_UpdaterThrowsInvalidOperation_PropagatesUnexpectedFailure()
     {
         var harness = new Harness();
         harness.VersionProvider.Version.Returns("5.1.0");
@@ -199,10 +239,9 @@ public sealed class UpdateCommandTests
             .UpdateAsync(Arg.Any<Release>(), Arg.Any<IProgress<UpdateProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(_ => throw new InvalidOperationException("bad artifact"));
 
-        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(() => harness.InvokeAsync("--yes"));
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(() => harness.InvokeAsync("--yes"));
 
-        Assert.True(ex.IsUserError);
-        Assert.Contains("bad artifact", ex.Message, StringComparison.Ordinal);
+        Assert.Equal("bad artifact", ex.Message);
     }
 
     private sealed class Harness
@@ -248,11 +287,18 @@ public sealed class UpdateCommandTests
 
         public override bool IsInteractive { get; } = isInteractive;
 
-        public override Task<bool> ConfirmAsync(string prompt, bool defaultValue = false, CancellationToken cancellationToken = default)
+        public override Task<bool> ConfirmAsync(
+            string prompt,
+            bool defaultValue,
+            bool whenInputUnavailable,
+            CancellationToken cancellationToken = default)
         {
-            // Reuse base capture so tests can still assert on the prompt line,
-            // but return the caller-controlled answer instead of the default.
-            base.ConfirmAsync(prompt, defaultValue, cancellationToken);
+            Task<bool> fallback = base.ConfirmAsync(prompt, defaultValue, whenInputUnavailable, cancellationToken);
+            if (!IsInteractive)
+            {
+                return fallback;
+            }
+
             return Task.FromResult(_confirmResponse);
         }
     }

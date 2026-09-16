@@ -24,15 +24,17 @@ internal enum InstallMethodKind
 
 /// <summary>
 /// Detected installation footprint for the running CLI. The
-/// <see cref="UpgradeCommand"/> is a paste-ready shell command the user
-/// should run instead of <c>func update</c> when
+/// <see cref="UpdateInstruction"/> tells the user how to update instead of
+/// running <c>func update</c> when
 /// <see cref="Kind"/> is anything other than <see cref="InstallMethodKind.Direct"/>.
 /// </summary>
 internal sealed record InstallMethod(
     InstallMethodKind Kind,
     string DisplayName,
-    string? UpgradeCommand)
+    string? UpdateInstruction)
 {
-    /// <summary>The neutral, in-place install (no package manager detected).</summary>
+    /// <summary>
+    /// Gets the neutral, in-place install with no package manager detected.
+    /// </summary>
     public static InstallMethod Direct { get; } = new(InstallMethodKind.Direct, "direct install", null);
 }

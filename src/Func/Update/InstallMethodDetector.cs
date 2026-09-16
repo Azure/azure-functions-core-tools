@@ -24,13 +24,12 @@ internal sealed class InstallMethodDetector(IOptions<CliEnvironmentOptions> envi
         // \node_modules\, choco under \chocolatey\, etc.).
         string normalized = processPath.Replace('\\', '/');
 
-        // node_modules → installed via `npm install -g azure-functions-core-tools`.
         if (Contains(normalized, "/node_modules/"))
         {
             return new InstallMethod(
                 InstallMethodKind.Npm,
                 "npm",
-                "npm install -g azure-functions-core-tools@4 --unsafe-perm true");
+                "Reinstall Azure Functions CLI with the v5 installer at https://aka.ms/func-cli.");
         }
 
         // Homebrew keg-only formulas live under Cellar/; the exposed binary is
@@ -43,7 +42,7 @@ internal sealed class InstallMethodDetector(IOptions<CliEnvironmentOptions> envi
             return new InstallMethod(
                 InstallMethodKind.Homebrew,
                 "Homebrew",
-                "brew upgrade azure-functions-core-tools");
+                "Run 'brew upgrade azure-functions-core-tools' to update.");
         }
 
         // Chocolatey shims live under %ChocolateyInstall%\bin\; the resolved
@@ -53,7 +52,7 @@ internal sealed class InstallMethodDetector(IOptions<CliEnvironmentOptions> envi
             return new InstallMethod(
                 InstallMethodKind.Chocolatey,
                 "Chocolatey",
-                "choco upgrade azure-functions-core-tools");
+                "Run 'choco upgrade azure-functions-core-tools' to update.");
         }
 
         // winget places packages under %LOCALAPPDATA%\Microsoft\WinGet\Packages\
@@ -64,7 +63,7 @@ internal sealed class InstallMethodDetector(IOptions<CliEnvironmentOptions> envi
             return new InstallMethod(
                 InstallMethodKind.Winget,
                 "winget",
-                "winget upgrade Microsoft.AzureFunctionsCoreTools");
+                "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.");
         }
 
         return InstallMethod.Direct;

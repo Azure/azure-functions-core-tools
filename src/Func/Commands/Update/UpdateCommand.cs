@@ -32,7 +32,7 @@ internal sealed class UpdateCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<bool> YesOption { get; } = new("--yes", "-y")
     {
-        Description = "Answer yes to confirmation prompts. Required when running non-interactively.",
+        Description = "Skip the update confirmation prompt.",
     };
 
     private readonly IReleaseFeed _releaseFeed;
@@ -76,41 +76,46 @@ internal sealed class UpdateCommand : FuncCliCommand, IBuiltInCommand
         {
             _interaction.WriteLine(
                 $"This Azure Functions CLI installation is managed by {installMethod.DisplayName}. "
-                + $"Run '{installMethod.UpgradeCommand}' to update.");
+                + installMethod.UpdateInstruction);
             return 0;
         }
 
         bool includePrerelease = parseResult.GetValue(PrereleaseOption);
         string? pinnedVersionRaw = parseResult.GetValue(VersionOption);
+        bool isPinnedVersion = !string.IsNullOrWhiteSpace(pinnedVersionRaw);
         bool yes = parseResult.GetValue(YesOption);
 
         Release target = await ResolveReleaseAsync(includePrerelease, pinnedVersionRaw, cancellationToken);
 
         SemVersion? currentVersion = TryParseCurrentVersion(_versionProvider.Version);
-        if (currentVersion is not null && SemVersion.PrecedenceComparer.Compare(currentVersion, target.Version) == 0)
+        int? versionComparison = currentVersion is null
+            ? null
+            : SemVersion.PrecedenceComparer.Compare(currentVersion, target.Version);
+        if (versionComparison == 0)
         {
             _interaction.WriteSuccess(
                 $"Azure Functions CLI is already up to date (version {currentVersion}).");
             return 0;
         }
 
+        if (versionComparison > 0 && !isPinnedVersion)
+        {
+            _interaction.WriteSuccess(
+                $"Azure Functions CLI {currentVersion} is newer than the latest available version {target.Version}. No update was performed.");
+            return 0;
+        }
+
         string currentDisplay = currentVersion?.ToString() ?? _versionProvider.Version;
+        string operation = versionComparison > 0 ? "Downgrading" : "Updating";
         _interaction.WriteLine(
-            $"Updating Azure Functions CLI: {currentDisplay} → {target.Version}");
+            $"{operation} Azure Functions CLI: {currentDisplay} → {target.Version}");
 
         if (!yes)
         {
-            if (!_interaction.IsInteractive)
-            {
-                throw new GracefulException(
-                    "'func update' requires confirmation, but the terminal is non-interactive. "
-                    + "Pass '--yes' (or '-y') to accept the update without prompting.",
-                    isUserError: true);
-            }
-
             bool confirmed = await _interaction.ConfirmAsync(
                 $"Continue and install func {target.Version}?",
                 defaultValue: true,
+                whenInputUnavailable: false,
                 cancellationToken);
             if (!confirmed)
             {
@@ -119,25 +124,15 @@ internal sealed class UpdateCommand : FuncCliCommand, IBuiltInCommand
             }
         }
 
-        try
-        {
-            await _interaction.RunWithProgressAsync(
-                $"Downloading func {target.Version}...",
-                async (progressContext, ct) =>
-                {
-                    var reporter = new ProgressAdapter(progressContext, target.Version.ToString());
-                    await _updater.UpdateAsync(target, reporter, ct);
-                    return true;
-                },
-                cancellationToken);
-        }
-        catch (InvalidOperationException ex)
-        {
-            // Feed/updater surfaces a bare InvalidOperationException for
-            // recoverable failures (missing artifact, transport error). Wrap
-            // as a user-facing error so Program.Main prints it cleanly.
-            throw new GracefulException(ex.Message, ex, isUserError: true);
-        }
+        await _interaction.RunWithProgressAsync(
+            $"Downloading func {target.Version}...",
+            async (progressContext, ct) =>
+            {
+                var reporter = new ProgressAdapter(progressContext, target.Version.ToString());
+                await _updater.UpdateAsync(target, reporter, ct);
+                return true;
+            },
+            cancellationToken);
 
         _interaction.WriteSuccess($"Azure Functions CLI updated to {target.Version}.");
         return 0;

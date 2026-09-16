@@ -54,6 +54,39 @@ public sealed class CliUpdaterTests
     }
 
     [Fact]
+    public async Task UpdateAsync_WithProgress_ReportsDownloadBytesAndPipelinePhases()
+    {
+        (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+        var progress = new RecordingProgress();
+
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
+            .Returns(OkOutcome("5.1.0\n"));
+        fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                Stream content = call.ArgAt<Stream>(1);
+                CancellationToken cancellationToken = call.ArgAt<CancellationToken>(2);
+                await content.CopyToAsync(Stream.Null, cancellationToken);
+            });
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
+
+        await updater.UpdateAsync(_stableRelease, progress, CancellationToken.None);
+
+        Assert.Collection(
+            progress.Values.Where(value => value.BytesRead is null),
+            value => Assert.Equal(UpdatePhase.Downloading, value.Phase),
+            value => Assert.Equal(UpdatePhase.Extracting, value.Phase),
+            value => Assert.Equal(UpdatePhase.Installing, value.Phase),
+            value => Assert.Equal(UpdatePhase.Verifying, value.Phase));
+        UpdateProgress download = Assert.Single(progress.Values, value => value.BytesRead is not null);
+        Assert.Equal(UpdatePhase.Downloading, download.Phase);
+        Assert.Equal(22, download.BytesRead);
+        Assert.Equal(22, download.TotalBytes);
+    }
+
+    [Fact]
     public async Task UpdateAsync_DownloadNonSuccessStatus_ThrowsGracefulWithRetryHint()
     {
         // Arrange
@@ -296,4 +329,11 @@ public sealed class CliUpdaterTests
 
     private static ProcessOutcome OkOutcome(string stdout) =>
         new(ExitCode: 0, StandardOutput: stdout, StandardError: string.Empty, TimedOut: false, ExecutableNotFound: false);
+
+    private sealed class RecordingProgress : IProgress<UpdateProgress>
+    {
+        public List<UpdateProgress> Values { get; } = [];
+
+        public void Report(UpdateProgress value) => Values.Add(value);
+    }
 }

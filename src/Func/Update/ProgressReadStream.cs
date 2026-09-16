@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Update;
 /// <summary>
 /// Read-only stream wrapper that reports cumulative bytes read to an
 /// <see cref="IProgress{T}"/> sink. Used by <see cref="CliUpdater"/> so the
-/// existing <see cref="IUpdateFileSystem.SaveStreamToFileAsync"/> path can
+/// existing <see cref="IFileSystem.SaveStreamToFileAsync"/> path can
 /// stay simple while the download surface gets live byte-count updates.
 /// </summary>
 internal sealed class ProgressReadStream(
