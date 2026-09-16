@@ -471,7 +471,7 @@ public class StartInitializationTests : IDisposable
         {
             ["go"] = workerRange,
         };
-        IFunctionsWorker installedWorker = CreateWorker("go", "native");
+        IFunctionsWorker installedWorker = CreateWorker("go", "go");
         IFunctionsWorkerInstaller workerInstaller = Substitute.For<IFunctionsWorkerInstaller>();
         WorkloadInstallResult workloadInstallResult = new(CreateWorkerEntry(FunctionsWorkerWorkloadPackages.GetPackageId(workerId), "1.0.0"), AlreadyInstalled: false);
         workerInstaller.InstallAsync(workerId, Arg.Any<IReadOnlyDictionary<string, VersionRange>>(), Arg.Any<CancellationToken>())

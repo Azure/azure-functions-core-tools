@@ -53,7 +53,13 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             ValidateSupportedRuntime(context, project.StackName, project.WorkerReference.WorkerRuntime, project.StackDisplayName);
 
             Log.ResolutionFailedAttemptingInstall(_logger, notResolved.Failure.GetType().Name, notResolved.Failure.Message, workerId.Value);
-            result = await TryInstallAndResolveWorkerAsync(context, workerId, workerVersionRanges, notResolved.Failure, cancellationToken);
+            result = await TryInstallAndResolveWorkerAsync(
+                context,
+                workerId,
+                project.WorkerReference.WorkerRuntime,
+                workerVersionRanges,
+                notResolved.Failure,
+                cancellationToken);
         }
 
         if (result is not FunctionsWorkerResolutionResult.Resolved resolved)
@@ -83,6 +89,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
     private async Task<FunctionsWorkerResolutionResult> TryInstallAndResolveWorkerAsync(
         StartInitializationStepContext context,
         FunctionsWorkerId workerId,
+        string workerRuntime,
         IReadOnlyDictionary<string, VersionRange> workerVersionRanges,
         FunctionsWorkerResolutionFailure failure,
         CancellationToken cancellationToken)
@@ -107,7 +114,14 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             : $"Installed worker {workloadInstallResult.Entry.PackageVersion}";
         await context.ReportProgressAsync(50, completionMessage, cancellationToken);
 
-        return FunctionsWorkerResolutionResults.Resolved(installResult.Worker);
+        IFunctionsWorker worker = string.Equals(installResult.Worker.WorkerRuntime, workerRuntime, StringComparison.OrdinalIgnoreCase)
+            ? installResult.Worker
+            : new RuntimeAdjustedFunctionsWorker(
+                installResult.Worker.Id,
+                workerRuntime,
+                installResult.Worker.WorkerConfigPath,
+                installResult.Worker.Version);
+        return FunctionsWorkerResolutionResults.Resolved(worker);
     }
 
     private async Task<FunctionsWorkerInstallResult> InstallWorkerAsync(
@@ -245,4 +259,10 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
 
     private static GracefulException CreateUserError(Exception exception)
         => new(exception.Message, isUserError: true, verboseMessage: exception.ToString());
+
+    private sealed record RuntimeAdjustedFunctionsWorker(
+        FunctionsWorkerId Id,
+        string WorkerRuntime,
+        string WorkerConfigPath,
+        string Version) : IFunctionsWorker;
 }
