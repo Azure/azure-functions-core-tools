@@ -5,6 +5,8 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Colors.Net;
 using Fclp;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using static Azure.Functions.Cli.Common.OutputTheme;
 
 namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
@@ -60,20 +62,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                 return false;
             }
 
-            // Required artifacts
-            var requiredFiles = new[] { "functions.metadata" };
-            var requiredDirectories = new[] { ".azurefunctions" };
-
-            // Validate files
-            foreach (var file in requiredFiles)
+            // New SDK projects source-generate metadata in the worker assembly instead of functions.metadata.
+            if (!FileSystemHelpers.FileExists(Path.Combine(directory, "functions.metadata"))
+                && !HasWorkerIndexedPayload(directory))
             {
-                var filePath = Path.Combine(directory, file);
-                if (!FileSystemHelpers.FileExists(filePath))
-                {
-                    errorMessage = $"Required file '{file}' not found in deployment structure. Ensure 'dotnet publish' has been run.";
-                    return false;
-                }
+                errorMessage = "Required file 'functions.metadata' not found in deployment structure, and no valid worker-indexed payload was found. Ensure 'dotnet publish' has been run.";
+                return false;
             }
+
+            var requiredDirectories = new[] { ".azurefunctions" };
 
             // Validate directories
             foreach (var dir in requiredDirectories)
@@ -87,6 +84,35 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
             }
 
             return true;
+        }
+
+        private static bool HasWorkerIndexedPayload(string directory)
+        {
+            var workerConfigPath = Path.Combine(directory, "worker.config.json");
+            if (!FileSystemHelpers.FileExists(workerConfigPath)
+                || !FileSystemHelpers.FileExists(Path.Combine(directory, "extensions.json"))
+                || !FileSystemHelpers.FileExists(Path.Combine(directory, ".azurefunctions", "function.deps.json")))
+            {
+                return false;
+            }
+
+            try
+            {
+                var description = JObject.Parse(File.ReadAllText(workerConfigPath))["description"] as JObject;
+                var workerPath = description?["defaultWorkerPath"];
+                return description?["language"]?.ToString() == "dotnet-isolated"
+                    && bool.TryParse(description["workerIndexing"]?.ToString(), out var workerIndexing)
+                    && workerIndexing
+                    && workerPath?.Type == JTokenType.String
+                    && !string.IsNullOrWhiteSpace((string)workerPath)
+                    && Path.GetFileName((string)workerPath) == (string)workerPath
+                    && FileSystemHelpers.FileExists(Path.Combine(directory, (string)workerPath))
+                    && JObject.Parse(File.ReadAllText(Path.Combine(directory, "extensions.json")))["extensions"] is JArray;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
         }
 
         private static void RunDotnetIsolatedFolderStructureValidation(string directory)

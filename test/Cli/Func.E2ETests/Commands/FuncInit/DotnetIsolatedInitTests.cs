@@ -35,12 +35,15 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             // Validate expected output content
             funcInitResult.Should().WriteVsCodeExtensionsJsonAndExitWithZero(workinDir);
             funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+            File.ReadAllText(Directory.GetFiles(workinDir, "*.csproj").Single())
+                .Should().Contain("<TargetFramework>net10.0</TargetFramework>");
         }
 
         [Theory]
         [InlineData("net8.0")]
         [InlineData("net9.0")]
         [InlineData("net10.0")]
+        [InlineData("net11.0")]
         public void Init_WithNetTargetFramework_GeneratesProjectFile_ContainsExpectedVersion(string targetFramework)
         {
             var workingDir = WorkingDirectory;
@@ -50,7 +53,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             var localSettingsPath = Path.Combine(workingDir, projectName, Common.Constants.LocalSettingsJsonFileName);
             var csprojfilepath = Path.Combine(workingDir, projectName, "Test-funcs.csproj");
             var expectedLocalSettingsContent = new[] { Common.Constants.FunctionsWorkerRuntime, "dotnet-isolated" };
-            var expectedCsprojContent = new[] { "Microsoft.NET.Sdk", "v4", targetFramework };
+            var expectedCsprojContent = targetFramework == "net11.0"
+                ? new[] { "Azure.Functions.Sdk/1.0.1", targetFramework, "Microsoft.Azure.Functions.Worker\" Version=\"2.52.0\"", "Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore\" Version=\"2.1.1\"" }
+                : new[] { "Microsoft.NET.Sdk", "v4", targetFramework };
             var filesToValidate = new List<(string FilePath, string[] ExpectedContent)>
             {
                 (localSettingsPath, expectedLocalSettingsContent),
@@ -65,6 +70,38 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             // Validate expected output content
             funcInitResult.Should().ExitWith(0);
             funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
+
+            if (targetFramework == "net11.0")
+            {
+                File.ReadAllText(csprojfilepath).Should()
+                    .NotContain("<AzureFunctionsVersion>")
+                    .And.NotContain("<OutputType>")
+                    .And.NotContain("Microsoft.Azure.Functions.Worker.Sdk");
+            }
+        }
+
+        [Theory]
+        [InlineData("fsharp", "net11.0")]
+        [InlineData("F#", "NET11.0")]
+        public void Init_WithNet11AndFSharp_RejectsUnsupportedLanguage(string language, string targetFramework)
+        {
+            new FuncInitCommand(FuncPath, nameof(Init_WithNet11AndFSharp_RejectsUnsupportedLanguage), Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(["--worker-runtime", "dotnet-isolated", "--language", language, "--target-framework", targetFramework])
+                .Should().ExitWith(1)
+                .And.HaveStdErrContaining(".NET 11 isolated project initialization is not yet supported for F#");
+
+            Directory.GetFiles(WorkingDirectory, "*.fsproj").Should().BeEmpty();
+        }
+
+        [Fact]
+        public void Init_DotnetHelp_ListsNet11()
+        {
+            new FuncRootCommand(FuncPath, nameof(Init_DotnetHelp_ListsNet11), Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(["init", "dotnet", "--help"])
+                .Should().ExitWith(0)
+                .And.HaveStdOutContaining("net11.0");
         }
 
         [Fact]

@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Actions.AzureActions;
 using Azure.Functions.Cli.Arm.Models;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.StacksApi;
 using Moq;
@@ -12,6 +13,53 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
 {
     public class PublishFunctionAppActionTests
     {
+        [Theory]
+        [InlineData("functionapp", "11.0", "netFrameworkVersion", "v11.0")]
+        [InlineData("functionapp", "v11.0", "netFrameworkVersion", "v11.0")]
+        [InlineData("functionapp,linux", "11.0", "linuxFxVersion", "DOTNET-ISOLATED|11.0")]
+        [InlineData("functionapp,linux", "v11.0", "linuxFxVersion", "DOTNET-ISOLATED|11.0")]
+        public async Task UpdateFrameworkVersions_Net11_UsesPlatformVersionFormat(string kind, string version, string setting, string expected)
+        {
+            var site = new Site("test-site")
+            {
+                Kind = kind,
+                Sku = "dynamic",
+                NetFrameworkVersion = "v10.0",
+                LinuxFxVersion = "DOTNET-ISOLATED|10.0"
+            };
+            var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
+            helperServiceMock
+                .Setup(x => x.UpdateWebSettings(site, It.IsAny<Dictionary<string, string>>()))
+                .ReturnsAsync(new HttpResult<string, string>(string.Empty));
+
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.DotnetIsolated, version, false, helperServiceMock.Object);
+
+            helperServiceMock.Verify(
+                x => x.UpdateWebSettings(site, It.Is<Dictionary<string, string>>(settings => settings.Count == 1 && settings[setting] == expected)),
+                Times.Once);
+        }
+
+        [Theory]
+        [InlineData("functionapp")]
+        [InlineData("functionapp,linux")]
+        public async Task UpdateFrameworkVersions_Net11AlreadyConfigured_DoesNotUpdate(string kind)
+        {
+            var site = new Site("test-site")
+            {
+                Kind = kind,
+                Sku = "dynamic",
+                NetFrameworkVersion = "v11.0",
+                LinuxFxVersion = "DOTNET-ISOLATED|11.0"
+            };
+            var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
+
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.DotnetIsolated, "11.0", false, helperServiceMock.Object);
+
+            helperServiceMock.Verify(
+                x => x.UpdateWebSettings(It.IsAny<Site>(), It.IsAny<Dictionary<string, string>>()),
+                Times.Never);
+        }
+
         [Fact]
         public async Task UpdateRuntimeConfigForFlex_SkipsUpdate_WhenNoRuntimeVersionDetected()
         {

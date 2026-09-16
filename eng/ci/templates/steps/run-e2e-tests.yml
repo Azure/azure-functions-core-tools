@@ -6,6 +6,27 @@ parameters:
 
 steps:
 - pwsh: |
+    $installRoot = "$(Build.SourcesDirectory)/.dotnet11"
+    New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+    if ($IsWindows) {
+        $script = Join-Path $installRoot 'dotnet-install.ps1'
+        Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $script
+        & $script -Channel 11.0 -Quality preview -InstallDir $installRoot -NoPath
+        $dotnet = Join-Path $installRoot 'dotnet.exe'
+    } else {
+        $script = Join-Path $installRoot 'dotnet-install.sh'
+        Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.sh' -OutFile $script
+        & bash $script --channel 11.0 --quality preview --install-dir $installRoot --no-path
+        $dotnet = Join-Path $installRoot 'dotnet'
+    }
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $dotnet --list-sdks
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Write-Host "##vso[task.setvariable variable=CORE_TOOLS_DOTNET11_ROOT]$installRoot"
+  displayName: 'Install isolated .NET 11 SDK for lifecycle E2E tests'
+  condition: and(succeeded(), eq('${{ parameters.worker }}', 'DotnetIsolated'))
+
+- pwsh: |
     $runtime = '${{ parameters.runtime }}'.ToLower()
     if ($runtime -like 'win*') {
         $funcPath = "$(Build.ArtifactStagingDirectory)/artifacts\$runtime\func.exe"
@@ -65,6 +86,7 @@ steps:
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     DURABLE_FUNCTION_PATH: $(DURABLE_FUNCTION_PATH)
     NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
+    CORE_TOOLS_DOTNET11_ROOT: $(CORE_TOOLS_DOTNET11_ROOT)
 
 - task: 1ES.PublishPipelineArtifact@1
   condition: succeededOrFailed()

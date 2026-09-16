@@ -449,6 +449,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated or dotnet");
             }
+
+            if (TargetFramework.Equals(Common.TargetFramework.Net11, StringComparison.OrdinalIgnoreCase)
+                && ResolvedLanguage == Constants.Languages.FSharp)
+            {
+                throw new CliArgumentsException(".NET 11 isolated project initialization is not yet supported for F#. Use C# or target .NET 10 instead.");
+            }
         }
 
         private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
