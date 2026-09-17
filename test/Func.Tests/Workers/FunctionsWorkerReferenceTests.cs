@@ -49,6 +49,14 @@ public class FunctionsWorkerReferenceTests
     }
 
     [Fact]
+    public void WorkerRuntime_WorkloadReferenceWithRuntimeOverride_ReturnsOverride()
+    {
+        var reference = FunctionsWorkerReference.FromWorkload("go", workerRuntime: "native");
+
+        reference.WorkerRuntime.Should().Be("native");
+    }
+
+    [Fact]
     public async Task ResolveWorkerAsync_WorkloadReferenceWithRuntimeOverride_PassesThroughFailure()
     {
         IFunctionsWorkerResolver resolver = Substitute.For<IFunctionsWorkerResolver>();
@@ -113,6 +121,17 @@ public class FunctionsWorkerReferenceTests
         resolved.Worker.WorkerConfigPath.Should().Be(WorkerConfigPath);
         resolved.Worker.Version.Should().Be("1.0.0");
         _ = resolver.DidNotReceive().ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void WorkerRuntime_WorkerInfoReference_ReturnsWorkerRuntime()
+    {
+        var reference = FunctionsWorkerReference.FromWorkerInfo(
+            "dotnet",
+            "dotnet-isolated",
+            "worker.config.json");
+
+        reference.WorkerRuntime.Should().Be("dotnet-isolated");
     }
 
     [Fact]

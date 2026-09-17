@@ -45,12 +45,16 @@ public abstract class FunctionsWorkerReference
         return new WorkerInfoReference(worker);
     }
 
+    public abstract string WorkerRuntime { get; }
+
     public abstract Task<FunctionsWorkerResolutionResult> ResolveWorkerAsync(FunctionsWorkerResolutionContext context, CancellationToken cancellationToken);
 
     private sealed class WorkloadReference(FunctionsWorkerId workerId, string? workerRuntimeOverride) : FunctionsWorkerReference
     {
         private readonly FunctionsWorkerId _workerId = workerId ?? throw new ArgumentNullException(nameof(workerId));
         private readonly string? _workerRuntimeOverride = workerRuntimeOverride;
+
+        public override string WorkerRuntime => _workerRuntimeOverride ?? _workerId.Value;
 
         public override async Task<FunctionsWorkerResolutionResult> ResolveWorkerAsync(FunctionsWorkerResolutionContext context, CancellationToken cancellationToken)
         {
@@ -78,6 +82,8 @@ public abstract class FunctionsWorkerReference
     private sealed class WorkerInfoReference(IFunctionsWorker worker) : FunctionsWorkerReference
     {
         private readonly IFunctionsWorker _worker = worker ?? throw new ArgumentNullException(nameof(worker));
+
+        public override string WorkerRuntime => _worker.WorkerRuntime;
 
         public override Task<FunctionsWorkerResolutionResult> ResolveWorkerAsync(FunctionsWorkerResolutionContext context, CancellationToken cancellationToken)
         {

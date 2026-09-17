@@ -40,6 +40,8 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
         ArgumentNullException.ThrowIfNull(context);
 
         FunctionsProject project = context.State.Project ?? throw new InvalidOperationException("Functions project was not resolved.");
+        ValidateSupportedRuntime(context, project.StackName, project.WorkerReference.WorkerRuntime, project.StackDisplayName);
+
         IReadOnlyDictionary<string, VersionRange> workerVersionRanges =
             context.State.ResolvedProfile?.WorkerVersionRanges
             ?? new Dictionary<string, VersionRange>(StringComparer.OrdinalIgnoreCase);
@@ -51,7 +53,13 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             && workerId is not null)
         {
             Log.ResolutionFailedAttemptingInstall(_logger, notResolved.Failure.GetType().Name, notResolved.Failure.Message, workerId.Value);
-            result = await TryInstallAndResolveWorkerAsync(context, workerId, workerVersionRanges, notResolved.Failure, cancellationToken);
+            result = await TryInstallAndResolveWorkerAsync(
+                context,
+                workerId,
+                project.WorkerReference.WorkerRuntime,
+                workerVersionRanges,
+                notResolved.Failure,
+                cancellationToken);
         }
 
         if (result is not FunctionsWorkerResolutionResult.Resolved resolved)
@@ -66,7 +74,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             throw CreateWorkerResolutionException(failedResult.Failure, context);
         }
 
-        ValidateSupportedRuntime(context, resolved.Worker);
+        ValidateSupportedRuntime(context, project.StackName, runtimeIdentifier: resolved.Worker.WorkerRuntime, project.StackDisplayName);
         context.State.Worker = resolved.Worker;
 
         string completionMessage = string.IsNullOrWhiteSpace(resolved.Worker.Version)
@@ -81,6 +89,7 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
     private async Task<FunctionsWorkerResolutionResult> TryInstallAndResolveWorkerAsync(
         StartInitializationStepContext context,
         FunctionsWorkerId workerId,
+        string workerRuntime,
         IReadOnlyDictionary<string, VersionRange> workerVersionRanges,
         FunctionsWorkerResolutionFailure failure,
         CancellationToken cancellationToken)
@@ -105,7 +114,14 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             : $"Installed worker {workloadInstallResult.Entry.PackageVersion}";
         await context.ReportProgressAsync(50, completionMessage, cancellationToken);
 
-        return FunctionsWorkerResolutionResults.Resolved(installResult.Worker);
+        IFunctionsWorker worker = string.Equals(installResult.Worker.WorkerRuntime, workerRuntime, StringComparison.OrdinalIgnoreCase)
+            ? installResult.Worker
+            : new RuntimeAdjustedFunctionsWorker(
+                installResult.Worker.Id,
+                workerRuntime,
+                installResult.Worker.WorkerConfigPath,
+                installResult.Worker.Version);
+        return FunctionsWorkerResolutionResults.Resolved(worker);
     }
 
     private async Task<FunctionsWorkerInstallResult> InstallWorkerAsync(
@@ -212,23 +228,38 @@ internal sealed class ResolveFunctionsWorkerInitializationStep(
             + $"{failure.Message} Run '{repairCommand}' to repair the install.";
     }
 
-    private static void ValidateSupportedRuntime(StartInitializationStepContext context, IFunctionsWorker worker)
+    /// <summary>
+    /// Accepts a profile match on either the stack name or the worker runtime name.
+    /// </summary>
+    private static void ValidateSupportedRuntime(
+        StartInitializationStepContext context,
+        string stackName,
+        string runtimeIdentifier,
+        string stackDisplayName)
     {
         if (context.State.ResolvedProfile is not { SupportedRuntimes: { } supportedRuntimes } profile)
         {
             return;
         }
 
-        if (supportedRuntimes.Any(runtime => string.Equals(runtime, worker.WorkerRuntime, StringComparison.OrdinalIgnoreCase)))
+        if (supportedRuntimes.Any(runtime =>
+            string.Equals(runtime, stackName, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(runtime, runtimeIdentifier, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
 
-        string message = $"Profile '{profile.Name}' does not support the detected runtime '{worker.WorkerRuntime}'. "
+        string message = $"Profile '{profile.Name}' does not support the '{stackDisplayName}' stack. "
             + $"Supported runtimes: {string.Join(", ", supportedRuntimes)}.";
         throw new GracefulException(message, isUserError: true);
     }
 
     private static GracefulException CreateUserError(Exception exception)
         => new(exception.Message, isUserError: true, verboseMessage: exception.ToString());
+
+    private sealed record RuntimeAdjustedFunctionsWorker(
+        FunctionsWorkerId Id,
+        string WorkerRuntime,
+        string WorkerConfigPath,
+        string Version) : IFunctionsWorker;
 }

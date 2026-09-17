@@ -47,9 +47,6 @@
         },
         "python": {
           "version": "[4.43.0]"
-        },
-        "go": {
-          "version": "[1.0.0]"
         }
       },
       "supportedRuntimes": [
@@ -73,17 +70,10 @@
       "workers": {
         "node": {
           "version": "[3.13.0]"
-        },
-        "python": {
-          "version": "[4.43.0]"
-        },
-        "go": {
-          "version": "[1.0.0]"
         }
       },
       "supportedRuntimes": [
         "node",
-        "python",
         "java",
         "powershell",
         "dotnet-isolated",
@@ -102,17 +92,10 @@
       "workers": {
         "node": {
           "version": "[3.13.0]"
-        },
-        "python": {
-          "version": "[4.43.0]"
-        },
-        "go": {
-          "version": "[1.0.0]"
         }
       },
       "supportedRuntimes": [
         "node",
-        "python",
         "java",
         "powershell",
         "dotnet-isolated",
@@ -134,9 +117,6 @@
         },
         "python": {
           "version": "[4.43.0]"
-        },
-        "go": {
-          "version": "[1.0.0]"
         }
       },
       "supportedRuntimes": [

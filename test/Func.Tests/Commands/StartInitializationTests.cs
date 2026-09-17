@@ -449,6 +449,62 @@ public class StartInitializationTests : IDisposable
             .InstallAsync(workerId, Arg.Is<IReadOnlyDictionary<string, VersionRange>>(ranges => HasWorkerRange(ranges, workerRange)), Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("native")]
+    [InlineData("go")]
+    public async Task DemoRunner_ProfiledMissingGoWorker_AllowsStackOrRuntimeBeforeInstall(string supportedRuntime)
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(_tempDir),
+            stackName: "go",
+            stackDisplayName: "Go",
+            workerReference: FunctionsWorkerReference.FromWorkload("go", workerRuntime: "native"));
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found go.mod"));
+        var workerId = new FunctionsWorkerId("go");
+        FunctionsWorkerResolutionFailure failure = CreateNotInstalledWorkerFailure("go");
+        IFunctionsWorkerResolver workerResolver = Substitute.For<IFunctionsWorkerResolver>();
+        workerResolver.ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>())
+            .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
+        IFunctionsWorkerResolverFactory workerResolverFactory = CreateWorkerResolverFactory(workerResolver);
+        var workerRange = VersionRange.Parse("[1.0.0]");
+        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["go"] = workerRange,
+        };
+        IFunctionsWorker installedWorker = CreateWorker("go", "go");
+        IFunctionsWorkerInstaller workerInstaller = Substitute.For<IFunctionsWorkerInstaller>();
+        WorkloadInstallResult workloadInstallResult = new(CreateWorkerEntry(FunctionsWorkerWorkloadPackages.GetPackageId(workerId), "1.0.0"), AlreadyInstalled: false);
+        workerInstaller.InstallAsync(workerId, Arg.Any<IReadOnlyDictionary<string, VersionRange>>(), Arg.Any<CancellationToken>())
+            .Returns(new FunctionsWorkerInstallResult(installedWorker, workloadInstallResult));
+        var runner = CreateRunner(
+            projectResolver,
+            CreateResolvedProfile(workerRanges, [supportedRuntime]),
+            CreateInstalledHostWorkloadResolver(),
+            workerInstaller: workerInstaller,
+            workerResolverFactory: workerResolverFactory,
+            hostProcessRunner: CreateSuccessfulHostProcessRunner());
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        StartInitializationResult result = await runner.RunAsync(
+            context,
+            new RecordingStartInitializationRenderer(),
+            CancellationToken.None);
+
+        result.Worker.WorkerRuntime.Should().Be("native");
+        result.Worker.Id.Should().Be(installedWorker.Id);
+        result.Worker.WorkerConfigPath.Should().Be(installedWorker.WorkerConfigPath);
+        result.Worker.Version.Should().Be(installedWorker.Version);
+        await workerInstaller.Received(1)
+            .InstallAsync(workerId, Arg.Any<IReadOnlyDictionary<string, VersionRange>>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task DemoRunner_ProfileRejectsUnsupportedDetectedRuntime()
     {
@@ -489,7 +545,118 @@ public class StartInitializationTests : IDisposable
 
         GracefulException ex = (await FluentActions.Awaiting(() => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
 
-        ex.Message.Should().Contain("does not support the detected runtime 'node'");
+        ex.Message.Should().Contain("does not support the 'Node.js' stack");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DemoRunner_ProfileRejectsUnsupportedStack_BeforeWorkerResolutionAndInstall(bool invalidInstallation)
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(_tempDir),
+            stackName: "python",
+            stackDisplayName: "Python");
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found requirements.txt"));
+        var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
+        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase);
+        var profile = new ResolvedProfile(
+            "windows-consumption",
+            profileSource,
+            Sku: "windows-consumption",
+            ProfileStatus.Stable,
+            DeprecationUrl: null,
+            VersionRange.Parse("[1.8.1, 4.1048.200)"),
+            workerRanges,
+            ExtensionBundleVersionRange: null,
+            SupportedRuntimes: ["node", "java", "powershell", "dotnet-isolated", "custom"],
+            Notes: null);
+        HostWorkloadResolution hostResolution = new HostWorkloadResolution.Installed(
+            CreateHostWorkload("4.1000.0"),
+            NuGetVersion.Parse("4.1000.0"),
+            ExplicitlyRequested: false);
+        IHostWorkloadResolver hostWorkloadResolver = Substitute.For<IHostWorkloadResolver>();
+        hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(hostResolution);
+        var workerId = new FunctionsWorkerId("python");
+        FunctionsWorkerResolutionFailure failure = invalidInstallation
+            ? FunctionsWorkerResolutionFailures.InvalidInstallation(
+                workerId, FunctionsWorkerWorkloadPackages.GetPackageId(workerId), "4.43.0", "worker.config.json", "Missing worker configuration.")
+            : CreateNotInstalledWorkerFailure("python");
+        IFunctionsWorkerResolver workerResolver = Substitute.For<IFunctionsWorkerResolver>();
+        workerResolver.ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>())
+            .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
+        IFunctionsWorkerInstaller workerInstaller = Substitute.For<IFunctionsWorkerInstaller>();
+        var runner = CreateRunner(
+            projectResolver,
+            new ProfileResolution.Resolved(profile, []),
+            hostWorkloadResolver,
+            workerResolverFactory: CreateWorkerResolverFactory(workerResolver),
+            workerInstaller: workerInstaller);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        GracefulException ex = (await FluentActions.Awaiting(() => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
+
+        ex.Message.Should().Contain("does not support the 'Python' stack");
+        ex.Message.Should().Contain("node, java, powershell, dotnet-isolated, custom");
+        await workerResolver.DidNotReceive().ResolveWorkerAsync(workerId, Arg.Any<CancellationToken>());
+        await workerInstaller.DidNotReceive().InstallAsync(
+            Arg.Any<FunctionsWorkerId>(),
+            Arg.Any<IReadOnlyDictionary<string, VersionRange>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DemoRunner_ProfileAllowsStackWhenWorkerRuntimeMatches()
+    {
+        // DotNet has StackName "dotnet" but WorkerRuntime "dotnet-isolated".
+        // The profile lists "dotnet-isolated" so it should pass validation via WorkerRuntime match.
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        TestFunctionsProject project = CreateProject(
+            WorkingDirectory.FromExplicit(_tempDir),
+            stackName: "dotnet",
+            stackDisplayName: ".NET",
+            workerReference: FunctionsWorkerReference.FromWorkerInfo("dotnet", "dotnet-isolated", _tempDir));
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "found .csproj"));
+        var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
+        Dictionary<string, VersionRange> workerRanges = new(StringComparer.OrdinalIgnoreCase);
+        var profile = new ResolvedProfile(
+            "flex",
+            profileSource,
+            Sku: "flex",
+            ProfileStatus.Stable,
+            DeprecationUrl: null,
+            VersionRange.Parse("[1.8.1, 4.1048.200)"),
+            workerRanges,
+            ExtensionBundleVersionRange: null,
+            SupportedRuntimes: ["dotnet-isolated", "node", "python"],
+            Notes: null);
+        HostWorkloadResolution hostResolution = new HostWorkloadResolution.Installed(
+            CreateHostWorkload("4.1000.0"),
+            NuGetVersion.Parse("4.1000.0"),
+            ExplicitlyRequested: false);
+        IHostWorkloadResolver hostWorkloadResolver = Substitute.For<IHostWorkloadResolver>();
+        hostWorkloadResolver.ResolveAsync(Arg.Any<HostWorkloadResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(hostResolution);
+        var runner = CreateRunner(projectResolver, new ProfileResolution.Resolved(profile, []), hostWorkloadResolver);
+        StartInitializationContext context = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 12,
+            demoSpeedMultiplier: 0.001,
+            demoAutoExit: true);
+
+        // Should NOT throw - "dotnet" StackName doesn't match but "dotnet-isolated" WorkerRuntime does
+        Func<Task> act = () => runner.RunAsync(context, new RecordingStartInitializationRenderer(), CancellationToken.None);
+        await act.Should().NotThrowAsync<GracefulException>();
     }
 
     [Fact]
@@ -976,8 +1143,9 @@ public class StartInitializationTests : IDisposable
         WorkingDirectory workingDirectory,
         string stackName = "dotnet-isolated",
         string stackDisplayName = ".NET",
-        bool supportsExtensionBundles = false)
-        => new(workingDirectory, stackName, stackDisplayName, supportsExtensionBundles);
+        bool supportsExtensionBundles = false,
+        FunctionsWorkerReference? workerReference = null)
+        => new(workingDirectory, stackName, stackDisplayName, supportsExtensionBundles, workerReference);
 
     private static FunctionsProjectHostRunContext CreateHostRunContext(WorkingDirectory workingDirectory)
         => new(
@@ -1193,7 +1361,9 @@ public class StartInitializationTests : IDisposable
         return hostWorkloadResolver;
     }
 
-    private static ProfileResolution CreateResolvedProfile(IReadOnlyDictionary<string, VersionRange> workerVersionRanges)
+    private static ProfileResolution CreateResolvedProfile(
+        IReadOnlyDictionary<string, VersionRange> workerVersionRanges,
+        IReadOnlyList<string>? supportedRuntimes = null)
     {
         var profileSource = new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "bundled");
         var profile = new ResolvedProfile(
@@ -1205,7 +1375,7 @@ public class StartInitializationTests : IDisposable
             VersionRange.Parse("[1.8.1, 4.1048.200)"),
             workerVersionRanges,
             ExtensionBundleVersionRange: null,
-            SupportedRuntimes: ["node"],
+            SupportedRuntimes: supportedRuntimes ?? ["node"],
             Notes: null);
         return new ProfileResolution.Resolved(profile, []);
     }
@@ -1351,16 +1521,16 @@ public class StartInitializationTests : IDisposable
         WorkingDirectory workingDirectory,
         string stackName,
         string stackDisplayName,
-        bool supportsExtensionBundles) : FunctionsProject
+        bool supportsExtensionBundles,
+        FunctionsWorkerReference? workerReference = null) : FunctionsProject
     {
-        private readonly WorkingDirectory _workingDirectory = workingDirectory;
-        private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload(stackName);
+        private readonly FunctionsWorkerReference _workerReference = workerReference ?? FunctionsWorkerReference.FromWorkload(stackName);
 
         public List<FunctionsProjectHostRunContext> PreparedContexts { get; } = [];
 
         public Action<FunctionsProjectHostRunContext>? PrepareAction { get; set; }
 
-        public override WorkingDirectory WorkingDirectory => _workingDirectory;
+        public override WorkingDirectory WorkingDirectory => workingDirectory;
 
         public override string StackName => stackName;
 
