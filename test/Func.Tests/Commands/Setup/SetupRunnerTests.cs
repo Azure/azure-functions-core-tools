@@ -730,14 +730,13 @@ public sealed class SetupRunnerTests : IDisposable
         InteractiveTestInteractionService interactive = new();
         SetupRunner runner = new(
             interactive,
-            _store,
-            catalog,
-            _installer,
-            _profileCatalog,
-            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
-            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
-            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
-            _bundleReader);
+            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>()), new SetupStackCatalog(catalog)),
+            new SetupProfileScopeResolver(
+                _profileCatalog,
+                new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
+                new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
+            new SetupDependencyPlanBuilder(_bundleReader, new SetupStackCatalog(catalog)),
+            new SetupDependencyInstaller(interactive, _store, catalog, _installer));
 
         SetupRunResult result = await runner.RunAsync(
             new SetupCommandOptions(
@@ -804,14 +803,13 @@ public sealed class SetupRunnerTests : IDisposable
         InteractiveTestInteractionService interactive = new();
         SetupRunner runner = new(
             interactive,
-            _store,
-            catalog,
-            _installer,
-            _profileCatalog,
-            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
-            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
-            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
-            _bundleReader);
+            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>()), new SetupStackCatalog(catalog)),
+            new SetupProfileScopeResolver(
+                _profileCatalog,
+                new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
+                new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
+            new SetupDependencyPlanBuilder(_bundleReader, new SetupStackCatalog(catalog)),
+            new SetupDependencyInstaller(interactive, _store, catalog, _installer));
 
         _ = await runner.RunAsync(
             new SetupCommandOptions(
@@ -846,14 +844,13 @@ public sealed class SetupRunnerTests : IDisposable
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
         SetupRunner runner = new(
             _interaction,
-            _store,
-            catalog,
-            _installer,
-            _profileCatalog,
-            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
-            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
-            new FakeCliConfigurationProvider(new Dictionary<string, string?>()),
-            _bundleReader,
+            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>()), new SetupStackCatalog(catalog)),
+            new SetupProfileScopeResolver(
+                _profileCatalog,
+                new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
+                new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
+            new SetupDependencyPlanBuilder(_bundleReader, new SetupStackCatalog(catalog)),
+            new SetupDependencyInstaller(_interaction, _store, catalog, _installer),
             firstRunStore);
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
@@ -868,14 +865,13 @@ public sealed class SetupRunnerTests : IDisposable
         IProfileCatalog? profileCatalog = null)
         => new(
             _interaction,
-            _store,
-            catalog,
-            _installer,
-            profileCatalog ?? _profileCatalog,
-            new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
-            new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions()),
-            new FakeCliConfigurationProvider(projectConfig ?? new Dictionary<string, string?>()),
-            _bundleReader);
+            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(projectConfig ?? new Dictionary<string, string?>()), new SetupStackCatalog(catalog)),
+            new SetupProfileScopeResolver(
+                profileCatalog ?? _profileCatalog,
+                new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
+                new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
+            new SetupDependencyPlanBuilder(_bundleReader, new SetupStackCatalog(catalog)),
+            new SetupDependencyInstaller(_interaction, _store, catalog, _installer));
 
     private SetupCommandOptions Options(
         IReadOnlyList<string>? features = null,
