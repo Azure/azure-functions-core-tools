@@ -137,6 +137,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
             File.WriteAllText(Path.Combine(_tempDirectory, "extensions.json"), "{\"extensions\":[]}");
             File.WriteAllText(Path.Combine(_tempDirectory, "App.dll"), string.Empty);
             Directory.CreateDirectory(Path.Combine(_tempDirectory, ".azurefunctions"));
+            File.WriteAllText(Path.Combine(_tempDirectory, ".azurefunctions", "function.deps.json"), "{}");
         }
     }
 }
