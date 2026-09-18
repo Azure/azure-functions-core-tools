@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 1200 660" style="display:block;max-width:1200px;height:auto" role="img" aria-labelledby="title description">
+  <title id="title">Azure Functions CLI templating architecture</title>
+  <desc id="description">The supply system produces versioned template packages and discovery information. Explicit package lifecycle operations populate a shared installed store. New and init use a Functions integration around Microsoft TemplateEngine to preview or create files. Init completes required project configuration before ordinary actions. New runs permitted item-template actions without init finalization. Constraints and bindings participate before creation. Discovery never implicitly installs into init.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#52647a"/></marker>
+    <style>
+      text { font-family: 'Segoe UI', Arial, sans-serif; fill: #152b43; }
+      .title { font-size: 26px; font-weight: 700; fill: #ffffff; }
+      .subtitle { font-size: 15px; fill: #c4d7ec; }
+      .section { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; }
+      .heading { font-size: 19px; font-weight: 650; }
+      .body { font-size: 15px; }
+      .small { font-size: 13px; fill: #445b73; }
+      .line { fill: none; stroke: #52647a; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="660" rx="18" fill="#f4f7fb"/>
+  <path d="M18 0 H1182 Q1200 0 1200 18 V100 H0 V18 Q0 0 18 0" fill="#112a45"/>
+  <text x="32" y="43" class="title">One template contract. Two connected systems.</text>
+  <text x="32" y="73" class="subtitle">Target architecture · Package discovery, installation and execution remain distinct</text>
+
+  <rect x="24" y="122" width="320" height="450" rx="14" fill="#eaf1fc" stroke="#c5d4ea"/>
+  <text x="44" y="151" class="section" fill="#254fa0">SUPPLY SYSTEM</text>
+  <rect x="44" y="172" width="280" height="106" rx="10" fill="#ffffff" stroke="#c5d4ea"/>
+  <text x="60" y="202" class="heading">Template publishers</text>
+  <text x="60" y="228" class="body">Built-in templates · Azure Samples</text>
+  <text x="60" y="252" class="body">Other compatible publishers</text>
+  <path d="M184 278 V301" class="line"/>
+  <rect x="44" y="308" width="280" height="97" rx="10" fill="#ffffff" stroke="#c5d4ea"/>
+  <text x="60" y="339" class="heading">Versioned packages</text>
+  <text x="60" y="365" class="body">Content · parameters · requirements</text>
+  <text x="60" y="388" class="body">Declared actions · provenance</text>
+  <path d="M184 405 V432" class="line"/>
+  <rect x="44" y="439" width="280" height="109" rx="10" fill="#ffffff" stroke="#c5d4ea"/>
+  <text x="60" y="470" class="heading">Search and browse</text>
+  <text x="60" y="496" class="body">Find packages and install references</text>
+  <text x="60" y="521" class="small">Does not install or generate projects</text>
+
+  <rect x="368" y="122" width="294" height="450" rx="14" fill="#e8f5f2" stroke="#b9dbd3"/>
+  <text x="388" y="151" class="section" fill="#17624f">PACKAGE LIFECYCLE</text>
+  <rect x="388" y="192" width="254" height="116" rx="10" fill="#ffffff" stroke="#b9dbd3"/>
+  <text x="404" y="223" class="heading">Explicit package request</text>
+  <text x="404" y="250" class="body">Install · update · uninstall</text>
+  <text x="404" y="276" class="small">Stage and validate before live mutation</text>
+  <path d="M324 353 H353 V250 H381" class="line"/>
+  <path d="M324 490 H352 V289 H381" class="line" stroke-dasharray="5 5"/>
+  <path d="M515 308 V341" class="line"/>
+  <rect x="388" y="348" width="254" height="112" rx="10" fill="#ffffff" stroke="#b9dbd3"/>
+  <text x="404" y="381" class="heading">Shared installed store</text>
+  <text x="404" y="408" class="body">Packages and catalog state</text>
+  <text x="404" y="434" class="small">Coordinated readers and writers</text>
+  <text x="388" y="496" class="body">Replacement failure restores state.</text>
+  <text x="388" y="522" class="body">Successful changes refresh metadata.</text>
+
+  <rect x="686" y="122" width="490" height="450" rx="14" fill="#eef0fc" stroke="#ced1eb"/>
+  <text x="706" y="151" class="section" fill="#514095">CLI EXECUTION</text>
+  <rect x="706" y="172" width="450" height="73" rx="10" fill="#ffffff" stroke="#ced1eb"/>
+  <text x="722" y="202" class="heading">func new · items</text>
+  <text x="950" y="202" class="heading">func init · projects</text>
+  <text x="722" y="227" class="body">Select · parse · prompt · render</text>
+  <path d="M931 245 V266" class="line"/>
+  <rect x="706" y="273" width="450" height="115" rx="10" fill="#ffffff" stroke="#ced1eb"/>
+  <text x="722" y="304" class="heading">Functions engine integration</text>
+  <text x="722" y="331" class="body">Metadata · constraints · bindings · exact invocation</text>
+  <text x="722" y="357" class="small">Microsoft TemplateEngine behind Functions-owned APIs</text>
+  <path d="M642 401 H674 V331 H699" class="line"/>
+  <path d="M931 388 V410" class="line"/>
+  <rect x="706" y="417" width="450" height="131" rx="10" fill="#ffffff" stroke="#ced1eb"/>
+  <text x="722" y="443" class="heading">Preview or create</text>
+  <text x="722" y="469" class="body">Preview: no target writes or actions.</text>
+  <text x="722" y="494" class="body">Init: create → required config → ordinary actions</text>
+  <text x="722" y="516" class="body">New: create → permitted item-template actions</text>
+  <text x="722" y="537" class="small">Init configuration failure stops remaining actions.</text>
+
+  <rect x="24" y="593" width="1152" height="44" rx="10" fill="#112a45"/>
+  <text x="44" y="621" style="font-size:15px;fill:#ffffff">Delivery principle</text>
+  <text x="180" y="621" style="font-size:15px;fill:#d8e5f2">Agree shared contracts first. Build independent components in parallel. Prove the integrated path before cutover.</text>
+</svg>

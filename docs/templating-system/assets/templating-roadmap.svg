@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 1140 660" style="display:block;max-width:1140px;height:auto" role="img" aria-labelledby="title description">
+  <title id="title">Three parallel builds, feature-specific integration</title>
+  <desc id="description">Agree small shared handoffs. Ahmed builds the runtime and required init support, contributor B builds safe package operations, and contributor C delivers the shared parser and early stack metadata before the new command. Three independent integration checks join installed catalog, new, and init as their real dependencies are ready. Finish remaining capabilities in parallel, then qualify all ten areas for release. Arrows are dependency direction, not time estimates or team-wide phase gates.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#587089"/></marker>
+    <style>
+      text { font-family: 'Segoe UI', Arial, sans-serif; fill: #142c46; }
+      .title { font-size: 28px; font-weight: 700; fill: white; }
+      .sub { font-size: 17px; fill: #d1dfed; }
+      .heading { font-size: 22px; font-weight: 650; }
+      .body { font-size: 18px; }
+      .small { font-size: 16px; fill: #3d5771; }
+      .label { font-size: 14px; font-weight: 700; letter-spacing: 1px; }
+      .arrow { stroke: #587089; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1140" height="660" rx="16" fill="#f3f6fa"/>
+  <path d="M16 0 H1124 Q1140 0 1140 16 V95 H0 V16 Q0 0 16 0" fill="#112b46"/>
+  <text x="28" y="40" class="title">Three builds in parallel. Join only what a feature needs.</text>
+  <text x="28" y="72" class="sub">Agree interfaces early • Deliver small slices • Integrate continuously • Qualify the full system</text>
+  <rect x="28" y="112" width="1084" height="55" rx="10" fill="#ffffff" stroke="#c8d5e3"/>
+  <text x="46" y="146" class="body">Shared handoffs: runtime/parameters · store access · eligibility/actions · packages/discovery</text>
+  <path d="M208 167 V190" class="arrow"/><path d="M570 167 V190" class="arrow"/><path d="M932 167 V190" class="arrow"/>
+  <rect x="28" y="197" width="346" height="205" rx="12" fill="#e8f0fd" stroke="#bed0eb"/>
+  <text x="48" y="225" class="label">AHMED</text>
+  <text x="48" y="258" class="heading">Runtime and init</text>
+  <text x="48" y="292" class="body">Host → metadata → invocation</text>
+  <text x="48" y="321" class="body">Required init support early</text>
+  <text x="48" y="350" class="body">Then basic → advanced init</text>
+  <text x="48" y="382" class="small">Publish usable runtime slices.</text>
+  <rect x="397" y="197" width="346" height="205" rx="12" fill="#e8f5ef" stroke="#b8dccb"/>
+  <text x="417" y="225" class="label">CONTRIBUTOR B</text>
+  <text x="417" y="258" class="heading">Packages and distribution</text>
+  <text x="417" y="292" class="body">Validate → install → safe replace</text>
+  <text x="417" y="321" class="body">Publishing and Samples tooling</text>
+  <text x="417" y="350" class="body">Search producer is separate.</text>
+  <text x="417" y="382" class="small">Share store policy with runtime.</text>
+  <rect x="766" y="197" width="346" height="205" rx="12" fill="#f0eafa" stroke="#d2c3e8"/>
+  <text x="786" y="225" class="label">CONTRIBUTOR C</text>
+  <text x="786" y="258" class="heading">Commands and templates</text>
+  <text x="786" y="292" class="body">Parser → early stack metadata</text>
+  <text x="786" y="321" class="body">Then new and template batches</text>
+  <text x="786" y="350" class="body">Adapters / search client follow.</text>
+  <text x="786" y="382" class="small">Init uses parser, not finished new.</text>
+  <text x="28" y="434" class="label">INTEGRATE WHEN EACH FEATURE IS READY, NOT WHEN EVERY LANE FINISHES</text>
+  <rect x="28" y="450" width="346" height="98" rx="10" fill="#ffffff" stroke="#c8d5e3"/>
+  <text x="46" y="480" class="heading">Installed catalog</text>
+  <text x="46" y="511" class="small">Runtime + lifecycle + shared store</text>
+  <text x="46" y="534" class="small">Install, list, update and refresh</text>
+  <rect x="397" y="450" width="346" height="98" rx="10" fill="#ffffff" stroke="#c8d5e3"/>
+  <text x="415" y="480" class="heading">Item creation</text>
+  <text x="415" y="511" class="small">Runtime + parser + new + eligibility</text>
+  <text x="415" y="534" class="small">A real item template</text>
+  <rect x="766" y="450" width="346" height="98" rx="10" fill="#ffffff" stroke="#c8d5e3"/>
+  <text x="784" y="480" class="heading">Project creation</text>
+  <text x="784" y="510" class="small">Runtime + parser + stack metadata</text>
+  <text x="784" y="534" class="small">Init + constraints + required actions</text>
+  <rect x="28" y="569" width="1084" height="67" rx="10" fill="#112b46"/>
+  <text x="46" y="596" style="font-family:'Segoe UI',Arial,sans-serif;font-size:18px;font-weight:650;fill:white">Keep building the rest in parallel. Then qualify and switch.</text>
+  <text x="46" y="621" style="font-family:'Segoe UI',Arial,sans-serif;font-size:16px;fill:#d1dfed">All stacks · advanced templates · actions / bindings · publishing / search · migration and release evidence</text>
+</svg>
