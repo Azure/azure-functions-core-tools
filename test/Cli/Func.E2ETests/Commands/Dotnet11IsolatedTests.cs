@@ -124,6 +124,10 @@ namespace Azure.Functions.Cli.E2ETests.Commands
             result.Should().ExitWith(0);
             result.Should().HaveStdOutContaining("Skipping build event for functions project (--no-build).");
             result.Should().NotHaveStdOutContaining("Building .NET project...");
+
+            // Proves the isolated folder-structure validation actually ran, so the test cannot pass
+            // by silently falling back to the plain dotnet runtime.
+            result.Should().HaveStdOutContaining("Validate Folder Structure");
             AssertPackage(packageDirectory, assemblyName);
         }
 

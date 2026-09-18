@@ -532,6 +532,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.DotnetIsolated)
             {
+                // Checked first, and case-insensitively, so that a target framework differing only in
+                // casing cannot fall through to the generic Dockerfile, which is still based on .NET 6.
+                if (Common.TargetFramework.Net11.Equals(targetFramework, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new CliException(Net11DockerNotSupportedMessage);
+                }
+
                 if (targetFramework == Common.TargetFramework.Net7)
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet7Isolated);
@@ -547,10 +554,6 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 else if (targetFramework == Common.TargetFramework.Net10)
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet10Isolated);
-                }
-                else if (targetFramework == Common.TargetFramework.Net11)
-                {
-                    throw new CliException(Net11DockerNotSupportedMessage);
                 }
                 else
                 {
