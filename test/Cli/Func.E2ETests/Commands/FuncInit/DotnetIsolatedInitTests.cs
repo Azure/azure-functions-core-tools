@@ -85,11 +85,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         [InlineData("F#", "NET11.0")]
         public void Init_WithNet11AndFSharp_RejectsUnsupportedLanguage(string language, string targetFramework)
         {
-            new FuncInitCommand(FuncPath, nameof(Init_WithNet11AndFSharp_RejectsUnsupportedLanguage), Log)
+            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithNet11AndFSharp_RejectsUnsupportedLanguage), Log)
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["--worker-runtime", "dotnet-isolated", "--language", language, "--target-framework", targetFramework])
-                .Should().ExitWith(1)
-                .And.HaveStdErrContaining(".NET 11 isolated project initialization is not yet supported for F#");
+                .Execute(["--worker-runtime", "dotnet-isolated", "--language", language, "--target-framework", targetFramework]);
+
+            funcInitResult.Should().ExitWith(1);
+            funcInitResult.Should().HaveStdErrContaining(".NET 11 isolated project initialization is not yet supported for F#");
 
             Directory.GetFiles(WorkingDirectory, "*.fsproj").Should().BeEmpty();
         }
@@ -99,11 +100,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         [InlineData("NET11.0")]
         public void Init_WithNet11AndDocker_RejectsDockerfileGeneration(string targetFramework)
         {
-            new FuncInitCommand(FuncPath, nameof(Init_WithNet11AndDocker_RejectsDockerfileGeneration), Log)
+            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithNet11AndDocker_RejectsDockerfileGeneration), Log)
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework, "--docker"])
-                .Should().ExitWith(1)
-                .And.HaveStdErrContaining("Dockerfile generation is not yet supported for .NET 11 isolated projects");
+                .Execute(["--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework, "--docker"]);
+
+            funcInitResult.Should().ExitWith(1);
+            funcInitResult.Should().HaveStdErrContaining("Dockerfile generation is not yet supported for .NET 11 isolated projects");
 
             File.Exists(Path.Combine(WorkingDirectory, "Dockerfile")).Should().BeFalse();
         }
@@ -111,11 +113,12 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         [Fact]
         public void Init_DotnetHelp_ListsNet11()
         {
-            new FuncRootCommand(FuncPath, nameof(Init_DotnetHelp_ListsNet11), Log)
+            var funcInitResult = new FuncRootCommand(FuncPath, nameof(Init_DotnetHelp_ListsNet11), Log)
                 .WithWorkingDirectory(WorkingDirectory)
-                .Execute(["init", "dotnet", "--help"])
-                .Should().ExitWith(0)
-                .And.HaveStdOutContaining("net11.0");
+                .Execute(["init", "dotnet", "--help"]);
+
+            funcInitResult.Should().ExitWith(0);
+            funcInitResult.Should().HaveStdOutContaining("net11.0");
         }
 
         [Fact]

@@ -95,7 +95,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands
             var testAssembly = typeof(Dotnet11IsolatedTests).Assembly.Location;
             var dotnet10Path = Path.GetFullPath(Path.Combine(
                 RuntimeEnvironment.GetRuntimeDirectory(),
-                "..", "..", "..",
+                "..",
+                "..",
+                "..",
                 OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet"));
 
             // Use the test host's .NET 10 runtime for the runner; only its child builds select SDK 11.
