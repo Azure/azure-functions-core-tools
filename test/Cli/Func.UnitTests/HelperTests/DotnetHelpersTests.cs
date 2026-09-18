@@ -8,6 +8,26 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
     public class DotnetHelpersTests
     {
+        [Theory]
+        [InlineData("net10.0")]
+        [InlineData("net11.0")]
+        [InlineData("net11.0-windows")]
+        public void TargetFrameworkRegex_RecognizesModernFrameworks(string targetFramework)
+        {
+            var output = $"{{\"Properties\":{{\"TargetFrameworks\":\"\",\"TargetFramework\":\"{targetFramework}\"}}}}";
+            var matches = TargetFrameworkHelper.TfmRegex.Matches(output);
+
+            Assert.Single(matches);
+            Assert.Equal(targetFramework, matches[0].Value);
+        }
+
+        [Fact]
+        public void SupportedFrameworks_Net11IsIsolatedOnly()
+        {
+            Assert.Contains("net11.0", TargetFrameworkHelper.GetSupportedTargetFrameworks());
+            Assert.Equal(new[] { "net8.0", "net6.0" }, TargetFrameworkHelper.GetSupportedInProcTargetFrameworks());
+        }
+
         [Fact]
         public void EnsureDotnet_DoesNotThrow_WhenDotnetExists()
         {

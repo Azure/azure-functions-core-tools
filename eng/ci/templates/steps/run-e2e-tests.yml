@@ -31,8 +31,24 @@ steps:
     Write-Host "##vso[task.setvariable variable=INPROC_RUN_SETTINGS]$(Build.SourcesDirectory)/test/Cli/Func.E2ETests/.runsettings/start_tests/ci_pipeline/dotnet_inproc.runsettings"
     Write-Host "##vso[task.setvariable variable=TEST_PROJECT_PATH]$(Build.SourcesDirectory)/test/TestFunctionApps"
     Write-Host "##vso[task.setvariable variable=FUNCTIONS_PYTHON_DOCKER_IMAGE]mcr.microsoft.com/azure-functions/python:4-python3.11-buildenv"
+
+    # A step condition cannot read the 'worker' parameter directly: callers pass it as the
+    # runtime macro $(languageWorker), which only resolves inside a step input like this script.
+    if ('${{ parameters.worker }}' -eq 'DotnetIsolated') {
+        Write-Host "##vso[task.setvariable variable=installDotnet11]true"
+    }
   displayName: 'Set environment variables for E2E tests'
 
+# Installed into the default tool path, alongside the SDKs from install-tools.yml, rather than a
+# private directory. Core Tools is a framework-dependent net10.0 app while the app under test runs a
+# net11.0 worker, so both runtimes have to resolve from a single root.
+- task: UseDotNet@2
+  displayName: 'Install .NET 11 SDK for lifecycle E2E tests'
+  condition: and(succeeded(), eq(variables['installDotnet11'], 'true'))
+  inputs:
+    packageType: sdk
+    version: '11.0.x'
+    includePreviewVersions: true
 
 - pwsh: |
     $(FUNC_PATH) --version
@@ -65,6 +81,7 @@ steps:
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     DURABLE_FUNCTION_PATH: $(DURABLE_FUNCTION_PATH)
     NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
+    CORE_TOOLS_DOTNET11_ROOT: $(Agent.ToolsDirectory)/dotnet
 
 - task: 1ES.PublishPipelineArtifact@1
   condition: succeededOrFailed()
