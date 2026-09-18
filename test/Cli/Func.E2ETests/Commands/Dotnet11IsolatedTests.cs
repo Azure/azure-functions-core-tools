@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands
         private const string TimerFunction = "TimerTrigger";
         private const string TimerSuccessLog = "Executed 'Functions.TimerTrigger' (Succeeded";
 
-        [SkippableTheory]
+        [SkippableTheory(Skip = "The host launches the worker with the machine-wide dotnet root, which has no .NET 11 runtime. Not redirectable via DOTNET_ROOT/DOTNET_HOST_PATH/PATH. See https://github.com/Azure/azure-functions-core-tools/issues/5602.")]
         [InlineData(false)]
         [InlineData(true)]
         public void Start_Net11_HttpAndTimerFunctionsExecute(bool useDotnetRun)

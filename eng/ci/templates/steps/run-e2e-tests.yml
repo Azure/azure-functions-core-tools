@@ -39,14 +39,16 @@ steps:
     }
   displayName: 'Set environment variables for E2E tests'
 
+# Installed into the default tool path, alongside the SDKs from install-tools.yml, rather than a
+# private directory. Core Tools is a framework-dependent net10.0 app while the app under test runs a
+# net11.0 worker, so both runtimes have to resolve from a single root.
 - task: UseDotNet@2
-  displayName: 'Install isolated .NET 11 SDK for lifecycle E2E tests'
+  displayName: 'Install .NET 11 SDK for lifecycle E2E tests'
   condition: and(succeeded(), eq(variables['installDotnet11'], 'true'))
   inputs:
     packageType: sdk
     version: '11.0.x'
     includePreviewVersions: true
-    installationPath: $(Build.SourcesDirectory)/.dotnet11
 
 - pwsh: |
     $(FUNC_PATH) --version
@@ -79,7 +81,7 @@ steps:
     DURABLE_STORAGE_CONNECTION: $(DURABLE_STORAGE_CONNECTION)
     DURABLE_FUNCTION_PATH: $(DURABLE_FUNCTION_PATH)
     NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
-    CORE_TOOLS_DOTNET11_ROOT: $(Build.SourcesDirectory)/.dotnet11
+    CORE_TOOLS_DOTNET11_ROOT: $(Agent.ToolsDirectory)/dotnet
 
 - task: 1ES.PublishPipelineArtifact@1
   condition: succeededOrFailed()

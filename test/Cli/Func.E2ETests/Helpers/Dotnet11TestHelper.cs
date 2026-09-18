@@ -38,7 +38,19 @@ namespace Azure.Functions.Cli.E2ETests.Helpers
                     Environment.GetEnvironmentVariable("PATH")))
                 .WithEnvironmentVariable("DOTNET_HOST_PATH", dotnetPath);
 
-            // Do not replace DOTNET_ROOT: a framework-dependent Core Tools still needs .NET 10.
+            // MSBuild exports these to child processes, pinning them to the SDK that is running the
+            // tests (.NET 10), which cannot target net11.0 and fails with NETSDK1045. They take
+            // precedence over PATH and DOTNET_HOST_PATH, so the SDK the func process spawns can only
+            // be redirected by removing them.
+            command.EnvironmentToRemove.Add("MSBuildSDKsPath");
+            command.EnvironmentToRemove.Add("MSBuildExtensionsPath");
+            command.EnvironmentToRemove.Add("MSBuildLoadMicrosoftTargetsReadOnly");
+
+            // DOTNET_ROOT is deliberately left alone: func resolves its runtime from the
+            // machine-wide install and ignores it, so overriding it here has no effect. That is
+            // also why the start/run tests are skipped, since the worker is launched from a root
+            // the harness cannot redirect. See
+            // https://github.com/Azure/azure-functions-core-tools/issues/5602.
         }
     }
 }
