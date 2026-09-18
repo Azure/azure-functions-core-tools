@@ -25,7 +25,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands
         private const string TimerFunction = "TimerTrigger";
         private const string TimerSuccessLog = "Executed 'Functions.TimerTrigger' (Succeeded";
 
-        [Theory]
+        [SkippableTheory]
         [InlineData(false)]
         [InlineData(true)]
         public void Start_Net11_HttpAndTimerFunctionsExecute(bool useDotnetRun)
@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands
             result.Should().HaveStdOutContaining(TimerSuccessLog);
         }
 
-        [Fact]
+        [SkippableFact]
         public void Pack_Net11_IncludesWorkerAndExtensions()
         {
             var testName = nameof(Pack_Net11_IncludesWorkerAndExtensions);
@@ -87,7 +87,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands
             AssertPackage(packageDirectory, assemblyName);
         }
 
-        [Fact]
+        [SkippableFact]
         public void Pack_Net11_NoBuild_AcceptsAzurePublishBuildOutput()
         {
             var testName = nameof(Pack_Net11_NoBuild_AcceptsAzurePublishBuildOutput);
