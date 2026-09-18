@@ -22,6 +22,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         // Default to .NET 10 if the target framework is not specified
         private const string DefaultTargetFramework = Common.TargetFramework.Net10;
         private const string DefaultInProcTargetFramework = Common.TargetFramework.Net8;
+
+        // There is no .NET 11 Azure Functions base image yet, so Dockerfile generation would
+        // otherwise fall back to a Dockerfile that cannot build a .NET 11 project.
+        private const string Net11DockerNotSupportedMessage = "Dockerfile generation is not yet supported for .NET 11 isolated projects because no .NET 11 Azure Functions base image is available. Target .NET 10 or omit --docker/--docker-only.";
+
         private readonly ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
         private readonly IEnumerable<IConfigurationProfile> _configurationProfiles;
@@ -450,10 +455,17 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated or dotnet");
             }
 
-            if (TargetFramework.Equals(Common.TargetFramework.Net11, StringComparison.OrdinalIgnoreCase)
-                && ResolvedLanguage == Constants.Languages.FSharp)
+            if (TargetFramework.Equals(Common.TargetFramework.Net11, StringComparison.OrdinalIgnoreCase))
             {
-                throw new CliArgumentsException(".NET 11 isolated project initialization is not yet supported for F#. Use C# or target .NET 10 instead.");
+                if (ResolvedLanguage == Constants.Languages.FSharp)
+                {
+                    throw new CliArgumentsException(".NET 11 isolated project initialization is not yet supported for F#. Use C# or target .NET 10 instead.");
+                }
+
+                if (InitDocker)
+                {
+                    throw new CliArgumentsException(Net11DockerNotSupportedMessage);
+                }
             }
         }
 
@@ -535,6 +547,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 else if (targetFramework == Common.TargetFramework.Net10)
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet10Isolated);
+                }
+                else if (targetFramework == Common.TargetFramework.Net11)
+                {
+                    throw new CliException(Net11DockerNotSupportedMessage);
                 }
                 else
                 {

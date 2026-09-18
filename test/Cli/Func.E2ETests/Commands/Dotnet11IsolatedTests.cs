@@ -116,6 +116,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands
 
             var packageDirectory = Path.Combine(WorkingDirectory, "packages");
             var result = CreateCommand(FuncPath, testName)
+                .WithEnvironmentVariable("FUNCTIONS_WORKER_RUNTIME", "dotnet-isolated")
                 .Execute(["pack", publishDirectory, "--no-build", "--output", packageDirectory]);
 
             result.Should().ExitWith(0);
