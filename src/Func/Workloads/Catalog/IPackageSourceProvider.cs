@@ -18,11 +18,11 @@ internal interface IPackageSourceProvider
     /// then the nuget.org default.
     /// </summary>
     /// <param name="source">
-    /// Optional explicit source: a v3 <c>index.json</c> URL or a local
-    /// directory path. <c>null</c> means "use the configured / default source".
+    /// Optional explicit source: an absolute HTTP(S) URL for a V3 service index.
+    /// <c>null</c> means "use the configured / default source".
     /// </param>
     /// <exception cref="ArgumentException">
-    /// The resolved source is not a recognisable URL or existing directory.
+    /// The resolved source is not an absolute HTTP(S) URL. Local paths are not supported.
     /// </exception>
     public PackageSource GetSource(string? source = null);
 }

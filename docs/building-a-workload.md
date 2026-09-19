@@ -1,8 +1,8 @@
 # Building a New Workload
 
-This guide walks through building a workload for the Azure Functions Core Tools v5 CLI. A workload is a NuGet package that the CLI loads at runtime to extend its behavior, most commonly to provide `func init` / `func new` support for a specific language stack (e.g. Node.js, Python, Java), but a workload can also contribute brand-new subcommands.
+This guide walks through building a workload for the Azure Functions CLI v5. A workload is a NuGet package that the CLI loads at runtime to extend its behavior, most commonly to provide `func init` / `func new` support for a specific language stack (e.g. Node.js, Python, Java), but a workload can also contribute brand-new subcommands.
 
-> **Spec**: this guide is the authoring view. The on-disk and on-feed layout, the `workload.json` schema, the `kind` discriminator (`workload` / `content` / `meta` / `rid-pointer`), and the install pipeline are specified in [`./proposed/workload-package-layout.md`](./proposed/workload-package-layout.md). Consult that doc for the contract; this guide stays focused on the happy-path authoring experience for `kind: workload`.
+> **Spec**: this guide is the authoring view. The on-disk and on-feed layout, the `workload.json` schema, the `kind` discriminator (`workload` / `content` / `meta` / `rid-pointer`), and the install pipeline are specified in the [package-layout spec](../proposed/workload-package-layout.md). Consult that doc for the contract; this guide stays focused on the happy-path authoring experience for `kind: workload`.
 
 ## Architecture
 
@@ -55,6 +55,8 @@ The shape mirrors WebJobs' `IWebJobsStartup`. `Configure(FunctionsCliBuilder)` i
 
 ## Quick Start
 
+The steps below use manual packaging. For SDK packaging, use `PackAsWorkload=true` and the [create-workload checklist](../.github/skills/create-workload/SKILL.md) instead of authoring a second manifest or duplicating generated tags.
+
 1. Create a class library project under `src/Workloads/<kind>/<Name>/` that targets `net10.0` and packs as `PackageType=FuncCliWorkload`; omit `<kind>/` for workloads that do not belong to a grouping
 2. Reference `Azure.Functions.Cli.Abstractions` (with `PrivateAssets=all` and `ExcludeAssets=runtime` so it isn't shipped inside your package)
 3. Subclass `Workload` and override `DisplayName`, `Description`, and `Configure`
@@ -86,7 +88,7 @@ Create the `Workloads.Node.csproj`. The csproj is the single source of truth for
     <Title>Node.js</Title>
     <Description>Azure Functions CLI tooling for Node.js projects.</Description>
     <PackageType>FuncCliWorkload</PackageType>
-    <PackageTags>kind:workload alias:node alias:javascript alias:typescript func-workload</PackageTags>
+    <PackageTags>kind:workload alias:node alias:javascript alias:typescript stack:node func-workload</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
@@ -113,13 +115,35 @@ Create the `Workloads.Node.csproj`. The csproj is the single source of truth for
 
 What each piece does:
 
-- `PackageType=FuncCliWorkload` is how the CLI's catalog discovers workload packages (see `docs/proposed/workload-package-layout.md` §5, §7).
+- `PackageType=FuncCliWorkload` is how the CLI's catalog discovers workload packages (see the [package-layout spec](../proposed/workload-package-layout.md), sections 5 and 7).
 - `Title` is the display name surfaced by NuGet feed UIs; `Description` is the one-line summary. The `Workload` class's `DisplayName` / `Description` overrides serve the same purpose for `func workload list` (no duplication: feed metadata vs. running CLI).
 - `PackageTags` should include exactly one `kind:<workload|content|meta>` tag matching `workload.json`'s `kind`, plus one or more `alias:<name>` tags so `func workload install <alias>` resolves. `func-workload` is recommended for generic feed UI discoverability.
+- A stack with multiple distinct aliases must include exactly one non-empty `stack:<canonical-alias>` tag matching one of those aliases. `func setup` uses this name for worker, template, and profile resolution, regardless of alias order. The example uses `stack:node`, so `node`, `javascript`, and `typescript` all resolve to the Node stack. A single distinct alias can omit the tag. Empty declarations and duplicate declarations, even identical ones, are invalid. Setup refuses invalid canonical metadata or a missing tag on a multi-alias stack rather than guessing.
 - `IncludeBuildOutput=false` + the explicit `<None Include="$(OutputPath)$(AssemblyName).dll" ... PackagePath="tools/any/" />` puts the workload assembly under `tools/any/` instead of `lib/`, which is where the loader looks.
 - `<None Include="workload.json" ... PackagePath="/" />` ships the manifest at the package root.
 - `SuppressDependenciesWhenPacking=true` plus `PrivateAssets=all` / `ExcludeAssets=runtime` on the `Abstractions` reference keep the workload self-contained: the CLI provides Abstractions (and the other host-shared contract assemblies, see §9.2 of the layout spec) at runtime. The same `PrivateAssets=all` rule applies to **every** `<PackageReference>` you add later, not just `Abstractions`.
 - `NU5128`/`NU5100` are suppressed because we deliberately ship without `lib/` and place files under `tools/any/`.
+
+When using the Workload SDK, it generates the `kind:` and primary `alias:` tags. Add alternate aliases and the canonical stack tag through `PackageTags`:
+
+```xml
+<PropertyGroup>
+  <PackAsWorkload>true</PackAsWorkload>
+  <WorkloadKind>workload</WorkloadKind>
+  <WorkloadAlias>node</WorkloadAlias>
+  <PackageTags>$(PackageTags);alias:javascript;alias:typescript;stack:node</PackageTags>
+</PropertyGroup>
+```
+
+### Making stacks and templates discoverable by setup
+
+- Publish to an absolute HTTP(S) V3 NuGet service-index URL. The client selects protocol version 3 even without a `.json` URL suffix, and discovery requires `SearchQueryService`. Local directories and V2 feeds are not supported as `--source`. Install a local `.nupkg` by passing its path to `func workload install` instead.
+- Keep setup stack packages portable with `kind:workload`. Publish templates as portable `kind:content` with `alias:<canonical-stack>-templates`. Their package IDs can be arbitrary. Setup uses feed aliases to find the exact ID, not a package-name prefix.
+- Setup and `func new` share templates eligibility rules. Installed lookup first filters the requested channel and portable content. Logical owner metadata takes precedence over physical metadata. The conventional effective template ID retains precedence regardless of aliases. Otherwise one custom alias owner is selected and competing custom owners fail. Setup preserves a usable installed owner until explicit migration. Other channels and unusable old rows do not block valid portable content. Template content remains under `tools/any/content`.
+- RID-based stack discovery is deferred because pointer metadata does not expose the implementation's logical role. This is not a restriction on SDK-supported RID workloads or the loader. Use portable packages for this setup discovery path. Template readers additionally require portable content. Observed pointer claims on these roles fail planning rather than being silently omitted, including on transport fallback.
+- An explicit preview or experimental bundle channel allows prerelease-only non-.NET templates to be discovered without enabling prerelease stacks or workers. Keep canonical stack aliases consistent between stable and prerelease-inclusive results. .NET templates have no bundle channel and follow the general prerelease policy.
+
+The setup design owns the [discovery scan and fallback contract](../proposed/func-setup-design.md#catalog-discovery), [channel policy](../proposed/func-setup-design.md#8-extension-bundle-policy), and [readiness limitations](../proposed/func-setup-design.md#current-limitations). A discoverable package is not a guarantee that setup provisions every prerequisite.
 
 ### Runtime-specific workload packages
 
@@ -141,6 +165,8 @@ Set `RuntimeIdentifiers` when a workload's payload differs by platform. The Work
 - Publish the pointer and every implementation at the same exact version and to the same feed. The CLI resolves only the mapped package ID at the pointer's exact version from the source that supplied the pointer.
 
 Users install, update, uninstall, and list the pointer identity. The CLI records the selected physical implementation and RID as ownership details; `func workload list --json` exposes both logical and physical package IDs.
+
+This is the general workload installer contract. Setup's portable stack/templates restriction above still applies.
 
 > **Pack scope.** The package must contain the publish output (workload `.dll`, `.deps.json`, optional `.pdb`, every transitive managed dependency, and any `runtimes/<rid>/` assets the dependencies ship). Use the Workload SDK's `PackAsWorkload` targets rather than manually copying only the primary assembly when a workload has a runtime dependency closure.
 
@@ -165,7 +191,7 @@ And a `release_notes.md`:
 - Initial scaffold of the Node.js workload (entry point + stub project initializer).
 ```
 
-Add a `workload.json` that points at your entry-point type. `assemblyPath` is **relative to `tools/any/`**, conventionally a bare filename (no leading `/`, no `..`); `type` is the FQN of your `Workload` subclass.
+For the manual packaging example above, add a `workload.json` that points at your entry-point type. With `PackAsWorkload=true`, the Workload SDK generates this manifest instead; do not add a second manual manifest. `assemblyPath` is **relative to `tools/any/`**, conventionally a bare filename (no leading `/`, no `..`); `type` is the FQN of your `Workload` subclass.
 
 ```json
 {
@@ -530,6 +556,8 @@ For ungrouped workloads, omit the `<kind>/` segment from the path filters.
 Use the Python pipelines (`eng/ci/workloads/python/{public,official}-build.yml`) as the reference. New workloads should not introduce per-workload job/step templates: `build-workload.yml` already covers build, test, and pack.
 
 ## Checklist
+
+This checklist follows the manual packaging example. SDK-authored workloads use the [create-workload checklist](../.github/skills/create-workload/SKILL.md).
 
 - [ ] New project `src/Workloads/<kind>/<Name>/Workloads.<Name>.csproj`, packs as `PackageType=FuncCliWorkload`, references `Abstractions` with `PrivateAssets=all` / `ExcludeAssets=runtime`
 - [ ] `Directory.Version.props` and `release_notes.md` next to the csproj

@@ -269,7 +269,7 @@ public class NewCommandRunnerTests
 
         IInstalledTemplatesWorkloads installedTemplates = Substitute.For<IInstalledTemplatesWorkloads>();
         installedTemplates
-            .ListInstalledAsync("node", Arg.Any<CancellationToken>())
+            .ListInstalledAsync("node", Arg.Any<CancellationToken>(), Arg.Any<BundleChannel?>())
             .Returns(installedVersions.Select(v => new InstalledTemplatesWorkload("node", v, Path.GetTempPath())).ToList());
 
         IHostJsonBundleSectionReader hostJsonReader = Substitute.For<IHostJsonBundleSectionReader>();

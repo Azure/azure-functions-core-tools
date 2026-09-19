@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Commands.Workload;
 /// <summary>
 /// <c>func workload install &lt;package&gt;</c>. Resolves a workload package
 /// id (or alias) through the configured catalog and installs it. Use
-/// <c>--source</c> to point at a local folder or alternate feed.
+/// <c>--source</c> to select an HTTP(S) V3 feed, or pass a local .nupkg path as the package argument.
 /// </summary>
 internal sealed class WorkloadInstallCommand : FuncCliCommand
 {
@@ -42,7 +42,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
     public Option<string?> SourceOption { get; } = new("--source")
     {
-        Description = "Catalog source URL or local directory to resolve from. Default: the configured catalog.",
+        Description = "HTTP(S) URL of a V3 NuGet feed. Default: the configured catalog. For local installs, pass the .nupkg path as the argument.",
     };
 
     public Option<bool?> IncludePrereleaseOption { get; } = new("--prerelease")
@@ -148,6 +148,10 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                 WriteNextStepsHintIfApplicable(result.Entry);
             }
             return 0;
+        }
+        catch (InvalidWorkloadSourceException ex)
+        {
+            throw new GracefulException(ex.Message, ex, isUserError: true);
         }
         catch (WorkloadPackageNotFoundException ex)
         {

@@ -30,6 +30,14 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
     }
 
     /// <inheritdoc />
+    public Task<CatalogSearchPage> SearchPageAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        CatalogSearchQuery effectiveQuery = query with { IncludePrerelease = IncludePrerelease(query.IncludePrerelease) };
+        return ResolveClient(effectiveQuery.Source).SearchPageAsync(effectiveQuery, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<ResolvedPackage?> ResolveLatestVersionAsync(string packageId, bool? includePrerelease, NuGetVersion? currentVersion = null,
         bool allowMajor = true, string? source = null, CancellationToken cancellationToken = default)
     {
@@ -95,7 +103,19 @@ internal sealed class WorkloadCatalog(IOptions<WorkloadCatalogOptions> options, 
     }
 
     private NuGetProtocolSourceClient ResolveClient(string? source)
-        => _clientFactory(_sourceProvider.GetSource(source));
+    {
+        PackageSource packageSource;
+        try
+        {
+            packageSource = _sourceProvider.GetSource(source);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidWorkloadSourceException(ex.Message, ex);
+        }
+
+        return _clientFactory(packageSource);
+    }
 
     private bool IncludePrerelease(bool? includePrerelease) => includePrerelease ?? _options.IncludePrerelease;
 

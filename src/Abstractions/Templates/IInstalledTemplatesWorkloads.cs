@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Projects;
+
 namespace Azure.Functions.Cli.Templates;
 
 /// <summary>
@@ -12,23 +14,36 @@ namespace Azure.Functions.Cli.Templates;
 public interface IInstalledTemplatesWorkloads
 {
     /// <summary>
-    /// NuGet package-id prefix for templates content workloads. Concrete ids
-    /// are <c>{Prefix}.&lt;Stack&gt;</c> (e.g. <c>Azure.Functions.Cli.Workloads.Templates.Node</c>).
-    /// Matched case-insensitively at lookup time; registry stores them lowercased
-    /// per NuGet normalization.
+    /// Conventional package-ID prefix used for templates content workloads.
     /// </summary>
     public const string TemplatesWorkloadPackageIdPrefix = "Azure.Functions.Cli.Workloads.Templates";
 
     /// <summary>
-    /// Returns every installed templates workload row whose package id matches
-    /// <c>{Prefix}.&lt;Stack&gt;</c> for the supplied <paramref name="stack"/>
-    /// (case-insensitive). Multiple rows may be returned when several
-    /// versions of the same stack's workload are installed side-by-side; the
-    /// orchestrator picks the matching channel.
+    /// Returns installed templates rows for the supplied stack across channels.
     /// </summary>
     public Task<IReadOnlyList<InstalledTemplatesWorkload>> ListInstalledAsync(
         string stack,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns portable templates rows for one owner in the requested channel, or across channels when omitted.
+    /// </summary>
+    /// <remarks>
+    /// Logical-owner metadata takes precedence over physical metadata. A conventional package ID wins
+    /// regardless of aliases. Otherwise exactly one owner must declare <c>&lt;stack&gt;-templates</c>.
+    /// Portable rows have a null or empty runtime identifier, or <c>any</c> (case-insensitive).
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="stack"/> is null, empty, or whitespace.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Competing custom owners claim the selected channel, or only unsupported templates rows match.
+    /// </exception>
+    public Task<IReadOnlyList<InstalledTemplatesWorkload>> ListInstalledAsync(
+        string stack,
+        CancellationToken cancellationToken,
+        BundleChannel? channel)
+        => ListInstalledAsync(stack, cancellationToken);
 }
 
 /// <summary>
@@ -40,7 +55,7 @@ public interface IInstalledTemplatesWorkloads
 /// (no label = stable, <c>-preview</c>, <c>-experimental</c>).
 /// </param>
 /// <param name="InstallDirectory">
-/// Absolute path to the workload's extracted install dir
+/// Absolute path to the physical package's extracted install root, not its content directory
 /// (<c>&lt;workload-home&gt;/workloads/&lt;packageId&gt;/&lt;packageVersion&gt;</c>).
 /// The templates content lives under <c>tools/any/content/</c> within this
 /// directory.

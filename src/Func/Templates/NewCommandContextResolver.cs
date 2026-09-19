@@ -62,7 +62,7 @@ internal sealed class NewCommandContextResolver(
         if (string.Equals(stack, "dotnet", StringComparison.OrdinalIgnoreCase))
         {
             IReadOnlyList<InstalledTemplatesWorkload> allRows =
-                await _installedTemplatesWorkloads.ListInstalledAsync(stack, cancellationToken);
+                await ListInstalledTemplatesAsync(stack, cancellationToken);
             workload = allRows
                 .OrderByDescending(row => row.PackageVersion, StringComparer.Ordinal)
                 .FirstOrDefault();
@@ -85,11 +85,12 @@ internal sealed class NewCommandContextResolver(
             }
 
             IReadOnlyList<InstalledTemplatesWorkload> allRows =
-                await _installedTemplatesWorkloads.ListInstalledAsync(stack, cancellationToken);
+                await ListInstalledTemplatesAsync(stack, cancellationToken, channel);
             workload = TemplatesChannelMapper.PickChannelMatched(allRows, channel);
 
             if (workload is null && channel != BundleChannel.Stable)
             {
+                allRows = await ListInstalledTemplatesAsync(stack, cancellationToken, BundleChannel.Stable);
                 workload = TemplatesChannelMapper.PickChannelMatched(allRows, BundleChannel.Stable);
                 usedStableFallback = workload is not null;
             }
@@ -130,6 +131,27 @@ internal sealed class NewCommandContextResolver(
             bundleId,
             channel,
             usedStableFallback));
+    }
+
+    /// <summary>
+    /// Translates conflicting or unsupported templates claims at the func new command boundary.
+    /// </summary>
+    private async Task<IReadOnlyList<InstalledTemplatesWorkload>> ListInstalledTemplatesAsync(
+        string stack, CancellationToken cancellationToken, BundleChannel? channel = null)
+    {
+        try
+        {
+            return channel is null
+                ? await _installedTemplatesWorkloads.ListInstalledAsync(stack, cancellationToken)
+                : await _installedTemplatesWorkloads.ListInstalledAsync(stack, cancellationToken, channel);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new GracefulException(
+                $"{ex.Message} Use 'func workload uninstall' to remove conflicting or unsupported templates packages, then retry.",
+                ex,
+                isUserError: true);
+        }
     }
 
     private static IReadOnlyDictionary<string, IProjectInitializer> BuildProjectInitializersByStack(

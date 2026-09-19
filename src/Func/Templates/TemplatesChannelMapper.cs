@@ -21,11 +21,8 @@ namespace Azure.Functions.Cli.Templates;
 internal static class TemplatesChannelMapper
 {
     /// <summary>
-    /// Picks the channel-matched installed workload row whose prerelease
-    /// label equals <paramref name="channelLabel"/>. Returns the highest
-    /// matching version (lex-sorted on package version string — sufficient
-    /// for PR4; PR5 can switch to NuGetVersion comparison if needed).
-    /// Returns <c>null</c> when no row matches.
+    /// Picks the highest valid NuGet version matching <paramref name="channel"/>.
+    /// Stable accepts released versions only. Returns <c>null</c> when no row matches.
     /// </summary>
     /// <param name="rows">The list of installed templates workloads to search.</param>
     /// <param name="channel">The channel to match.</param>
@@ -43,9 +40,8 @@ internal static class TemplatesChannelMapper
         NuGetVersion? bestVersion = null;
         foreach (InstalledTemplatesWorkload row in rows)
         {
-            NuGetVersion rowVersion = new(row.PackageVersion);
-            BundleChannel matched = BundleHelpers.GetBundleChannel(rowVersion);
-            if (matched != channel)
+            if (!NuGetVersion.TryParse(row.PackageVersion, out NuGetVersion? rowVersion)
+                || !BundleHelpers.MatchesChannel(rowVersion, channel))
             {
                 continue;
             }

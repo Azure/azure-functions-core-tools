@@ -1,9 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Frozen;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads.Storage;
+using Spectre.Console;
 
 namespace Azure.Functions.Cli.Commands.Setup;
 
@@ -24,11 +26,13 @@ internal interface ISetupFeatureResolver
 internal sealed class SetupFeatureResolver(
     IInteractionService interaction,
     IWorkloadStore workloadStore,
-    ICliConfigurationProvider configurationProvider) : ISetupFeatureResolver
+    ICliConfigurationProvider configurationProvider,
+    ISetupStackCatalog stackCatalog) : ISetupFeatureResolver
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IWorkloadStore _workloadStore = workloadStore ?? throw new ArgumentNullException(nameof(workloadStore));
     private readonly ICliConfigurationProvider _configurationProvider = configurationProvider ?? throw new ArgumentNullException(nameof(configurationProvider));
+    private readonly ISetupStackCatalog _stackCatalog = stackCatalog ?? throw new ArgumentNullException(nameof(stackCatalog));
 
     public async Task<SetupFeaturePlan?> ResolveFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
@@ -57,9 +61,35 @@ internal sealed class SetupFeatureResolver(
         HashSet<string> workerRuntimes = new(StringComparer.OrdinalIgnoreCase);
         bool includeExtensionBundle = false;
 
+        // Fetched on the first stack-shaped feature so a host-only run still
+        // makes no catalog call. Results are cached, so the plan builder's
+        // later lookup costs nothing.
+        SetupStackSnapshot? stacks = null;
+
         foreach (string rawFeature in requestedFeatures)
         {
             string feature = NormalizeFeature(rawFeature);
+            if (feature == SetupRuntimes.DotNetProfileRuntime) feature = SetupRuntimes.DotNetFeature;
+
+            // Fold before dispatch, not inside the default arm. A stack with
+            // dedicated handling has to reach its own case: an alternate
+            // spelling of dotnet folded afterwards would already have been
+            // routed to the generic path and picked up a worker and a bundle
+            // that dotnet doesn't use.
+            if (!IsResolverKeyword(feature))
+            {
+                stacks ??= await _stackCatalog.GetStacksAsync(options.Source, options.IncludePrerelease, cancellationToken);
+                string requested = feature;
+                feature = stacks.CanonicalStackName(feature);
+                if (requested == SetupRuntimes.DotNetFeature && feature != SetupRuntimes.DotNetFeature)
+                    throw new SetupConfigurationException("The 'dotnet' alias must identify the canonical dotnet stack. Use an unambiguous --source.");
+                if (IsResolverKeyword(feature))
+                {
+                    throw new SetupConfigurationException(
+                        $"Stack alias '{rawFeature}' resolves to reserved setup feature '{feature}'. "
+                        + "Install the package explicitly with 'func workload install --exact <package-id>'.");
+                }
+            }
 
             switch (feature)
             {
@@ -127,7 +157,7 @@ internal sealed class SetupFeatureResolver(
 
         if (!options.NonInteractive && _interaction.IsInteractive)
         {
-            StackChoicesResult choices = await BuildStackChoicesAsync(cancellationToken);
+            StackChoicesResult choices = await BuildStackChoicesAsync(options, cancellationToken);
 
             // Render installed stacks as static "fake checkbox" lines above
             // the prompt so they're visible in context but cannot be toggled
@@ -164,9 +194,16 @@ internal sealed class SetupFeatureResolver(
         return ["runtime"];
     }
 
-    private async Task<StackChoicesResult> BuildStackChoicesAsync(CancellationToken cancellationToken)
+    private async Task<StackChoicesResult> BuildStackChoicesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
-        IReadOnlyList<string> stacks = SetupDependency.Stacks;
+        SetupStackSnapshot snapshot = await _stackCatalog.GetStacksAsync(options.Source, options.IncludePrerelease, cancellationToken);
+
+        // A stack aliased as one of the CLI's own feature words can't be
+        // offered: picking it comes back through as that word, dispatches to
+        // the built-in arm, and the package the user chose is never planned.
+        IReadOnlyList<string> stacks = [.. snapshot.StackNames.Where(static stack => !IsResolverKeyword(stack))];
+        if (stacks.Count == 0)
+            throw new SetupConfigurationException("No eligible stacks are available from the workload catalog. Resolve alias conflicts or select another --source.");
         HashSet<string> installedStackPackageIds;
         try
         {
@@ -191,13 +228,13 @@ internal sealed class SetupFeatureResolver(
         List<string> installedStacks = [];
         foreach (string stack in stacks.OrderBy(static stack => stack, StringComparer.OrdinalIgnoreCase))
         {
-            if (installedStackPackageIds.Contains(SetupDependency.Stack(stack).PackageId))
+            if (snapshot.StackPackageId(stack) is { } packageId && installedStackPackageIds.Contains(packageId))
             {
                 installedStacks.Add(stack);
             }
             else
             {
-                promptChoices.Add(new MultiSelectionChoice(stack, stack));
+                promptChoices.Add(new MultiSelectionChoice(stack, Markup.Escape(stack)));
             }
         }
 
@@ -227,6 +264,24 @@ internal sealed class SetupFeatureResolver(
             runtimeFeatures.Add(new SetupRuntimeFeature(name, profileRuntime, installWorker));
         }
     }
+
+    /// <summary>
+    /// Feature names the switch below dispatches on directly rather than
+    /// treating as stack aliases. Two consequences: folding them is a no-op and
+    /// would put a host-only run on the network, and a discovered stack under
+    /// one of these names can't be offered, because selecting it lands on the
+    /// built-in arm and the package is never planned.
+    /// </summary>
+    /// <remarks>
+    /// <c>dotnet</c> is deliberately absent. It reaches the built-in arm too,
+    /// but that arm keeps the name, so a discovered dotnet stack still resolves
+    /// and is safe to offer.
+    /// </remarks>
+    internal static readonly FrozenSet<string> ResolverKeywords =
+        FrozenSet.ToFrozenSet<string>(["host", "runtime", ".net", "dotnet-inprocess", SetupRuntimes.DotNetProfileRuntime],
+            StringComparer.OrdinalIgnoreCase);
+
+    private static bool IsResolverKeyword(string feature) => ResolverKeywords.Contains(feature);
 
     private static string NormalizeFeature(string value)
     {

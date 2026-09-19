@@ -72,7 +72,7 @@ public class NewCommandContextResolverTests
         fixture.HostJsonReader.ReadAsync(fixture.WorkingDirectory.Info, Arg.Any<CancellationToken>())
             .Returns(new HostJsonBundleSection(BundleHelpers.PreviewBundleId, "[4.0.0, 5.0.0)"));
         InstalledTemplatesWorkload stableWorkload = new("node", "1.0.0", "stable-install");
-        fixture.InstalledTemplates.ListInstalledAsync("node", Arg.Any<CancellationToken>())
+        fixture.InstalledTemplates.ListInstalledAsync("node", Arg.Any<CancellationToken>(), Arg.Any<BundleChannel?>())
             .Returns([stableWorkload]);
         NewCommandContextResolver resolver = fixture.CreateResolver();
 
@@ -94,7 +94,7 @@ public class NewCommandContextResolverTests
         fixture.StackOptions.Get(Arg.Any<string>()).Returns(new StackOptions { Runtime = "node", Language = "javascript" });
         fixture.HostJsonReader.ReadAsync(fixture.WorkingDirectory.Info, Arg.Any<CancellationToken>())
             .Returns(new HostJsonBundleSection(BundleHelpers.PreviewBundleId, "[4.0.0, 5.0.0)"));
-        fixture.InstalledTemplates.ListInstalledAsync("node", Arg.Any<CancellationToken>())
+        fixture.InstalledTemplates.ListInstalledAsync("node", Arg.Any<CancellationToken>(), Arg.Any<BundleChannel?>())
             .Returns([new InstalledTemplatesWorkload("node", "1.0.0-experimental.1", "experimental-install")]);
         NewCommandContextResolver resolver = fixture.CreateResolver();
 

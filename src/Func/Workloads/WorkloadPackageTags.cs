@@ -7,6 +7,7 @@ internal static class WorkloadPackageTags
 {
     public const string AliasPrefix = "alias:";
     public const string KindPrefix = "kind:";
+    public const string StackPrefix = "stack:";
     public const string RuntimeIdentifierPrefix = "rid:";
 
     public static IReadOnlyList<string> ParseValues(string? tags, string prefix)

@@ -17,6 +17,22 @@ public sealed class NuGetProtocolSourceClientTests
         "https://feed.test/v3/index.json",
         "test");
 
+    [Theory]
+    [InlineData("alias:javascript alias:node stack:node", "node")]
+    [InlineData("stack:node alias:node alias:javascript", "node")]
+    [InlineData("alias:node", null)]
+    [InlineData("alias:node stack:node stack:javascript", "node javascript")]
+    public void ParseV3Hits_PreservesCanonicalDeclarationIncludingInvalidDuplicates(string tags, string? expected)
+    {
+      var response = new JObject
+      {
+        ["data"] = new JArray(new JObject { ["id"] = "contoso.node", ["version"] = "1.0.0", ["tags"] = tags }),
+      };
+
+      NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().ContainSingle()
+        .Which.CanonicalStack.Should().Be(expected);
+    }
+
     [Fact]
     public void ParseV3Hits_ParsesIdVersionAndAliasesFromTagsString()
     {
@@ -104,9 +120,8 @@ public sealed class NuGetProtocolSourceClientTests
     [Fact]
     public void ParseV3Hits_FiltersHitsLackingFuncCliWorkloadPackageType()
     {
-        // nuget.org ignores `packageType=` when q is empty, so an unfiltered
-        // `func workload search` leaks arbitrary packages (issue #5198).
-        // Defensive filter keeps hits that omit packageTypes (some feeds
+        // Guards against feeds that ignore `packageType=` and hand back
+        // arbitrary packages. Keeps hits that omit packageTypes (some feeds
         // don't include the field) but drops hits that declare other types.
         var response = JObject.Parse("""
             {
