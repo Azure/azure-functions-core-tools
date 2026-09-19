@@ -79,7 +79,7 @@ Lists installed workloads with id, version, kind (`workload`,
 #### `func workload search`
 
 ```
-func workload search [<query>] [--source <path>] [--include-prereleases] [--json]
+func workload search [<query>] [--source <url>] [--prerelease] [--json]
 ```
 
 Searches the configured workload catalog (NuGet feed by default) and
@@ -93,18 +93,20 @@ returns id, latest version, and description for matching packages.
 
 ##### Options
 
-- `--source <path>`
-  - Queries an alternate feed (URL or local path) instead of the
-    configured default catalog.
-- `--include-prereleases`
-  - Includes pre-release versions in the results. Default: stable only.
+- `--source <url>`
+  - Queries an alternate HTTP(S) V3 NuGet feed instead of the configured
+    default catalog. Local directories are not supported.
+- `--prerelease`
+  - Includes prerelease versions in the results. When omitted, a valid
+    `FUNC_CLI_WORKLOADS_PRERELEASE` setting wins, otherwise the CLI build's
+    stable/prerelease status supplies the default.
 - `--json`
   - Emits machine-readable JSON output.
 
 #### `func workload install`
 
 ```
-func workload install <package> [--version|-v <v>] [--source <path>] [--exact|-e] [--include-prereleases] [--force|-f]
+func workload install <package> [--version|-v <v>] [--source <url>] [--exact|-e] [--prerelease] [--force|-f]
 ```
 
 Acquires and installs a workload. See §6.1 for the full install pipeline.
@@ -121,25 +123,25 @@ exits non-zero with the same hint.
 - `<package>`
   - Required. Matched as an `alias:<name>` tag by default (see §5.3 and
     §6.1 for the resolution flow). With `--exact`, must be the literal
-    package id.
+    package id. To install a local package, pass its `.nupkg` path as this
+    positional argument instead of using `--source`.
 
 ##### Options
 
 - `--version|-v`
-  - Installs the specified semver version. Default: the latest stable
-    version available in the catalog. Combine with
-    `--include-prereleases` to allow pre-release versions when resolving
-    "latest".
-- `--source <path>`
-  - Installs from a local path or alternate feed (e.g. for development
-    or internal mirrors) instead of the configured default catalog.
+  - Installs the specified semver version. Without a version, resolves the
+    latest version allowed by the effective prerelease policy. Use
+    `--prerelease` to include prereleases when resolving "latest".
+- `--source <url>`
+  - Resolves packages from an alternate HTTP(S) V3 NuGet feed (e.g. for
+    development or internal mirrors). It does not accept local directories.
 - `--exact|-e`
   - Disables alias matching. `<package>` must be the literal package id
     (case-insensitive). Use when an alias collides across multiple
     packages or when scripting against a known id.
-- `--include-prereleases`
-  - Allows pre-release versions to be selected when resolving "latest".
-    Default: stable only.
+- `--prerelease`
+  - Allows prerelease versions when resolving "latest". When omitted,
+    uses the environment/build default described for search above.
 - `--force|-f`
   - Skips the "already installed" prompt and proceeds with a
     side-by-side install. For normal workloads, the new version (if
@@ -178,7 +180,7 @@ Removes an installed workload. By default removes only the active version.
 #### `func workload update`
 
 ```
-func workload update [<package>] [--version|-v <v>] [--all] [--major] [--source <path>] [--include-prereleases]
+func workload update [<package>] [--version|-v <v>] [--all] [--major] [--source <url>] [--prerelease]
 ```
 
 Updates a workload **in place**: removes one existing installed version
@@ -204,12 +206,12 @@ Default is "same major version only". See §6.4 for the full pipeline.
 - `--major`
   - Allows crossing a major-version boundary. Default: same major
     version only, to protect against breaking changes.
-- `--source <path>`
-  - Resolves updates from an alternate feed instead of the configured
-    default catalog.
-- `--include-prereleases`
-  - Allows pre-release versions to be selected when resolving "latest".
-    Default: stable only.
+- `--source <url>`
+  - Resolves updates from an alternate HTTP(S) V3 NuGet feed instead of the
+    configured default catalog. Local directories are not supported.
+- `--prerelease`
+  - Allows prerelease versions when resolving "latest". When omitted,
+    uses the environment/build default described for search above.
 
 #### `func workload prune`
 
@@ -434,7 +436,7 @@ they only exist as registry rows in `metas[]` (§10.1) so cascade
 uninstall can find their members.
 
 The exact interface names and shapes are documented in
-[`building-a-workload.md`](./building-a-workload.md). That document is
+[`building-a-workload.md`](../docs/building-a-workload.md). That document is
 currently stale and will be refreshed alongside the first contract
 revision; detailed interface signatures are deliberately out of scope
 for this spec. Adding a new contribution point is an additive change
@@ -488,9 +490,8 @@ The metadata the CLI needs is split between two sources:
     - `description` → one-line summary shown in `func workload search`.
       The runtime `Workload.Description` is the source of truth for
       installed workloads.
-    - `tags` → NuGet tags. The CLI gives meaning to one reserved tag
-      convention; all other tags are treated as free-form metadata for
-      search ranking only:
+    - `tags` → NuGet tags. The CLI recognises `kind:`, `rid:`, `alias:`,
+      and `stack:` metadata. Other tags are free-form search metadata:
         - `alias:<name>` → declares a short alias (e.g. `alias:python`)
           that the user can pass to `install` / `uninstall` / `update`
           instead of the full package id. A workload may declare
@@ -498,6 +499,18 @@ The metadata the CLI needs is split between two sources:
           NuGet-tag-safe; uniqueness is by convention only (NuGet has
           no central authority). Alias collisions across packages force
           users into `--exact` resolution (see §6.1 install flow).
+        - `stack:<canonical-alias>` → identifies the runtime name used by
+          `func setup` for a `kind:workload` stack package. It must match one
+          of the package's aliases and may appear only once. A package with
+          one distinct alias may omit this tag. Multi-alias stack packages
+          must declare it. Empty declarations and duplicates, even identical
+          duplicates, are invalid. Alias order does not identify the runtime. For example,
+          `alias:javascript alias:node stack:node kind:workload` plans the
+          Node worker, templates, and profile runtime for either spelling.
+          Invalid canonical metadata, or a missing tag on a multi-alias stack,
+          causes setup to refuse discovery with guidance to correct the metadata
+          or install by exact package id. Package authors can add this tag
+          through `PackageTags`.
     - `packageTypes` → **must** include a `FuncCliWorkload` entry. This
       is how the CLI (and the catalog) distinguish workload packages
       from arbitrary NuGets. Packages without this package type are
@@ -596,6 +609,37 @@ The CLI persists everything it needs for startup in a single
 **workload registry** at `~/.azure-functions/workloads.json` (see §6.1).
 Workload authors never touch this file; it is owned by `func workload
 install` / `uninstall`.
+
+#### Setup discovery and templates consumers
+
+Workload sources are absolute HTTP(S) V3 service-index URLs. The provider
+sets protocol version 3 regardless of the URL suffix. Search requires a
+`SearchQueryService` entry. There is no V2 or local-directory source
+fallback. Local `.nupkg` paths are positional install inputs instead.
+
+Setup discovers portable `kind:workload` stacks by canonical aliases and
+portable `kind:content` templates by `alias:<canonical-stack>-templates`.
+Package IDs may be arbitrary. Observed RID-pointer claims for stack or
+templates roles fail planning, including on fallback. Host/worker pointer
+installation is separate and does not imply RID templates support.
+
+Setup and `func new` share templates eligibility rules. Installed lookup filters
+the requested channel and portable content before owner selection.
+Logical owner metadata takes precedence over physical
+metadata. The conventional effective ID retains precedence regardless of aliases.
+Otherwise a single custom alias owner is selected, with competing custom owners
+rejected. Unrelated channels and unusable old rows do not block valid portable
+templates. Readers expect content under `tools/any/content`.
+Setup preserves a usable installed owner until explicit migration.
+
+An explicit preview/experimental bundle channel permits prerelease-only
+non-.NET templates discovery without enabling prerelease stacks or workers.
+Keep canonical names consistent across stable and prerelease-inclusive results.
+.NET templates remain channel-less.
+
+The setup design owns the [scan and fallback contract](func-setup-design.md#catalog-discovery),
+[channel policy](func-setup-design.md#8-extension-bundle-policy), and
+[readiness limitations](func-setup-design.md#current-limitations).
 
 ### 5.4 Versioning
 
@@ -814,9 +858,7 @@ side install (use `install --force` for that, §6.1).
    `--version|-v <existing>`, target that exact installed version;
    error if `<existing>` is not present in the registry (no fallback,
    no auto-install).
-2. **Resolve the new version** from the catalog, honoring
-   `--include-prereleases` and the same-major-by-default rule
-   (`--major` opts in to crossing a major boundary).
+2. **Resolve the new version** from the catalog using `--prerelease` and the same-major default (`--major` allows a major-version change).
 3. **Fetch and validate** the new version through the same staging
    pipeline as install (§6.1 steps 3-5). On any failure, the staging
    directory is cleaned up and the registry is not modified; the

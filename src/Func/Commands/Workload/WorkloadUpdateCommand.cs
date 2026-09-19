@@ -48,7 +48,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
     public Option<string?> SourceOption { get; } = new("--source")
     {
-        Description = "Catalog source URL or local directory to resolve from. Default: the configured catalog.",
+        Description = "HTTP(S) URL of a V3 NuGet feed. Default: the configured catalog.",
     };
 
     public Option<bool?> IncludePrereleaseOption { get; } = new("--prerelease")
@@ -207,6 +207,10 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             RenderSingle(result);
             return 0;
         }
+        catch (InvalidWorkloadSourceException ex)
+        {
+            throw new GracefulException(ex.Message, ex, isUserError: true);
+        }
         catch (WorkloadPackageNotFoundException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
@@ -255,7 +259,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 RenderSingle(result);
             }
             catch (Exception ex) when (
-                ex is WorkloadPackageNotFoundException
+                ex is InvalidWorkloadSourceException
+                or WorkloadPackageNotFoundException
                 or FileNotFoundException
                 or InvalidWorkloadException
                 or InvalidOperationException)

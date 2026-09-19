@@ -34,7 +34,7 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
             return Build(_options.Source.Trim());
         }
 
-        return new PackageSource(DefaultSourceUrl, DefaultSourceName);
+        return new PackageSource(DefaultSourceUrl, DefaultSourceName) { ProtocolVersion = 3 };
     }
 
     private static PackageSource Build(string value)
@@ -45,7 +45,7 @@ internal sealed class PackageSourceProvider(IOptions<WorkloadCatalogOptions> opt
         if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
         {
-            return new PackageSource(value, value);
+            return new PackageSource(value, value) { ProtocolVersion = 3 };
         }
 
         throw new ArgumentException(

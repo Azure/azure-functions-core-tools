@@ -53,7 +53,16 @@ public sealed class SetupRunnerTests : IDisposable
             {
                 string packageId = (string)callInfo[0]!;
                 var version = (NuGetVersion)callInfo[1]!;
-                return new WorkloadInstallResult(Entry(packageId, version.ToNormalizedString()), AlreadyInstalled: false);
+                bool nodeTemplates = string.Equals(packageId, "Azure.Functions.Cli.Workloads.Templates.Node", StringComparison.OrdinalIgnoreCase);
+                WorkloadEntry entry = Entry(packageId, version.ToNormalizedString(),
+                    aliases: nodeTemplates ? ["node-templates"] : [],
+                    kind: nodeTemplates ? WorkloadKind.Content : WorkloadKind.Workload);
+                if (nodeTemplates)
+                {
+                    _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+                }
+
+                return new WorkloadInstallResult(entry, AlreadyInstalled: false);
             });
     }
 
@@ -730,12 +739,12 @@ public sealed class SetupRunnerTests : IDisposable
         InteractiveTestInteractionService interactive = new();
         SetupRunner runner = new(
             interactive,
-            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>())),
+            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>()), new SetupStackCatalog(catalog)),
             new SetupProfileScopeResolver(
                 _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
-            new SetupDependencyPlanBuilder(_bundleReader),
+            new SetupDependencyPlanBuilder(_bundleReader, new SetupStackCatalog(catalog)),
             new SetupDependencyInstaller(interactive, _store, catalog, _installer));
 
         SetupRunResult result = await runner.RunAsync(
@@ -803,12 +812,12 @@ public sealed class SetupRunnerTests : IDisposable
         InteractiveTestInteractionService interactive = new();
         SetupRunner runner = new(
             interactive,
-            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>())),
+            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>()), new SetupStackCatalog(catalog)),
             new SetupProfileScopeResolver(
                 _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
-            new SetupDependencyPlanBuilder(_bundleReader),
+            new SetupDependencyPlanBuilder(_bundleReader, new SetupStackCatalog(catalog)),
             new SetupDependencyInstaller(interactive, _store, catalog, _installer));
 
         _ = await runner.RunAsync(
@@ -832,7 +841,11 @@ public sealed class SetupRunnerTests : IDisposable
             && line.Contains("func workload uninstall", StringComparison.Ordinal));
         interactive.Lines.Should().Contain(line => line.Contains("[✓] node", StringComparison.Ordinal));
         interactive.Lines.Should().NotContain(line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal) && line.Contains("node", StringComparison.Ordinal));
-        interactive.MultiSelectionChoices.SelectMany(g => g).Should().NotContain(c => c.Value == "node");
+        interactive.MultiSelectionChoices.Should().ContainSingle().Which.Select(choice => choice.Value)
+            .Should().BeEquivalentTo(["dotnet", "go", "python"]);
+        List<string> lines = [.. interactive.Lines];
+        lines.FindIndex(line => line.Contains("[✓] node", StringComparison.Ordinal)).Should()
+            .BeLessThan(lines.FindIndex(line => line.StartsWith("MULTISELECT:", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -844,12 +857,12 @@ public sealed class SetupRunnerTests : IDisposable
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
         SetupRunner runner = new(
             _interaction,
-            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>())),
+            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>()), new SetupStackCatalog(catalog)),
             new SetupProfileScopeResolver(
                 _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
-            new SetupDependencyPlanBuilder(_bundleReader),
+            new SetupDependencyPlanBuilder(_bundleReader, new SetupStackCatalog(catalog)),
             new SetupDependencyInstaller(_interaction, _store, catalog, _installer),
             firstRunStore);
 
@@ -865,12 +878,12 @@ public sealed class SetupRunnerTests : IDisposable
         IProfileCatalog? profileCatalog = null)
         => new(
             _interaction,
-            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(projectConfig ?? new Dictionary<string, string?>())),
+            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(projectConfig ?? new Dictionary<string, string?>()), new SetupStackCatalog(catalog)),
             new SetupProfileScopeResolver(
                 profileCatalog ?? _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
-            new SetupDependencyPlanBuilder(_bundleReader),
+            new SetupDependencyPlanBuilder(_bundleReader, new SetupStackCatalog(catalog)),
             new SetupDependencyInstaller(_interaction, _store, catalog, _installer));
 
     private SetupCommandOptions Options(
@@ -982,6 +995,18 @@ public sealed class SetupRunnerTests : IDisposable
             }
 
             return Task.FromResult<IReadOnlyList<CatalogSearchResult>>([.. _aliases.Values]);
+        }
+
+        public async Task<CatalogSearchPage> SearchPageAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (query.Skip > 0)
+            {
+                return new CatalogSearchPage([], 0);
+            }
+
+            IReadOnlyList<CatalogSearchResult> items = await SearchAsync(query, cancellationToken);
+            return new CatalogSearchPage(items, items.Count == 0 ? 0 : 100);
         }
 
         public Task<ResolvedPackage?> ResolveLatestVersionAsync(

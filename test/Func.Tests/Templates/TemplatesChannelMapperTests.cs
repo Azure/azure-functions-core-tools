@@ -38,4 +38,23 @@ public class TemplatesChannelMapperTests
 
         TemplatesChannelMapper.PickChannelMatched(rows, BundleChannel.Experimental).Should().BeNull();
     }
+
+    [Theory]
+    [InlineData("9.0.0-beta.1", false)]
+    [InlineData("9.0.0-beta.1", true)]
+    [InlineData("9.0.0-rc.1", false)]
+    [InlineData("9.0.0-rc.1", true)]
+    [InlineData("invalid-version", false)]
+    [InlineData("invalid-version", true)]
+    [InlineData("", false)]
+    [InlineData("", true)]
+    public void PickChannelMatched_UnfilteredRows_IgnoreInvalidOrNonStableVersions(string version, bool reverse)
+    {
+        InstalledTemplatesWorkload stable = new("node", "1.10.0", "stable");
+        InstalledTemplatesWorkload[] rows = [new("node", version, "ineligible"), new("node", "1.9.0", "older"), stable];
+
+        TemplatesChannelMapper.PickChannelMatched(reverse ? [.. rows.Reverse()] : rows, BundleChannel.Stable)
+            .Should().BeSameAs(stable);
+        TemplatesChannelMapper.PickChannelMatched([rows[0]], BundleChannel.Stable).Should().BeNull();
+    }
 }

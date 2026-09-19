@@ -162,7 +162,7 @@ public sealed class NewCommandBundleGateIntegrationTests : IDisposable
         var options = Substitute.For<IOptionsMonitor<StackOptions>>();
         options.Get(Arg.Any<string>()).Returns(new StackOptions { Runtime = "node", Language = "javascript" });
         var installed = Substitute.For<IInstalledTemplatesWorkloads>();
-        installed.ListInstalledAsync("node", Arg.Any<CancellationToken>())
+        installed.ListInstalledAsync("node", Arg.Any<CancellationToken>(), Arg.Any<BundleChannel?>())
             .Returns(new InstalledTemplatesWorkload[] { new("node", "1.0.0", Path.Combine(_root, "templates")) });
         HostJsonBundleSectionReader hostReader = new();
         TemplateEngineProviderRegistry registry = new([provider ?? new V2EngineProvider(installed)]);

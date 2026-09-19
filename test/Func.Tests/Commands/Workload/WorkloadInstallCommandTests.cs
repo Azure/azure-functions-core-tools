@@ -43,6 +43,17 @@ public class WorkloadInstallCommandTests
     }
 
     [Fact]
+    public void SourceHelp_DistinguishesRemoteFeedsFromLocalPackageArguments()
+    {
+        var install = NewInstall();
+        var update = UpdateCommand();
+
+        install.SourceOption.Description.Should().Contain("HTTP(S)").And.Contain("V3").And.NotContain("local directory");
+        update.SourceOption.Description.Should().Contain("HTTP(S)").And.Contain("V3").And.NotContain("local directory");
+        install.WorkloadArgument.Description.Should().Contain(".nupkg");
+    }
+
+    [Fact]
     public async Task Install_PackageId_RoutesToCatalogInstaller()
     {
         StubCatalogResult();
@@ -287,10 +298,10 @@ public class WorkloadInstallCommandTests
     }
 
     [Fact]
-    public async Task Install_LocalFolderSource_TreatedAsCatalogSource()
+    public async Task Install_SourceValue_ForwardedForCatalogValidation()
     {
-        // --source can be a folder path; the catalog (LocalFolderSourceClient)
-        // handles it. The CLI does not special-case paths.
+        // This mock-backed test checks forwarding only. The real source provider
+        // rejects local paths; accepting the mock result does not imply support.
         StubCatalogResult();
 
         var cmd = NewInstall();

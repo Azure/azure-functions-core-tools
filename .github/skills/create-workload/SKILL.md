@@ -5,8 +5,8 @@ description: 'Use when adding a new func CLI workload (e.g. Node, Python, Java).
 
 # Create a New Workload
 
-See `docs/building-a-workload.md` for the authoring guide and rationale, and
-`docs/proposed/workload-package-layout.md` for the package-layout spec
+See [the authoring guide](../../../docs/building-a-workload.md) for rationale, and
+[the package-layout spec](../../../proposed/workload-package-layout.md)
 (`workload.json` schema, `kind` discriminator, install pipeline). Use the
 Python stack workload (`src/Workloads/Stacks/Python/`) as the canonical
 reference for stack workloads.
@@ -49,9 +49,11 @@ Create the following files:
 
   </Project>
   ```
-  - `PackAsWorkload=true` triggers the SDK build targets in `eng/build/Workloads/` that handle packaging, `workload.json` generation, dependency filtering, and pack layout. Do **not** manually set `PackageType`, `PackageTags`, `IncludeBuildOutput`, or `SuppressDependenciesWhenPacking` — the SDK targets set all of these from `WorkloadKind` and `WorkloadAlias`.
+  - `PackAsWorkload=true` triggers the SDK build targets in `eng/build/Workloads/` that handle packaging, `workload.json` generation, dependency filtering, and pack layout. Do not manually set `PackageType`, `IncludeBuildOutput`, or `SuppressDependenciesWhenPacking`, or duplicate the generated `kind:` and primary `alias:` tags. The SDK sets these from `WorkloadKind` and `WorkloadAlias`.
   - `WorkloadKind` must be one of: `workload`, `content`, `meta`, `rid-pointer`. Stack workloads use `workload`.
   - `WorkloadAlias` is the short name users pass to `func workload install <alias>`.
+  - For a multi-alias stack, append alternate aliases and exactly one non-empty `stack:<canonical-alias>` tag to `PackageTags`. The canonical name must match an alias and is used by setup for worker, template, and profile resolution. Alias order has no meaning. For example, with `WorkloadAlias=node`, use `<PackageTags>$(PackageTags);alias:javascript;alias:typescript;stack:node</PackageTags>`. A single distinct alias needs no extra tag. Empty declarations and duplicate declarations, even identical ones, are invalid.
+  - Use portable packages for setup discovery. RID-based stack discovery is deferred because pointer metadata hides the implementation's logical role, not because the SDK or loader rejects RID workloads. Template readers require portable content. Observed RID-pointer stack/templates aliases fail this setup path, including on transport fallback.
   - `Title` is the feed-UI display name; `Description` is the one-line summary.
   - The Abstractions reference does **not** need `PrivateAssets`/`ExcludeAssets` — the SDK targets (`Workload.Pack.targets`) automatically exclude unified CLI assemblies from the package via the `ResolveWorkloadCopyLocal` task.
   - If the workload embeds template files, add `<EmbeddedResource Include="Templates/**" />`.
@@ -236,6 +238,14 @@ Use `eng/ci/release/official-release.workload.python.yml` as the reference.
 
 - [ ] `docs/repo-structure.md`, add the new project directories and CI pipeline entries.
 - [ ] `docs/building-a-workload.md`, update only if you introduce new patterns. The existing guide already covers the standard shape this skill scaffolds.
+
+### Setup integration checklist
+
+- [ ] Use an absolute HTTP(S) V3 service-index URL for feed testing. The client sets protocol version 3 regardless of URL suffix, and discovery requires `SearchQueryService`. `--source` does not accept local directories or V2 feeds. Pass local `.nupkg` paths positionally to `func workload install`.
+- [ ] Templates use portable `kind:content`, `alias:<canonical-stack>-templates`, and `tools/any/content`. The package ID can be arbitrary. Setup and `func new` share eligibility rules. Installed lookup filters channel and portability before choosing an effective owner, using logical metadata ahead of physical metadata. The conventional ID retains precedence regardless of aliases. Otherwise one custom alias owner is required. Unrelated channels and unusable old rows do not block valid templates. Setup preserves a usable installed owner until explicit migration.
+- [ ] Keep canonical stack metadata consistent across stable and prerelease-inclusive results. An explicit preview/experimental bundle channel can discover prerelease-only non-.NET templates without enabling prerelease stacks or workers. .NET templates remain channel-less.
+- [ ] For custom-feed tests, follow the [discovery scan and fallback contract](../../../proposed/func-setup-design.md#catalog-discovery). Do not duplicate its operational limits here.
+- [ ] Do not claim setup guarantees every prerequisite. See the [readiness limitations](../../../proposed/func-setup-design.md#current-limitations) and [check-mode side effects](../../../proposed/func-setup-design.md#10-check-mode).
 
 ### 6. Verify
 

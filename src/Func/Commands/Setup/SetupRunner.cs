@@ -123,7 +123,7 @@ internal sealed class SetupRunner(
 
     private async Task<ProfileSetupOutcome> RunProfileAsync(SetupCommandOptions options, SetupFeaturePlan featurePlan, SetupProfileScope profileScope, SetupRenderer renderer, CancellationToken cancellationToken)
     {
-        SetupDependencyPlan plan = await _dependencyPlanBuilder.BuildDependencyPlanAsync(options.WorkingDirectory, featurePlan, profileScope, cancellationToken);
+        SetupDependencyPlan plan = await _dependencyPlanBuilder.BuildDependencyPlanAsync(options, featurePlan, profileScope, cancellationToken);
         int failures = 0;
 
         foreach (SetupDependency dependency in plan.Dependencies)

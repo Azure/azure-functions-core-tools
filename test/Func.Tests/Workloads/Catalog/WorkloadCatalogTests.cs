@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
@@ -18,6 +19,75 @@ public sealed class WorkloadCatalogTests
 {
     private static readonly PackageSource _defaultSource = new("https://default.test/v3/index.json", "default");
     private static readonly PackageSource _altSource = new("https://override.test/v3/index.json", "override");
+
+    [Fact]
+    public async Task Discovery_SourceWithoutSearchService_FailsInsteadOfUsingOfflineFallback()
+    {
+        var index = new ServiceIndexResourceV3(JObject.Parse("{\"version\":\"3.0.0\",\"resources\":[]}"), DateTime.UtcNow);
+        var client = new NuGetProtocolSourceClient(TestRepository.Build(_defaultSource, index));
+        WorkloadCatalog catalog = NewCatalog((_defaultSource, client));
+
+        await FluentActions.Awaiting(() => new SetupStackCatalog(catalog).GetStacksAsync(null, false, CancellationToken.None))
+            .Should().ThrowAsync<SetupConfigurationException>().WithMessage("*SearchQueryService*");
+    }
+
+    [Fact]
+    public async Task SearchPageAsync_InvalidSource_PreservesCauseAndDoesNotCreateClient()
+    {
+        var provider = Substitute.For<IPackageSourceProvider>();
+        var cause = new ArgumentException("invalid source");
+        provider.GetSource("./feed").Returns<PackageSource>(_ => throw cause);
+        int clientCalls = 0;
+        WorkloadCatalog catalog = new(Options.Create(new WorkloadCatalogOptions()), provider, _ =>
+        {
+            clientCalls++;
+            throw new InvalidOperationException("Unexpected client creation");
+        });
+
+        var error = await FluentActions.Awaiting(() => catalog.SearchPageAsync(new CatalogSearchQuery { Source = "./feed" }))
+            .Should().ThrowAsync<InvalidWorkloadSourceException>();
+
+        error.Which.InnerException.Should().BeSameAs(cause);
+        clientCalls.Should().Be(0);
+        await FluentActions.Awaiting(() => catalog.SearchAsync(new CatalogSearchQuery { Source = "./feed" }))
+            .Should().ThrowAsync<InvalidWorkloadSourceException>("all catalog operations distinguish rejected sources");
+    }
+
+    [Fact]
+    public async Task SearchPageAsync_PreservesRawCountWhileLegacySearchStillReturnsFilteredHits()
+    {
+        JObject response = SearchResponse(("workload", "1.0.0"), ("unrelated", "1.0.0"));
+        response["data"]![1]!["packageTypes"] = new JArray(new JObject { ["name"] = "Dependency" });
+        var client = new FakeClient(TestRepository.Build(_altSource, NewServiceIndex()), response);
+        var provider = Substitute.For<IPackageSourceProvider>();
+        provider.GetSource(_altSource.Source).Returns(_altSource);
+        WorkloadCatalog catalog = new(Options.Create(new WorkloadCatalogOptions { IncludePrerelease = true }), provider, _ => client);
+        var query = new CatalogSearchQuery { Source = _altSource.Source, Skip = 200, Take = 100 };
+
+        CatalogSearchPage page = await catalog.SearchPageAsync(query);
+        IReadOnlyList<CatalogSearchResult> legacy = await catalog.SearchAsync(query);
+
+        page.RawCount.Should().Be(2);
+        page.Items.Should().ContainSingle().Which.PackageId.Should().Be("workload");
+        legacy.Should().BeEquivalentTo(page.Items);
+        client.LastSearchUri!.Query.Should().Contain("skip=200").And.Contain("take=100").And.Contain("prerelease=true");
+        provider.Received(2).GetSource(_altSource.Source);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("{}")]
+    [InlineData("{\"data\":null}")]
+    [InlineData("{\"data\":{}}")]
+    public async Task SearchPageAsync_MalformedPage_IsNotReportedAsEndOfFeed(string? json)
+    {
+        var client = new FakeClient(TestRepository.Build(_defaultSource, NewServiceIndex()), json is null ? null : JObject.Parse(json));
+        WorkloadCatalog catalog = NewCatalog((_defaultSource, client));
+
+        await FluentActions.Awaiting(() => catalog.SearchPageAsync(new CatalogSearchQuery()))
+            .Should().ThrowAsync<InvalidDataException>();
+        (await catalog.SearchAsync(new CatalogSearchQuery())).Should().BeEmpty("the legacy search contract is unchanged");
+    }
 
     [Fact]
     public async Task SearchAsync_DelegatesToConfiguredSource()

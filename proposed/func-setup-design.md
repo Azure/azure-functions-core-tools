@@ -1,17 +1,26 @@
 # `func setup` Design (Draft)
 
-This document describes the proposed `func setup` command for the Azure Functions CLI (`func`). It is a working draft.
+This working draft records the intended setup goals and the current Azure Functions CLI (`func`) implementation. The inherited limitations listed below remain gaps against the readiness goal, not newly accepted completion criteria.
 
 ## 1. Identity
 
-`func setup` is a **machine readiness orchestrator**. It coordinates several subsystems so that a freshly installed `func` is ready to develop or run Azure Functions, in one command, idempotently, in both interactive and CI environments.
+`func setup` is a **dependency readiness orchestrator**. It coordinates CLI workloads in interactive and CI environments. Success reports the selected workload reconciliation outcome, not a guarantee that language SDKs, external tools, or every runtime prerequisite are ready.
 
 It is intentionally a small, thin command. Its interface is small ("ready this machine for func"), but behind that interface it sequences work across:
 
 - Host workload installation.
 - Setup feature expansion, where user-facing feature IDs such as `runtime`, `node`, or `dotnet-isolated` map to one or more lower-level workload installs.
 - Profile-constrained installation for runtime constraint sets.
-- Extension bundle cache priming when the selected feature/worker runtime uses extension bundles.
+- Stack and templates workload installation when discovery provides them.
+- Extension bundle workload installation when the selected feature/worker runtime uses extension bundles.
+
+### Scope of the discovery change
+
+Setup discovers package identity from workload metadata, then reconciles concrete dependencies. The extraction keeps feature resolution, profile selection, planning, installation, and rendering independently testable. Discovery replaces the fixed stack list without introducing another package manager.
+
+Three invariants govern that integration. Partial discovery must not replace known ownership with fallback guesses. A prospective templates package must not displace a usable installed owner without explicit migration. Setup and `func new` must use the same templates eligibility and ownership rules.
+
+Discovery distinguishes source configuration errors from transport failures. It does not add SDK provisioning, feed-wide uniqueness guarantees, transactions, automatic owner migration, or RID stack/templates support. The existing channel-less .NET templates version ordering is unchanged. The automation limitations in sections 10 through 14 remain separate from discovery.
 
 ### What it is *not*
 
@@ -23,6 +32,8 @@ It is intentionally a small, thin command. Its interface is small ("ready this m
 
 ## 2. Goals
 
+These are readiness goals, not guarantees of the discovery layer. Sections 10 through 14 describe the current automation and readiness gaps.
+
 - Give a new user a single command to go from "I installed `func`" to "I can run a function".
 - Give CI a single command to bring a fresh runner to a known-ready state.
 - Be idempotent: safe to re-run on every CI job, on a developer's machine after adding new features, and after partial failures.
@@ -32,7 +43,7 @@ It is intentionally a small, thin command. Its interface is small ("ready this m
 ## 3. Command Surface
 
 ```text
-func setup [--features <list>]
+func setup [<path>] [--features <list>]...
            [--profile <name>]... [--profiles <list>]
            [--install-policy <latest-compatible|if-needed>]
            [--source <nuget-feed>]
@@ -43,34 +54,46 @@ func setup [--features <list>]
 
 | Option | Description |
 | --- | --- |
-| `--features <list>` | Comma-separated setup feature IDs to ensure are present. Features are CLI-curated capabilities, not raw workload package IDs. |
+| `--features <list>` | Repeatable or comma-separated setup feature IDs. Accepts `host`, `runtime`, and stack/runtime names, not literal workload package IDs. |
 | `--profile <name>` | Canonical repeatable option for profile names whose constraints should be applied. |
 | `--profiles <list>` | Comma-separated convenience alias for passing multiple profiles. |
 | `--install-policy <policy>` | Dependency reconciliation policy. Default: `latest-compatible`. |
-| `--source <nuget-feed>` | Override the NuGet package source used for workload catalog resolution and installation. Same semantics as workload commands. |
-| `--prerelease` | Allow prerelease package versions during catalog resolution. Prerelease versions are not considered unless this option is present. |
+| `--source <nuget-feed>` | Override the HTTP(S) V3 NuGet service index used for discovery, resolution, and installation. Local feed directories are not supported. |
+| `--prerelease` | Override the workload prerelease policy. Without an explicit value, use `FUNC_CLI_WORKLOADS_PRERELEASE` when valid, otherwise the running CLI's stable/prerelease status. Explicit bundle channels have separate rules below. |
 | `--non-interactive` | Never prompt. Fail if a required answer is missing or a step would otherwise block. |
-| `--yes`, `-y` | Accept defaults for any prompt that would otherwise block. Implies non-interactive. |
-| `--check` | Report what would change. Make no mutations. Exits non-zero if anything is missing or drifted according to the selected install policy. |
-| `--output <plain|json>` | Output mode. `plain` is human-readable text. `json` emits newline-delimited JSON events. |
+| `--yes`, `-y` | Parsed as an assume-yes option, but does not currently suppress the stack picker. Use `--non-interactive` for unattended setup. |
+| `--check` | Check selected dependencies without installing or updating workloads. Metadata caches and the first-run marker may change. |
+| `--output <plain|json>` | Output mode. `plain` is human-readable text. `json` renders event objects, but does not suppress the stack picker or global advisories and does not guarantee one physical line per event. |
 
 ## 4. Setup Features
 
 `--features` accepts setup feature IDs. A feature is a user-facing capability that expands to one or more lower-level dependencies.
 
-The initial built-in feature catalog is:
+The feature expansion is:
 
 | Feature | Meaning |
 | --- | --- |
 | `host` | Install or verify only the Azure Functions host workload. No workers. No extension bundle. |
-| `runtime` | Install or verify the host and the default stable extension bundle. No stack worker. |
-| `node`, `python`, `java`, `powershell`, `custom`, `go` | Install or verify host, the selected worker workload, and the default stable extension bundle. |
-| `dotnet-isolated` | Install or verify host and the `dotnet-isolated` worker. Extension bundles are skipped because this stack does not use them. |
-| Future feature IDs, such as `durable` | Expand to one or more additional workloads or caches. |
+| `runtime` | Install or verify the host and selected extension bundle (stable by default). No stack worker. |
+| Catalog stack, such as `node`, `python`, or `go` | Host, optional worker, discovered stack and optional templates workloads, plus the selected extension bundle. |
+| `dotnet`, also accepted as `dotnet-isolated` | Host, discovered .NET stack and optional .NET templates. No separate worker or extension bundle. Profile checks use `dotnet-isolated`. |
+| Other runtime name, such as `java`, `powershell`, or `custom` | The same generic worker/bundle path. Stack and templates workloads are added only when discovery maps the name. |
 
-Raw workload package IDs remain the responsibility of `func workload install`. Unknown setup feature IDs fail with a message that distinguishes setup features from workload package IDs and points users to `func workload search` or `func workload install`.
+Raw workload package IDs remain the responsibility of `func workload install`. An unknown setup name is currently treated as a runtime, with an optional worker at `Azure.Functions.Cli.Workloads.Workers.<runtime>` and a bundle. It is not rejected merely for being unknown. This inherited behavior can succeed without installing a stack or worker. Use `func workload search --stack` to browse the selected feed rather than treating arbitrary package IDs as features.
 
-The supported .NET setup stack is `dotnet-isolated`. There is no separate in-process `dotnet` stack feature.
+The canonical .NET setup name is `dotnet`, mapped to profile runtime `dotnet-isolated`. This does not enable in-process .NET. `.net` and `dotnet-inprocess` are rejected.
+
+### Catalog discovery
+
+Setup discovers stack packages from `kind:workload` and `alias:` tags, and templates content packages from `kind:content` and `alias:<canonical-stack>-templates`. Package IDs need not follow Microsoft's naming convention. Multiple distinct stack aliases require exactly one non-empty `stack:<canonical-alias>` tag matching an alias. A single distinct alias may omit the tag. Empty or duplicate declarations, even identical duplicates, are invalid. Alias order does not choose the runtime.
+
+Discovery supports portable stack and templates packages. Observed `kind:rid-pointer` aliases and concrete-RID stack/templates metadata used for either role fail closed, including on offline fallback. Alias ownership spans all observed package kinds. Alternate spellings cannot bypass a contested canonical name or its restricted templates role, and aliases that fold into reserved setup feature words are rejected. Host and worker RID pointers use the installer separately, not stack discovery.
+
+Each discovery scan requests up to 100 rows per page with independent limits of 1,000 raw rows and 32 search requests. Offsets advance by raw row count, before package-type filtering. A stable `totalHits` can establish completion. Without a total, only an empty raw page ends the scan, not a short or filtered-empty page. Reaching either limit without observing completion fails without caching the partial result. For example, 1,000 rows without a total cannot prove completion within the budget.
+
+Malformed responses, inconsistent pagination, conflicting kinds, alias sets, or canonical stack names for repeated package IDs, invalid canonical tags, and unsupported sources fail rather than triggering offline fallback. Identical parsed rows are allowed. Transport failures use built-in maps while retaining observed conflicts and unsupported roles. A completed scan also uses built-in maps when no unambiguous canonical stack entry was collected. Collected entries later rejected for a concrete RID or reserved setup name do not trigger that fallback. The fallback contains Node, Python, Go, and .NET stacks, with templates for Node, Python, and .NET. Successful discovery does not fill missing built-in stacks from that fallback. Requesting such a missing built-in stack fails planning.
+
+Snapshots, including transport fallbacks, are cached by source override and prerelease policy for the catalog instance. Discovery remains best effort. Offset paging is not a stable snapshot of a mutable feed, and retaining observed conflicts is not a guarantee of feed-wide alias uniqueness.
 
 ## 5. Feature Defaults
 
@@ -78,8 +101,11 @@ If `--features` is provided, it is the complete explicit feature request.
 
 If `--features` is not provided:
 
-1. If `.func/config.json` declares a worker runtime, setup treats that worker runtime as the stack feature to prepare.
-2. Otherwise, setup defaults to the `runtime` feature.
+1. If `.func/config.json` declares `stack.runtime`, setup uses that stack feature.
+2. Otherwise, an interactive run without `--non-interactive` offers a stack picker, including with `--yes` or JSON output. Entries with a matching package ID in the workload registry are shown as already installed and are not selectable. This is a UI hint, not a dependency health check.
+3. With `--non-interactive` or an unavailable interactive terminal, setup defaults to `runtime` instead of showing the picker.
+
+If every eligible stack is already registered, the picker path is a successful no-op. No eligible stacks is an error, as is submitting an empty selection. `--check` alone does not suppress the stack picker. Use explicit features or `--non-interactive` for unattended checks.
 
 Setup does not infer worker runtime from any other project file.
 
@@ -112,11 +138,11 @@ The profile affects dependency selection as follows:
 | Selected worker workloads | Constrained by the matching profile worker version range when one exists. |
 | Extension bundle | Constrained by the profile extension bundle range, but only when the selected feature/worker runtime uses extension bundles. |
 
-Host workload catalog resolution and installation must use a literal RID-specific package ID, not alias/tag lookup. The package ID format is `Azure.Functions.Cli.Workloads.Host.<RID>`, where `<RID>` is the current CLI runtime identifier, such as `win-x64`, `linux-arm64`, or `osx-arm64`. This prevents a package from hijacking the host install through an alias and supports multiple RID-specific host packages sharing the same public alias.
+Host resolution uses the literal logical package ID `Azure.Functions.Cli.Workloads.Host`, not alias/tag lookup or a hand-built RID suffix. Python workers use `Azure.Functions.Cli.Workloads.Workers.Python`. The workload installer follows each pointer's current-RID mapping at the exact pointer version and source. Other worker IDs use `Azure.Functions.Cli.Workloads.Workers.<canonical-runtime>`. Installed dependency matching accepts physical IDs and logical owner IDs.
 
 Worker constraints apply only to workers selected by `--features` or by `.func/config.json` worker runtime. Setup does not install every worker listed by a profile.
 
-If a selected worker runtime is not supported by a profile, setup fails for that profile. If the profile supports the runtime but does not specify an explicit worker version range for it, setup installs the worker according to the selected install policy without a profile range.
+If a selected runtime is not supported by a profile, the planner records a failure and omits that runtime's dependencies. It does not block otherwise valid dependencies for the profile. Those dependencies are reconciled before returned planning failures are reported, as described in section 14. If the profile supports the runtime but has no worker range, worker resolution has no profile range. Stack and templates versions are not constrained by worker ranges. Workers remain optional, as described under current limitations below.
 
 ## 8. Extension Bundle Policy
 
@@ -131,15 +157,23 @@ Policy resolution:
 
 | Worker runtime / feature | Policy |
 | --- | --- |
-| `dotnet-isolated` | `NotSupported` |
+| `dotnet` / `dotnet-isolated` | `NotSupported` |
 | All other known stack features | `DefaultStable` |
 | Unknown worker runtimes | `DefaultStable` |
 
 `NotSupported` means setup does not install or check extension bundles for that feature. A profile `extensionBundle` range does not force bundle installation for a stack that does not use bundles.
 
-`DefaultStable` means setup ensures the stable default extension bundle workload is present when the selected feature includes bundle setup.
+`DefaultStable` means bundle setup is included, using the stable channel unless the project explicitly selects another supported channel.
 
 When a project `host.json` declares an extension bundle, setup intersects the `host.json` bundle version range with the selected profile range. When no project bundle declaration is available, setup uses the stable default bundle ID with the profile range, if any.
+
+An explicit preview or experimental bundle ID also selects that channel for non-.NET templates. If the general prerelease policy is off, setup performs a separate prerelease-inclusive templates discovery without opting stacks or workers into prerelease versions. Canonical stack names must remain consistent across completed scans, and conflicts or unsupported roles observed in either scan fail planning. If the supplemental scan falls back, the normal scan's package ownership, canonical names, and known absence of templates remain authoritative. Built-in fallback IDs do not replace or fill that normal result. .NET templates remain channel-less and follow the general prerelease policy.
+
+Bundle and channeled templates resolution falls back to stable, with a warning, when no matching version exists on the requested non-stable channel within the applicable range. A general prerelease opt-in does not change the selected bundle/templates channel.
+
+Search metadata may describe a newer version than the selected channel. Setup validates the actual templates registry entry before reporting installation success or using an installed-version shortcut. It requires portable content with the expected effective logical alias or the legacy conventional ID. A mismatch discovered after installation is a failure with an explicit uninstall command, not an automatic rollback.
+
+Setup and the templates consumer share one eligibility policy. Channel and portable-content filtering precede owner selection. Within that channel, the conventional effective package ID retains precedence regardless of its aliases. Otherwise a single custom alias owner is selected, and competing custom owners fail. Unrelated channels or an old non-portable row do not block usable portable templates. Before considering a prospective package, setup preserves any usable owner selected from the installed registry. Replacing that incumbent requires explicit migration in either direction between conventional and custom owners. This does not change selection precedence when both owners are already installed. The registry is checked again after installation.
 
 ## 9. Install Policy
 
@@ -150,72 +184,75 @@ When a project `host.json` declares an extension bundle, setup intersects the `h
 For each dependency, setup resolves the maximum available version that satisfies all active constraints and ensures that version is installed.
 
 - If a lower compatible version is installed and the catalog resolves a newer compatible version, setup installs the newer version.
-- If catalog resolution fails for any reason but an installed version satisfies the active constraints, setup warns and accepts the installed version as a fallback. JSON output reports this as a fallback result.
-- If no installed compatible version exists and catalog resolution fails, setup fails.
+- If a handled transport failure or no matching catalog version prevents resolution, an installed compatible version can satisfy the dependency as a fallback. JSON output reports `satisfied-fallback`.
+- Unsupported sources and discovery configuration errors are not fallback cases.
+- Without a compatible installed version, required dependencies fail. Optional workers/templates can be skipped when catalog resolution finds no matching version. Templates registry-readiness or matching-entry metadata errors still fail. Transport failures do not produce an optional skip.
 
 ### `if-needed`
 
-For each dependency, setup first checks installed state.
+For each concrete dependency, setup first checks installed state. Stack aliases still require discovery to establish package identity before reconciliation. This policy is not an offline alias-resolution mode.
 
 - If any installed version satisfies the active constraints, setup skips installation.
 - If no installed compatible version exists, setup resolves and installs the maximum available compatible version.
-- If no installed compatible version exists and catalog resolution fails, setup fails.
+- If no installed compatible version exists, the same required/optional failure rules as `latest-compatible` apply.
 
 ### `--prerelease`
 
-Prerelease versions are considered only when `--prerelease` is present. Otherwise, setup resolves stable packages only.
+An explicit `--prerelease` value wins. Otherwise, a valid `FUNC_CLI_WORKLOADS_PRERELEASE` setting wins, then the CLI build determines the default (stable builds exclude prereleases, prerelease builds include them). Explicit bundle and non-.NET templates channels use the separate rules in section 8.
 
 ### `--source`
 
-`--source` passes a NuGet source override to workload catalog resolution and workload installation. This lets CI and development workflows validate setup against private or staging workload feeds without changing global CLI configuration.
+`--source` overrides `FUNC_CLI_WORKLOADS_SOURCE`, with nuget.org used when neither is set. Sources must be absolute HTTP(S) V3 service-index URLs. The client sets protocol version 3 even when the URL has no `.json` suffix, and search requires a `SearchQueryService` entry. Local directories, file URLs, and V2 feeds are not supported. A local `.nupkg` belongs in the positional argument to `func workload install`, not `setup --source`.
+
+Source syntax is validated when discovery or dependency resolution consumes the source. A satisfied host/runtime `if-needed` run retains its installed-first shortcut even when an unused source setting is invalid. Host/runtime-only runs skip stack discovery, not all catalog or metadata access.
 
 ## 10. Check Mode
 
-`--check` uses the same resolution logic as a real run but makes no mutations.
+`--check` uses dependency resolution without installing or updating workloads. Successful checks still attempt to write the first-run marker, including the all-stacks-installed picker no-op. There is no check-mode guard on that write. Metadata caches may also change, including profile and NuGet HTTP caches. It is not a filesystem-wide read-only or offline mode.
 
 `--check` follows the selected install policy:
 
 - With `latest-compatible`, check reports drift when an installed compatible version is older than the maximum available compatible version.
 - With `if-needed`, check passes when any installed version satisfies the active constraints.
-- If catalog resolution fails and an installed compatible version exists, check reports the same fallback result as install mode.
+- For handled transport failures or no matching catalog version, check reports the same installed-version fallback as install mode. Configuration errors still fail.
 
-`--check` exits with code `1` on any drift, missing dependency, incompatible installed state, or failed dependency resolution. It exits with code `0` only when all selected profiles and dependencies are satisfied according to the selected install policy.
+`--check` exits with code `1` for failed dependency results or planning/configuration errors. A missing resolved target version is reported as `failed`, not `would-install`. Optional missing workers/templates can be `skipped`, so exit code `0` is not proof that every prerequisite exists or that installed payloads are intact.
 
-When multiple profiles are selected, check mode evaluates all profile loops and summarizes all failures.
+Check mode continues through dependency results and returned planning failures for all selected profiles. A thrown configuration error ends the run rather than continuing to later profiles.
 
 ## 11. Interactive and Non-Interactive Behavior
 
-The default interactive flow may prompt before installing selected dependencies.
+The interactive flow selects stacks when no explicit or project feature is available. There is no separate setup confirmation before each dependency install.
 
 `--non-interactive` never prompts. It fails if setup cannot decide what to install from explicit arguments and supported defaults.
 
-`--yes` implies non-interactive and accepts setup defaults. For example, with no `--features` and no `.func/config.json` worker runtime, `--yes` accepts the default `runtime` feature.
+`--yes` is parsed but is not used to suppress the picker. JSON output does not suppress it either. With no explicit features or project stack runtime, both can enter the interactive picker. Use `--non-interactive` to select the `runtime` default without prompting.
 
-Telemetry consent remains out of scope for `func setup`; it is handled by the global CLI bootstrap path.
+Direct `setup` invocations skip the global first-run prompt. Check and JSON setup invocations do not suppress the background CLI version check or add gates for trailing version/alias advisories. Those advisories retain their own normal conditions. JSON mode suppresses setup's human prerelease hint, but is not a guarantee of machine-only output. Telemetry ownership remains outside setup.
 
 ## 12. JSON Output
 
-`--output json` emits newline-delimited JSON (NDJSON). Each line is one event object. There is no separate final JSON document; the final state is represented by the `setup.completed` or `setup.failed` event.
+The output goal is newline-delimited JSON (NDJSON). Currently `--output json` serializes each event object with `type` and `timestamp` through the ordinary interaction-service line writer, not a raw-output path. Console rendering can wrap an event across physical lines. Picker output and global advisories can also appear, so consumers cannot rely on clean NDJSON. There is no separate final JSON document. Parser and bootstrap failures are outside this event contract.
 
 The v1 event set is:
 
 | Event | Description |
 | --- | --- |
-| `setup.started` | Emitted once when setup begins. Includes selected features, profiles, source override, install policy, check mode, and prerelease setting. |
-| `profile.started` | Emitted at the start of each profile loop. Includes profile name/source when one is active. |
-| `dependency.detected` | Emitted for every resolved dependency before it is checked or installed. Includes dependency type, ID, constraints, feature, and profile. |
-| `dependency.result` | Emitted after each dependency is checked or reconciled. Includes action/result, selected version, installed version, fallback state, and message. |
-| `profile.completed` | Emitted after a profile loop completes. Includes profile outcome and summary counts. |
-| `setup.completed` | Emitted when setup completes successfully or with check drift. Includes exit code and summary counts. |
-| `setup.failed` | Emitted for fatal failures that prevent normal completion. |
+| `setup.started` | After features and profile scopes resolve. Includes features, worker runtimes, profiles, source override, install policy, check mode, and prerelease setting. |
+| `profile.started` | At the start of each profile loop, with the profile name when constrained. |
+| `dependency.detected` | Before a planned dependency is checked or installed. Includes type, name, package ID when applicable, version range, and profile. |
+| `dependency.result` | Status, package ID when applicable, version when selected, message, and optional warning. Also used for planning failures that have no preceding `dependency.detected`. |
+| `profile.completed` | Profile name, success, and failure count. |
+| `setup.completed` | Success with `success: true`. Check drift produces `setup.failed` instead. |
+| `setup.failed` | A failure count or configuration-error message. It can occur before `setup.started`. |
+| `setup.warning` | Profile warnings, which can precede `setup.started`. |
+| `setup.skipped` | Renderer event for the all-stacks-installed picker no-op, which JSON invocations can also reach. |
 
-Recommended dependency result states:
+Dependency result states are:
 
+- `satisfied`
 - `installed`
-- `already-satisfied`
 - `satisfied-fallback`
-- `would-install`
-- `would-skip`
 - `skipped`
 - `failed`
 
@@ -223,12 +260,12 @@ Human-readable output should present the same decisions in plain language.
 
 ## 13. State and File Layout
 
-`func setup` mutates only dependency/cache state owned by the underlying subsystems:
+Normal setup can write dependency state, metadata caches, and the first-run marker through the owning subsystems. The workload home defaults to:
 
 ```text
 ~/.azure-functions/
   workloads/   # Owned by the workload subsystem
-  profiles/    # Owned by the profiles subsystem, if applicable
+  workloads.json
 ```
 
 Setup does not write to:
@@ -238,15 +275,23 @@ Setup does not write to:
 - `host.json`
 - `local.settings.json`
 
-The first-run marker/hints originally proposed for setup are deferred from v1. First-run UX should be handled separately.
+Successful setup attempts to mark first-run completion on a best-effort basis, including check mode, JSON mode, and the all-stacks-installed picker no-op. Metadata cache locations are owned by the profile and NuGet subsystems, not restricted to the workload payload directory.
 
 ## 14. Failure Semantics
 
-- Each underlying subsystem call is atomic per its own contract.
-- Setup accepts partial completion; a re-run finishes the job. There is no rollback.
-- Install mode stops at the first failed profile loop and exits non-zero.
-- Check mode continues through all selected profile loops and exits non-zero if any loop fails or drifts.
+- Returned planning failures are reported after the profile's planned dependencies are reconciled. Discovery excludes a rejected runtime's dependencies, but does not add profile-wide preflight. Valid host, bundle, or other runtime dependencies can be installed before a planning failure is reported.
+- Setup permits partial completion. A re-run can reconcile remaining dependencies after the failure's cause is addressed. There is no rollback or transaction across profiles.
+- Install mode stops at the first failed dependency or profile loop and exits non-zero. Earlier dependency installs and earlier successful profiles remain installed.
+- Check mode continues through returned failures, but a thrown configuration error aborts the run.
 - Errors clearly state what completed and what did not, with the exact command or option to retry when possible.
+
+### Current limitations
+
+- `--yes` and JSON output do not suppress the picker. Successful checks can write the first-run marker. JSON events do not yet have guaranteed physical-line framing or setup-specific global advisory suppression.
+- Workers and templates are optional. A catalog result with no matching version is treated as missing even when versions exist but all are incompatible with the active range or policy. That inherited behavior can skip an incompatible optional worker rather than fail setup.
+- Installed-state checks compare registry identities and versions. They do not validate payload files or prove that host, worker, or templates content can run.
+- Setup discovery supports portable stack/templates roles, not RID pointers for those roles. The installed templates consumer also rejects matching non-portable rows. Supporting host/worker RID pointers does not imply RID templates support.
+- Discovery is bounded and best effort. Neither a successful scan nor transport fallback guarantees that unobserved or concurrently changed feed aliases are unique.
 
 ## 15. Boundaries with `init`, `start`, and `workload`
 

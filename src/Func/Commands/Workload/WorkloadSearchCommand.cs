@@ -105,6 +105,10 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         {
             results = await _catalog.SearchAsync(searchQuery, cancellationToken);
         }
+        catch (InvalidWorkloadSourceException ex)
+        {
+            throw new GracefulException(ex.Message, ex, isUserError: true);
+        }
         catch (ArgumentException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);

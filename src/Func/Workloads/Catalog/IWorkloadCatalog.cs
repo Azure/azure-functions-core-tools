@@ -14,6 +14,8 @@ namespace Azure.Functions.Cli.Workloads.Catalog;
 /// Backed by NuGet by design. The abstraction exists so command code stays
 /// workload-flavoured (and unit-testable), not to enable swapping the
 /// distribution mechanism. Treat NuGet as a permanent dependency.
+/// Source resolution throws <see cref="InvalidWorkloadSourceException"/> for an
+/// unsupported source, allowing commands to distinguish it from transport errors.
 /// </remarks>
 internal interface IWorkloadCatalog
 {
@@ -23,6 +25,15 @@ internal interface IWorkloadCatalog
     /// <param name="query">Filter, paging, and source-override bag.</param>
     /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
     public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Searches one feed page, retaining its raw entry count for pagination even
+    /// when every returned entry is excluded by client-side filtering.
+    /// </summary>
+    /// <exception cref="InvalidWorkloadSourceException">
+    /// The selected source is not a supported NuGet feed.
+    /// </exception>
+    public Task<CatalogSearchPage> SearchPageAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns the highest installable version of <paramref name="packageId"/>

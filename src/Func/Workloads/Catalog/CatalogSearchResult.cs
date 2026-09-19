@@ -24,6 +24,12 @@ internal sealed record CatalogSearchResult(
     PackageSource Source)
 {
     /// <summary>
+    /// Canonical runtime alias declared by an optional <c>stack:</c> tag.
+    /// Multi-alias stack packages must declare it; a single alias is unambiguous.
+    /// </summary>
+    public string? CanonicalStack { get; init; }
+
+    /// <summary>
     /// Lowercased value parsed from the <c>kind:</c> NuGet tag (e.g. <c>workload</c>,
     /// <c>content</c>, <c>meta</c>). <see langword="null"/> when the package omits the
     /// tag. Lets callers filter results to a particular package shape, e.g.

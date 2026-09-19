@@ -11,6 +11,11 @@
 > §6.1, §6.2, and §10.1. They are tracked here so the spec PR can
 > ride along with the layout iteration.
 
+Setup requires portable stack/templates packages. This restriction does not
+apply to general RID workload installation. See the [setup authoring
+contract](#71-setup-discovery-and-templates-contract) and the existing
+[RID authoring guide](../docs/building-a-workload.md#runtime-specific-workload-packages).
+
 ## 1. Goals
 
 - Pick a single, opinionated package layout so workload authors don't have
@@ -402,24 +407,24 @@ of PackageReference asset paths (§5.1). The trailing `any/` segment
 is kept for two specific reasons:
 
 1. **Future-proofing for RID-specific workloads.** The slot exists
-   in the established `DotnetTool` convention (`tools/<tfm>/<rid>/`)
-   for a reason: a tool may need separate bytes per RID. Workloads
-   in v1 are portable (§4) and always populate `tools/any/`. If a
-   future workload class needs RID-specific bits — e.g., a workload
-   that wraps a native CLI it ships alongside — `tools/win-x64/` can
-   sit next to `tools/any/` without a layout migration. With a flat
-   `tools/`, the same scenario forces either a sub-folder rename
-   (breaking change) or reading the payload's `.deps.json` to pick
-   one of several flat sets, both of which are incompatible with
-   the "extract the `tools/<rid>/` subtree as-is" install rule
-   (§5.2).
+  in the established `DotnetTool` convention (`tools/<tfm>/<rid>/`)
+  for a reason: a tool may need separate bytes per RID. Workloads
+  in v1 are portable (§4) and always populate `tools/any/`. If a
+  future workload class needs RID-specific bits — e.g., a workload
+  that wraps a native CLI it ships alongside — `tools/win-x64/` can
+  sit next to `tools/any/` without a layout migration. With a flat
+  `tools/`, the same scenario forces either a sub-folder rename
+  (breaking change) or reading the payload's `.deps.json` to pick
+  one of several flat sets, both of which are incompatible with
+  the "extract the `tools/<rid>/` subtree as-is" install rule
+  (§5.2).
 2. **Reads as "explicitly portable", not "RID forgotten".** A
-   reviewer or scanner looking at the package sees `tools/any/` and
-   immediately knows the package author marked the payload as
-   cross-platform. A flat `tools/` is silent on the question, and
-   tools that already understand `tools/<tfm>/<rid>/` (signing
-   pipelines, content scanners, mirroring tools) may misinterpret
-   it.
+  reviewer or scanner looking at the package sees `tools/any/` and
+  immediately knows the package author marked the payload as
+  cross-platform. A flat `tools/` is silent on the question, and
+  tools that already understand `tools/<tfm>/<rid>/` (signing
+  pipelines, content scanners, mirroring tools) may misinterpret
+  it.
 
 Why **`any`** and not the host's RID for v1: per §4, the workload
 assembly is portable. Picking `any` keeps a single folder authors
@@ -830,7 +835,7 @@ member's frozen `members[]` snapshot in each meta covers the rest.
 
 We use NuGet for:
 
-- Feed protocol (V2 + V3), package download — `NuGet.Protocol`.
+- HTTP(S) V3 feed protocol and package download through `NuGet.Protocol`.
   `FindPackageByIdResource` for download (the same API
   `dotnet tool install` uses); `PackageMetadataResource` for
   per-package metadata (id, version, package types, tags,
@@ -838,9 +843,10 @@ We use NuGet for:
 - Version range syntax (`[1.2.0,2.0.0)`) and comparison —
   `NuGet.Versioning`. Used for meta-member range resolution and
   installed-vs-requested SxS decisions.
-- `nuget.config` discovery, source ordering, package source
-  mapping, credential providers — `NuGet.Configuration`,
-  `NuGet.Credentials`.
+- Credential providers and HTTP transport through the NuGet libraries.
+  Workload source selection is CLI-owned, using `--source`, then
+  `FUNC_CLI_WORKLOADS_SOURCE`, then nuget.org. It is not NuGet's
+  multi-source restore or source-mapping policy.
 - `.nupkg` / `.nuspec` parsing — `NuGet.Packaging`.
 
 We **don't** use:
@@ -1003,6 +1009,36 @@ layout is self-contained. The in-package `workload.json` (§5.4) is
 | `icon`         | Path to `icon.png` packed at the root.                |
 | `releaseNotes` | Recommended. Sourced from `release_notes.md` via the existing `Release.targets`. |
 
+### 7.1 Setup discovery and templates contract
+
+- Sources must be absolute HTTP(S) V3 service-index URLs. The client sets
+  protocol version 3 even without a `.json` suffix. Discovery requires
+  `SearchQueryService`. V2 and local-directory sources are unsupported.
+  Local `.nupkg` files are positional `func workload install` inputs.
+- Portable `kind:workload` stacks use one canonical alias. Multiple distinct
+  aliases require exactly one non-empty `stack:<canonical-alias>` tag
+  matching an alias. A single distinct alias can omit it. Empty and duplicate
+  declarations, even identical duplicates, are invalid.
+- Templates are portable `kind:content` packages with
+  `alias:<canonical-stack>-templates`. IDs can be arbitrary. Setup and `func new`
+  share eligibility rules. Installed lookup
+  filters channel and portability first, then prefers the conventional effective
+  owner regardless of aliases. Otherwise one custom alias owner is required.
+  Logical metadata takes precedence over physical metadata. Unrelated channels
+  and unusable old rows do not block valid templates. Readers expect `tools/any/content`.
+  Setup preserves a usable installed owner until explicit migration.
+- Observed RID-pointer aliases used for stack/templates roles fail setup
+  planning, including on fallback. Host/worker pointers remain supported
+  through the separate installer contract.
+- An explicit preview/experimental bundle channel allows prerelease-only
+  non-.NET templates discovery without opting stacks or workers into
+  prereleases. Keep canonical names consistent across stable and inclusive results.
+  .NET templates remain channel-less and follow the general prerelease policy.
+
+The setup design owns the [scan and fallback contract](func-setup-design.md#catalog-discovery),
+[channel policy](func-setup-design.md#8-extension-bundle-policy), and
+[readiness limitations](func-setup-design.md#current-limitations).
+
 ## 8. Worked examples
 
 ### 8.1 Normal workload: `Azure.Functions.Cli.Workload.Node`
@@ -1060,12 +1096,18 @@ content-root directory itself (§5.4).
   <packageTypes>
     <packageType name="FuncCliWorkload" />
   </packageTypes>
-  <tags>kind:workload alias:node alias:javascript alias:typescript</tags>
+  <tags>kind:workload alias:node alias:javascript alias:typescript stack:node</tags>
   <readme>README.md</readme>
   <icon>icon.png</icon>
   <!-- No <dependencies>: workload packages are self-contained (§5.5, §9.3). -->
 </metadata>
 ```
+
+The `stack:node` tag identifies the canonical setup runtime for all three
+aliases. Multi-alias stack packages must declare exactly one canonical stack
+tag matching an alias. A single distinct alias can omit it. Empty or duplicate
+declarations, even identical duplicates, are invalid. Alias order does not
+select the runtime. See section 7.1 for the discovery and consumer limits.
 
 ### 8.2 Content package: Functions host runtime
 
