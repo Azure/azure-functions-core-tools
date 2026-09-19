@@ -324,6 +324,8 @@ public sealed class FirstRunCoordinatorTests
 
         public void WriteLine(string text) => _lines.Add(text);
 
+        public void WriteRawLine(string text) => WriteLine(text);
+
         public void WriteBlankLine() => _lines.Add(string.Empty);
 
         public void WriteLine(Action<InlineLine> build) => _lines.Add("LINE");

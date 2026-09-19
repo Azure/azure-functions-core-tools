@@ -65,7 +65,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<bool> CheckOption { get; } = new("--check")
     {
-        Description = "Check whether the selected dependencies are installed without making changes.",
+        Description = "Check selected dependencies without installing or updating workloads. Metadata caches may change.",
     };
 
     public Option<string?> OutputOption { get; } = new("--output")
@@ -80,7 +80,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         : base(
             "setup",
             "Prepare local Azure Functions CLI dependencies. "
-            + "Installs everything needed to develop and run a Functions app for the chosen stack(s) (host, worker, stack, templates, extension bundle). "
+            + "Reconciles host, worker, stack, templates, and extension bundle workloads for the chosen stack(s). "
             + "For installing individual workload packages, see 'func workload'.")
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
@@ -97,6 +97,17 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(YesOption);
         Options.Add(CheckOption);
         Options.Add(OutputOption);
+    }
+
+    internal static bool ShouldSuppressAdvisories(ParseResult parseResult)
+    {
+        ArgumentNullException.ThrowIfNull(parseResult);
+
+        // Leave malformed option values to the parser's normal error reporting.
+        return parseResult.CommandResult.Command is SetupCommand setup
+            && ((parseResult.GetResult(setup.CheckOption)?.Errors.Any() != true && parseResult.GetValue(setup.CheckOption))
+                || (parseResult.GetResult(setup.OutputOption)?.Errors.Any() != true
+                    && string.Equals(parseResult.GetValue(setup.OutputOption)?.Trim(), "json", StringComparison.OrdinalIgnoreCase)));
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)

@@ -285,6 +285,43 @@ public class SetupStackDiscoveryWiringTests
         public override bool IsInteractive => true;
     }
 
+    [Theory]
+    [InlineData(true, false, null, "runtime")]
+    [InlineData(false, true, null, "runtime")]
+    [InlineData(true, false, "powershell", "powershell")]
+    [InlineData(false, true, "powershell", "powershell")]
+    public async Task FeatureResolver_PromptsSuppressed_UsesProjectDefaultOrRuntime(
+        bool assumeYes, bool json, string? configuredRuntime, string expectedFeature)
+    {
+        WithDiscoveredStacks(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["node"] = "contoso.workloads.node",
+            ["powershell"] = "contoso.workloads.powershell",
+        });
+        IWorkloadStore store = Substitute.For<IWorkloadStore>();
+        store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);
+        ICliConfigurationProvider configuration = Substitute.For<ICliConfigurationProvider>();
+        configuration.GetProjectConfiguration(Arg.Any<DirectoryInfo>()).Returns(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = configuredRuntime,
+            }).Build());
+        SelectAllInteractionService interaction = new();
+        SetupFeatureResolver resolver = new(interaction, store, configuration, _stackCatalog);
+
+        SetupFeaturePlan? plan = await resolver.ResolveFeaturesAsync(
+            Options([]) with { AssumeYes = assumeYes, OutputMode = json ? SetupOutputMode.Json : SetupOutputMode.Plain },
+            CancellationToken.None);
+
+        plan.Should().NotBeNull();
+        plan!.Features.Should().Equal([expectedFeature]);
+        interaction.MultiSelectionChoices.Should().BeEmpty();
+        interaction.Lines.Should().BeEmpty();
+        await store.DidNotReceive().GetWorkloadsAsync(Arg.Any<CancellationToken>());
+        await _stackCatalog.Received(configuredRuntime is null ? 0 : 1).GetStacksAsync(
+            Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task FeatureResolver_EmptySnapshot_FailsInsteadOfReportingAllStacksInstalled()
     {

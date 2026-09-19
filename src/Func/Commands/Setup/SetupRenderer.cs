@@ -207,7 +207,7 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
     {
         payload["type"] = eventType;
         payload["timestamp"] = DateTimeOffset.UtcNow;
-        _interaction.WriteLine(JsonSerializer.Serialize(payload, _jsonOptions));
+        _interaction.WriteRawLine(JsonSerializer.Serialize(payload, _jsonOptions));
     }
 
     private static Dictionary<string, object?> DependencyPayload(SetupProfileScope profileScope, SetupDependency dependency)

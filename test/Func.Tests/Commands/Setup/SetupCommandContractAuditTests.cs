@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using AwesomeAssertions.Execution;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Configuration;
@@ -71,6 +72,52 @@ public sealed class SetupCommandContractAuditTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task ResolveFeaturesAsync_PromptsSuppressedWithoutFeatures_DefaultsToRuntime(bool json)
+    {
+        AuditHarness harness = CreateHarness(NormalSnapshot());
+        SetupCommandOptions options = Options(assumeYes: !json, json: json);
+
+        SetupFeaturePlan? plan = await harness.FeatureResolver.ResolveFeaturesAsync(options, CancellationToken.None);
+
+        harness.Interaction.PromptCount.Should().Be(0);
+        harness.Interaction.MultiSelectionChoices.Should().BeEmpty();
+        harness.Interaction.Lines.Should().BeEmpty();
+        plan.Should().NotBeNull();
+        plan!.Features.Should().Equal("runtime");
+        plan.RuntimeFeatures.Should().BeEmpty();
+        plan.WorkerRuntimes.Should().BeEmpty();
+        plan.IncludeExtensionBundle.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_InteractiveJsonWithoutFeatures_DefaultsToRuntimeAndWritesOnlyJson(bool allInstalled)
+    {
+        SetupStackSnapshot snapshot = NormalSnapshot();
+        IReadOnlyList<WorkloadEntry> installed = allInstalled ? InstalledStacks(snapshot) : [InstalledStack(NodePackage)];
+        AuditHarness harness = CreateHarness(snapshot, installed);
+
+        SetupRunResult result = await harness.Runner.RunAsync(Options(json: true), CancellationToken.None);
+
+        // Parse every captured line, including any accidental human output or blank lines.
+        JsonElement[] events = ReadEvents(harness.Interaction.Lines);
+        result.ExitCode.Should().Be(0);
+        harness.Interaction.PromptCount.Should().Be(0);
+        harness.Interaction.MultiSelectionChoices.Should().BeEmpty();
+        JsonElement started = events.Should().ContainSingle(item => EventType(item) == "setup.started").Which;
+        started.GetProperty("features").EnumerateArray().Select(item => item.GetString()).Should().Equal("runtime");
+        started.GetProperty("worker_runtimes").EnumerateArray().Should().BeEmpty();
+        events.Where(item => EventType(item) == "dependency.detected")
+            .Select(item => item.GetProperty("dependency_type").GetString()).Should().Equal("host", "extension-bundle");
+        events.Should().ContainSingle(item => EventType(item) == "setup.completed")
+            .Which.GetProperty("success").GetBoolean().Should().BeTrue();
+        events.Should().NotContain(item => EventType(item) == "setup.skipped" || EventType(item) == "setup.failed");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task ResolveFeaturesAsync_UnusableSnapshotWithEmptyStore_ThrowsInsteadOfReturningNull(bool allAmbiguous)
     {
         AuditHarness harness = CreateHarness(UnusableSnapshot(allAmbiguous));
@@ -114,9 +161,117 @@ public sealed class SetupCommandContractAuditTests
         harness.Interaction.AllOutput.Should().Contain("node").And.Contain("java");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_AllLegitimateStacksInstalled_OnlyInstallModeMarksFirstRunComplete(bool check)
+    {
+        SetupStackSnapshot snapshot = NormalSnapshot();
+        AuditHarness harness = CreateHarness(snapshot, InstalledStacks(snapshot));
+
+        SetupRunResult result = await harness.Runner.RunAsync(Options(check: check), CancellationToken.None);
+
+        result.ExitCode.Should().Be(0);
+        harness.Interaction.PromptCount.Should().Be(0);
+        harness.Interaction.Lines.Should().Contain(line => line.StartsWith("HINT:", StringComparison.Ordinal)
+            && line.Contains("Nothing to install", StringComparison.Ordinal));
+        await harness.Profiles.DidNotReceive().ResolveProfileScopesAsync(
+            Arg.Any<SetupCommandOptions>(), Arg.Any<SetupRenderer>(), Arg.Any<CancellationToken>());
+        await harness.Installer.DidNotReceive().EnsureDependencyAsync(
+            Arg.Any<SetupCommandOptions>(), Arg.Any<SetupDependency>(), Arg.Any<CancellationToken>());
+        await harness.FirstRunStore.Received(check ? 0 : 1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_SatisfiedDependencies_OnlyInstallModeMarksFirstRunComplete(bool check)
+    {
+        AuditHarness harness = CreateHarness(NormalSnapshot());
+
+        SetupRunResult result = await harness.Runner.RunAsync(Options(["host"], check: check, json: true), CancellationToken.None);
+
+        result.ExitCode.Should().Be(0);
+        JsonElement[] events = ReadEvents(harness.Interaction.Lines);
+        events.Should().ContainSingle(item => EventType(item) == "dependency.result")
+            .Which.GetProperty("status").GetString().Should().Be("satisfied");
+        events.Should().ContainSingle(item => EventType(item) == "setup.completed")
+            .Which.GetProperty("success").GetBoolean().Should().BeTrue();
+        await harness.Installer.Received(1).EnsureDependencyAsync(
+            Arg.Any<SetupCommandOptions>(), Arg.Any<SetupDependency>(), Arg.Any<CancellationToken>());
+        await harness.FirstRunStore.Received(check ? 0 : 1).MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_FailedDependency_NeverMarksFirstRunComplete(bool check)
+    {
+        AuditHarness harness = CreateHarness(NormalSnapshot(),
+            dependencyResult: dependency => SetupDependencyResult.Failed(dependency, "Contract-audit prerequisite missing."));
+
+        SetupRunResult result = await harness.Runner.RunAsync(Options(["host"], check: check, json: true), CancellationToken.None);
+
+        result.ExitCode.Should().Be(1);
+        JsonElement[] events = ReadEvents(harness.Interaction.Lines);
+        events.Should().ContainSingle(item => EventType(item) == "dependency.result")
+            .Which.GetProperty("status").GetString().Should().Be("failed");
+        events.Should().ContainSingle(item => EventType(item) == "setup.failed");
+        events.Should().NotContain(item => EventType(item) == "setup.completed");
+        await harness.FirstRunStore.DidNotReceive().MarkCompleteAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task RunAsync_CanceledAtFinalDependencyOrProfileReport_DoesNotReportOrPersistCompletion(bool cancelAfterProfileReport, bool check)
+    {
+        using CancellationTokenSource cancellation = new();
+        bool cancellationPointReached = false;
+        AuditHarness harness = CreateHarness(NormalSnapshot(), dependencyResult: dependency =>
+        {
+            if (!cancelAfterProfileReport && dependency.Kind == SetupDependencyKind.ExtensionBundle)
+            {
+                cancellationPointReached = true;
+                cancellation.Cancel();
+            }
+
+            return Satisfied(dependency);
+        });
+        if (cancelAfterProfileReport)
+        {
+            harness.Interaction.OnLineWritten = line =>
+            {
+                using var document = JsonDocument.Parse(line);
+                if (EventType(document.RootElement) == "profile.completed")
+                {
+                    cancellationPointReached = true;
+                    cancellation.Cancel();
+                }
+            };
+        }
+
+        Exception? error = await Record.ExceptionAsync(() => harness.Runner.RunAsync(
+            Options(["runtime"], check: check, json: true), cancellation.Token));
+
+        JsonElement[] events = ReadEvents(harness.Interaction.Lines);
+        using AssertionScope scope = new();
+        cancellationPointReached.Should().BeTrue();
+        cancellation.IsCancellationRequested.Should().BeTrue();
+        error.Should().BeAssignableTo<OperationCanceledException>();
+        events.Should().NotContain(item => EventType(item) == "setup.completed");
+        harness.FirstRunStore.ReceivedCalls().Should()
+            .NotContain(call => call.GetMethodInfo().Name == nameof(IFirstRunStateStore.MarkCompleteAsync));
+        await harness.Installer.Received(2).EnsureDependencyAsync(
+            Arg.Any<SetupCommandOptions>(), Arg.Any<SetupDependency>(), cancellation.Token);
+    }
+
     private static AuditHarness CreateHarness(
         SetupStackSnapshot snapshot,
-        IReadOnlyList<WorkloadEntry>? installed = null)
+        IReadOnlyList<WorkloadEntry>? installed = null,
+        Func<SetupDependency, SetupDependencyResult>? dependencyResult = null)
     {
         AuditInteractionService interaction = new();
         var catalog = Substitute.For<ISetupStackCatalog>();
@@ -134,8 +289,10 @@ public sealed class SetupCommandContractAuditTests
         SetupDependencyPlanBuilder planner = new(bundleReader, catalog);
         var installer = Substitute.For<ISetupDependencyInstaller>();
         installer.EnsureDependencyAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<SetupDependency>(), Arg.Any<CancellationToken>())
-            .Returns(call => Satisfied(call.Arg<SetupDependency>()));
+            .Returns(call => (dependencyResult ?? Satisfied)(call.Arg<SetupDependency>()));
         var firstRunStore = Substitute.For<IFirstRunStateStore>();
+        // The runner must observe cancellation even when the store does not enforce the token.
+        firstRunStore.MarkCompleteAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
         SetupRunner runner = new(interaction, features, profiles, planner, installer, firstRunStore);
         return new AuditHarness(features, runner, profiles, installer, firstRunStore, interaction);
     }
@@ -178,6 +335,8 @@ public sealed class SetupCommandContractAuditTests
 
     private static SetupCommandOptions Options(
         IReadOnlyList<string>? features = null,
+        bool assumeYes = false,
+        bool check = false,
         bool json = false)
         => new(
             new DirectoryInfo("setup-contract-audit"),
@@ -187,8 +346,8 @@ public sealed class SetupCommandContractAuditTests
             SetupInstallPolicy.IfNeeded,
             IncludePrerelease: false,
             NonInteractive: false,
-            AssumeYes: false,
-            Check: false,
+            AssumeYes: assumeYes,
+            Check: check,
             OutputMode: json ? SetupOutputMode.Json : SetupOutputMode.Plain);
 
     private static JsonElement[] ReadEvents(IReadOnlyList<string> lines)
@@ -206,6 +365,8 @@ public sealed class SetupCommandContractAuditTests
         return [.. events];
     }
 
+    private static string? EventType(JsonElement item) => item.GetProperty("type").GetString();
+
     private sealed record AuditHarness(
         SetupFeatureResolver FeatureResolver,
         SetupRunner Runner,
@@ -214,11 +375,21 @@ public sealed class SetupCommandContractAuditTests
         IFirstRunStateStore FirstRunStore,
         AuditInteractionService Interaction);
 
-    private sealed class AuditInteractionService : TestInteractionService
+    private sealed class AuditInteractionService : TestInteractionService, IInteractionService
     {
         public override bool IsInteractive => true;
 
         public int PromptCount { get; private set; }
+
+        public Action<string>? OnLineWritten { get; set; }
+
+        void IInteractionService.WriteLine(string text)
+        {
+            base.WriteLine(text);
+            OnLineWritten?.Invoke(text);
+        }
+
+        void IInteractionService.WriteRawLine(string text) => ((IInteractionService)this).WriteLine(text);
 
         public override async Task<IReadOnlyList<string>> PromptForMultiSelectionAsync(
             string title, IEnumerable<string> choices, CancellationToken cancellationToken = default)

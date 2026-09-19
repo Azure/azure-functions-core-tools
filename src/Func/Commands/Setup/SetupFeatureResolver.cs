@@ -155,7 +155,7 @@ internal sealed class SetupFeatureResolver(
             return [configuredStack.Trim()];
         }
 
-        if (!options.NonInteractive && _interaction.IsInteractive)
+        if (!options.NonInteractive && !options.AssumeYes && options.OutputMode != SetupOutputMode.Json && _interaction.IsInteractive)
         {
             StackChoicesResult choices = await BuildStackChoicesAsync(options, cancellationToken);
 

@@ -51,10 +51,15 @@ public class SetupPlanningCompletenessTests
             Arg.Is<SetupDependency>(dependency => dependency.Kind == SetupDependencyKind.Worker
                 || dependency.Kind == SetupDependencyKind.Stack || dependency.Kind == SetupDependencyKind.Templates),
             Arg.Any<CancellationToken>());
-        await installer.Received(1).EnsureDependencyAsync(options,
-            Arg.Is<SetupDependency>(dependency => dependency.Kind == SetupDependencyKind.Host), CancellationToken.None);
-        await installer.Received(canonical == SetupRuntimes.DotNetFeature ? 0 : 1).EnsureDependencyAsync(options,
-            Arg.Is<SetupDependency>(dependency => dependency.Kind == SetupDependencyKind.ExtensionBundle), CancellationToken.None);
+        if (!check)
+        {
+            await installer.DidNotReceiveWithAnyArgs().EnsureDependencyAsync(default!, default!, default);
+        }
+        else
+        {
+            await installer.Received(1).EnsureDependencyAsync(Arg.Is<SetupCommandOptions>(o => o.Check),
+                Arg.Is<SetupDependency>(dependency => dependency.Kind == SetupDependencyKind.Host), Arg.Any<CancellationToken>());
+        }
 
         await workloadCatalog.Received(1).SearchPageAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>());
     }

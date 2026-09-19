@@ -20,7 +20,7 @@ Setup discovers package identity from workload metadata, then reconciles concret
 
 Three invariants govern that integration. Partial discovery must not replace known ownership with fallback guesses. A prospective templates package must not displace a usable installed owner without explicit migration. Setup and `func new` must use the same templates eligibility and ownership rules.
 
-Discovery distinguishes source configuration errors from transport failures. It does not add SDK provisioning, feed-wide uniqueness guarantees, transactions, automatic owner migration, or RID stack/templates support. The existing channel-less .NET templates version ordering is unchanged. The automation limitations in sections 10 through 14 remain separate from discovery.
+Discovery distinguishes source configuration errors from transport failures. It does not add SDK provisioning, feed-wide uniqueness guarantees, transactions, automatic owner migration, or RID stack/templates support. The existing channel-less .NET templates version ordering is unchanged.
 
 ### What it is *not*
 
@@ -32,7 +32,7 @@ Discovery distinguishes source configuration errors from transport failures. It 
 
 ## 2. Goals
 
-These are readiness goals, not guarantees of the discovery layer. Sections 10 through 14 describe the current automation and readiness gaps.
+These are readiness goals, not guarantees that every prerequisite is ready. Section 14 describes the remaining readiness limitations.
 
 - Give a new user a single command to go from "I installed `func`" to "I can run a function".
 - Give CI a single command to bring a fresh runner to a known-ready state.
@@ -61,9 +61,9 @@ func setup [<path>] [--features <list>]...
 | `--source <nuget-feed>` | Override the HTTP(S) V3 NuGet service index used for discovery, resolution, and installation. Local feed directories are not supported. |
 | `--prerelease` | Override the workload prerelease policy. Without an explicit value, use `FUNC_CLI_WORKLOADS_PRERELEASE` when valid, otherwise the running CLI's stable/prerelease status. Explicit bundle channels have separate rules below. |
 | `--non-interactive` | Never prompt. Fail if a required answer is missing or a step would otherwise block. |
-| `--yes`, `-y` | Parsed as an assume-yes option, but does not currently suppress the stack picker. Use `--non-interactive` for unattended setup. |
-| `--check` | Check selected dependencies without installing or updating workloads. Metadata caches and the first-run marker may change. |
-| `--output <plain|json>` | Output mode. `plain` is human-readable text. `json` renders event objects, but does not suppress the stack picker or global advisories and does not guarantee one physical line per event. |
+| `--yes`, `-y` | Suppress the stack picker and use project/runtime defaults when features are omitted. |
+| `--check` | Check selected dependencies without installing or updating workloads. Metadata caches may change. Does not write the first-run marker. |
+| `--output <plain|json>` | Output mode. `plain` is human-readable text. `json` emits newline-delimited JSON events and suppresses the stack picker and human advisories. |
 
 ## 4. Setup Features
 
@@ -102,10 +102,10 @@ If `--features` is provided, it is the complete explicit feature request.
 If `--features` is not provided:
 
 1. If `.func/config.json` declares `stack.runtime`, setup uses that stack feature.
-2. Otherwise, an interactive run without `--non-interactive` offers a stack picker, including with `--yes` or JSON output. Entries with a matching package ID in the workload registry are shown as already installed and are not selectable. This is a UI hint, not a dependency health check.
-3. With `--non-interactive` or an unavailable interactive terminal, setup defaults to `runtime` instead of showing the picker.
+2. Otherwise, an interactive plain run without `--non-interactive` or `--yes` offers a stack picker. Entries with a matching package ID in the workload registry are shown as already installed and are not selectable. This is a UI hint, not a dependency health check.
+3. With `--non-interactive`, `--yes`, JSON output, or an unavailable interactive terminal, setup defaults to `runtime` instead of showing the picker.
 
-If every eligible stack is already registered, the picker path is a successful no-op. No eligible stacks is an error, as is submitting an empty selection. `--check` alone does not suppress the stack picker. Use explicit features or `--non-interactive` for unattended checks.
+If every eligible stack is already registered, the picker path is a successful no-op. No eligible stacks is an error, as is submitting an empty selection. `--check` alone does not suppress the stack picker. Use explicit features or a non-interactive option for unattended checks.
 
 Setup does not infer worker runtime from any other project file.
 
@@ -142,7 +142,7 @@ Host resolution uses the literal logical package ID `Azure.Functions.Cli.Workloa
 
 Worker constraints apply only to workers selected by `--features` or by `.func/config.json` worker runtime. Setup does not install every worker listed by a profile.
 
-If a selected runtime is not supported by a profile, the planner records a failure and omits that runtime's dependencies. It does not block otherwise valid dependencies for the profile. Those dependencies are reconciled before returned planning failures are reported, as described in section 14. If the profile supports the runtime but has no worker range, worker resolution has no profile range. Stack and templates versions are not constrained by worker ranges. Workers remain optional, as described under current limitations below.
+If a selected runtime is not supported by a profile, setup fails planning for that profile. In install mode, any returned planning failure blocks all dependency installs for that profile, including otherwise valid host, bundle, and other runtime dependencies. This does not undo earlier successful profiles. Check mode still checks the planned dependencies and reports returned planning failures, as described in section 14. If the profile supports the runtime but has no worker range, worker resolution has no profile range. Stack and templates versions are not constrained by worker ranges. Workers remain optional, as described under current limitations below.
 
 ## 8. Extension Bundle Policy
 
@@ -208,7 +208,7 @@ Source syntax is validated when discovery or dependency resolution consumes the 
 
 ## 10. Check Mode
 
-`--check` uses dependency resolution without installing or updating workloads. Successful checks still attempt to write the first-run marker, including the all-stacks-installed picker no-op. There is no check-mode guard on that write. Metadata caches may also change, including profile and NuGet HTTP caches. It is not a filesystem-wide read-only or offline mode.
+`--check` uses dependency resolution without installing or updating workloads and does not write the first-run marker, including the all-stacks-installed no-op path. Metadata caches may change, including profile and NuGet HTTP caches. It is not a filesystem-wide read-only or offline mode.
 
 `--check` follows the selected install policy:
 
@@ -226,13 +226,13 @@ The interactive flow selects stacks when no explicit or project feature is avail
 
 `--non-interactive` never prompts. It fails if setup cannot decide what to install from explicit arguments and supported defaults.
 
-`--yes` is parsed but is not used to suppress the picker. JSON output does not suppress it either. With no explicit features or project stack runtime, both can enter the interactive picker. Use `--non-interactive` to select the `runtime` default without prompting.
+`--yes` and JSON output suppress the picker and use project/runtime defaults. They do not select every offered stack. For example, with no explicit features or project stack runtime, either uses `runtime`.
 
-Direct `setup` invocations skip the global first-run prompt. Check and JSON setup invocations do not suppress the background CLI version check or add gates for trailing version/alias advisories. Those advisories retain their own normal conditions. JSON mode suppresses setup's human prerelease hint, but is not a guarantee of machine-only output. Telemetry ownership remains outside setup.
+Direct `setup` invocations skip the global first-run prompt. Parsed check and JSON setup invocations suppress the background CLI version check and trailing version/alias advisories, including after failures. JSON mode also suppresses setup's human prerelease hint. Telemetry ownership remains outside setup.
 
 ## 12. JSON Output
 
-The output goal is newline-delimited JSON (NDJSON). Currently `--output json` serializes each event object with `type` and `timestamp` through the ordinary interaction-service line writer, not a raw-output path. Console rendering can wrap an event across physical lines. Picker output and global advisories can also appear, so consumers cannot rely on clean NDJSON. There is no separate final JSON document. Parser and bootstrap failures are outside this event contract.
+`--output json` emits newline-delimited JSON (NDJSON). Each event object with `type` and `timestamp` is serialized through the interaction service's raw line writer, bypassing console wrapping so each setup renderer event occupies one physical line. There is no separate final JSON document. Parser and bootstrap failures are outside this event contract.
 
 The v1 event set is:
 
@@ -246,7 +246,7 @@ The v1 event set is:
 | `setup.completed` | Success with `success: true`. Check drift produces `setup.failed` instead. |
 | `setup.failed` | A failure count or configuration-error message. It can occur before `setup.started`. |
 | `setup.warning` | Profile warnings, which can precede `setup.started`. |
-| `setup.skipped` | Renderer event for the all-stacks-installed picker no-op, which JSON invocations can also reach. |
+| `setup.skipped` | Renderer event for the all-stacks-installed picker no-op. Ordinary JSON invocations bypass that picker path. |
 
 Dependency result states are:
 
@@ -275,19 +275,18 @@ Setup does not write to:
 - `host.json`
 - `local.settings.json`
 
-Successful setup attempts to mark first-run completion on a best-effort basis, including check mode, JSON mode, and the all-stacks-installed picker no-op. Metadata cache locations are owned by the profile and NuGet subsystems, not restricted to the workload payload directory.
+Successful normal setup marks first-run completion on a best-effort basis, including the all-stacks-installed picker no-op. Check mode never marks it. JSON install mode still can. Metadata cache locations are owned by the profile and NuGet subsystems, not restricted to the workload payload directory.
 
 ## 14. Failure Semantics
 
-- Returned planning failures are reported after the profile's planned dependencies are reconciled. Discovery excludes a rejected runtime's dependencies, but does not add profile-wide preflight. Valid host, bundle, or other runtime dependencies can be installed before a planning failure is reported.
+- In normal install mode, all returned planning failures are reported before installing any dependency **for that profile**. None of that profile's dependencies are installed when its plan has a failure. This is not a preflight transaction across all profiles.
 - Setup permits partial completion. A re-run can reconcile remaining dependencies after the failure's cause is addressed. There is no rollback or transaction across profiles.
-- Install mode stops at the first failed dependency or profile loop and exits non-zero. Earlier dependency installs and earlier successful profiles remain installed.
+- With a valid plan, install mode stops at the first failed dependency. A failed profile ends the run with a non-zero exit code before later profiles are processed. Earlier dependency installs and earlier successful profiles remain installed.
 - Check mode continues through returned failures, but a thrown configuration error aborts the run.
 - Errors clearly state what completed and what did not, with the exact command or option to retry when possible.
 
 ### Current limitations
 
-- `--yes` and JSON output do not suppress the picker. Successful checks can write the first-run marker. JSON events do not yet have guaranteed physical-line framing or setup-specific global advisory suppression.
 - Workers and templates are optional. A catalog result with no matching version is treated as missing even when versions exist but all are incompatible with the active range or policy. That inherited behavior can skip an incompatible optional worker rather than fail setup.
 - Installed-state checks compare registry identities and versions. They do not validate payload files or prove that host, worker, or templates content can run.
 - Setup discovery supports portable stack/templates roles, not RID pointers for those roles. The installed templates consumer also rejects matching non-portable rows. Supporting host/worker RID pointers does not imply RID templates support.
