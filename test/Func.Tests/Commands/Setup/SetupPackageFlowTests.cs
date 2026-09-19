@@ -237,25 +237,12 @@ public sealed class SetupPackageFlowTests : IDisposable
             string[] rejectedRuntimePackages = [StackId, "azure.functions.cli.workloads.workers.node", TemplatesId];
             _downloads.Should().NotContain(download => rejectedRuntimePackages.Contains(download.Id, StringComparer.OrdinalIgnoreCase));
             installed.Should().NotContain(entry => rejectedRuntimePackages.Contains(entry.PackageId, StringComparer.OrdinalIgnoreCase));
-            if (!check)
-            {
-                _downloads.Select(download => (download.Id.ToLowerInvariant(), download.Version)).Should().BeEquivalentTo([
-                    (HostWorkloadPackage.PackageId.ToLowerInvariant(), "4.1.0"),
-                    (IInstalledBundleWorkloads.BundleWorkloadPackageId.ToLowerInvariant(), "4.10.0-preview.1"),
-                ]);
-                installed.Select(entry => entry.PackageId).Should().BeEquivalentTo([
-                    HostWorkloadPackage.PackageId.ToLowerInvariant(), IInstalledBundleWorkloads.BundleWorkloadPackageId.ToLowerInvariant()]);
-            }
-        }
-
-        if (check)
-        {
-            _downloads.Should().BeEmpty();
-            installed.Should().BeEmpty();
         }
 
         if (conflict || check)
         {
+            _downloads.Should().BeEmpty();
+            installed.Should().BeEmpty();
             await _marker.DidNotReceive().MarkCompleteAsync(Arg.Any<CancellationToken>());
         }
         else

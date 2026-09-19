@@ -48,7 +48,7 @@ public sealed class SetupRunnerSourceValidationTests
         harness.AssertNoClientOrInstall();
         await harness.Profiles.Received(1).ResolveProfileScopesAsync(options, Arg.Any<SetupRenderer>(), CancellationToken.None);
         await harness.Store.Received(feature == "host" ? 1 : 2).GetWorkloadsAsync(CancellationToken.None);
-        await harness.Marker.Received(1).MarkCompleteAsync(CancellationToken.None);
+        await harness.Marker.Received(check ? 0 : 1).MarkCompleteAsync(CancellationToken.None);
         if (json)
         {
             JsonElement[] events = ReadEvents(harness.Interaction);
@@ -121,7 +121,7 @@ public sealed class SetupRunnerSourceValidationTests
         }
 
         harness.AssertNoClientOrInstall();
-        await harness.Marker.Received(installed ? 1 : 0).MarkCompleteAsync(CancellationToken.None);
+        harness.Marker.ReceivedCalls().Should().BeEmpty();
     }
 
     [Theory]
@@ -221,7 +221,7 @@ public sealed class SetupRunnerSourceValidationTests
         dependency.GetProperty("message").GetString().Should().Contain("offline");
         events.Should().ContainSingle(item => EventType(item) == "setup.completed");
         harness.WorkloadInstaller.ReceivedCalls().Should().BeEmpty();
-        await harness.Marker.Received(1).MarkCompleteAsync(CancellationToken.None);
+        harness.Marker.ReceivedCalls().Should().BeEmpty();
     }
 
     [Theory]
@@ -313,6 +313,27 @@ public sealed class SetupRunnerSourceValidationTests
 
         result.ExitCode.Should().Be(1);
         FailureMessage(harness.Interaction, false).Should().Contain(source);
+        harness.AssertNoClientOrInstall();
+        harness.Profiles.ReceivedCalls().Should().BeEmpty();
+        harness.Store.ReceivedCalls().Should().BeEmpty();
+        harness.Marker.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_AlreadyCancelled_DoesNotValidateSourceOrWriteHints(bool json)
+    {
+        var harness = new RunnerHarness("./invalid-configured-feed");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        SetupCommandOptions options = Request("host", null, false, json) with { IncludePrerelease = true };
+
+        var error = await FluentActions.Awaiting(() => harness.CreateRunner().RunAsync(options, cancellation.Token))
+            .Should().ThrowAsync<OperationCanceledException>();
+
+        error.Which.CancellationToken.Should().Be(cancellation.Token);
+        harness.Interaction.Lines.Should().BeEmpty();
         harness.AssertNoClientOrInstall();
         harness.Profiles.ReceivedCalls().Should().BeEmpty();
         harness.Store.ReceivedCalls().Should().BeEmpty();

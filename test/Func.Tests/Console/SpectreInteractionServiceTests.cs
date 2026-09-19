@@ -10,6 +10,35 @@ namespace Azure.Functions.Cli.Tests.Console;
 
 public class SpectreInteractionServiceTests
 {
+    [Fact]
+    public void WriteRawLine_LongText_WritesVerbatimToInjectedStdout()
+    {
+        using var stdout = new BufferedConsole(interactive: false, ansi: false, noColor: true);
+        using var stderr = new BufferedConsole(interactive: false, ansi: false, noColor: true);
+        stdout.Profile.Width = 80;
+        var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+        string text = $"[red]{new string('x', 200)}[/]";
+
+        service.WriteRawLine(text);
+
+        stdout.Output.Should().Be(text + Environment.NewLine);
+        stderr.Output.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WriteRawLine_NullText_ThrowsBeforeWriting()
+    {
+        using var stdout = new BufferedConsole(interactive: false, ansi: false);
+        using var stderr = new BufferedConsole(interactive: false, ansi: false);
+        var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+
+        Action act = () => service.WriteRawLine(null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("text");
+        stdout.Output.Should().BeEmpty();
+        stderr.Output.Should().BeEmpty();
+    }
+
     public static IEnumerable<object[]> Capabilities()
     {
         foreach (bool input in new[] { false, true })

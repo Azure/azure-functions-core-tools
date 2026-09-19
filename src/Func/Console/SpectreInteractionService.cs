@@ -39,6 +39,12 @@ internal class SpectreInteractionService : IInteractionService
 
     public void WriteLine(string text) => _stdout.WriteLine(text);
 
+    public void WriteRawLine(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        _stdout.Profile.Out.Writer.WriteLine(text);
+    }
+
     public void WriteBlankLine() => _stdout.WriteLine();
 
     public void WriteLine(Action<InlineLine> build)
