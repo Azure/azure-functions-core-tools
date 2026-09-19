@@ -31,6 +31,7 @@ internal sealed class SetupRunner(
     public async Task<SetupRunResult> RunAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
+        cancellationToken.ThrowIfCancellationRequested();
 
         SetupRenderer renderer = new(_interaction, options.OutputMode);
         if (options.IncludePrerelease && options.OutputMode != SetupOutputMode.Json)
@@ -41,16 +42,23 @@ internal sealed class SetupRunner(
         try
         {
             SetupFeaturePlan? featurePlan = await _featureResolver.ResolveFeaturesAsync(options, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             if (featurePlan is null)
             {
                 // No stacks were offered to install (every supported stack is
                 // already installed). Treat that as a clean no-op, not a failure.
                 renderer.SetupSkippedNoSelection();
-                await TryMarkFirstRunCompleteAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!options.Check)
+                {
+                    await TryMarkFirstRunCompleteAsync(cancellationToken);
+                }
+
                 return new SetupRunResult(0);
             }
 
             IReadOnlyList<SetupProfileScope> profileScopes = await _profileScopeResolver.ResolveProfileScopesAsync(options, renderer, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
             renderer.SetupStarted(options, featurePlan, profileScopes);
 
@@ -59,10 +67,13 @@ internal sealed class SetupRunner(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 renderer.ProfileStarted(profileScope);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 ProfileSetupOutcome outcome = await RunProfileAsync(options, featurePlan, profileScope, renderer, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 failureCount += outcome.FailureCount;
                 renderer.ProfileCompleted(profileScope, outcome);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 if (outcome.FailureCount > 0 && !options.Check)
                 {
@@ -71,6 +82,7 @@ internal sealed class SetupRunner(
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             if (failureCount > 0)
             {
                 renderer.SetupFailed(failureCount);
@@ -78,21 +90,29 @@ internal sealed class SetupRunner(
             }
 
             renderer.SetupCompleted();
-            await TryMarkFirstRunCompleteAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!options.Check)
+            {
+                await TryMarkFirstRunCompleteAsync(cancellationToken);
+            }
+
             return new SetupRunResult(0);
         }
         catch (SetupConfigurationException ex)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             renderer.SetupFailed(ex.Message);
             return new SetupRunResult(1);
         }
         catch (ProfileConfigurationException ex)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             renderer.SetupFailed(ex.Message);
             return new SetupRunResult(1);
         }
         catch (ExtensionBundleConfigurationException ex)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             renderer.SetupFailed(ex.Message);
             return new SetupRunResult(1);
         }
@@ -124,13 +144,18 @@ internal sealed class SetupRunner(
     private async Task<ProfileSetupOutcome> RunProfileAsync(SetupCommandOptions options, SetupFeaturePlan featurePlan, SetupProfileScope profileScope, SetupRenderer renderer, CancellationToken cancellationToken)
     {
         SetupDependencyPlan plan = await _dependencyPlanBuilder.BuildDependencyPlanAsync(options.WorkingDirectory, featurePlan, profileScope, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         int failures = 0;
 
         foreach (SetupDependency dependency in plan.Dependencies)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             renderer.DependencyDetected(profileScope, dependency);
+            cancellationToken.ThrowIfCancellationRequested();
             SetupDependencyResult result = await _dependencyInstaller.EnsureDependencyAsync(options, dependency, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             renderer.DependencyResult(profileScope, dependency, result);
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (result.Status == SetupDependencyStatus.Failed)
             {
@@ -144,7 +169,9 @@ internal sealed class SetupRunner(
 
         foreach (SetupDependencyResult failure in plan.Failures)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             renderer.DependencyResult(profileScope, failure.Dependency, failure);
+            cancellationToken.ThrowIfCancellationRequested();
             failures++;
             if (!options.Check)
             {
@@ -152,6 +179,7 @@ internal sealed class SetupRunner(
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return new ProfileSetupOutcome(failures);
     }
 }

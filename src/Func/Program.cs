@@ -5,6 +5,7 @@ using System.CommandLine;
 using System.Diagnostics;
 using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Commands.Start;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
@@ -51,8 +52,9 @@ Console.CancelKeyPress += (_, e) =>
     }
 };
 
-// Fire background version check (non-blocking, best-effort)
-Task<string?> versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
+// Leave advisories disabled until the parsed command establishes its output contract.
+Task<string?> versionCheckTask = Task.FromResult<string?>(null);
+bool allowAdvisories = false;
 
 var stopwatch = Stopwatch.StartNew();
 int exitCode = 0;
@@ -92,6 +94,12 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         // Disable POSIX bundling so single-dash typos like `-name` surface as unrecognized options.
         var parserConfiguration = new ParserConfiguration { EnablePosixBundling = false };
         commandParseResult = rootCommand.Parse(normalizedArgs, parserConfiguration);
+        allowAdvisories = !SetupCommand.ShouldSuppressAdvisories(commandParseResult);
+        if (allowAdvisories)
+        {
+            versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
+        }
+
         commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
         activity?.SetCommandName(commandName);
 
@@ -139,9 +147,9 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
     }
 } // activity disposed (and stopped) here, before host shutdown flushes
 
-// Print version update notice if available (bounded wait). Skip on
-// user requested cancellation.
-if (exitCode != 130)
+// Skip trailing advisories for check/JSON setup, including after failures.
+// Other commands retain the bounded version notice unless cancelled.
+if (allowAdvisories && exitCode != 130)
 {
     await PrintVersionNotice(interaction, versionCheckTask, cts.Token);
     aliasNudge?.TryPrint(exitCode, commandName);

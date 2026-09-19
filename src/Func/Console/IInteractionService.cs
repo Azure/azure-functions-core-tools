@@ -34,6 +34,11 @@ internal interface IInteractionService
     /// <summary>Writes a single line of unstyled text to stdout.</summary>
     public void WriteLine(string text);
 
+    /// <summary>
+    /// Writes text followed by a newline to stdout without markup processing or line wrapping.
+    /// </summary>
+    public void WriteRawLine(string text);
+
     /// <summary>Writes a blank line to stdout.</summary>
     public void WriteBlankLine();
 

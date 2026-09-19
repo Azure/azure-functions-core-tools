@@ -747,7 +747,7 @@ public sealed class SetupRunnerTests : IDisposable
                 SetupInstallPolicy.LatestCompatible,
                 IncludePrerelease: false,
                 NonInteractive: false,
-                AssumeYes: true,
+                AssumeYes: false,
                 Check: false,
                 SetupOutputMode.Plain),
             CancellationToken.None);
@@ -820,7 +820,7 @@ public sealed class SetupRunnerTests : IDisposable
                 SetupInstallPolicy.LatestCompatible,
                 IncludePrerelease: false,
                 NonInteractive: false,
-                AssumeYes: true,
+                AssumeYes: false,
                 Check: false,
                 SetupOutputMode.Plain),
             CancellationToken.None);
