@@ -127,7 +127,14 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
 
         if (effectivePrerelease && results.Count > 0)
         {
-            results = await ExpandResultsByChannelAsync(results, cancellationToken);
+            try
+            {
+                results = await ExpandResultsByChannelAsync(results, cancellationToken);
+            }
+            catch (InvalidWorkloadSourceException ex)
+            {
+                throw new GracefulException(ex.Message, ex, isUserError: true);
+            }
         }
 
         if (json)
@@ -217,6 +224,10 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
             versions = await _catalog.ListVersionsAsync(result.PackageId, result.Source.Source, cancellationToken);
         }
         catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (InvalidWorkloadSourceException)
         {
             throw;
         }

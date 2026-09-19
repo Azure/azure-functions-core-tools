@@ -103,6 +103,12 @@ returns id, latest version, and description for matching packages.
 - `--json`
   - Emits machine-readable JSON output.
 
+Prerelease search enriches each returned package with versions grouped by channel.
+If version listing is unavailable, search can retain the original hit. A classified
+invalid-source failure, including a malformed V3 service index, instead fails the
+command with an actionable error, even when the primary search succeeded. Cancellation
+propagates. The same policy applies to cards and JSON output.
+
 #### `func workload install`
 
 ```
