@@ -52,6 +52,7 @@ internal sealed class SetupRunner(
                 if (!options.Check)
                 {
                     await TryMarkFirstRunCompleteAsync(cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
 
                 return new SetupRunResult(0);
@@ -78,6 +79,7 @@ internal sealed class SetupRunner(
                 if (outcome.FailureCount > 0 && !options.Check)
                 {
                     renderer.SetupFailed(failureCount);
+                    cancellationToken.ThrowIfCancellationRequested();
                     return new SetupRunResult(1);
                 }
             }
@@ -86,6 +88,7 @@ internal sealed class SetupRunner(
             if (failureCount > 0)
             {
                 renderer.SetupFailed(failureCount);
+                cancellationToken.ThrowIfCancellationRequested();
                 return new SetupRunResult(1);
             }
 
@@ -94,6 +97,7 @@ internal sealed class SetupRunner(
             if (!options.Check)
             {
                 await TryMarkFirstRunCompleteAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             return new SetupRunResult(0);
@@ -102,18 +106,21 @@ internal sealed class SetupRunner(
         {
             cancellationToken.ThrowIfCancellationRequested();
             renderer.SetupFailed(ex.Message);
+            cancellationToken.ThrowIfCancellationRequested();
             return new SetupRunResult(1);
         }
         catch (ProfileConfigurationException ex)
         {
             cancellationToken.ThrowIfCancellationRequested();
             renderer.SetupFailed(ex.Message);
+            cancellationToken.ThrowIfCancellationRequested();
             return new SetupRunResult(1);
         }
         catch (ExtensionBundleConfigurationException ex)
         {
             cancellationToken.ThrowIfCancellationRequested();
             renderer.SetupFailed(ex.Message);
+            cancellationToken.ThrowIfCancellationRequested();
             return new SetupRunResult(1);
         }
     }

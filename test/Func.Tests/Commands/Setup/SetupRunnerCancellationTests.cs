@@ -16,6 +16,169 @@ namespace Azure.Functions.Cli.Tests.Commands.Setup;
 
 public sealed class SetupRunnerCancellationTests
 {
+    public static TheoryData<string, bool, bool> TerminalFailureCases
+    {
+        get
+        {
+            TheoryData<string, bool, bool> cases = [];
+            foreach (string branch in new[] { "install", "check", "setup", "profile", "bundle" })
+            {
+                foreach (bool json in new[] { false, true })
+                {
+                    foreach (bool cancel in new[] { false, true }) cases.Add(branch, json, cancel);
+                }
+            }
+
+            return cases;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(TerminalFailureCases))]
+    public async Task RunAsync_CanceledDuringTerminalFailure_PropagatesAfterRendering(string branch, bool json, bool cancel)
+    {
+        using CancellationTokenSource cancellation = new();
+        Fixture fixture = new();
+        if (branch is "install" or "check")
+        {
+            fixture.Installer.EnsureDependencyAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<SetupDependency>(), cancellation.Token)
+                .Returns(call => SetupDependencyResult.Failed(call.Arg<SetupDependency>(), "dependency failed"));
+        }
+        else
+        {
+            Exception failure = branch switch
+            {
+                "setup" => new SetupConfigurationException("invalid setup"),
+                "profile" => new ProfileConfigurationException("invalid profile"),
+                _ => new ExtensionBundleConfigurationException("invalid bundle"),
+            };
+            fixture.Plans.BuildDependencyPlanAsync(Arg.Any<DirectoryInfo>(), Arg.Any<SetupFeaturePlan>(),
+                Arg.Any<SetupProfileScope>(), cancellation.Token).Returns(Task.FromException<SetupDependencyPlan>(failure));
+        }
+
+        int terminalWrites = 0;
+        void OnTerminalFailure()
+        {
+            terminalWrites++;
+            if (cancel) cancellation.Cancel();
+        }
+
+        fixture.Interaction.AfterEvent = item =>
+        {
+            if (item.GetProperty("type").GetString() == "setup.failed") OnTerminalFailure();
+        };
+        fixture.Interaction.AfterError = message =>
+        {
+            if (message != "dependency failed") OnTerminalFailure();
+        };
+
+        Task<SetupRunResult> run = fixture.Runner().RunAsync(Options(check: branch == "check", json), cancellation.Token);
+
+        if (cancel)
+        {
+            var error = await FluentActions.Awaiting(async () => await run).Should().ThrowAsync<OperationCanceledException>();
+            error.Which.CancellationToken.Should().Be(cancellation.Token);
+        }
+        else
+        {
+            (await run).ExitCode.Should().Be(1);
+        }
+
+        // Cancellation cannot retract the terminal output which triggered it.
+        terminalWrites.Should().Be(1);
+        cancellation.IsCancellationRequested.Should().Be(cancel);
+        if (json) fixture.Interaction.EventTypes.Should().ContainSingle(type => type == "setup.failed");
+        fixture.Interaction.EventTypes.Should().NotContain("setup.completed");
+        fixture.FirstRun.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task RunAsync_MarkerCompletesAfterCancellation_PropagatesUnlessUncanceled(bool noSelection, bool cancel, bool markerFails)
+    {
+        using CancellationTokenSource cancellation = new();
+        Fixture fixture = new();
+        if (noSelection)
+        {
+            fixture.Features.ResolveFeaturesAsync(Arg.Any<SetupCommandOptions>(), cancellation.Token)
+                .Returns(Task.FromResult<SetupFeaturePlan?>(null));
+        }
+
+        TaskCompletionSource marker = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.FirstRun.MarkCompleteAsync(cancellation.Token).Returns(marker.Task);
+        Task<SetupRunResult> run = fixture.Runner().RunAsync(Options(check: false), cancellation.Token);
+        run.IsCompleted.Should().BeFalse();
+        fixture.FirstRun.ReceivedCalls().Should().ContainSingle();
+
+        if (cancel) cancellation.Cancel();
+        if (markerFails) marker.SetException(new IOException("Marker unavailable."));
+        else marker.SetResult();
+
+        if (cancel)
+        {
+            var error = await FluentActions.Awaiting(async () => await run).Should().ThrowAsync<OperationCanceledException>();
+            error.Which.CancellationToken.Should().Be(cancellation.Token);
+        }
+        else
+        {
+            // Marker persistence remains best effort when cancellation was not requested.
+            (await run).ExitCode.Should().Be(0);
+        }
+
+        fixture.Interaction.EventTypes.Last().Should().Be(noSelection ? "setup.skipped" : "setup.completed");
+        fixture.Interaction.EventTypes.Should().NotContain("setup.failed");
+        fixture.FirstRun.ReceivedCalls().Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task RunAsync_CanceledDuringSuccessfulTerminalRender_DoesNotWriteMarker(bool noSelection, bool check, bool cancel)
+    {
+        using CancellationTokenSource cancellation = new();
+        Fixture fixture = new();
+        if (noSelection)
+        {
+            fixture.Features.ResolveFeaturesAsync(Arg.Any<SetupCommandOptions>(), cancellation.Token)
+                .Returns(Task.FromResult<SetupFeaturePlan?>(null));
+        }
+
+        string terminalType = noSelection ? "setup.skipped" : "setup.completed";
+        fixture.Interaction.AfterEvent = item =>
+        {
+            if (cancel && item.GetProperty("type").GetString() == terminalType) cancellation.Cancel();
+        };
+
+        Task<SetupRunResult> run = fixture.Runner().RunAsync(Options(check), cancellation.Token);
+
+        if (cancel)
+        {
+            var error = await FluentActions.Awaiting(async () => await run).Should().ThrowAsync<OperationCanceledException>();
+            error.Which.CancellationToken.Should().Be(cancellation.Token);
+        }
+        else
+        {
+            (await run).ExitCode.Should().Be(0);
+        }
+
+        fixture.Interaction.EventTypes.Last().Should().Be(terminalType);
+        fixture.Interaction.EventTypes.Should().ContainSingle(type => type == terminalType).And.NotContain("setup.failed");
+        await fixture.FirstRun.Received(!check && !cancel ? 1 : 0).MarkCompleteAsync(cancellation.Token);
+    }
+
     [Theory]
     [InlineData(false, false, false)]
     [InlineData(false, false, true)]
@@ -257,6 +420,7 @@ internal sealed class SetupRecordingInteraction : IInteractionService
         .Where(item => item.GetProperty("type").GetString() == "dependency.result" && item.GetProperty("status").GetString() == "failed")
         .Select(item => item.GetProperty("message").GetString()!);
     public Action<JsonElement>? AfterEvent { get; set; }
+    public Action<string>? AfterError { get; set; }
 
     public void WriteLine(string text)
     {
@@ -275,6 +439,7 @@ internal sealed class SetupRecordingInteraction : IInteractionService
     {
         _inner.WriteError(message);
         Errors.Add(message);
+        AfterError?.Invoke(message);
     }
 
     public void WriteBlankLine() => _inner.WriteBlankLine();
