@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
+using System.Reflection;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Common;
@@ -141,6 +142,63 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+    }
+
+    [Theory]
+    [Trait("Category", "Integration")]
+    [InlineData(0, true, "--version", "setup", "--output")]
+    [InlineData(0, true, "--version", "setup", "--check=false", "--output")]
+    [InlineData(0, false, "--version", "setup", "--check=true", "--output")]
+    [InlineData(0, true, "--help", "setup", "--output")]
+    [InlineData(1, true, "setup", "--output")]
+    [InlineData(0, false, "--version", "setup", "--output=json")]
+    [InlineData(0, true, "--version", "setup", "--install-policy")]
+    [InlineData(0, true, "--version")]
+    [InlineData(0, true, "--version", "setup", "--output=json", "--output=plain")]
+    [InlineData(0, true, "--version", "setup", "--check=true", "--check=false")]
+    [InlineData(0, false, "--version", "setup", "--check=true", "--check=false", "--output=json")]
+    [InlineData(0, true, "[suggest]", "setup", "--output")]
+    public async Task Program_ParserAction_PreservesDispatchAndAdvisoryPolicy(int expectedExit, bool advisory, params string[] args)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-setup-parser-{Guid.NewGuid():N}");
+        CliConfigurationPathsOptions paths = new(Path.Combine(directory, "home"));
+        WorkloadPathsOptions workloads = new(Path.Combine(directory, "workload-home"));
+        string project = Path.Combine(directory, "project");
+        using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(60));
+
+        try
+        {
+            Directory.CreateDirectory(paths.Home);
+            Directory.CreateDirectory(project);
+            await File.WriteAllTextAsync(paths.VersionCachePath, CachedVersion, cancellation.Token);
+
+            CliResult result = await RunCliAsync(directory, paths.Home, workloads.Home, project, args, cancellation.Token);
+
+            output.WriteLine("stdout: {0}{1}stderr: {2}", result.StandardOutput, Environment.NewLine, result.StandardError);
+            result.ExitCode.Should().Be(expectedExit);
+            result.StandardError.Should().NotContain("unexpected error");
+            if (expectedExit == 0) result.StandardError.Should().BeEmpty();
+            else result.StandardError.Should().Contain("Required argument missing for option:").And.Contain("--output");
+
+            if (args.Contains("--version"))
+            {
+                Assembly cliAssembly = typeof(SetupCommand).Assembly;
+                string expectedVersion = cliAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                    ?? cliAssembly.GetName().Version?.ToString() ?? string.Empty;
+                using StringReader lines = new(result.StandardOutput);
+                lines.ReadLine().Should().Be(expectedVersion);
+            }
+            else if (!args.Contains("[suggest]")) result.StandardOutput.Should().Contain("func setup").And.Contain("--output");
+
+            result.StandardOutput.Contains("A newer version", StringComparison.Ordinal).Should().Be(advisory);
+            result.StandardOutput.Contains(CachedVersion, StringComparison.Ordinal).Should().Be(advisory);
+            File.Exists(Path.Combine(paths.Home, FileFirstRunStateStore.MarkerFileName)).Should().BeFalse();
+            File.Exists(workloads.WorkloadRegistryPath).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
         }
     }
 

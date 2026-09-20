@@ -165,6 +165,55 @@ public sealed class SetupAdvisoryGatingTests
             .Should().ThrowExactly<ArgumentNullException>().WithParameterName("parseResult");
     }
 
+    [Theory]
+    [InlineData(false, 0, "--version", "setup", "--output")]
+    [InlineData(false, 0, "--version", "setup", "--check=false", "--output")]
+    [InlineData(true, 0, "--version", "setup", "--check=true", "--output")]
+    [InlineData(false, 0, "--version", "prepare", "-o")]
+    [InlineData(false, 0, "--help", "setup", "--output")]
+    [InlineData(false, 1, "setup", "--output")]
+    [InlineData(true, 0, "--version", "setup", "--output=json")]
+    [InlineData(false, 0, "--version", "setup", "--install-policy")]
+    [InlineData(false, 0, "--version")]
+    [InlineData(false, 0, "--version", "setup", "--output=json", "--output=plain")]
+    [InlineData(false, 0, "--version", "setup", "--check=true", "--check=false")]
+    [InlineData(true, 0, "--version", "setup", "--check=true", "--check=false", "--output=json")]
+    [InlineData(false, 0, "--version", "setup", "--check=true", "--check=false", "--output")]
+    [InlineData(false, 0, "[suggest]", "setup", "--output")]
+    [InlineData(true, 0, "[suggest]", "setup", "--output=json")]
+    [InlineData(false, 0, "[suggest]", "setup", "--check=false", "--output")]
+    [InlineData(false, 0, "--version", "prepare", "-o=json", "-o=plain")]
+    public async Task ShouldSuppressAdvisories_SelectedParserAction_PreservesDispatch(bool expected, int expectedExit, params string[] args)
+    {
+        var root = TestParser.CreateRoot(new TestInteractionService());
+        var setup = root.Subcommands.OfType<SetupCommand>().Single();
+        setup.Aliases.Add("prepare");
+        setup.OutputOption.Aliases.Add("-o");
+        var parsed = root.Parse(args, new ParserConfiguration { EnablePosixBundling = false });
+        var action = parsed.Action;
+        var errors = parsed.Errors.ToArray();
+        using StringWriter stdout = new();
+        using StringWriter stderr = new();
+        using CancellationTokenSource cancellation = new();
+
+        bool suppress = SetupCommand.ShouldSuppressAdvisories(parsed);
+        parsed.Action.Should().BeSameAs(action);
+        parsed.Errors.Should().Equal(errors);
+        int exit = await parsed.InvokeAsync(new InvocationConfiguration
+        {
+            EnableDefaultExceptionHandler = false,
+            Output = stdout,
+            Error = stderr,
+        }, cancellation.Token);
+
+        suppress.Should().Be(expected);
+        exit.Should().Be(expectedExit);
+        parsed.Action.Should().BeSameAs(action);
+        parsed.Errors.Should().Equal(errors);
+        if (expectedExit == 0) stderr.ToString().Should().BeEmpty();
+        else stderr.ToString().Should().Contain("Required argument missing for option: '--output'");
+    }
+
     [Fact]
     public void SetupCommand_AutomationHelp_DescribesDefaultsAndCheckSideEffects()
     {

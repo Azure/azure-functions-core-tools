@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads.Catalog;
@@ -100,11 +101,23 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
     {
         ArgumentNullException.ThrowIfNull(parseResult);
 
-        // Leave malformed option values to the parser's normal error reporting.
-        return parseResult.CommandResult.Command is SetupCommand setup
-            && ((parseResult.GetResult(setup.CheckOption)?.Errors.Any() != true && parseResult.GetValue(setup.CheckOption))
-                || (parseResult.GetResult(setup.OutputOption)?.Errors.Any() != true
-                    && string.Equals(parseResult.GetValue(setup.OutputOption)?.Trim(), "json", StringComparison.OrdinalIgnoreCase)));
+        if (parseResult.CommandResult.Command is not SetupCommand setup)
+        {
+            return false;
+        }
+
+        OptionResult? check = parseResult.GetResult(setup.CheckOption);
+        OptionResult? output = parseResult.GetResult(setup.OutputOption);
+        return (check is not null && CanReadValue(check) && check.GetValueOrDefault<bool>())
+            || (output is not null && CanReadValue(output)
+                && string.Equals(output.GetValueOrDefault<string?>()?.Trim(), "json", StringComparison.OrdinalIgnoreCase));
+
+        // Version and completion actions can clear parse errors without fixing
+        // arity. Reading such a value would add errors and preempt their action.
+        static bool CanReadValue(OptionResult result)
+            => !result.Errors.Any()
+                && result.Tokens.Count >= result.Option.Arity.MinimumNumberOfValues
+                && result.Tokens.Count <= result.Option.Arity.MaximumNumberOfValues;
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
