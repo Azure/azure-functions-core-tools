@@ -71,7 +71,10 @@ internal sealed partial class CdnReleaseFeed(
 
         // Verify the artifact exists on CDN with a HEAD request.
         using var request = new HttpRequestMessage(HttpMethod.Head, downloadUri);
-        using HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using HttpResponseMessage response = await SendAsync(
+            request,
+            $"checking version {version}",
+            cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -94,7 +97,11 @@ internal sealed partial class CdnReleaseFeed(
 
     private async Task<VersionManifest> FetchManifestAsync(CancellationToken cancellationToken)
     {
-        using HttpResponseMessage response = await _httpClient.GetAsync(ManifestPath, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, ManifestPath);
+        using HttpResponseMessage response = await SendAsync(
+            request,
+            "reading the version manifest",
+            cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -125,6 +132,29 @@ internal sealed partial class CdnReleaseFeed(
         }
 
         return manifest;
+    }
+
+    private async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        string operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                $"Timed out while {operation} from the Azure Functions CLI CDN. Check your connection and try again.",
+                ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvalidOperationException(
+                $"Could not reach the Azure Functions CLI CDN while {operation}. Check your connection and try again.",
+                ex);
+        }
     }
 
     private SemVersion? TryParseVersion(string? versionString, string fieldName)

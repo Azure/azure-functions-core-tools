@@ -13,8 +13,11 @@ namespace Azure.Functions.Cli.Update;
 internal interface IInstallMethodDetector
 {
     /// <summary>
-    /// Returns the detected install method. Never returns <see langword="null"/>;
-    /// unknown installations map to <see cref="InstallMethod.Direct"/>.
+    /// Returns the detected install method.
     /// </summary>
+    /// <exception cref="Azure.Functions.Cli.Common.GracefulException">
+    /// The installation is not owned by a recognized package manager and is
+    /// outside the install-script directory.
+    /// </exception>
     public InstallMethod Detect();
 }

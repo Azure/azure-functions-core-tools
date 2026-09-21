@@ -7,22 +7,24 @@ using Microsoft.Extensions.Options;
 namespace Azure.Functions.Cli.Update;
 
 /// <inheritdoc cref="IInstallMethodDetector" />
-internal sealed class InstallMethodDetector(IOptions<CliEnvironmentOptions> environmentOptions) : IInstallMethodDetector
+internal sealed class InstallMethodDetector(
+    IOptions<CliEnvironmentOptions> environmentOptions,
+    IProcessEnvironment processEnvironment) : IInstallMethodDetector
 {
+    internal const string InstallDirectoryEnvironmentVariable = "FUNC_CLI_INSTALL_DIR";
+
     private readonly CliEnvironmentOptions _environment = (environmentOptions ?? throw new ArgumentNullException(nameof(environmentOptions))).Value;
+    private readonly IProcessEnvironment _processEnvironment = processEnvironment ?? throw new ArgumentNullException(nameof(processEnvironment));
 
     public InstallMethod Detect()
     {
         string? processPath = _environment.ProcessPath;
-        if (string.IsNullOrEmpty(processPath))
+        if (string.IsNullOrWhiteSpace(processPath))
         {
-            return InstallMethod.Direct;
+            throw UnknownInstallation(processPath);
         }
 
-        // Normalise separators so a single set of substring checks works on
-        // both POSIX and Windows paths (npm on Windows still installs under
-        // \node_modules\, choco under \chocolatey\, etc.).
-        string normalized = processPath.Replace('\\', '/');
+        string normalized = Normalize(processPath);
 
         if (Contains(normalized, "/node_modules/"))
         {
@@ -58,7 +60,9 @@ internal sealed class InstallMethodDetector(IOptions<CliEnvironmentOptions> envi
         // winget places packages under %LOCALAPPDATA%\Microsoft\WinGet\Packages\
         // by default; the resolved binary path contains that segment.
         if (Contains(normalized, "/WinGet/Packages/")
-            || Contains(normalized, "/winget/packages/"))
+            || Contains(normalized, "/winget/packages/")
+            || Contains(normalized, "/WindowsApps/")
+            || Contains(normalized, "/Program Files/Microsoft/Azure Functions Core Tools/"))
         {
             return new InstallMethod(
                 InstallMethodKind.Winget,
@@ -66,9 +70,46 @@ internal sealed class InstallMethodDetector(IOptions<CliEnvironmentOptions> envi
                 "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.");
         }
 
-        return InstallMethod.Direct;
+        string? installDirectory = GetInstallDirectory();
+        if (installDirectory is not null && IsUnderDirectory(normalized, Normalize(installDirectory)))
+        {
+            return InstallMethod.Direct;
+        }
+
+        throw UnknownInstallation(processPath);
     }
+
+    private string? GetInstallDirectory()
+    {
+        string? configured = _processEnvironment.Get(InstallDirectoryEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
+
+        string? home = _processEnvironment.Get("USERPROFILE");
+        if (string.IsNullOrWhiteSpace(home))
+        {
+            home = _processEnvironment.Get("HOME");
+        }
+
+        return string.IsNullOrWhiteSpace(home) ? null : Path.Combine(home, ".azure-functions");
+    }
+
+    private static bool IsUnderDirectory(string path, string directory)
+    {
+        string prefix = directory.TrimEnd('/') + "/";
+        return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string Normalize(string path) => path.Replace('\\', '/').TrimEnd('/');
 
     private static bool Contains(string haystack, string needle) =>
         haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+
+    private static GracefulException UnknownInstallation(string? processPath) =>
+        new(
+            $"Cannot update the Azure Functions CLI installation at '{processPath ?? "unknown"}' in place. " +
+            "Reinstall it with the v5 installer at https://aka.ms/func-cli, or use the package manager that installed it.",
+            isUserError: true);
 }

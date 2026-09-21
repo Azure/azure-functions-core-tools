@@ -19,6 +19,8 @@ public sealed class InstallMethodDetectorTests
     [InlineData("/home/linuxbrew/.linuxbrew/Cellar/azure-functions-core-tools/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
     [InlineData("C:\\ProgramData\\chocolatey\\lib\\azure-functions-core-tools\\tools\\func.exe", (int)InstallMethodKind.Chocolatey, "Chocolatey", "Run 'choco upgrade azure-functions-core-tools' to update.")]
     [InlineData("C:\\Users\\me\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Microsoft.AzureFunctionsCoreTools_Microsoft.Winget.Source_8wekyb3d8bbwe\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
+    [InlineData("C:\\Program Files\\Microsoft\\Azure Functions Core Tools\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
+    [InlineData("C:\\Program Files\\WindowsApps\\Microsoft.AzureFunctionsCoreTools_5.0.0_x64__8wekyb3d8bbwe\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
     public void Detect_KnownPackageManagerPath_ReturnsMatchingMethod(
         string processPath,
         int expectedKindValue,
@@ -26,7 +28,7 @@ public sealed class InstallMethodDetectorTests
         string expectedUpdateInstruction)
     {
         var expectedKind = (InstallMethodKind)expectedKindValue;
-        var detector = new InstallMethodDetector(CreateOptions(processPath));
+        var detector = new InstallMethodDetector(CreateOptions(processPath), Substitute.For<IProcessEnvironment>());
 
         InstallMethod result = detector.Detect();
 
@@ -36,12 +38,13 @@ public sealed class InstallMethodDetectorTests
     }
 
     [Theory]
-    [InlineData("/opt/azure-functions-cli/func")]
-    [InlineData("C:\\Program Files\\Azure Functions CLI\\func.exe")]
-    [InlineData("/home/user/tools/func")]
-    public void Detect_DirectInstallPath_ReturnsDirect(string processPath)
+    [InlineData("/home/user/.azure-functions/func", "HOME", "/home/user")]
+    [InlineData("C:\\Users\\me\\.azure-functions\\func.exe", "USERPROFILE", "C:\\Users\\me")]
+    public void Detect_DefaultInstallScriptPath_ReturnsDirect(string processPath, string homeVariable, string homePath)
     {
-        var detector = new InstallMethodDetector(CreateOptions(processPath));
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get(homeVariable).Returns(homePath);
+        var detector = new InstallMethodDetector(CreateOptions(processPath), environment);
 
         InstallMethod result = detector.Detect();
 
@@ -50,19 +53,45 @@ public sealed class InstallMethodDetectorTests
     }
 
     [Fact]
-    public void Detect_NullProcessPath_ReturnsDirect()
+    public void Detect_OverriddenInstallScriptPath_ReturnsDirect()
     {
-        var detector = new InstallMethodDetector(CreateOptions(null));
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns("/opt/azure-functions-cli");
+        var detector = new InstallMethodDetector(CreateOptions("/opt/azure-functions-cli/func"), environment);
 
         InstallMethod result = detector.Detect();
 
         Assert.Equal(InstallMethodKind.Direct, result.Kind);
     }
 
-    [Fact]
-    public void Constructor_NullEnvironment_Throws()
+    [Theory]
+    [InlineData("/home/user/tools/func")]
+    [InlineData("C:\\Program Files\\Azure Functions CLI\\func.exe")]
+    [InlineData(null)]
+    public void Detect_UnknownInstallPath_ThrowsGraceful(string? processPath)
     {
-        Assert.Throws<ArgumentNullException>(() => new InstallMethodDetector(null!));
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get("HOME").Returns("/home/user");
+        var detector = new InstallMethodDetector(CreateOptions(processPath), environment);
+
+        GracefulException exception = Assert.Throws<GracefulException>(detector.Detect);
+
+        Assert.True(exception.IsUserError);
+        Assert.Contains("https://aka.ms/func-cli", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Constructor_NullOptions_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => new InstallMethodDetector(null!, Substitute.For<IProcessEnvironment>()));
+    }
+
+    [Fact]
+    public void Constructor_NullProcessEnvironment_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => new InstallMethodDetector(CreateOptions("/home/user/.azure-functions/func"), null!));
     }
 
     private static IOptions<CliEnvironmentOptions> CreateOptions(string? processPath)

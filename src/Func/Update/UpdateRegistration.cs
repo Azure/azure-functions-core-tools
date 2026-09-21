@@ -66,11 +66,13 @@ internal static class UpdateRegistration
                 sp.GetRequiredService<IFileSystem>(),
                 sp.GetRequiredService<IOptions<CliEnvironmentOptions>>(),
                 sp.GetRequiredService<IProcessRunner>(),
+                sp.GetRequiredService<IUpdateLockProvider>(),
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CliUpdater>>());
         });
 
         services.TryAddSingleton<IFileSystem, PhysicalFileSystem>();
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
+        services.TryAddSingleton<IUpdateLockProvider, FileUpdateLockProvider>();
         services.TryAddSingleton<IInstallMethodDetector, InstallMethodDetector>();
 
         return services;
