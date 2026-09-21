@@ -69,6 +69,49 @@ public sealed class CliUpdaterTests
     }
 
     [Fact]
+    public async Task UpdateAsync_DownloadTimeout_ThrowsGracefulWithRetryHint()
+    {
+        var handler = new StubHttpMessageHandler((_, _) => throw new OperationCanceledException("timeout"));
+        (CliUpdater updater, _, _, _) = CreateUpdater(httpHandler: handler);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("Timed out", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("again", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.IsType<OperationCanceledException>(ex.InnerException);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_CallerCancellation_PropagatesCancellation()
+    {
+        (CliUpdater updater, _, _, _) = CreateUpdater(httpHandler: SuccessDownloadHandler());
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => updater.UpdateAsync(_stableRelease, cancellation.Token));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_LockUnavailable_DoesNotStageOrDownload()
+    {
+        IUpdateLockProvider updateLockProvider = Substitute.For<IUpdateLockProvider>();
+        updateLockProvider.Acquire(_fakeInstallDir).Returns(_ =>
+            throw new GracefulException("another update", isUserError: true));
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler(),
+            updateLockProvider);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.Equal("another update", ex.Message);
+        fileSystem.DidNotReceive().CreateTempDirectory(Arg.Any<string>());
+    }
+
+    [Fact]
     public async Task UpdateAsync_VerificationOutputMismatch_RollsBackAllFilesAndThrowsGraceful()
     {
         // Arrange
@@ -265,11 +308,16 @@ public sealed class CliUpdaterTests
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static (CliUpdater Updater, IFileSystem FileSystem, IProcessRunner ProcessRunner, CliEnvironmentOptions Environment)
-        CreateUpdater(StubHttpMessageHandler httpHandler)
+        CreateUpdater(StubHttpMessageHandler httpHandler, IUpdateLockProvider? updateLockProvider = null)
     {
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
         var environment = new CliEnvironmentOptions { ProcessPath = _fakeProcessPath };
         IProcessRunner processRunner = Substitute.For<IProcessRunner>();
+        if (updateLockProvider is null)
+        {
+            updateLockProvider = Substitute.For<IUpdateLockProvider>();
+            updateLockProvider.Acquire(_fakeInstallDir).Returns(Substitute.For<IDisposable>());
+        }
 
         fileSystem.CreateTempDirectory(Arg.Any<string>())
             .Returns(
@@ -281,7 +329,13 @@ public sealed class CliUpdaterTests
             BaseAddress = new Uri("https://cdn.functions.azure.com/"),
         };
 
-        CliUpdater updater = new(client, fileSystem, Options.Create(environment), processRunner, NullLogger<CliUpdater>.Instance);
+        CliUpdater updater = new(
+            client,
+            fileSystem,
+            Options.Create(environment),
+            processRunner,
+            updateLockProvider,
+            NullLogger<CliUpdater>.Instance);
         return (updater, fileSystem, processRunner, environment);
     }
 
