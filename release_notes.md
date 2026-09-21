@@ -7,6 +7,10 @@
   - CLI Version: 4.7.0
   - Host Runtime Version: 4.51.100 (includes 4.851.100, 4.651.100)
 
+#### Breaking Changes
+
+- **Python 3.9 is no longer supported.** This version has reached end-of-life. Please upgrade to Python 3.10 or later to continue using Azure Functions Core Tools.
+
 #### Changes
 - Fixed Python native dependency builds to inherit authenticated pip indexes in Docker containers (#5574)
 - Make host.json optional across func publish, and pack (#5488)

@@ -1,4 +1,5 @@
 {
     "azureFunctions.suppressProject": true,
-    "dotnet.defaultSolution": "Azure.Functions.Cli.sln"
+    "dotnet.defaultSolution": "Azure.Functions.Cli.sln",
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }
