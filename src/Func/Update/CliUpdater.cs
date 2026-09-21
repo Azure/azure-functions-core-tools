@@ -14,6 +14,7 @@ internal sealed partial class CliUpdater(
     IFileSystem fileSystem,
     IOptions<CliEnvironmentOptions> environmentOptions,
     IProcessRunner processRunner,
+    IUpdateLockProvider updateLockProvider,
     ILogger<CliUpdater> logger) : ICliUpdater
 {
     private const string OldFileSuffix = ".old";
@@ -22,6 +23,7 @@ internal sealed partial class CliUpdater(
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly CliEnvironmentOptions _environment = (environmentOptions ?? throw new ArgumentNullException(nameof(environmentOptions))).Value;
     private readonly IProcessRunner _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
+    private readonly IUpdateLockProvider _updateLockProvider = updateLockProvider ?? throw new ArgumentNullException(nameof(updateLockProvider));
     private readonly ILogger<CliUpdater> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task UpdateAsync(Release release, CancellationToken cancellationToken)
@@ -30,6 +32,7 @@ internal sealed partial class CliUpdater(
 
         string binaryPath = GetBinaryPath();
         string installDir = Path.GetDirectoryName(binaryPath)!;
+        using IDisposable updateLock = _updateLockProvider.Acquire(installDir);
 
         // Stage the download on the same volume as the install directory so
         // File.Move never crosses volume boundaries.
@@ -179,6 +182,13 @@ internal sealed partial class CliUpdater(
         {
             throw new GracefulException(
                 $"Could not reach the CDN to download func {release.Version}. Check your connection and run 'func update' again.",
+                ex,
+                isUserError: true);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new GracefulException(
+                $"Timed out while downloading func {release.Version}. Check your connection and run 'func update' again.",
                 ex,
                 isUserError: true);
         }
