@@ -48,6 +48,40 @@ public sealed class FileUpdateLockProviderTests
         }
     }
 
+    [Fact]
+    public void Acquire_MissingInstallDirectory_PreservesDirectoryNotFoundError()
+    {
+        string installDirectory = CreateInstallDirectory();
+        try
+        {
+            var provider = new FileUpdateLockProvider();
+
+            Assert.Throws<DirectoryNotFoundException>(
+                () => provider.Acquire(Path.Combine(installDirectory, "missing")));
+        }
+        finally
+        {
+            Directory.Delete(installDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Acquire_LockPathIsDirectory_PreservesAccessError()
+    {
+        string installDirectory = CreateInstallDirectory();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(installDirectory, FileUpdateLockProvider.LockFileName));
+            var provider = new FileUpdateLockProvider();
+
+            Assert.Throws<UnauthorizedAccessException>(() => provider.Acquire(installDirectory));
+        }
+        finally
+        {
+            Directory.Delete(installDirectory, recursive: true);
+        }
+    }
+
     private static string CreateInstallDirectory()
     {
         string path = Path.Combine(Path.GetTempPath(), $"func-update-lock-{Guid.NewGuid():N}");

@@ -111,6 +111,68 @@ public sealed class CliUpdaterTests
         fileSystem.DidNotReceive().CreateTempDirectory(Arg.Any<string>());
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UpdateAsync_BodyTimeout_ThrowsGracefulAndReleasesLock(bool failOnOpen)
+    {
+        var failure = new OperationCanceledException("body timeout");
+        var handler = new StubHttpMessageHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new FailingHttpContent(failure, failOnOpen),
+        });
+        IUpdateLockProvider lockProvider = Substitute.For<IUpdateLockProvider>();
+        IDisposable updateLock = Substitute.For<IDisposable>();
+        lockProvider.Acquire(_fakeInstallDir).Returns(updateLock);
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(handler, lockProvider);
+        ReadDownloadBody(fileSystem);
+
+        var ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("Timed out", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("run 'func update' again", ex.Message, StringComparison.Ordinal);
+        Assert.Same(failure, ex.InnerException);
+        fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
+        updateLock.Received(1).Dispose();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UpdateAsync_CallerCancellationDuringBodyRead_PropagatesCancellation(bool failOnOpen)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var failure = new OperationCanceledException(cancellation.Token);
+        var handler = new StubHttpMessageHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new FailingHttpContent(failure, failOnOpen, cancellation.Cancel),
+        });
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(handler);
+        ReadDownloadBody(fileSystem);
+
+        var ex = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => updater.UpdateAsync(_stableRelease, cancellation.Token));
+
+        Assert.Same(failure, ex);
+        Assert.Equal(cancellation.Token, ex.CancellationToken);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_DownloadWriteFailure_PreservesIoError()
+    {
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(SuccessDownloadHandler());
+        var failure = new IOException("disk full");
+        fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(failure);
+
+        var ex = await Assert.ThrowsAsync<IOException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.Same(failure, ex);
+    }
+
     [Fact]
     public async Task UpdateAsync_VerificationOutputMismatch_RollsBackAllFilesAndThrowsGraceful()
     {
@@ -337,6 +399,18 @@ public sealed class CliUpdaterTests
             updateLockProvider,
             NullLogger<CliUpdater>.Instance);
         return (updater, fileSystem, processRunner, environment);
+    }
+
+    private static void ReadDownloadBody(IFileSystem fileSystem)
+    {
+        fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                Stream content = call.ArgAt<Stream>(1);
+                CancellationToken cancellationToken = call.ArgAt<CancellationToken>(2);
+                byte[] buffer = new byte[1];
+                await content.ReadExactlyAsync(buffer.AsMemory(), cancellationToken);
+            });
     }
 
     private static StubHttpMessageHandler SuccessDownloadHandler()

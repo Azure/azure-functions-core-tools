@@ -109,15 +109,32 @@ internal sealed partial class CdnReleaseFeed(
                 $"Error reading version manifest from '{ManifestPath}': {response.StatusCode}");
         }
 
-        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-
         VersionManifest? manifest;
         try
         {
+            await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             manifest = await JsonSerializer.DeserializeAsync(
                 stream,
                 UpdateJsonContext.Default.VersionManifest,
                 cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                "Timed out while reading the version manifest from the Azure Functions CLI CDN. Check your connection and try again.",
+                ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvalidOperationException(
+                "Could not read the version manifest from the Azure Functions CLI CDN. Check your connection and try again.",
+                ex);
+        }
+        catch (IOException ex)
+        {
+            throw new InvalidOperationException(
+                "Could not read the version manifest from the Azure Functions CLI CDN. Check your connection and try again.",
+                ex);
         }
         catch (JsonException ex)
         {
