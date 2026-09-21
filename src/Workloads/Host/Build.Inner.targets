@@ -4,7 +4,7 @@
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);StageHostWorkloadPayload</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
-  <Target Name="StageHostWorkloadPayload">
+  <Target Name="StageHostWorkloadPayload" DependsOnTargets="_SetWorkloadProperties">
     <PropertyGroup>
       <HostWorkloadPayloadRoot>$(IntermediateOutputPath)workload-payload/</HostWorkloadPayloadRoot>
     </PropertyGroup>
@@ -25,7 +25,7 @@
     <ItemGroup>
       <TfmSpecificPackageFile
         Include="$(HostWorkloadPayloadRoot)**/*"
-        PackagePath="tools/any/%(RecursiveDir)%(Filename)%(Extension)"
+        PackagePath="$(_WorkloadPackageContentRoot)%(RecursiveDir)%(Filename)%(Extension)"
         Visible="false" />
     </ItemGroup>
   </Target>

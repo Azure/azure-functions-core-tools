@@ -4,10 +4,9 @@ Repo-only notes for contributors. Not packaged into the nupkg.
 
 ## Pack details
 
-Release packaging should be performed with a RID-specific self-contained payload under `tools/any/` by passing
-`-p:PackRidSpecificHostWorkload=true -r <rid> -p:SelfContained=true`, which also suffixes the package id with the RID.
-The self-contained executable must be placed at `tools/any/Azure.Functions.Cli.Workloads.Host` on Unix-like platforms and
-`tools/any/Azure.Functions.Cli.Workloads.Host.exe` on Windows.
+Release packaging creates RID-specific packages by passing `-p:PackAllRids=true`. Each self-contained payload is placed
+under `tools/<rid>/`, and its package id is suffixed with that RID. For example, the Windows x64 package contains
+`tools/win-x64/Azure.Functions.Cli.Workloads.Host.exe`.
 
 ## Local CLI/host iteration
 
