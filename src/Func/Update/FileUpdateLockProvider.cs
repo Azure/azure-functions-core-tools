@@ -25,12 +25,24 @@ internal sealed class FileUpdateLockProvider : IUpdateLockProvider
                 bufferSize: 1,
                 FileOptions.None);
         }
-        catch (IOException ex)
+        catch (IOException ex) when (IsLockContention(ex))
         {
             throw new GracefulException(
                 $"Another Azure Functions CLI update is already running for '{installDirectory}'. Wait for it to finish and try again.",
                 ex,
                 isUserError: true);
         }
+    }
+
+    private static bool IsLockContention(IOException exception)
+    {
+        // FileStream exposes a Win32 HRESULT on Windows and raw EWOULDBLOCK errno on Unix.
+        if (OperatingSystem.IsWindows())
+        {
+            return exception.HResult == unchecked((int)0x80070020);
+        }
+
+        return (OperatingSystem.IsLinux() && exception.HResult == 11)
+            || (OperatingSystem.IsMacOS() && exception.HResult == 35);
     }
 }
