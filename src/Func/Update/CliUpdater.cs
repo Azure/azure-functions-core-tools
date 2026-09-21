@@ -173,10 +173,20 @@ internal sealed partial class CliUpdater(
 
     private async Task DownloadAsync(Release release, string zipPath, CancellationToken cancellationToken)
     {
-        HttpResponseMessage response;
         try
         {
-            response = await _httpClient.GetAsync(release.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using HttpResponseMessage response = await _httpClient.GetAsync(
+                release.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new GracefulException(
+                    $"CDN returned {(int)response.StatusCode} while downloading func {release.Version}. Try again later.",
+                    isUserError: true);
+            }
+
+            await using Stream content = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await _fileSystem.SaveStreamToFileAsync(zipPath, content, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
@@ -191,19 +201,6 @@ internal sealed partial class CliUpdater(
                 $"Timed out while downloading func {release.Version}. Check your connection and run 'func update' again.",
                 ex,
                 isUserError: true);
-        }
-
-        using (response)
-        {
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new GracefulException(
-                    $"CDN returned {(int)response.StatusCode} while downloading func {release.Version}. Try again later.",
-                    isUserError: true);
-            }
-
-            await using Stream content = await response.Content.ReadAsStreamAsync(cancellationToken);
-            await _fileSystem.SaveStreamToFileAsync(zipPath, content, cancellationToken);
         }
     }
 
