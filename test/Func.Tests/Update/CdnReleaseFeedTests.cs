@@ -182,6 +182,64 @@ public sealed class CdnReleaseFeedTests
     }
 
     [Fact]
+    public async Task GetLatestAsync_ConnectionFailure_ThrowsActionableError()
+    {
+        CdnReleaseFeed feed = CreateFeed((_, _) => throw new HttpRequestException("offline"));
+
+        InvalidOperationException ex = (await FluentActions
+            .Awaiting(() => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        ex.Message.Should().Contain("Could not reach");
+        ex.Message.Should().Contain("Check your connection");
+        ex.InnerException.Should().BeOfType<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task GetLatestAsync_Timeout_ThrowsActionableError()
+    {
+        CdnReleaseFeed feed = CreateFeed((_, _) => throw new OperationCanceledException("timeout"));
+
+        InvalidOperationException ex = (await FluentActions
+            .Awaiting(() => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        ex.Message.Should().Contain("Timed out");
+        ex.Message.Should().Contain("Check your connection");
+        ex.InnerException.Should().BeOfType<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task GetVersionAsync_ConnectionFailure_ThrowsActionableError()
+    {
+        CdnReleaseFeed feed = CreateFeed((_, _) => throw new HttpRequestException("offline"));
+        var target = SemVersion.Parse("5.1.0", SemVersionStyles.Strict);
+
+        InvalidOperationException ex = (await FluentActions
+            .Awaiting(() => feed.GetVersionAsync(target, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        ex.Message.Should().Contain("Could not reach");
+        ex.Message.Should().Contain("Check your connection");
+        ex.InnerException.Should().BeOfType<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task GetVersionAsync_Timeout_ThrowsActionableError()
+    {
+        CdnReleaseFeed feed = CreateFeed((_, _) => throw new OperationCanceledException("timeout"));
+        var target = SemVersion.Parse("5.1.0", SemVersionStyles.Strict);
+
+        InvalidOperationException ex = (await FluentActions
+            .Awaiting(() => feed.GetVersionAsync(target, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        ex.Message.Should().Contain("Timed out");
+        ex.Message.Should().Contain("Check your connection");
+        ex.InnerException.Should().BeOfType<OperationCanceledException>();
+    }
+
+    [Fact]
     public async Task GetLatestAsync_PreCancelledToken_ThrowsOperationCanceled()
     {
         var handler = new StubHttpMessageHandler(RespondWithManifest());
@@ -191,6 +249,23 @@ public sealed class CdnReleaseFeedTests
         await cts.CancelAsync();
 
         await FluentActions.Awaiting(() => feed.GetLatestAsync(includePrerelease: false, cts.Token)).Should().ThrowAsync<TaskCanceledException>();
+    }
+
+    [Fact]
+    public async Task GetVersionAsync_PreCancelledToken_ThrowsOperationCanceled()
+    {
+        var handler = new StubHttpMessageHandler((_, cancellationToken) =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        CdnReleaseFeed feed = CreateFeed(handler);
+        var target = SemVersion.Parse("5.1.0", SemVersionStyles.Strict);
+
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await FluentActions.Awaiting(() => feed.GetVersionAsync(target, cts.Token)).Should().ThrowAsync<OperationCanceledException>();
     }
 
     private static Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> RespondWithManifest()
