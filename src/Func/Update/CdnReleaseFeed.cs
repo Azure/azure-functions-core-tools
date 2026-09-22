@@ -43,7 +43,7 @@ internal sealed partial class CdnReleaseFeed(
                     $"Error reading version manifest from '{ManifestPath}': no valid version found");
             }
 
-            return new Release(best, BuildDownloadUri(best));
+            return await CreateReleaseAsync(best, BuildDownloadUri(best), cancellationToken);
         }
         else
         {
@@ -59,7 +59,7 @@ internal sealed partial class CdnReleaseFeed(
                     $"Error reading version manifest from '{ManifestPath}': invalid version '{manifest.Stable}'");
             }
 
-            return new Release(version, BuildDownloadUri(version));
+            return await CreateReleaseAsync(version, BuildDownloadUri(version), cancellationToken);
         }
     }
 
@@ -92,7 +92,62 @@ internal sealed partial class CdnReleaseFeed(
                 $"Error checking version {version} at '{downloadUri}': {response.StatusCode}", ex);
         }
 
-        return new Release(version, downloadUri);
+        return await CreateReleaseAsync(version, downloadUri, cancellationToken);
+    }
+
+    private async Task<Release> CreateReleaseAsync(SemVersion version, Uri downloadUri, CancellationToken cancellationToken)
+    {
+        string sidecarPath = $"{downloadUri}.sha256";
+        using var request = new HttpRequestMessage(HttpMethod.Get, sidecarPath);
+        using HttpResponseMessage response = await SendAsync(request, $"reading checksum sidecar '{sidecarPath}'", cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Could not read checksum sidecar '{sidecarPath}': {response.StatusCode}. " +
+                "The update cannot be verified. Try again later.");
+        }
+
+        string body;
+        try
+        {
+            await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var reader = new StreamReader(stream);
+            body = await reader.ReadToEndAsync(cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                $"Timed out while reading checksum sidecar '{sidecarPath}'. Check your connection and try again.", ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvalidOperationException(
+                $"Could not read checksum sidecar '{sidecarPath}'. Check your connection and try again.", ex);
+        }
+        catch (IOException ex)
+        {
+            throw new InvalidOperationException(
+                $"Could not read checksum sidecar '{sidecarPath}'. Check your connection and try again.", ex);
+        }
+
+        string entry = body.TrimEnd('\r', '\n');
+        if (entry.Length < 67 || entry[64] != ' ' || entry[65] != ' ' || !entry[..64].All(Uri.IsHexDigit))
+        {
+            throw new InvalidOperationException(
+                $"Invalid checksum sidecar '{sidecarPath}': expected a 64-hex SHA-256 digest followed by two spaces and the artifact filename. " +
+                "The update cannot be verified. Try again later.");
+        }
+
+        string expectedFileName = Path.GetFileName(downloadUri.OriginalString);
+        if (!string.Equals(entry[66..], expectedFileName, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Invalid checksum sidecar '{sidecarPath}': expected artifact filename '{expectedFileName}'. " +
+                "The update cannot be verified. Try again later.");
+        }
+
+        return new Release(version, downloadUri) { Sha256Checksum = entry[..64] };
     }
 
     private async Task<VersionManifest> FetchManifestAsync(CancellationToken cancellationToken)
