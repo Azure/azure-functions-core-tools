@@ -1,8 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.IO.Abstractions;
 using Azure.Functions.Cli.Actions.LocalActions.PackAction;
+using Azure.Functions.Cli.Common;
 using Newtonsoft.Json.Linq;
+using NSubstitute;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
@@ -72,6 +75,30 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests.PackAction
 
             Assert.False(DotnetPackSubcommandAction.ValidateDotnetIsolatedFolderStructure(_tempDirectory, out string errorMessage));
             Assert.NotEmpty(errorMessage);
+        }
+
+        [Fact]
+        public void ValidateDotnetFolderStructure_WorkerIndexedPayload_UsesFileSystemOverride()
+        {
+            var fileSystem = Substitute.For<IFileSystem>();
+            var workerConfigPath = Path.Combine(_tempDirectory, "worker.config.json");
+            var extensionsPath = Path.Combine(_tempDirectory, "extensions.json");
+            fileSystem.File.Exists(workerConfigPath).Returns(true);
+            fileSystem.File.Exists(extensionsPath).Returns(true);
+            fileSystem.File.Exists(Path.Combine(_tempDirectory, "App.dll")).Returns(true);
+            fileSystem.File.Exists(Path.Combine(_tempDirectory, ".azurefunctions", "function.deps.json")).Returns(true);
+            fileSystem.Directory.Exists(Path.Combine(_tempDirectory, ".azurefunctions")).Returns(true);
+            fileSystem.File.ReadAllText(workerConfigPath).Returns(
+                "{\"description\":{\"language\":\"dotnet-isolated\",\"workerIndexing\":true,\"defaultWorkerPath\":\"App.dll\"}}");
+            fileSystem.File.ReadAllText(extensionsPath).Returns("{\"extensions\":[]}");
+
+            using (FileSystemHelpers.Override(fileSystem))
+            {
+                var result = DotnetPackSubcommandAction.ValidateDotnetIsolatedFolderStructure(_tempDirectory, out string errorMessage);
+
+                Assert.True(result);
+                Assert.Empty(errorMessage);
+            }
         }
 
         [Theory]

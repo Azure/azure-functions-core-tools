@@ -98,7 +98,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
 
             try
             {
-                var description = JObject.Parse(File.ReadAllText(workerConfigPath))["description"] as JObject;
+                var description = JObject.Parse(FileSystemHelpers.ReadAllTextFromFile(workerConfigPath))["description"] as JObject;
                 var workerPath = description?["defaultWorkerPath"];
                 return description?["language"]?.ToString() == "dotnet-isolated"
                     && bool.TryParse(description["workerIndexing"]?.ToString(), out var workerIndexing)
@@ -107,7 +107,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions.PackAction
                     && !string.IsNullOrWhiteSpace((string)workerPath)
                     && Path.GetFileName((string)workerPath) == (string)workerPath
                     && FileSystemHelpers.FileExists(Path.Combine(directory, (string)workerPath))
-                    && JObject.Parse(File.ReadAllText(Path.Combine(directory, "extensions.json")))["extensions"] is JArray;
+                    && JObject.Parse(FileSystemHelpers.ReadAllTextFromFile(Path.Combine(directory, "extensions.json")))["extensions"] is JArray;
             }
             catch (JsonException)
             {
