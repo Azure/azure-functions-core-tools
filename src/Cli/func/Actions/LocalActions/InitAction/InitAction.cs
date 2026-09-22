@@ -481,7 +481,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 : WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", workerRuntimeSetting);
 
-            // For Go (preview) we leave AzureWebJobsStorage empty rather than seeding the storage
+            // For Go we leave AzureWebJobsStorage empty rather than seeding the storage
             // emulator connection string. This avoids 'func azure functionapp publish -i -y' silently
             // overwriting a production app's AzureWebJobsStorage with 'UseDevelopmentStorage=true'.
             string azureWebJobsStorageValue = workerRuntime == Helpers.WorkerRuntime.Go
@@ -489,7 +489,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 : Constants.StorageEmulatorConnectionString;
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", azureWebJobsStorageValue);
 
-            // Add the explicit Go preview opt-in so the CLI doesn't have to fall back to scanning
+            // Add the explicit Go opt-in so the CLI doesn't have to fall back to scanning
             // for go.mod on every command. See WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage.
             if (workerRuntime == Helpers.WorkerRuntime.Go)
             {

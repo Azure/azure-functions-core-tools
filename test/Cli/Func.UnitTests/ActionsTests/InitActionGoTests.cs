@@ -195,11 +195,11 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData("go")]
         [InlineData("Go")]
         [InlineData("GO")]
-        public void GetCurrentWorkerRuntimeLanguage_GoPreviewEnvVar_ResolvesToGo(string envValue)
+        public void GetCurrentWorkerRuntimeLanguage_GoEnvVar_ResolvesToGo(string envValue)
         {
             // Env var takes precedence over local.settings.json and the go.mod fallback.
             // Even with no project markers and no FUNCTIONS_WORKER_RUNTIME, the explicit
-            // preview opt-in is enough to select the Go runtime.
+            // Go opt-in is enough to select the Go runtime.
             var secretsManager = Substitute.For<ISecretsManager>();
             secretsManager.GetSecrets(Arg.Any<bool>()).Returns(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
@@ -225,7 +225,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData("go")]
         [InlineData("Go")]
         [InlineData("GO")]
-        public void GetCurrentWorkerRuntimeLanguage_GoPreviewSetting_ResolvesToGo(string settingValue)
+        public void GetCurrentWorkerRuntimeLanguage_GoSetting_ResolvesToGo(string settingValue)
         {
             // local.settings.json wins when the env var isn't set, without any go.mod scan.
             var secretsManager = Substitute.For<ISecretsManager>();
@@ -257,7 +257,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData("python")]
         [InlineData("rust")]
         [InlineData("")]
-        public void GetCurrentWorkerRuntimeLanguage_GoPreviewFalsy_FallsThroughToLegacyResolution(string flagValue)
+        public void GetCurrentWorkerRuntimeLanguage_NonGoSetting_FallsThroughToLegacyResolution(string flagValue)
         {
             // Non-"go" flag values must not short-circuit; the legacy native+go.mod path should still run.
             var secretsManager = Substitute.For<ISecretsManager>();
@@ -292,7 +292,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Fact]
-        public void GetCurrentWorkerRuntimeLanguage_GoPreviewEnvVar_BeatsSecretsManagerThrow()
+        public void GetCurrentWorkerRuntimeLanguage_GoEnvVar_BeatsSecretsManagerThrow()
         {
             // SecretsManager throwing (e.g. command run from outside a project root) must not
             // mask an explicit env-var opt-in.
