@@ -4,7 +4,7 @@ Repo-only notes for contributors. Not packaged into the nupkg.
 
 ## Pack details
 
-Release packaging creates RID-specific packages by passing `-p:PackAllRids=true`. Each self-contained payload is placed
+Release packaging creates RID-specific, self-contained packages by passing `-p:PackAllRids=true -p:SelfContained=true`. Each self-contained payload is placed
 under `tools/<rid>/`, and its package id is suffixed with that RID. For example, the Windows x64 package contains
 `tools/win-x64/Azure.Functions.Cli.Workloads.Host.exe`.
 
