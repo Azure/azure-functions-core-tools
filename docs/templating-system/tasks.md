@@ -21,3 +21,4 @@
 - [ ] 3.3 Resolve conflicting terminology, context models, result shapes, and lifecycle assumptions across all focused designs.
 - [ ] 3.4 Update the umbrella inventory after any focused change is renamed, split, added, or removed.
 - [ ] 3.5 Strictly validate all ten focused changes and this umbrella change before declaring the templating system fully specified.
+- [ ] 3.6 Resolve the [companion-template acquisition handoff](work-packages.md#companion-acquisition) in Phase 1 and update the owning focused designs. Keep [#5384](https://github.com/Azure/azure-functions-core-tools/issues/5384)'s remote stack identity and meta-package recipes distinct from template lifecycle and installed stack metadata. Reference [#5595](https://github.com/Azure/azure-functions-core-tools/pull/5595) as prior implementation/review evidence, not a required merge. Implementation and acceptance belong to work packages 2, 6 and 9 and the applicable command consumers.

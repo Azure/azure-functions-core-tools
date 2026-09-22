@@ -53,6 +53,8 @@ For init, generation is followed by **mandatory CLI-owned project configuration*
 
 Agree required project-action and workload-constraint schemas with the consumers. Assign the remaining action, binding and search design work to its implementation owners.
 
+The default-acquisition proposal must cover the [companion-template acquisition handoff](work-packages.md#companion-acquisition). Decide the caller and package relationship in Phase 1, implement the integration in package 6's acquisition slice using package 2, and qualify existing installations in package 9. This tracks a requirement from the deferred setup work, not approval to merge its legacy implementation.
+
 **What unlocks the next work?** Only that component's interfaces and examples need agreement. Parser work need not wait for the init context decision. Store work need not wait for search design. The [four handoffs](work-packages.md#handoffs) state the exact outputs.
 
 ### Phase 2 · Build independently, publish small usable slices

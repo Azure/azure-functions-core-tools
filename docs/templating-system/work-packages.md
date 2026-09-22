@@ -24,7 +24,7 @@ An interface here means both a data shape and its behavior, including errors, ca
 - **Init preparation.** Context-free metadata does not evaluate bindings/defaults. Conditional projects can depend on final parameters and effects, while execution context is immutable. Demonstrate what noninvocable preparation can evaluate and when final eligibility is established. Preserve candidate identity through revalidation. Do not silently introduce mutable sessions. Homogeneous common context is optional in the quickstart specification. Mixed context must not fabricate values.
 - **Store safety.** Specify read-lease lifetime and invalidation together with replacement. On rollback, dispose the engine session before restoring the snapshot, then recreate it against the restored store before returning diagnostics. Temporary validation sessions and this recovery sequence are not reusable global execution sessions.
 - **Authoring support.** Define the exact workload constraints, required configuration action and supported ordinary actions/bind sources. Minimum init support is an early dependency. Unspecified adapter behavior is not an implementation detail to invent.
-- **Default acquisition and compatibility.** Select the explicit setup/workload/package operation that installs companion templates, its source/version policy and partial-failure behavior. It must not become implicit installation inside init. Decide how old templates, options and external workloads transition.
+- **Default acquisition and compatibility.** Complete the [companion-template acquisition handoff](#companion-acquisition) before wiring its caller. Select the explicit setup/workload/package operation, source/version policy and partial-failure behavior. It must not become implicit installation inside init. Decide how old templates, options and external workloads transition.
 - **Discovery policy.** Agree the manifest and each consumer's feed/trust/freshness rules before building that slice. Publication recovery is needed before operational acceptance, not before a fixture-based reader can start. B owns the stable Functions-controlled browse URL and destination delivery, C consumes it. The destination can evolve behind a redirect. Search and init remain separate from package mutation.
 
 Record each decision in its owning focused design, with the dependent documents updated. There is no all-designs-complete gate for unrelated implementation.
@@ -131,6 +131,25 @@ Record each decision in its owning focused design, with the dependent documents 
 **Needs real integration to finish:** packages 1/5 validate every template, 2 installs artifacts from the intended feed, and 3/4 exercise generated output. Derive supported language/platform cases from registrations and build policy, not this six-stack list alone.
 
 **Done when:** every supported combination has usable published content and deliberate upgrade behavior. Coordinate all production stack registrations and initializer removal at cutover. Never vary scaffolding engines based on whether template packages happen to be installed.
+
+<a id="companion-acquisition"></a>
+
+### Companion-template acquisition handoff
+
+This deliverable carries forward the acquisition requirement exposed by [deferred PR #5595](https://github.com/Azure/azure-functions-core-tools/pull/5595), not its legacy content-workload ownership implementation. [Issue #5451](https://github.com/Azure/azure-functions-core-tools/issues/5451) tracks setup decomposition. [Issue #5384](https://github.com/Azure/azure-functions-core-tools/issues/5384) tracks remote stack package identity and meta-package dependency recipes. That remote lookup is distinct from this package's installed stack-capability catalog and package 8's template-search manifest.
+
+**Phase 1 decision, led by Ahmed with B/C input:** record where the stack-to-companion `FuncTemplate` relationship is declared, the explicit acquisition caller, source/version selection, cancellation and partial-failure behavior, and compatibility with old templates and external workloads. Update the owning focused designs, including init's currently deferred acquisition section and any affected lifecycle contract. These policies remain undecided until that design is reviewed. Neither implicit installation inside `func init` nor automatic owner migration is authorized by this handoff.
+
+**Package 6 acquisition slice:** B supplies publication/acquisition services, C supplies package metadata/content, and Ahmed integrates the chosen caller. Use package 2's engine-managed lifecycle rather than another template registry or legacy alias-owner selector. Integrate once that contract and lifecycle slice are ready, without waiting for the entire templating program.
+
+Acceptance evidence, shared with packages 2, 3/4 and 9:
+
+- [ ] An explicit caller resolves the declared companion package and installs it through the real lifecycle path. An unknown template reference does not trigger implicit installation.
+- [ ] The installed package is visible through the runtime catalog and usable by the applicable `func new`/`func init` path. A registry row alone is not readiness evidence.
+- [ ] Source/version selection, missing packages, offline behavior, cancellation and partial failure follow the reviewed contract. Repeat execution does not duplicate the installation.
+- [ ] Existing installations, replacement failures and cross-channel/package transitions have an explicit compatibility decision and regression coverage. Package 9 qualifies legacy retirement before cutover.
+
+Keep #5595's feed-validation and owner/channel findings as regression input when relevant, not as a requirement to reproduce its current algorithm. Setup stack-package discovery stays with #5384. [PR #5605](https://github.com/Azure/azure-functions-core-tools/pull/5605) concerns workload-search error handling and is separate from package 8's template search.
 
 <a id="samples"></a>
 
