@@ -22,11 +22,9 @@ internal sealed record Release(SemVersion Version, Uri DownloadUrl)
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "zip" : "tar.gz";
 
     /// <summary>
-    /// Expected SHA-256 hex digest of the downloaded archive, or <c>null</c>
-    /// when the release feed does not yet publish checksums.
+    /// Expected SHA-256 hex digest from the archive's published checksum sidecar.
     /// </summary>
-    // TODO: Populate from the release feed once checksum metadata is available (#5445).
-    public string? Sha256Checksum { get; init; }
+    public required string Sha256Checksum { get; init; }
 
     public bool IsPrerelease => Version.IsPrerelease;
 }
