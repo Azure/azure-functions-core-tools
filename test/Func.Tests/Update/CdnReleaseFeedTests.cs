@@ -22,6 +22,7 @@ public sealed class CdnReleaseFeedTests
 
         latest.Version.ToString().Should().Be("5.1.0");
         latest.IsPrerelease.Should().BeFalse();
+        latest.Sha256Checksum.Should().Be(new string('a', 64));
     }
 
     [Fact]
@@ -35,6 +36,7 @@ public sealed class CdnReleaseFeedTests
 
         latest.Version.ToString().Should().Be("5.2.0-preview.1");
         latest.IsPrerelease.Should().BeTrue();
+        latest.Sha256Checksum.Should().Be(new string('a', 64));
     }
 
     [Fact]
@@ -101,7 +103,9 @@ public sealed class CdnReleaseFeedTests
                 return MakeJsonResponse(LoadFixture());
             }
 
-            return new HttpResponseMessage(HttpStatusCode.OK);
+            return request.Method == HttpMethod.Head
+                ? new HttpResponseMessage(HttpStatusCode.OK)
+                : MakeChecksumResponse(request);
         });
 
         CdnReleaseFeed feed = CreateFeed(handler);
@@ -111,6 +115,7 @@ public sealed class CdnReleaseFeedTests
 
         result.Version.ToString().Should().Be("5.0.0-preview.1");
         result.IsPrerelease.Should().BeTrue();
+        result.Sha256Checksum.Should().Be(new string('a', 64));
     }
 
     [Fact]
@@ -340,14 +345,23 @@ public sealed class CdnReleaseFeedTests
     private static Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> RespondWithManifest()
     {
         byte[] body = LoadFixture();
-        return (_, _) => MakeJsonResponse(body);
+        return (request, _) => request.RequestUri!.AbsolutePath.EndsWith(".sha256", StringComparison.Ordinal)
+            ? MakeChecksumResponse(request)
+            : MakeJsonResponse(body);
     }
 
     private static Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> RespondWithJson(string json)
     {
         byte[] body = System.Text.Encoding.UTF8.GetBytes(json);
-        return (_, _) => MakeJsonResponse(body);
+        return (request, _) => request.RequestUri!.AbsolutePath.EndsWith(".sha256", StringComparison.Ordinal)
+            ? MakeChecksumResponse(request)
+            : MakeJsonResponse(body);
     }
+
+    private static HttpResponseMessage MakeChecksumResponse(HttpRequestMessage request) => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent($"{new string('a', 64)}  {Path.GetFileName(request.RequestUri!.AbsolutePath)[..^7]}\n"),
+    };
 
     private static HttpResponseMessage MakeJsonResponse(byte[] body) => new(HttpStatusCode.OK)
     {

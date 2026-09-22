@@ -206,13 +206,6 @@ internal sealed partial class CliUpdater(
 
     private async Task VerifyChecksumAsync(Release release, string filePath, CancellationToken cancellationToken)
     {
-        if (release.Sha256Checksum is null)
-        {
-            // TODO: Remove this early-return once the release feed publishes checksums (#5445).
-            Log.NoChecksumAvailable(_logger, release.Version);
-            return;
-        }
-
         string actual = await _fileSystem.ComputeSha256Async(filePath, cancellationToken);
 
         if (!string.Equals(actual, release.Sha256Checksum, StringComparison.OrdinalIgnoreCase))
@@ -330,9 +323,6 @@ internal sealed partial class CliUpdater(
 
         [LoggerMessage(LogLevel.Information, "Previous version restored.")]
         public static partial void PreviousVersionRestored(ILogger logger);
-
-        [LoggerMessage(LogLevel.Debug, "No checksum available for {Version}; skipping integrity check.")]
-        public static partial void NoChecksumAvailable(ILogger logger, object version);
 
         [LoggerMessage(LogLevel.Debug, "Checksum verified for {Version}.")]
         public static partial void ChecksumVerified(ILogger logger, object version);
