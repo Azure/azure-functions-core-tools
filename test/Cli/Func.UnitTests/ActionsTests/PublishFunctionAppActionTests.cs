@@ -14,7 +14,6 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
     public class PublishFunctionAppActionTests
     {
         [Theory]
-        [InlineData("dynamic")]
         [InlineData("flexconsumption")]
         [InlineData("elasticpremium")]
         [InlineData("premium")]
@@ -30,6 +29,23 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 () => PublishFunctionAppAction.ValidateGoPublishOptions(site, BuildOption.Default, buildNativeDeps: false));
 
             Assert.Null(exception);
+        }
+
+        [Fact]
+        public void ValidateGoPublishOptions_LinuxConsumption_Throws()
+        {
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp,linux",
+                Sku = "dynamic"
+            };
+
+            var exception = Assert.Throws<CliException>(
+                () => PublishFunctionAppAction.ValidateGoPublishOptions(site, BuildOption.Default, buildNativeDeps: false));
+
+            Assert.Equal(
+                "Go is not supported on Linux Consumption Function Apps. Use Flex Consumption, Elastic Premium, or a Dedicated Linux plan.",
+                exception.Message);
         }
 
         [Fact]

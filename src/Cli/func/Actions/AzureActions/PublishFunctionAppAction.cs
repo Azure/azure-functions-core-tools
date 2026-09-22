@@ -455,6 +455,12 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 throw new CliException("Go is only supported for Linux Function Apps.");
             }
 
+            if (functionApp.IsDynamic)
+            {
+                throw new CliException(
+                    "Go is not supported on Linux Consumption Function Apps. Use Flex Consumption, Elastic Premium, or a Dedicated Linux plan.");
+            }
+
             if (publishBuildOption == BuildOption.Remote || publishBuildOption == BuildOption.Container)
             {
                 throw new CliException(
