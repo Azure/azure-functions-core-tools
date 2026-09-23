@@ -131,7 +131,16 @@ internal sealed partial class CdnReleaseFeed(
                 $"Could not read checksum sidecar '{sidecarPath}'. Check your connection and try again.", ex);
         }
 
-        string entry = body.TrimEnd('\r', '\n');
+        string entry = body;
+        if (entry.EndsWith("\r\n", StringComparison.Ordinal))
+        {
+            entry = entry[..^2];
+        }
+        else if (entry.EndsWith('\n'))
+        {
+            entry = entry[..^1];
+        }
+
         if (entry.Length < 67 || entry[64] != ' ' || entry[65] != ' ' || !entry[..64].All(Uri.IsHexDigit))
         {
             throw new InvalidOperationException(
