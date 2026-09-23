@@ -160,6 +160,13 @@ internal sealed class SetupFeatureResolver(
             return picked;
         }
 
+        if (options.AssumeYes && options.OutputMode == SetupOutputMode.Plain)
+        {
+            _interaction.WriteHint(
+                "No language stack was selected. Setup targets only the host and extension bundle. "
+                + "For language-specific setup, run `func setup --yes --features <stack>`.");
+        }
+
         return ["runtime"];
     }
 

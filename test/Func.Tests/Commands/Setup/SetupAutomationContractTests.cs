@@ -60,7 +60,15 @@ public sealed class SetupAutomationContractTests
         plan.WorkerRuntimes.Should().BeEmpty();
         plan.IncludeExtensionBundle.Should().BeTrue();
         harness.Interaction.PromptCount.Should().Be(0);
-        harness.Interaction.Lines.Should().BeEmpty();
+        if (assumeYes && !json)
+        {
+            harness.Interaction.Lines.Should().ContainSingle().Which.Should().StartWith("HINT: No language stack was selected.");
+        }
+        else
+        {
+            harness.Interaction.Lines.Should().BeEmpty();
+        }
+
         await harness.Store.DidNotReceive().GetWorkloadsAsync(Arg.Any<CancellationToken>());
     }
 

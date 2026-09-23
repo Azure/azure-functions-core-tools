@@ -202,6 +202,8 @@ The interactive flow selects stacks when no explicit or project feature is avail
 
 `--yes` and JSON output also suppress the picker. They do not select every stack. With no explicit features or configured project runtime, either uses `runtime`.
 
+In plain output, `--yes` reports that this fallback targets only the host and extension bundle and points to `--features <stack>` for language-specific setup. The hint also applies in check mode. Explicit features, a configured runtime, and JSON output do not produce this hint.
+
 Direct `setup` invocations skip the global first-run prompt. Parsed check and JSON setup invocations suppress the background CLI version check and trailing version/alias advisories, including after failures. JSON mode also suppresses setup's human prerelease hint. Telemetry ownership remains outside setup.
 
 ## 12. JSON Output
