@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads.Catalog;
@@ -57,12 +58,12 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<bool> YesOption { get; } = new("--yes", "-y")
     {
-        Description = "Answer yes to setup prompts.",
+        Description = "Skip the stack picker and use project/runtime defaults when features are omitted.",
     };
 
     public Option<bool> CheckOption { get; } = new("--check")
     {
-        Description = "Check whether the selected dependencies are installed without making changes.",
+        Description = "Check selected dependencies without installing or updating workloads. Metadata caches may change.",
     };
 
     public Option<string?> OutputOption { get; } = new("--output")
@@ -77,7 +78,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         : base(
             "setup",
             "Prepare local Azure Functions CLI dependencies. "
-            + "Installs everything needed to develop and run a Functions app for the chosen stack(s) (host, worker, stack, templates, extension bundle). "
+            + "Reconciles host, worker, stack, templates, and extension bundle workloads for the chosen stack(s). "
             + "For installing individual workload packages, see 'func workload'.")
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
@@ -94,6 +95,29 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(YesOption);
         Options.Add(CheckOption);
         Options.Add(OutputOption);
+    }
+
+    internal static bool ShouldSuppressAdvisories(ParseResult parseResult)
+    {
+        ArgumentNullException.ThrowIfNull(parseResult);
+
+        if (parseResult.CommandResult.Command is not SetupCommand setup)
+        {
+            return false;
+        }
+
+        OptionResult? check = parseResult.GetResult(setup.CheckOption);
+        OptionResult? output = parseResult.GetResult(setup.OutputOption);
+        return (check is not null && CanReadValue(check) && check.GetValueOrDefault<bool>())
+            || (output is not null && CanReadValue(output)
+                && string.Equals(output.GetValueOrDefault<string?>()?.Trim(), "json", StringComparison.OrdinalIgnoreCase));
+
+        // Version and completion actions can clear parse errors without fixing
+        // arity. Reading such a value would add errors and preempt their action.
+        static bool CanReadValue(OptionResult result)
+            => !result.Errors.Any()
+                && result.Tokens.Count >= result.Option.Arity.MinimumNumberOfValues
+                && result.Tokens.Count <= result.Option.Arity.MaximumNumberOfValues;
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)

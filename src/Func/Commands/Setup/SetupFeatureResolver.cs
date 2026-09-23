@@ -125,7 +125,7 @@ internal sealed class SetupFeatureResolver(
             return [configuredStack.Trim()];
         }
 
-        if (!options.NonInteractive && _interaction.IsInteractive)
+        if (!options.NonInteractive && !options.AssumeYes && options.OutputMode != SetupOutputMode.Json && _interaction.IsInteractive)
         {
             StackChoicesResult choices = await BuildStackChoicesAsync(cancellationToken);
 
@@ -148,8 +148,7 @@ internal sealed class SetupFeatureResolver(
             if (choices.PromptChoices.Count == 0)
             {
                 // Every supported stack is already installed; nothing to
-                // offer. Treat as a clean opt-out so the caller marks the
-                // first-run flag and exits without prompting.
+                // offer. Treat as a clean no-op without prompting.
                 return null;
             }
 
@@ -159,6 +158,13 @@ internal sealed class SetupFeatureResolver(
                 cancellationToken);
 
             return picked;
+        }
+
+        if (options.AssumeYes && options.OutputMode == SetupOutputMode.Plain)
+        {
+            _interaction.WriteHint(
+                "No language stack was selected. Setup targets only the host and extension bundle. "
+                + "For language-specific setup, run `func setup --yes --features <stack>`.");
         }
 
         return ["runtime"];
