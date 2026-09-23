@@ -304,7 +304,7 @@ if ($Version) {
 }
 
 $assetExt = if ($os -eq 'win') { 'zip' } else { 'tar.gz' }
-$assetName = "Azure.Functions.Cli.$rid.$Version.$assetExt"
+$assetName = "func-$rid.$assetExt"
 $downloadUrl = "$Script:DownloadBaseUrl/public/cli/v5/$Version/$assetName"
 
 # Probe availability up front so an unavailable version fails with a clear message
