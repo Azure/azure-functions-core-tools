@@ -29,6 +29,12 @@ public sealed class CdnReleaseChecksumTests
             _digest + "  wrong.zip",
             _digest + "  ../{filename}",
             _digest + "  {filename}\n" + _digest + "  {filename}",
+            _digest + "  {filename}\r",
+            _digest + "  {filename}\n\n",
+            _digest + "  {filename}\r\n\r\n",
+            _digest + "  {filename}\n\r",
+            _digest + "  {filename}\r\r\n",
+            _digest + "  {filename}\n\r\n",
         ];
         foreach (bool pinned in _pinnedCases)
         {
@@ -61,7 +67,13 @@ public sealed class CdnReleaseChecksumTests
 
     [Theory]
     [InlineData(false, false, "5.1.0", "")]
+    [InlineData(false, false, "5.1.0", "\n")]
+    [InlineData(false, false, "5.1.0", "\r\n")]
+    [InlineData(false, true, "5.2.0-preview.1", "")]
     [InlineData(false, true, "5.2.0-preview.1", "\n")]
+    [InlineData(false, true, "5.2.0-preview.1", "\r\n")]
+    [InlineData(true, false, "5.1.0", "")]
+    [InlineData(true, false, "5.1.0", "\n")]
     [InlineData(true, false, "5.1.0", "\r\n")]
     public async Task Discovery_ValidSidecar_BindsChecksumToSelectedArtifact(
         bool pinned, bool preview, string expectedVersion, string newline)
