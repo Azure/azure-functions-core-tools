@@ -16,6 +16,7 @@ using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.DotNet;
 using Azure.Functions.Cli.Templates.V2;
+using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workers;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Extensions.Configuration;
@@ -127,6 +128,7 @@ internal static class CliHostFactory
         builder.Services.AddWorkloadInstaller();
         builder.Services.AddQuickstartManifest();
         builder.Services.AddManagedAzurite();
+        builder.Services.AddCliUpdate();
         builder.Services.AddTemplatesOrchestrator();
         builder.Services.AddV2TemplateEngine();
         builder.Services.AddDotNetTemplateEngine();
