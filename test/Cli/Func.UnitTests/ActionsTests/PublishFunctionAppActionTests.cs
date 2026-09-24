@@ -96,6 +96,30 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             Assert.Equal("native", setting);
         }
 
+        [Fact]
+        public async Task UpdateFrameworkVersions_GoForcePublish_UsesGoLinuxFxVersion()
+        {
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp,linux",
+                Sku = "elasticpremium",
+                LinuxFxVersion = "Node|22"
+            };
+            var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
+            helperServiceMock
+                .Setup(x => x.UpdateWebSettings(site, It.IsAny<Dictionary<string, string>>()))
+                .ReturnsAsync(new HttpResult<string, string>(string.Empty));
+
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.Go, null, true, helperServiceMock.Object);
+
+            helperServiceMock.Verify(
+                x => x.UpdateWebSettings(
+                    site,
+                    It.Is<Dictionary<string, string>>(settings =>
+                        settings.Count == 1 && settings[Constants.LinuxFxVersion] == "Go|1.0")),
+                Times.Once);
+        }
+
         [Theory]
         [InlineData("functionapp", "11.0", "netFrameworkVersion", "v11.0")]
         [InlineData("functionapp", "v11.0", "netFrameworkVersion", "v11.0")]

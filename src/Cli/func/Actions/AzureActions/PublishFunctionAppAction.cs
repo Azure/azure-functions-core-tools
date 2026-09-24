@@ -180,8 +180,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             Utilities.WarnIfGoWorkerRuntime(workerRuntime);
 
-            // Go is cross-compiled to linux/amd64. Reject Windows targets and unsupported
-            // build modes up front; all Linux hosting SKUs use the same local Go artifact.
+            // Go is cross-compiled to linux/amd64. Reject unsupported hosting plans and
+            // build modes up front; supported Linux plans use the same local Go artifact.
             if (workerRuntime == WorkerRuntime.Go)
             {
                 ValidateGoPublishOptions(functionApp, PublishBuildOption, BuildNativeDeps);
@@ -349,7 +349,10 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if ((functionApp.IsFlex && !string.IsNullOrEmpty(workerRuntimeStr)) ||
                 (!functionApp.IsFlex && functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out workerRuntimeStr)))
             {
-                var resolution = $"You can pass --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
+                string expectedWorkerRuntimeSetting = functionApp.IsFlex
+                    ? WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime)
+                    : GetFunctionAppWorkerRuntimeSetting(workerRuntime);
+                var resolution = $"You can pass --force to update your Azure app with '{expectedWorkerRuntimeSetting}' as a '{Constants.FunctionsWorkerRuntime}'";
                 try
                 {
                     var azureWorkerRuntime = NormalizeFunctionAppWorkerRuntime(workerRuntimeStr, workerRuntime);
@@ -357,8 +360,8 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         if (Force)
                         {
-                            ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
-                            result[Constants.FunctionsWorkerRuntime] = GetFunctionAppWorkerRuntimeSetting(workerRuntime);
+                            ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{expectedWorkerRuntimeSetting}' because --force was passed"));
+                            result[Constants.FunctionsWorkerRuntime] = expectedWorkerRuntimeSetting;
                         }
                         else if (workerRuntime == WorkerRuntime.DotnetIsolated)
                         {
@@ -377,7 +380,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
                 catch (ArgumentException) when (Force)
                 {
-                    result[Constants.FunctionsWorkerRuntime] = GetFunctionAppWorkerRuntimeSetting(workerRuntime);
+                    result[Constants.FunctionsWorkerRuntime] = expectedWorkerRuntimeSetting;
                 }
                 catch (ArgumentException) when (!Force)
                 {
@@ -596,7 +599,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         var updatedSettings = new Dictionary<string, string>
                         {
-                            [Constants.LinuxFxVersion] = $"DOCKER|{Constants.WorkerRuntimeImages.GetValueOrDefault(workerRuntime).FirstOrDefault()}"
+                            [Constants.LinuxFxVersion] = GetLinuxFxVersionForWorkerRuntime(workerRuntime)
                         };
 
                         var settingsResult = await helperService.UpdateWebSettings(functionApp, updatedSettings);
@@ -615,6 +618,22 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                 }
             }
+        }
+
+        internal static string GetLinuxFxVersionForWorkerRuntime(WorkerRuntime workerRuntime)
+        {
+            if (workerRuntime == WorkerRuntime.Go)
+            {
+                return "Go|1.0";
+            }
+
+            if (Constants.WorkerRuntimeImages.TryGetValue(workerRuntime, out IEnumerable<string> images) &&
+                images.FirstOrDefault() is string image)
+            {
+                return $"DOCKER|{image}";
+            }
+
+            throw new CliException($"Unable to determine the expected LinuxFxVersion for worker runtime {workerRuntime}.");
         }
 
         private static async Task UpdateDotNetIsolatedFrameworkVersion(Site functionApp, string dotnetFrameworkVersion, AzureHelperService helperService)
