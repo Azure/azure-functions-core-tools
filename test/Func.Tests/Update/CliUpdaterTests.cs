@@ -27,7 +27,10 @@ public sealed class CliUpdaterTests
 
     private static readonly Release _stableRelease = new(
         SemVersion.Parse("5.1.0", SemVersionStyles.Strict),
-        new Uri("public/cli/v5/5.1.0/Azure.Functions.Cli.linux-x64.5.1.0.zip", UriKind.Relative));
+        new Uri("public/cli/v5/5.1.0/Azure.Functions.Cli.linux-x64.5.1.0.zip", UriKind.Relative))
+    {
+        Sha256Checksum = new string('a', 64),
+    };
 
     [Fact]
     public async Task UpdateAsync_HappyPath_DownloadsExtractsSwapsAndVerifies()
@@ -66,6 +69,111 @@ public sealed class CliUpdaterTests
 
         Assert.Contains("503", ex.Message, StringComparison.Ordinal);
         Assert.Contains("again", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_DownloadTimeout_ThrowsGracefulWithRetryHint()
+    {
+        var handler = new StubHttpMessageHandler((_, _) => throw new OperationCanceledException("timeout"));
+        (CliUpdater updater, _, _, _) = CreateUpdater(httpHandler: handler);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("Timed out", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("again", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.IsType<OperationCanceledException>(ex.InnerException);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_CallerCancellation_PropagatesCancellation()
+    {
+        (CliUpdater updater, _, _, _) = CreateUpdater(httpHandler: SuccessDownloadHandler());
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => updater.UpdateAsync(_stableRelease, cancellation.Token));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_LockUnavailable_DoesNotStageOrDownload()
+    {
+        IUpdateLockProvider updateLockProvider = Substitute.For<IUpdateLockProvider>();
+        updateLockProvider.Acquire(_fakeInstallDir).Returns(_ =>
+            throw new GracefulException("another update", isUserError: true));
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler(),
+            updateLockProvider);
+
+        GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.Equal("another update", ex.Message);
+        fileSystem.DidNotReceive().CreateTempDirectory(Arg.Any<string>());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UpdateAsync_BodyTimeout_ThrowsGracefulAndReleasesLock(bool failOnOpen)
+    {
+        var failure = new OperationCanceledException("body timeout");
+        var handler = new StubHttpMessageHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new FailingHttpContent(failure, failOnOpen),
+        });
+        IUpdateLockProvider lockProvider = Substitute.For<IUpdateLockProvider>();
+        IDisposable updateLock = Substitute.For<IDisposable>();
+        lockProvider.Acquire(_fakeInstallDir).Returns(updateLock);
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(handler, lockProvider);
+        ReadDownloadBody(fileSystem);
+
+        var ex = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.True(ex.IsUserError);
+        Assert.Contains("Timed out", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("run 'func update' again", ex.Message, StringComparison.Ordinal);
+        Assert.Same(failure, ex.InnerException);
+        fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
+        updateLock.Received(1).Dispose();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UpdateAsync_CallerCancellationDuringBodyRead_PropagatesCancellation(bool failOnOpen)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var failure = new OperationCanceledException(cancellation.Token);
+        var handler = new StubHttpMessageHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new FailingHttpContent(failure, failOnOpen, cancellation.Cancel),
+        });
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(handler);
+        ReadDownloadBody(fileSystem);
+
+        var ex = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => updater.UpdateAsync(_stableRelease, cancellation.Token));
+
+        Assert.Same(failure, ex);
+        Assert.Equal(cancellation.Token, ex.CancellationToken);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_DownloadWriteFailure_PreservesIoError()
+    {
+        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(SuccessDownloadHandler());
+        var failure = new IOException("disk full");
+        fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(failure);
+
+        var ex = await Assert.ThrowsAsync<IOException>(
+            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+
+        Assert.Same(failure, ex);
     }
 
     [Fact]
@@ -119,30 +227,32 @@ public sealed class CliUpdaterTests
     public async Task UpdateAsync_ChecksumMismatch_ThrowsGracefulBeforeExtract()
     {
         // Arrange — release carries an expected checksum that won't match
-        Release releaseWithChecksum = _stableRelease with { Sha256Checksum = "expected0000" };
+        Release releaseWithChecksum = _stableRelease;
+        string actualChecksum = new('b', 64);
 
         (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
         fileSystem.ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("actual1111");
+            .Returns(actualChecksum);
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
             () => updater.UpdateAsync(releaseWithChecksum, CancellationToken.None));
 
         Assert.Contains("Checksum mismatch", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("expected0000", ex.Message, StringComparison.Ordinal);
-        Assert.Contains("actual1111", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(releaseWithChecksum.Sha256Checksum, ex.Message, StringComparison.Ordinal);
+        Assert.Contains(actualChecksum, ex.Message, StringComparison.Ordinal);
 
         // Extract should never have been called
         fileSystem.DidNotReceive().ExtractZip(Arg.Any<string>(), Arg.Any<string>());
+        fileSystem.DidNotReceive().ExtractTarGz(Arg.Any<string>(), Arg.Any<string>());
+        fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
-    public async Task UpdateAsync_NoChecksum_SkipsVerificationAndProceeds()
+    public async Task UpdateAsync_MatchingChecksum_VerifiesBeforeExtraction()
     {
-        // Arrange — null checksum (current state until feed publishes them)
         (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
@@ -155,8 +265,19 @@ public sealed class CliUpdaterTests
         // Act
         await updater.UpdateAsync(_stableRelease, CancellationToken.None);
 
-        // Assert — ComputeSha256Async was never called
-        await fileSystem.DidNotReceive().ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await fileSystem.Received(1).ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
+        Received.InOrder(() =>
+        {
+            _ = fileSystem.ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
+            if (Release.ArchiveExtension == "zip")
+            {
+                fileSystem.ExtractZip(Arg.Any<string>(), _fakeExtractDir);
+            }
+            else
+            {
+                fileSystem.ExtractTarGz(Arg.Any<string>(), _fakeExtractDir);
+            }
+        });
     }
 
     [Fact]
@@ -265,11 +386,18 @@ public sealed class CliUpdaterTests
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static (CliUpdater Updater, IFileSystem FileSystem, IProcessRunner ProcessRunner, CliEnvironmentOptions Environment)
-        CreateUpdater(StubHttpMessageHandler httpHandler)
+        CreateUpdater(StubHttpMessageHandler httpHandler, IUpdateLockProvider? updateLockProvider = null)
     {
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
         var environment = new CliEnvironmentOptions { ProcessPath = _fakeProcessPath };
         IProcessRunner processRunner = Substitute.For<IProcessRunner>();
+        fileSystem.ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(_stableRelease.Sha256Checksum);
+        if (updateLockProvider is null)
+        {
+            updateLockProvider = Substitute.For<IUpdateLockProvider>();
+            updateLockProvider.Acquire(_fakeInstallDir).Returns(Substitute.For<IDisposable>());
+        }
 
         fileSystem.CreateTempDirectory(Arg.Any<string>())
             .Returns(
@@ -281,8 +409,26 @@ public sealed class CliUpdaterTests
             BaseAddress = new Uri("https://cdn.functions.azure.com/"),
         };
 
-        CliUpdater updater = new(client, fileSystem, Options.Create(environment), processRunner, NullLogger<CliUpdater>.Instance);
+        CliUpdater updater = new(
+            client,
+            fileSystem,
+            Options.Create(environment),
+            processRunner,
+            updateLockProvider,
+            NullLogger<CliUpdater>.Instance);
         return (updater, fileSystem, processRunner, environment);
+    }
+
+    private static void ReadDownloadBody(IFileSystem fileSystem)
+    {
+        fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                Stream content = call.ArgAt<Stream>(1);
+                CancellationToken cancellationToken = call.ArgAt<CancellationToken>(2);
+                byte[] buffer = new byte[1];
+                await content.ReadExactlyAsync(buffer.AsMemory(), cancellationToken);
+            });
     }
 
     private static StubHttpMessageHandler SuccessDownloadHandler()

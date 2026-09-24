@@ -14,6 +14,7 @@ internal sealed partial class CliUpdater(
     IFileSystem fileSystem,
     IOptions<CliEnvironmentOptions> environmentOptions,
     IProcessRunner processRunner,
+    IUpdateLockProvider updateLockProvider,
     ILogger<CliUpdater> logger) : ICliUpdater
 {
     private const string OldFileSuffix = ".old";
@@ -22,6 +23,7 @@ internal sealed partial class CliUpdater(
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly CliEnvironmentOptions _environment = (environmentOptions ?? throw new ArgumentNullException(nameof(environmentOptions))).Value;
     private readonly IProcessRunner _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
+    private readonly IUpdateLockProvider _updateLockProvider = updateLockProvider ?? throw new ArgumentNullException(nameof(updateLockProvider));
     private readonly ILogger<CliUpdater> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task UpdateAsync(Release release, CancellationToken cancellationToken)
@@ -30,6 +32,7 @@ internal sealed partial class CliUpdater(
 
         string binaryPath = GetBinaryPath();
         string installDir = Path.GetDirectoryName(binaryPath)!;
+        using IDisposable updateLock = _updateLockProvider.Acquire(installDir);
 
         // Stage the download on the same volume as the install directory so
         // File.Move never crosses volume boundaries.
@@ -170,21 +173,11 @@ internal sealed partial class CliUpdater(
 
     private async Task DownloadAsync(Release release, string zipPath, CancellationToken cancellationToken)
     {
-        HttpResponseMessage response;
         try
         {
-            response = await _httpClient.GetAsync(release.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new GracefulException(
-                $"Could not reach the CDN to download func {release.Version}. Check your connection and run 'func update' again.",
-                ex,
-                isUserError: true);
-        }
+            using HttpResponseMessage response = await _httpClient.GetAsync(
+                release.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
-        using (response)
-        {
             if (!response.IsSuccessStatusCode)
             {
                 throw new GracefulException(
@@ -195,17 +188,24 @@ internal sealed partial class CliUpdater(
             await using Stream content = await response.Content.ReadAsStreamAsync(cancellationToken);
             await _fileSystem.SaveStreamToFileAsync(zipPath, content, cancellationToken);
         }
+        catch (HttpRequestException ex)
+        {
+            throw new GracefulException(
+                $"Could not reach the CDN to download func {release.Version}. Check your connection and run 'func update' again.",
+                ex,
+                isUserError: true);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new GracefulException(
+                $"Timed out while downloading func {release.Version}. Check your connection and run 'func update' again.",
+                ex,
+                isUserError: true);
+        }
     }
 
     private async Task VerifyChecksumAsync(Release release, string filePath, CancellationToken cancellationToken)
     {
-        if (release.Sha256Checksum is null)
-        {
-            // TODO: Remove this early-return once the release feed publishes checksums (#5445).
-            Log.NoChecksumAvailable(_logger, release.Version);
-            return;
-        }
-
         string actual = await _fileSystem.ComputeSha256Async(filePath, cancellationToken);
 
         if (!string.Equals(actual, release.Sha256Checksum, StringComparison.OrdinalIgnoreCase))
@@ -323,9 +323,6 @@ internal sealed partial class CliUpdater(
 
         [LoggerMessage(LogLevel.Information, "Previous version restored.")]
         public static partial void PreviousVersionRestored(ILogger logger);
-
-        [LoggerMessage(LogLevel.Debug, "No checksum available for {Version}; skipping integrity check.")]
-        public static partial void NoChecksumAvailable(ILogger logger, object version);
 
         [LoggerMessage(LogLevel.Debug, "Checksum verified for {Version}.")]
         public static partial void ChecksumVerified(ILogger logger, object version);

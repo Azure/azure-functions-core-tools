@@ -43,7 +43,7 @@ internal sealed partial class CdnReleaseFeed(
                     $"Error reading version manifest from '{ManifestPath}': no valid version found");
             }
 
-            return new Release(best, BuildDownloadUri(best));
+            return await CreateReleaseAsync(best, BuildDownloadUri(best), cancellationToken);
         }
         else
         {
@@ -59,7 +59,7 @@ internal sealed partial class CdnReleaseFeed(
                     $"Error reading version manifest from '{ManifestPath}': invalid version '{manifest.Stable}'");
             }
 
-            return new Release(version, BuildDownloadUri(version));
+            return await CreateReleaseAsync(version, BuildDownloadUri(version), cancellationToken);
         }
     }
 
@@ -71,7 +71,10 @@ internal sealed partial class CdnReleaseFeed(
 
         // Verify the artifact exists on CDN with a HEAD request.
         using var request = new HttpRequestMessage(HttpMethod.Head, downloadUri);
-        using HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using HttpResponseMessage response = await SendAsync(
+            request,
+            $"checking version {version}",
+            cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -89,12 +92,80 @@ internal sealed partial class CdnReleaseFeed(
                 $"Error checking version {version} at '{downloadUri}': {response.StatusCode}", ex);
         }
 
-        return new Release(version, downloadUri);
+        return await CreateReleaseAsync(version, downloadUri, cancellationToken);
+    }
+
+    private async Task<Release> CreateReleaseAsync(SemVersion version, Uri downloadUri, CancellationToken cancellationToken)
+    {
+        string sidecarPath = $"{downloadUri}.sha256";
+        using var request = new HttpRequestMessage(HttpMethod.Get, sidecarPath);
+        using HttpResponseMessage response = await SendAsync(request, $"reading checksum sidecar '{sidecarPath}'", cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Could not read checksum sidecar '{sidecarPath}': {response.StatusCode}. " +
+                "The update cannot be verified. Try again later.");
+        }
+
+        string body;
+        try
+        {
+            await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var reader = new StreamReader(stream);
+            body = await reader.ReadToEndAsync(cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                $"Timed out while reading checksum sidecar '{sidecarPath}'. Check your connection and try again.", ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvalidOperationException(
+                $"Could not read checksum sidecar '{sidecarPath}'. Check your connection and try again.", ex);
+        }
+        catch (IOException ex)
+        {
+            throw new InvalidOperationException(
+                $"Could not read checksum sidecar '{sidecarPath}'. Check your connection and try again.", ex);
+        }
+
+        string entry = body;
+        if (entry.EndsWith("\r\n", StringComparison.Ordinal))
+        {
+            entry = entry[..^2];
+        }
+        else if (entry.EndsWith('\n'))
+        {
+            entry = entry[..^1];
+        }
+
+        if (entry.Length < 67 || entry[64] != ' ' || entry[65] != ' ' || !entry[..64].All(Uri.IsHexDigit))
+        {
+            throw new InvalidOperationException(
+                $"Invalid checksum sidecar '{sidecarPath}': expected a 64-hex SHA-256 digest followed by two spaces and the artifact filename. " +
+                "The update cannot be verified. Try again later.");
+        }
+
+        string expectedFileName = Path.GetFileName(downloadUri.OriginalString);
+        if (!string.Equals(entry[66..], expectedFileName, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Invalid checksum sidecar '{sidecarPath}': expected artifact filename '{expectedFileName}'. " +
+                "The update cannot be verified. Try again later.");
+        }
+
+        return new Release(version, downloadUri) { Sha256Checksum = entry[..64] };
     }
 
     private async Task<VersionManifest> FetchManifestAsync(CancellationToken cancellationToken)
     {
-        using HttpResponseMessage response = await _httpClient.GetAsync(ManifestPath, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, ManifestPath);
+        using HttpResponseMessage response = await SendAsync(
+            request,
+            "reading the version manifest",
+            cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -102,15 +173,32 @@ internal sealed partial class CdnReleaseFeed(
                 $"Error reading version manifest from '{ManifestPath}': {response.StatusCode}");
         }
 
-        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-
         VersionManifest? manifest;
         try
         {
+            await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             manifest = await JsonSerializer.DeserializeAsync(
                 stream,
                 UpdateJsonContext.Default.VersionManifest,
                 cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                "Timed out while reading the version manifest from the Azure Functions CLI CDN. Check your connection and try again.",
+                ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvalidOperationException(
+                "Could not read the version manifest from the Azure Functions CLI CDN. Check your connection and try again.",
+                ex);
+        }
+        catch (IOException ex)
+        {
+            throw new InvalidOperationException(
+                "Could not read the version manifest from the Azure Functions CLI CDN. Check your connection and try again.",
+                ex);
         }
         catch (JsonException ex)
         {
@@ -125,6 +213,29 @@ internal sealed partial class CdnReleaseFeed(
         }
 
         return manifest;
+    }
+
+    private async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        string operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                $"Timed out while {operation} from the Azure Functions CLI CDN. Check your connection and try again.",
+                ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvalidOperationException(
+                $"Could not reach the Azure Functions CLI CDN while {operation}. Check your connection and try again.",
+                ex);
+        }
     }
 
     private SemVersion? TryParseVersion(string? versionString, string fieldName)

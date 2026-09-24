@@ -22,6 +22,7 @@ public sealed class CdnReleaseFeedTests
 
         latest.Version.ToString().Should().Be("5.1.0");
         latest.IsPrerelease.Should().BeFalse();
+        latest.Sha256Checksum.Should().Be(new string('a', 64));
     }
 
     [Fact]
@@ -35,6 +36,7 @@ public sealed class CdnReleaseFeedTests
 
         latest.Version.ToString().Should().Be("5.2.0-preview.1");
         latest.IsPrerelease.Should().BeTrue();
+        latest.Sha256Checksum.Should().Be(new string('a', 64));
     }
 
     [Fact]
@@ -101,7 +103,9 @@ public sealed class CdnReleaseFeedTests
                 return MakeJsonResponse(LoadFixture());
             }
 
-            return new HttpResponseMessage(HttpStatusCode.OK);
+            return request.Method == HttpMethod.Head
+                ? new HttpResponseMessage(HttpStatusCode.OK)
+                : MakeChecksumResponse(request);
         });
 
         CdnReleaseFeed feed = CreateFeed(handler);
@@ -111,6 +115,7 @@ public sealed class CdnReleaseFeedTests
 
         result.Version.ToString().Should().Be("5.0.0-preview.1");
         result.IsPrerelease.Should().BeTrue();
+        result.Sha256Checksum.Should().Be(new string('a', 64));
     }
 
     [Fact]
@@ -182,6 +187,64 @@ public sealed class CdnReleaseFeedTests
     }
 
     [Fact]
+    public async Task GetLatestAsync_ConnectionFailure_ThrowsActionableError()
+    {
+        CdnReleaseFeed feed = CreateFeed((_, _) => throw new HttpRequestException("offline"));
+
+        InvalidOperationException ex = (await FluentActions
+            .Awaiting(() => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        ex.Message.Should().Contain("Could not reach");
+        ex.Message.Should().Contain("Check your connection");
+        ex.InnerException.Should().BeOfType<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task GetLatestAsync_Timeout_ThrowsActionableError()
+    {
+        CdnReleaseFeed feed = CreateFeed((_, _) => throw new OperationCanceledException("timeout"));
+
+        InvalidOperationException ex = (await FluentActions
+            .Awaiting(() => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        ex.Message.Should().Contain("Timed out");
+        ex.Message.Should().Contain("Check your connection");
+        ex.InnerException.Should().BeOfType<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task GetVersionAsync_ConnectionFailure_ThrowsActionableError()
+    {
+        CdnReleaseFeed feed = CreateFeed((_, _) => throw new HttpRequestException("offline"));
+        var target = SemVersion.Parse("5.1.0", SemVersionStyles.Strict);
+
+        InvalidOperationException ex = (await FluentActions
+            .Awaiting(() => feed.GetVersionAsync(target, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        ex.Message.Should().Contain("Could not reach");
+        ex.Message.Should().Contain("Check your connection");
+        ex.InnerException.Should().BeOfType<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task GetVersionAsync_Timeout_ThrowsActionableError()
+    {
+        CdnReleaseFeed feed = CreateFeed((_, _) => throw new OperationCanceledException("timeout"));
+        var target = SemVersion.Parse("5.1.0", SemVersionStyles.Strict);
+
+        InvalidOperationException ex = (await FluentActions
+            .Awaiting(() => feed.GetVersionAsync(target, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>()).Which;
+
+        ex.Message.Should().Contain("Timed out");
+        ex.Message.Should().Contain("Check your connection");
+        ex.InnerException.Should().BeOfType<OperationCanceledException>();
+    }
+
+    [Fact]
     public async Task GetLatestAsync_PreCancelledToken_ThrowsOperationCanceled()
     {
         var handler = new StubHttpMessageHandler(RespondWithManifest());
@@ -193,17 +256,112 @@ public sealed class CdnReleaseFeedTests
         await FluentActions.Awaiting(() => feed.GetLatestAsync(includePrerelease: false, cts.Token)).Should().ThrowAsync<TaskCanceledException>();
     }
 
+    [Fact]
+    public async Task GetVersionAsync_PreCancelledToken_ThrowsOperationCanceled()
+    {
+        var handler = new StubHttpMessageHandler((_, cancellationToken) =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        CdnReleaseFeed feed = CreateFeed(handler);
+        var target = SemVersion.Parse("5.1.0", SemVersionStyles.Strict);
+
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await FluentActions.Awaiting(() => feed.GetVersionAsync(target, cts.Token)).Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetLatestAsync_BodyTimeout_ThrowsActionableError(bool failOnOpen)
+    {
+        var failure = new OperationCanceledException("body timeout");
+        CdnReleaseFeed feed = CreateFeed((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new FailingHttpContent(failure, failOnOpen),
+        });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None));
+
+        ex.Message.Should().Contain("Timed out").And.Contain("Check your connection");
+        ex.InnerException.Should().BeSameAs(failure);
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public async Task GetLatestAsync_BodyConnectionFailure_ThrowsActionableError(bool failOnOpen, bool ioFailure)
+    {
+        Exception failure = ioFailure ? new IOException("connection reset") : new HttpRequestException("connection reset");
+        CdnReleaseFeed feed = CreateFeed((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new FailingHttpContent(failure, failOnOpen),
+        });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None));
+
+        ex.Message.Should().Contain("Could not read").And.Contain("Check your connection");
+        ex.InnerException.Should().BeSameAs(failure);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetLatestAsync_CallerCancellationDuringBodyRead_PropagatesCancellation(bool failOnOpen)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var failure = new OperationCanceledException(cancellation.Token);
+        CdnReleaseFeed feed = CreateFeed((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new FailingHttpContent(failure, failOnOpen, cancellation.Cancel),
+        });
+
+        var ex = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => feed.GetLatestAsync(includePrerelease: false, cancellation.Token));
+
+        ex.Should().BeSameAs(failure);
+        ex.CancellationToken.Should().Be(cancellation.Token);
+    }
+
+    [Fact]
+    public async Task GetLatestAsync_InvalidJson_PreservesFormatError()
+    {
+        CdnReleaseFeed feed = CreateFeed(RespondWithJson("{"));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => feed.GetLatestAsync(includePrerelease: false, CancellationToken.None));
+
+        ex.Message.Should().Contain("invalid format");
+        ex.InnerException.Should().BeAssignableTo<System.Text.Json.JsonException>();
+    }
+
     private static Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> RespondWithManifest()
     {
         byte[] body = LoadFixture();
-        return (_, _) => MakeJsonResponse(body);
+        return (request, _) => request.RequestUri!.AbsolutePath.EndsWith(".sha256", StringComparison.Ordinal)
+            ? MakeChecksumResponse(request)
+            : MakeJsonResponse(body);
     }
 
     private static Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> RespondWithJson(string json)
     {
         byte[] body = System.Text.Encoding.UTF8.GetBytes(json);
-        return (_, _) => MakeJsonResponse(body);
+        return (request, _) => request.RequestUri!.AbsolutePath.EndsWith(".sha256", StringComparison.Ordinal)
+            ? MakeChecksumResponse(request)
+            : MakeJsonResponse(body);
     }
+
+    private static HttpResponseMessage MakeChecksumResponse(HttpRequestMessage request) => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent($"{new string('a', 64)}  {Path.GetFileName(request.RequestUri!.AbsolutePath)[..^7]}\n"),
+    };
 
     private static HttpResponseMessage MakeJsonResponse(byte[] body) => new(HttpStatusCode.OK)
     {
