@@ -5,7 +5,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
 /// Host-parameter keys under which resolved project context
-/// (<see cref="FuncTemplateEngineContext"/>) is exposed to
+/// (<see cref="TemplateEngineContext"/>) is exposed to
 /// <c>Microsoft.TemplateEngine</c>. The <c>func:</c> prefix keeps them from
 /// colliding with the engine's built-in host params (e.g. <c>prefs:language</c>).
 /// Func custom constraints read these values back via
@@ -13,15 +13,28 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </summary>
 internal static class FuncTemplateEngineHostParameters
 {
-    /// <summary>Resolved stack (e.g. <c>dotnet</c>, <c>node</c>, <c>python</c>).</summary>
+    /// <summary>
+    /// Resolved project root directory.
+    /// </summary>
+    public const string ProjectRoot = "func:project-root";
+
+    /// <summary>
+    /// Resolved stack (e.g. <c>dotnet</c>, <c>node</c>, <c>python</c>).
+    /// </summary>
     public const string Stack = "func:stack";
 
-    /// <summary>Resolved language (e.g. <c>C#</c>, <c>typescript</c>).</summary>
+    /// <summary>
+    /// Resolved language (e.g. <c>C#</c>, <c>typescript</c>).
+    /// </summary>
     public const string Language = "func:language";
 
-    /// <summary>Resolved extension-bundle version the project targets.</summary>
+    /// <summary>
+    /// Resolved extension-bundle version the project targets.
+    /// </summary>
     public const string BundleVersion = "func:bundle-version";
 
-    /// <summary>Resolved extension-bundle channel the project targets.</summary>
+    /// <summary>
+    /// Resolved extension-bundle ID the project targets.
+    /// </summary>
     public const string BundleId = "func:bundle-id";
 }

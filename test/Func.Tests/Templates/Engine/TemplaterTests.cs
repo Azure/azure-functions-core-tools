@@ -3,8 +3,7 @@
 
 using System.Reflection;
 using AwesomeAssertions;
-using Azure.Functions.Cli.Bundles;
-using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Installer;
@@ -83,10 +82,7 @@ public class TemplaterTests : IDisposable
     }
 
     private Templater CreateTemplater()
-        => Templater.Create(
-            new ProjectResolutionResult.NotResolved("test: no project resolved"),
-            new ExtensionBundleResolution.NotResolved("test: no bundle installed"),
-            settingsLocation: _hive);
+        => Templater.Create(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), settingsLocation: _hive);
 
     private string CreateSampleTemplatePackage()
     {
