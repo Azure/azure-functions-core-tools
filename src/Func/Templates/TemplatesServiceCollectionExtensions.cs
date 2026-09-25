@@ -36,6 +36,7 @@ internal static class TemplatesServiceCollectionExtensions
         services.AddSingleton<NewCommandRenderer>();
         services.AddSingleton<INewCommandResultRenderer, NewCommandResultRenderer>();
         services.AddSingleton<INewCommandRunner, NewCommandRunner>();
+        services.AddSingleton<ITemplaterFactory, TemplaterFactory>();
 
         return services;
     }
