@@ -108,6 +108,20 @@ public class TelemetryTests
     }
 
     [Fact]
+    public void StartWorkloadBootActivity_WithMeasuredDuration_UsesMeasuredDuration()
+    {
+        using var listener = SubscribeListener();
+        var measuredDuration = TimeSpan.FromMilliseconds(250);
+
+        var activity = CliTelemetry.Trace.StartWorkloadBootActivity(measuredDuration);
+        activity.Should().NotBeNull();
+        activity.Dispose();
+
+        activity.OperationName.Should().Be(TelemetryConventions.WorkloadBootActivityName);
+        activity.Duration.Should().BeGreaterThanOrEqualTo(measuredDuration);
+    }
+
+    [Fact]
     public void SetCommandName_AppliesDisplayNameAndTag()
     {
         using var listener = SubscribeListener();

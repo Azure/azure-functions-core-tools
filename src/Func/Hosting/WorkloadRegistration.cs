@@ -3,7 +3,6 @@
 
 using System.Diagnostics;
 using Azure.Functions.Cli.Console;
-using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Invocation;
 using Azure.Functions.Cli.Workloads.Loading;
@@ -30,12 +29,6 @@ namespace Azure.Functions.Cli.Hosting;
 /// versions stay in the on-disk registry for rollback but aren't loaded into
 /// the process. Content-only entries are added to the provider inventory;
 /// meta entries are skipped.
-/// <para>
-/// Boot duration is captured by the <c>cli.workload.boot</c> activity opened
-/// here; the <see cref="WorkloadBootMetricListener"/> translates that
-/// activity's stop into the boot-duration histogram so the metric and the
-/// trace stay in sync (workload count, error.type on failure).
-/// </para>
 /// </remarks>
 internal static class WorkloadRegistration
 {
@@ -48,7 +41,7 @@ internal static class WorkloadRegistration
     /// <param name="paths">Pre-resolved workload paths, including the workload home. Construct with the default ctor to use the env-var-aware resolver, or with an explicit home in tests.</param>
     /// <param name="interaction">Used to surface per-workload load and Configure failures as warnings.</param>
     /// <param name="cancellationToken">Cancellation propagated to manifest reads.</param>
-    public static async Task RegisterWorkloadsAsync(
+    public static async Task<WorkloadBootTelemetry> RegisterWorkloadsAsync(
         IServiceCollection services,
         WorkloadPathsOptions paths,
         IInteractionService interaction,
@@ -58,20 +51,10 @@ internal static class WorkloadRegistration
         ArgumentNullException.ThrowIfNull(paths);
         ArgumentNullException.ThrowIfNull(interaction);
 
-        // The activity name doubles as the metric scope: WorkloadBootMetricListener
-        // translates the stop event into cli.workload.boot_duration with the
-        // same count tag and, on failure, the same error.type tag.
-        using Activity? activity = CliTelemetry.Trace.StartWorkloadBootActivity();
-        try
-        {
-            int loadedCount = await RegisterCoreAsync(services, paths, interaction, cancellationToken);
-            activity?.SetTag(TelemetryConventions.CliWorkloadCount, loadedCount);
-        }
-        catch (Exception ex)
-        {
-            activity?.Fail(ex);
-            throw;
-        }
+        var stopwatch = Stopwatch.StartNew();
+        int loadedCount = await RegisterCoreAsync(services, paths, interaction, cancellationToken);
+        stopwatch.Stop();
+        return new WorkloadBootTelemetry(loadedCount, stopwatch.Elapsed);
     }
 
     private static async Task<int> RegisterCoreAsync(
@@ -220,3 +203,5 @@ internal static class WorkloadRegistration
     private static NuGetVersion ParseVersionOrZero(string version)
         => NuGetVersion.TryParse(version, out NuGetVersion? parsed) ? parsed : new NuGetVersion(0, 0, 0);
 }
+
+internal sealed record WorkloadBootTelemetry(int WorkloadCount, TimeSpan Duration);

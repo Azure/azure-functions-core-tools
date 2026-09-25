@@ -42,7 +42,8 @@ internal static class CliHostFactory
     public static async Task<IHost> CreateHostAsync(IInteractionService interaction, CancellationToken cancellationToken = default)
     {
         HostApplicationBuilder builder = CreateBuilder(interaction);
-        await builder.RegisterWorkloadsAsync(cancellationToken);
+        WorkloadBootTelemetry workloadBootTelemetry = await builder.RegisterWorkloadsAsync(cancellationToken);
+        builder.Services.AddSingleton(workloadBootTelemetry);
         return builder.Build();
     }
 
@@ -72,10 +73,6 @@ internal static class CliHostFactory
         builder.Services.AddSingleton(configurationPaths);
         builder.Services.AddSingleton(configurationProvider);
         builder.Services.AddSingleton<ICliConfigurationProvider>(configurationProvider);
-
-        // Bridge the cli.workload.boot activity to the boot-duration histogram
-        // so callers only need to start the activity. Idempotent.
-        WorkloadBootMetricListener.EnsureRegistered();
 
         // Only wire OpenTelemetry when a connection string is available and the
         // user hasn't opted out; otherwise ActivitySource / Meter calls no-op.

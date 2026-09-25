@@ -42,14 +42,19 @@ internal static class ActivityExtensions
         }
 
         /// <summary>
-        /// Starts an <see cref="Activity"/> that represents the workload load
-        /// + Configure phase at CLI startup. The activity is also picked up
-        /// by <see cref="WorkloadBootMetricListener"/>, which translates its
-        /// stop into the boot-duration metric so trace and metric stay in
-        /// sync. Returns <c>null</c> when no listener is subscribed.
+        /// Starts an <see cref="Activity"/> that represents the measured
+        /// workload load + Configure phase. The activity is emitted after the
+        /// telemetry provider starts, with its start time shifted back by the
+        /// measured <paramref name="duration"/>.
         /// </summary>
-        public Activity? StartWorkloadBootActivity()
-            => source.StartActivity(TelemetryConventions.WorkloadBootActivityName, ActivityKind.Internal);
+        public Activity? StartWorkloadBootActivity(TimeSpan duration)
+            => source.StartActivity(
+                TelemetryConventions.WorkloadBootActivityName,
+                ActivityKind.Internal,
+                default(ActivityContext),
+                tags: null,
+                links: null,
+                startTime: DateTimeOffset.UtcNow - duration);
     }
 
     extension(Activity activity)
