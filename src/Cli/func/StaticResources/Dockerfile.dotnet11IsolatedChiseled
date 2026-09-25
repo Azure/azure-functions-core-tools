@@ -3,7 +3,7 @@ WORKDIR /src
 COPY . .
 RUN dotnet publish -c Release -o /app/publish
 
-# This image uses a chiseled (minimal) Azure Functions base image for a smaller size and fewer vulnerabilities.
+# This image uses a chiseled (minimal) Azure Functions base image.
 # It doesn't include the .NET runtime, so the next step copies it in from the official .NET image.
 FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated11.0-chiseled AS final
 COPY --from=mcr.microsoft.com/dotnet/aspnet:11.0 /usr/share/dotnet /usr/share/dotnet
