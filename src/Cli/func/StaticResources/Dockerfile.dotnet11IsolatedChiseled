@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet publish -c Release -o /app/publish
+
+# The chiseled Azure Functions base image does not include the .NET runtime, a shell, or a package manager.
+# The ASP.NET Core runtime used by the app is copied in from the official .NET image below.
+FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated11.0-chiseled AS final
+COPY --from=mcr.microsoft.com/dotnet/aspnet:11.0 /usr/share/dotnet /usr/share/dotnet
+
+ENV DOTNET_ROOT=/usr/share/dotnet
+ENV PATH="/usr/share/dotnet:${PATH}" \
+    FUNCTIONS_WORKER_RUNTIME=dotnet-isolated \
+    FUNCTIONS_WORKER_RUNTIME_VERSION=11.0 \
+    AzureFunctionsJobHost__Logging__Console__IsEnabled=true
+
+WORKDIR /home/site/wwwroot
+COPY --from=build /app/publish .

@@ -95,28 +95,36 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             Directory.GetFiles(WorkingDirectory, "*.fsproj").Should().BeEmpty();
         }
 
+        private static readonly string[] _expectedNet11ChiseledDockerfileContent =
+        [
+            "FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build",
+            "FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated11.0-chiseled AS final",
+            "COPY --from=mcr.microsoft.com/dotnet/aspnet:11.0 /usr/share/dotnet /usr/share/dotnet",
+            "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated",
+            "FUNCTIONS_WORKER_RUNTIME_VERSION=11.0"
+        ];
+
         [Theory]
         [InlineData("net11.0")]
         [InlineData("NET11.0")]
-        public void Init_WithNet11AndDocker_RejectsDockerfileGeneration(string targetFramework)
+        public void Init_WithNet11AndDocker_GeneratesChiseledDockerfile(string targetFramework)
         {
-            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithNet11AndDocker_RejectsDockerfileGeneration), Log)
+            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithNet11AndDocker_GeneratesChiseledDockerfile), Log)
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(["--worker-runtime", "dotnet-isolated", "--target-framework", targetFramework, "--docker"]);
 
-            funcInitResult.Should().ExitWith(1);
-            funcInitResult.Should().HaveStdErrContaining("Dockerfile generation is not yet supported for .NET 11 isolated projects");
-
-            File.Exists(Path.Combine(WorkingDirectory, "Dockerfile")).Should().BeFalse();
+            funcInitResult.Should().ExitWith(0);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent([(Path.Combine(WorkingDirectory, "Dockerfile"), _expectedNet11ChiseledDockerfileContent)]);
         }
 
         [Theory]
         [InlineData("detected", null)]
         [InlineData("explicit-lowercase", "net11.0")]
         [InlineData("explicit-uppercase", "NET11.0")]
-        public async Task Init_DockerOnlyOnNet11Project_RejectsDockerfileGeneration(string scenario, string? explicitTargetFramework)
+        public async Task Init_DockerOnlyOnNet11Project_GeneratesChiseledDockerfile(string scenario, string? explicitTargetFramework)
         {
-            var testName = $"{nameof(Init_DockerOnlyOnNet11Project_RejectsDockerfileGeneration)}_{scenario}";
+            var testName = $"{nameof(Init_DockerOnlyOnNet11Project_GeneratesChiseledDockerfile)}_{scenario}";
             await FuncInitWithRetryAsync(testName, [".", "--worker-runtime", "dotnet-isolated", "--target-framework", "net11.0"]);
 
             string[] args = explicitTargetFramework is null
@@ -127,9 +135,9 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
                 .WithWorkingDirectory(WorkingDirectory)
                 .Execute(args);
 
-            funcInitResult.Should().ExitWith(1);
-            funcInitResult.Should().HaveStdErrContaining("Dockerfile generation is not yet supported for .NET 11 isolated projects");
-            File.Exists(Path.Combine(WorkingDirectory, "Dockerfile")).Should().BeFalse();
+            funcInitResult.Should().ExitWith(0);
+            funcInitResult.Should().WriteDockerfile();
+            funcInitResult.Should().FilesExistsWithExpectContent([(Path.Combine(WorkingDirectory, "Dockerfile"), _expectedNet11ChiseledDockerfileContent)]);
         }
 
         [Fact]
