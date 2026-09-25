@@ -3,8 +3,8 @@ WORKDIR /src
 COPY . .
 RUN dotnet publish -c Release -o /app/publish
 
-# The chiseled Azure Functions base image does not include the .NET runtime, a shell, or a package manager.
-# The ASP.NET Core runtime used by the app is copied in from the official .NET image below.
+# This image uses a chiseled (minimal) Azure Functions base image for a smaller size and fewer vulnerabilities.
+# It doesn't include the .NET runtime, so the next step copies it in from the official .NET image.
 FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated11.0-chiseled AS final
 COPY --from=mcr.microsoft.com/dotnet/aspnet:11.0 /usr/share/dotnet /usr/share/dotnet
 
