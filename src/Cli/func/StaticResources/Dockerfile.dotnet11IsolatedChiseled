@@ -8,6 +8,12 @@ RUN dotnet publish -c Release -o /app/publish
 FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated11.0-chiseled AS final
 COPY --from=mcr.microsoft.com/dotnet/aspnet:11.0 /usr/share/dotnet /usr/share/dotnet
 
+# The base image doesn't include a shell. For debugging purposes, you can add other dependencies as needed.
+# For example, uncomment the lines below to add a lightweight shell using BusyBox.
+# BusyBox doesn't include an SSH server, so it doesn't enable SSH access to your app on App Service.
+# COPY --from=busybox:uclibc /bin/busybox /bin/busybox
+# RUN ["/bin/busybox", "--install", "-s", "/bin"]
+
 ENV DOTNET_ROOT=/usr/share/dotnet
 ENV PATH="/usr/share/dotnet:${PATH}" \
     FUNCTIONS_WORKER_RUNTIME=dotnet-isolated \
