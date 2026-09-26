@@ -14,6 +14,15 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
     [Trait(WorkerRuntimeTraits.WorkerRuntime, WorkerRuntimeTraits.DotnetIsolated)]
     public class DotnetIsolatedInitTests(ITestOutputHelper log) : BaseE2ETests(log)
     {
+        private static readonly string[] _expectedNet11ChiseledDockerfileContent =
+        [
+            "FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build",
+            "FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated11.0-chiseled AS final",
+            "COPY --from=mcr.microsoft.com/dotnet/aspnet:11.0 /usr/share/dotnet /usr/share/dotnet",
+            "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated",
+            "FUNCTIONS_WORKER_RUNTIME_VERSION=11.0"
+        ];
+
         [Fact]
         public void Init_WithWorkerRuntime_GeneratesExpectedFunctionProjectFiles()
         {
@@ -94,15 +103,6 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
 
             Directory.GetFiles(WorkingDirectory, "*.fsproj").Should().BeEmpty();
         }
-
-        private static readonly string[] _expectedNet11ChiseledDockerfileContent =
-        [
-            "FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build",
-            "FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated11.0-chiseled AS final",
-            "COPY --from=mcr.microsoft.com/dotnet/aspnet:11.0 /usr/share/dotnet /usr/share/dotnet",
-            "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated",
-            "FUNCTIONS_WORKER_RUNTIME_VERSION=11.0"
-        ];
 
         [Theory]
         [InlineData("net11.0")]
