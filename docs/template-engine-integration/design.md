@@ -40,9 +40,9 @@ ITemplaterFactory.Create(context)
           v
       Templater
       |       |
-      |       +-- ListAsync()
+      |       +-- ListAsync(type)
       |
-      +-- ResolveGroupAsync(reference)
+      +-- ResolveGroupAsync(reference, type)
                   |
                   v
        TemplateGroup : IReadOnlyList<ResolvedTemplate>
@@ -74,7 +74,7 @@ TemplateEngineContext
    `- Version
 ```
 
-Project and bundle data may be absent only when the calling command's policy permits that state. The integration does not infer missing values. Strong domain value types should be retained where available so canonical stack, language, bundle ID, and semantic version representations are decided before engine creation.
+Project and bundle data may be absent only when the calling command's policy permits that state. Stack and language can be unavailable while the project root is known, as for a new mixed-stack project in `func init`. The integration does not infer missing values. Strong domain value types should be retained where available so canonical stack, language, bundle ID, and semantic version representations are decided before engine creation.
 
 The context is copied into host defaults:
 
@@ -103,7 +103,7 @@ The initial implementation does not promise concurrent operations on one session
 
 ### Catalog projection preserves eligibility diagnostics
 
-`ListAsync` loads installed templates and evaluates their constraints in the command context. It projects each engine template into a func-owned `TemplateCatalogEntry`, including identity, aliases, group identity, language, precedence, package origin when known, visibility, parameter metadata, and eligibility diagnostics. The same projected candidate model is used by template groups so listing and execution cannot disagree about a symbol.
+`ListAsync(type)` loads installed templates of the requested type and evaluates their constraints in the command context. It projects each engine template into a func-owned `TemplateCatalogEntry`, including identity, template type, aliases, group identity, language, precedence, package origin when known, visibility, parameter metadata, and eligibility diagnostics. The same projected candidate model is used by template groups so listing and execution cannot disagree about a symbol.
 
 Restricted entries remain in the catalog so `func new --list` and diagnostic flows can explain why an installed template cannot run. The command decides whether ordinary presentation hides host-hidden templates; exact identity lookup still has access to them.
 
@@ -118,18 +118,31 @@ Failed(message, constraint type)
 
 `NotEvaluated` and recognized evaluation failures are fail-closed states. They are kept distinct from an ordinary restriction because they point to template or host configuration defects.
 
+### Template type scopes listing and resolution
+
+`TemplateType` projects TemplateEngine's `tags.type` convention:
+
+```text
+tags.type = item     -> TemplateType.Item
+tags.type = project  -> TemplateType.Project
+missing or other     -> matches neither type
+```
+
+`func new` requests `TemplateType.Item` and `func init` requests `TemplateType.Project`. Type is part of matching rather than a later group filter, so project and item templates that share a short name never form one ambiguous group. A wrong-type match is kept as a diagnostic so the command can point users to `func new` or `func init`, but it never enters the eligible group. A reference that matches only templates without a recognized type reports an authoring diagnostic rather than not found.
+
 ### Resolution returns an immutable read-only TemplateGroup
 
-`ResolveGroupAsync(reference)` applies this order:
+`ResolveGroupAsync(reference, type)` applies this order:
 
 1. Find exact full identity matches.
 2. If none exist, find exact case-insensitive short-name matches.
-3. Evaluate all constraints for the raw matches.
-4. Partition short-name matches by `groupIdentity`; an ungrouped identity is its own singleton group.
-5. Project every eligible matched template into an invocation-ready `ResolvedTemplate`.
-6. Return a func-owned resolution outcome containing either a group or targeted diagnostics.
+3. Set aside matches of another template type as wrong-type diagnostics.
+4. Evaluate all constraints for the remaining matches.
+5. Partition short-name matches by `groupIdentity`; an ungrouped identity is its own singleton group.
+6. Project every eligible matched template into an invocation-ready `ResolvedTemplate`.
+7. Return a func-owned resolution outcome containing either a group or targeted diagnostics.
 
-Exact identity is an ambiguity escape hatch, not a compatibility escape hatch. Constraints are evaluated before any candidate enters the eligible set.
+Exact identity is an ambiguity escape hatch, not a type or compatibility escape hatch. Constraints are evaluated before any candidate enters the eligible set.
 
 `TemplateGroup` implements `IReadOnlyList<ResolvedTemplate>`. Its items are the eligible templates for one group identity, in stable deterministic order. Rejected-template diagnostics are retained as group metadata but are not list items. Every item contains immutable projected command parameter definitions, including the effective func host aliases.
 
@@ -260,7 +273,7 @@ Compatibility constraints continue to query immutable host defaults directly. A 
 
 The integration exposes candidate parameter definitions and func aliases; it does not construct the root command. A DI-registered `ITemplateArgumentParser` belongs to the `func new` orchestration layer. It depends on `System.CommandLine`, but neither `TemplateGroup` nor its candidates do. The thin command handler delegates the execution flow to this orchestration layer.
 
-For each remaining `ResolvedTemplate`, `ITemplateArgumentParser` receives its projected `TemplateParameterDefinition` collection and the raw template argument tokens. It creates an ephemeral item-specific command, adds `--{LongName}` and the optional `-{ShortName}` aliases, configures type, choice, and required-value validation, and parses the same token sequence independently. It returns template identity, diagnostics, and values keyed by `CanonicalName`.
+For each remaining `ResolvedTemplate`, `ITemplateArgumentParser` receives its projected `TemplateParameterDefinition` collection and the raw template argument tokens. It creates an ephemeral item-specific command, adds `--{LongName}` and the optional `-{ShortName}` aliases, configures type and choice validation, and parses the same token sequence independently. It returns template identity, diagnostics, values keyed by `CanonicalName`, and unresolved required parameters.
 
 The `func new` command performs:
 
@@ -276,7 +289,7 @@ stage A parse
   -> invoke selected ResolvedTemplate
 ```
 
-Stage B maps aliases to canonical symbols and rejects unmatched options, missing values, invalid choices or types, and missing required values. Parse errors are never swallowed and unmatched tokens are not accepted as successful defaults.
+Stage B maps aliases to canonical symbols. Unmatched options, missing option values, and invalid choices or types make a candidate argument-incompatible. A required parameter with no value or default leaves the candidate selectable but not invocable until the value is supplied, so the command can prompt for it. Parse errors are never swallowed and unmatched tokens are not accepted as successful defaults.
 
 Successful item parse results narrow `TemplateGroup`; parsing itself does not mutate the group. When command policy selects an item, the orchestration layer uses only that item's canonical symbol-value mapping to create `TemplateInvocationRequest`. `ResolvedTemplate.InvokeAsync` consumes the mapping and does not parse command tokens again.
 
@@ -287,12 +300,14 @@ This design does not decide whether the template reference is ultimately positio
 Catalog, group discovery, and invocation return typed outcomes rather than throwing for expected user states. Empty and multi-item groups are ordinary values interpreted by command policy. The supporting models provide enough detail for commands to distinguish:
 
 - not found;
+- wrong template type;
 - restricted;
 - constraint not evaluated or failed;
 - ambiguous group;
 - unsatisfied filters;
 - multiple remaining templates;
 - invalid arguments;
+- unresolved required values;
 - destructive file conflict;
 - success.
 

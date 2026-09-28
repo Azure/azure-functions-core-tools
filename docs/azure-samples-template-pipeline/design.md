@@ -202,6 +202,7 @@ A root authored configuration is preserved byte-for-byte. The central validator 
 
 - valid identity and short-name metadata;
 - `tags.type` equal to `project`;
+- workload constraints, in the form `template-engine-constraints` defines;
 - at least one trusted Functions project configuration finalization action;
 - every active configuration action to reference a resolved primary output and supply canonical stack and language;
 - no direct `.func/config.json` template content;
@@ -216,6 +217,8 @@ When the authored file is absent, `.github/azure-functions-template.yaml` suppli
 3. Adds one mandatory trusted configuration finalization action referencing that primary output and carrying the declared canonical stack and language.
 
 The generated template uses the descriptor's identity, short name, name, and description, sets `tags.type` to `project`, and treats the complete filtered snapshot as content. It defines no parameter symbols, replacements, or ordinary post-actions. It emits a singular language tag only when all declared projects have the same language; mixed-language topology is represented exclusively by the configuration actions.
+
+The packager also adds the workload constraint defined by `template-engine-constraints`, derived from the declared project stacks. The descriptor has no workload field, so requirements always follow the declared projects.
 
 Both modes pass the same TemplateEngine load, dry-run, action, output-path, and package safety validation during release packaging. Onboarding PR validation does not acquire source releases or validate repository-owned template definitions.
 

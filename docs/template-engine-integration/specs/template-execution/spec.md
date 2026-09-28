@@ -42,7 +42,7 @@ The integration SHALL create a fresh host and template engine environment for ea
 - **THEN** every phase uses the same host defaults and engine environment
 
 ### Requirement: Installed template catalog
-The integration SHALL list all templates known to the func settings hive, including templates that are ineligible in the current context. Each catalog entry SHALL include template identity, short names, group identity, language, precedence, owning package information when available, eligibility, and constraint diagnostics.
+The integration SHALL list the templates of the requested template type known to the func settings hive, including templates that are ineligible in the current context. Each catalog entry SHALL include template identity, template type, short names, group identity, language, precedence, owning package information when available, eligibility, and constraint diagnostics.
 
 #### Scenario: Eligible and restricted templates are listed
 - **WHEN** the installed catalog contains both eligible and context-restricted templates
@@ -53,7 +53,7 @@ The integration SHALL list all templates known to the func settings hive, includ
 - **THEN** listing distinguishes that authoring or configuration failure from an ordinary context restriction
 
 ### Requirement: Deterministic template reference matching
-The integration SHALL first match a template reference against exact full template identities. If no full identity matches, it SHALL match exact short names case-insensitively. Full identity matching SHALL be the deterministic escape hatch from short-name ambiguity, but SHALL NOT bypass constraints.
+The integration SHALL first match a template reference against exact full template identities. If no full identity matches, it SHALL match exact short names case-insensitively. Full identity matching SHALL be the deterministic escape hatch from short-name ambiguity, but SHALL NOT bypass template type or constraints. Matching SHALL be scoped to the requested template type. TemplateEngine `tags.type` values `item` and `project` SHALL identify item and project templates, and a missing or unrecognized value SHALL match neither. A match of another type SHALL produce a wrong-type diagnostic and SHALL NOT enter the eligible group. A reference that matches only templates without a recognized type SHALL produce an authoring diagnostic rather than a not-found outcome.
 
 #### Scenario: Full identity and short name both match
 - **WHEN** the reference exactly matches one template identity and also matches another template's short name
@@ -62,6 +62,14 @@ The integration SHALL first match a template reference against exact full templa
 #### Scenario: Short name differs only by case
 - **WHEN** a reference differs in case from an installed short name
 - **THEN** the short name is considered a match
+
+#### Scenario: Item and project templates share a short name
+- **WHEN** a reference matches an item template and a project template by short name
+- **THEN** resolution for item templates considers only the item template
+
+#### Scenario: Reference identifies another template type
+- **WHEN** a reference exactly matches the identity of a template of another type
+- **THEN** resolution returns a wrong-type outcome rather than an eligible group
 
 #### Scenario: No installed reference matches
 - **WHEN** no installed template has the exact identity or short name
@@ -185,7 +193,7 @@ Templates SHALL be able to opt in to resolved func context using bind symbols su
 - **THEN** the integration does not inject a template symbol on its behalf
 
 ### Requirement: Candidate-specific argument contract
-The integration SHALL expose each resolved template's canonical parameter definitions and func host aliases so a command-layer parser can perform strict item-specific parsing. The command-layer parser SHALL consume projected metadata and SHALL NOT parse `func.host.json` directly. Unknown aliases, missing values, invalid choices, invalid types, and missing required parameters SHALL prevent invocation rather than being ignored or replaced by defaults.
+The integration SHALL expose each resolved template's canonical parameter definitions and func host aliases so a command-layer parser can perform strict item-specific parsing. The command-layer parser SHALL consume projected metadata and SHALL NOT parse `func.host.json` directly. Unknown aliases, missing option values, invalid choices, and invalid types SHALL make a candidate argument-incompatible rather than being ignored or replaced by defaults. A required parameter without a value or default SHALL leave the candidate selectable but SHALL prevent invocation until a value is supplied.
 
 #### Scenario: Candidate parameter is valid
 - **WHEN** the command layer maps an item-specific alias to a canonical symbol and validates its value
@@ -196,8 +204,12 @@ The integration SHALL expose each resolved template's canonical parameter defini
 - **THEN** execution returns an invalid-arguments outcome and does not invoke a template
 
 #### Scenario: Candidate parameter value is invalid
-- **WHEN** a supplied value violates the selected parameter's type, choice, or required-value contract
+- **WHEN** a supplied value violates the selected parameter's type or choice contract
 - **THEN** execution returns an invalid-arguments outcome with item-specific diagnostics
+
+#### Scenario: Required parameter is unresolved
+- **WHEN** a candidate's required parameter has no supplied value or default
+- **THEN** the candidate remains selectable and is not invoked until the value is supplied
 
 ### Requirement: Self-contained resolved template invocation
 An invocable resolved template SHALL carry the selected template, approved constraint state, host metadata, and command-scoped invocation plumbing required to invoke itself asynchronously. Invocation SHALL accept an output location, canonical template parameter values, file-conflict policy, and cancellation token, and SHALL return a func-owned result without requiring the caller to pass the template back to the integration entry point.
@@ -215,7 +227,7 @@ An invocable resolved template SHALL carry the selected template, approved const
 - **THEN** invocation fails explicitly and does not create a replacement environment
 
 ### Requirement: Structured integration outcomes
-Listing, group discovery, and invocation SHALL return func-owned result models and diagnostics rather than writing directly to the console. The models SHALL provide the information commands need to distinguish not found, restricted, constraint evaluation failure, multiple matching groups, empty filtered groups, multiple remaining templates, invalid arguments, destructive file conflict, cancellation, and successful creation.
+Listing, group discovery, and invocation SHALL return func-owned result models and diagnostics rather than writing directly to the console. The models SHALL provide the information commands need to distinguish not found, wrong template type, restricted, constraint evaluation failure, multiple matching groups, empty filtered groups, multiple remaining templates, invalid arguments, unresolved required values, destructive file conflict, cancellation, and successful creation.
 
 #### Scenario: Command renders an integration failure
 - **WHEN** resolution or invocation produces a non-success outcome

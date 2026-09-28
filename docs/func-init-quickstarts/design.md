@@ -2,7 +2,7 @@
 
 See `proposal.md` for motivation and `specs/func-init-quickstarts/spec.md` for the behavior contract.
 
-The pending `func-init-execution` design assumes stack-first selection, one prospective stack and language, one generated Functions project, and one CLI-generated `.func/config.json` at the init target. Azure-Samples quickstarts can contain multiple independently configured Functions projects plus non-Functions projects, so those assumptions cannot describe the required experience.
+The `func-init-execution` design originally assumed stack-first selection, one prospective stack and language, one generated Functions project, and one CLI-generated `.func/config.json` at the init target. Azure-Samples quickstarts can contain multiple independently configured Functions projects plus non-Functions projects, so those assumptions cannot describe the required experience.
 
 The existing templating program already separates concerns:
 
@@ -284,7 +284,7 @@ Parameterized or conditional project topology cannot be expressed by the synthes
 - **[Finalization can fail after files are generated]** -> Preflight every declaration and path, use atomic writes, skip ordinary actions, and report partial initialization without destructive rollback.
 - **[Restricted picker entries can overwhelm the prompt]** -> Show concise summaries in the picker and render detailed calls to action separately.
 - **[Browse URL destination is not yet designed]** -> Use a Functions-owned redirect so the CLI contract remains stable.
-- **[Synthesized quickstarts require reviewed project topology]** -> Require static project roots, stacks, and languages in onboarding and use authored template configuration for parameterized or conditional topology.
+- **[Synthesized quickstarts require reviewed project topology]** -> Require static project roots, stacks, and languages in the repository-owned synthesis descriptor and use authored template configuration for parameterized or conditional topology.
 
 ## Migration Plan
 

@@ -4,15 +4,15 @@ See `proposal.md` for motivation and `specs/func-init-execution/spec.md` for the
 
 `InitCommand` currently owns project-state detection, adoption and healing, stack and language prompts, destructive cleanup, CLI configuration writes, bundle warnings, workload option registration, and direct dispatch to `IProjectInitializer.InitializeAsync`. `IProjectInitializer` combines discoverable stack metadata with stack-specific command options and filesystem behavior. Implementations either write project files directly or launch another template CLI, so project creation does not share the func TemplateEngine environment or package registry.
 
-The `template-engine-integration` change supplies command-scoped `Templater`, context-aware constraints, immutable `TemplateGroup`, projected parameter metadata, and self-invoking `ResolvedTemplate`. The `template-engine-post-actions` change supplies the trusted Functions project configuration action and resolved action metadata. The `func-new-execution` change supplies the strict two-stage parser and alias rules that both template commands need. Unlike `func new`, init cannot resolve an existing project before selecting a template: it must first join installed stack metadata with context-free project-template metadata and only then construct a prospective project context.
+The `template-engine-integration` change supplies command-scoped `Templater`, context-aware constraints, immutable `TemplateGroup`, projected parameter metadata, and self-invoking `ResolvedTemplate`. The `template-engine-post-actions` change supplies the trusted Functions project configuration action and resolved action metadata. The `func-new-execution` change supplies the strict two-stage parser and alias rules that both template commands need. Unlike `func new`, init cannot resolve an existing project before selecting a template. It selects from context-free project-template metadata and only then constructs a prospective project context. `func-init-quickstarts` is authoritative for template-first selection, whole-template filters, and multi-project topology, and this design follows it.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
 - Separate installed stack capability metadata from project generation behavior.
-- Support equivalent stack-first, language-first, template-first, and fully explicit selection.
-- Create exactly one context-bearing `Templater` after stack and language are known.
+- Select a project template first and apply stack and language as whole-template filters.
+- Create exactly one context-bearing `Templater` after the project template is selected.
 - Preserve adoption and healing without forcing project templates into existing-project workflows.
 - Make project-template invocation expose enough resolved primary-output and configuration-action metadata to finalize CLI project configuration.
 - Share template argument semantics with `func new` rather than maintaining a second dynamic parser.
@@ -71,7 +71,7 @@ Project templates are expected to be delivered in a companion `FuncTemplate` pac
 
 ### Context-free metadata enables template-first selection
 
-`func init --template` must inspect template type, group, identity, aliases, language, visibility, and precedence before stack and language exist. Constraint-aware `Templater.ListAsync` cannot serve that purpose because its host defaults are immutable and compatibility constraints require the final context.
+`func init` must inspect template type, group, identity, aliases, language, visibility, precedence, and projected configuration actions before any project context exists. Constraint-aware `Templater.ListAsync` cannot serve that purpose because its host defaults are immutable and compatibility constraints require the final context.
 
 The integration therefore exposes a context-free catalog snapshot backed by the shared func settings hive:
 
@@ -83,41 +83,28 @@ TemplateMetadataCatalog
 
 Catalog entries are descriptors, not `ResolvedTemplate` instances. They do not evaluate context-dependent constraints, bind symbols, defaults, or invocation readiness. The catalog is safe to cache or reuse because it contains no command project context; package lifecycle changes invalidate its snapshot.
 
-After stack and language selection, init creates one `Templater` and resolves the chosen reference again. That second resolution is authoritative and can surface package changes, constraints, malformed host metadata, or another context-dependent restriction.
+After template selection, init creates one `Templater` and resolves the chosen reference again. That second resolution is authoritative and can surface package changes, constraints, malformed host metadata, or another context-dependent restriction.
 
 **Alternative considered:** create a partial-context `Templater`, inspect templates, dispose it, then create another after selection. This violates the one execution-environment-per-command design and repeats engine initialization. It is rejected.
 
 **Alternative considered:** evaluate every template once for every installed stack and language. Constraint instances capture environments, making this expensive and inconsistent with immutable command context. It is rejected.
 
-### Compatibility is a language intersection
+### Selection is template-first
 
-Every project-template variant must declare the standard TemplateEngine `language` tag. The command normalizes that value through installed stack canonical labels and aliases, then builds:
-
-```text
-InitCandidate
-|- ProjectStack
-|- CanonicalLanguage
-`- ProjectTemplateGroupReference
-```
-
-The candidate universe is the join of installed stack languages and installed project-template variant languages. No func-specific stack tag is introduced. When multiple stacks own the same language, the matrix contains one candidate per owner and preserves the ambiguity.
-
-Missing language tags are authoring failures rather than wildcards. Treating an untagged project template as compatible with every stack would make generated project semantics unknowable and is rejected.
-
-### All explicit filters apply before selection policy
-
-The command first applies supplied `--template`, `--stack`, and `--language` values to the candidate matrix, regardless of their order on the command line. Invalid explicit values fail without prompting for substitutes.
-
-Missing dimensions are resolved in this order:
+Init follows the template-first flow defined by `func-init-quickstarts`:
 
 ```text
-no explicit template: stack -> language -> template
-explicit template:    compatible stack -> compatible language
-explicit language:    owning stack -> template
-explicit stack:       supported language -> template
+select project-template group
+  -> resolve template variant and parameters
+  -> resolve active configuration actions
+  -> check stack and language filters against every active project
 ```
 
-At each dimension:
+Each generated project's stack and language come from its configuration action. `--stack` and `--language` are assertions about the whole template, so every active project must match. A mixed template remains valid when neither filter is supplied. Filter values match canonical names and `IProjectStack` aliases case-insensitively.
+
+Explicit filters apply regardless of their order on the command line, and invalid explicit values fail without prompting for substitutes. The authoritative check runs against active actions once parameters resolve. Whether filters also narrow the template picker earlier, using the catalog's projected configuration actions, is left to the preparation prototype.
+
+At each choice point:
 
 ```text
 0 values -> targeted incompatibility or missing-package result
@@ -127,7 +114,9 @@ At each dimension:
 
 The special name `basic` has no selection semantics. A sole applicable template group is automatically selected; multiple groups prompt even when one is named basic.
 
-A pure `InitCandidateResolver` owns matrix construction and immutable filters. This abstraction is justified here because selection spans three independent dimensions and must support every ordering without duplicating branches in `InitCommand`.
+Standard `language` tags remain optional metadata for homogeneous variants. No func-specific stack tag is introduced.
+
+**Alternative considered:** select stack, then language, then template from the intersection of installed stack languages and template language tags. No singular stack or language can represent a heterogeneous template. It is rejected.
 
 ### The static command owns only init-level options
 
@@ -150,19 +139,19 @@ An immutable `InitExecutionRequest` carries the static values and raw template t
 
 ### A prospective context precedes the command-scoped `Templater`
 
-Once one stack and language pair is selected, init creates:
+Once a project template is selected, init creates:
 
 ```text
 TemplateEngineContext
-|- CommandDirectory = target project directory
+|- CommandDirectory = target directory
 |- Project
-|  |- RootDirectory = target project directory
-|  |- Stack = selected canonical stack
-|  `- Language = selected canonical language
+|  |- RootDirectory = target directory
+|  |- Stack = common stack of the active projects, or unavailable
+|  `- Language = common language of the active projects, or unavailable
 `- Bundle = unavailable
 ```
 
-The project value is prospective: the directory may be empty and no project files are required. Host defaults still expose `WorkingDirectory`, `func:project-root`, `func:stack`, and `func:language`, allowing project templates to use the same bind and constraint mechanisms as item templates.
+The project value is prospective: the directory may be empty and no project files are required. Stack and language are exposed only when every active project shares them, so a mixed template never sees a fabricated singular value. Host defaults still expose `WorkingDirectory`, `func:project-root`, and any available `func:stack` and `func:language`, allowing project templates to use the same bind and constraint mechanisms as item templates.
 
 Bundle ID and version are absent. Project templates choose or generate bundle configuration through template symbols and content; they must not require an already resolved bundle constraint.
 
@@ -181,7 +170,7 @@ One `Templater` is created from this snapshot and reused for authoritative group
 - final canonical reparse after prompted values;
 - argument compatibility before precedence.
 
-After authoritative context resolution, the runner applies language, candidate argument compatibility, and highest remaining precedence. One surviving template invokes directly; genuine remaining ambiguity prompts or fails non-interactively.
+After authoritative context resolution, the runner applies explicit filters, candidate argument compatibility, and highest remaining precedence. One surviving template invokes directly; genuine remaining ambiguity prompts or fails non-interactively.
 
 Required visible template symbols are prompted only when unresolved. Optional values use template defaults. Hidden required symbols without defaults are authoring failures.
 
@@ -203,7 +192,7 @@ project root = parent(resolved primary output)
 config path  = project root/.func/config.json
 ```
 
-The action carries canonical stack and language. For the initial single-stack/language selection model, every active action value must agree with the selected canonical candidate. The exact action ID, serialized argument schema, rename propagation, and TemplateEngine projection belong to `template-engine-post-actions`.
+The action carries canonical stack and language. Values can differ between projects, and must match `--stack` or `--language` when supplied. The exact action ID, serialized argument schema, rename propagation, and TemplateEngine projection belong to `template-engine-post-actions`.
 
 Project template content cannot create or modify `.func/config.json` directly. The trusted action is template-declared topology but CLI-owned behavior: Func validates the declaration, computes the destination, and serializes the current CLI configuration schema.
 
@@ -219,7 +208,7 @@ After candidate parameters are complete, init resolves active configuration acti
 - optional or continue-on-error configuration behavior;
 - a missing, ambiguous, inactive, or non-file primary-output reference;
 - a resolved primary output outside the target;
-- empty, non-canonical, or candidate-incompatible stack/language;
+- empty or non-canonical stack/language, or a value that conflicts with an explicit filter;
 - duplicate resolved project roots;
 - project template file effects targeting `.func/config.json`;
 - configuration output collisions with any other planned effect.
@@ -255,7 +244,7 @@ Post      report ordinary post-actions
 
 The func-owned preview preserves phase and source so deletion followed by recreation is not flattened into misleading independent output. TemplateEngine effects remain unchanged internally; the init renderer composes cleanup and invocation results.
 
-`--force` never bypasses stack, type, language, constraints, parsing, or ambiguity checks. Selection and combined preflight happen before destructive cleanup.
+`--force` never bypasses stack, type, filter, constraint, parsing, or ambiguity checks. Selection and combined preflight happen before destructive cleanup.
 
 ### Config persistence is mandatory
 
@@ -283,14 +272,14 @@ Init orchestration retains func-owned outcomes for:
 - project creation success;
 - partial creation after configuration failure.
 
-No applicable template falls back to workload scaffolding. Diagnostics name the selected stack and language and direct the user to `func new install`.
+No applicable template falls back to workload scaffolding. Diagnostics name any supplied filters, show the browse URL, and direct the user to `func new install`.
 
 Known outcomes are rendered through `IInteractionService` or wrapped at the command boundary using the repository's `GracefulException` policy. Unexpected integration defects propagate. Cancellation is honored before cleanup and through catalog access, prompting, preflight, creation, configuration, and post-actions.
 
 ## Risks / Trade-offs
 
 - **[Template-first selection needs metadata before context]** -> Keep catalog descriptors context-free and perform authoritative resolution again through one final context-bound `Templater`.
-- **[Language is the only stack compatibility axis]** -> Preserve every matching stack owner and add func-specific metadata only if real overlapping-language incompatibility emerges.
+- **[Active projects can depend on template parameters, but context is fixed when the session starts]** -> Prototype the preparation sequence before implementation, including whether filters narrow the picker early. It must keep one immutable session and never fabricate singular values.
 - **[Every stack now depends on installed project templates]** -> Provide explicit package guidance and migrate default project template packages before removing initializer fallback.
 - **[Project creation and configuration finalization are sequential]** -> Preflight every action and combined path, use atomic writes, and report partial completion without destructive rollback.
 - **[Actual invocation evaluates effects more than once]** -> Prefer correctness and combined preflight; optimize only if TemplateEngine exposes a safe reusable creation plan.
@@ -304,7 +293,7 @@ Known outcomes are rendered through `IInteractionService` or wrapped at the comm
 2. Add trusted project configuration action projection, primary-output resolution, and planned configuration effects while preserving item behavior.
 3. Introduce `IProjectStack` and migrate stack registrations, aliases, and tests from `IProjectInitializer`.
 4. Package and install project templates covering every supported stack and canonical language.
-5. Introduce init candidate matrix construction and explicit stack/language/template filtering.
+5. Introduce template-first selection and whole-template stack and language filters.
 6. Reuse the shared strict template parser and prompt services from `func-new-execution`.
 7. Route empty and forced initialization through prospective context, `Templater`, and project `ResolvedTemplate`.
 8. Route adoption and healing through `IProjectStack` metadata and canonical configuration serialization.

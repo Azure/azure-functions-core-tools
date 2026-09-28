@@ -10,7 +10,7 @@ Azure-Samples quickstart repositories are independently released source reposito
 - Add `eng/ci/publish-releases.yaml` to scan onboarded GitHub repositories daily for eligible releases.
 - Require published releases to use `v` followed by SemVer 2.0, support prereleases only through explicit opt-in, and use a required minimum version as the initial backfill boundary.
 - Build packages from the exact commit referenced by each eligible release tag without executing repository-controlled code.
-- Preserve and dry-run a valid authored root `.template.config/template.json`, or synthesize a project template from the release-owned `.github/azure-functions-template.yaml` descriptor with one required `.func/config.json` finalization action per declared project.
+- Preserve and dry-run a valid authored root `.template.config/template.json`, or synthesize a project template from the release-owned `.github/azure-functions-template.yaml` descriptor with one required `.func/config.json` finalization action per declared project and a workload constraint derived from the declared stacks.
 - Read the synthesis descriptor before excluding `.git`, `.github`, generated build output, credentials, and unsafe links from package content.
 - Require an MIT or Apache-2.0 license detected from the release commit or declared through a reviewed override.
 - Create NuGet packages under the `Azure.Functions.Templates.` prefix with package type `FuncTemplate`, source repository metadata, commit provenance, and a release-notes link to the GitHub release.
@@ -32,4 +32,5 @@ None.
 - Introduces the separate internal `func-templates` Azure DevOps repository and its source, schema, tooling, tests, and pipeline layout.
 - Requires read-only GitHub API access, an Azure Artifacts staging feed, and NuGet.org publication credentials protected by an approval-gated environment.
 - Produces packages compatible with the `FuncTemplate` ownership contract from `template-package-install`.
+- Depends on `template-engine-constraints` for the workload constraint form and on `template-engine-post-actions` for the trusted configuration finalization action.
 - Does not change Azure Functions CLI commands, package installation behavior, quickstart catalogs, or template discovery manifests.

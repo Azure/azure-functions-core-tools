@@ -47,7 +47,7 @@ Each focused change SHALL own detailed requirements for its assigned capability.
 - **THEN** `azure-samples-template-pipeline` is the authoritative focused change
 
 #### Scenario: Init quickstart behavior is specified
-- **WHEN** behavior concerns first-class `func init` discovery and selection of available Azure-Samples quickstart templates
+- **WHEN** behavior concerns `func init` template selection order, multi-project topology, or installed Azure-Samples quickstart templates
 - **THEN** `func-init-quickstarts` is the authoritative focused change
 
 ### Requirement: Cross-change dependencies

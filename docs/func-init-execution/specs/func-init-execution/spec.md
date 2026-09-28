@@ -1,6 +1,6 @@
 ## Purpose
 
-Defines how `func init` selects an installed stack, language, and project template before creating or adopting an Azure Functions project.
+Defines how `func init` selects an installed project template and applies stack and language filters before creating or adopting an Azure Functions project.
 
 ## ADDED Requirements
 
@@ -17,14 +17,18 @@ Defines how `func init` selects an installed stack, language, and project templa
 
 #### Scenario: Multiple explicit filters are supplied
 - **WHEN** a user supplies `--stack`, `--language`, and `--template`
-- **THEN** the command validates the exact requested stack-language-template combination
+- **THEN** the command validates that the requested template satisfies both filters
 
 ### Requirement: Installed stack metadata
-`func init` SHALL derive available stacks and languages exclusively from installed stack workloads. Each installed stack SHALL expose a canonical stack ID, display name, worker runtime aliases, canonical languages, and language aliases. Stack workloads SHALL NOT directly scaffold project files or contribute template-specific command options.
+`func init` SHALL derive available stacks and languages exclusively from installed stack workloads. Each installed stack SHALL expose a canonical stack ID, display name, worker runtime aliases, canonical languages, and language aliases. A canonical language MAY be supported by multiple installed stacks. Stack workloads SHALL NOT directly scaffold project files or contribute template-specific command options.
 
 #### Scenario: Installed stacks are available
 - **WHEN** multiple stack workloads are installed
-- **THEN** stack and language selection uses their declared canonical metadata and aliases
+- **THEN** stack and language filters use their declared canonical metadata and aliases
+
+#### Scenario: Multiple stacks support one language
+- **WHEN** multiple installed stacks declare the same canonical language
+- **THEN** language lookup keeps every owning stack and does not silently choose the first registered workload
 
 #### Scenario: No stack workload is installed
 - **WHEN** no installed stack metadata is available
@@ -39,7 +43,7 @@ Defines how `func init` selects an installed stack, language, and project templa
 - **THEN** that value is exposed and parsed as a project-template symbol
 
 ### Requirement: Project-template metadata
-`func init` SHALL consider only templates whose TemplateEngine `tags.type` value identifies them as project templates. Every project-template variant SHALL declare a recognized canonical `language` tag. Templates with missing or unsupported language metadata SHALL be excluded with template-authoring diagnostics.
+`func init` SHALL consider only templates whose TemplateEngine `tags.type` value identifies them as project templates. Each generated project's stack and language SHALL come from its configuration action. A singular `language` tag MAY distinguish homogeneous variants and SHALL NOT be required.
 
 #### Scenario: Project and item templates share a short name
 - **WHEN** project and item templates share a short name
@@ -49,111 +53,84 @@ Defines how `func init` selects an installed stack, language, and project templa
 - **WHEN** `--template` identifies an item template
 - **THEN** the command refuses invocation and directs the user to `func new`
 
-#### Scenario: Project template omits language
-- **WHEN** a project-template variant has no language tag
-- **THEN** it is not eligible for initialization and its diagnostic identifies the missing required metadata
-
-#### Scenario: Project template declares unsupported language
-- **WHEN** no installed stack recognizes a project-template variant's language
-- **THEN** that variant is not an applicable initialization candidate
-
-### Requirement: Stack-template compatibility
-`func init` SHALL derive compatible initialization candidates by intersecting each project-template variant's canonical language with the canonical languages supported by installed stacks. A language MAY be owned by multiple installed stacks, and every compatible owner SHALL remain available until explicitly selected or prompted.
-
-#### Scenario: One stack owns the template language
-- **WHEN** one installed stack supports a project-template variant's language
-- **THEN** that stack-template-language combination is compatible
-
-#### Scenario: Multiple stacks own the template language
-- **WHEN** multiple installed stacks support the same project-template language
-- **THEN** all matching stacks remain candidates and the command does not silently choose the first registered workload
-
-#### Scenario: Stack has no template for one language
-- **WHEN** an installed stack supports a language for which no project template is installed
-- **THEN** that language is omitted from applicable initialization choices
+#### Scenario: Mixed template omits a language tag
+- **WHEN** a project template's configuration actions declare multiple languages and it has no language tag
+- **THEN** it remains eligible for initialization
 
 ### Requirement: Explicit filters are authoritative
-`func init` SHALL apply every supplied stack, language, and template filter before prompting or automatically selecting any unresolved dimension. Canonical names and declared aliases SHALL match case-insensitively. A supplied value that matches no compatible candidate SHALL fail rather than falling back to another choice.
+`func init` SHALL honor every supplied stack, language, and template filter and SHALL apply stack and language filters to the whole template, as `func-init-quickstarts` specifies. Canonical names and declared aliases SHALL match case-insensitively. A supplied value that matches no compatible candidate SHALL fail rather than falling back to another choice.
 
 #### Scenario: Stack is supplied
 - **WHEN** `--stack` identifies an installed stack
-- **THEN** only that stack's applicable languages and project templates remain
+- **THEN** a project template is accepted only when every active project uses that stack
 
 #### Scenario: Language is supplied
-- **WHEN** `--language` identifies a language owned by one installed stack
-- **THEN** that stack and language are selected before project templates are considered
-
-#### Scenario: Language has multiple stack owners
-- **WHEN** `--language` matches multiple installed stacks
-- **THEN** the command retains those stacks for explicit or interactive selection
+- **WHEN** `--language` identifies an installed language
+- **THEN** a project template is accepted only when every active project uses that language
 
 #### Scenario: Stack and language conflict
 - **WHEN** the requested stack does not support the requested language
 - **THEN** the command reports the conflict and does not prompt for a substitute
 
 #### Scenario: Template and stack conflict
-- **WHEN** the requested project template has no language variant supported by the requested stack
-- **THEN** the command reports the compatible stacks and languages without invoking another template
+- **WHEN** the requested project template has an active project with another stack
+- **THEN** the command reports the template's project stacks without invoking another template
 
 ### Requirement: Progressive automatic and interactive selection
-After explicit filtering, `func init` SHALL automatically select any dimension with exactly one remaining value. It SHALL prompt only for stack, language, or project-template choices that remain genuinely ambiguous. When no template was explicitly supplied, stack SHALL be resolved before language and language before template presentation.
+`func init` SHALL automatically select any choice with exactly one remaining value. It SHALL prompt only for project-template group, variant, or required parameter choices that remain genuinely ambiguous. When no template was explicitly supplied, the project-template group SHALL be the first choice presented.
 
 #### Scenario: No filters are supplied
-- **WHEN** multiple installed stacks, languages, and templates are applicable
-- **THEN** the interactive command prompts for stack, then language, then project template
+- **WHEN** multiple installed project-template groups are applicable
+- **THEN** the interactive command prompts for a project-template group first
 
-#### Scenario: Stack has one applicable language
-- **WHEN** the selected stack has exactly one language with an installed project template
-- **THEN** the command selects that language without prompting
+#### Scenario: Group has one applicable variant
+- **WHEN** the selected group has exactly one applicable variant
+- **THEN** the command selects that variant without prompting
 
 #### Scenario: One applicable project template remains
-- **WHEN** stack and language filtering leaves one project-template group
+- **WHEN** exactly one applicable project-template group remains
 - **THEN** the command selects it without prompting regardless of its short name
 
 #### Scenario: Multiple project templates remain
-- **WHEN** stack and language filtering leaves multiple project-template groups
+- **WHEN** multiple applicable project-template groups remain
 - **THEN** the command prompts an interactive user to select one
 
 #### Scenario: Template is supplied first
-- **WHEN** `--template` resolves a group supporting multiple installed stack-language combinations
-- **THEN** the command prompts only for unresolved compatible stacks and languages
+- **WHEN** `--template` resolves a group with multiple applicable variants
+- **THEN** the command prompts for the variant rather than another template
 
 ### Requirement: Non-interactive initialization
-When `--non-interactive` is supplied, or the terminal cannot prompt, `func init` SHALL fail whenever more than one compatible stack, language, template, or required template value remains. Diagnostics SHALL identify every available explicit choice needed to complete the command.
+When `--non-interactive` is supplied, or the terminal cannot prompt, `func init` SHALL fail whenever more than one applicable template group or variant, or an unresolved required template value, remains. Diagnostics SHALL identify every available explicit choice needed to complete the command.
 
-#### Scenario: Stack choice is ambiguous
-- **WHEN** multiple compatible stacks remain in non-interactive execution
-- **THEN** the command lists their canonical IDs and requests `--stack`
-
-#### Scenario: Language choice is ambiguous
-- **WHEN** a selected stack has multiple applicable languages in non-interactive execution
-- **THEN** the command lists their canonical labels and requests `--language`
+#### Scenario: Variant choice is ambiguous
+- **WHEN** multiple variants of the selected group remain in non-interactive execution
+- **THEN** the command lists their template identities and requests `--template`
 
 #### Scenario: Template choice is ambiguous
 - **WHEN** multiple project-template groups remain in non-interactive execution
 - **THEN** the command lists their references and requests `--template`
 
-#### Scenario: Every dimension is unique
-- **WHEN** filtering leaves exactly one stack, language, template, and complete parameter set
+#### Scenario: Every choice is resolved
+- **WHEN** exactly one template, variant, and complete parameter set remain
 - **THEN** non-interactive initialization proceeds without prompts
 
 ### Requirement: Prospective project context
-Before context-dependent template resolution, `func init` SHALL create one immutable prospective project context containing the target directory, selected canonical stack, and selected canonical language. Template constraints, host bindings, parameter defaults, dry-run, and creation SHALL use that same context. Extension bundle identity and version SHALL remain unavailable because no project bundle has yet been generated or resolved.
+Before context-dependent template resolution, `func init` SHALL create one immutable prospective project context whose command directory and project root are the target directory. It SHALL NOT expose a stack or language that the active projects do not share, as `func-init-quickstarts` specifies. Template constraints, host bindings, parameter defaults, dry-run, and creation SHALL use that same context. Extension bundle identity and version SHALL remain unavailable because no project bundle has yet been generated or resolved.
 
 #### Scenario: Project does not yet exist
 - **WHEN** initialization targets an empty directory
-- **THEN** project templates receive the target directory, selected stack, and selected language as project context
+- **THEN** project templates receive the target directory as project context
 
-#### Scenario: Project template reads host bindings
-- **WHEN** a project template binds to func stack or language host context
-- **THEN** it receives the selected canonical values
+#### Scenario: Mixed template reads host bindings
+- **WHEN** active projects declare different stacks
+- **THEN** singular func stack host context is unavailable
 
 #### Scenario: Project template requires resolved bundle context
 - **WHEN** a project template declares a compatibility requirement for an existing resolved bundle
 - **THEN** that requirement cannot be satisfied during new-project initialization
 
 ### Requirement: Strict project-template argument parsing
-After selecting a prospective stack and language context, `func init` SHALL parse project-template arguments using the same strict candidate-specific contract as `func new`. Reserved aliases, collision fallbacks, invalid-input handling, missing-required-value prompting, canonical symbol mapping, and precedence ordering SHALL be consistent between the commands.
+After selecting a project template, `func init` SHALL parse project-template arguments using the same strict candidate-specific contract as `func new`. Reserved aliases, collision fallbacks, invalid-input handling, missing-required-value prompting, canonical symbol mapping, and precedence ordering SHALL be consistent between the commands.
 
 #### Scenario: Template-specific option is valid
 - **WHEN** a supplied option is valid for one project-template candidate
@@ -191,7 +168,7 @@ After selecting a prospective stack and language context, `func init` SHALL pars
 - **THEN** the command refuses to scaffold over the project
 
 ### Requirement: Force reinitialization
-`--force` SHALL reinitialize by deleting all target content except the `.git` directory before project-template creation. It SHALL NOT bypass installed-stack validation, project-template type, language compatibility, constraints, strict parsing, selection ambiguity, primary-output resolution, or configuration-action preflight.
+`--force` SHALL reinitialize by deleting all target content except the `.git` directory before project-template creation. It SHALL NOT bypass installed-stack validation, project-template type, whole-template filters, constraints, strict parsing, selection ambiguity, primary-output resolution, or configuration-action preflight.
 
 #### Scenario: Force is confirmed interactively
 - **WHEN** an interactive user requests `--force` for a non-empty target and confirms the destructive operation
@@ -206,7 +183,7 @@ After selecting a prospective stack and language context, `func init` SHALL pars
 - **THEN** the explicit switch authorizes cleanup without a prompt
 
 ### Requirement: Project configuration uses trusted finalization actions
-Every Functions project generated by a project template SHALL be represented by one mandatory trusted project configuration action. The action SHALL reference a resolved primary-output file located directly in the project root and SHALL supply canonical stack and language compatible with the selected init candidate. Func SHALL derive the project root from the resolved output's parent and generate `.func/config.json` through the CLI-owned serializer.
+Every Functions project generated by a project template SHALL be represented by one mandatory trusted project configuration action. The action SHALL reference a resolved primary-output file located directly in the project root and SHALL supply canonical stack and language that satisfy any explicit `--stack` and `--language` filters. Func SHALL derive the project root from the resolved output's parent and generate `.func/config.json` through the CLI-owned serializer.
 
 #### Scenario: Project configuration action is declared
 - **WHEN** a project template generates a Functions project
@@ -216,12 +193,12 @@ Every Functions project generated by a project template SHALL be represented by 
 - **WHEN** TemplateEngine renames or relocates the referenced primary output
 - **THEN** configuration is written relative to the resolved output path
 
-#### Scenario: Single-language stack is selected
-- **WHEN** the selected stack currently supports one language
+#### Scenario: Project uses a single-language stack
+- **WHEN** a generated project's stack currently supports one language
 - **THEN** the action still supplies and persists that canonical language explicitly
 
-#### Scenario: Action conflicts with selected candidate
-- **WHEN** an active configuration action declares a stack or language incompatible with the selected init candidate
+#### Scenario: Action conflicts with an explicit filter
+- **WHEN** an active configuration action declares a stack or language that conflicts with `--stack` or `--language`
 - **THEN** initialization fails before target modification
 
 ### Requirement: Configuration action declarations are preflighted
@@ -248,7 +225,7 @@ Before target modification, `func init` SHALL validate every active project conf
 - **THEN** initialization fails before target modification
 
 ### Requirement: Dry-run includes configuration finalization
-`func init --dry-run` SHALL perform complete stack, language, template, argument, constraint, required-value, primary-output, and configuration-action resolution without modifying the filesystem or executing actions. The preview SHALL combine `--force` cleanup, project-template files, planned CLI-owned `.func/config.json` writes, and ordinary post-actions in execution order.
+`func init --dry-run` SHALL perform complete template, filter, argument, constraint, required-value, primary-output, and configuration-action resolution without modifying the filesystem or executing actions. The preview SHALL combine `--force` cleanup, project-template files, planned CLI-owned `.func/config.json` writes, and ordinary post-actions in execution order.
 
 #### Scenario: Empty project is previewed
 - **WHEN** a user runs `func init --dry-run` for an empty target
@@ -285,11 +262,11 @@ After project-template scaffolding succeeds, `func init` SHALL execute active pr
 - **THEN** configuration and ordinary post-actions are reported but not executed
 
 ### Requirement: Missing applicable project templates
-`func init` SHALL fail with actionable guidance when no installed project template supports the selected installed stack and language. The command SHALL NOT fall back to workload-owned scaffolding.
+`func init` SHALL fail with actionable guidance when no installed project template satisfies the request. The command SHALL NOT fall back to workload-owned scaffolding.
 
-#### Scenario: Stack and language have no template
-- **WHEN** an installed stack and language are selected but no compatible project template is installed
-- **THEN** the command directs the user to install an applicable template package through `func new install`
+#### Scenario: Filters match no installed template
+- **WHEN** `--stack` or `--language` matches no installed project template
+- **THEN** the command shows the browse URL and directs the user to install an applicable template package through `func new install`
 
 #### Scenario: Former workload initializer exists
 - **WHEN** legacy workload scaffolding code exists but no compatible project template is installed
