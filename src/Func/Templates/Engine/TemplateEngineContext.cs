@@ -37,10 +37,14 @@ internal sealed record TemplateEngineContext
 /// </summary>
 internal sealed record TemplateEngineProjectContext
 {
-    public TemplateEngineProjectContext(WorkingDirectory rootDirectory, string stack, string? language = null)
+    public TemplateEngineProjectContext(WorkingDirectory rootDirectory, string? stack, string? language = null)
     {
         ArgumentNullException.ThrowIfNull(rootDirectory);
-        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        if (stack is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        }
+
         if (language is not null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(language);
@@ -53,7 +57,10 @@ internal sealed record TemplateEngineProjectContext
 
     public WorkingDirectory RootDirectory { get; }
 
-    public string Stack { get; }
+    /// <summary>
+    /// Project stack, or <c>null</c> when the command did not resolve one.
+    /// </summary>
+    public string? Stack { get; }
 
     /// <summary>
     /// Project language, or <c>null</c> when the command did not resolve one.

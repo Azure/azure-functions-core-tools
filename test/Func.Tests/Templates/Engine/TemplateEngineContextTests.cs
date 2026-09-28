@@ -27,6 +27,14 @@ public class TemplateEngineContextTests
     }
 
     [Fact]
+    public void ProjectContext_WithoutStack_LeavesStackUnresolved()
+    {
+        TemplateEngineProjectContext project = new(_directory, stack: null);
+
+        project.Stack.Should().BeNull();
+    }
+
+    [Fact]
     public void ProjectContext_NullRootDirectory_Throws()
     {
         Action act = () => _ = new TemplateEngineProjectContext(null!, "node");

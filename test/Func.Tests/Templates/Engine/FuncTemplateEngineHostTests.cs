@@ -101,6 +101,21 @@ public class FuncTemplateEngineHostTests
     }
 
     [Fact]
+    public void TryGetHostParamDefault_ProjectWithoutStack_ReportsOnlyStackUnavailable()
+    {
+        TemplateEngineContext context = new(_commandDirectory, new TemplateEngineProjectContext(_projectRoot, stack: null, "TypeScript"));
+        using FuncTemplateEngineHost host = new(context);
+
+        bool found = host.TryGetHostParamDefault(FuncTemplateEngineHostParameters.Stack, out string? value);
+
+        found.Should().BeFalse();
+        value.Should().BeNull();
+        host.TryGetHostParamDefault(FuncTemplateEngineHostParameters.ProjectRoot, out _).Should().BeTrue();
+        host.TryGetHostParamDefault(FuncTemplateEngineHostParameters.Language, out string? language).Should().BeTrue();
+        language.Should().Be("TypeScript");
+    }
+
+    [Fact]
     public void Constructor_NullContext_Throws()
     {
         Action act = () => _ = new FuncTemplateEngineHost(null!);

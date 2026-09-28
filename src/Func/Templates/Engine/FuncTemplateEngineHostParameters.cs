@@ -24,7 +24,7 @@ internal static class FuncTemplateEngineHostParameters
     public const string Stack = "func:stack";
 
     /// <summary>
-    /// Resolved language (e.g. <c>C#</c>, <c>typescript</c>).
+    /// Resolved language (e.g. <c>C#</c>, <c>TypeScript</c>).
     /// </summary>
     public const string Language = "func:language";
 

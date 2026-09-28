@@ -53,7 +53,11 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
         if (context.Project is { } project)
         {
             defaults[FuncTemplateEngineHostParameters.ProjectRoot] = DirectoryValue(project.RootDirectory);
-            defaults[FuncTemplateEngineHostParameters.Stack] = project.Stack;
+            if (project.Stack is not null)
+            {
+                defaults[FuncTemplateEngineHostParameters.Stack] = project.Stack;
+            }
+
             if (project.Language is not null)
             {
                 defaults[FuncTemplateEngineHostParameters.Language] = project.Language;
