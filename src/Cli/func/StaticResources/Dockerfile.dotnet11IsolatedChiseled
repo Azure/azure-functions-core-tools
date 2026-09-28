@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 COPY . .
-RUN dotnet publish -c Release -o /app/publish
+RUN dotnet publish *.csproj -c Release -o /app/publish
 
 # This image uses a chiseled (minimal) Azure Functions base image.
 # It doesn't include the .NET 11 runtime, so the next step copies it in from the official .NET image.
