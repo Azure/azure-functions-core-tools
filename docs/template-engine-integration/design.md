@@ -120,6 +120,8 @@ Failed(message, constraint type)
 
 `NotEvaluated` and recognized evaluation failures are fail-closed states. They are kept distinct from an ordinary restriction because they point to template or host configuration defects.
 
+`template-engine-constraints` defines the func constraint types, how engine results map to these states, and the diagnostic kept for each unmet constraint.
+
 ### Template type scopes listing and resolution
 
 `TemplateType` projects TemplateEngine's `tags.type` convention:
