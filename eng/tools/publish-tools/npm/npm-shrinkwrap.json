@@ -1,0 +1,97 @@
+{
+  "name": "azure-functions-core-tools",
+  "version": "0.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "azure-functions-core-tools",
+      "version": "0.0.0",
+      "hasInstallScript": true,
+      "license": "MIT",
+      "os": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "dependencies": {
+        "https-proxy-agent": "^7.0.6",
+        "progress": "2.0.3",
+        "yauzl": "^3.2.0"
+      },
+      "bin": {
+        "azfun": "lib/main.js",
+        "azurefunctions": "lib/main.js",
+        "func": "lib/main.js"
+      },
+      "engines": {
+        "node": ">=22"
+      }
+    },
+    "node_modules/agent-base": {
+      "version": "7.1.4",
+      "integrity": "sha1-48121MVI7oldPD/Y3B9sW5Ay56g=",
+      "license": "MIT",
+      "engines": {
+        "node": ">= 14"
+      }
+    },
+    "node_modules/debug": {
+      "version": "4.4.3",
+      "integrity": "sha1-xq5DLZvZZiWC/OCHCbA4xY6ePWo=",
+      "license": "MIT",
+      "dependencies": {
+        "ms": "^2.1.3"
+      },
+      "engines": {
+        "node": ">=6.0"
+      },
+      "peerDependenciesMeta": {
+        "supports-color": {
+          "optional": true
+        }
+      }
+    },
+    "node_modules/https-proxy-agent": {
+      "version": "7.0.6",
+      "integrity": "sha1-2o3+rH2hMLBcK6S1nJts1mYRprk=",
+      "license": "MIT",
+      "dependencies": {
+        "agent-base": "^7.1.2",
+        "debug": "4"
+      },
+      "engines": {
+        "node": ">= 14"
+      }
+    },
+    "node_modules/ms": {
+      "version": "2.1.3",
+      "integrity": "sha1-V0yBOM4dK1hh8LRFedut1gxmFbI=",
+      "license": "MIT"
+    },
+    "node_modules/pend": {
+      "version": "1.2.0",
+      "integrity": "sha1-elfrVQpng/kRUzH89GY9XI4AelA=",
+      "license": "MIT"
+    },
+    "node_modules/progress": {
+      "version": "2.0.3",
+      "integrity": "sha1-foz42PW48jnBvGi+tOt4Vn1XLvg=",
+      "license": "MIT",
+      "engines": {
+        "node": ">=0.4.0"
+      }
+    },
+    "node_modules/yauzl": {
+      "version": "3.4.0",
+      "integrity": "sha1-iLKiFFXzfKfczy7rM7rLQ5IyJxk=",
+      "license": "MIT",
+      "dependencies": {
+        "pend": "~1.2.0"
+      },
+      "engines": {
+        "node": ">=12"
+      }
+    }
+  }
+}

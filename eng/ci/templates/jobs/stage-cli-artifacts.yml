@@ -5,6 +5,9 @@ parameters:
 - name: sign
   type: boolean
   default: false
+- name: includeNpmPackage
+  type: boolean
+  default: false
 - name: runtimes
   type: object
   default:
@@ -38,6 +41,11 @@ jobs:
         **/func.exe
         **/install.ps1
         **/install.sh
+    - ${{ if eq(parameters.includeNpmPackage, true) }}:
+      - input: pipelineArtifact
+        targetPath: $(drop_path)/npm
+        artifactName: drop_npm
+        itemPattern: '**/*.tgz'
 
     outputs:
     - output: pipelineArtifact
@@ -102,6 +110,14 @@ jobs:
           }
           Remove-Item -Recurse -Force -Path $stage
         displayName: 'Restore signed macOS runtimes'
+
+    - ${{ if eq(parameters.includeNpmPackage, true) }}:
+      - task: CopyFiles@2
+        displayName: Copy npm package
+        inputs:
+          SourceFolder: $(drop_path)/npm
+          Contents: '**/*.tgz'
+          TargetFolder: $(release_path)
 
     # Archive all runtimes before Linux PGP signing. Linux PGP produces detached
     # signatures (.sig), so we sign the final .tar.gz archives rather than the

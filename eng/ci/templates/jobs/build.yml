@@ -13,6 +13,13 @@ parameters:
 - name: build_args
   type: string
   default: ''
+- name: npmPackageDirectory
+  type: string
+  default: ''
+- name: npmPackageNames
+  type: object
+  default:
+  - azure-functions-core-tools
 
 jobs:
 - job: build
@@ -25,6 +32,9 @@ jobs:
   - name: publish_dir
     readonly: true
     value: $(Build.ArtifactStagingDirectory)/pub
+  - name: npm_pack_dir
+    readonly: true
+    value: $(Build.ArtifactStagingDirectory)/npm
 
   templateContext:
     outputParentDirectory: $(Build.ArtifactStagingDirectory)
@@ -39,6 +49,11 @@ jobs:
         displayName: Publish CLI
         path: $(publish_dir)
         artifact: drop_cli
+    - ${{ if containsValue(parameters.artifacts, 'npm') }}:
+      - output: pipelineArtifact
+        displayName: Publish npm packages
+        path: $(npm_pack_dir)
+        artifact: drop_npm
 
   steps:
     - template: /eng/ci/templates/steps/setup-dependencies.yml@self
@@ -106,6 +121,57 @@ jobs:
             install.ps1
             install.sh
           TargetFolder: $(publish_dir)
+
+    - ${{ if containsValue(parameters.artifacts, 'npm') }}:
+      - task: NodeTool@0
+        displayName: Install Node.js
+        inputs:
+          versionSpec: 22.x
+
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $packageDirectory = '${{ parameters.npmPackageDirectory }}'
+          $version = '$(Build.BuildNumber)'.Trim().TrimStart('v', 'V')
+
+          if ([string]::IsNullOrWhiteSpace($packageDirectory)) {
+            throw 'npmPackageDirectory is required when creating npm artifacts.'
+          }
+
+          npm ci --ignore-scripts --prefix $packageDirectory
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Failed to restore npm package dependencies.'
+          }
+
+          npm version $version --no-git-tag-version --allow-same-version --prefix $packageDirectory
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to set npm package version to '$version'."
+          }
+
+          New-Item -ItemType Directory -Path '$(npm_pack_dir)' -Force | Out-Null
+        displayName: Prepare npm packages
+
+      - ${{ each packageName in parameters.npmPackageNames }}:
+        - pwsh: |
+            $ErrorActionPreference = 'Stop'
+            $packageDirectory = '${{ parameters.npmPackageDirectory }}'
+
+            npm pkg set 'name=${{ packageName }}' --prefix $packageDirectory
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to set npm package name to '${{ packageName }}'."
+            }
+
+            npm install --package-lock-only --ignore-scripts --prefer-offline --prefix $packageDirectory
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to update the npm shrinkwrap for '${{ packageName }}'."
+            }
+
+            $packageOutputDirectory = Join-Path '$(npm_pack_dir)' '${{ packageName }}'
+            New-Item -ItemType Directory -Path $packageOutputDirectory -Force | Out-Null
+            npm pack $packageDirectory --pack-destination $packageOutputDirectory
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create the '${{ packageName }}' npm package."
+            }
+          displayName: Pack ${{ packageName }}
 
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       - template: ci/sign-files.yml@eng
