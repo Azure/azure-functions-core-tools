@@ -17,8 +17,7 @@ COPY --from=mcr.microsoft.com/dotnet/aspnet:11.0 /usr/share/dotnet /usr/share/do
 ENV DOTNET_ROOT=/usr/share/dotnet
 ENV PATH="/usr/share/dotnet:${PATH}" \
     FUNCTIONS_WORKER_RUNTIME=dotnet-isolated \
-    FUNCTIONS_WORKER_RUNTIME_VERSION=11.0 \
+    AzureWebJobsScriptRoot=/home/site/wwwroot \
     AzureFunctionsJobHost__Logging__Console__IsEnabled=true
 
-WORKDIR /home/site/wwwroot
-COPY --from=build /app/publish .
+COPY --from=build /app/publish /home/site/wwwroot

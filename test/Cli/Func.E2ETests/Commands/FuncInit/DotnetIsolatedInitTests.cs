@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             "FROM mcr.microsoft.com/azure-functions/dotnet-isolated:4-dotnet-isolated11.0-chiseled AS final",
             "COPY --from=mcr.microsoft.com/dotnet/aspnet:11.0 /usr/share/dotnet /usr/share/dotnet",
             "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated",
-            "FUNCTIONS_WORKER_RUNTIME_VERSION=11.0"
+            "AzureWebJobsScriptRoot=/home/site/wwwroot"
         ];
 
         [Fact]
