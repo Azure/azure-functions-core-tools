@@ -6,6 +6,7 @@ using AwesomeAssertions;
 using Azure.Functions.Cli.Actions;
 using Azure.Functions.Cli.Actions.LocalActions;
 using Colors.Net;
+using Newtonsoft.Json.Linq;
 using NSubstitute;
 using Xunit;
 
@@ -19,12 +20,14 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
 
         private readonly string _testDirectory;
         private readonly string _originalDirectory;
+        private readonly TextReader _originalConsoleIn;
         private readonly StringBuilder _consoleOutput;
         private readonly IConsoleWriter _mockConsole;
 
         public DownloadBundleActionTests()
         {
             _originalDirectory = Directory.GetCurrentDirectory();
+            _originalConsoleIn = Console.In;
             _testDirectory = Path.Combine(Path.GetTempPath(), $"func_download_bundle_test_{Guid.NewGuid():N}");
             Directory.CreateDirectory(_testDirectory);
 
@@ -55,6 +58,8 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             {
                 // Ignore directory errors
             }
+
+            Console.SetIn(_originalConsoleIn);
 
             if (Directory.Exists(_testDirectory))
             {
@@ -215,10 +220,12 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
 
             // Create a fake existing bundle
             var bundlePath = Path.Combine(_testDirectory, "bundles", "4.30.0");
+            var sentinelFile = Path.Combine(bundlePath, "existing-bundle-sentinel.txt");
             Directory.CreateDirectory(bundlePath);
-            await File.WriteAllTextAsync(Path.Combine(bundlePath, "bundle.json"), "{}");
+            await File.WriteAllTextAsync(sentinelFile, "existing bundle content");
 
             var action = new DownloadBundleAction { Force = true };
+            Console.SetIn(new StringReader("y"));
 
             try
             {
@@ -230,7 +237,54 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
             }
 
             var output = _consoleOutput.ToString();
+            output.Should().Contain(Path.GetFullPath(Path.Combine(_testDirectory, "bundles")));
             output.Should().Contain("Clearing existing bundles");
+            File.Exists(sentinelFile).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task RunAsync_WithForce_WhenConfirmationDeclined_DoesNotDeleteConfiguredPath()
+        {
+            Directory.SetCurrentDirectory(_testDirectory);
+
+            var externalBundlePath = Path.Combine(Path.GetTempPath(), $"func_external_bundle_test_{Guid.NewGuid():N}");
+            var sentinelFile = Path.Combine(externalBundlePath, "do-not-delete.txt");
+            Directory.CreateDirectory(externalBundlePath);
+            await File.WriteAllTextAsync(sentinelFile, "user data");
+
+            try
+            {
+                var hostJson = Path.Combine(_testDirectory, "host.json");
+                var hostJsonContent = new JObject
+                {
+                    ["version"] = "2.0",
+                    ["extensionBundle"] = new JObject
+                    {
+                        ["id"] = "Microsoft.Azure.Functions.ExtensionBundle",
+                        ["version"] = "[4.*, 5.0.0)",
+                        ["downloadPath"] = externalBundlePath
+                    }
+                };
+                await File.WriteAllTextAsync(hostJson, hostJsonContent.ToString());
+
+                Console.SetIn(new StringReader("n"));
+                var action = new DownloadBundleAction { Force = true };
+
+                await action.RunAsync();
+
+                File.Exists(sentinelFile).Should().BeTrue();
+                var output = _consoleOutput.ToString();
+                output.Should().Contain(Path.GetFullPath(externalBundlePath));
+                output.Should().Contain("Continue? [y/N]");
+                output.Should().Contain("No files were deleted");
+            }
+            finally
+            {
+                if (Directory.Exists(externalBundlePath))
+                {
+                    Directory.Delete(externalBundlePath, recursive: true);
+                }
+            }
         }
 
         [Fact]
