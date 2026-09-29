@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
+using Microsoft.TemplateEngine.Edge.Settings;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -16,11 +18,15 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
     public TemplateEngineContext Context => _session.Context;
 
     /// <summary>
-    /// Enumerates the templates installed in the func hive.
+    /// Lists the installed templates of <paramref name="type"/>, including hidden templates and templates whose func
+    /// host metadata can't be used.
     /// </summary>
-    public Task<IReadOnlyList<ITemplateInfo>> GetTemplatesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TemplateCatalogEntry>> ListAsync(TemplateType type, CancellationToken cancellationToken = default)
     {
-        return _session.PackageManager.GetTemplatesAsync(cancellationToken);
+        TemplatePackageManager packageManager = _session.PackageManager;
+        IReadOnlyList<ITemplateInfo> templates = await packageManager.GetTemplatesAsync(cancellationToken);
+        IReadOnlyList<ITemplatePackage> packages = await packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
+        return TemplateCatalogProjector.Project(templates, packages, type);
     }
 
     public void Dispose() => _session.Dispose();

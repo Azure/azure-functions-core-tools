@@ -19,12 +19,16 @@ internal static class TemplateFixtures
     public const string ItemTemplateShortName = "func-tests-item";
     public const string ProjectTemplateIdentity = "Func.Tests.Project";
     public const string ProjectTemplateShortName = "func-tests-project";
+    public const string OtherTypeTemplateIdentity = "Func.Tests.OtherType";
+    public const string UntypedTemplateIdentity = "Func.Tests.Untyped";
     public const string MetadataTemplateIdentity = "Func.Tests.Metadata";
     public const string InvalidHostTemplateIdentity = "Func.Tests.InvalidHost";
     public const string DotnetHostOnlyTemplateIdentity = "Func.Tests.DotnetHostOnly";
+    public const string HiddenTemplateIdentity = "Func.Tests.Hidden";
 
     /// <summary>
-    /// Writes a folder package with one item template and one basic project template, and returns its path.
+    /// Writes a folder package with one item template, one basic project template, and two templates without an item
+    /// or project type, and returns its path.
     /// </summary>
     public static string WriteBasicPackage(string parentDirectory)
     {
@@ -61,6 +65,29 @@ internal static class TemplateFixtures
             }
             """,
             ("host.json", """{ "version": "2.0" }"""));
+
+        WriteTemplate(
+            Path.Combine(packageDirectory, "other-type"),
+            $$"""
+            {
+              "identity": "{{OtherTypeTemplateIdentity}}",
+              "name": "Func Tests Other Type",
+              "shortName": "func-tests-other-type",
+              "tags": { "type": "solution" }
+            }
+            """,
+            ("OtherType.txt", "OtherType content"));
+
+        WriteTemplate(
+            Path.Combine(packageDirectory, "untyped"),
+            $$"""
+            {
+              "identity": "{{UntypedTemplateIdentity}}",
+              "name": "Func Tests Untyped",
+              "shortName": "func-tests-untyped"
+            }
+            """,
+            ("Untyped.txt", "Untyped content"));
 
         return packageDirectory;
     }
@@ -128,6 +155,19 @@ internal static class TemplateFixtures
             """,
             ("DotnetHostOnly.txt", "DotnetHostOnly content"),
             ("dotnetcli.host.json", """{ "isHidden": true }"""));
+
+        WriteTemplate(
+            Path.Combine(packageDirectory, "hidden"),
+            $$"""
+            {
+              "identity": "{{HiddenTemplateIdentity}}",
+              "name": "Func Tests Hidden",
+              "shortName": "func-tests-hidden",
+              "tags": { "type": "item" }
+            }
+            """,
+            ("Hidden.txt", "Hidden content"),
+            ("func.host.json", """{ "isHidden": true }"""));
 
         return packageDirectory;
     }
