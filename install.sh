@@ -360,7 +360,7 @@ resolve_version() {
 
 resolve_version
 
-ASSET_NAME="Azure.Functions.Cli.${RID}.${VERSION}.tar.gz"
+ASSET_NAME="func-${RID}.tar.gz"
 DOWNLOAD_URL="${DOWNLOAD_BASE_URL}/public/cli/v5/${VERSION}/${ASSET_NAME}"
 
 say_info "Installing func CLI ${VERSION} (${RID})..."
@@ -391,7 +391,6 @@ else
     secure_curl "$DOWNLOAD_URL" "${TEMP_DIR}/${ASSET_NAME}"
     mkdir -p "$INSTALL_DIR"
     tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$INSTALL_DIR"
-    chmod +x "${INSTALL_DIR}/func" 2>/dev/null || true
 
     if [[ "$OS" == "osx" ]]; then
         xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
