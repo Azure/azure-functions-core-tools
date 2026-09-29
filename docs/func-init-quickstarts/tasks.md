@@ -31,7 +31,7 @@
 
 ## 5. Configuration Preflight and Dry-Run
 
-- [ ] 5.1 Validate the selected template has at least one mandatory trusted configuration action with canonical stack and language.
+- [ ] 5.1 Validate the selected template has at least one mandatory trusted configuration action with canonical stack and language, and that an installed stack supports each action's language.
 - [ ] 5.2 Validate primary-output references, target containment, direct project-root anchors, unique project roots, and configuration output collisions.
 - [ ] 5.3 Reject template file effects that create or modify `.func/config.json`.
 - [ ] 5.4 Add planned `.func/config.json` writes to combined creation effects and dry-run rendering.
@@ -41,7 +41,7 @@
 ## 6. Project Configuration Finalization
 
 - [ ] 6.1 Add a command-scoped finalization service that derives each project root from its resolved primary-output file and writes the current CLI configuration schema atomically.
-- [ ] 6.2 Validate the generated primary-output anchor exists and the installed workload recognizes each action's canonical stack and language before writing that project configuration.
+- [ ] 6.2 Validate the generated primary-output anchor exists before writing that project configuration.
 - [ ] 6.3 Execute configuration actions in declared order after scaffolding and before every ordinary post-action.
 - [ ] 6.4 Stop on the first configuration failure, preserve generated content and prior writes, skip ordinary post-actions, and return a partial-initialization result identifying the failed project.
 - [ ] 6.5 Add finalization tests for one and multiple projects, nested roots, atomic writes, ordering, ordinary post-actions, and partial failures.

@@ -209,6 +209,7 @@ After candidate parameters are complete, init resolves active configuration acti
 - a missing, ambiguous, inactive, or non-file primary-output reference;
 - a resolved primary output outside the target;
 - empty or non-canonical stack/language, or a value that conflicts with an explicit filter;
+- a stack that is not installed, or a language its stack does not support;
 - duplicate resolved project roots;
 - project template file effects targeting `.func/config.json`;
 - configuration output collisions with any other planned effect.

@@ -7,7 +7,7 @@
 - [ ] 1.5 Consume the trusted Functions project configuration action contract and project its metadata without exposing TemplateEngine action types to commands.
 - [ ] 1.6 Resolve active configuration actions against final primary-output paths after conditions and file renames.
 - [ ] 1.7 Add planned CLI-owned `.func/config.json` effects for project configuration actions while leaving item-template effects unchanged.
-- [ ] 1.8 Preflight action identity, mandatory failure semantics, canonical stack/language, primary-output references, target containment, unique project roots, and output collisions.
+- [ ] 1.8 Preflight action identity, mandatory failure semantics, canonical stack/language supported by an installed stack, primary-output references, target containment, unique project roots, and output collisions.
 - [ ] 1.9 Preserve resolved primary outputs and separate mandatory configuration actions from ordinary post-actions in invocation results.
 - [ ] 1.10 Add focused integration tests for action projection, renamed primary outputs, dry-run, creation, overlap rejection, configuration failure, and unchanged item-template behavior.
 

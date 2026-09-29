@@ -202,7 +202,7 @@ A root authored configuration is preserved byte-for-byte. The central validator 
 
 - valid identity and short-name metadata;
 - `tags.type` equal to `project`;
-- workload constraints, in the form `template-engine-constraints` defines;
+- workload constraints, in the form `template-engine-constraints` defines, that require every stack its configuration actions declare;
 - at least one trusted Functions project configuration finalization action;
 - every active configuration action to reference a resolved primary output and supply canonical stack and language;
 - no direct `.func/config.json` template content;

@@ -223,6 +223,7 @@ Actual execution is ordered:
 ```text
 Prepare
   validate candidate, actions, constraints, and combined effects
+  validate each action's installed stack recognizes its canonical language
   clear non-git target content when --force is authorized
 
 Template
@@ -232,12 +233,13 @@ Finalize
   for each configuration action in declared order:
     verify resolved primary-output file exists
     compute parent project root
-    validate installed stack recognizes canonical language
     atomically write .func/config.json
 
 Post
   execute ordinary post-actions in declared order
 ```
+
+Stack and language support is checked before cleanup, so `--force` never clears a target for a project init cannot configure.
 
 Configuration actions use the current CLI serializer and are mandatory. They cannot be skipped by future ordinary-action consent policy. Ordinary post-actions never run when finalization is incomplete.
 

@@ -53,13 +53,13 @@
 - [ ] 7.1 Detect only root `.template.config/template.json` and `.github/azure-functions-template.yaml` as template sources.
 - [ ] 7.2 Reject releases containing both recognized sources or neither source, without allowing onboarding to select a mode or alternate path.
 - [ ] 7.3 Author the strict centrally owned schema for `.github/azure-functions-template.yaml`, requiring schema version, identity, short name, name, description, and non-empty projects.
-- [ ] 7.4 Preserve authored configuration byte-for-byte and validate TemplateEngine loading, dry-run, identity, short names, project type, workload constraints, required configuration finalization actions, resolved primary outputs, and safety policy.
+- [ ] 7.4 Preserve authored configuration byte-for-byte and validate TemplateEngine loading, dry-run, identity, short names, project type, workload constraints covering every action stack, required configuration finalization actions, resolved primary outputs, and safety policy.
 - [ ] 7.5 Parse the synthesis descriptor before filtering `.github`, then validate each project root for normalized relative syntax, case-insensitive uniqueness, non-overlap, excluded paths, and a regular direct-child `host.json`.
 - [ ] 7.6 Validate canonical stack and language compatibility for every synthesized project.
 - [ ] 7.7 Synthesize project `template.json` from descriptor metadata, adding each project `host.json` as a primary output, one mandatory trusted configuration finalization action per project, and the workload constraint derived from the declared stacks.
 - [ ] 7.8 Omit parameter symbols, replacements, and ordinary post-actions from synthesized configuration; emit a singular language tag only for homogeneous project topology.
 - [ ] 7.9 Validate synthesized configuration through the same TemplateEngine load, dry-run, action, output-path, and safety path as authored configuration.
-- [ ] 7.10 Add tests for valid authored configuration, byte preservation, dual and missing ownership, malformed descriptors, invalid actions, missing workload constraints, unsafe authored behavior, root and nested synthesized projects, path attacks, overlapping roots, missing host files, mixed stacks and languages, descriptor metadata, filtering, and dry-run failures.
+- [ ] 7.10 Add tests for valid authored configuration, byte preservation, dual and missing ownership, malformed descriptors, invalid actions, missing or incomplete workload constraints, unsafe authored behavior, root and nested synthesized projects, path attacks, overlapping roots, missing host files, mixed stacks and languages, descriptor metadata, filtering, and dry-run failures.
 
 ## 8. NuGet Package Construction and Validation
 

@@ -215,7 +215,7 @@ For each release snapshot, the pipeline SHALL accept exactly one template source
 
 ### Requirement: Authored template configuration is preserved and dry-run
 
-When the release snapshot contains root `.template.config/template.json` and no synthesis descriptor, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, workload constraints in the form defined by `template-engine-constraints`, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
+When the release snapshot contains root `.template.config/template.json` and no synthesis descriptor, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, workload constraints in the form defined by `template-engine-constraints` that require every stack its configuration actions declare, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
 
 #### Scenario: Valid authored template exists
 
@@ -230,6 +230,11 @@ When the release snapshot contains root `.template.config/template.json` and no 
 #### Scenario: Authored template omits workload constraints
 
 - **WHEN** the authored template declares no workload constraints
+- **THEN** package construction fails
+
+#### Scenario: Authored workload constraints miss a project stack
+
+- **WHEN** a configuration action declares a stack that the authored workload constraints do not require
 - **THEN** package construction fails
 
 #### Scenario: Authored configuration is invalid
