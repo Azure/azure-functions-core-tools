@@ -13,6 +13,40 @@ public sealed class CdnReleaseFeedTests
 {
     private const string FixtureResource = "Azure.Functions.Cli.Tests.Update.Fixtures.version.json";
 
+    [Theory]
+    [InlineData("win-x64", "func-win-x64.zip")]
+    [InlineData("win-arm64", "func-win-arm64.zip")]
+    [InlineData("linux-x64", "func-linux-x64.tar.gz")]
+    [InlineData("linux-arm64", "func-linux-arm64.tar.gz")]
+    [InlineData("osx-x64", "func-osx-x64.tar.gz")]
+    [InlineData("osx-arm64", "func-osx-arm64.tar.gz")]
+    public void BuildDownloadUri_UsesNativeArtifactForTargetRuntime(string runtimeIdentifier, string fileName)
+    {
+        var version = SemVersion.Parse("5.1.0-preview.1", SemVersionStyles.Strict);
+
+        Uri uri = CdnReleaseFeed.BuildDownloadUri(version, runtimeIdentifier);
+
+        uri.IsAbsoluteUri.Should().BeFalse();
+        uri.OriginalString.Should().Be($"public/cli/v5/5.1.0-preview.1/{fileName}");
+    }
+
+    [Fact]
+    public void BuildDownloadUri_NullVersion_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => CdnReleaseFeed.BuildDownloadUri(null!, "linux-x64"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void BuildDownloadUri_InvalidRuntimeIdentifier_Throws(string? runtimeIdentifier)
+    {
+        var version = SemVersion.Parse("5.1.0", SemVersionStyles.Strict);
+
+        Assert.ThrowsAny<ArgumentException>(() => CdnReleaseFeed.BuildDownloadUri(version, runtimeIdentifier!));
+    }
+
     [Fact]
     public async Task GetLatestAsync_StableOnly_ReturnsStableVersion()
     {
@@ -89,7 +123,7 @@ public sealed class CdnReleaseFeedTests
         Release latest = await feed.GetLatestAsync(includePrerelease: false, CancellationToken.None);
 
         latest.DownloadUrl.ToString().Should().Contain("5.1.0");
-        latest.DownloadUrl.ToString().Should().Contain("Azure.Functions.Cli.");
+        latest.DownloadUrl.ToString().Should().Contain("/func-");
         latest.DownloadUrl.ToString().Should().MatchRegex(@"\.(zip|tar\.gz)$");
     }
 

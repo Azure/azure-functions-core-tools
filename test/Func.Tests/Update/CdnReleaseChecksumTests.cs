@@ -28,6 +28,8 @@ public sealed class CdnReleaseChecksumTests
             _digest + " *{filename}",
             _digest + "  wrong.zip",
             _digest + "  ../{filename}",
+            _digest + $"  Azure.Functions.Cli.{RuntimeInformation.RuntimeIdentifier}.5.1.0.zip",
+            _digest + $"  Azure.Functions.Cli.{RuntimeInformation.RuntimeIdentifier}.5.1.0.tar.gz",
             _digest + "  {filename}\n" + _digest + "  {filename}",
             _digest + "  {filename}\r",
             _digest + "  {filename}\n\n",
@@ -79,11 +81,12 @@ public sealed class CdnReleaseChecksumTests
         bool pinned, bool preview, string expectedVersion, string newline)
     {
         List<string> sidecarRequests = [];
+        List<string> artifactRequests = [];
         CdnReleaseFeed feed = CreateFeed(request =>
         {
             sidecarRequests.Add(request.RequestUri!.AbsolutePath);
             return Response($"{_digest.ToUpperInvariant()}  {ArtifactFileName(request)}{newline}");
-        });
+        }, artifactRequests);
 
         Release release = pinned
             ? await feed.GetVersionAsync(_version, CancellationToken.None)
@@ -92,7 +95,17 @@ public sealed class CdnReleaseChecksumTests
         release.Version.ToString().Should().Be(expectedVersion);
         release.Sha256Checksum.Should().Be(_digest.ToUpperInvariant());
         sidecarRequests.Should().ContainSingle()
-            .Which.Should().Be($"/public/cli/v5/{expectedVersion}/Azure.Functions.Cli.{RuntimeInformation.RuntimeIdentifier}.{expectedVersion}.{Release.ArchiveExtension}.sha256");
+            .Which.Should().Be($"/public/cli/v5/{expectedVersion}/func-{RuntimeInformation.RuntimeIdentifier}.{Release.ArchiveExtension}.sha256");
+        release.DownloadUrl.OriginalString.Should().Be(
+            $"public/cli/v5/{expectedVersion}/func-{RuntimeInformation.RuntimeIdentifier}.{Release.ArchiveExtension}");
+        if (pinned)
+        {
+            artifactRequests.Should().ContainSingle().Which.Should().Be("/" + release.DownloadUrl.OriginalString);
+        }
+        else
+        {
+            artifactRequests.Should().BeEmpty();
+        }
     }
 
     [Theory]
@@ -183,12 +196,15 @@ public sealed class CdnReleaseChecksumTests
 
     private static HttpResponseMessage Response(string body) => new(HttpStatusCode.OK) { Content = new StringContent(body) };
 
-    private static CdnReleaseFeed CreateFeed(Func<HttpRequestMessage, HttpResponseMessage> sidecarResponse)
+    private static CdnReleaseFeed CreateFeed(
+        Func<HttpRequestMessage, HttpResponseMessage> sidecarResponse,
+        List<string>? artifactRequests = null)
     {
         var handler = new StubHttpMessageHandler((request, _) =>
         {
             if (request.Method == HttpMethod.Head)
             {
+                artifactRequests?.Add(request.RequestUri!.AbsolutePath);
                 return new HttpResponseMessage(HttpStatusCode.OK);
             }
 

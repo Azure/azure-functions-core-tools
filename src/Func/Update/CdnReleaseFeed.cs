@@ -43,7 +43,7 @@ internal sealed partial class CdnReleaseFeed(
                     $"Error reading version manifest from '{ManifestPath}': no valid version found");
             }
 
-            return await CreateReleaseAsync(best, BuildDownloadUri(best), cancellationToken);
+            return await CreateReleaseAsync(best, BuildDownloadUri(best, RuntimeInformation.RuntimeIdentifier), cancellationToken);
         }
         else
         {
@@ -59,7 +59,7 @@ internal sealed partial class CdnReleaseFeed(
                     $"Error reading version manifest from '{ManifestPath}': invalid version '{manifest.Stable}'");
             }
 
-            return await CreateReleaseAsync(version, BuildDownloadUri(version), cancellationToken);
+            return await CreateReleaseAsync(version, BuildDownloadUri(version, RuntimeInformation.RuntimeIdentifier), cancellationToken);
         }
     }
 
@@ -67,7 +67,7 @@ internal sealed partial class CdnReleaseFeed(
     {
         ArgumentNullException.ThrowIfNull(version);
 
-        Uri downloadUri = BuildDownloadUri(version);
+        Uri downloadUri = BuildDownloadUri(version, RuntimeInformation.RuntimeIdentifier);
 
         // Verify the artifact exists on CDN with a HEAD request.
         using var request = new HttpRequestMessage(HttpMethod.Head, downloadUri);
@@ -254,10 +254,11 @@ internal sealed partial class CdnReleaseFeed(
         return version;
     }
 
-    private static Uri BuildDownloadUri(SemVersion version)
+    internal static Uri BuildDownloadUri(SemVersion version, string runtimeIdentifier)
     {
-        string rid = RuntimeInformation.RuntimeIdentifier;
-        return new Uri($"public/cli/v5/{version}/Azure.Functions.Cli.{rid}.{version}.{Release.ArchiveExtension}", UriKind.Relative);
+        ArgumentNullException.ThrowIfNull(version);
+        string extension = Release.GetArchiveExtension(runtimeIdentifier);
+        return new Uri($"public/cli/v5/{version}/func-{runtimeIdentifier}.{extension}", UriKind.Relative);
     }
 
     private static partial class Log
