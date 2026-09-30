@@ -159,7 +159,7 @@ When a constraint lists alternatives and none is satisfied, the message gives ea
 
 ### Workload requirements give the same result before a project exists
 
-`func-workload`, `os`, and `host` read no project context, so they give the same result before and after a template is chosen. The catalog read before selection can therefore use them to show unavailable templates, as `func-init-quickstarts` requires. `func-bundle` depends on the resolved command context. The authoritative evaluation runs in the command's `Templater`, and how the catalog evaluates constraints without a second command session is decided with the `func init` catalog work.
+`func-workload`, `os`, and `host` read no project context, so they give the same result before and after a template is chosen. `func init` lists templates from the session it later invokes them from, so its picker can show unavailable templates, as `func-init-quickstarts` requires, and that result is final. `func-bundle` depends on the resolved command context, which `func new` resolves before it lists templates.
 
 ### Azure-Samples packages declare their stack workloads
 
@@ -192,7 +192,6 @@ The `func-workload` factory needs the loaded workload snapshot and the installed
 - **[Engine results carry text rather than structure]** -> Diagnostics keep the constraint type beside the text, func constraints generate both their message and next step, and summaries come from the state and type.
 - **[Func types and `host` compare versions differently]** -> Document both readings and test minimum and prerelease cases.
 - **[`func-workload` can't select an extension bundle channel]** -> Add a channel argument if a project template needs one.
-- **[Evaluating before selection needs an engine environment]** -> Decide the mechanism with the `func init` catalog work, and keep the command's `Templater` authoritative.
 - **[Generated commands can drift from the workload commands]** -> Build next steps in one place and test them against the workload command options.
 - **[Evaluating every listed template adds time]** -> Evaluate against in-memory snapshots with one constraint manager per command.
 
