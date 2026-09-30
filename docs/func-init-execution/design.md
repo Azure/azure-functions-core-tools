@@ -112,7 +112,7 @@ At each choice point:
 >1       -> prompt, or non-interactive ambiguity result
 ```
 
-The special name `basic` has no selection semantics. A sole applicable template group is automatically selected; multiple groups prompt even when one is named basic.
+The special name `basic` has no selection semantics. A sole applicable template group is automatically selected; multiple groups prompt even when one is named basic. An interactive run still shows the picker when unavailable groups are listed beside the sole applicable one, so they stay visible.
 
 Standard `language` tags remain optional metadata for homogeneous variants. No func-specific stack tag is introduced.
 
@@ -273,7 +273,7 @@ Init orchestration retains func-owned outcomes for:
 - project creation success;
 - partial creation after configuration failure.
 
-No applicable template falls back to workload scaffolding. Diagnostics name any supplied filters, show the browse URL, and direct the user to `func new install`.
+No applicable template falls back to workload scaffolding. Diagnostics name any supplied filters, show the browse URL, and direct the user to `func new install`. When templates are installed but none can be used, the diagnostic also shows each distinct call to action from their constraints once, because the missing piece is usually a workload rather than a template.
 
 Known outcomes are rendered through `IInteractionService` or wrapped at the command boundary using the repository's `GracefulException` policy. Unexpected integration defects propagate. Cancellation is honored before cleanup and through catalog access, prompting, preflight, creation, configuration, and post-actions.
 

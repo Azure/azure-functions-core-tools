@@ -60,7 +60,7 @@ When no template is supplied and prompting is available, `func init` SHALL prese
 
 #### Scenario: One installed project template is available
 
-- **WHEN** exactly one eligible installed project-template group is available
+- **WHEN** exactly one eligible installed project-template group is available and no unavailable group is listed
 - **THEN** the command may select it automatically
 
 ### Requirement: Explicit template references remain authoritative
@@ -94,7 +94,19 @@ The interactive installed-template experience SHALL show a stable Functions-owne
 
 ### Requirement: Restricted installed templates remain visible
 
-Installed project templates rejected by workload constraints SHALL remain visible in interactive template discovery as unavailable choices, unless explicit stack or language filters rule them out. The picker SHALL show a concise restriction summary, SHALL prevent selection of an unavailable template, and SHALL render detailed calls to action supplied by the constraint system outside the picker.
+Installed project templates rejected by workload constraints SHALL remain visible in interactive template discovery as unavailable choices, unless explicit stack or language filters rule them out. The picker SHALL show a concise restriction summary, SHALL prevent selection of an unavailable template, and SHALL render detailed calls to action supplied by the constraint system outside the picker. An interactive command SHALL show the picker even when only one eligible group remains beside unavailable groups. When no eligible group remains, the command SHALL NOT show a picker. It SHALL report that no installed template can be used, show each distinct call to action once with the browse URL, and exit non-zero without modifying the target.
+
+#### Scenario: One usable template is listed with unavailable ones
+
+- **WHEN** exactly one eligible group remains and other listed groups are unavailable
+- **THEN** the interactive command shows the picker instead of selecting the eligible group automatically
+
+#### Scenario: No installed template can be used
+
+- **WHEN** every installed project template that the filters leave is unavailable
+- **THEN** the command shows no picker
+- **AND** reports that no installed template can be used, with each distinct call to action once and the browse URL
+- **AND** exits non-zero without modifying the target
 
 #### Scenario: Template is missing a required workload
 

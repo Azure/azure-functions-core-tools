@@ -72,7 +72,7 @@
 ## 7. Selection and Prompting
 
 - [ ] 7.1 Honor every explicit template, stack, and language filter without prompting for substitutes.
-- [ ] 7.2 Auto-select any template group or variant with exactly one remaining value.
+- [ ] 7.2 Auto-select any template group or variant with exactly one remaining value, except that an interactive run shows the group picker while unavailable groups are listed.
 - [ ] 7.3 Prompt for the project-template group first when no template was supplied, then only for unresolved variants and required parameters.
 - [ ] 7.4 Avoid special-casing the basic template name and auto-select only when one applicable group remains.
 - [ ] 7.5 Fail non-interactively with the remaining template references or identities whenever a template or variant prompt would be required.
@@ -107,7 +107,7 @@
 
 - [ ] 10.1 Add func-owned init outcomes for no stacks, duplicate stacks, incompatibility, wrong template type, missing packages, ambiguity, invalid arguments, and restricted templates.
 - [ ] 10.2 Render template and variant prompts using canonical values and user-facing display labels.
-- [ ] 10.3 Render no-template guidance with any supplied filters, the browse URL, and a `func new install` next action.
+- [ ] 10.3 Render no-template guidance with any supplied filters, the browse URL, a `func new install` next action, and each distinct call to action once when installed templates cannot be used.
 - [ ] 10.4 Render ordered plain dry-run effects for cleanup, project files, action-planned `.func/config.json`, and ordinary post-actions.
 - [ ] 10.5 Render the same dry-run and creation data through stable JSON output.
 - [ ] 10.6 Render declined cleanup, successful adoption, successful healing, successful creation, and partial initialization distinctly.
@@ -131,7 +131,7 @@
 - [ ] 12.2 Test duplicate stack IDs, aliases, one-to-many language ownership, and no-installed-stack guidance.
 - [ ] 12.3 Test project-template type validation, item-type diagnostics, and mixed templates without a language tag.
 - [ ] 12.4 Test template-first selection with no filters, stack or language filters, explicit templates, and mixed-stack templates.
-- [ ] 12.5 Test auto-selection, interactive prompting order, and every non-interactive ambiguity diagnostic.
+- [ ] 12.5 Test auto-selection, including a lone applicable group beside unavailable ones, interactive prompting order, and every non-interactive ambiguity diagnostic.
 - [ ] 12.6 Test shared template parsing, alias collisions, invalid input, missing required values, canonical mappings, and precedence timing.
 - [ ] 12.7 Test that stack and language host bindings are unavailable for single-stack and mixed templates, and that bundle defaults are unavailable.
 - [ ] 12.8 Test empty, initialized, adoptable, healable, forced, and declined-force state paths.

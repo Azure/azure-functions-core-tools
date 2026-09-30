@@ -18,16 +18,16 @@
 - [ ] 3.1 Replace stack-first init creation selection with installed `tags.type = project` group selection followed by variant and parameter resolution.
 - [ ] 3.2 Preserve exact identity-before-short-name matching and deterministic non-interactive ambiguity errors for explicit templates.
 - [ ] 3.3 Narrow the picker by `--stack` and `--language` to templates that can still match, then apply them as all-project filters over active resolved configurations.
-- [ ] 3.4 Keep restricted installed templates in interactive candidates while preventing their selection.
+- [ ] 3.4 Keep restricted installed templates in interactive candidates while preventing their selection, and show the picker even when only one eligible group remains beside them.
 - [ ] 3.5 Add selection tests for homogeneous and heterogeneous templates, conditional projects, explicit filter conflicts, restricted templates, and non-interactive input.
 
 ## 4. Discovery and Remediation UX
 
 - [ ] 4.1 Add the stable Functions-owned quickstart browse URL to the CLI-owned options or constants boundary.
 - [ ] 4.2 Render installed project templates, unavailable summaries, and the browse URL through `IInteractionService`.
-- [ ] 4.3 Render structured constraint diagnostics and calls to action outside the picker for restricted explicit and interactive selections.
+- [ ] 4.3 Render structured constraint diagnostics and calls to action outside the picker for restricted explicit and interactive selections, and render each distinct call to action once with the browse URL instead of a picker when no installed template can be used.
 - [ ] 4.4 Return browse and `func new install` guidance without package mutation when an explicit template is not installed.
-- [ ] 4.5 Add command tests for empty catalogs, unknown templates, unavailable templates, browse guidance, themed output, and item-template rejection.
+- [ ] 4.5 Add command tests for empty catalogs, unknown templates, unavailable templates, one usable template beside unavailable ones, catalogs where nothing is usable, browse guidance, themed output, and item-template rejection.
 
 ## 5. Configuration Preflight and Dry-Run
 

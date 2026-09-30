@@ -114,6 +114,8 @@ Browse more templates: <URL>
 
 Restricted entries cannot be selected. Concise summaries fit the picker; detailed constraint diagnostics and calls to action are rendered after or alongside it using structured results from the constraint system. An explicitly requested restricted template bypasses the picker but produces the same detailed remediation.
 
+When one eligible group remains beside unavailable ones, the picker is still shown so the unavailable ones stay visible. When no eligible group remains, init skips the picker. It reports that no installed template can be used, shows each distinct call to action once, adds the browse URL, and exits without modifying the target. The missing piece is usually a workload rather than a template, so the calls to action matter more than generic install guidance.
+
 Func does not infer package commands from constraint text. `template-engine-constraints` owns the distinction between missing, outdated, incompatible, unevaluable, and failed constraints and supplies any appropriate call to action.
 
 **Alternative considered:** hide restricted templates. Users would not know an installed quickstart exists or how to unblock it. It is rejected.

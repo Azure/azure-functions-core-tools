@@ -77,7 +77,7 @@ Defines how `func init` selects an installed project template and applies stack 
 - **THEN** the command reports the template's project stacks without invoking another template
 
 ### Requirement: Progressive automatic and interactive selection
-`func init` SHALL automatically select any choice with exactly one remaining value. For group and variant choices, only eligible templates that can still match explicit stack and language filters remain. It SHALL prompt only for project-template group, variant, or required parameter choices that remain genuinely ambiguous. When no template was explicitly supplied, the project-template group SHALL be the first choice presented.
+`func init` SHALL automatically select any choice with exactly one remaining value. For group and variant choices, only eligible templates that can still match explicit stack and language filters remain. An interactive group choice SHALL NOT be selected automatically while unavailable groups are listed beside it. It SHALL prompt only for project-template group, variant, or required parameter choices that remain genuinely ambiguous. When no template was explicitly supplied, the project-template group SHALL be the first choice presented.
 
 #### Scenario: No filters are supplied
 - **WHEN** multiple installed project-template groups are applicable
@@ -88,8 +88,12 @@ Defines how `func init` selects an installed project template and applies stack 
 - **THEN** the command selects that variant without prompting
 
 #### Scenario: One applicable project template remains
-- **WHEN** exactly one applicable project-template group remains
+- **WHEN** exactly one applicable project-template group remains and no unavailable group is listed
 - **THEN** the command selects it without prompting regardless of its short name
+
+#### Scenario: One applicable template is listed with unavailable ones
+- **WHEN** exactly one applicable group remains and the interactive picker lists unavailable groups
+- **THEN** the command shows the picker instead of selecting the applicable group automatically
 
 #### Scenario: Multiple project templates remain
 - **WHEN** multiple applicable project-template groups remain
@@ -281,6 +285,11 @@ After project-template scaffolding succeeds, `func init` SHALL execute active pr
 #### Scenario: Filters match no installed template
 - **WHEN** `--stack` or `--language` matches no installed project template
 - **THEN** the command shows the browse URL and directs the user to install an applicable template package through `func new install`
+
+#### Scenario: No installed template can be used
+- **WHEN** project templates are installed but none of those the filters leave is eligible
+- **THEN** the command shows each distinct call to action once with the browse URL
+- **AND** exits without modifying the target
 
 #### Scenario: Former workload initializer exists
 - **WHEN** legacy workload scaffolding code exists but no compatible project template is installed
