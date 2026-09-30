@@ -77,12 +77,12 @@ Project templates are expected to be delivered in a companion `FuncTemplate` pac
 init template context (target directory)
   -> one Templater
        |- ListAsync(TemplateType.Project)  entries, eligibility, declared projects
-       |- select group and variant
+       |- select group and variant         from the list, or --template through ResolveGroupAsync
        |- parse parameters and dry-run     active projects and planned effects
-       `- invoke                           the listed template, in the same session
+       `- invoke                           the selected template, in the same session
 ```
 
-Constraints are evaluated in that context when templates are listed, so the eligibility shown before selection is final. The command forms the selected group from the entries it listed instead of looking the reference up again, so it invokes one of the templates the user saw.
+Constraints are evaluated in that context when templates are listed, so the eligibility shown before selection is final. When the user picks from the list, the command forms the group from the listed entries instead of looking the template up again, so it invokes one of the templates the user saw. An explicit `--template` reference is resolved once through the same `Templater` with `ResolveGroupAsync(reference, TemplateType.Project)`, which keeps full-identity precedence and the wrong-type diagnostic that sends item templates to `func new`.
 
 **Alternative considered:** list templates from a context-free catalog, then create a context-bound `Templater` and resolve the chosen reference again. That needs two engine environments, and the second resolution can find a different template or result than the one the user selected. It is rejected.
 

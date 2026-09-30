@@ -115,7 +115,7 @@ When `--non-interactive` is supplied, or the terminal cannot prompt, `func init`
 - **THEN** non-interactive initialization proceeds without prompts
 
 ### Requirement: Init template context
-Before listing project templates, `func init` SHALL create one immutable template context whose command directory and project root are the target directory. The context SHALL NOT expose a stack, language, or extension bundle. Listing, constraint evaluation, host bindings, parameter defaults, dry-run, and creation SHALL use one `Templater` created from that context.
+Before listing project templates, `func init` SHALL create one immutable template context whose command directory and project root are the target directory. The context SHALL NOT expose a stack, language, or extension bundle. Listing, reference resolution, constraint evaluation, host bindings, parameter defaults, dry-run, and creation SHALL use one `Templater` created from that context.
 
 #### Scenario: Project does not yet exist
 - **WHEN** initialization targets an empty directory
@@ -129,6 +129,11 @@ Before listing project templates, `func init` SHALL create one immutable templat
 #### Scenario: Selected template is invoked
 - **WHEN** the user selects a listed project template
 - **THEN** init forms the group from the entries its `Templater` listed and invokes it through that `Templater` without looking the reference up again
+
+#### Scenario: Template is named explicitly
+- **WHEN** `--template` names a template
+- **THEN** init resolves the reference once through the same `Templater` with type-aware resolution
+- **AND** an item-template identity is reported as the wrong type rather than as not found
 
 #### Scenario: Project template requires resolved bundle context
 - **WHEN** a project template declares a compatibility requirement for an existing resolved bundle

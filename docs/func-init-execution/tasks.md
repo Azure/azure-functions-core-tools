@@ -83,7 +83,7 @@
 - [ ] 8.1 Create the init template context from the target directory without a stack, language, or bundle.
 - [ ] 8.2 Leave bundle ID and version unavailable during project initialization and test bundle-dependent constraints fail closed.
 - [ ] 8.3 Create one command-scoped `Templater` before listing project templates and reuse it through selection, parsing, dry-run, and invocation.
-- [ ] 8.4 Form the selected group from the entries the `Templater` listed instead of looking the reference up again.
+- [ ] 8.4 Form a picked group from the entries the `Templater` listed, and resolve an explicit `--template` reference once through the same `Templater` with type-aware resolution.
 - [ ] 8.5 Reuse the `func new` candidate parser and alias coordinator for project-template symbols.
 - [ ] 8.6 Parse raw template tokens independently for every remaining variant and distinguish invalid explicit input from unresolved required input.
 - [ ] 8.7 Filter argument-compatible identities before applying highest remaining precedence.
