@@ -42,7 +42,7 @@ The integration SHALL create a fresh host and template engine environment for ea
 - **THEN** every phase uses the same host defaults and engine environment
 
 ### Requirement: Installed template catalog
-The integration SHALL list the templates of the requested template type known to the func settings hive, including templates that are ineligible in the current context. Each catalog entry SHALL include template identity, template type, short names, group identity, language, precedence, owning package information when available, eligibility, and constraint diagnostics.
+The integration SHALL list the templates of the requested template type known to the func settings hive, including templates that are ineligible in the current context. Each catalog entry SHALL include template identity, template type, short names, group identity, language, precedence, owning package information when available, eligibility, and constraint diagnostics. Project template entries SHALL also include the Functions projects their configuration actions declare.
 
 #### Scenario: Eligible and restricted templates are listed
 - **WHEN** the installed catalog contains both eligible and context-restricted templates
@@ -51,6 +51,11 @@ The integration SHALL list the templates of the requested template type known to
 #### Scenario: Constraint cannot be evaluated
 - **WHEN** an installed template declares a constraint that cannot be evaluated
 - **THEN** listing distinguishes that authoring or configuration failure from an ordinary context restriction
+
+#### Scenario: Catalog is read before a template is picked
+- **WHEN** a command lists templates for the user to pick from
+- **THEN** the entries and their eligibility come from the session that later invokes the picked template
+- **AND** the picked group is formed from those listed entries
 
 ### Requirement: Deterministic template reference matching
 The integration SHALL first match a template reference against exact full template identities. If no full identity matches, it SHALL match exact short names case-insensitively. Full identity matching SHALL be the deterministic escape hatch from short-name ambiguity, but SHALL NOT bypass template type or constraints. Matching SHALL be scoped to the requested template type. TemplateEngine `tags.type` values `item` and `project` SHALL identify item and project templates, and a missing or unrecognized value SHALL match neither. A match of another type SHALL produce a wrong-type diagnostic and SHALL NOT enter the eligible group. A reference that matches only templates without a recognized type SHALL produce an authoring diagnostic rather than a not-found outcome.

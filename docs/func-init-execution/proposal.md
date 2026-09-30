@@ -8,7 +8,7 @@
 - Select a project template first through `--template` or a prompt, and treat `--stack` and `--language` as filters that every generated project must match, prompting only when deterministic filtering leaves a genuine choice.
 - Preserve existing-project detection and metadata-only adoption/healing without invoking project templates. Replace initializer-based stack metadata with `IProjectStack`, always persist canonical stack and language, make configuration-write failures fatal, and reject `--template` on these paths unless `--force` selects reinitialization.
 - Reuse the same strict candidate parsing, reserved-alias handling, required-value prompting, precedence ordering, dry-run behavior, and non-interactive policy specified for `func new`.
-- Create a prospective immutable project context from the target directory, exposing stack and language only when every generated project shares them, before constructing one command-scoped `Templater`.
+- Create an immutable template context from the target directory, without a stack, language, or bundle, and one command-scoped `Templater` from it before listing project templates.
 - Require project templates to declare trusted Functions project configuration actions that reference resolved primary outputs and supply canonical stack and language; use those actions to generate CLI-owned `.func/config.json`.
 - Preserve destructive `--force` behavior by clearing target content except `.git`, including those planned deletions in dry-run output.
 - Run mandatory project configuration actions after scaffolding and before ordinary project-template post-actions.
@@ -28,7 +28,7 @@ None.
 
 - Reworks `InitCommand` orchestration, template selection, workload registration, project creation, dry-run rendering, and project configuration persistence.
 - Replaces `IProjectInitializer`, `InitContext`, `IInitOptionRegistry`, and workload-owned project scaffolding with `IProjectStack` metadata and TemplateEngine project templates.
-- Depends on `template-engine-integration` for context-free catalog metadata, `TemplateType.Project` resolution, command-scoped `Templater`, projected parameters, immutable groups, and self-invoking `ResolvedTemplate`.
+- Depends on `template-engine-integration` for constraint-aware catalog entries, `TemplateType.Project` resolution, command-scoped `Templater`, projected parameters, immutable groups, and self-invoking `ResolvedTemplate`.
 - Depends on `template-engine-post-actions` for the trusted Functions project configuration action, projected action metadata, resolved primary-output references, and dry-run behavior.
 - Depends on the strict parser and alias behavior designed in `func-new-execution`.
 - Follows `func-init-quickstarts` for template-first selection, whole-template filters, and multi-project topology.

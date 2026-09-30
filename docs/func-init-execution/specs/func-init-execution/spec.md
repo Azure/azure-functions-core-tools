@@ -77,7 +77,7 @@ Defines how `func init` selects an installed project template and applies stack 
 - **THEN** the command reports the template's project stacks without invoking another template
 
 ### Requirement: Progressive automatic and interactive selection
-`func init` SHALL automatically select any choice with exactly one remaining value. It SHALL prompt only for project-template group, variant, or required parameter choices that remain genuinely ambiguous. When no template was explicitly supplied, the project-template group SHALL be the first choice presented.
+`func init` SHALL automatically select any choice with exactly one remaining value. For group and variant choices, only eligible templates that can still match explicit stack and language filters remain. It SHALL prompt only for project-template group, variant, or required parameter choices that remain genuinely ambiguous. When no template was explicitly supplied, the project-template group SHALL be the first choice presented.
 
 #### Scenario: No filters are supplied
 - **WHEN** multiple installed project-template groups are applicable
@@ -114,16 +114,21 @@ When `--non-interactive` is supplied, or the terminal cannot prompt, `func init`
 - **WHEN** exactly one template, variant, and complete parameter set remain
 - **THEN** non-interactive initialization proceeds without prompts
 
-### Requirement: Prospective project context
-Before context-dependent template resolution, `func init` SHALL create one immutable prospective project context whose command directory and project root are the target directory. It SHALL NOT expose a stack or language that the active projects do not share, as `func-init-quickstarts` specifies. Template constraints, host bindings, parameter defaults, dry-run, and creation SHALL use that same context. Extension bundle identity and version SHALL remain unavailable because no project bundle has yet been generated or resolved.
+### Requirement: Init template context
+Before listing project templates, `func init` SHALL create one immutable template context whose command directory and project root are the target directory. The context SHALL NOT expose a stack, language, or extension bundle. Listing, constraint evaluation, host bindings, parameter defaults, dry-run, and creation SHALL use one `Templater` created from that context.
 
 #### Scenario: Project does not yet exist
 - **WHEN** initialization targets an empty directory
 - **THEN** project templates receive the target directory as project context
 
-#### Scenario: Mixed template reads host bindings
-- **WHEN** active projects declare different stacks
-- **THEN** singular func stack host context is unavailable
+#### Scenario: Template reads host stack binding
+- **WHEN** a project template binds `func:stack` or `func:language`
+- **THEN** the host reports the value as unavailable, even when every project uses one stack and language
+- **AND** the bind symbol receives its declared default
+
+#### Scenario: Selected template is invoked
+- **WHEN** the user selects a listed project template
+- **THEN** init forms the group from the entries its `Templater` listed and invokes it through that `Templater` without looking the reference up again
 
 #### Scenario: Project template requires resolved bundle context
 - **WHEN** a project template declares a compatibility requirement for an existing resolved bundle

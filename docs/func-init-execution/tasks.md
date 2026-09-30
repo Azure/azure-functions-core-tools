@@ -1,9 +1,9 @@
 ## 1. Template Integration Prerequisites
 
-- [ ] 1.1 Add a context-free template metadata catalog backed by the shared func hive without evaluating command constraints or producing invocable templates.
+- [ ] 1.1 Use the project catalog entries, eligibility, and declared projects defined by `template-engine-integration` and `func-init-quickstarts` instead of a separate init catalog.
 - [ ] 1.2 Add project-type listing and reference resolution that exposes identity, aliases, group identity, language, precedence, visibility, and package origin.
 - [ ] 1.3 Treat project-template language tags as optional variant metadata, with configuration actions authoritative for each project's stack and language.
-- [ ] 1.4 Ensure package install, update, and uninstall invalidate context-free catalog snapshots.
+- [ ] 1.4 Evaluate project-template constraints when listing in the init context, and enforce that result through selection and invocation.
 - [ ] 1.5 Consume the trusted Functions project configuration action contract and project its metadata without exposing TemplateEngine action types to commands.
 - [ ] 1.6 Resolve active configuration actions against final primary-output paths after conditions and file renames.
 - [ ] 1.7 Add planned CLI-owned `.func/config.json` effects for project configuration actions while leaving item-template effects unchanged.
@@ -61,12 +61,13 @@
 
 ## 6. Template Selection
 
-- [ ] 6.1 Prototype when filters are checked and when the prospective context is fixed for conditional topology, and record the decision in this design.
+- [x] 6.1 Prototype when filters are checked and when the template context is fixed for conditional topology, and record the decision in this design.
 - [ ] 6.2 Define immutable selection models for project-template groups, variants, and their projected configuration actions.
 - [ ] 6.3 Apply `--stack` and `--language` to every active project configuration, matching canonical names and `IProjectStack` aliases case-insensitively.
 - [ ] 6.4 Keep mixed-stack and mixed-language templates available when the corresponding filter is absent.
 - [ ] 6.5 Enforce project type with wrong-type diagnostics and report unknown filters, stack-language conflicts, and whole-template conflicts without substituting another template.
-- [ ] 6.6 Add filter tests for homogeneous, mixed, and conditional templates, alias matching, and conflicts.
+- [ ] 6.6 Narrow groups and their variants by `--stack` and `--language` to templates whose unconditional projects all match every supplied filter and that declare at least one project matching them all.
+- [ ] 6.7 Add filter tests for homogeneous, mixed, and conditional templates, grouped variants, both filters together, templates that declare no project, alias matching, and conflicts.
 
 ## 7. Selection and Prompting
 
@@ -77,12 +78,12 @@
 - [ ] 7.5 Fail non-interactively with the remaining template references or identities whenever a template or variant prompt would be required.
 - [ ] 7.6 Preserve cancellation through every selection prompt and return no partially selected mutable state.
 
-## 8. Prospective Context and Parsing
+## 8. Template Context and Parsing
 
-- [ ] 8.1 Create the prospective template context from the target directory, exposing stack and language only when every active project shares them.
+- [ ] 8.1 Create the init template context from the target directory without a stack, language, or bundle.
 - [ ] 8.2 Leave bundle ID and version unavailable during project initialization and test bundle-dependent constraints fail closed.
-- [ ] 8.3 Create one command-scoped `Templater` after project-template selection and reuse it through authoritative resolution and invocation.
-- [ ] 8.4 Resolve the selected project-template reference again through the context-bound `Templater` and surface catalog-to-execution drift.
+- [ ] 8.3 Create one command-scoped `Templater` before listing project templates and reuse it through selection, parsing, dry-run, and invocation.
+- [ ] 8.4 Form the selected group from the entries the `Templater` listed instead of looking the reference up again.
 - [ ] 8.5 Reuse the `func new` candidate parser and alias coordinator for project-template symbols.
 - [ ] 8.6 Parse raw template tokens independently for every remaining variant and distinguish invalid explicit input from unresolved required input.
 - [ ] 8.7 Filter argument-compatible identities before applying highest remaining precedence.
@@ -132,7 +133,7 @@
 - [ ] 12.4 Test template-first selection with no filters, stack or language filters, explicit templates, and mixed-stack templates.
 - [ ] 12.5 Test auto-selection, interactive prompting order, and every non-interactive ambiguity diagnostic.
 - [ ] 12.6 Test shared template parsing, alias collisions, invalid input, missing required values, canonical mappings, and precedence timing.
-- [ ] 12.7 Test common and unavailable stack and language host bindings and unavailable bundle defaults.
+- [ ] 12.7 Test that stack and language host bindings are unavailable for single-stack and mixed templates, and that bundle defaults are unavailable.
 - [ ] 12.8 Test empty, initialized, adoptable, healable, forced, and declined-force state paths.
 - [ ] 12.9 Test configuration actions always persist canonical stack and language and project template content never owns `.func/config.json`.
 - [ ] 12.10 Test resolved primary-output paths and action-planned configuration effects for dry-run and actual invocation.
@@ -145,7 +146,7 @@
 
 - [ ] 13.1 Update `func init --help` for project-template selection, non-interactive behavior, dry-run, and template-specific options.
 - [ ] 13.2 Document installed stack and project-template requirements, whole-template filters, and `func new install` guidance.
-- [ ] 13.3 Document the primary-output/configuration-action authoring contract, CLI ownership of `.func/config.json`, and mandatory canonical stack and language.
+- [ ] 13.3 Document the primary-output/configuration-action authoring contract, CLI ownership of `.func/config.json`, mandatory canonical stack and language, and that `func:stack` and `func:language` are unavailable to project templates.
 - [ ] 13.4 Document destructive force behavior and ordered dry-run effects.
 - [ ] 13.5 Document the breaking `IProjectInitializer` to `IProjectStack` workload migration.
 - [ ] 13.6 Run targeted abstraction, workload, init command, template integration, parser, renderer, and project-template tests.

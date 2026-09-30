@@ -83,20 +83,19 @@ The awesome-azd gallery is a visual precedent but not the authoritative destinat
 The interactive flow becomes:
 
 ```text
-load installed project-template groups
-  -> project unavailable states
-  -> display picker and browse URL
+load installed project-template groups with eligibility and declared projects
+  -> narrow groups by stack/language filters
+  -> display picker, unavailable groups included, and browse URL
   -> select one template group
   -> resolve template variant and parameters
   -> resolve active project configuration actions
   -> apply whole-template stack/language filters
-  -> evaluate final constraints
   -> preflight effects
 ```
 
 Template selection comes first because no singular stack or language can represent a heterogeneous template. Basic template groups can still contain stack/language variants and expose parameters after selection.
 
-The context-free catalog projects enough trusted configuration-action metadata to describe potential stack/language requirements and unavailable state without invoking the template. Authoritative active actions are resolved with the selected candidate and final parameters before scaffolding.
+The catalog comes from the command's own session. It projects enough trusted configuration-action metadata to describe each template's potential stacks and languages, and its constraint results give the unavailable state, without invoking the template. Authoritative active actions are resolved with the selected candidate and final parameters before scaffolding.
 
 **Alternative considered:** keep the stack/language/template prompt order and branch to a separate quickstart picker. This fragments installed project templates and makes package type determine command UX. It is rejected.
 
@@ -199,20 +198,17 @@ A heterogeneous template is valid when those singular filters are absent. Supply
 
 For conditional projects, only active configuration actions participate after final template parameter resolution. This may require completing template parameters before a filter can be authoritatively evaluated.
 
+Before a template is selected, the filters narrow the picker to templates that can still match. Every unconditional project must match all supplied filters, and at least one project must match them all. A conditional project that uses another value does not remove the template, because parameters can still turn it off. If it stays on, the check after parameters rejects the template and names that project. A group remains in the picker when any of its variants can still match, and the same rule narrows the variants of the selected group.
+
 Standard TemplateEngine language tags remain useful for homogeneous variants but are not required to encode a mixed topology. Configuration actions are authoritative for each generated project's canonical values.
 
 **Alternative considered:** match when any project satisfies the filter. A user asking for a Node project could receive a Node/Python solution, making the explicit filter misleading. It is rejected.
 
-### Mixed templates do not fabricate singular host context
+### Init's context has no stack or language
 
-The template execution context always supplies target working directory and prospective solution root. Stack and language host context are:
+The template execution context supplies the target working directory and solution root. It never supplies a stack or language, whether a template's projects share one or not. Configuration actions already declare each project's values, and the context is fixed before a template is selected, when those values are not known.
 
-```text
-all active projects share value -> expose common canonical value
-active projects differ          -> value unavailable
-```
-
-Workload constraints do not depend on a fabricated singular stack or language. A mixed template that requires one of those singular host values in another constraint or bind symbol fails closed or receives an unavailable value according to the integration contract.
+Workload constraints do not depend on a singular stack or language. A template that binds `func:stack` or `func:language` receives its bind default.
 
 This preserves the invariant that host context reflects true resolved state.
 
@@ -282,7 +278,7 @@ Parameterized or conditional project topology cannot be expressed by the synthes
 - **[Template-first flow revises the pending init execution design]** -> Treat this focused change as authoritative for selection order and restack/reconcile the companion specification before implementation.
 - **[Configuration action metadata duplicates project facts already present in source]** -> Keep only the stable primary-output reference, stack, and language; avoid a separate topology manifest.
 - **[Conditional topology delays whole-template filtering]** -> Resolve required parameters and active actions before applying the authoritative filter.
-- **[Mixed templates cannot expose singular stack/language context]** -> Fail closed rather than selecting an arbitrary project.
+- **[Project templates cannot read a stack or language from the host]** -> Configuration actions declare both for each project, and a template that binds them sets a default.
 - **[Finalization can fail after files are generated]** -> Preflight every declaration and path, use atomic writes, skip ordinary actions, and report partial initialization without destructive rollback.
 - **[Restricted picker entries can overwhelm the prompt]** -> Show concise summaries in the picker and render detailed calls to action separately.
 - **[Browse URL destination is not yet designed]** -> Use a Functions-owned redirect so the CLI contract remains stable.

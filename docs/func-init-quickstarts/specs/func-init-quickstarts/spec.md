@@ -46,7 +46,7 @@ Defines how `func init` discovers and runs installed quickstart project template
 
 ### Requirement: Interactive initialization is template-first
 
-When no template is supplied and prompting is available, `func init` SHALL present installed project-template groups before resolving template variants, template parameters, stack filters, or language filters. After a template group is selected, the command SHALL resolve only the remaining choices required by that group.
+When no template is supplied and prompting is available, `func init` SHALL present installed project-template groups, narrowed by any explicit stack and language filters, before resolving template variants or template parameters. After a template group is selected, the command SHALL resolve only the remaining choices required by that group.
 
 #### Scenario: Multiple installed templates are available
 
@@ -94,7 +94,7 @@ The interactive installed-template experience SHALL show a stable Functions-owne
 
 ### Requirement: Restricted installed templates remain visible
 
-Installed project templates rejected by workload constraints SHALL remain visible in interactive template discovery as unavailable choices. The picker SHALL show a concise restriction summary, SHALL prevent selection of an unavailable template, and SHALL render detailed calls to action supplied by the constraint system outside the picker.
+Installed project templates rejected by workload constraints SHALL remain visible in interactive template discovery as unavailable choices, unless explicit stack or language filters rule them out. The picker SHALL show a concise restriction summary, SHALL prevent selection of an unavailable template, and SHALL render detailed calls to action supplied by the constraint system outside the picker.
 
 #### Scenario: Template is missing a required workload
 
@@ -207,7 +207,7 @@ Project-template file effects MUST NOT create or modify `.func/config.json` dire
 
 ### Requirement: Stack and language filters apply to the whole template
 
-Explicit `--stack` and `--language` values SHALL filter a selected template against every active Functions project configuration action. A supplied stack or language matches only when every generated Functions project declares that canonical value. A mixed-stack or mixed-language template remains available when the corresponding singular filter is absent.
+Explicit `--stack` and `--language` values SHALL filter a selected template against every active Functions project configuration action. A supplied stack or language matches only when every generated Functions project declares that canonical value. A mixed-stack or mixed-language template remains available when the corresponding singular filter is absent. Before template parameters are resolved, the filters SHALL narrow template groups and their variants to templates that can still match, where every unconditional project matches all supplied filters and at least one project matches them all. A group SHALL remain when any of its variants can still match.
 
 #### Scenario: Every project matches the stack filter
 
@@ -231,6 +231,26 @@ Explicit `--stack` and `--language` values SHALL filter a selected template agai
 - **WHEN** any active project configuration declares another language than `--language`
 - **THEN** initialization reports the whole-template conflict before scaffolding
 
+#### Scenario: Filter narrows the picker
+
+- **WHEN** `--stack` or `--language` is supplied and no template is named
+- **THEN** the picker offers only groups with a variant whose unconditional projects all match every supplied filter and that declares at least one project matching them all
+
+#### Scenario: Filter narrows the variants of a named group
+
+- **WHEN** `--template` names a group whose variants use different stacks and `--stack` is supplied
+- **THEN** only the variants that can still match remain for automatic selection or prompting
+
+#### Scenario: Filters are matched together
+
+- **WHEN** a template's only project with the requested stack uses another language than `--language`
+- **THEN** the template is not offered
+
+#### Scenario: Active conditional project conflicts with a filter
+
+- **WHEN** a conditional project that uses another stack than `--stack` is active once parameters resolve
+- **THEN** initialization reports the conflict before scaffolding and names that project
+
 ### Requirement: Mixed project templates do not require singular language metadata
 
 A project template that declares multiple Functions project configurations SHALL NOT be required to represent its complete topology through one TemplateEngine `tags.language` value. Configuration actions SHALL be authoritative for per-project stack and language. Standard language tags MAY continue to distinguish variants where one value accurately describes the complete template.
@@ -245,14 +265,14 @@ A project template that declares multiple Functions project configurations SHALL
 - **WHEN** a template variant's projects all use one language
 - **THEN** its standard language tag may participate in variant selection
 
-### Requirement: Mixed topology has no fabricated singular context
+### Requirement: Init context has no singular stack or language
 
-When active configuration actions declare multiple stacks or languages, `func init` MUST NOT expose an arbitrary stack or language as the singular func project context. Context consumers requiring one stack or language SHALL observe that value as unavailable. Homogeneous templates MAY expose their common canonical value.
+`func init` MUST NOT expose a stack or language as the singular func project context, whether a template's projects share one or not. Context consumers requiring one stack or language SHALL observe that value as unavailable.
 
 #### Scenario: Template has one common stack and language
 
 - **WHEN** every active project configuration declares the same stack and language
-- **THEN** the prospective template context may expose those common values
+- **THEN** singular `func:stack` and `func:language` context is unavailable
 
 #### Scenario: Template has mixed stacks
 

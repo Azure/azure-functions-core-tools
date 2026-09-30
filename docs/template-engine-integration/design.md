@@ -74,7 +74,7 @@ TemplateEngineContext
    `- Version
 ```
 
-Project and bundle data may be absent only when the calling command's policy permits that state. Stack and language can be unavailable while the project root is known, as for a new mixed-stack project in `func init`. The integration does not infer missing values. Strong domain value types should be retained where available so canonical stack, language, bundle ID, and semantic version representations are decided before engine creation.
+Project and bundle data may be absent only when the calling command's policy permits that state. Stack and language can be unavailable while the project root is known, as for every new project in `func init`. The integration does not infer missing values. Strong domain value types should be retained where available so canonical stack, language, bundle ID, and semantic version representations are decided before engine creation.
 
 The context is copied into host defaults:
 
@@ -106,6 +106,8 @@ The initial implementation does not promise concurrent operations on one session
 `ListAsync(type)` loads installed templates of the requested type and evaluates their constraints in the command context. It projects each engine template into a func-owned `TemplateCatalogEntry`, including identity, template type, aliases, group identity, language, precedence, package origin when known, visibility, parameter metadata, and eligibility diagnostics. The same projected candidate model is used by template groups so listing and execution cannot disagree about a symbol.
 
 Restricted entries remain in the catalog so `func new --list` and diagnostic flows can explain why an installed template cannot run. The command decides whether ordinary presentation hides host-hidden templates; exact identity lookup still has access to them.
+
+Commands build their context from what exists before a template is picked, so the catalog a command reads before a pick comes from the session that later invokes the template, and its eligibility is the eligibility resolution enforces. When a user picks from that catalog, the command forms the template group from the listed entries instead of looking the reference up again, so a package change during the prompt cannot replace the template. `func init` shows entries that are not eligible as unavailable, with the summary from `template-engine-constraints`, and does not let users pick them. Project template entries also carry the projects their configuration actions declare, as `template-engine-post-actions` projects them, so `func init` can narrow its picker before parameters are known.
 
 The integration uses a common `ConstraintEvaluation` model for both catalog entries and resolution:
 

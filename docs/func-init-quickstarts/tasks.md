@@ -8,16 +8,16 @@
 ## 2. Project Topology Metadata
 
 - [ ] 2.1 Add func-owned models for projected and resolved Functions project configurations without exposing TemplateEngine post-action implementation types to commands.
-- [ ] 2.2 Project trusted configuration-action metadata into context-free installed project-template catalog entries.
+- [ ] 2.2 Project trusted configuration-action metadata, including whether each action is conditional, into installed project-template catalog entries.
 - [ ] 2.3 Resolve active configuration actions against final template parameters and final primary-output paths.
-- [ ] 2.4 Derive homogeneous prospective stack and language values while leaving mixed values unavailable.
+- [ ] 2.4 Leave stack and language unavailable in the init template context for every template.
 - [ ] 2.5 Add unit tests for single-project, multi-project, mixed, conditional, renamed, and unavailable topology projections.
 
 ## 3. Template-First Selection
 
 - [ ] 3.1 Replace stack-first init creation selection with installed `tags.type = project` group selection followed by variant and parameter resolution.
 - [ ] 3.2 Preserve exact identity-before-short-name matching and deterministic non-interactive ambiguity errors for explicit templates.
-- [ ] 3.3 Apply explicit `--stack` and `--language` as all-project filters over active resolved configurations.
+- [ ] 3.3 Narrow the picker by `--stack` and `--language` to templates that can still match, then apply them as all-project filters over active resolved configurations.
 - [ ] 3.4 Keep restricted installed templates in interactive candidates while preventing their selection.
 - [ ] 3.5 Add selection tests for homogeneous and heterogeneous templates, conditional projects, explicit filter conflicts, restricted templates, and non-interactive input.
 

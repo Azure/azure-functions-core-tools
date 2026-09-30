@@ -24,7 +24,8 @@
 - [ ] 4.2 Make constraint evaluation mandatory before creating invocation-ready `ResolvedTemplate` items while retaining rejected-template diagnostics outside the group's item list.
 - [ ] 4.3 Implement `TemplateGroup` as an immutable `IReadOnlyList<ResolvedTemplate>` with stable ordering, indexed access, enumeration, and filters that preserve item symbol definitions and diagnostics.
 - [ ] 4.4 Implement explicit language, validated-argument, and highest-precedence filters without adding an automatic final-selection or ambiguity policy.
-- [ ] 4.5 Add tests for type scoping, wrong-type matches, identity precedence, short-name matching, multiple groups, restricted-only matches, list behavior, immutable filtering, stable ordering, and zero, one, or multiple remaining items.
+- [ ] 4.5 Form a template group from listed catalog entries for commands that let users pick from the catalog, without looking the reference up again.
+- [ ] 4.6 Add tests for type scoping, wrong-type matches, identity precedence, short-name matching, multiple groups, restricted-only matches, groups formed from listed entries, list behavior, immutable filtering, stable ordering, and zero, one, or multiple remaining items.
 
 ## 5. Resolved Template Invocation
 
