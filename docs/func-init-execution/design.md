@@ -273,7 +273,7 @@ Init orchestration retains func-owned outcomes for:
 - project creation success;
 - partial creation after configuration failure.
 
-No applicable template falls back to workload scaffolding. Diagnostics name any supplied filters, show the browse URL, and direct the user to `func new install`. When templates are installed but none can be used, the diagnostic also shows each distinct call to action from their constraints once, because the missing piece is usually a workload rather than a template.
+When no template applies, init does not fall back to workload scaffolding. Diagnostics name any supplied filters, show the browse URL, and direct the user to `func new install`. When templates are installed but none can be used, the diagnostic also shows each distinct call to action from their constraints once, because the missing piece is usually a workload rather than a template.
 
 Known outcomes are rendered through `IInteractionService` or wrapped at the command boundary using the repository's `GracefulException` policy. Unexpected integration defects propagate. Cancellation is honored before cleanup and through catalog access, prompting, preflight, creation, configuration, and post-actions.
 
@@ -301,4 +301,4 @@ Known outcomes are rendered through `IInteractionService` or wrapped at the comm
 9. Remove `InitContext`, `IInitOptionRegistry`, workload-contributed options, and workload project-generation code after every stack is template-backed.
 10. Update help, documentation, package guidance, and dry-run rendering.
 
-During migration, the new path can be exercised with template-backed test stacks before switching production stack registrations. The final switch must remove initializer fallback atomically so missing template packages fail consistently rather than changing scaffolding engines. Rollback restores workload initializer registration and the previous init runner; installed template packages and the shared func template hive remain compatible.
+During migration, the new path can be exercised with template-backed test stacks before switching production stack registrations. The final switch must remove initializer fallback atomically so missing template packages fail consistently rather than changing scaffolding engines. It ships only after the default project template packages for every supported stack are published and installable on both fresh and upgraded machines, and the baseline init regression tests pass against those published packages. Rollback restores workload initializer registration and the previous init runner; installed template packages and the shared func template hive remain compatible.
