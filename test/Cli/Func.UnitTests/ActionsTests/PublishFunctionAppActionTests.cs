@@ -14,6 +14,113 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
     public class PublishFunctionAppActionTests
     {
         [Theory]
+        [InlineData("flexconsumption")]
+        [InlineData("elasticpremium")]
+        [InlineData("premium")]
+        public void ValidateGoPublishOptions_LinuxHostingSku_DoesNotThrow(string sku)
+        {
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp,linux",
+                Sku = sku
+            };
+
+            var exception = Record.Exception(
+                () => PublishFunctionAppAction.ValidateGoPublishOptions(site, BuildOption.Default, buildNativeDeps: false));
+
+            Assert.Null(exception);
+        }
+
+        [Fact]
+        public void ValidateGoPublishOptions_LinuxConsumption_Throws()
+        {
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp,linux",
+                Sku = "dynamic"
+            };
+
+            var exception = Assert.Throws<CliException>(
+                () => PublishFunctionAppAction.ValidateGoPublishOptions(site, BuildOption.Default, buildNativeDeps: false));
+
+            Assert.Equal(
+                "Go is not supported on Linux Consumption Function Apps. Use Flex Consumption, Elastic Premium, or a Dedicated Linux plan.",
+                exception.Message);
+        }
+
+        [Fact]
+        public void ValidateGoPublishOptions_WindowsApp_Throws()
+        {
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp",
+                Sku = "premium"
+            };
+
+            var exception = Assert.Throws<CliException>(
+                () => PublishFunctionAppAction.ValidateGoPublishOptions(site, BuildOption.Default, buildNativeDeps: false));
+
+            Assert.Equal("Go is only supported for Linux Function Apps.", exception.Message);
+        }
+
+        [Theory]
+        [InlineData(BuildOption.Remote)]
+        [InlineData(BuildOption.Container)]
+        public void ValidateGoPublishOptions_UnsupportedBuildMode_Throws(BuildOption buildOption)
+        {
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp,linux",
+                Sku = "premium"
+            };
+
+            var exception = Assert.Throws<CliException>(
+                () => PublishFunctionAppAction.ValidateGoPublishOptions(site, buildOption, buildNativeDeps: false));
+
+            Assert.StartsWith($"--build {buildOption} is not supported for Go.", exception.Message);
+        }
+
+        [Fact]
+        public void NormalizeFunctionAppWorkerRuntime_NativeGoApp_ReturnsGo()
+        {
+            var runtime = PublishFunctionAppAction.NormalizeFunctionAppWorkerRuntime("native", WorkerRuntime.Go);
+
+            Assert.Equal(WorkerRuntime.Go, runtime);
+        }
+
+        [Fact]
+        public void GetFunctionAppWorkerRuntimeSetting_Go_ReturnsNative()
+        {
+            var setting = PublishFunctionAppAction.GetFunctionAppWorkerRuntimeSetting(WorkerRuntime.Go);
+
+            Assert.Equal("native", setting);
+        }
+
+        [Fact]
+        public async Task UpdateFrameworkVersions_GoForcePublish_UsesGoLinuxFxVersion()
+        {
+            var site = new Site("test-site")
+            {
+                Kind = "functionapp,linux",
+                Sku = "elasticpremium",
+                LinuxFxVersion = "Node|22"
+            };
+            var helperServiceMock = new Mock<PublishFunctionAppAction.AzureHelperService>(null, null);
+            helperServiceMock
+                .Setup(x => x.UpdateWebSettings(site, It.IsAny<Dictionary<string, string>>()))
+                .ReturnsAsync(new HttpResult<string, string>(string.Empty));
+
+            await PublishFunctionAppAction.UpdateFrameworkVersions(site, WorkerRuntime.Go, null, true, helperServiceMock.Object);
+
+            helperServiceMock.Verify(
+                x => x.UpdateWebSettings(
+                    site,
+                    It.Is<Dictionary<string, string>>(settings =>
+                        settings.Count == 1 && settings[Constants.LinuxFxVersion] == "Go|1.0")),
+                Times.Once);
+        }
+
+        [Theory]
         [InlineData("functionapp", "11.0", "netFrameworkVersion", "v11.0")]
         [InlineData("functionapp", "v11.0", "netFrameworkVersion", "v11.0")]
         [InlineData("functionapp,linux", "11.0", "linuxFxVersion", "DOTNET-ISOLATED|11.0")]

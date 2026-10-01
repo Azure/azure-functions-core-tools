@@ -26,7 +26,7 @@ namespace Azure.Functions.Cli.Helpers
         Powershell,
         [DisplayString("custom")]
         Custom,
-        [DisplayString("go (preview)")]
+        [DisplayString("go")]
         Go
     }
 

@@ -180,33 +180,11 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             Utilities.WarnIfGoWorkerRuntime(workerRuntime);
 
-            // Go is cross-compiled to linux/amd64 and currently only supported on Flex Consumption.
-            // Reject Windows targets, non-Flex SKUs, and unsupported build modes up front.
+            // Go is cross-compiled to linux/amd64. Reject unsupported hosting plans and
+            // build modes up front; supported Linux plans use the same local Go artifact.
             if (workerRuntime == WorkerRuntime.Go)
             {
-                if (!functionApp.IsLinux)
-                {
-                    throw new CliException("Go is only supported for Linux Function Apps.");
-                }
-
-                if (!functionApp.IsFlex)
-                {
-                    throw new CliException("Go is only supported on Flex Consumption Function Apps.");
-                }
-
-                if (PublishBuildOption == BuildOption.Remote || PublishBuildOption == BuildOption.Container)
-                {
-                    throw new CliException(
-                        $"--build {PublishBuildOption} is not supported for Go. Run 'func publish' without '--build {PublishBuildOption}'.");
-                }
-
-                // BuildNativeDeps is checked separately because ResolveBuildOption (called later) flips
-                // PublishBuildOption to BuildOption.Container when --build-native-deps is set, which would
-                // bypass the Go build branch and ship a zip with a missing or stale 'app' binary.
-                if (BuildNativeDeps)
-                {
-                    throw new CliException("--build-native-deps is not supported for Go. Run 'func publish' without '--build-native-deps'.");
-                }
+                ValidateGoPublishOptions(functionApp, PublishBuildOption, BuildNativeDeps);
             }
 
             // Get the GitIgnoreParser from the functionApp root
@@ -371,16 +349,19 @@ namespace Azure.Functions.Cli.Actions.AzureActions
             if ((functionApp.IsFlex && !string.IsNullOrEmpty(workerRuntimeStr)) ||
                 (!functionApp.IsFlex && functionApp.AzureAppSettings.TryGetValue(Constants.FunctionsWorkerRuntime, out workerRuntimeStr)))
             {
-                var resolution = $"You can pass --force to update your Azure app with '{workerRuntime}' as a '{Constants.FunctionsWorkerRuntime}'";
+                string expectedWorkerRuntimeSetting = functionApp.IsFlex
+                    ? WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime)
+                    : GetFunctionAppWorkerRuntimeSetting(workerRuntime);
+                var resolution = $"You can pass --force to update your Azure app with '{expectedWorkerRuntimeSetting}' as a '{Constants.FunctionsWorkerRuntime}'";
                 try
                 {
-                    var azureWorkerRuntime = WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntimeStr);
+                    var azureWorkerRuntime = NormalizeFunctionAppWorkerRuntime(workerRuntimeStr, workerRuntime);
                     if (azureWorkerRuntime != workerRuntime)
                     {
                         if (Force)
                         {
-                            ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{workerRuntime}' because --force was passed"));
-                            result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
+                            ColoredConsole.WriteLine(WarningColor($"Setting '{Constants.FunctionsWorkerRuntime}' to '{expectedWorkerRuntimeSetting}' because --force was passed"));
+                            result[Constants.FunctionsWorkerRuntime] = expectedWorkerRuntimeSetting;
                         }
                         else if (workerRuntime == WorkerRuntime.DotnetIsolated)
                         {
@@ -399,7 +380,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                 }
                 catch (ArgumentException) when (Force)
                 {
-                    result[Constants.FunctionsWorkerRuntime] = WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
+                    result[Constants.FunctionsWorkerRuntime] = expectedWorkerRuntimeSetting;
                 }
                 catch (ArgumentException) when (!Force)
                 {
@@ -469,6 +450,49 @@ namespace Azure.Functions.Cli.Actions.AzureActions
 
             return result;
         }
+
+        internal static void ValidateGoPublishOptions(Site functionApp, BuildOption publishBuildOption, bool buildNativeDeps)
+        {
+            if (!functionApp.IsLinux)
+            {
+                throw new CliException("Go is only supported for Linux Function Apps.");
+            }
+
+            if (functionApp.IsDynamic)
+            {
+                throw new CliException(
+                    "Go is not supported on Linux Consumption Function Apps. Use Flex Consumption, Elastic Premium, or a Dedicated Linux plan.");
+            }
+
+            if (publishBuildOption == BuildOption.Remote || publishBuildOption == BuildOption.Container)
+            {
+                throw new CliException(
+                    $"--build {publishBuildOption} is not supported for Go. Run 'func publish' without '--build {publishBuildOption}'.");
+            }
+
+            // ResolveBuildOption flips the build option to Container when --build-native-deps is
+            // set, which would bypass the Go build branch and could publish a stale or missing binary.
+            if (buildNativeDeps)
+            {
+                throw new CliException("--build-native-deps is not supported for Go. Run 'func publish' without '--build-native-deps'.");
+            }
+        }
+
+        internal static WorkerRuntime NormalizeFunctionAppWorkerRuntime(string workerRuntime, WorkerRuntime localWorkerRuntime)
+        {
+            if (localWorkerRuntime == WorkerRuntime.Go &&
+                string.Equals(workerRuntime, "native", StringComparison.OrdinalIgnoreCase))
+            {
+                return WorkerRuntime.Go;
+            }
+
+            return WorkerRuntimeLanguageHelper.NormalizeWorkerRuntime(workerRuntime);
+        }
+
+        internal static string GetFunctionAppWorkerRuntimeSetting(WorkerRuntime workerRuntime)
+            => workerRuntime == WorkerRuntime.Go
+                ? "native"
+                : WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
 
         public static async Task UpdateRuntimeConfigForFlex(Site site, string runtimeName, string runtimeVersion, AzureHelperService helperService, bool force = false, bool overwriteSettings = false)
         {
@@ -575,7 +599,7 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     {
                         var updatedSettings = new Dictionary<string, string>
                         {
-                            [Constants.LinuxFxVersion] = $"DOCKER|{Constants.WorkerRuntimeImages.GetValueOrDefault(workerRuntime).FirstOrDefault()}"
+                            [Constants.LinuxFxVersion] = GetLinuxFxVersionForWorkerRuntime(workerRuntime)
                         };
 
                         var settingsResult = await helperService.UpdateWebSettings(functionApp, updatedSettings);
@@ -594,6 +618,22 @@ namespace Azure.Functions.Cli.Actions.AzureActions
                     }
                 }
             }
+        }
+
+        internal static string GetLinuxFxVersionForWorkerRuntime(WorkerRuntime workerRuntime)
+        {
+            if (workerRuntime == WorkerRuntime.Go)
+            {
+                return "Go|1.0";
+            }
+
+            if (Constants.WorkerRuntimeImages.TryGetValue(workerRuntime, out IEnumerable<string> images) &&
+                images.FirstOrDefault() is string image)
+            {
+                return $"DOCKER|{image}";
+            }
+
+            throw new CliException($"Unable to determine the expected LinuxFxVersion for worker runtime {workerRuntime}.");
         }
 
         private static async Task UpdateDotNetIsolatedFrameworkVersion(Site functionApp, string dotnetFrameworkVersion, AzureHelperService helperService)

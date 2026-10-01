@@ -72,7 +72,7 @@ namespace Azure.Functions.Cli
             }
 
             ColoredConsole
-                .WriteLine("Go support is in preview. The build/publish behavior and deployment layout may change before GA.".DarkYellow());
+                .WriteLine("Go is generally available on Flex Consumption. Support on Elastic Premium and Dedicated Linux plans is in preview, and build/publish behavior may change before GA.".DarkYellow());
 
             ColoredConsole.WriteLine();
         }
