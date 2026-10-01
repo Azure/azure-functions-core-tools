@@ -90,25 +90,19 @@ function extractExecutable(archivePath, destination) {
                 return;
             }
 
-            let extracted = false;
             archive.on('error', reject);
             archive.on('end', () => {
-                if (!extracted) {
-                    reject(new Error(`Archive does not contain '${expectedEntry}'.`));
-                    return;
-                }
-
-                resolve();
+                reject(new Error(`Archive does not contain '${expectedEntry}'.`));
             });
             archive.on('entry', entry => {
-                if (entry.fileName !== expectedEntry || extracted) {
-                    archive.close();
-                    reject(new Error(`Archive contains unexpected entry '${entry.fileName}'.`));
+                if (entry.fileName !== expectedEntry) {
+                    archive.readEntry();
                     return;
                 }
 
                 archive.openReadStream(entry, (streamError, input) => {
                     if (streamError) {
+                        archive.close();
                         reject(streamError);
                         return;
                     }
@@ -116,9 +110,9 @@ function extractExecutable(archivePath, destination) {
                     const output = fs.createWriteStream(destination, { mode: 0o755 });
                     input.on('error', reject);
                     output.on('error', reject);
-                    output.on('finish', () => {
-                        extracted = true;
-                        archive.readEntry();
+                    output.on('close', () => {
+                        archive.close();
+                        resolve();
                     });
                     input.pipe(output);
                 });
