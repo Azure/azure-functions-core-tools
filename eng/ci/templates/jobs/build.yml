@@ -160,6 +160,7 @@ jobs:
               throw "Failed to set npm package name to '${{ packageName }}'."
             }
 
+            # npm updates an existing npm-shrinkwrap.json in place; this flag avoids modifying node_modules.
             npm install --package-lock-only --ignore-scripts --prefer-offline --prefix $packageDirectory
             if ($LASTEXITCODE -ne 0) {
               throw "Failed to update the npm shrinkwrap for '${{ packageName }}'."
