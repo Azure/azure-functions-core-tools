@@ -18,7 +18,11 @@ if (!fs.existsSync(executable)) {
 const child = spawn(executable, process.argv.slice(2), {
     stdio: 'inherit'
 });
-const signalHandlers = new Map();
+const handleSigint = () => {};
+const handleSigterm = () => child.kill('SIGTERM');
+
+process.on('SIGINT', handleSigint);
+process.on('SIGTERM', handleSigterm);
 
 child.on('error', error => {
     console.error(`Failed to start Azure Functions CLI: ${error.message}`);
@@ -26,20 +30,13 @@ child.on('error', error => {
 });
 
 child.on('exit', (code, signal) => {
+    process.off('SIGINT', handleSigint);
+    process.off('SIGTERM', handleSigterm);
+
     if (signal) {
-        const handler = signalHandlers.get(signal);
-        if (handler) {
-            process.off(signal, handler);
-        }
         process.kill(process.pid, signal);
         return;
     }
 
     process.exitCode = code ?? 1;
 });
-
-for (const signal of ['SIGINT', 'SIGTERM']) {
-    const handler = () => child.kill(signal);
-    signalHandlers.set(signal, handler);
-    process.on(signal, handler);
-}
