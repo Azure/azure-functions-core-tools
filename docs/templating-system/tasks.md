@@ -21,3 +21,4 @@
 - [ ] 3.3 Resolve conflicting terminology, context models, result shapes, and lifecycle assumptions across all focused designs.
 - [ ] 3.4 Update the umbrella inventory after any focused change is renamed, split, added, or removed.
 - [ ] 3.5 Strictly validate all ten focused changes and this umbrella change before declaring the templating system fully specified.
+- [ ] 3.6 Assign companion-template acquisition to a focused change and update `func-init-execution` and `template-package-install` with the result.

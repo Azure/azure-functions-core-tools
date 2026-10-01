@@ -7,24 +7,25 @@
 
 ## 2. Func-Owned Template Models
 
-- [ ] 2.1 Add func-owned catalog and candidate models, including immutable parameter definitions with canonical name, effective `longName`, optional `shortName`, validation details, and visibility without exposing TemplateEngine types.
-- [ ] 2.2 Add typed resolution and invocation outcomes for not found, restricted, constraint failure, ambiguous group, unsatisfied language, ambiguous variant, invalid arguments, file conflict, and success.
+- [ ] 2.1 Add func-owned catalog and candidate models, including template type and immutable parameter definitions with canonical name, effective `longName`, optional `shortName`, validation details, and visibility without exposing TemplateEngine types.
+- [ ] 2.2 Add typed resolution and invocation outcomes for not found, wrong type, restricted, constraint failure, ambiguous group, unsatisfied language, ambiguous variant, invalid arguments, unresolved required values, file conflict, and success.
 - [ ] 2.3 Add the internal func host metadata reader and projection layer that parses the selected `.template.config/func.host.json`, joins `symbolInfo` to canonical parameter symbols, and stores the projected definitions on each candidate.
 - [ ] 2.4 Add projection tests for long-name overrides, canonical-name fallback, short-name suppression, hidden parameters, always-visible parameters, hidden templates, malformed host metadata, non-parameter symbols, and absent package metadata.
 
 ## 3. Catalog and Constraint Evaluation
 
 - [ ] 3.1 Centralize constraint evaluation so listing and resolution share one fail-closed representation of eligible, restricted, not-evaluated, and failed constraints.
-- [ ] 3.2 Update `Templater.ListAsync` to return every installed template with current-context eligibility and diagnostics.
+- [ ] 3.2 Update `Templater.ListAsync` to return every installed template of the requested type with current-context eligibility and diagnostics.
 - [ ] 3.3 Add tests for mixed eligible and restricted catalogs, unevaluable constraints, exact context values, and listing templates hidden by host metadata.
 
 ## 4. Template Group Resolution
 
-- [ ] 4.1 Implement full-identity-first and case-insensitive exact-short-name matching with ungrouped identities treated as singleton groups.
+- [ ] 4.1 Implement type-scoped, full-identity-first, case-insensitive exact-short-name matching that keeps wrong-type matches as diagnostics and treats ungrouped identities as singleton groups.
 - [ ] 4.2 Make constraint evaluation mandatory before creating invocation-ready `ResolvedTemplate` items while retaining rejected-template diagnostics outside the group's item list.
 - [ ] 4.3 Implement `TemplateGroup` as an immutable `IReadOnlyList<ResolvedTemplate>` with stable ordering, indexed access, enumeration, and filters that preserve item symbol definitions and diagnostics.
 - [ ] 4.4 Implement explicit language, validated-argument, and highest-precedence filters without adding an automatic final-selection or ambiguity policy.
-- [ ] 4.5 Add tests for identity precedence, short-name matching, multiple groups, restricted-only matches, list behavior, immutable filtering, stable ordering, and zero, one, or multiple remaining items.
+- [ ] 4.5 Form a template group from listed catalog entries for commands that let users pick from the catalog, without looking the reference up again.
+- [ ] 4.6 Add tests for type scoping, wrong-type matches, identity precedence, short-name matching, multiple groups, restricted-only matches, groups formed from listed entries, list behavior, immutable filtering, stable ordering, and zero, one, or multiple remaining items.
 
 ## 5. Resolved Template Invocation
 
@@ -38,7 +39,7 @@
 
 - [ ] 6.1 Update the `func new` execution path to resolve command directory, project, language, and bundle context before creating `Templater`.
 - [ ] 6.2 Add a DI-registered command-layer `ITemplateArgumentParser` and replace best-effort dynamic option hydration with item-specific second-stage parsing based only on each `ResolvedTemplate.Parameters` collection.
-- [ ] 6.3 Reject unknown aliases, missing values, invalid types or choices, and missing required parameters before resolving or invoking a template.
+- [ ] 6.3 Reject unknown aliases, missing option values, and invalid types or choices, and keep candidates with unresolved required parameters selectable but not invocable until the values are supplied.
 - [ ] 6.4 Narrow the immutable template group using command-selected filters, then invoke the sole remaining item, report ambiguity, or prompt according to command policy.
 - [ ] 6.5 Render func-owned listing, resolution, parsing, and invocation outcomes through `IInteractionService` with targeted next actions.
 - [ ] 6.6 Add command tests for valid dynamic parameters, invalid argument categories, restricted templates, group and variant ambiguity, file conflicts, cancellation, and successful creation.

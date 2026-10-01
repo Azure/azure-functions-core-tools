@@ -215,7 +215,7 @@ For each release snapshot, the pipeline SHALL accept exactly one template source
 
 ### Requirement: Authored template configuration is preserved and dry-run
 
-When the release snapshot contains root `.template.config/template.json` and no synthesis descriptor, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
+When the release snapshot contains root `.template.config/template.json` and no synthesis descriptor, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, workload constraints in the form defined by `template-engine-constraints` that require every stack its configuration actions declare, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
 
 #### Scenario: Valid authored template exists
 
@@ -225,6 +225,16 @@ When the release snapshot contains root `.template.config/template.json` and no 
 #### Scenario: Authored template omits configuration finalization
 
 - **WHEN** the authored template does not declare a valid configuration finalization action for an active Functions project
+- **THEN** package construction fails
+
+#### Scenario: Authored template omits workload constraints
+
+- **WHEN** the authored template declares no workload constraints
+- **THEN** package construction fails
+
+#### Scenario: Authored workload constraints miss a project stack
+
+- **WHEN** a configuration action declares a stack that the authored workload constraints do not require
 - **THEN** package construction fails
 
 #### Scenario: Authored configuration is invalid
@@ -268,7 +278,7 @@ The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion:
 
 ### Requirement: Source descriptor is synthesized into template configuration
 
-When the release snapshot contains `.github/azure-functions-template.yaml` and does not contain root `.template.config/template.json`, the pipeline SHALL synthesize template configuration in staging using the descriptor's identity, short name, name, description, and projects. The synthesized template SHALL have project type and SHALL treat the complete filtered release snapshot as template content. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying the declared canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions.
+When the release snapshot contains `.github/azure-functions-template.yaml` and does not contain root `.template.config/template.json`, the pipeline SHALL synthesize template configuration in staging using the descriptor's identity, short name, name, description, and projects. The synthesized template SHALL have project type and SHALL treat the complete filtered release snapshot as template content. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying the declared canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add the workload constraint defined by `template-engine-constraints`, derived from the declared project stacks.
 
 #### Scenario: Repository has no template configuration
 
@@ -291,6 +301,11 @@ When the release snapshot contains `.github/azure-functions-template.yaml` and d
 - **WHEN** declared projects use different canonical languages
 - **THEN** the synthesized template omits a singular language tag
 - **AND** preserves per-project languages in configuration actions
+
+#### Scenario: Synthesized projects use mixed stacks
+
+- **WHEN** declared projects use different canonical stacks
+- **THEN** the synthesized workload constraint requires the workloads for every declared stack
 
 ### Requirement: Package licensing is release-specific and allowlisted
 

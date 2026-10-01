@@ -9,13 +9,13 @@ The func templating redesign spans integration, package lifecycle, command execu
   - `template-package-install`
   - `func-init-execution`
   - `func-new-execution`
+  - `azure-samples-template-pipeline`
+  - `func-init-quickstarts`
 - Track these focused changes that still need specifications:
   - `template-engine-constraints`
   - `template-engine-post-actions`
   - `template-engine-bind-sources`
   - `func-new-search`
-  - `azure-samples-template-pipeline`
-  - `func-init-quickstarts`
 - Define the responsibility and dependency boundaries between the focused changes.
 - Define completion criteria for the overall templating system while keeping detailed behavior authoritative in the focused specifications.
 - Use the umbrella change for coordination and sequencing only; product implementation remains in the focused changes.

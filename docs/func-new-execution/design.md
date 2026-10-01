@@ -58,7 +58,7 @@ Task<TemplateGroupResolution> ResolveGroupAsync(
 
 Type is supplied during matching rather than applied as a `TemplateGroup` filter afterward. This prevents project and item templates that share a short name from creating cross-type group ambiguity. Wrong-type exact matches remain diagnostic matches so the command can direct users to `func init`; they never enter the eligible group.
 
-The `template-engine-integration` design and requirements must expose this query dimension before command implementation begins. Exact identity remains an ambiguity escape hatch, not a type or constraint escape hatch.
+The `template-engine-integration` design and requirements define this query dimension. Exact identity remains an ambiguity escape hatch, not a type or constraint escape hatch.
 
 **Alternative considered:** resolve every type and filter the returned group in `NewCommandRunner`. This is too late because group-identity ambiguity may already have been reported across templates the command can never execute. It is rejected.
 
@@ -127,7 +127,7 @@ TemplateCandidateParseResult
 `- IsArgumentCompatible
 ```
 
-Unknown options, missing option values, invalid choices, and invalid types make a candidate argument-incompatible. A required parameter that has no explicit or resolved default does not make otherwise valid explicit input incompatible; it remains as missing input that can be prompted after selection. This distinction requires the `template-engine-integration` candidate-parsing wording to treat unresolved required values as non-invocable but still selectable.
+Unknown options, missing option values, invalid choices, and invalid types make a candidate argument-incompatible. A required parameter that has no explicit or resolved default does not make otherwise valid explicit input incompatible; it remains as missing input that can be prompted after selection. The `template-engine-integration` candidate-parsing contract treats unresolved required values as non-invocable but still selectable.
 
 The selected candidate is parsed once more with the same ephemeral schema after prompt values are added. That final result is authoritative. The root command graph is not mutated or reparsed.
 
@@ -233,7 +233,6 @@ Known user failures become `GracefulException` only at the command boundary when
 ## Risks / Trade-offs
 
 - **[Stage A temporarily accepts unmatched tokens]** -> Preserve them only for Stage B and require a strict candidate parse before any success path.
-- **[Active integration artifacts currently describe missing required values as parse failures]** -> Refine that boundary so missing required values remain selectable but cannot be invoked until supplied.
 - **[TemplateEngine type metadata may be absent or malformed]** -> Keep classification policy in the integration change; `func new` requests only positively classified item templates.
 - **[Changing the positional path meaning breaks previews and scripts]** -> Mark the change as breaking, update help and documentation together, and provide precise parser diagnostics for obsolete forms.
 - **[Execution paths can differ from project roots]** -> Carry both values in immutable context and test `WorkingDirectory` separately from `func:project-root`.
