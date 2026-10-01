@@ -2,8 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Abstractions.Common;
-using Azure.Functions.Cli.Bundles;
-using Azure.Functions.Cli.Projects;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
@@ -41,38 +39,12 @@ internal class Templater
 
     public TemplatePackageManager PackageManager => _packageManager;
 
-    public static Templater Create(
-        ProjectResolutionResult? projectResolution = null,
-        ExtensionBundleResolution? bundleResolution = null,
-        string? settingsLocation = null)
+    public static Templater Create(TemplateEngineContext context, string? settingsLocation = null)
     {
-        projectResolution ??= ProjectResolutionResults.NotResolved("No project resolution context provided");
-        bundleResolution ??= new ExtensionBundleResolution.NotResolved("No bundle resolution context provided");
+        ArgumentNullException.ThrowIfNull(context);
         settingsLocation ??= Path.Combine(FuncHomeResolver.Resolve(), SettingsDirectoryName);
 
-        Dictionary<string, string>? hostParams = null;
-        if (projectResolution is ProjectResolutionResult.Resolved resolved)
-        {
-            string stack = resolved.Project.StackName.ToLowerInvariant();
-            hostParams = new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [FuncTemplateEngineHostParameters.Stack] = stack,
-            };
-
-            string? language = resolved.Project.Language?.ToLowerInvariant();
-            if (language is not null)
-            {
-                hostParams[FuncTemplateEngineHostParameters.Language] = language;
-            }
-
-            if (resolved.Project.SupportsExtensionBundles && bundleResolution is ExtensionBundleResolution.Resolved bundle)
-            {
-                hostParams[FuncTemplateEngineHostParameters.BundleVersion] = bundle.Version;
-                hostParams[FuncTemplateEngineHostParameters.BundleId] = bundle.BundleId;
-            }
-        }
-
-        FuncTemplateEngineHost host = new(hostParams);
+        FuncTemplateEngineHost host = new(context);
         EngineEnvironmentSettings settings = new(host, settingsLocation: settingsLocation);
         Templater templater = new(settings);
         return templater;
