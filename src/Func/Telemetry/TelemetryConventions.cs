@@ -10,7 +10,7 @@ namespace Azure.Functions.Cli.Telemetry;
 /// </summary>
 internal static class TelemetryConventions
 {
-    // Resource attribute keys (set once on the ResourceBuilder).
+    // Common signal dimensions; service identity is also retained in the resource.
     public const string ServiceName = "service.name";
     public const string ServiceVersion = "service.version";
     public const string OsType = "os.type";

@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -149,7 +150,11 @@ public sealed class CliHostFactoryTests : IDisposable
         var rootCommand = Parser.CreateCommand(host.Services);
 
         var workloads = host.Services.GetRequiredService<IWorkloadProvider>().GetWorkloads();
+        WorkloadBootTelemetry telemetry = host.Services.GetRequiredService<WorkloadBootTelemetry>();
         workloads.Should().BeEmpty();
+        telemetry.WorkloadCount.Should().Be(0);
+        telemetry.Duration.Should().BeGreaterThanOrEqualTo(TimeSpan.Zero);
+        telemetry.StartTime.Should().BeOnOrBefore(DateTimeOffset.UtcNow);
         rootCommand.Subcommands.Should().NotContain(c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
         interaction.Lines.Should().NotContain(l => l.StartsWith("WARNING:", StringComparison.Ordinal));
     }

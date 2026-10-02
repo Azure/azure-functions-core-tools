@@ -6,6 +6,8 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Telemetry;
+using Azure.Functions.Cli.Tests.Telemetry;
 using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -15,9 +17,12 @@ public class HostProcessStartInfoFactoryTests : IDisposable
     private readonly string _tempDir;
     private readonly DirectoryInfo _startupDirectory;
     private readonly DirectoryInfo _contentRoot;
+    private readonly InMemoryProcessEnvironment _environment = new();
+    private readonly CliTelemetryEnvironment _telemetryEnvironment;
 
     public HostProcessStartInfoFactoryTests()
     {
+        _telemetryEnvironment = new CliTelemetryEnvironment(_environment, _environment.Set);
         _tempDir = Path.Combine(Path.GetTempPath(), $"func-host-process-{Guid.NewGuid():N}");
         _startupDirectory = Directory.CreateDirectory(Path.Combine(_tempDir, "project", "bin"));
         _contentRoot = Directory.CreateDirectory(Path.Combine(_tempDir, "workload", "tools", "any"));
@@ -26,6 +31,7 @@ public class HostProcessStartInfoFactoryTests : IDisposable
 
     public void Dispose()
     {
+        _telemetryEnvironment.Dispose();
         if (Directory.Exists(_tempDir))
         {
             Directory.Delete(_tempDir, recursive: true);
@@ -35,7 +41,7 @@ public class HostProcessStartInfoFactoryTests : IDisposable
     [Fact]
     public void Create_UsesPreparedStartupDirectoryEnvironmentAndDefaultPort()
     {
-        var factory = new HostProcessStartInfoFactory();
+        var factory = new HostProcessStartInfoFactory(_telemetryEnvironment);
         HostProcessStartContext context = CreateContext(
             port: null,
             enableAuth: true,
@@ -68,7 +74,7 @@ public class HostProcessStartInfoFactoryTests : IDisposable
     [Fact]
     public void Create_UsesExplicitPortAndOnlyForwardsSupportedArguments()
     {
-        var factory = new HostProcessStartInfoFactory();
+        var factory = new HostProcessStartInfoFactory(_telemetryEnvironment);
         HostProcessStartContext context = CreateContext(
             port: 9090,
             enableAuth: false,
@@ -88,12 +94,47 @@ public class HostProcessStartInfoFactoryTests : IDisposable
     [InlineData(65536)]
     public void Create_WhenPortIsOutOfRange_ThrowsGracefulException(int port)
     {
-        var factory = new HostProcessStartInfoFactory();
+        var factory = new HostProcessStartInfoFactory(_telemetryEnvironment);
         HostProcessStartContext context = CreateContext(port: port, enableAuth: false);
 
         var exception = FluentActions.Invoking(() => factory.Create(context)).Should().ThrowExactly<GracefulException>().Which;
 
         exception.Message.Should().Contain("--port");
+    }
+
+    [Fact]
+    public void Create_PreservesHostTelemetrySettingsInsteadOfCliOverrides()
+    {
+        _environment.Set(CliTelemetryEnvironment.SdkStatsDisabled, "false");
+        _environment.Set(CliTelemetryEnvironment.ResourceMetricsEnabled, "true");
+        _telemetryEnvironment.Apply();
+        var factory = new HostProcessStartInfoFactory(_telemetryEnvironment);
+
+        HostProcessLaunchInfo launchInfo = factory.Create(CreateContext(port: null, enableAuth: false));
+
+        launchInfo.StartInfo.Environment[CliTelemetryEnvironment.SdkStatsDisabled].Should().Be("false");
+        launchInfo.StartInfo.Environment[CliTelemetryEnvironment.ResourceMetricsEnabled].Should().Be("true");
+        launchInfo.StartInfo.Environment.Should().NotContainKey(CliTelemetryEnvironment.StatsbeatDisabled);
+        _environment.Get(CliTelemetryEnvironment.SdkStatsDisabled).Should().Be("true");
+    }
+
+    [Fact]
+    public void Create_ExplicitProjectTelemetrySettingsOverrideInheritedValues()
+    {
+        _environment.Set(CliTelemetryEnvironment.SdkStatsDisabled, "false");
+        _telemetryEnvironment.Apply();
+        var factory = new HostProcessStartInfoFactory(_telemetryEnvironment);
+        HostProcessStartContext context = CreateContext(
+            port: null,
+            enableAuth: false,
+            environmentVariables: new Dictionary<string, string>
+            {
+                [CliTelemetryEnvironment.SdkStatsDisabled] = "true",
+            });
+
+        HostProcessLaunchInfo launchInfo = factory.Create(context);
+
+        launchInfo.StartInfo.Environment[CliTelemetryEnvironment.SdkStatsDisabled].Should().Be("true");
     }
 
     private HostProcessStartContext CreateContext(

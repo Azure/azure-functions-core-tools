@@ -9,12 +9,14 @@ This document explains the runtime architecture of the Azure Functions Core Tool
 ```
 Program.cs
   ├── Build IInteractionService (Spectre + DefaultTheme)
+  ├── Wire cancellation (Ctrl+C / SIGTERM via CancellationTokenSource)
+  ├── Capture invocation start time
   │
   ├── HostApplicationBuilder
   │   ├── Register IInteractionService
   │   ├── Register OpenTelemetry (when a connection string is baked in)
-  │   │   ├── ConfigureResource(CliTelemetry.ConfigureResource)
-  │   │   ├── WithTracing → AzureMonitorTraceExporter
+  │   │   ├── ConfigureResource(CliTelemetry.ConfigureResource): service identity only
+  │   │   ├── WithTracing → common-dimension processor → AzureMonitorTraceExporter
   │   │   └── WithMetrics → AzureMonitorMetricExporter
   │   └── WorkloadRegistration.RegisterWorkloads(FunctionsCliBuilder)
   │       └── For each installed workload: workload.Configure(workloadBuilder)
@@ -23,6 +25,8 @@ Program.cs
   │            registers IProjectInitializer and any supporting services)
   │
   ├── host.StartAsync()    ← OTel listeners subscribed before any tracing
+  ├── Start root command activity using the captured invocation start time
+  ├── Emit the measured workload boot span and metric
   │
   ├── Parser.CreateCommand(host.Services)
   │   ├── Build root command
@@ -34,18 +38,16 @@ Program.cs
   │   │   other; emit a warning to stderr that names the offending workload(s)
   │   └── Replace help rendering with Spectre on all commands
   │
-  ├── Wire cancellation (Ctrl+C / SIGTERM via CancellationTokenSource)
   ├── Fire background CLI version check (non-blocking)
-  │
-  ├── Start root command activity (telemetry wraps the entire invocation)
   │
   ├── rootCommand.Parse(args).InvokeAsync()
   │
-  ├── Print CLI version upgrade notice (if newer v5 release available)
-  │
   ├── Record command metrics (name, exit code, duration)
+  ├── Stop command activity
   │
-  ├── host.StopAsync(3s)  ← flushes OTel exporters with a bounded wait
+  ├── host.Dispose()  ← persist pending telemetry without waiting for network delivery
+  │
+  ├── Print CLI version upgrade notice (if newer v5 release available)
   │
   └── Error handling
       ├── OperationCanceledException → exit 130
@@ -299,11 +301,20 @@ The CLI uses [OpenTelemetry](https://opentelemetry.io/) with the Azure Monitor e
 
 ### How It Works
 
-- `CliTelemetry` owns a single `ActivitySource` and `Meter`, both named `Azure.Functions.Cli`.
-- The OTel SDK is registered on the host via `AddOpenTelemetry().WithTracing/.WithMetrics` only when an instrumentation key is baked in. The hosted services subscribe listeners on `host.StartAsync` and flush + dispose on `host.StopAsync`.
-- The root activity wraps the entire command invocation; command name, exit code, OS, and runtime version land as activity tags / resource attributes.
-- A `Counter<long>` records command-execution counts with the same dimensions, plus a `Histogram<double>` for command duration in milliseconds.
-- `host.StopAsync(TimeSpan.FromSeconds(3))` bounds the export flush so a slow exporter can't hang the CLI on exit.
+- `CliTelemetry` owns a single `ActivitySource` and `Meter`, both named `azure.functions.cli`.
+- Providers start with `host.StartAsync()` before the command activity is created. Workload registration still runs before host build; its count and original timestamps are captured and emitted after the providers start.
+- The `cli.command` span includes the invocation's startup time, with a child `cli.workload.boot` span for workload registration. Command outcomes are tagged with `cli.command.name` and `process.exit_code`.
+- `cli.command.count`, `cli.command.duration`, and `cli.workload.boot_duration` are recorded while the metrics provider is alive. Command metrics are recorded and the command activity is stopped before the host is disposed.
+- CLI spans use 100% sampling rather than a per-process rate limiter, which can discard the only spans from a short invocation. The existing telemetry opt-out still applies.
+- Azure Monitor exporter 1.9 persists pending telemetry during shutdown. The CLI sets `Azure.Monitor.OpenTelemetry.Exporter.ShutdownDrainBudgetMilliseconds` to `0`, so normal exit pays for the local persistence write rather than a network round trip. Delivery runs in the background or during a subsequent invocation; telemetry is not guaranteed to appear immediately. A writable local exporter storage directory is required for durable buffering.
+
+### Dimensions and SDK-generated telemetry
+
+The resource contains the CLI service name/version and a generated instance ID, without ambient resource detectors. A trace processor adds allow-listed CLI service, OS, and runtime attributes to each span; the same attributes are added to metric measurements **before aggregation**. These appear directly in Application Insights `customDimensions`, while service identity also populates the standard Application Insights columns.
+
+The CLI disables the exporter-generated `_OTELRESOURCE_` rows with `OTEL_DOTNET_AZURE_MONITOR_ENABLE_RESOURCE_METRICS=false`. This switch only suppresses those rows; it does not perform enrichment. SDK stats (`Item_Success_Count`, `Item_Dropped_Count`, `Item_Retry_Count`) and Statsbeat are disabled with their respective environment switches, because exporter 1.9 does not expose public options for them. Standard metrics, performance counters, and Live Metrics are disabled through exporter options.
+
+These switches are scoped to the CLI process lifetime. The Functions host receives the original inherited values, with explicit project settings still taking precedence, so the CLI's choices do not disable the function app's own telemetry.
 
 ### Opt-Out
 

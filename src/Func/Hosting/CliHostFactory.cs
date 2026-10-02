@@ -22,6 +22,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Trace;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -39,9 +40,10 @@ internal static class CliHostFactory
     /// Creates the builder, registers installed workloads, and builds the
     /// host. Caller is responsible for <see cref="IHost.StartAsync"/>.
     /// </summary>
-    public static async Task<IHost> CreateHostAsync(IInteractionService interaction, CancellationToken cancellationToken = default)
+    public static async Task<IHost> CreateHostAsync(IInteractionService interaction, CliTelemetryEnvironment telemetryEnvironment, CancellationToken cancellationToken = default)
     {
-        HostApplicationBuilder builder = CreateBuilder(interaction);
+        ArgumentNullException.ThrowIfNull(telemetryEnvironment);
+        HostApplicationBuilder builder = CreateBuilder(interaction, telemetryEnvironment);
         await builder.RegisterWorkloadsAsync(cancellationToken);
         return builder.Build();
     }
@@ -52,9 +54,10 @@ internal static class CliHostFactory
     /// before workloads register; production code should use
     /// <see cref="CreateHostAsync"/>.
     /// </summary>
-    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction)
+    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction, CliTelemetryEnvironment? telemetryEnvironment = null)
     {
         ArgumentNullException.ThrowIfNull(interaction);
+        telemetryEnvironment ??= new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
 
         // Empty builder: skip the default config and logging providers a CLI
         // doesn't need. The host owns shared lifetimes (currently just the
@@ -73,25 +76,24 @@ internal static class CliHostFactory
         builder.Services.AddSingleton(configurationProvider);
         builder.Services.AddSingleton<ICliConfigurationProvider>(configurationProvider);
 
-        // Bridge the cli.workload.boot activity to the boot-duration histogram
-        // so callers only need to start the activity. Idempotent.
-        WorkloadBootMetricListener.EnsureRegistered();
-
         // Only wire OpenTelemetry when a connection string is available and the
         // user hasn't opted out; otherwise ActivitySource / Meter calls no-op.
         if (CliTelemetry.TryGetConnectionString(out string? connectionString))
         {
+            telemetryEnvironment.Apply();
             builder.Services.AddOpenTelemetry()
                 .ConfigureResource(r => CliTelemetry.ConfigureResource(r))
                 .WithTracing(t => t
                     .AddSource(CliTelemetry.SourceName)
-                    .AddAzureMonitorTraceExporter(o => o.ConnectionString = connectionString))
+                    .AddProcessor(new CliActivityEnrichmentProcessor(CliTelemetry.GetCommonAttributes()))
+                    .AddAzureMonitorTraceExporter(o => CliTelemetry.ConfigureExporter(o, connectionString)))
                 .WithMetrics(m => m
                     .AddMeter(CliTelemetry.SourceName)
-                    .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
+                    .AddAzureMonitorMetricExporter(o => CliTelemetry.ConfigureExporter(o, connectionString)));
         }
 
-        builder.Services.AddSingleton<IProcessEnvironment, ProcessEnvironment>();
+        builder.Services.AddSingleton(telemetryEnvironment);
+        builder.Services.AddSingleton<IProcessEnvironment>(telemetryEnvironment);
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerContentResolver, DefaultFunctionsWorkerContentResolver>();
