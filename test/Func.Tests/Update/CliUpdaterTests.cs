@@ -46,7 +46,7 @@ public sealed class CliUpdaterTests
         fileSystem.FileExists(_fakeProcessPath).Returns(true);
 
         // Act
-        await updater.UpdateAsync(_stableRelease, CancellationToken.None);
+        await updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None);
 
         // Assert: binary renamed to .old, new binary copied in
         fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
@@ -54,6 +54,39 @@ public sealed class CliUpdaterTests
 
         // Verify was run
         await processRunner.Received(1).RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithProgress_ReportsDownloadBytesAndPipelinePhases()
+    {
+        (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+        RecordingProgress progress = new();
+
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
+            .Returns(OkOutcome("5.1.0\n"));
+        fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                Stream content = call.ArgAt<Stream>(1);
+                CancellationToken cancellationToken = call.ArgAt<CancellationToken>(2);
+                await content.CopyToAsync(Stream.Null, cancellationToken);
+            });
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
+
+        await updater.UpdateAsync(_stableRelease, progress, CancellationToken.None);
+
+        Assert.Collection(
+            progress.Values.Where(value => value.BytesRead is null),
+            value => Assert.Equal(UpdatePhase.Downloading, value.Phase),
+            value => Assert.Equal(UpdatePhase.Extracting, value.Phase),
+            value => Assert.Equal(UpdatePhase.Installing, value.Phase),
+            value => Assert.Equal(UpdatePhase.Verifying, value.Phase));
+        UpdateProgress download = Assert.Single(progress.Values, value => value.BytesRead is not null);
+        Assert.Equal(UpdatePhase.Downloading, download.Phase);
+        Assert.Equal(22, download.BytesRead);
+        Assert.Equal(22, download.TotalBytes);
     }
 
     [Fact]
@@ -65,7 +98,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("503", ex.Message, StringComparison.Ordinal);
         Assert.Contains("again", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -78,7 +111,7 @@ public sealed class CliUpdaterTests
         (CliUpdater updater, _, _, _) = CreateUpdater(httpHandler: handler);
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.True(ex.IsUserError);
         Assert.Contains("Timed out", ex.Message, StringComparison.Ordinal);
@@ -94,7 +127,7 @@ public sealed class CliUpdaterTests
         await cancellation.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => updater.UpdateAsync(_stableRelease, cancellation.Token));
+            () => updater.UpdateAsync(_stableRelease, progress: null, cancellation.Token));
     }
 
     [Fact]
@@ -108,7 +141,7 @@ public sealed class CliUpdaterTests
             updateLockProvider);
 
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Equal("another update", ex.Message);
         fileSystem.DidNotReceive().CreateTempDirectory(Arg.Any<string>());
@@ -131,7 +164,7 @@ public sealed class CliUpdaterTests
         ReadDownloadBody(fileSystem);
 
         var ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.True(ex.IsUserError);
         Assert.Contains("Timed out", ex.Message, StringComparison.Ordinal);
@@ -156,7 +189,7 @@ public sealed class CliUpdaterTests
         ReadDownloadBody(fileSystem);
 
         var ex = await Assert.ThrowsAsync<OperationCanceledException>(
-            () => updater.UpdateAsync(_stableRelease, cancellation.Token));
+            () => updater.UpdateAsync(_stableRelease, progress: null, cancellation.Token));
 
         Assert.Same(failure, ex);
         Assert.Equal(cancellation.Token, ex.CancellationToken);
@@ -171,7 +204,7 @@ public sealed class CliUpdaterTests
             .ThrowsAsync(failure);
 
         var ex = await Assert.ThrowsAsync<IOException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Same(failure, ex);
     }
@@ -192,7 +225,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("Verification failed", ex.Message, StringComparison.OrdinalIgnoreCase);
 
@@ -217,7 +250,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         await Assert.ThrowsAsync<IOException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         // Swap never completed, so rollback should NOT attempt to restore backup
         fileSystem.DidNotReceive().MoveFile(_fakeBackupPath, _fakeProcessPath);
@@ -238,7 +271,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(releaseWithChecksum, CancellationToken.None));
+            () => updater.UpdateAsync(releaseWithChecksum, progress: null, CancellationToken.None));
 
         Assert.Contains("Checksum mismatch", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(releaseWithChecksum.Sha256Checksum, ex.Message, StringComparison.Ordinal);
@@ -263,7 +296,7 @@ public sealed class CliUpdaterTests
         fileSystem.FileExists(_fakeProcessPath).Returns(true);
 
         // Act
-        await updater.UpdateAsync(_stableRelease, CancellationToken.None);
+        await updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None);
 
         await fileSystem.Received(1).ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
         Received.InOrder(() =>
@@ -302,7 +335,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         // Both files were swapped
         fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
@@ -335,7 +368,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         await Assert.ThrowsAsync<IOException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         // The original was renamed to .old successfully
         fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
@@ -356,7 +389,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("empty", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -374,7 +407,7 @@ public sealed class CliUpdaterTests
 
         // Act + Assert
         GracefulException ex = await Assert.ThrowsAsync<GracefulException>(
-            () => updater.UpdateAsync(_stableRelease, CancellationToken.None));
+            () => updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None));
 
         Assert.Contains("escapes the install directory", ex.Message, StringComparison.OrdinalIgnoreCase);
 
@@ -442,4 +475,11 @@ public sealed class CliUpdaterTests
 
     private static ProcessOutcome OkOutcome(string stdout) =>
         new(ExitCode: 0, StandardOutput: stdout, StandardError: string.Empty, TimedOut: false, ExecutableNotFound: false);
+
+    private sealed class RecordingProgress : IProgress<UpdateProgress>
+    {
+        public List<UpdateProgress> Values { get; } = [];
+
+        public void Report(UpdateProgress value) => Values.Add(value);
+    }
 }
