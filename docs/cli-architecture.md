@@ -45,7 +45,7 @@ Program.cs
   ├── Record command metrics (name, exit code, duration)
   ├── Stop command activity
   │
-  ├── host.Dispose()  ← persist pending telemetry without waiting for network delivery
+  ├── host.Dispose()  ← flush queued telemetry; may wait for network delivery
   │
   ├── Print CLI version upgrade notice (if newer v5 release available)
   │
@@ -306,13 +306,13 @@ The CLI uses [OpenTelemetry](https://opentelemetry.io/) with the Azure Monitor e
 - The `cli.command` span includes the invocation's startup time, with a child `cli.workload.boot` span for workload registration. Command outcomes are tagged with `cli.command.name` and `process.exit_code`.
 - `cli.command.count`, `cli.command.duration`, and `cli.workload.boot_duration` are recorded while the metrics provider is alive. Command metrics are recorded and the command activity is stopped before the host is disposed.
 - CLI spans use 100% sampling rather than a per-process rate limiter, which can discard the only spans from a short invocation. The existing telemetry opt-out still applies.
-- Azure Monitor exporter 1.9 persists pending telemetry during shutdown. The CLI sets `Azure.Monitor.OpenTelemetry.Exporter.ShutdownDrainBudgetMilliseconds` to `0`, so normal exit pays for the local persistence write rather than a network round trip. Delivery runs in the background or during a subsequent invocation; telemetry is not guaranteed to appear immediately. A writable local exporter storage directory is required for durable buffering.
+- Disposing the host flushes and disposes the OpenTelemetry providers using Azure Monitor exporter 1.7.0. Pending telemetry can add network latency to CLI exit; there is no zero-wait shutdown override.
 
 ### Dimensions and SDK-generated telemetry
 
 The resource contains the CLI service name/version and a generated instance ID, without ambient resource detectors. A trace processor adds allow-listed CLI service, OS, and runtime attributes to each span; the same attributes are added to metric measurements **before aggregation**. These appear directly in Application Insights `customDimensions`, while service identity also populates the standard Application Insights columns.
 
-The CLI disables the exporter-generated `_OTELRESOURCE_` rows with `OTEL_DOTNET_AZURE_MONITOR_ENABLE_RESOURCE_METRICS=false`. This switch only suppresses those rows; it does not perform enrichment. SDK stats (`Item_Success_Count`, `Item_Dropped_Count`, `Item_Retry_Count`) and Statsbeat are disabled with their respective environment switches, because exporter 1.9 does not expose public options for them. Standard metrics, performance counters, and Live Metrics are disabled through exporter options.
+The CLI disables the exporter-generated `_OTELRESOURCE_` rows with `OTEL_DOTNET_AZURE_MONITOR_ENABLE_RESOURCE_METRICS=false`. This switch only suppresses those rows; it does not perform enrichment. SDK stats (`Item_Success_Count`, `Item_Dropped_Count`, `Item_Retry_Count`) and Statsbeat are disabled with their respective environment switches, because exporter 1.7 does not expose public options for them. Standard metrics, performance counters, and Live Metrics are disabled through exporter options.
 
 These switches are scoped to the CLI process lifetime. The Functions host receives the original inherited values, with explicit project settings still taking precedence, so the CLI's choices do not disable the function app's own telemetry.
 
