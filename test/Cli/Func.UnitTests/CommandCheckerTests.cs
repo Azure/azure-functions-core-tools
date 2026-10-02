@@ -23,7 +23,7 @@ namespace Azure.Functions.Cli.UnitTests
             }
             else
             {
-                var exists = CommandChecker.CommandExists("bash");
+                var exists = CommandChecker.CommandExists("sh");
                 var doesntExist = CommandChecker.CommandExists("fooo");
 
                 exists.Should().BeTrue(because: "checking if sh command exists should always be true on Unix-like");
