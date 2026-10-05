@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.IO.Compression;
 using System.Net;
 using System.Text.Json;
@@ -90,6 +91,95 @@ public class TelemetryExportTests
             TelemetryConventions.CommandCountInstrument,
             TelemetryConventions.CommandDurationInstrument,
             TelemetryConventions.WorkloadBootDurationInstrument);
+    }
+
+    /// <summary>
+    /// Regression guard for the lifecycle bug fixed in <c>Program.cs</c>: the
+    /// command metric/activity must be recorded before the trace and meter
+    /// providers are disposed, relying on disposal's implicit shutdown flush
+    /// (no explicit <c>ForceFlush</c>) — mirroring the real shutdown path.
+    /// </summary>
+    [Fact]
+    public void AzureMonitorExport_RecordedBeforeProviderDisposal_IsFlushedOnDispose()
+    {
+        var payloads = new ConcurrentQueue<string>();
+        using var source = new ActivitySource(CliTelemetry.SourceName, CliTelemetry.CliVersion);
+        using var meter = new Meter(CliTelemetry.SourceName, CliTelemetry.CliVersion);
+        (TracerProvider traces, MeterProvider metrics) = BuildProviders(payloads);
+
+        using (Activity? command = source.StartCommandActivity(DateTimeOffset.UtcNow))
+        {
+            command.Should().NotBeNull();
+            command!.SetCommandName("dispose-order-recorded-before");
+            meter.RecordCommand("dispose-order-recorded-before", exitCode: 0, durationMs: 1);
+        }
+
+        traces.Dispose();
+        metrics.Dispose();
+
+        List<JsonElement> items = [.. payloads.SelectMany(ParseItems)];
+        items.Should().Contain(item => item.GetProperty("data").GetProperty("baseType").GetString() == "RemoteDependencyData");
+        items.Should().Contain(item =>
+            item.GetProperty("data").GetProperty("baseType").GetString() == "MetricData" &&
+            item.GetProperty("data").GetProperty("baseData").GetProperty("metrics").EnumerateArray()
+                .Any(metric => metric.GetProperty("name").GetString() == TelemetryConventions.CommandCountInstrument));
+    }
+
+    /// <summary>
+    /// Inverse of <see cref="AzureMonitorExport_RecordedBeforeProviderDisposal_IsFlushedOnDispose"/>:
+    /// recording after the providers are disposed drops the telemetry
+    /// silently. Demonstrates why the ordering in <c>Program.cs</c>'s
+    /// <c>finally</c> block (record, then dispose) matters.
+    /// </summary>
+    [Fact]
+    public void AzureMonitorExport_RecordedAfterProviderDisposal_IsLost()
+    {
+        var payloads = new ConcurrentQueue<string>();
+        using var source = new ActivitySource(CliTelemetry.SourceName, CliTelemetry.CliVersion);
+        using var meter = new Meter(CliTelemetry.SourceName, CliTelemetry.CliVersion);
+        (TracerProvider traces, MeterProvider metrics) = BuildProviders(payloads);
+
+        traces.Dispose();
+        metrics.Dispose();
+
+        using (Activity? command = source.StartCommandActivity(DateTimeOffset.UtcNow))
+        {
+            command?.SetCommandName("dispose-order-recorded-after");
+            meter.RecordCommand("dispose-order-recorded-after", exitCode: 0, durationMs: 1);
+        }
+
+        payloads.Should().BeEmpty();
+    }
+
+    private static (TracerProvider Traces, MeterProvider Metrics) BuildProviders(ConcurrentQueue<string> payloads)
+    {
+        using var environment = new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
+        environment.Apply();
+        var client = new HttpClient(new RecordingHandler(payloads));
+        var options = new AzureMonitorExporterOptions();
+
+        // A distinct instrumentation key per call avoids colliding with the
+        // Azure Monitor exporter's process-wide per-key transmitter cache,
+        // which would otherwise route this test's telemetry through a
+        // different test's (already-torn-down) transport.
+        CliTelemetry.ConfigureExporter(options, $"InstrumentationKey={Guid.NewGuid()}");
+        options.Transport = new HttpClientTransport(client);
+        options.DisableOfflineStorage = true;
+
+        TracerProvider traces = Sdk.CreateTracerProviderBuilder()
+            .SetResourceBuilder(CliTelemetry.CreateResourceBuilder())
+            .AddSource(CliTelemetry.SourceName)
+            .SetSampler(new AlwaysOnSampler())
+            .AddProcessor(new CliActivityEnrichmentProcessor(CliTelemetry.GetCommonAttributes()))
+            .AddProcessor(new SimpleActivityExportProcessor(new AzureMonitorTraceExporter(options)))
+            .Build();
+        MeterProvider metrics = Sdk.CreateMeterProviderBuilder()
+            .SetResourceBuilder(CliTelemetry.CreateResourceBuilder())
+            .AddMeter(CliTelemetry.SourceName)
+            .AddReader(new PeriodicExportingMetricReader(new AzureMonitorMetricExporter(options)))
+            .Build();
+
+        return (traces, metrics);
     }
 
     private static IEnumerable<JsonElement> ParseItems(string payload)

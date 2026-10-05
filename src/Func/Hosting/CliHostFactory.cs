@@ -92,8 +92,12 @@ internal static class CliHostFactory
                     .AddAzureMonitorMetricExporter(o => CliTelemetry.ConfigureExporter(o, connectionString)));
         }
 
-        builder.Services.AddSingleton(telemetryEnvironment);
-        builder.Services.AddSingleton<IProcessEnvironment>(telemetryEnvironment);
+        // Registered via factory (not AddSingleton(instance)) so the host's
+        // ServiceProvider takes ownership and restores the overridden
+        // environment variables on disposal, even for callers (e.g. tests)
+        // that invoke CreateBuilder without supplying their own scope.
+        builder.Services.AddSingleton(_ => telemetryEnvironment);
+        builder.Services.AddSingleton<IProcessEnvironment>(sp => sp.GetRequiredService<CliTelemetryEnvironment>());
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerContentResolver, DefaultFunctionsWorkerContentResolver>();
