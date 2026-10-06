@@ -146,12 +146,13 @@ The staged managed package is validated:
 - A folder package is accepted only when the staged `TemplatePackageManager` discovers at least one valid template from that managed package.
 - Every accepted package must expose at least one valid template after TemplateEngine scanning.
 - Every `.template.config/template.json` in the staged package passes the raw constraint declaration validation defined by `template-engine-constraints`, including third-party and folder packages. Engine scanning alone cannot establish this because it may silently discard malformed declarations.
+- NuGet packages declared for another template host, including `FuncTemplate` plus `Template`, contain no func constraint types. This applies to prebuilt third-party packages as well as first-party packaging, while shared packages without func constraints remain accepted.
 
 Raw validation is context-independent and does not evaluate requirements against installed workloads. Well-formed unknown constraint types remain available for fail-closed eligibility evaluation after installation. Invalid declarations reject the staged package before live hive mutation, including forced replacements and updates.
 
-The isolated `Templater` and temporary hive are disposed and deleted after preflight. Filesystem creation, copying, locking, and cleanup are behind injectable boundaries so tests do not depend on the process temp directory.
+Preflight retains the resolved package identity, version, installer/source identity, and content fingerprints of package-type metadata and every raw template configuration. The temporary engine session can be disposed after preflight, but this validation evidence remains available through the live transaction. Filesystem creation, copying, locking, and cleanup are behind injectable boundaries so tests do not depend on the process temp directory.
 
-This staging may acquire a NuGet package twice: once for validation and once when committing through the live managed provider. That cost is accepted initially because it preserves TemplateEngine's source semantics and source identity. Optimization can reuse an engine-supported acquisition artifact later only if it preserves the original installer and source details.
+This staging may acquire a NuGet package twice: once for validation and once through the live managed provider. The actual acquired package must match the preflight identity and validation fingerprints and pass the same raw declaration and host-sharing checks before transaction commit. Compare the complete configuration inventory so added or removed templates cannot evade the check. A changed local archive or folder, or different content returned under the same package identity/version, fails the operation and restores the previous hive before the lifecycle lock is released. Invalid staging is rejected before live mutation; a later acquisition mismatch is a transaction failure, not permission to publish unvalidated content. Optimization can reuse an engine-supported acquisition artifact only if it preserves the original installer and source details.
 
 **Alternative considered:** install into the live hive and uninstall an invalid package. That creates a visibility window for unsupported packages and can leave them registered if cleanup fails. It is rejected.
 
@@ -199,14 +200,14 @@ Folder packages report no update when TemplateEngine reports the folder as curre
 
 ### Replacement is protected by a func hive transaction
 
-The pinned TemplateEngine global provider uninstalls the existing package before its installer acquires a replacement. `Templater` therefore wraps every operation that can replace a live package in `ITemplateHiveTransaction`.
+The pinned TemplateEngine global provider uninstalls the existing package before its installer acquires a replacement. `Templater` therefore wraps every operation that installs or replaces package content in `ITemplateHiveTransaction`, including first installs, so unvalidated acquisition results cannot become committed state.
 
 The transaction:
 
 1. acquires a func-owned cross-process lifecycle lock under the template settings directory;
 2. snapshots TemplateEngine package registration, the affected package mount point, and template cache state;
 3. invokes the managed provider operation;
-4. commits only after provider success and cache rebuild;
+4. validates actual acquired package metadata and raw configuration against the retained preflight evidence, then commits only after those checks, provider success, and cache rebuild;
 5. disposes the engine session before rollback;
 6. restores the snapshot byte-for-byte when acquisition, validation, registration, or cache rebuild fails;
 7. recreates the command-scoped engine session against the restored hive before returning diagnostics.
@@ -215,7 +216,7 @@ All func template install, update, uninstall, listing, and execution entry point
 
 The transaction implementation depends on an injectable template-hive filesystem and lock abstraction. It does not deserialize or rewrite `packages.json`; restoring the exact snapshot avoids taking ownership of TemplateEngine's private persistence schema.
 
-Uninstall is not rolled back after a successful provider result because deletion is the requested outcome. Update, same-source version replacement, and forced cross-source replacement are rollback-protected.
+Uninstall is not rolled back after a successful provider result because deletion is the requested outcome. First install, update, same-source version replacement, and forced cross-source replacement are rollback-protected. A failed first install restores the previous hive without leaving the new package registered.
 
 **Alternative considered:** trust the provider operation as atomic. Its current implementation deletes the previous NuGet package before downloading the replacement, so this does not satisfy the spec. It is rejected.
 

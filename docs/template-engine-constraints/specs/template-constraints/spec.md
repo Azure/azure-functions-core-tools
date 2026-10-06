@@ -20,7 +20,7 @@ Templates SHALL declare func requirements in the TemplateEngine `constraints` se
 - **THEN** the template's evaluation is `Failed`
 
 ### Requirement: Consumer-side raw declaration validation
-The CLI SHALL validate every template's raw `.template.config/template.json` constraint declarations during isolated package install/update preflight and installed-template listing and resolution, including third-party packages and folder installs. Validation SHALL reject a present non-object constraints section, non-object entries, missing, non-string, or empty types, repeated labels, and invalid func arguments before engine normalization can discard them. An omitted or empty constraints object SHALL be valid. Validation SHALL NOT depend on installed workloads or reject a well-formed declaration solely because its type is unknown. Listing and resolution SHALL classify malformed or unreadable declarations as `Failed` and SHALL evaluate constraints from the same validated content snapshot. Cached engine metadata SHALL NOT replace raw validation. Invocation SHALL reject selected-template configuration that is unreadable or changed since that snapshot, without resolving the reference again or substituting a template.
+The CLI SHALL validate every template's raw `.template.config/template.json` constraint declarations during isolated package install/update preflight and installed-template listing and resolution, including third-party packages and folder installs. Validation SHALL reject a present non-object constraints section, non-object entries, missing, non-string, or empty types, invalid func arguments, a repeated top-level `constraints` member, and duplicate property names in any object within the constraints subtree before normalization can discard them. Duplicate checks SHALL be local to each object. An omitted or empty constraints object SHALL be valid. Validation SHALL NOT depend on installed workloads or reject a well-formed declaration solely because its type is unknown. Listing and resolution SHALL classify malformed or unreadable declarations as `Failed` and SHALL evaluate constraints from the same validated content snapshot. Cached engine metadata SHALL NOT replace raw validation. Invocation SHALL reject selected-template configuration that is unreadable or changed since that snapshot, without resolving the reference again or substituting a template.
 
 #### Scenario: Third-party package has a malformed constraint
 - **WHEN** an install or update stages a third-party template package with a non-object constraint entry
@@ -30,6 +30,19 @@ The CLI SHALL validate every template's raw `.template.config/template.json` con
 #### Scenario: Raw declaration has a repeated label
 - **WHEN** raw template configuration repeats a constraint label that engine normalization would replace
 - **THEN** consumer validation rejects the declaration instead of evaluating only the replacement
+
+#### Scenario: Top-level constraints member repeats
+- **WHEN** raw template configuration contains a requirement in one `constraints` member followed by another `constraints` member
+- **THEN** validation rejects the configuration before the later member can hide the earlier requirement
+
+#### Scenario: Constraint or argument properties repeat
+- **WHEN** a constraint object repeats `type` or `args`, or an object-form argument repeats `id` or `version`
+- **THEN** validation rejects the configuration before either value can replace the other
+
+#### Scenario: Separate alternatives have the same property names
+- **WHEN** separate alternative argument objects each declare one `id` and one `version`
+- **THEN** duplicate-property validation accepts the distinct objects
+- **AND** the alternatives remain subject to their normal argument and eligibility checks
 
 #### Scenario: Constraint type is not a string
 - **WHEN** a raw constraint entry has a numeric, boolean, null, object, or array type value
@@ -60,15 +73,29 @@ The CLI SHALL validate every template's raw `.template.config/template.json` con
 - **AND** eligibility remains subject to the template's other checks
 
 ### Requirement: Func constraint types stay in func template packages
-Func constraint types SHALL use the `func-` prefix. A template package that other template hosts also install SHALL NOT declare func constraint types. First-party templates that require func constraint types SHALL ship in func-only packages. Packaging SHALL reject func constraint types in packages also declared for other hosts.
+Func constraint types SHALL use the `func-` prefix. A template package that other template hosts also install SHALL NOT declare func constraint types. First-party templates that require func constraint types SHALL ship in func-only packages. Packaging and isolated install/update preflight SHALL reject func constraint types when NuGet metadata also declares `Template` or another supported host-sharing declaration. Installed-template validation SHALL apply the same rule to available package metadata and classify violations as `Failed`. Folder installs without NuGet package-type metadata SHALL retain raw declaration validation without a synthesized shared-package classification.
 
 #### Scenario: Package is also a dotnet new package
 - **WHEN** a template package also declares the `Template` package type and a template declares a func constraint type
 - **THEN** packaging fails
 
+#### Scenario: Prebuilt shared package declares func constraints
+- **WHEN** install or update stages a third-party NuGet package that declares `FuncTemplate` and `Template` and contains func constraint types
+- **THEN** preflight rejects it before live mutation
+- **AND** force cannot bypass the shared-package rule
+
+#### Scenario: Already-installed shared package declares func constraints
+- **WHEN** an installed NuGet package's available metadata declares `Template` and a template declares func constraint types
+- **THEN** installed-template validation reports the template as `Failed` and blocks selection
+
 #### Scenario: Shared package has no func constraint types
 - **WHEN** a template package also declares the `Template` package type and its templates declare no func constraint types
 - **THEN** the shared-package rule does not reject it
+
+#### Scenario: Folder has no package-type metadata
+- **WHEN** a folder template declares valid func constraints without NuGet package-type metadata
+- **THEN** consumer validation does not invent a shared-package classification
+- **AND** the template remains subject to raw declaration and eligibility checks
 
 #### Scenario: Func-only package requires a stack
 - **WHEN** a first-party func-only template package declares a `func-workload` requirement

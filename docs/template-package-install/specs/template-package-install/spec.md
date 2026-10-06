@@ -171,7 +171,7 @@ The CLI SHALL accept `--source <feed>` on template install and update commands a
 
 ### Requirement: Raw constraints are validated before live mutation
 
-Template install, replacement, and update SHALL validate every `.template.config/template.json` in the staged package using the context-independent raw declaration validator defined by `template-engine-constraints`. The requirement SHALL apply to third-party NuGet packages and folders, including forced operations. Engine discovery SHALL NOT substitute for raw validation. Invalid declarations SHALL reject the staged package before live hive mutation and leave any previous installation unchanged. Well-formed unknown constraint types SHALL NOT be rejected solely for being unknown, and validation SHALL NOT evaluate workload availability on the installation machine.
+Template install, replacement, and update SHALL validate every `.template.config/template.json` in the staged package using the context-independent raw declaration validator defined by `template-engine-constraints`. The requirement SHALL apply to third-party NuGet packages and folders, including forced operations. Engine discovery SHALL NOT substitute for raw validation. Invalid declarations, including repeated top-level `constraints` members or duplicate properties within the constraints subtree, SHALL reject the staged package before live hive mutation and leave any previous installation unchanged. Preflight SHALL also enforce the shared-package rule from NuGet host-sharing metadata and reject func constraint types in packages also declared for another host. Well-formed unknown constraint types SHALL NOT be rejected solely for being unknown, and validation SHALL NOT evaluate workload availability on the installation machine.
 
 #### Scenario: Malformed third-party package replaces an installed package
 
@@ -184,6 +184,17 @@ Template install, replacement, and update SHALL validate every `.template.config
 - **WHEN** a forced folder or NuGet replacement contains malformed constraint declarations
 - **THEN** the command rejects it without replacing the installed package
 
+#### Scenario: Prebuilt shared package contains func constraints
+
+- **WHEN** a staged third-party NuGet package declares `FuncTemplate` and `Template` and contains func constraint types
+- **THEN** preflight rejects it before live mutation even with force
+- **AND** any previous installation remains unchanged
+
+#### Scenario: Shared package contains no func constraints
+
+- **WHEN** a staged NuGet package declares `FuncTemplate` and `Template` without func constraint types
+- **THEN** the shared-package rule permits it subject to the other package checks
+
 #### Scenario: Valid constraint cannot be satisfied on the installation machine
 
 - **WHEN** a staged template has valid constraint declarations but requires a workload absent from the installation machine
@@ -194,6 +205,32 @@ Template install, replacement, and update SHALL validate every `.template.config
 
 - **WHEN** a staged template declares a structurally valid unknown constraint type
 - **THEN** raw validation preserves the declaration and does not reject the package solely for that type
+
+### Requirement: Committed content matches validated preflight content
+
+Install, replacement, and update SHALL retain preflight evidence for the resolved package identity, version, installer/source identity, package-type metadata, and complete raw template configuration inventory. Before transaction commit, the actual acquired content SHALL match that evidence and pass the same raw declaration and shared-package checks. A mismatch or validation failure SHALL restore the previous hive before releasing the lifecycle lock. First-install failure SHALL leave no new package registered. Provider success, identity/version equality, and cache rebuild alone SHALL NOT authorize commit.
+
+#### Scenario: Local archive changes after preflight
+
+- **WHEN** a validated local NuGet archive changes before the provider acquires it for the live operation
+- **THEN** the content mismatch fails the transaction
+- **AND** the previous hive is restored before other func processes can read it
+
+#### Scenario: Reacquired package has different declarations
+
+- **WHEN** the provider returns different package-type metadata or raw configuration under the same identity and version
+- **THEN** the operation fails instead of committing that package
+- **AND** any previous installation remains installed and usable
+
+#### Scenario: First install acquires different content
+
+- **WHEN** a first install acquires content different from its validated preflight content
+- **THEN** the command fails and restores the prior hive without leaving the new package registered
+
+#### Scenario: Actual content matches preflight
+
+- **WHEN** the actual package identity, metadata, configuration inventory, and validation fingerprints match preflight and the provider and cache operations succeed
+- **THEN** the transaction can commit without changing the requested installer/source identity
 
 ### Requirement: Package types determine the owning command
 

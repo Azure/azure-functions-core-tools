@@ -18,9 +18,10 @@
 - [ ] 3.1 Add an injectable temporary-hive provider and cleanup boundary suitable for deterministic tests.
 - [ ] 3.2 Implement isolated `Templater` preflight using the same TemplateEngine install request, host components, and installer selection as the live operation.
 - [ ] 3.3 Validate staged NuGet packages with `IFuncPackageTypeClassifier` and require `FuncTemplate` without `FuncCliWorkload`.
-- [ ] 3.4 Validate staged folder packages and all accepted NuGet packages by requiring TemplateEngine to discover at least one template from the managed package and applying the shared raw constraint declaration validator to every `.template.config/template.json`, without evaluating workload availability.
+- [ ] 3.4 Validate staged folder packages and all accepted NuGet packages by requiring TemplateEngine to discover at least one template from the managed package and applying the shared raw constraint declaration validator to every `.template.config/template.json`, without evaluating workload availability. Enforce the func-constraint shared-package rule from NuGet host-sharing metadata before live mutation, including prebuilt third-party packages.
 - [ ] 3.5 Translate staged installer failures and vulnerabilities into func-owned domain outcomes while preserving cancellation.
-- [ ] 3.6 Add preflight tests for valid NuGet and folder packages, workload-only packages, dual package types, missing package types, empty folders, malformed templates and raw constraints, acquisition failures, and cleanup. Include third-party packages, forced replacement and update with unchanged live state after rejection, valid unknown types, and valid constraints whose workloads are absent on the installation machine.
+- [ ] 3.6 Add preflight tests for valid NuGet and folder packages, workload-only packages, dual package types, missing package types, empty folders, malformed templates and raw constraints, acquisition failures, and cleanup. Include duplicate root and nested constraint properties, prebuilt shared packages with and without func constraints, third-party packages, forced replacement and update with unchanged live state after rejection, valid unknown types, and valid constraints whose workloads are absent on the installation machine.
+- [ ] 3.7 Retain resolved identity, installer/source identity, and content fingerprints for package-type metadata and the complete raw configuration inventory through the live transaction, without treating identity/version equality as content equality.
 
 ## 4. Hive Transaction and Concurrency
 
@@ -28,8 +29,8 @@
 - [ ] 4.2 Update all `Templater` read and lifecycle entry points from `template-engine-integration` to acquire the appropriate shared or exclusive lifecycle lock.
 - [ ] 4.3 Implement opaque snapshots of TemplateEngine package registration, affected package mounts, and template cache state without parsing or rewriting the provider's persistence format.
 - [ ] 4.4 Implement commit, disposal-before-rollback, byte-for-byte restore, and engine-session recreation for failed replacement operations.
-- [ ] 4.5 Rebuild the TemplateEngine cache before transaction commit and trigger rollback when cache rebuilding fails or cancellation occurs after live mutation begins.
-- [ ] 4.6 Add tests that inject failures during provider uninstall, acquisition, registration, cache rebuild, cancellation, and rollback, proving the previous package remains installed and usable.
+- [ ] 4.5 Validate actual acquired metadata and configuration against retained preflight evidence and the same declaration/shared-package rules before cache rebuild and transaction commit. Include first installs and trigger rollback on mismatch, validation/cache failure, or cancellation after live mutation begins.
+- [ ] 4.6 Add tests that inject failures during provider uninstall, acquisition, registration, content verification, cache rebuild, cancellation, and rollback, proving the previous package remains installed and usable. Include changed local archives and folders, same-identity/version content drift, added/removed configurations, first-install cleanup, and identical-content controls.
 - [ ] 4.7 Add concurrent reader/writer tests proving listing and execution cannot observe transient replacement state.
 
 ## 5. Templater Install Lifecycle
