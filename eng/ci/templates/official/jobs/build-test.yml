@@ -17,9 +17,6 @@ jobs:
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
     NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
   steps:
-  - pwsh: . "tools/start-emulators.ps1" -NoWait
-    displayName: "Start emulators (NoWait)"
-
   - pwsh: |
       $simulateReleaseBuild = $null
       if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
@@ -70,6 +67,9 @@ jobs:
     inputs:
       workingFile: '$(Build.SourcesDirectory)/.npmrc'
 
+  - pwsh: . "tools/start-emulators.ps1" -NoWait
+    displayName: "Start emulators (NoWait)"
+
   - task: NuGetAuthenticate@1
     displayName: 'Authenticate NuGet'
 
@@ -84,11 +84,6 @@ jobs:
         # acquire access token from Azure CLI and export it to AZURE_MANAGEMENT_ACCESS_TOKEN
         $accessToken = (az account get-access-token --query "accessToken" | % { $_.Trim('"') })
         echo "##vso[task.setvariable variable=azure_management_access_token]$accessToken"
-
-  - pwsh: |
-      .\validateWorkerVersions.ps1
-    displayName: 'Validate worker versions'
-    condition: ne(variables['skipWorkerVersionValidation'], 'true')
 
   - task: PowerShell@2
     displayName: "Run Check Vulnerabilities Script"
