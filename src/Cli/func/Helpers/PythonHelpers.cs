@@ -168,7 +168,7 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (pythonVersion?.Version == null)
             {
-                var message = "Could not find a Python version. 3.10.x, 3.11.x, 3.12.x, 3.13.x, or 3.14.x is recommended, and used in Azure Functions.";
+                var message = "Could not find a Python version. 3.11.x, 3.12.x, 3.13.x, 3.14.x, or 3.15.x is recommended, and used in Azure Functions.";
                 if (errorIfNoVersion)
                 {
                     throw new CliException(message);
@@ -183,26 +183,26 @@ namespace Azure.Functions.Cli.Helpers
                 ColoredConsole.WriteLine(VerboseColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
             }
 
-            // Python 3.[9|10|11|12] (supported)
+            // Supported Python 3 versions
             if (IsVersionSupported(pythonVersion))
             {
                 return;
             }
 
-            // Python 3.x (but not 3.[9|10|11|12]), not recommended, may fail. E.g.: 3.4, 3.5.
+            // Unsupported Python 3 versions are not recommended and may fail. E.g.: 3.4, 3.5.
             if (pythonVersion.Major == 3)
             {
                 if (errorIfNotSupported)
                 {
-                    throw new CliException($"Python 3.10.x to 3.14.x is required for this operation. " +
-                        $"Please install Python 3.10, 3.11, 3.12, 3.13 or 3.14 and use a virtual environment to switch to Python 3.10, 3.11, 3.12, 3.13 or 3.14.");
+                    throw new CliException($"Python 3.11.x to 3.15.x is required for this operation. " +
+                        $"Please install Python 3.11, 3.12, 3.13, 3.14 or 3.15 and use a virtual environment to switch to Python 3.11, 3.12, 3.13, 3.14 or 3.15.");
                 }
 
-                ColoredConsole.WriteLine(WarningColor("Python 3.10.x, 3.11.x, 3.12.x, 3.13.x or 3.14.x is recommended, and used in Azure Functions."));
+                ColoredConsole.WriteLine(WarningColor("Python 3.11.x, 3.12.x, 3.13.x, 3.14.x or 3.15.x is recommended, and used in Azure Functions."));
             }
 
             // No Python 3
-            var error = "Python 3.x (recommended version 3.[10|11|12|13|14]) is required.";
+            var error = "Python 3.x (recommended version 3.[11|12|13|14|15]) is required.";
             if (errorIfNoVersion)
             {
                 throw new CliException(error);
@@ -240,6 +240,7 @@ namespace Azure.Functions.Cli.Helpers
             var python312GetVersionTask = GetVersion("python3.12");
             var python313GetVersionTask = GetVersion("python3.13");
             var python314GetVersionTask = GetVersion("python3.14");
+            var python315GetVersionTask = GetVersion("python3.15");
 
             var versions = new List<WorkerLanguageVersionInfo>
             {
@@ -251,7 +252,8 @@ namespace Azure.Functions.Cli.Helpers
                 await python311GetVersionTask,
                 await python312GetVersionTask,
                 await python313GetVersionTask,
-                await python314GetVersionTask
+                await python314GetVersionTask,
+                await python315GetVersionTask
             };
 
             // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
@@ -608,6 +610,8 @@ namespace Azure.Functions.Cli.Helpers
                         return StaticResources.DockerfilePython313;
                     case 14:
                         return StaticResources.DockerfilePython314;
+                    case 15:
+                        return StaticResources.DockerfilePython315;
                 }
             }
 
@@ -635,6 +639,8 @@ namespace Azure.Functions.Cli.Helpers
                         return (await StaticResources.DockerfilePython313BuildEnv, true);
                     case 14:
                         return (await StaticResources.DockerfilePython314BuildEnv, true);
+                    case 15:
+                        return (await StaticResources.DockerfilePython315BuildEnv, true);
                 }
             }
 
@@ -647,6 +653,7 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
+                    case 15:
                     case 14:
                     case 13:
                     case 12:
@@ -664,11 +671,11 @@ namespace Azure.Functions.Cli.Helpers
 
         public static bool IsLinuxFxVersionRuntimeVersionMatched(string linuxFxVersion, int? major, int? minor)
         {
-            // No linux fx version will default to python 3.13
+            // No linux fx version will default to python 3.14
             if (string.IsNullOrEmpty(linuxFxVersion))
             {
-                // Match if version is 3.13
-                return major == 3 && minor == 13;
+                // Match if version is 3.14
+                return major == 3 && minor == 14;
             }
 
             // Only validate on LinuxFxVersion that follows the pattern PYTHON|<version>
