@@ -43,6 +43,10 @@ Every entry must be satisfied. When `args` is an array, its items are alternativ
 
 The engine matches type names case-sensitively and discards entry labels. It also skips an entry that isn't an object or has no `type`, and a repeated label replaces the earlier entry. Both silently drop a requirement, so authoring validation rejects them.
 
+The same context-independent raw declaration validator runs in packaging, isolated install/update preflight, and installed-template listing and resolution. It reads the mounted `.template.config/template.json` before duplicate labels or malformed entries can be lost through engine normalization. An omitted or empty constraints object is valid. A present non-object section, a non-object entry, a missing, non-string, or empty type, repeated labels, or invalid func arguments fails validation. A well-formed unknown type remains a declaration and is evaluated as `NotEvaluated`, not silently dropped or rejected merely for being unknown.
+
+Preflight rejects a package containing malformed declarations before live hive mutation. Listing and resolution validate current mounted content even for packages already installed or loaded from the engine cache, and report malformed declarations as `Failed`. Constraint evaluation uses the same validated content snapshot, not stale cached declarations. Before invocation, the session verifies that the selected template's configuration still matches that snapshot. Changed or unreadable configuration blocks invocation with guidance to rerun; it never triggers reference resolution or substitutes another template. These checks validate declarations, not workload availability on the packaging or installation machine.
+
 **Alternative considered:** declare requirements in `func.host.json`, which other hosts ignore. Func would need a second evaluator beside the engine's constraint manager, and listing and resolution would read eligibility from two places. It is rejected while no shared template needs a func requirement.
 
 ### Func constraint types stay in func template packages
@@ -50,6 +54,8 @@ The engine matches type names case-sensitively and discards entry labels. It als
 A host that doesn't know a constraint type reports it as not evaluated, so `dotnet new` refuses to create the template without `--force`. A template package that other hosts also install, such as one that also declares the `Template` package type, must not use func constraint types.
 
 Project templates for `func init` carry func configuration actions, so they already live in func template packages. Item templates shared with `dotnet new` or Visual Studio rely on the command's own checks, such as stack resolution, rather than func constraints.
+
+First-party templates that need func constraints ship in func-only packages. Packaging rejects func constraint types in packages also declared for other hosts. Shared packages without func constraint types remain supported.
 
 ### `func-workload` requires loaded workloads
 
@@ -63,6 +69,8 @@ Project templates for `func init` carry func configuration actions, so they alre
 
 The constraint checks the workloads the CLI loaded when the command started: the highest installed version of each runtime workload (kind `workload`) that loaded, and every installed version of each content workload (kind `content`), such as extension bundles, except packages built for another platform. A loaded workload matches when the name equals one of its aliases, its package ID, or the published package ID of a platform-specific workload, ignoring case. Checking loaded versions keeps eligibility aligned with the versions commands actually use.
 
+The snapshot contains only workloads that passed the CLI's applicable compatibility and activation checks. Installed entries that were rejected remain available for diagnostics but cannot satisfy a constraint. The workload subsystem owns managed-contract, packaging, and activation checks. The template subsystem owns package classification and supported template formats and features. Template constraints are additional eligibility checks, not replacements for either boundary.
+
 A name must start with an ASCII letter or digit, contain only ASCII letters, digits, `.`, `-`, and `_`, and not end in `.nupkg`. Any other name makes the constraint fail, so template text can't change a generated command. Evaluation never contacts a feed, so workload constraints behave the same offline.
 
 ### `func-bundle` requires the project's extension bundle
@@ -74,7 +82,7 @@ A name must start with an ASCII letter or digit, contain only ASCII letters, dig
 { "type": "func-bundle", "args": { "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview", "version": "[4.29,)" } }
 ```
 
-A string argument is a version range for any bundle identity, and identities compare case-insensitively. When the command resolved no bundle, as in `func init` or a project without extension bundles, the constraint is restricted and can't be satisfied. `func-new-execution` decides whether a declared bundle that can't be resolved stops the command first. Project templates express bundle needs through `func-workload`, and packaging rejects `func-bundle` in project templates.
+A string argument is a version range for any bundle identity, and identities compare case-insensitively. When the command resolved no bundle, as in `func init` or a project without extension bundles, the constraint is restricted and can't be satisfied. For projects that use extension bundles, `func new` stops before template listing if a declared bundle cannot be resolved. Projects without extension bundles, including .NET projects, remain supported with absent bundle context. Project templates express bundle needs through `func-workload`, and packaging rejects `func-bundle` in project templates.
 
 ### Versions use NuGet ranges
 
@@ -88,6 +96,8 @@ Both func types use NuGet version range syntax, the same syntax as the `extensio
 | omitted | any version |
 
 A bare version is a minimum. A version also satisfies a range when it's a prerelease whose release version is in the range, as the workload catalog already treats prerelease workloads, so `1.0` accepts `1.0.0-preview.2`. An invalid range makes the constraint fail rather than match nothing.
+
+This prerelease rule applies only to `func-workload` and `func-bundle` eligibility. It does not select or install prerelease packages and must not be reused for CLI minimums or managed-contract compatibility. Those checks retain their own version ordering, so a CLI minimum of `5.2.0` does not accept `5.2.0-preview.1`.
 
 The engine's `host` and `sdk-version` constraints compare differently. A bare version is an exact match, and a minimum such as `[5.0,)` excludes 5.0 prereleases. Func types follow NuGet so workload and bundle ranges read the same as `host.json`.
 
@@ -130,7 +140,7 @@ A func constraint builds its message and next step from the parsed requirement, 
 | Result | When | Next step |
 |---|---|---|
 | Workload missing | No installed workload matches | `func setup --features <feature>` when a setup feature installs the workload, such as a stack's feature, `host`, or `runtime` for extension bundles, otherwise `func workload install <workload>` |
-| Workload not loaded | A matching workload is installed but didn't load | None, because the CLI's load warning already explains why |
+| Workload not usable | A matching workload is installed but was rejected by compatibility checks or didn't load | None; retain the CLI's compatibility or load diagnostic rather than treating the workload as missing |
 | Workload outdated | Every matching loaded version is below the range | `func workload update <workload>` when the range has no upper bound, adding `--major` when the minimum is in a higher major version, otherwise none |
 | Workload incompatible | Every matching loaded version is outside the range and at least one is above it | None |
 | Bundle outdated | The resolved bundle version is below the range | Allow the required version in the `host.json` bundle range, or install a newer extension bundle |
@@ -141,6 +151,8 @@ A func constraint builds its message and next step from the parsed requirement, 
 | `Failed` | The constraint is invalid or couldn't run | Check the template's constraint configuration |
 
 Extension bundles are an exception to the update command. One package carries every bundle channel, and `func workload update` replaces the highest installed version regardless of channel, so an outdated `bundles` workload gets fixed guidance to install a newer extension bundle instead. For `NotEvaluated` and `Failed`, this guidance replaces any call to action from the engine.
+
+Install and update guidance identifies an explicit acquisition action, not a guarantee that the selected package is compatible. The CLI names a specific compatible replacement only when it is known. Constraints neither search older package versions nor broaden a user's version or profile pin.
 
 When a constraint lists alternatives and none is satisfied, the message gives each alternative's reason, and a next step appears only when the arguments name a single workload. Built-in and unknown types keep the engine's message. Commands render every constraint message as plain text with control characters removed.
 
@@ -188,7 +200,7 @@ The `func-workload` factory needs the loaded workload snapshot and the installed
 
 - **[Shared templates can't declare func requirements]** -> State the rule in the authoring guidance, and revisit host-specific requirements if a shared template needs one.
 - **[Shared .NET templates could adopt `sdk-version`]** -> Func would then need an SDK provider so it evaluates those templates instead of blocking them.
-- **[The engine drops malformed or repeated entries while loading]** -> Authoring and packaging validation reject them before a package ships.
+- **[The engine drops malformed or repeated entries while loading]** -> Shared raw validation rejects them in packaging and package preflight and blocks malformed installed templates, even when engine cache data omits the declaration.
 - **[Engine results carry text rather than structure]** -> Diagnostics keep the constraint type beside the text, func constraints generate both their message and next step, and summaries come from the state and type.
 - **[Func types and `host` compare versions differently]** -> Document both readings and test minimum and prerelease cases.
 - **[`func-workload` can't select an extension bundle channel]** -> Add a channel argument if a project template needs one.

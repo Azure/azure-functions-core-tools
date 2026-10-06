@@ -145,6 +145,9 @@ The staged managed package is validated:
 - Only `FuncTemplate` alone is accepted by `func new`.
 - A folder package is accepted only when the staged `TemplatePackageManager` discovers at least one valid template from that managed package.
 - Every accepted package must expose at least one valid template after TemplateEngine scanning.
+- Every `.template.config/template.json` in the staged package passes the raw constraint declaration validation defined by `template-engine-constraints`, including third-party and folder packages. Engine scanning alone cannot establish this because it may silently discard malformed declarations.
+
+Raw validation is context-independent and does not evaluate requirements against installed workloads. Well-formed unknown constraint types remain available for fail-closed eligibility evaluation after installation. Invalid declarations reject the staged package before live hive mutation, including forced replacements and updates.
 
 The isolated `Templater` and temporary hive are disposed and deleted after preflight. Filesystem creation, copying, locking, and cleanup are behind injectable boundaries so tests do not depend on the process temp directory.
 

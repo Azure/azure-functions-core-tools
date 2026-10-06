@@ -57,6 +57,23 @@ Defines how `func new` resolves an existing Functions project, selects and confi
 - **WHEN** `--path` identifies a nested directory beneath the project root
 - **THEN** the template working directory is the nested path while project compatibility context comes from the discovered project root
 
+### Requirement: Extension bundle resolution before template listing
+For projects that use extension bundles, `func new` SHALL resolve a declared bundle before creating `Templater` or listing templates. If the declared bundle cannot be resolved, the command SHALL fail with bundle repair guidance and SHALL NOT list or invoke templates. Projects without extension bundles, including .NET projects, SHALL remain supported with absent bundle context.
+
+#### Scenario: Declared bundle cannot be resolved
+- **WHEN** a project that uses extension bundles declares a bundle with no resolvable installed version
+- **THEN** the command fails with bundle repair guidance before creating `Templater`
+- **AND** no templates are listed or invoked
+
+#### Scenario: Declared bundle resolves
+- **WHEN** the project's declared bundle resolves to an installed version
+- **THEN** that bundle identity and version are captured in the immutable context before listing
+
+#### Scenario: Project does not use extension bundles
+- **WHEN** a project without extension bundles, including a .NET project, lists or selects an item template
+- **THEN** absent bundle context alone does not fail the command
+- **AND** a template declaring `func-bundle` is restricted while templates without that requirement remain eligible subject to their other checks
+
 ### Requirement: Strict staged argument parsing
 `func new` SHALL first parse its stable command arguments while preserving the original template-specific token sequence. It SHALL then parse that same sequence independently against each remaining template candidate's projected parameter contract. The candidate-specific parse SHALL reject unknown aliases, missing option values, invalid types, and invalid choices.
 

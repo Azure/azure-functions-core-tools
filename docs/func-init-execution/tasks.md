@@ -151,3 +151,4 @@
 - [ ] 13.5 Document the breaking `IProjectInitializer` to `IProjectStack` workload migration.
 - [ ] 13.6 Run targeted abstraction, workload, init command, template integration, parser, renderer, and project-template tests.
 - [ ] 13.7 Run restore, the clean Release build with warnings treated as errors, and the full test suite.
+- [ ] 13.8 Keep fixture-based CLI regression suites separate from switch qualification. Before removing initializer fallback, verify default first-party project template packages are published and installable for every supported stack and pass baseline init smoke scenarios on fresh and upgraded machines against those published packages.

@@ -31,7 +31,7 @@
 
 - [ ] 4.1 Resolve `--path` as the requested template execution directory, defaulting to process current directory without requiring it to be the project root.
 - [ ] 4.2 Discover the containing Functions project by walking upward from the execution directory or its nearest existing ancestor.
-- [ ] 4.3 Resolve stack, explicit language override or project language fallback, and extension bundle identity and version into canonical values.
+- [ ] 4.3 Resolve stack, explicit language override or project language fallback, and extension bundle identity and version into canonical values. For projects that use extension bundles, reject an unresolved declared bundle with repair guidance before creating `Templater` or listing templates, while preserving absent bundle context for projects without bundles, including .NET.
 - [ ] 4.4 Populate template working directory and discovered project root as distinct immutable context values.
 - [ ] 4.5 Return actionable `func init` guidance when no Functions project exists in the execution path hierarchy.
 - [ ] 4.6 Create one `Templater` from the immutable context and reuse it through listing, resolution, parsing, prompting, dry-run, and creation.
@@ -95,6 +95,7 @@
 - [ ] 10.5 Test plain and JSON rendering for list, preview, creation, ambiguity, invalid arguments, and missing input.
 - [ ] 10.6 Add end-to-end parser coverage proving Stage A unmatched tokens cannot reach a success path without strict Stage B validation.
 - [ ] 10.7 Add consecutive-command coverage proving separate project contexts create separate engine environments without stale host defaults.
+- [ ] 10.8 Test unresolved declared bundles fail before engine creation, listing, or invocation; resolved bundles populate immutable context; and projects without bundles, including .NET, remain supported unless the selected template requires `func-bundle`.
 
 ## 11. Documentation and Validation
 

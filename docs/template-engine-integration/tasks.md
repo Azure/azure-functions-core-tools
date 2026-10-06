@@ -14,7 +14,7 @@
 
 ## 3. Catalog and Constraint Evaluation
 
-- [ ] 3.1 Centralize constraint evaluation so listing and resolution share one fail-closed representation of eligible, restricted, not-evaluated, and failed constraints.
+- [ ] 3.1 Centralize constraint evaluation so listing and resolution share raw declaration validation over current mounted configuration and one fail-closed representation of eligible, restricted, not-evaluated, and failed constraints. Evaluate the validated content snapshot, not stale declarations from the engine cache.
 - [ ] 3.2 Update `Templater.ListAsync` to return every installed template of the requested type with current-context eligibility and diagnostics.
 - [ ] 3.3 Add tests for mixed eligible and restricted catalogs, unevaluable constraints, exact context values, and listing templates hidden by host metadata.
 
@@ -32,7 +32,7 @@
 - [ ] 5.1 Add `TemplateInvocationRequest` and `TemplateInvocationResult` models for output location, canonical symbol values, file-conflict policy, file changes, and post-actions.
 - [ ] 5.2 Add the internal command-scoped invocation service that adapts the selected template and func-owned request to `TemplateCreator`.
 - [ ] 5.3 Implement `ResolvedTemplate.Parameters` and `InvokeAsync` so every eligible group item exposes its immutable symbol details, carries its invocation service, and cannot be publicly constructed from an unchecked template.
-- [ ] 5.4 Enforce cancellation, disposed-scope failure, and file-conflict-only force behavior without bypassing approved constraints.
+- [ ] 5.4 Enforce cancellation, disposed-scope failure, and file-conflict-only force behavior without bypassing approved constraints. Before creation, reject selected-template configuration that is unreadable or changed since validation, with rerun guidance and no reference re-resolution or substitution.
 - [ ] 5.5 Add invocation tests for canonical parameter values, exact candidate selection, successful output projection, cancellation, file conflicts, engine failures, and invocation after disposal.
 
 ## 6. Command Integration and Strict Parsing

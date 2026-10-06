@@ -9,6 +9,7 @@ Templates need a way to say what they require before a command runs them. `func 
 - Keep the engine's `os` and `host` constraints, and stop registering the .NET SDK `sdk-version` and `workload` constraints.
 - Map constraint results to the four eligibility states in `template-engine-integration`, with a reason for each restriction and, where one exists, a CLI-generated next step.
 - Limit func constraint types to func template packages, and define how Azure-Samples packages declare workload requirements.
+- Validate raw constraint declarations in packaging, isolated package preflight, and installed-template listing and resolution; reject changed or unreadable selected-template configuration before invocation.
 - Keep target-framework-aware template selection out of constraints.
 
 ## Capabilities
@@ -19,7 +20,9 @@ Templates need a way to say what they require before a command runs them. `func 
 
 ### Modified Capabilities
 
-None.
+- `template-package-install`: Reject malformed raw constraint declarations before live hive mutation, including third-party and folder packages.
+- `template-execution`: Validate current mounted declarations and preserve the selected template while rejecting changed or unreadable configuration before creation.
+- `func-new-execution`: Resolve required extension bundles before creating the engine environment or listing templates, while preserving projects without bundles.
 
 ## Impact
 

@@ -169,6 +169,32 @@ The CLI SHALL accept `--source <feed>` on template install and update commands a
 - **AND** the user installs a folder package without `--source`
 - **THEN** the CLI installs from the requested folder without consulting the configured NuGet feed
 
+### Requirement: Raw constraints are validated before live mutation
+
+Template install, replacement, and update SHALL validate every `.template.config/template.json` in the staged package using the context-independent raw declaration validator defined by `template-engine-constraints`. The requirement SHALL apply to third-party NuGet packages and folders, including forced operations. Engine discovery SHALL NOT substitute for raw validation. Invalid declarations SHALL reject the staged package before live hive mutation and leave any previous installation unchanged. Well-formed unknown constraint types SHALL NOT be rejected solely for being unknown, and validation SHALL NOT evaluate workload availability on the installation machine.
+
+#### Scenario: Malformed third-party package replaces an installed package
+
+- **WHEN** an install or update stages a third-party package whose raw constraints are malformed
+- **THEN** the command rejects it before live hive mutation
+- **AND** the previously installed package remains unchanged
+
+#### Scenario: Force cannot bypass raw validation
+
+- **WHEN** a forced folder or NuGet replacement contains malformed constraint declarations
+- **THEN** the command rejects it without replacing the installed package
+
+#### Scenario: Valid constraint cannot be satisfied on the installation machine
+
+- **WHEN** a staged template has valid constraint declarations but requires a workload absent from the installation machine
+- **THEN** workload availability does not fail declaration preflight
+- **AND** eligibility is evaluated in the eventual consuming command's context
+
+#### Scenario: Package has valid unknown constraint types
+
+- **WHEN** a staged template declares a structurally valid unknown constraint type
+- **THEN** raw validation preserves the declaration and does not reject the package solely for that type
+
 ### Requirement: Package types determine the owning command
 
 For NuGet packages, the CLI SHALL install a package through `func new install` only when it declares the `FuncTemplate` package type. The CLI SHALL install a NuGet package through `func workload install` only when it declares the `FuncCliWorkload` package type. A NuGet package declaring both types SHALL be rejected as ambiguous, and a NuGet package declaring neither type SHALL be rejected as unsupported. A folder install has no NuGet package-type metadata and SHALL instead be accepted only when Microsoft.TemplateEngine discovers at least one valid template from that folder.

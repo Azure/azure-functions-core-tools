@@ -19,12 +19,60 @@ Templates SHALL declare func requirements in the TemplateEngine `constraints` se
 - **WHEN** a `func-workload` constraint omits `args`
 - **THEN** the template's evaluation is `Failed`
 
+### Requirement: Consumer-side raw declaration validation
+The CLI SHALL validate every template's raw `.template.config/template.json` constraint declarations during isolated package install/update preflight and installed-template listing and resolution, including third-party packages and folder installs. Validation SHALL reject a present non-object constraints section, non-object entries, missing, non-string, or empty types, repeated labels, and invalid func arguments before engine normalization can discard them. An omitted or empty constraints object SHALL be valid. Validation SHALL NOT depend on installed workloads or reject a well-formed declaration solely because its type is unknown. Listing and resolution SHALL classify malformed or unreadable declarations as `Failed` and SHALL evaluate constraints from the same validated content snapshot. Cached engine metadata SHALL NOT replace raw validation. Invocation SHALL reject selected-template configuration that is unreadable or changed since that snapshot, without resolving the reference again or substituting a template.
+
+#### Scenario: Third-party package has a malformed constraint
+- **WHEN** an install or update stages a third-party template package with a non-object constraint entry
+- **THEN** preflight rejects the package before live hive mutation
+- **AND** any previous installation remains unchanged
+
+#### Scenario: Raw declaration has a repeated label
+- **WHEN** raw template configuration repeats a constraint label that engine normalization would replace
+- **THEN** consumer validation rejects the declaration instead of evaluating only the replacement
+
+#### Scenario: Constraint type is not a string
+- **WHEN** a raw constraint entry has a numeric, boolean, null, object, or array type value
+- **THEN** consumer validation rejects it instead of coercing it into an unknown type
+
+#### Scenario: Installed template has malformed declarations
+- **WHEN** listing or resolution reads malformed raw declarations from an already-installed template
+- **THEN** the template is reported as `Failed` with an authoring diagnostic
+- **AND** it cannot become invocation-ready even if the engine cache omits the malformed constraint
+
+#### Scenario: Folder configuration changes after selection
+- **WHEN** a selected folder template's configuration changes after listing or resolution validated it
+- **THEN** invocation fails before creation with guidance to rerun
+- **AND** the command does not resolve its reference again or substitute another template
+
+#### Scenario: Template configuration becomes unreadable
+- **WHEN** selected-template configuration cannot be read before invocation
+- **THEN** invocation fails before creation instead of trusting cached declarations
+
+#### Scenario: Unknown type is well formed
+- **WHEN** a raw declaration has a valid unknown type and otherwise valid structure
+- **THEN** raw validation preserves the declaration
+- **AND** eligibility is `NotEvaluated` and blocks selection
+
+#### Scenario: Template declares no constraints
+- **WHEN** raw configuration omits constraints or declares an empty constraints object
+- **THEN** raw validation succeeds
+- **AND** eligibility remains subject to the template's other checks
+
 ### Requirement: Func constraint types stay in func template packages
-Func constraint types SHALL use the `func-` prefix. A template package that other template hosts also install SHALL NOT declare func constraint types.
+Func constraint types SHALL use the `func-` prefix. A template package that other template hosts also install SHALL NOT declare func constraint types. First-party templates that require func constraint types SHALL ship in func-only packages. Packaging SHALL reject func constraint types in packages also declared for other hosts.
 
 #### Scenario: Package is also a dotnet new package
-- **WHEN** a template package also declares the `Template` package type
-- **THEN** its templates declare no func constraint types
+- **WHEN** a template package also declares the `Template` package type and a template declares a func constraint type
+- **THEN** packaging fails
+
+#### Scenario: Shared package has no func constraint types
+- **WHEN** a template package also declares the `Template` package type and its templates declare no func constraint types
+- **THEN** the shared-package rule does not reject it
+
+#### Scenario: Func-only package requires a stack
+- **WHEN** a first-party func-only template package declares a `func-workload` requirement
+- **THEN** the shared-package rule permits that declaration
 
 ### Requirement: Workload requirements
 The `func-workload` constraint SHALL name a workload by alias or package ID with an optional version range. Names SHALL start with an ASCII letter or digit, SHALL contain only ASCII letters, digits, `.`, `-`, and `_`, SHALL NOT end in `.nupkg`, and SHALL compare case-insensitively with the aliases, package IDs, and published package IDs of the workloads the CLI loaded when the command started. The loaded workloads SHALL be the highest installed version of each runtime workload that loaded and every installed version of each content workload except packages built for another platform. The constraint SHALL be satisfied when a matching loaded workload has a version in the range. When a matching workload is installed but didn't load, the constraint SHALL be restricted without a next step. Evaluation SHALL NOT access the network or depend on project context.
@@ -72,6 +120,23 @@ The `func-workload` constraint SHALL name a workload by alias or package ID with
 - **WHEN** a workload constraint is evaluated before a project context exists
 - **THEN** it gives the same result it gives inside a project
 
+### Requirement: Compatibility and eligibility boundaries
+The workload subsystem SHALL own applicable CLI/workload contract, packaging, and activation checks. The template subsystem SHALL own template package classification and supported format and feature checks. The workload snapshot used by `func-workload` SHALL exclude workloads rejected by applicable compatibility or activation checks. Template constraints SHALL NOT replace or bypass those checks, select replacement package versions, or acquire packages.
+
+#### Scenario: Installed workload was rejected before activation
+- **WHEN** a matching workload is installed but rejected by compatibility checks and no matching usable workload is present
+- **THEN** the workload cannot satisfy the template's requirement
+- **AND** the template is restricted without a new install or update command
+- **AND** the command retains the CLI-owned compatibility diagnostic instead of classifying the workload as missing
+
+#### Scenario: Usable workload satisfies the requirement
+- **WHEN** a matching workload passes applicable compatibility and activation checks and its version satisfies the template's requirement
+- **THEN** the workload constraint is satisfied
+
+#### Scenario: Workload passes compatibility but misses the template range
+- **WHEN** a matching workload passes applicable compatibility and activation checks but its version is outside the template's range
+- **THEN** package compatibility does not make the template eligible
+
 ### Requirement: Extension bundle requirements
 The `func-bundle` constraint SHALL compare an optional bundle identity and version range with the `func:bundle-id` and `func:bundle-version` values of the command context. Identities SHALL compare case-insensitively. When the command resolved no bundle, the constraint SHALL be restricted. Project templates SHALL NOT declare `func-bundle`.
 
@@ -97,7 +162,7 @@ The `func-bundle` constraint SHALL compare an optional bundle identity and versi
 - **THEN** the constraint is restricted and cannot be satisfied
 
 ### Requirement: Version ranges
-Func constraint versions SHALL use NuGet version range syntax, including floating versions, where a bare version is a minimum and an omitted version accepts any version. A prerelease version SHALL also satisfy a range when its release version is in the range. An invalid range SHALL make the constraint fail.
+Func constraint versions SHALL use NuGet version range syntax, including floating versions, where a bare version is a minimum and an omitted version accepts any version. A prerelease version SHALL also satisfy a range when its release version is in the range. An invalid range SHALL make the constraint fail. This prerelease rule SHALL apply only to `func-workload` and `func-bundle` eligibility and SHALL NOT alter package selection, CLI minimums, or managed-contract compatibility checks.
 
 #### Scenario: Bare version
 - **WHEN** a constraint declares version `1.2`
@@ -125,6 +190,11 @@ The CLI SHALL evaluate the TemplateEngine `os` and `host` constraints unchanged 
 #### Scenario: Template requires a minimum CLI version
 - **WHEN** a template declares a `host` constraint for `func` with a version range
 - **THEN** the CLI version decides the result
+
+#### Scenario: Preview CLI is below a stable minimum
+- **WHEN** a template declares a `host` constraint for `func` with range `[5.2.0,)` and the CLI is `5.2.0-preview.1`
+- **THEN** the template is restricted
+- **AND** the func workload prerelease rule does not change the host result
 
 #### Scenario: Template requires a .NET SDK version
 - **WHEN** a template declares an `sdk-version` constraint
@@ -168,6 +238,11 @@ Every unmet constraint SHALL have a message that states the reason and, where on
 #### Scenario: Restriction has no fix
 - **WHEN** the resolved bundle has another identity
 - **THEN** the diagnostic explains the requirement without a next step
+
+#### Scenario: Compatible replacement is not known
+- **WHEN** a constraint gives install or update guidance and no compatible replacement version is known
+- **THEN** guidance does not name a supposedly compatible version or promise automatic compatible-version selection
+- **AND** it does not change a version or profile pin
 
 #### Scenario: Extension bundles workload is outdated
 - **WHEN** a `func-workload` constraint on `bundles` finds only older versions

@@ -18,9 +18,9 @@
 - [ ] 3.1 Add an injectable temporary-hive provider and cleanup boundary suitable for deterministic tests.
 - [ ] 3.2 Implement isolated `Templater` preflight using the same TemplateEngine install request, host components, and installer selection as the live operation.
 - [ ] 3.3 Validate staged NuGet packages with `IFuncPackageTypeClassifier` and require `FuncTemplate` without `FuncCliWorkload`.
-- [ ] 3.4 Validate staged folder packages and all accepted NuGet packages by requiring TemplateEngine to discover at least one template from the managed package.
+- [ ] 3.4 Validate staged folder packages and all accepted NuGet packages by requiring TemplateEngine to discover at least one template from the managed package and applying the shared raw constraint declaration validator to every `.template.config/template.json`, without evaluating workload availability.
 - [ ] 3.5 Translate staged installer failures and vulnerabilities into func-owned domain outcomes while preserving cancellation.
-- [ ] 3.6 Add preflight tests for valid NuGet and folder packages, workload-only packages, dual package types, missing package types, empty folders, malformed templates, acquisition failures, and cleanup.
+- [ ] 3.6 Add preflight tests for valid NuGet and folder packages, workload-only packages, dual package types, missing package types, empty folders, malformed templates and raw constraints, acquisition failures, and cleanup. Include third-party packages, forced replacement and update with unchanged live state after rejection, valid unknown types, and valid constraints whose workloads are absent on the installation machine.
 
 ## 4. Hive Transaction and Concurrency
 
