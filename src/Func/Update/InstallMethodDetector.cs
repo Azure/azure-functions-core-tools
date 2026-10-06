@@ -37,9 +37,7 @@ internal sealed class InstallMethodDetector(
         // Homebrew keg-only formulas live under Cellar/; the exposed binary is
         // usually a symlink from /opt/homebrew/bin or /usr/local/bin, but
         // ProcessPath resolves to the real Cellar path on macOS.
-        if (Contains(normalized, "/Cellar/")
-            || Contains(normalized, "/homebrew/")
-            || Contains(normalized, "/linuxbrew/"))
+        if (IsHomebrewInstallPath(normalized))
         {
             return new InstallMethod(
                 InstallMethodKind.Homebrew,
@@ -99,10 +97,31 @@ internal sealed class InstallMethodDetector(
     private static bool IsUnderDirectory(string path, string directory)
     {
         string prefix = directory.TrimEnd('/') + "/";
-        return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        StringComparison comparison = IsWindowsPath(path) && IsWindowsPath(directory)
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        return path.StartsWith(prefix, comparison);
     }
 
     private static string Normalize(string path) => path.Replace('\\', '/').TrimEnd('/');
+
+    private static bool IsWindowsPath(string path) =>
+        path.StartsWith("//", StringComparison.Ordinal)
+        || (path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '/');
+
+    private static bool IsHomebrewInstallPath(string path)
+    {
+        string[] segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 4 || !segments[^1].Equals("func", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string formula = segments[^3];
+        return segments[^4].Equals("Cellar", StringComparison.OrdinalIgnoreCase)
+            && (formula.Equals("azure-functions-core-tools", StringComparison.OrdinalIgnoreCase)
+                || formula.StartsWith("azure-functions-core-tools@", StringComparison.OrdinalIgnoreCase));
+    }
 
     private static bool Contains(string haystack, string needle) =>
         haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);

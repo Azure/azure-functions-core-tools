@@ -15,6 +15,7 @@ public sealed class InstallMethodDetectorTests
     [InlineData("/usr/local/lib/node_modules/azure-functions-core-tools/bin/func", (int)InstallMethodKind.Npm, "npm", "Reinstall Azure Functions CLI with the v5 installer at https://aka.ms/func-cli.")]
     [InlineData("C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\azure-functions-core-tools\\bin\\func.exe", (int)InstallMethodKind.Npm, "npm", "Reinstall Azure Functions CLI with the v5 installer at https://aka.ms/func-cli.")]
     [InlineData("/opt/homebrew/Cellar/azure-functions-core-tools/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
+    [InlineData("/opt/homebrew/Cellar/azure-functions-core-tools@4/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
     [InlineData("/usr/local/Cellar/azure-functions-core-tools/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
     [InlineData("/home/linuxbrew/.linuxbrew/Cellar/azure-functions-core-tools/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
     [InlineData("C:\\ProgramData\\chocolatey\\lib\\azure-functions-core-tools\\tools\\func.exe", (int)InstallMethodKind.Chocolatey, "Chocolatey", "Run 'choco upgrade azure-functions-core-tools' to update.")]
@@ -50,6 +51,57 @@ public sealed class InstallMethodDetectorTests
 
         Assert.Equal(InstallMethodKind.Direct, result.Kind);
         Assert.Null(result.UpdateInstruction);
+    }
+
+    [Theory]
+    [InlineData("/home/linuxbrew")]
+    [InlineData("/home/Cellar/azure-functions-core-tools/4.0.5000")]
+    public void Detect_DefaultInstallScriptPathWithHomebrewInHomeDirectory_ReturnsDirect(string home)
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get("HOME").Returns(home);
+        var detector = new InstallMethodDetector(CreateOptions($"{home}/.azure-functions/func"), environment);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Direct, result.Kind);
+    }
+
+    [Fact]
+    public void Detect_CaseOnlyDifferentDefaultInstallDirectoryOnUnix_ThrowsGraceful()
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get("HOME").Returns("/home/user");
+        var detector = new InstallMethodDetector(CreateOptions("/home/user/.AZURE-FUNCTIONS/func"), environment);
+
+        GracefulException exception = Assert.Throws<GracefulException>(detector.Detect);
+
+        Assert.True(exception.IsUserError);
+    }
+
+    [Fact]
+    public void Detect_CaseOnlyDifferentDefaultInstallDirectoryOnWindows_ReturnsDirect()
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get("USERPROFILE").Returns("C:\\Users\\Me");
+        var detector = new InstallMethodDetector(CreateOptions("c:\\users\\me\\.AZURE-FUNCTIONS\\func.exe"), environment);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Direct, result.Kind);
+    }
+
+    [Fact]
+    public void Detect_GenuinePackageManagerPathUnderConfiguredInstallDirectory_ReturnsPackageManager()
+    {
+        const string installDirectory = "/opt/homebrew/Cellar/azure-functions-core-tools/4.0.5000";
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns(installDirectory);
+        var detector = new InstallMethodDetector(CreateOptions($"{installDirectory}/func"), environment);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Homebrew, result.Kind);
     }
 
     [Fact]
