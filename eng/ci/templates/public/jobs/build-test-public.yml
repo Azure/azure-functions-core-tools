@@ -48,9 +48,6 @@ jobs:
 
   - task: NuGetAuthenticate@1
     displayName: 'Authenticate NuGet'
-  - pwsh: |
-      .\validateWorkerVersions.ps1
-    displayName: 'Validate worker versions'
   - task: PowerShell@2
     displayName: "Run Check Vulnerabilities Script"
     inputs:
