@@ -17,9 +17,6 @@ jobs:
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
     NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
   steps:
-  - pwsh: . "tools/start-emulators.ps1" -NoWait
-    displayName: "Start emulators (NoWait)"
-
   - pwsh: |
       $simulateReleaseBuild = $null
       if (-not([bool]::TryParse($env:SimulateReleaseBuild, [ref] $simulateReleaseBuild)))
@@ -69,6 +66,9 @@ jobs:
     displayName: 'Authenticate npm'
     inputs:
       workingFile: '$(Build.SourcesDirectory)/.npmrc'
+
+  - pwsh: . "tools/start-emulators.ps1" -NoWait
+    displayName: "Start emulators (NoWait)"
 
   - task: NuGetAuthenticate@1
     displayName: 'Authenticate NuGet'

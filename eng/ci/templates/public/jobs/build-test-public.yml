@@ -17,8 +17,6 @@ jobs:
     DEVOPS_REPO_COMMIT: $(Build.SourceVersion)
     NPM_CONFIG_USERCONFIG: $(Build.SourcesDirectory)/.npmrc
   steps:
-  - pwsh: . "tools/start-emulators.ps1" -NoWait
-    displayName: "Start emulators (NoWait)"
   - pwsh: |
       $isIntegrationBuild = $false
       if ($env:INTEGRATIONBUILDNUMBER -like "PreRelease*-*")
@@ -45,6 +43,9 @@ jobs:
     displayName: 'Authenticate npm'
     inputs:
       workingFile: '$(Build.SourcesDirectory)/.npmrc'
+
+  - pwsh: . "tools/start-emulators.ps1" -NoWait
+    displayName: "Start emulators (NoWait)"
 
   - task: NuGetAuthenticate@1
     displayName: 'Authenticate NuGet'
