@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Telemetry;
 /// Scopes exporter-only environment switches without changing the Functions host's inherited settings.
 /// </summary>
 internal sealed class CliTelemetryEnvironment(IProcessEnvironment environment, Action<string, string?> setVariable)
-    : IProcessEnvironment, IDisposable
+    : IProcessEnvironment, ITelemetryEnvironmentScope
 {
     internal const string SdkStatsDisabled = "APPLICATIONINSIGHTS_SDKSTATS_DISABLED";
     internal const string StatsbeatDisabled = "APPLICATIONINSIGHTS_STATSBEAT_DISABLED";
@@ -26,14 +26,14 @@ internal sealed class CliTelemetryEnvironment(IProcessEnvironment environment, A
         return _originalValues.TryGetValue(name, out string? value) ? value : _environment.Get(name);
     }
 
-    internal void Apply()
+    void ITelemetryEnvironmentScope.Apply()
     {
         Override(SdkStatsDisabled, "true");
         Override(StatsbeatDisabled, "true");
         Override(ResourceMetricsEnabled, "false");
     }
 
-    internal void RestoreInheritedVariables(IDictionary<string, string?> environment)
+    void ITelemetryEnvironmentScope.RestoreInheritedVariables(IDictionary<string, string?> environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
 

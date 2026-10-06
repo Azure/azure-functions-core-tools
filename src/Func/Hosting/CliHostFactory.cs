@@ -40,7 +40,7 @@ internal static class CliHostFactory
     /// Creates the builder, registers installed workloads, and builds the
     /// host. Caller is responsible for <see cref="IHost.StartAsync"/>.
     /// </summary>
-    public static async Task<IHost> CreateHostAsync(IInteractionService interaction, CliTelemetryEnvironment telemetryEnvironment, CancellationToken cancellationToken = default)
+    public static async Task<IHost> CreateHostAsync(IInteractionService interaction, ITelemetryEnvironmentScope telemetryEnvironment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(telemetryEnvironment);
         HostApplicationBuilder builder = CreateBuilder(interaction, telemetryEnvironment);
@@ -54,7 +54,7 @@ internal static class CliHostFactory
     /// before workloads register; production code should use
     /// <see cref="CreateHostAsync"/>.
     /// </summary>
-    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction, CliTelemetryEnvironment? telemetryEnvironment = null)
+    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction, ITelemetryEnvironmentScope? telemetryEnvironment = null)
     {
         ArgumentNullException.ThrowIfNull(interaction);
         telemetryEnvironment ??= new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
@@ -97,7 +97,7 @@ internal static class CliHostFactory
         // environment variables on disposal, even for callers (e.g. tests)
         // that invoke CreateBuilder without supplying their own scope.
         builder.Services.AddSingleton(_ => telemetryEnvironment);
-        builder.Services.AddSingleton<IProcessEnvironment>(sp => sp.GetRequiredService<CliTelemetryEnvironment>());
+        builder.Services.AddSingleton<IProcessEnvironment>(sp => (IProcessEnvironment)sp.GetRequiredService<ITelemetryEnvironmentScope>());
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerContentResolver, DefaultFunctionsWorkerContentResolver>();

@@ -15,9 +15,10 @@ public class CliTelemetryEnvironmentTests
         environment.Set(CliTelemetryEnvironment.ResourceMetricsEnabled, "true");
         environment.Set("UNRELATED", "unchanged");
         using var scope = new CliTelemetryEnvironment(environment, environment.Set);
+        var telemetryScope = (ITelemetryEnvironmentScope)scope;
 
-        scope.Apply();
-        scope.Apply();
+        telemetryScope.Apply();
+        telemetryScope.Apply();
 
         environment.Get(CliTelemetryEnvironment.SdkStatsDisabled).Should().Be("true");
         environment.Get(CliTelemetryEnvironment.StatsbeatDisabled).Should().Be("true");
@@ -34,7 +35,7 @@ public class CliTelemetryEnvironmentTests
         var environment = new InMemoryProcessEnvironment();
         environment.Set(CliTelemetryEnvironment.ResourceMetricsEnabled, "true");
         var scope = new CliTelemetryEnvironment(environment, environment.Set);
-        scope.Apply();
+        ((ITelemetryEnvironmentScope)scope).Apply();
 
         scope.Dispose();
         scope.Dispose();
@@ -50,7 +51,8 @@ public class CliTelemetryEnvironmentTests
         var environment = new InMemoryProcessEnvironment();
         environment.Set(CliTelemetryEnvironment.SdkStatsDisabled, "false");
         using var scope = new CliTelemetryEnvironment(environment, environment.Set);
-        scope.Apply();
+        var telemetryScope = (ITelemetryEnvironmentScope)scope;
+        telemetryScope.Apply();
         var child = new Dictionary<string, string?>
         {
             [CliTelemetryEnvironment.SdkStatsDisabled] = "true",
@@ -59,7 +61,7 @@ public class CliTelemetryEnvironmentTests
             ["UNRELATED"] = "unchanged",
         };
 
-        scope.RestoreInheritedVariables(child);
+        telemetryScope.RestoreInheritedVariables(child);
 
         child.Should().HaveCount(2);
         child[CliTelemetryEnvironment.SdkStatsDisabled].Should().Be("false");
@@ -83,8 +85,9 @@ public class CliTelemetryEnvironmentTests
     {
         var environment = new InMemoryProcessEnvironment();
         using var scope = new CliTelemetryEnvironment(environment, environment.Set);
+        var telemetryScope = (ITelemetryEnvironmentScope)scope;
 
         FluentActions.Invoking(() => scope.Get(string.Empty)).Should().Throw<ArgumentException>();
-        FluentActions.Invoking(() => scope.RestoreInheritedVariables(null!)).Should().Throw<ArgumentNullException>();
+        FluentActions.Invoking(() => telemetryScope.RestoreInheritedVariables(null!)).Should().Throw<ArgumentNullException>();
     }
 }

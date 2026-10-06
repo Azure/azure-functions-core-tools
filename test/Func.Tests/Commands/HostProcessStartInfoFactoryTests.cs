@@ -18,7 +18,7 @@ public class HostProcessStartInfoFactoryTests : IDisposable
     private readonly DirectoryInfo _startupDirectory;
     private readonly DirectoryInfo _contentRoot;
     private readonly InMemoryProcessEnvironment _environment = new();
-    private readonly CliTelemetryEnvironment _telemetryEnvironment;
+    private readonly ITelemetryEnvironmentScope _telemetryEnvironment;
 
     public HostProcessStartInfoFactoryTests()
     {

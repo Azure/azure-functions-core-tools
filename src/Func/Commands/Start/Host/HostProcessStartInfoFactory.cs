@@ -8,9 +8,9 @@ using Azure.Functions.Cli.Telemetry;
 
 namespace Azure.Functions.Cli.Commands.Start.Host;
 
-internal sealed class HostProcessStartInfoFactory(CliTelemetryEnvironment telemetryEnvironment)
+internal sealed class HostProcessStartInfoFactory(ITelemetryEnvironmentScope telemetryEnvironment)
 {
-    private readonly CliTelemetryEnvironment _telemetryEnvironment =
+    private readonly ITelemetryEnvironmentScope _telemetryEnvironment =
         telemetryEnvironment ?? throw new ArgumentNullException(nameof(telemetryEnvironment));
 
     public const int DefaultPort = 7071;

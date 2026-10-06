@@ -29,7 +29,7 @@ public class TelemetryExportTests
     [Fact]
     public void AzureMonitorExport_ContainsEnrichedSignalsWithoutResourceOrSdkMetrics()
     {
-        using var environment = new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
+        using var environment = (ITelemetryEnvironmentScope)new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
         environment.Apply();
         var payloads = new ConcurrentQueue<string>();
         using var client = new HttpClient(new RecordingHandler(payloads));
@@ -153,7 +153,7 @@ public class TelemetryExportTests
 
     private static (TracerProvider Traces, MeterProvider Metrics) BuildProviders(ConcurrentQueue<string> payloads)
     {
-        using var environment = new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
+        using var environment = (ITelemetryEnvironmentScope)new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
         environment.Apply();
         var client = new HttpClient(new RecordingHandler(payloads));
         var options = new AzureMonitorExporterOptions();
