@@ -1,5 +1,20 @@
 # Azure Functions CLI v5: GA Readiness
 
+**Status:** PROPOSAL - FOR TEAM REVIEW.
+
+## Pre-Ignite review package
+
+The [pre-Ignite review package](./v5-ga-readiness/README.md) extends this
+readiness model with checkpoint outcomes, work-item classifications, open
+decisions, proposed feature cuts, and documentation follow-up. Its controlling
+objective is **GA before Ignite 2026**; exact freeze and release dates are not
+commitments. The earlier work inventory and design history remain preserved.
+
+The feature outcomes below describe the intended program, not approval to ship
+every feature before GA. The review package explicitly asks the team to decide
+the retained feature cutline, including templating and quickstart evolution.
+Neither this proposal nor the linked package certifies a candidate for release.
+
 This document describes **how we decide a v5 build is ready to ship**, and what
 must be true before GA. It complements, and does not replace, the existing
 planning documents:
@@ -77,7 +92,7 @@ until its gates are satisfied.
 | --- | --- | --- | --- | --- |
 | **Preview 3** | Behavioural baseline | Shipped | Treated as the reference build that later candidates are compared against | CDN distribution with version-pinned artifacts and published checksums |
 | **Preview 4** | Reliability and plumbing | Hardening of existing surfaces; install and packaging correctness; no major new feature surface expected | Baseline differential established; bug bash on changed surfaces; unit and component suites green | Install path validated across supported platforms; release notes current for the build |
-| **Preview 5** | Feature-completeness push | Remaining planned feature scope lands — self-update, template constraints, release mechanics | Automated CLI scenario suite running against the baseline; no unexplained regressions | Additional release channels exercised; release mechanics rehearsed rather than improvised |
+| **Preview 5** | Feature-completeness push | The selected GA feature tranche is complete; retained migrations and release mechanics are validated | Automated CLI scenario suite running against the baseline; no unexplained regressions | Additional release channels exercised; release mechanics rehearsed rather than improvised |
 | **RC1** | Plausible GA candidate | No planned major feature tranche remains | Full scenario suite green across the supported matrix; release and channel validation green | All GA-blocking channels operational; signing and verification in place; migration and parity positions closed sufficiently to ship |
 | **RC2** | Only if required | Blocking fixes only | Re-validation of the affected areas plus full regression | Re-validation of affected channels |
 | **GA** | Final validated release | Scope frozen | All release-blocking suites green; accepted known issues documented | All channels published and verified; cutover completed |
@@ -94,23 +109,27 @@ accommodate a feature.
 
 ## 3. Feature lane
 
-Major workstreams, described at the level of the outcome required before GA.
+The table describes intended workstream outcomes, not an approved minimum feature
+set. The [review matrix](./v5-ga-readiness/work-items.md) distinguishes required
+safe user outcomes from conditional feature targets and proposed deferrals.
 Issue-level tracking lives in [`v5-ga-plan.md`](./v5-ga-plan.md) and GitHub.
 
-| Workstream | Outcome required before GA |
+| Workstream | Intended outcome, subject to the feature cutline |
 | --- | --- |
 | **`func update`** | The CLI can update itself safely: integrity-verified downloads, serialised concurrent updates, rollback on failure, and correct behaviour when the CLI was installed through a package manager that owns updates. See [`func-update.spec.md`](./func-update.spec.md). |
 | **Profiles and release mechanics** | Profiles are versioned and released through a defined process rather than by hand, with a documented path for correcting a bad profile release. |
 | **Templating** | `func init` and `func new` run on the func-owned template catalog, templates can declare what they require, and a template that cannot run is shown as unavailable with an actionable reason rather than silently failing. |
-| **Telemetry and diagnostics** | Per-command instrumentation with a settled export lifecycle, honouring opt-out, with no measurable cost to command startup. |
+| **Telemetry and diagnostics** | If export is retained, settled lifecycle and opt-out/content handling, with measured startup and shutdown cost within reviewed acceptance limits. Supported diagnostics remain required independently. |
 | **Quickstart and workload evolution** | Quickstart content and its distribution follow the workload and template-package model rather than remaining special-cased in the CLI. |
 | **Quality automation** | See the quality lane. This is a feature of the project, not a side activity. |
 | **Performance** | Command startup and common-path latency are measured, tracked across builds, and do not regress silently. |
 | **Parity** | A per-language and per-tooling position against v4 — either at parity, deliberately changed with migration guidance, or deliberately dropped with a documented rationale. |
 
-Nothing here is promised into a specific preview. The constraint that matters is
-that each must reach its GA outcome **by RC1**, because RC1 is defined as having
-no planned major feature tranche after it.
+No optional workstream becomes GA-blocking merely by appearing in this table.
+Every feature actually retained in the GA cutline must be complete **by RC1**;
+the required quality, security, distribution, and release-safety outcomes remain
+protected. Scope decisions must preserve supported user workflows or explicitly
+document accepted gaps and migration alternatives.
 
 ---
 
@@ -150,10 +169,11 @@ context.
 
 ### Local-first execution
 
-Scenarios run without cloud resources wherever possible. The CLI manages its own
-storage emulator, so project creation, host startup and trigger invocation are
-all locally verifiable. Scenarios that genuinely require cloud resources are
-isolated and kept out of the fast suites.
+Scenarios run without cloud resources wherever possible. Qualify supported local
+project/start/invocation journeys using pinned inputs and the managed storage
+emulator where applicable. This does not make every trigger or deployment flow
+network-independent. Required externally dependent workflows have separate
+qualification; they are kept out of the fast suites, not out of release coverage.
 
 ### Test maturity
 
@@ -195,9 +215,12 @@ GA gate, not an implementation detail.
 | npm | GA-blocking. |
 | APT | Post-GA. |
 
-Chocolatey, MSI, Scoop, RPM and the internal tooling feed were **removed** from
+Chocolatey, Scoop, RPM and the internal tooling feed were **removed** from
 the v5 distribution plan. They should not be reintroduced as GA channels without
 a new decision.
+
+MSI is not a separately committed channel. Whether winget requires an MSI
+artifact remains an open question in `cli-release-story.md` and the review package.
 
 **Install-method detection is separate from channel support.** The CLI
 recognises installations it does not own — including package managers that are
@@ -207,8 +230,9 @@ manager is not a commitment to release through it.
 
 ### Integrity and signing
 
-Published artifacts are signed, and release staging invokes platform-appropriate
-signing for Linux, macOS and Windows. Before GA the remaining requirements are
+Release staging invokes platform-appropriate signing for Linux, macOS and
+Windows. That infrastructure alone does not certify every published artifact.
+Before GA the remaining requirements are
 that signing is applied to every artifact a user can download on every supported
 platform, that macOS notarization requirements are satisfied, and that signature
 verification is documented for users who want to check an artifact themselves.
@@ -244,10 +268,11 @@ supported. Most of this originates in [`v5-ga-plan.md`](./v5-ga-plan.md).
 | **Accessibility** | Colour-disabled and non-interactive terminal behaviour audited; interaction surfaces usable with assistive technology. |
 | **Localization** | A decision on whether localization is in scope for GA, then execution if it is. |
 
-Two items on this list have no engineering dependency but long lead times —
-**partner readiness** and **migration guidance**. They are the most likely to
-become the critical path if they start late, precisely because nothing blocks
-them.
+**Partner intake** and **migration evidence gathering** can start before feature
+completion. Final partner acceptance and migration guidance still depend on the
+selected scope and validated user workflows. Begin preparation early to reduce
+elapsed-time risk; owner estimates and delivery evidence are needed before
+identifying an actual critical path.
 
 ---
 
@@ -260,9 +285,11 @@ A build is RC1 when:
 
 1. Planned major feature scope is complete — **no further feature tranche is
    planned after RC1.**
-2. Required quality gates are green: the scenario suite passes across the
-   supported matrix, and every differential against the baseline is either an
-   unchanged pass or a declared, reviewed expected delta.
+2. Required quality gates are green across the supported matrix. Differences
+  are classified and reviewed; unchanged passes and expected deltas have
+  passing evidence. New capabilities and baseline limitations have passing
+  candidate acceptance checks, not an invented baseline pass. No unexplained
+  regression or inconclusive result is accepted as green.
 3. All GA-blocking distribution channels are operational, not merely designed.
 4. Signing and integrity verification are in place for every published artifact.
 5. Parity and migration positions are closed sufficiently to ship — not
@@ -270,6 +297,12 @@ A build is RC1 when:
 6. Partner teams have been informed and their blocking concerns resolved.
 7. Release and rollback mechanics are executable by someone following the
    playbook, rather than reconstructed from memory.
+
+RC test results qualify the recorded artifacts, not an arbitrary later build of
+the same source. Prepare and qualify the exact final GA version, signed payloads
+and channel packaging before publication. Version/suffix changes, rebuilds,
+re-signing or changed wrappers require the relevant evidence to be renewed; GA
+publication cannot become an untested implementation or packaging phase.
 
 If a feature slips past RC1, it moves to a post-GA release. It does not convert
 RC1 into another preview — doing so means the project has no release candidate,
