@@ -2,7 +2,88 @@
 
 Defines how Azure-Samples quickstart releases are onboarded, converted into safe `FuncTemplate` NuGet packages, staged, approved, and published to NuGet.org.
 
+The scope extension permits independently selectable templates from one source repository. A reviewed package assignment may select one or several source-owned definitions; per-stack aggregation and private intermediate packages are not required. Source-scope and assignment schema extensions must be explicitly versioned.
+
 ## ADDED Requirements
+
+### Requirement: Source scopes preserve independent sample choices
+
+Publication SHALL retain separate selectable identities for independent source samples, including different folders of one repository. Reviewed assignments MAY select one or several definitions from an exact source release. It MUST NOT turn independent choices into one combined solution, require per-stack aggregation for discovery UX, or duplicate a template identity into competing packages implicitly.
+
+#### Scenario: Python connectors source contains two samples
+
+- **WHEN** Office 365 and SharePoint definitions select different folders of the same approved release
+- **THEN** published package/template references expose two independent project templates
+- **AND** each creates only its intended content scope
+
+### Requirement: Multiple source scopes have explicit versioned ownership
+
+The extended descriptor SHALL use a supported explicit schema version to define named identities, normalized content roots, and exactly one authored or synthesized configuration per definition. Onboarding MAY select definition IDs under its supported extension but MUST NOT supply project paths or topology. Validation SHALL reject traversal, escaping links, excluded content, unsafe roots, and ambiguous ownership. Authored configuration MUST NOT be rewritten to hide scope or grouping conflicts.
+
+#### Scenario: Unsupported descriptor fields use the old version
+
+- **WHEN** a source declares multiple template scopes using a schema version that does not define them
+- **THEN** source validation fails rather than reinterpret the original descriptor
+
+#### Scenario: A scope escapes the release snapshot
+
+- **WHEN** a declared template content root or linked content escapes the acquired source boundary
+- **THEN** source validation fails before assembly
+
+### Requirement: Package assignments select a complete source definition set
+
+Each assignment SHALL identify an approved source release and a complete set of named source-owned definitions. A missing or invalid selected definition MUST NOT be silently omitted. Changed definitions or source content under an existing package ID/version SHALL be immutable conflicts. Unrelated valid package candidates MAY continue.
+
+#### Scenario: Selected definition is invalid
+
+- **WHEN** one of two selected definitions fails validation
+- **THEN** that package candidate fails without publishing a reduced set
+- **AND** unrelated valid package candidates may continue
+
+### Requirement: Classification follows Functions project declarations
+
+Non-Functions content MUST NOT fabricate another required Functions stack. Mixed-stack templates SHALL retain every Functions project declaration and constraint. Publishing MUST NOT infer one primary stack from a manifest language or implicitly duplicate a template into stack packages.
+
+#### Scenario: Python sample contains a web frontend
+
+- **WHEN** a sample declares only Python Functions projects and also includes a JavaScript web frontend
+- **THEN** the opaque frontend does not by itself make the sample a mixed Functions-stack member
+
+#### Scenario: Template declares Python and Node Functions projects
+
+- **WHEN** validated project declarations require both stacks
+- **THEN** package validation retains both requirements
+- **AND** does not infer Python-only placement from the manifest language label
+
+### Requirement: Completed packages validate independent definitions
+
+The packager SHALL discover and dry-run every template from the completed package and compare discovery with its reviewed assignment. It SHALL reject duplicate identities, ambiguous short names across distinct groups, missing definitions, invalid actions, and unintended content effects. Independent samples SHALL use distinct groups; shared groups require intentional variants of one named definition. Only a fully validated package SHALL enter staging/promotion.
+
+#### Scenario: Package contains a duplicate identity
+
+- **WHEN** two members advertise the same full identity
+- **THEN** package validation fails before staging or promotion
+
+#### Scenario: Independent samples reuse one template group
+
+- **WHEN** two independent definitions advertise the same group identity
+- **THEN** validation fails rather than allow precedence to collapse one sample into another's variants
+- **AND** authored grouping metadata is not rewritten to hide the conflict
+
+### Requirement: Scope provenance and publication evidence are complete
+
+Package provenance SHALL retain the source release/version/commit and selected definition IDs, normalized scopes, content digests, and relevant license notices. Provenance metadata SHALL remain outside scaffolded roots. The approval record SHALL identify the exact published artifact and definitions so discovery can verify curated status under its own trust policy. Prefixes or self-declared tags MUST NOT count as sanction. Publishing SHALL NOT create the public discovery manifest or implement its trust transport.
+
+#### Scenario: Scope changes under an existing version
+
+- **WHEN** the same package ID/version selects different definitions or source content
+- **THEN** publication reports an immutable conflict and does not replace the artifact
+
+#### Scenario: Discovery consumes published packages
+
+- **WHEN** approved packages are publicly available
+- **THEN** their publication evidence identifies exact artifacts and source scopes
+- **AND** the separate discovery component applies its feed/curation policy and publishes browsing metadata
 
 ### Requirement: The func-templates repository owns the packaging control plane
 
@@ -17,7 +98,7 @@ The system SHALL use the `func-templates` repository in the `internal` project o
 
 ### Requirement: Onboarding is PR-reviewed YAML
 
-Each file directly under `src/Quickstarts/` with the `.yaml` extension SHALL contain `schemaVersion: 1` and a `quickstarts` array containing zero or more onboarding entries. The scanner SHALL combine every matching file into one logical onboarding manifest. Filenames and the file containing an entry MUST NOT contribute to entry identity.
+Each file directly under `src/Quickstarts/` with the `.yaml` extension SHALL use a centrally supported schema version and contain a `quickstarts` array. Version 1 retains its original single-package semantics; scoped assignments SHALL require an explicitly supported extension. The scanner SHALL combine matching files without using filenames as identity.
 
 #### Scenario: Multiple onboarding files are combined
 
@@ -36,7 +117,7 @@ Each file directly under `src/Quickstarts/` with the `.yaml` extension SHALL con
 
 ### Requirement: The onboarding schema is strict
 
-Every onboarding file SHALL validate against `src/Schema/quickstart.schema.json`. The schema SHALL reject unknown properties and SHALL define required values, types, formats, allowed values, and defaults for schema version 1.
+Every onboarding file SHALL validate against its centrally owned supported schema. Unknown fields and unsupported versions SHALL be rejected. Extended assignments SHALL NOT reinterpret version 1 or move project topology into onboarding.
 
 #### Scenario: Unknown field is rejected
 
@@ -45,7 +126,7 @@ Every onboarding file SHALL validate against `src/Schema/quickstart.schema.json`
 
 #### Scenario: Unsupported schema version is rejected
 
-- **WHEN** an onboarding file declares a schema version other than `1`
+- **WHEN** an onboarding file declares a version not supported by the central schema
 - **THEN** PR validation fails
 
 ### Requirement: Each onboarding entry has stable package and release identity
@@ -79,11 +160,11 @@ Each entry SHALL require a stable `id`, an `Azure-Samples/<repository>` slug, a 
 
 ### Requirement: Onboarding identities are globally unique
 
-The system SHALL enforce case-insensitive uniqueness across all onboarding files for onboarding ID, repository slug, and package ID. Moving an unchanged entry between files MUST NOT change its effective values.
+Onboarding and package IDs SHALL be globally unique case-insensitively. Version 1 SHALL also enforce repository uniqueness. A supported scoped extension MAY reference one repository in several assignments only when their named template-definition ownership is disjoint. Moving entries between files MUST NOT change identity.
 
 #### Scenario: Duplicate value exists in another file
 
-- **WHEN** two entries resolve to the same globally unique value ignoring case
+- **WHEN** entries collide on ID/package identity, violate original-mode repository uniqueness, or assign one template definition to competing packages
 - **THEN** PR validation fails and identifies both entries
 
 ### Requirement: PR validation is atomic
@@ -194,11 +275,11 @@ The packaging process SHALL NOT execute build scripts, package-manager scripts, 
 
 ### Requirement: Authored and synthesized template ownership is exclusive
 
-For each release snapshot, the pipeline SHALL accept exactly one template source: root `.template.config/template.json` or `.github/azure-functions-template.yaml`. The pipeline SHALL fail package generation when both sources are present or both sources are absent. Onboarding MUST NOT select the mode or point to another path.
+In the original single-definition mode, the pipeline SHALL accept exactly one template source: root `.template.config/template.json` or `.github/azure-functions-template.yaml`. It SHALL reject both-present and both-absent snapshots in that mode. In the explicitly versioned multi-definition mode, the source descriptor SHALL select independently scoped authored or synthesized definitions, and each definition SHALL have exactly one owner. A descriptor MAY reference authored subfolder configurations but MUST NOT synthesize or override those same definitions. Onboarding MUST NOT select project topology or arbitrary configuration paths.
 
 #### Scenario: Authored configuration and synthesis descriptor are present
 
-- **WHEN** the release snapshot contains root `.template.config/template.json`
+- **WHEN** a single-definition release snapshot contains root `.template.config/template.json`
 - **AND** the release snapshot contains `.github/azure-functions-template.yaml`
 - **THEN** package generation fails with a redundant template ownership diagnostic
 
@@ -215,7 +296,7 @@ For each release snapshot, the pipeline SHALL accept exactly one template source
 
 ### Requirement: Authored template configuration is preserved and dry-run
 
-When the release snapshot contains root `.template.config/template.json` and no synthesis descriptor, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, workload constraints in the form defined by `template-engine-constraints` that require every stack its configuration actions declare, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
+For an authored definition, whether selected by the original root convention or the explicitly versioned multi-definition descriptor, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, workload constraints in the form defined by `template-engine-constraints` that require every stack its configuration actions declare, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
 
 #### Scenario: Valid authored template exists
 
@@ -244,7 +325,7 @@ When the release snapshot contains root `.template.config/template.json` and no 
 
 ### Requirement: Synthesized project declarations are safe and complete
 
-The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion: 1`, reject unknown properties, and require non-empty `identity`, `shortName`, `name`, `description`, and `projects`. Each project SHALL require `root`, `stack`, and `language`. `root` SHALL be `.` or a normalized `/`-separated repository-relative path. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots. The declared stack and language SHALL be canonical and compatible. The filtered release snapshot SHALL contain a regular `host.json` directly under each declared root.
+The original `.github/azure-functions-template.yaml` single-definition descriptor SHALL use `schemaVersion: 1`, reject unknown properties, and require non-empty `identity`, `shortName`, `name`, `description`, and `projects`. Extended definitions SHALL use an explicitly versioned strict schema rather than accept new fields under version 1. Each synthesized definition SHALL require the same metadata and non-empty project declarations. Each project SHALL require `root`, `stack`, and `language`. `root` SHALL be `.` or a normalized `/`-separated path relative to the validated template content scope. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots within the definition. The declared stack and language SHALL be canonical and compatible. Each scope SHALL contain a regular `host.json` directly under every declared root.
 
 #### Scenario: Descriptor metadata is incomplete
 
@@ -278,13 +359,19 @@ The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion:
 
 ### Requirement: Source descriptor is synthesized into template configuration
 
-When the release snapshot contains `.github/azure-functions-template.yaml` and does not contain root `.template.config/template.json`, the pipeline SHALL synthesize template configuration in staging using the descriptor's identity, short name, name, description, and projects. The synthesized template SHALL have project type and SHALL treat the complete filtered release snapshot as template content. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying the declared canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add the workload constraint defined by `template-engine-constraints`, derived from the declared project stacks.
+For each synthesized definition, the pipeline SHALL generate template configuration using that definition's identity, short name, name, description, and projects. The template SHALL have project type and SHALL use only its validated filtered content scope. The original single-root mode uses the complete filtered snapshot; an extended scoped definition MUST NOT copy unrelated sample folders. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and carrying canonical stack and language. It SHALL define no parameter symbols, replacements, or ordinary post-actions. It SHALL add workload constraints derived from every declared project stack.
 
 #### Scenario: Repository has no template configuration
 
-- **WHEN** the release snapshot lacks root `.template.config/template.json`
-- **AND** the release snapshot contains a valid `.github/azure-functions-template.yaml`
+- **WHEN** the original single-definition snapshot lacks root `.template.config/template.json`
+- **AND** it contains a valid single-definition synthesis descriptor
 - **THEN** the pipeline adds a minimal synthesized project template to staging
+
+#### Scenario: Extended descriptor selects authored subfolder definitions
+
+- **WHEN** a versioned descriptor selects authored configurations from subfolders
+- **THEN** those definitions remain authored and pass authored validation
+- **AND** absence of a root configuration does not trigger synthesis for them
 
 #### Scenario: Synthesized template is validated
 
@@ -309,7 +396,7 @@ When the release snapshot contains `.github/azure-functions-template.yaml` and d
 
 ### Requirement: Package licensing is release-specific and allowlisted
 
-The pipeline SHALL determine licensing from the exact release commit. It SHALL first use an explicit reviewed `licenseExpression` when present, otherwise use the GitHub repository-license API at the release commit, and otherwise inspect a root license file from the staged snapshot. Only SPDX expressions `MIT` and `Apache-2.0` SHALL be accepted. An explicit override SHALL NOT remove the requirement for a root license file.
+For each package, licensing SHALL come from the exact source release through reviewed override, release-specific repository detection, or source-root license inspection. Only SPDX `MIT` or `Apache-2.0` SHALL be accepted, and an override SHALL NOT remove the file requirement. Selected subfolder scopes SHALL retain relevant source-root notices. Cross-repository aggregate license policy is outside this scope.
 
 #### Scenario: GitHub detects an allowed license
 
@@ -325,16 +412,16 @@ The pipeline SHALL determine licensing from the exact release commit. It SHALL f
 
 #### Scenario: License is unsupported
 
-- **WHEN** the effective license is not MIT or Apache-2.0
+- **WHEN** the source release license is not MIT or Apache-2.0
 - **THEN** package construction fails
 
 ### Requirement: NuGet packages have func template identity and provenance
 
-Each generated package SHALL use the explicit package ID, the release-derived package version, and package type `FuncTemplate`. NuGet metadata SHALL include the effective description and license, a project URL for the GitHub repository, repository type `git`, the canonical repository URL, the resolved commit SHA, and a release-notes link to the corresponding GitHub release. The root license file SHALL remain in template content.
+Each package SHALL use the reviewed assignment's `packageId`, not its internal operational `id`, along with the source-release-derived version, `FuncTemplate` type, effective description/license, canonical source repository/commit, and release URL. It SHALL include selected-definition provenance and notices and exclude private pipeline identifiers.
 
 #### Scenario: Package metadata is inspected
 
-- **WHEN** a generated package is opened
+- **WHEN** a published package is opened
 - **THEN** its ID, version, package type, description, license, project URL, repository URL, commit, and release-notes link match the resolved release
 
 #### Scenario: Pipeline implementation metadata is inspected
@@ -358,11 +445,11 @@ Before publication, the pipeline SHALL inspect the completed `.nupkg`, load and 
 
 ### Requirement: Azure Artifacts staging is the publication checkpoint
 
-Every validated package SHALL first be published to the Azure Artifacts staging feed. The staging feed and NuGet.org SHALL be queried by package ID and version to determine publication state. Pipeline-run artifacts SHALL NOT be the durable publication record.
+Every validated template package SHALL first enter Azure Artifacts staging. Staging and NuGet.org SHALL be queried by package ID/version and selected-definition provenance to determine publication state. Run-retained artifacts SHALL NOT be the durable checkpoint.
 
 #### Scenario: Version is absent from both feeds
 
-- **WHEN** an eligible package version exists in neither feed
+- **WHEN** a validated package version exists in neither publication feed
 - **THEN** the pipeline builds, validates, and publishes it to staging
 
 #### Scenario: Version exists only in staging
@@ -377,18 +464,23 @@ Every validated package SHALL first be published to the Azure Artifacts staging 
 
 ### Requirement: One approval promotes the successful run set
 
-After all release candidates in a scheduled or manual run have been processed through staging, the pipeline SHALL present one summary and request one approval for all successfully staged packages in that run. Approval SHALL promote the exact staged `.nupkg` files to NuGet.org without rebuilding them. Releases that failed before staging SHALL be reported separately and SHALL NOT block approval or promotion of successful packages.
+The pipeline SHALL request one approval for successfully staged packages and their complete selected definitions. Approval SHALL promote the exact staged bytes without rebuilding. An invalid selected definition blocks its package; unrelated fully validated packages MAY be approved and promoted.
 
 #### Scenario: Run has multiple successful packages
 
-- **WHEN** several packages reach staging in one run
-- **THEN** one approval authorizes promotion of the complete successful set
+- **WHEN** several fully validated packages reach staging
+- **THEN** one approval authorizes their exact complete artifacts
 
 #### Scenario: Run has partial failure
 
-- **WHEN** some releases fail and others reach staging
-- **THEN** the approval includes the successfully staged packages
+- **WHEN** some package candidates fail and other complete packages reach staging
+- **THEN** approval includes only those fully validated packages
 - **AND** failures are reported separately
+
+#### Scenario: One selected scope fails validation
+
+- **WHEN** a package has one valid definition and another invalid selected definition
+- **THEN** that package is not staged or approved with only the valid definition
 
 #### Scenario: Approval is withheld
 
@@ -407,7 +499,7 @@ The pipeline SHALL retry transient GitHub, network, and feed failures with bound
 
 #### Scenario: Previous promotion was interrupted
 
-- **WHEN** a package is present in staging but absent from NuGet.org
+- **WHEN** a validated package is present in staging but absent from NuGet.org
 - **THEN** a later run can promote the staged artifact
 
 #### Scenario: Publication run overlaps
@@ -417,12 +509,13 @@ The pipeline SHALL retry transient GitHub, network, and feed failures with bound
 
 ### Requirement: Operators can target manual recovery
 
-The publication pipeline SHALL support a manual run filtered by onboarding ID and optional package version. Manual execution SHALL use the same discovery, validation, staging, approval, and immutable publication behavior as scheduled execution and SHALL NOT provide a force-overwrite mode.
+The pipeline SHALL support manual recovery by onboarding/package ID and optional source-release version, preserving the reviewed definition selection. It SHALL reuse normal validation, staging, approval, and immutable promotion without force overwrite.
 
 #### Scenario: Operator targets one entry
 
-- **WHEN** an operator starts a manual run for one onboarding ID
+- **WHEN** an operator starts a recovery run for one onboarding/package ID
 - **THEN** unrelated entries are not processed
+- **AND** promotion still requires the normal approval gate
 
 #### Scenario: Operator requests an existing conflicting version
 
