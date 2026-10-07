@@ -44,26 +44,64 @@ Defines how `func init` discovers and runs installed quickstart project template
 - **WHEN** an uninstalled template could be identified as first-party
 - **THEN** the initial capability still does not install it implicitly
 
-### Requirement: Curated companion acquisition preserves default availability
+### Requirement: Stack acquisition supplies basic companions only
 
-Explicit stack installation through setup or the stack install command SHALL acquire approved basic-template companions and SHALL acquire curated quickstart companions by default. Users SHALL be able to opt out of curated quickstart acquisition without losing basic project or item templates. Companion acquisition SHALL be separate from `func init` execution and SHALL follow the acquisition design's source, version, failure, and ownership rules.
+Explicit stack installation through setup or direct stack install SHALL acquire approved basic project/item companions under the acquisition design. It MUST NOT preinstall curated quickstarts or expose a curated preinstallation option. Existing installed quickstart packages SHALL NOT be removed by this policy change.
 
-#### Scenario: Stack installation includes curated companions
+#### Scenario: Fresh stack installation
 
-- **WHEN** a supported stack installation completes with companion acquisition enabled
-- **THEN** its approved quickstart project templates are installed without a separate user-issued template install command
-- **AND** eligible templates are available through `func init`
+- **WHEN** a supported stack installation completes
+- **THEN** approved basic project and item templates are installed without separate package commands
+- **AND** no curated quickstart payload is acquired by that stack operation
 
-#### Scenario: User opts out of quickstarts
+### Requirement: Curated discovery precedes payload acquisition
 
-- **WHEN** the user opts out of curated quickstart acquisition during stack installation
-- **THEN** the operation does not acquire those quickstart companions
-- **AND** it still acquires required basic-template companions
-- **AND** it does not uninstall already-installed packages
+CLI browse/search SHALL expose sanctioned available templates without requiring their packages to be installed. The discovery component SHALL own the package/template manifest and its configured-feed, curation, and freshness rules. Publishing onboarding and the installed TemplateEngine catalog SHALL remain separate from this cached metadata. Browsing/searching MUST NOT mutate installed package state.
+
+#### Scenario: Curated package is not installed
+
+- **WHEN** a valid discovery entry describes a sanctioned quickstart absent from the installed catalog
+- **THEN** the user can inspect and select it from metadata without downloading its payload
+- **AND** merely viewing or filtering the catalog does not install it
+
+### Requirement: Guided use has explicit acquisition authorization
+
+A guided use action SHALL show the concrete package ID, version, source, full template identity, and verified curation before acquisition through the lifecycle. It SHALL require confirmation or explicit non-interactive authorization and preserve installed source/pin choices. After acquisition it SHALL finish the lifecycle session, open a fresh init session under the shared-read contract, and bind the selected entry to the authorized package owner, actual installed version, recorded source, and approved artifact/provenance before validating constraints or creating files. A template name alone MUST NOT authorize selection from another package. Unknown curation, unexpected owners, or unverifiable artifacts SHALL block guided use. The verified entry SHALL remain authoritative through the integration's snapshot/locking rules. The flow MUST NOT silently update template packages or workloads.
+
+#### Scenario: User authorizes install and use
+
+- **WHEN** a user authorizes acquisition of a sanctioned discovery selection
+- **THEN** the lifecycle acquires the selected package under its source/version rules
+- **AND** the shared init path runs only after installed identity, parameters, constraints, and output effects are validated
+
+#### Scenario: Another installed package advertises the same template identity
+
+- **WHEN** a different installed package advertises the sanctioned template's identity or short name
+- **THEN** guided use verifies the concrete owning package against its authorized reference
+- **AND** rejects an unexpected owner rather than substitute its template
+- **AND** no project files are created from that substitution
+
+#### Scenario: Acquisition is declined or fails
+
+- **WHEN** the user declines, acquisition is cancelled, or installation fails
+- **THEN** project creation does not start and the target remains unchanged
+- **AND** the lifecycle retains its existing failure-safe package behavior
+
+#### Scenario: Non-interactive discovery lacks acquisition authorization
+
+- **WHEN** a non-interactive selection needs installation but no explicit acquisition authorization was supplied
+- **THEN** the flow provides an actionable authorization/install hint
+- **AND** does not acquire a package or create project files
+
+#### Scenario: Installed package conflicts with discovery version
+
+- **WHEN** discovery advertises a different version or source from the installed selection
+- **THEN** guided use does not silently override the installed version, source, or pin
+- **AND** any replacement requires an explicit lifecycle action under its existing policy
 
 ### Requirement: Quickstart removal requires a qualified replacement
 
-The existing `func quickstart` command SHALL remain available until a pinned inventory of entries supported by the current CLI has usable template-package replacements, default companion acquisition works on fresh and upgraded installs, discovery and migration guidance are available, replacement regression tests pass, and the content and publication handoff is agreed with the responsible owners. The command switch SHALL remove the old creation path rather than keep a permanent alias. It SHALL NOT remove the shared manifest from unrelated consumers.
+The existing `func quickstart` command SHALL remain available until a pinned supported-entry inventory has usable published replacements, basic companion acquisition works on fresh and upgraded installs, guided metadata discovery/acquisition/creation and migration guidance are available, replacement regression tests pass, and the responsible owners agree the handoff. The command switch SHALL remove the old creation path rather than keep a permanent alias. It SHALL NOT remove the shared manifest from unrelated consumers.
 
 #### Scenario: Repository exposes separate subfolder samples
 
@@ -80,7 +118,7 @@ The existing `func quickstart` command SHALL remain available until a pinned inv
 #### Scenario: User discovers a sample outside installed companions
 
 - **WHEN** a user wants a sample not present in the installed catalog
-- **THEN** working browse or search identifies the sample and its installation instructions without requiring a known package ID
+- **THEN** working CLI browse/search identifies the sample and offers the authorized guided use flow without requiring a known package ID
 - **AND** discovery exposes relevant language, resource, infrastructure-as-code, and sample information
 - **AND** `func init` does not install the selected package implicitly
 
