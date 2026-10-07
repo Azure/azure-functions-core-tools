@@ -16,9 +16,9 @@
 
 ## 3. Cross-Change Coordination
 
-- [ ] 3.1 Reconcile the ten focused changes so every detailed requirement has one authoritative owner.
+- [ ] 3.1 Reconcile every listed focused change, including companion acquisition, so each detailed requirement has one authoritative owner.
 - [ ] 3.2 Add explicit dependency references wherever a focused change consumes a contract owned by another change.
 - [ ] 3.3 Resolve conflicting terminology, context models, result shapes, and lifecycle assumptions across all focused designs.
 - [ ] 3.4 Update the umbrella inventory after any focused change is renamed, split, added, or removed.
-- [ ] 3.5 Strictly validate all ten focused changes and this umbrella change before declaring the templating system fully specified.
-- [ ] 3.6 Assign companion-template acquisition to a focused change and update `func-init-execution` and `template-package-install` with the result.
+- [ ] 3.5 Strictly validate every listed focused change and this umbrella change, and resolve open companion acquisition contracts before declaring the templating system fully specified.
+- [ ] 3.6 Review the `template-companion-acquisition` proposal and settle its mapping, ownership, and upgrade decisions before implementing it in setup and stack installation.

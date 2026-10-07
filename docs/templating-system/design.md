@@ -22,7 +22,7 @@ Four identified areas do not yet have focused changes:
 | `template-engine-bind-sources` | Func-supported value sources such as MSBuild properties and npm package properties | Planned |
 | `func-new-search` | NuGet feed scanning, `FuncTemplate` discovery manifests, CDN publication, and `func new search` consumption | Planned |
 
-One cross-cutting decision has no owner yet. `func-init-execution` defers how a stack workload's companion template packages are identified, acquired, and installed. The outcome updates `func-init-execution` and `template-package-install`.
+The [template-companion-acquisition proposal](../template-companion-acquisition/design.md) is an additional focused change covering how approved basic project/item companions are acquired with a stack. Its mapping, ownership, and upgrade contracts remain under review. Curated payloads are not preinstalled: discovery owns metadata browsing and an explicitly authorized guided use action, while init execution consumes installed templates. Overall readiness includes the basic acquisition and guided discovery boundaries, not just the original ten artifact sets.
 
 OpenSpec does not provide parent-child change semantics. This umbrella change therefore coordinates stable focused-change identities and responsibilities through documentation and tracking tasks; every focused change remains independently valid and implementable.
 
@@ -56,7 +56,8 @@ templating-system
   |   `-- template-engine-integration
   |
   +-- package lifecycle
-  |   `-- template-package-install
+  |   +-- template-package-install
+  |   `-- template-companion-acquisition
   |
   +-- command execution
   |   +-- func-new-execution
@@ -97,7 +98,7 @@ templating-system
 
 The integration change is the common foundation. Package lifecycle shares its hive and engine bootstrap boundary. Command execution consumes catalog, resolution, parameter, and invocation contracts. Constraints and bind sources extend engine registration and context. Post-actions consume invocation results and command execution policy.
 
-Search depends on the `FuncTemplate` package contract and produces installable package references rather than creating a second installer. The Azure-Samples pipeline produces packages conforming to that same contract. Init quickstarts depend on the Azure-Samples pipeline and init execution behavior. They do not consume the search manifest. An unknown template points to a Functions-owned browse URL instead.
+Search depends on the `FuncTemplate` package contract and produces package/template references from a CDN discovery index, not another installer. Read-only browse can precede payload installation. A separately authorized guided use action composes the existing lifecycle with installed init execution under the discovery contract. The Azure-Samples pipeline supplies packages and source provenance, not the discovery index. Basic companion acquisition supplies ordinary init/new templates. The quickstart migration requires both basic companions and guided discovery/use; a direct unknown init reference still produces guidance without implicit installation.
 
 Focused changes can progress independently when their required contracts are settled. The umbrella does not impose a total implementation order where no technical dependency exists.
 
@@ -121,6 +122,6 @@ This prevents a completed proposal from being mistaken for shipped behavior and 
 1. Retain the six existing focused changes as authoritative.
 2. Create `template-engine-constraints`, `template-engine-post-actions`, `template-engine-bind-sources`, and `func-new-search` as separate OpenSpec changes.
 3. Reconcile their declared dependencies with the existing six changes.
-4. Mark the templating system fully specified only after all ten changes pass strict validation.
+4. Mark the templating system fully specified only after all listed changes, including companion acquisition, have reviewed contracts and pass strict validation.
 
 There is no product rollback for this coordination change. Reverting it removes the umbrella inventory without altering focused specifications or implementation.
