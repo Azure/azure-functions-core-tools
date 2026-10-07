@@ -73,7 +73,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("3.6.8b", true)]
         [InlineData("3.7.2", true)]
         [InlineData("3.8.0", true)]
-        [InlineData("3.9.0", false)]
+        [InlineData("3.9.0", true)]
         [InlineData("3.10.0", false)]
         [InlineData("3.11.0", false)]
         [InlineData("3.12.0", false)]
