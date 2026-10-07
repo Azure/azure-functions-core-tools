@@ -5,7 +5,7 @@ Coordinates the focused specifications that together define the func templating 
 ## ADDED Requirements
 
 ### Requirement: Focused change inventory
-The templating system SHALL be divided across these focused OpenSpec changes: `template-engine-integration`, `template-package-install`, `func-init-execution`, `func-new-execution`, `template-engine-constraints`, `template-engine-post-actions`, `template-engine-bind-sources`, `func-new-search`, `azure-samples-template-pipeline`, and `func-init-quickstarts`. The umbrella change SHALL track whether each focused change has complete planning artifacts without treating artifact completion as implementation completion.
+The templating system SHALL be divided across these focused OpenSpec changes: `template-engine-integration`, `template-package-install`, `template-companion-acquisition`, `func-init-execution`, `func-new-execution`, `template-engine-constraints`, `template-engine-post-actions`, `template-engine-bind-sources`, `func-new-search`, `azure-samples-template-pipeline`, and `func-init-quickstarts`. The umbrella change SHALL track whether each focused change has complete planning artifacts and reviewed contracts without treating artifact completion as implementation completion.
 
 #### Scenario: Existing focused change is tracked
 - **WHEN** a focused change has complete proposal, specification, design, and task artifacts
@@ -33,6 +33,12 @@ Each focused change SHALL own detailed requirements for its assigned capability.
 #### Scenario: Command execution behavior is specified
 - **WHEN** behavior concerns item-template execution through `func new` or project-template execution through `func init`
 - **THEN** `func-new-execution` or `func-init-execution`, respectively, is the authoritative focused change
+
+#### Scenario: Stack companion acquisition is specified
+
+- **WHEN** behavior concerns identifying and acquiring approved basic or curated template bundles with an explicit stack installation
+- **THEN** `template-companion-acquisition` owns that orchestration
+- **AND** `template-package-install` remains authoritative for each template lifecycle operation
 
 #### Scenario: Extensibility behavior is specified
 - **WHEN** behavior concerns func-specific engine constraints, post-actions, or bind sources
@@ -63,7 +69,7 @@ Focused changes SHALL declare dependencies on other focused changes whenever the
 
 #### Scenario: Quickstart integration consumes Azure-Samples templates
 - **WHEN** `func init` exposes Azure-Samples quickstart templates
-- **THEN** `func-init-quickstarts` declares dependencies on `azure-samples-template-pipeline` and `func-init-execution`
+- **THEN** `func-init-quickstarts` declares dependencies on `azure-samples-template-pipeline`, `template-companion-acquisition`, and `func-init-execution`
 
 #### Scenario: Search indexes installable template packages
 - **WHEN** template discovery publishes an entry that users can install
@@ -74,7 +80,7 @@ Focused changes SHALL declare dependencies on other focused changes whenever the
 - **THEN** the conflict is resolved in the focused change that owns that responsibility before the templating system is considered fully specified
 
 ### Requirement: Overall specification readiness
-The templating system SHALL be considered fully specified only when all ten focused changes contain complete, strictly valid planning artifacts and their cross-change dependencies are consistent.
+The templating system SHALL be considered fully specified only when every listed focused change, including companion acquisition, contains complete, strictly valid planning artifacts and reviewed, consistent cross-change contracts. Open draft questions SHALL NOT be treated as settled acquisition behavior.
 
 #### Scenario: One focused specification is missing
 - **WHEN** any listed focused change lacks a required planning artifact
