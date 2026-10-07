@@ -44,6 +44,52 @@ Defines how `func init` discovers and runs installed quickstart project template
 - **WHEN** an uninstalled template could be identified as first-party
 - **THEN** the initial capability still does not install it implicitly
 
+### Requirement: Curated companion acquisition preserves default availability
+
+Explicit stack installation through setup or the stack install command SHALL acquire approved basic-template companions and SHALL acquire curated quickstart companions by default. Users SHALL be able to opt out of curated quickstart acquisition without losing basic project or item templates. Companion acquisition SHALL be separate from `func init` execution and SHALL follow the acquisition design's source, version, failure, and ownership rules.
+
+#### Scenario: Stack installation includes curated companions
+
+- **WHEN** a supported stack installation completes with companion acquisition enabled
+- **THEN** its approved quickstart project templates are installed without a separate user-issued template install command
+- **AND** eligible templates are available through `func init`
+
+#### Scenario: User opts out of quickstarts
+
+- **WHEN** the user opts out of curated quickstart acquisition during stack installation
+- **THEN** the operation does not acquire those quickstart companions
+- **AND** it still acquires required basic-template companions
+- **AND** it does not uninstall already-installed packages
+
+### Requirement: Quickstart removal requires a qualified replacement
+
+The existing `func quickstart` command SHALL remain available until a pinned inventory of entries supported by the current CLI has usable template-package replacements, default companion acquisition works on fresh and upgraded installs, discovery and migration guidance are available, replacement regression tests pass, and the content and publication handoff is agreed with the responsible owners. The command switch SHALL remove the old creation path rather than keep a permanent alias. It SHALL NOT remove the shared manifest from unrelated consumers.
+
+#### Scenario: Repository exposes separate subfolder samples
+
+- **WHEN** two supported manifest entries select different folders from one repository
+- **THEN** the replacement retains two independently selectable project templates
+- **AND** each generates its intended source scope rather than a combined solution
+
+#### Scenario: Source is not yet publishable
+
+- **WHEN** a supported sample lacks an eligible release, required template metadata, or a supported packaging scope
+- **THEN** that sample remains an unresolved migration dependency
+- **AND** the old command is not removed while its replacement coverage is incomplete
+
+#### Scenario: User discovers a sample outside installed companions
+
+- **WHEN** a user wants a sample not present in the installed catalog
+- **THEN** working browse or search identifies the sample and its installation instructions without requiring a known package ID
+- **AND** discovery exposes relevant language, resource, infrastructure-as-code, and sample information
+- **AND** `func init` does not install the selected package implicitly
+
+#### Scenario: Package remains at its installed version
+
+- **WHEN** a newer curated package is published but the installed package has not been updated
+- **THEN** initialization uses the installed version
+- **AND** this migration does not imply an automatic template or workload update
+
 ### Requirement: Interactive initialization is template-first
 
 When no template is supplied and prompting is available, `func init` SHALL present installed project-template groups, narrowed by any explicit stack and language filters, before resolving template variants or template parameters. After a template group is selected, the command SHALL resolve only the remaining choices required by that group.

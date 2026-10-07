@@ -56,6 +56,24 @@ Only declared Functions project configuration actions participate in Func topolo
 
 **Alternative considered:** introduce a `quickstart` type. Package provenance and curation do not change TemplateEngine execution semantics. It is rejected.
 
+### The installed-template experience replaces func quickstart
+
+The existing v5 `func quickstart` command is replaced by `func init`, not retained as a second scaffolding engine or introduced as an init subcommand. A basic project and a curated sample both use `func init --template <name>` or the installed project-template picker. Individual function templates remain under `func new`.
+
+This follows the [original quickstart proposal's handoff to the template designs](https://github.com/Azure/azure-functions-core-tools/pull/5026#issuecomment-5298569474). Consolidation changes command syntax, but must not introduce a separate manual template-install step for the curated content users already receive through their installed stack.
+
+Today, a supported stack registers its quickstart provider, the CLI reads the CDN manifest, and scaffolding fetches the selected tagged repository snapshot. The [current manifest](https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json) can register independent samples from different folders of one repository. For example, the Python connectors repository exposes [Office 365](https://github.com/Azure-Samples/functions-connectors-python/tree/v1.0.1/office365App) and [SharePoint](https://github.com/Azure-Samples/functions-connectors-python/tree/v1.0.1/sharepointApp) as separate choices. Their replacements must remain independently selectable and generate only their intended content, not become one combined solution.
+
+An explicit stack installation, whether through setup or the stack install command, must acquire the approved basic-template companions and acquire curated quickstart companions by default. A quickstart opt-out skips that acquisition without removing basic templates or packages already installed. Companion identification, package grouping, sources, versions, upgrades, ownership, cancellation, and partial failure belong to the companion-template acquisition design. The publishing design must cover independently selectable templates and repository subfolder scopes before the command switch.
+
+The migration inventory pins the existing test manifest and maps every entry supported by the current CLI to its source revision and content scope, replacement package, template identity, and short name. It records intentional naming changes and source releases or authoring metadata that still need onboarding work. Branch-tracking entries currently filtered out of the CLI are not treated as working scenarios to preserve. A singular manifest language is not proof of single-stack source topology; declared Functions project requirements remain authoritative in the replacement.
+
+The replacement must also cover discovery, not just file generation. Installed selection and functioning browse or search must let users find samples, inspect their purpose and included content, and narrow by the relevant language, resource, and infrastructure-as-code metadata without guessing package IDs. The discovery design owns the interface and its catalog. It may use a browse experience rather than reproduce every old CLI flag, but a placeholder URL or parameter help alone does not satisfy this gate.
+
+Manifest caching currently gives curated entries periodic refresh, whereas installed packages execute their installed versions. Package update notifications and automatic refresh are outside this migration decision. No equivalent freshness guarantee or silent workload upgrade is implied.
+
+**Alternative considered:** retain `func quickstart` permanently as a shortcut. That leaves two public creation workflows and a separate repository-fetch contract after the template runtime covers their intended content. The old command remains during migration, but is removed with the final switch rather than becoming a permanent alias.
+
 ### Package installation remains explicit
 
 `func init` queries only the installed template catalog. An unknown `--template` reference produces:
@@ -296,5 +314,7 @@ Parameterized or conditional project topology cannot be expressed by the synthes
 6. Add installed quickstart rendering, browse guidance, restricted entries, whole-template filters, and multi-project success output.
 7. Exercise the flow with homogeneous, heterogeneous, conditional, restricted, dry-run, forced, and partial-failure fixtures.
 8. Enable the experience only after default project templates and representative Azure-Samples packages satisfy the authoring contract.
+
+Keep the existing `func quickstart` command until the supported-entry inventory is covered, reviewed packages are published, default companion acquisition works on fresh and upgraded installs, discovery and migration guidance are usable, and replacement regression tests pass. Agree the content and publication handoff with the existing quickstart and publishing owners before removal. The command-switch change removes the old command and its unused provider and fetch dispatch in the same change that enables the qualified replacement. It does not remove the shared catalog from other consumers such as editor galleries.
 
 Rollback restores the previous init selection and CLI-owned single-root configuration step. Installed template packages remain managed by the same template package lifecycle, but packages relying only on multi-project configuration actions will not be fully usable by the prior init flow.

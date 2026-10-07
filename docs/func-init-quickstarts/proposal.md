@@ -6,6 +6,8 @@ Azure-Samples quickstarts will be distributed as ordinary `FuncTemplate` package
 
 - Make interactive `func init` template-first by listing installed TemplateEngine templates with `tags.type = project` before resolving remaining template choices.
 - Run an installed template by exact identity or short name through `func init --template <template>`.
+- Replace the existing `func quickstart` workflow only after supported sample content, independent subfolder choices, default companion acquisition, discovery, and regression coverage are ready.
+- Require approved stack companions to preserve curated availability without a separate manual install step, with a quickstart-only opt-out whose mechanics are owned by companion acquisition.
 - Require explicit template package installation; an unknown template reference provides browse and `func new install` guidance rather than installing implicitly.
 - Show a stable Functions-owned browse URL alongside the installed-template experience without defining the backing gallery or catalog in this change.
 - Keep workload-restricted installed templates visible as unavailable, show a concise restriction summary, and render actionable remediation supplied by the constraint system.
@@ -35,4 +37,6 @@ None.
 - Depends on `template-engine-post-actions` for the mandatory Functions project configuration action.
 - Depends on `template-package-install` for explicit package installation and on `azure-samples-template-pipeline` for packaged quickstart supply.
 - Requires corresponding package-authoring changes so synthesized and authored quickstarts declare workload requirements, project primary outputs, and configuration actions.
+- Requires the companion acquisition and publishing designs to support the current quickstart inventory, and the discovery design to supply a usable replacement for catalog browsing and sample information.
+- Leaves automatic updates and freshness policy separate from command migration, and does not claim installed packages track CDN manifest changes automatically.
 - Does not define remote template search, a gallery implementation, implicit installation, package publication, workload acquisition, or multi-project adoption.
