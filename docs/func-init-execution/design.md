@@ -65,7 +65,7 @@ An `InstalledProjectStackCatalog` validates unique stack IDs, canonicalizes lang
 
 The refactor applies to every stack workload in one migration. Retaining `IProjectInitializer` as a temporary creation fallback would allow behavior to vary based on which templates happen to be installed and is rejected.
 
-Project templates are delivered in companion `FuncTemplate` packages rather than embedded in stack assemblies. The [companion acquisition proposal](../template-companion-acquisition/design.md) defines their reviewed mapping and explicit acquisition through setup and stack installation, including default curated quickstarts and a curated-only opt-out. Init still consumes only the installed catalog; it is not an acquisition entry point.
+Basic project templates are delivered in companion `FuncTemplate` packages rather than embedded in stack assemblies. The [companion acquisition proposal](../template-companion-acquisition/design.md) defines their reviewed mapping and explicit acquisition through setup and stack installation. It does not preinstall curated quickstarts. Curated metadata browsing and explicitly authorized guided acquisition are separate discovery orchestration; the init execution path still consumes installed templates.
 
 **Alternative considered:** keep `IProjectInitializer` for metadata while no longer calling `InitializeAsync`. Its name and remaining methods would misrepresent the contract and encourage new workload-owned scaffolding. It is rejected.
 

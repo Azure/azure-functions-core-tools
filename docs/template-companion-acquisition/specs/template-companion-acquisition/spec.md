@@ -6,7 +6,7 @@ Defines the proposed acquisition of approved stack companion templates without a
 
 ### Requirement: Approved mappings govern companion acquisition
 
-The planner SHALL identify basic and curated companions from a reviewed Functions-owned mapping of approved stack identities to package IDs, version ranges, and source policy. It MUST NOT infer approval from stack aliases, template text, or package-name prefixes. TemplateEngine SHALL remain authoritative for installed template package registration.
+The planner SHALL identify basic project/item companions from a reviewed Functions-owned mapping of approved stack identities to package IDs, version ranges, and source policy. It MUST NOT infer approval from stack aliases, template text, or package-name prefixes. TemplateEngine SHALL remain authoritative for installed package registration.
 
 #### Scenario: Mapping is unavailable or invalid
 
@@ -14,30 +14,31 @@ The planner SHALL identify basic and curated companions from a reviewed Function
 - **THEN** the operation fails before deploying the planned packages
 - **AND** reports the invalid or missing mapping rather than installing guessed package IDs
 
-### Requirement: Stack acquisition includes separate companion roles
+### Requirement: Stack acquisition supplies basic templates without curated preinstallation
 
-Setup and direct installation of an approved stack SHALL include basic companion acquisition and SHALL include curated quickstart acquisition by default. Non-stack workload installation SHALL NOT acquire template packages. Template execution SHALL NOT acquire companions implicitly.
+Setup and direct installation of an approved stack SHALL acquire basic project/item companions. It MUST NOT preinstall curated quickstarts or expose a curated preinstallation option. Non-stack workload installation SHALL NOT acquire template packages. Template execution SHALL NOT acquire companions implicitly.
 
 #### Scenario: Fresh stack installation
 
 - **WHEN** the user explicitly installs an approved stack with default options
-- **THEN** the acquisition plan identifies its basic and curated package versions
+- **THEN** the acquisition plan identifies its basic package versions
 - **AND** installs them through the existing template lifecycle without separate per-package user commands
+- **AND** no curated quickstart payload is acquired
 
 #### Scenario: Non-stack workload installation
 
 - **WHEN** the user installs a worker, host, or other workload without an approved stack acquisition mapping
 - **THEN** no companion template operation is performed
 
-### Requirement: Curated acquisition has an explicit opt-out
+### Requirement: Curated discovery and guided use are separate from stack acquisition
 
-Stack acquisition SHALL provide a curated-only opt-out. It MUST NOT remove basic templates or packages already installed. An unrelated CLI invocation MUST NOT reset an opt-out or restore a package explicitly removed by the user.
+Curated availability SHALL come from discovery metadata that can be browsed without payload installation. Browsing/search SHALL remain read-only. Any guided acquisition SHALL require a separate explicitly authorized action under the discovery and template lifecycle contracts. Stack acquisition MUST NOT uninstall already-installed curated packages or restore user-removed packages through unrelated invocations.
 
-#### Scenario: Curated acquisition is disabled
+#### Scenario: Curated package is already installed
 
-- **WHEN** the user opts out while acquiring a stack
-- **THEN** basic companion acquisition remains in the plan
-- **AND** curated packages are not acquired or uninstalled
+- **WHEN** a stack installation encounters a user-installed curated package
+- **THEN** the stack operation does not uninstall or update it
+- **AND** it remains visible to the normal installed-template catalog
 
 ### Requirement: Existing user package choices are preserved
 
@@ -59,11 +60,11 @@ Acquisition SHALL use the owning lifecycle's version, source, locking, and repla
 
 Acquisition SHALL resolve and validate the plan before writes, SHALL honor cancellation between operations, and SHALL rely on per-package rollback. It MUST NOT promise an atomic transaction across workload and template stores. Failure of a later requested package SHALL return non-zero, retain earlier valid installations, and report an idempotent recovery action.
 
-#### Scenario: Curated acquisition fails after basic setup succeeds
+#### Scenario: Basic companion acquisition fails after stack installation
 
-- **WHEN** the stack and basic companions are installed but curated acquisition fails
-- **THEN** those completed packages remain installed
-- **AND** the operation reports incomplete acquisition and the missing curated package
+- **WHEN** the stack is installed but a required basic companion fails
+- **THEN** completed valid packages remain installed
+- **AND** the operation returns non-zero and reports incomplete acquisition and the missing basic package
 - **AND** a retry does not redeploy already-satisfied components
 
 #### Scenario: Offline request lacks a required package
@@ -73,7 +74,7 @@ Acquisition SHALL resolve and validate the plan before writes, SHALL honor cance
 
 ### Requirement: Existing machines have a qualified acquisition path
 
-The command migration SHALL include an explicit upgrade or repair path for approved companions on existing installations. It SHALL preserve prior opt-outs and unrelated user packages. Legacy template workloads MUST NOT be considered new-engine registrations without migration validation.
+The command migration SHALL include an explicit upgrade or repair path for approved basic companions on existing installations. It SHALL preserve unrelated user packages and installed pins/source choices. Legacy template workloads MUST NOT be considered new-engine registrations without migration validation.
 
 #### Scenario: Machine has legacy template workloads
 

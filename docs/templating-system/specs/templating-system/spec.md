@@ -36,7 +36,7 @@ Each focused change SHALL own detailed requirements for its assigned capability.
 
 #### Scenario: Stack companion acquisition is specified
 
-- **WHEN** behavior concerns identifying and acquiring approved basic or curated template bundles with an explicit stack installation
+- **WHEN** behavior concerns identifying and acquiring approved basic project/item companions with an explicit stack installation
 - **THEN** `template-companion-acquisition` owns that orchestration
 - **AND** `template-package-install` remains authoritative for each template lifecycle operation
 
@@ -74,6 +74,13 @@ Focused changes SHALL declare dependencies on other focused changes whenever the
 #### Scenario: Search indexes installable template packages
 - **WHEN** template discovery publishes an entry that users can install
 - **THEN** `func-new-search` declares the package compatibility contract it consumes from `template-package-install`
+
+#### Scenario: Discovery selection enters guided use
+
+- **WHEN** a user explicitly authorizes acquisition and creation for a sanctioned discovery selection
+- **THEN** the discovery contract owns the curation, confirmation, and package/template mapping
+- **AND** acquisition uses `template-package-install` before entering the installed project-template execution path
+- **AND** ordinary search remains read-only and stack installation does not preinstall curated payloads
 
 #### Scenario: Child requirements conflict
 - **WHEN** focused changes assign incompatible behavior to the same responsibility
