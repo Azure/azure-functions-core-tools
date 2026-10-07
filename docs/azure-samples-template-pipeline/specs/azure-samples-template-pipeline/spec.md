@@ -2,23 +2,23 @@
 
 Defines how Azure-Samples quickstart releases are onboarded, converted into safe `FuncTemplate` NuGet packages, staged, approved, and published to NuGet.org.
 
-The proposed curated bundle mode retains single-release validation as a private source-unit boundary. Public package promotion applies to assembled bundles; source units used by bundles are not independently promoted. Single-source tag/version metadata describes the input, while an aggregate's public version and provenance follow the additional bundle requirements below. Versioned source-scope schema changes must be explicit rather than silently accepted under the original schema.
+The scope extension permits independently selectable templates from one source repository. A reviewed package assignment may select one or several source-owned definitions; per-stack aggregation and private intermediate packages are not required. Source-scope and assignment schema extensions must be explicitly versioned.
 
 ## ADDED Requirements
 
-### Requirement: Curated bundles contain independently selectable templates
+### Requirement: Source scopes preserve independent sample choices
 
-Curated publication SHALL assemble a stable per-stack `FuncTemplate` bundle from approved source definitions. Basic project/item packages SHALL remain separate. A bundle SHALL contain separate selectable template identities for independent samples, including different subfolders of one repository. It MUST NOT turn those alternatives into one template generating all samples.
+Publication SHALL retain separate selectable identities for independent source samples, including different folders of one repository. Reviewed assignments MAY select one or several definitions from an exact source release. It MUST NOT turn independent choices into one combined solution, require per-stack aggregation for discovery UX, or duplicate a template identity into competing packages implicitly.
 
 #### Scenario: Python connectors source contains two samples
 
 - **WHEN** Office 365 and SharePoint definitions select different folders of the same approved release
-- **THEN** the aggregate exposes two independently selectable project templates
+- **THEN** published package/template references expose two independent project templates
 - **AND** each creates only its intended content scope
 
 ### Requirement: Multiple source scopes have explicit versioned ownership
 
-The extended source descriptor SHALL use an explicitly versioned schema to define template identities, normalized content roots, and exactly one authored or synthesized configuration per definition. Central onboarding MUST NOT supply project topology. Scope validation SHALL reject traversal, escaping links, excluded content, unsafe project roots, and ambiguous ownership. Authored configuration MUST NOT be patched by aggregation.
+The extended descriptor SHALL use a supported explicit schema version to define named identities, normalized content roots, and exactly one authored or synthesized configuration per definition. Onboarding MAY select definition IDs under its supported extension but MUST NOT supply project paths or topology. Validation SHALL reject traversal, escaping links, excluded content, unsafe roots, and ambiguous ownership. Authored configuration MUST NOT be rewritten to hide scope or grouping conflicts.
 
 #### Scenario: Unsupported descriptor fields use the old version
 
@@ -30,25 +30,19 @@ The extended source descriptor SHALL use an explicitly versioned schema to defin
 - **WHEN** a declared template content root or linked content escapes the acquired source boundary
 - **THEN** source validation fails before assembly
 
-### Requirement: Reviewed recipes pin aggregate membership
+### Requirement: Package assignments select a complete source definition set
 
-A bundle recipe SHALL declare a stable public package ID, canonical stack, independent bundle version, and exact approved source releases and template identities. Changed membership or source revisions SHALL require a new bundle version. An unavailable or invalid required member MUST NOT be silently omitted. Unrelated bundle candidates MAY continue independently.
+Each assignment SHALL identify an approved source release and a complete set of named source-owned definitions. A missing or invalid selected definition MUST NOT be silently omitted. Changed definitions or source content under an existing package ID/version SHALL be immutable conflicts. Unrelated valid package candidates MAY continue.
 
-#### Scenario: New quickstart is added to Python
+#### Scenario: Selected definition is invalid
 
-- **WHEN** a reviewed recipe adds a validated Python quickstart
-- **THEN** publication produces a new version of the existing Python curated package
-- **AND** the addition does not require a new public package ID for that quickstart
+- **WHEN** one of two selected definitions fails validation
+- **THEN** that package candidate fails without publishing a reduced set
+- **AND** unrelated valid package candidates may continue
 
-#### Scenario: Required source release cannot be acquired
+### Requirement: Classification follows Functions project declarations
 
-- **WHEN** a pinned required member cannot be acquired or validated
-- **THEN** that bundle candidate fails without publishing a reduced member set
-- **AND** unrelated valid bundle candidates can continue
-
-### Requirement: Bundle classification follows Functions project topology
-
-A homogeneous bundle member SHALL declare Functions projects matching the bundle's canonical stack. Non-Functions content MUST NOT fabricate another required Functions stack. Mixed-stack templates SHALL retain all project declarations and constraints and MUST NOT be mislabeled or duplicated into several bundles as an implicit placement rule. Their distribution SHALL require an explicitly reviewed policy.
+Non-Functions content MUST NOT fabricate another required Functions stack. Mixed-stack templates SHALL retain every Functions project declaration and constraint. Publishing MUST NOT infer one primary stack from a manifest language or implicitly duplicate a template into stack packages.
 
 #### Scenario: Python sample contains a web frontend
 
@@ -58,39 +52,38 @@ A homogeneous bundle member SHALL declare Functions projects matching the bundle
 #### Scenario: Template declares Python and Node Functions projects
 
 - **WHEN** validated project declarations require both stacks
-- **THEN** bundle validation retains both requirements and applies the reviewed mixed-stack placement policy
+- **THEN** package validation retains both requirements
 - **AND** does not infer Python-only placement from the manifest language label
 
-### Requirement: Completed aggregate validates every member
+### Requirement: Completed packages validate independent definitions
 
-The packager SHALL discover and dry-run every template from the completed bundle, compare identities with the recipe, and reject duplicate identities, ambiguous short names across distinct groups, missing members, invalid configuration actions, and unintended content effects. Independent samples SHALL use distinct groups. Shared group identity SHALL be accepted only for variants explicitly declared as one recipe member, and validation SHALL prove every independent member remains individually selectable. Only a fully validated aggregate SHALL enter public promotion. Its private source units MUST NOT be promoted as competing public packages.
+The packager SHALL discover and dry-run every template from the completed package and compare discovery with its reviewed assignment. It SHALL reject duplicate identities, ambiguous short names across distinct groups, missing definitions, invalid actions, and unintended content effects. Independent samples SHALL use distinct groups; shared groups require intentional variants of one named definition. Only a fully validated package SHALL enter staging/promotion.
 
-#### Scenario: Aggregate contains a duplicate template identity
+#### Scenario: Package contains a duplicate identity
 
 - **WHEN** two members advertise the same full identity
-- **THEN** aggregate validation fails before public staging or promotion
+- **THEN** package validation fails before staging or promotion
 
 #### Scenario: Independent samples reuse one template group
 
-- **WHEN** two independent recipe members advertise the same group identity
-- **THEN** aggregate validation fails rather than allow precedence to collapse one sample into another's variants
+- **WHEN** two independent definitions advertise the same group identity
+- **THEN** validation fails rather than allow precedence to collapse one sample into another's variants
 - **AND** authored grouping metadata is not rewritten to hide the conflict
 
-### Requirement: Aggregate provenance is immutable and complete
+### Requirement: Scope provenance and publication evidence are complete
 
-The public bundle version SHALL come from the approved recipe, not one member's tag. Its metadata SHALL identify the recipe revision and every template's source repository, release, resolved commit, content scope, license, and content digest. All member notices SHALL be retained and the combined package license SHALL be accurate. Metadata manifests SHALL remain outside scaffolded template roots. Feed checks SHALL reject changed provenance under an existing bundle ID/version, and promotion SHALL reuse the exact staged bytes.
+Package provenance SHALL retain the source release/version/commit and selected definition IDs, normalized scopes, content digests, and relevant license notices. Provenance metadata SHALL remain outside scaffolded roots. The approval record SHALL identify the exact published artifact and definitions so discovery can verify curated status under its own trust policy. Prefixes or self-declared tags MUST NOT count as sanction. Publishing SHALL NOT create the public discovery manifest or implement its trust transport.
 
-#### Scenario: Bundle version is reused with a changed source
+#### Scenario: Scope changes under an existing version
 
-- **WHEN** the same public ID/version resolves to different membership or source commits
-- **THEN** publication reports an immutable version conflict
-- **AND** does not replace the existing artifact
+- **WHEN** the same package ID/version selects different definitions or source content
+- **THEN** publication reports an immutable conflict and does not replace the artifact
 
-#### Scenario: Bundle combines approved source licenses
+#### Scenario: Discovery consumes published packages
 
-- **WHEN** members have different permitted source licenses
-- **THEN** the package retains their individual notices and uses the reviewed combined expression
-- **AND** does not assign one member's license to all content
+- **WHEN** approved packages are publicly available
+- **THEN** their publication evidence identifies exact artifacts and source scopes
+- **AND** the separate discovery component applies its feed/curation policy and publishes browsing metadata
 
 ### Requirement: The func-templates repository owns the packaging control plane
 
@@ -105,7 +98,7 @@ The system SHALL use the `func-templates` repository in the `internal` project o
 
 ### Requirement: Onboarding is PR-reviewed YAML
 
-Each file directly under `src/Quickstarts/` with the `.yaml` extension SHALL contain `schemaVersion: 1` and a `quickstarts` array containing zero or more onboarding entries. The scanner SHALL combine every matching file into one logical onboarding manifest. Filenames and the file containing an entry MUST NOT contribute to entry identity.
+Each file directly under `src/Quickstarts/` with the `.yaml` extension SHALL use a centrally supported schema version and contain a `quickstarts` array. Version 1 retains its original single-package semantics; scoped assignments SHALL require an explicitly supported extension. The scanner SHALL combine matching files without using filenames as identity.
 
 #### Scenario: Multiple onboarding files are combined
 
@@ -124,7 +117,7 @@ Each file directly under `src/Quickstarts/` with the `.yaml` extension SHALL con
 
 ### Requirement: The onboarding schema is strict
 
-Every onboarding file SHALL validate against `src/Schema/quickstart.schema.json`. The schema SHALL reject unknown properties and SHALL define required values, types, formats, allowed values, and defaults for schema version 1.
+Every onboarding file SHALL validate against its centrally owned supported schema. Unknown fields and unsupported versions SHALL be rejected. Extended assignments SHALL NOT reinterpret version 1 or move project topology into onboarding.
 
 #### Scenario: Unknown field is rejected
 
@@ -133,7 +126,7 @@ Every onboarding file SHALL validate against `src/Schema/quickstart.schema.json`
 
 #### Scenario: Unsupported schema version is rejected
 
-- **WHEN** an onboarding file declares a schema version other than `1`
+- **WHEN** an onboarding file declares a version not supported by the central schema
 - **THEN** PR validation fails
 
 ### Requirement: Each onboarding entry has stable package and release identity
@@ -167,11 +160,11 @@ Each entry SHALL require a stable `id`, an `Azure-Samples/<repository>` slug, a 
 
 ### Requirement: Onboarding identities are globally unique
 
-The system SHALL enforce case-insensitive uniqueness across all onboarding files for onboarding ID, repository slug, and package ID. Moving an unchanged entry between files MUST NOT change its effective values.
+Onboarding and package IDs SHALL be globally unique case-insensitively. Version 1 SHALL also enforce repository uniqueness. A supported scoped extension MAY reference one repository in several assignments only when their named template-definition ownership is disjoint. Moving entries between files MUST NOT change identity.
 
 #### Scenario: Duplicate value exists in another file
 
-- **WHEN** two entries resolve to the same globally unique value ignoring case
+- **WHEN** entries collide on ID/package identity, violate original-mode repository uniqueness, or assign one template definition to competing packages
 - **THEN** PR validation fails and identifies both entries
 
 ### Requirement: PR validation is atomic
@@ -403,7 +396,7 @@ For each synthesized definition, the pipeline SHALL generate template configurat
 
 ### Requirement: Package licensing is release-specific and allowlisted
 
-For each source unit, the pipeline SHALL determine licensing from the exact release commit. It SHALL first use an explicit reviewed `licenseExpression` when present, otherwise use the GitHub repository-license API at the release commit, and otherwise inspect the source root license file. Only source expressions `MIT` and `Apache-2.0` SHALL be accepted, and an override SHALL NOT remove the file requirement. Aggregate metadata SHALL instead use the reviewed accurate combined expression for its allowed member licenses and preserve all notices.
+For each package, licensing SHALL come from the exact source release through reviewed override, release-specific repository detection, or source-root license inspection. Only SPDX `MIT` or `Apache-2.0` SHALL be accepted, and an override SHALL NOT remove the file requirement. Selected subfolder scopes SHALL retain relevant source-root notices. Cross-repository aggregate license policy is outside this scope.
 
 #### Scenario: GitHub detects an allowed license
 
@@ -419,16 +412,16 @@ For each source unit, the pipeline SHALL determine licensing from the exact rele
 
 #### Scenario: License is unsupported
 
-- **WHEN** a source unit's effective license is not MIT or Apache-2.0
+- **WHEN** the source release license is not MIT or Apache-2.0
 - **THEN** package construction fails
 
 ### Requirement: NuGet packages have func template identity and provenance
 
-Each private source-unit package SHALL use its explicit onboarding package ID, release-derived version, `FuncTemplate` package type, effective source description/license, canonical source repository URL and resolved commit, and release URL. Its license SHALL remain with the relevant content. Each public aggregate SHALL instead use its approved recipe package ID and independent bundle version, with recipe repository metadata and complete per-template provenance and notices as required above. Both kinds SHALL exclude private pipeline identifiers.
+Each package SHALL use the reviewed assignment's `packageId`, not its internal operational `id`, along with the source-release-derived version, `FuncTemplate` type, effective description/license, canonical source repository/commit, and release URL. It SHALL include selected-definition provenance and notices and exclude private pipeline identifiers.
 
 #### Scenario: Package metadata is inspected
 
-- **WHEN** a private source-unit package is opened
+- **WHEN** a published package is opened
 - **THEN** its ID, version, package type, description, license, project URL, repository URL, commit, and release-notes link match the resolved release
 
 #### Scenario: Pipeline implementation metadata is inspected
@@ -452,44 +445,42 @@ Before publication, the pipeline SHALL inspect the completed `.nupkg`, load and 
 
 ### Requirement: Azure Artifacts staging is the publication checkpoint
 
-Every validated private source unit SHALL be checkpointed in its internal staging feed and SHALL be complete there when provenance matches. Every validated public aggregate SHALL first be published to staging, and its staging feed and NuGet.org SHALL be queried by bundle ID/version and full provenance to determine public publication state. Private source units MUST NOT be queued for promotion because they are absent from NuGet.org. Pipeline-run artifacts SHALL NOT be the durable checkpoint for either kind.
+Every validated template package SHALL first enter Azure Artifacts staging. Staging and NuGet.org SHALL be queried by package ID/version and selected-definition provenance to determine publication state. Run-retained artifacts SHALL NOT be the durable checkpoint.
 
 #### Scenario: Version is absent from both feeds
 
-- **WHEN** an eligible public aggregate version exists in neither public publication feed
+- **WHEN** a validated package version exists in neither publication feed
 - **THEN** the pipeline builds, validates, and publishes it to staging
 
 #### Scenario: Version exists only in staging
 
-- **WHEN** the expected public aggregate version exists in staging but not NuGet.org
+- **WHEN** the expected package version exists in staging but not NuGet.org
 - **THEN** the pipeline reuses the staged package for promotion without rebuilding it
 
 #### Scenario: Version exists in both feeds
 
-- **WHEN** the expected public aggregate version exists in both feeds with matching provenance
+- **WHEN** the expected package version exists in both feeds with matching provenance
 - **THEN** the release is complete and skipped
 
 ### Requirement: One approval promotes the successful run set
 
-After public aggregate candidates have been processed through staging, the pipeline SHALL request one approval for the successfully staged public bundles. Private source units SHALL be excluded from this approval set. Approval SHALL promote the exact staged bundle files without rebuilding them. Failed required source inputs SHALL block their dependent bundle, while unrelated completed bundles MAY still be approved and promoted.
+The pipeline SHALL request one approval for successfully staged packages and their complete selected definitions. Approval SHALL promote the exact staged bytes without rebuilding. An invalid selected definition blocks its package; unrelated fully validated packages MAY be approved and promoted.
 
 #### Scenario: Run has multiple successful packages
 
-- **WHEN** several completed public aggregates reach staging in one run
-- **THEN** one approval authorizes promotion of those public aggregates only
-- **AND** private source inputs are not included
+- **WHEN** several fully validated packages reach staging
+- **THEN** one approval authorizes their exact complete artifacts
 
 #### Scenario: Run has partial failure
 
-- **WHEN** some bundle candidates fail and other public aggregates reach staging
-- **THEN** the approval includes only the successfully staged public aggregates
+- **WHEN** some package candidates fail and other complete packages reach staging
+- **THEN** approval includes only those fully validated packages
 - **AND** failures are reported separately
 
-#### Scenario: Private inputs stage but their dependent bundle fails
+#### Scenario: One selected scope fails validation
 
-- **WHEN** source units reach private staging but their aggregate fails validation
-- **THEN** none of those units enter a public approval set
-- **AND** public recovery waits for a completed validated aggregate
+- **WHEN** a package has one valid definition and another invalid selected definition
+- **THEN** that package is not staged or approved with only the valid definition
 
 #### Scenario: Approval is withheld
 
@@ -508,7 +499,7 @@ The pipeline SHALL retry transient GitHub, network, and feed failures with bound
 
 #### Scenario: Previous promotion was interrupted
 
-- **WHEN** a public aggregate is present in staging but absent from NuGet.org
+- **WHEN** a validated package is present in staging but absent from NuGet.org
 - **THEN** a later run can promote the staged artifact
 
 #### Scenario: Publication run overlaps
@@ -518,13 +509,13 @@ The pipeline SHALL retry transient GitHub, network, and feed failures with bound
 
 ### Requirement: Operators can target manual recovery
 
-The pipeline SHALL support explicit manual recovery targets for source onboarding ID/release version and for public bundle ID/recipe version. Source recovery SHALL stop at private staging; bundle recovery SHALL use normal assembly, validation, staging, approval, and immutable promotion. Neither SHALL provide a force-overwrite mode.
+The pipeline SHALL support manual recovery by onboarding/package ID and optional source-release version, preserving the reviewed definition selection. It SHALL reuse normal validation, staging, approval, and immutable promotion without force overwrite.
 
 #### Scenario: Operator targets one entry
 
-- **WHEN** an operator starts a source recovery run for one onboarding ID
+- **WHEN** an operator starts a recovery run for one onboarding/package ID
 - **THEN** unrelated entries are not processed
-- **AND** source staging does not authorize public bundle promotion
+- **AND** promotion still requires the normal approval gate
 
 #### Scenario: Operator requests an existing conflicting version
 

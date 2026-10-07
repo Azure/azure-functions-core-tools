@@ -2,7 +2,7 @@
 
 Azure-Samples quickstart repositories are independently released source repositories, but the Azure Functions CLI template system consumes versioned `FuncTemplate` NuGet packages. A centrally managed supply pipeline is needed to onboard eligible repositories, detect new releases, convert immutable release snapshots into safe template packages, and publish those packages without requiring each sample repository to own packaging infrastructure.
 
-The draft bundle extension preserves default curated availability through a stable package per stack. It separates private source-release validation inputs from public aggregate packages and extends the original single-template source scope so independent subfolder samples remain separate choices.
+The source-scope extension preserves independent subfolder samples without mandatory per-stack aggregation. Discovery metadata and explicitly authorized guided use provide the streamlined selection/acquisition flow.
 
 ## What Changes
 
@@ -16,11 +16,11 @@ The draft bundle extension preserves default curated availability through a stab
 - Read the synthesis descriptor before excluding `.git`, `.github`, generated build output, credentials, and unsafe links from package content.
 - Require an MIT or Apache-2.0 license detected from the release commit or declared through a reviewed override.
 - Create NuGet packages under the `Azure.Functions.Templates.` prefix with package type `FuncTemplate`, source repository metadata, commit provenance, and a release-notes link to the GitHub release.
-- Checkpoint source units privately, stage validated public aggregates, request one approval for the successful public bundles, and promote only those exact artifacts to NuGet.org.
-- Process source releases and unrelated bundles independently, retry transient failures, and recover from their separate feed states without promoting private inputs or silently omitting a required member.
-- Propose reviewed per-stack bundle recipes with independent versions, exact source/member pins, and per-template provenance and license notices.
+- Stage validated packages, request one approval for successful candidates, and promote their exact artifacts without rebuilding.
+- Process independent package candidates, retry transient failures, and recover from feed state without silently omitting a selected definition.
 - Extend source-owned definitions through a versioned schema to support multiple independently selectable scopes, while retaining authored/synthesized ownership and the no-source-code-execution rule.
-- Validate every member from the final aggregate package and block a bundle with an invalid required member rather than silently omit it.
+- Validate every selected definition from the completed package, retaining independent groups, source-scope provenance, and notices.
+- Supply verified publication evidence to the separate discovery component rather than treating package labels as curation proof.
 
 ## Capabilities
 
@@ -39,4 +39,4 @@ None.
 - Produces packages compatible with the `FuncTemplate` ownership contract from `template-package-install`.
 - Depends on `template-engine-constraints` for the workload constraint form and on `template-engine-post-actions` for the trusted configuration finalization action.
 - Does not change Azure Functions CLI commands, package installation behavior, quickstart catalogs, or template discovery manifests.
-- Leaves mixed-stack bundle placement, recipe/descriptor shape, standalone-package migration, and combined-license policy as explicit publishing review questions.
+- Leaves versioned descriptor/assignment shape, package grouping, allowlist coverage, publication evidence, and identity migration as review questions.
