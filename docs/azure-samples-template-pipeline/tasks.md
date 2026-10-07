@@ -44,15 +44,15 @@
 ## 6. License Resolution
 
 - [ ] 6.1 Implement license resolution from reviewed YAML override, GitHub repository-license API at the release commit, and root release license-file inspection.
-- [ ] 6.2 Allow only SPDX `MIT` and `Apache-2.0`, and require a root license file even when an override is supplied.
+- [ ] 6.2 Allow only SPDX `MIT` and `Apache-2.0` for source units, require source root license files, and separately validate reviewed aggregate expressions and retained member notices.
 - [ ] 6.3 Preserve the root license file as template content and project the effective expression into package metadata.
 - [ ] 6.4 Add tests for both allowed licenses, GitHub detection, file fallback, valid override, missing file, unknown detection, and unsupported expressions.
 
 ## 7. Template Configuration
 
-- [ ] 7.1 Detect only root `.template.config/template.json` and `.github/azure-functions-template.yaml` as template sources.
-- [ ] 7.2 Reject releases containing both recognized sources or neither source, without allowing onboarding to select a mode or alternate path.
-- [ ] 7.3 Author the strict centrally owned schema for `.github/azure-functions-template.yaml`, requiring schema version, identity, short name, name, description, and non-empty projects.
+- [ ] 7.1 Detect the original single-root sources and explicitly versioned source descriptors that select scoped definitions.
+- [ ] 7.2 Reject conflicting ownership per definition, preserving the original root-mode coexistence rule without rejecting descriptors that reference authored subfolder definitions.
+- [ ] 7.3 Author strict versioned descriptor schemas covering the original template metadata and the extended list of independently owned content scopes.
 - [ ] 7.4 Preserve authored configuration byte-for-byte and validate TemplateEngine loading, dry-run, identity, short names, project type, workload constraints covering every action stack, required configuration finalization actions, resolved primary outputs, and safety policy.
 - [ ] 7.5 Parse the synthesis descriptor before filtering `.github`, then validate each project root for normalized relative syntax, case-insensitive uniqueness, non-overlap, excluded paths, and a regular direct-child `host.json`.
 - [ ] 7.6 Validate canonical stack and language compatibility for every synthesized project.
@@ -63,9 +63,9 @@
 
 ## 8. NuGet Package Construction and Validation
 
-- [ ] 8.1 Generate package metadata for explicit ID, release-derived version, `FuncTemplate` package type, description, license, project URL, Git repository URL, commit SHA, and GitHub release-notes link.
+- [ ] 8.1 Generate source-unit metadata from the source release and public aggregate metadata from the recipe version and complete member provenance.
 - [ ] 8.2 Pack the filtered source and effective template configuration without adding Azure Pipeline definition or run metadata.
-- [ ] 8.3 Inspect the completed `.nupkg` and verify package identity, version, type, metadata, source commit, release URL, content, and exclusions.
+- [ ] 8.3 Inspect each completed source-unit or aggregate package against its applicable identity, version, type, metadata, provenance, content, and exclusion rules.
 - [ ] 8.4 Load and dry-run templates from the completed package through Microsoft.TemplateEngine and require valid project type, configuration finalization actions, and resolved primary outputs.
 - [ ] 8.5 Produce deterministic package hashes for staging and promotion verification.
 - [ ] 8.6 Add package-level tests for authored and synthesized single- and multi-project templates, configuration actions, dry-run effects, metadata provenance, license inclusion, exclusions, invalid archives, and TemplateEngine discovery.
@@ -73,15 +73,15 @@
 ## 9. Feed State and Staging
 
 - [ ] 9.1 Implement exact package ID/version lookup and package download for the Azure Artifacts staging feed and NuGet.org.
-- [ ] 9.2 Verify repository commit provenance for every package found in either feed and report immutable version conflicts.
-- [ ] 9.3 Model absent, staging-only, and complete feed states without a separate processing ledger.
+- [ ] 9.2 Verify source commit provenance for private units and recipe/member provenance for public aggregates, reporting immutable conflicts for either kind.
+- [ ] 9.3 Treat validated private staging as source-unit completion and model separate absent, staging-only, and complete public bundle states.
 - [ ] 9.4 Publish newly validated packages to staging and treat the staged artifact as the durable promotion source.
 - [ ] 9.5 Prevent concurrent feed mutation by scheduled and manual publication runs.
 - [ ] 9.6 Add tests for all feed states, conflicting commits, idempotent reruns, concurrent runs, and interrupted staging.
 
 ## 10. Approval and NuGet.org Promotion
 
-- [ ] 10.1 Build one run summary containing every successfully staged package and all separately failed releases.
+- [ ] 10.1 Build a public approval summary containing only successfully staged aggregate bundles, with private source and dependent-bundle failures reported separately.
 - [ ] 10.2 Configure one approval-gated environment for promoting the complete successful run set.
 - [ ] 10.3 Download each exact staged package after approval and revalidate identity, provenance, safety, and hash without rebuilding.
 - [ ] 10.4 Push unchanged approved packages to NuGet.org and verify resulting feed provenance.
@@ -91,7 +91,7 @@
 ## 11. Scheduled and Manual Publication Operations
 
 - [ ] 11.1 Create `eng/ci/publish-releases.yaml` with daily discovery, independent candidate processing, staging, summary, approval, promotion, and final outcome stages.
-- [ ] 11.2 Add manual onboarding-ID and optional version filters that reuse the complete scheduled pipeline path.
+- [ ] 11.2 Add explicit source-ID/release and bundle-ID/recipe-version recovery targets, keeping source recovery private and bundle promotion approval-gated.
 - [ ] 11.3 Apply bounded exponential backoff to transient GitHub, network, staging-feed, and NuGet.org operations.
 - [ ] 11.4 Continue independent candidates after item failures, fail the final run when unresolved failures remain, and report discovered, staged, promoted, complete, skipped, and failed counts.
 - [ ] 11.5 Notify the central `func-templates` operations team after retries are exhausted and redact credentials and tokens from logs and summaries.
@@ -103,5 +103,18 @@
 - [ ] 12.2 Document publication states, the shared approval gate, manual recovery, immutable conflicts, and central operational ownership.
 - [ ] 12.3 Provision GitHub read access, Azure Artifacts staging, NuGet.org prefix ownership and credentials, concurrency controls, approval environment, and notifications with least privilege.
 - [ ] 12.4 Run a no-publication canary against representative authored and synthesized repositories and inspect the resulting packages.
-- [ ] 12.5 Stage representative packages and verify installation through the Azure Functions CLI `FuncTemplate` package path.
-- [ ] 12.6 Approve and promote the exact canary artifacts, verify NuGet.org metadata and installation, then enable the daily schedule.
+- [ ] 12.5 Stage representative public aggregates and verify installation through the Azure Functions CLI `FuncTemplate` path, retaining source units only in private staging.
+- [ ] 12.6 Approve and promote only the exact public canary aggregates, verify their NuGet.org metadata and installation, then enable the daily schedule.
+
+## 13. Curated Stack Bundle Extension
+
+- [ ] 13.1 Agree basic/curated bundle grouping, public IDs, source-unit visibility, existing standalone identity migration, and package size budgets.
+- [ ] 13.2 Design versioned source-scope and bundle-recipe schemas, preserving source-owned topology and exact member release pins.
+- [ ] 13.3 Map the supported manifest inventory to independent template identities and source scopes, including connector subfolders and required source metadata/releases.
+- [ ] 13.4 Stage and validate every source scope without executing source-controlled code, retaining root license notices for scoped content.
+- [ ] 13.5 Assemble isolated template roots from multiple approved repositories and compare final discovery with the approved recipe.
+- [ ] 13.6 Reject duplicate identities, independent samples sharing a group, ambiguous short names, invalid members, unintended output scopes, and silently reduced bundles.
+- [ ] 13.7 Record per-template provenance, recipe revision, content digests, and legally reviewed combined license expressions outside template content.
+- [ ] 13.8 Apply aggregate-version conflict checks, private source-unit handling, approval, and exact staged-byte promotion consistently across the original single-source requirements.
+- [ ] 13.9 Agree mixed-stack distribution without duplicate identities, preserving all configuration actions and workload constraints.
+- [ ] 13.10 Test multiple source repositories, independent subfolder samples, failed required members, recipe changes, license combinations, moved tags, and interrupted aggregate promotion.

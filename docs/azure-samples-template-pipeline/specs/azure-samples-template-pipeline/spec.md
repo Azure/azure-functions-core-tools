@@ -2,7 +2,95 @@
 
 Defines how Azure-Samples quickstart releases are onboarded, converted into safe `FuncTemplate` NuGet packages, staged, approved, and published to NuGet.org.
 
+The proposed curated bundle mode retains single-release validation as a private source-unit boundary. Public package promotion applies to assembled bundles; source units used by bundles are not independently promoted. Single-source tag/version metadata describes the input, while an aggregate's public version and provenance follow the additional bundle requirements below. Versioned source-scope schema changes must be explicit rather than silently accepted under the original schema.
+
 ## ADDED Requirements
+
+### Requirement: Curated bundles contain independently selectable templates
+
+Curated publication SHALL assemble a stable per-stack `FuncTemplate` bundle from approved source definitions. Basic project/item packages SHALL remain separate. A bundle SHALL contain separate selectable template identities for independent samples, including different subfolders of one repository. It MUST NOT turn those alternatives into one template generating all samples.
+
+#### Scenario: Python connectors source contains two samples
+
+- **WHEN** Office 365 and SharePoint definitions select different folders of the same approved release
+- **THEN** the aggregate exposes two independently selectable project templates
+- **AND** each creates only its intended content scope
+
+### Requirement: Multiple source scopes have explicit versioned ownership
+
+The extended source descriptor SHALL use an explicitly versioned schema to define template identities, normalized content roots, and exactly one authored or synthesized configuration per definition. Central onboarding MUST NOT supply project topology. Scope validation SHALL reject traversal, escaping links, excluded content, unsafe project roots, and ambiguous ownership. Authored configuration MUST NOT be patched by aggregation.
+
+#### Scenario: Unsupported descriptor fields use the old version
+
+- **WHEN** a source declares multiple template scopes using a schema version that does not define them
+- **THEN** source validation fails rather than reinterpret the original descriptor
+
+#### Scenario: A scope escapes the release snapshot
+
+- **WHEN** a declared template content root or linked content escapes the acquired source boundary
+- **THEN** source validation fails before assembly
+
+### Requirement: Reviewed recipes pin aggregate membership
+
+A bundle recipe SHALL declare a stable public package ID, canonical stack, independent bundle version, and exact approved source releases and template identities. Changed membership or source revisions SHALL require a new bundle version. An unavailable or invalid required member MUST NOT be silently omitted. Unrelated bundle candidates MAY continue independently.
+
+#### Scenario: New quickstart is added to Python
+
+- **WHEN** a reviewed recipe adds a validated Python quickstart
+- **THEN** publication produces a new version of the existing Python curated package
+- **AND** the addition does not require a new public package ID for that quickstart
+
+#### Scenario: Required source release cannot be acquired
+
+- **WHEN** a pinned required member cannot be acquired or validated
+- **THEN** that bundle candidate fails without publishing a reduced member set
+- **AND** unrelated valid bundle candidates can continue
+
+### Requirement: Bundle classification follows Functions project topology
+
+A homogeneous bundle member SHALL declare Functions projects matching the bundle's canonical stack. Non-Functions content MUST NOT fabricate another required Functions stack. Mixed-stack templates SHALL retain all project declarations and constraints and MUST NOT be mislabeled or duplicated into several bundles as an implicit placement rule. Their distribution SHALL require an explicitly reviewed policy.
+
+#### Scenario: Python sample contains a web frontend
+
+- **WHEN** a sample declares only Python Functions projects and also includes a JavaScript web frontend
+- **THEN** the opaque frontend does not by itself make the sample a mixed Functions-stack member
+
+#### Scenario: Template declares Python and Node Functions projects
+
+- **WHEN** validated project declarations require both stacks
+- **THEN** bundle validation retains both requirements and applies the reviewed mixed-stack placement policy
+- **AND** does not infer Python-only placement from the manifest language label
+
+### Requirement: Completed aggregate validates every member
+
+The packager SHALL discover and dry-run every template from the completed bundle, compare identities with the recipe, and reject duplicate identities, ambiguous short names across distinct groups, missing members, invalid configuration actions, and unintended content effects. Independent samples SHALL use distinct groups. Shared group identity SHALL be accepted only for variants explicitly declared as one recipe member, and validation SHALL prove every independent member remains individually selectable. Only a fully validated aggregate SHALL enter public promotion. Its private source units MUST NOT be promoted as competing public packages.
+
+#### Scenario: Aggregate contains a duplicate template identity
+
+- **WHEN** two members advertise the same full identity
+- **THEN** aggregate validation fails before public staging or promotion
+
+#### Scenario: Independent samples reuse one template group
+
+- **WHEN** two independent recipe members advertise the same group identity
+- **THEN** aggregate validation fails rather than allow precedence to collapse one sample into another's variants
+- **AND** authored grouping metadata is not rewritten to hide the conflict
+
+### Requirement: Aggregate provenance is immutable and complete
+
+The public bundle version SHALL come from the approved recipe, not one member's tag. Its metadata SHALL identify the recipe revision and every template's source repository, release, resolved commit, content scope, license, and content digest. All member notices SHALL be retained and the combined package license SHALL be accurate. Metadata manifests SHALL remain outside scaffolded template roots. Feed checks SHALL reject changed provenance under an existing bundle ID/version, and promotion SHALL reuse the exact staged bytes.
+
+#### Scenario: Bundle version is reused with a changed source
+
+- **WHEN** the same public ID/version resolves to different membership or source commits
+- **THEN** publication reports an immutable version conflict
+- **AND** does not replace the existing artifact
+
+#### Scenario: Bundle combines approved source licenses
+
+- **WHEN** members have different permitted source licenses
+- **THEN** the package retains their individual notices and uses the reviewed combined expression
+- **AND** does not assign one member's license to all content
 
 ### Requirement: The func-templates repository owns the packaging control plane
 
@@ -194,11 +282,11 @@ The packaging process SHALL NOT execute build scripts, package-manager scripts, 
 
 ### Requirement: Authored and synthesized template ownership is exclusive
 
-For each release snapshot, the pipeline SHALL accept exactly one template source: root `.template.config/template.json` or `.github/azure-functions-template.yaml`. The pipeline SHALL fail package generation when both sources are present or both sources are absent. Onboarding MUST NOT select the mode or point to another path.
+In the original single-definition mode, the pipeline SHALL accept exactly one template source: root `.template.config/template.json` or `.github/azure-functions-template.yaml`. It SHALL reject both-present and both-absent snapshots in that mode. In the explicitly versioned multi-definition mode, the source descriptor SHALL select independently scoped authored or synthesized definitions, and each definition SHALL have exactly one owner. A descriptor MAY reference authored subfolder configurations but MUST NOT synthesize or override those same definitions. Onboarding MUST NOT select project topology or arbitrary configuration paths.
 
 #### Scenario: Authored configuration and synthesis descriptor are present
 
-- **WHEN** the release snapshot contains root `.template.config/template.json`
+- **WHEN** a single-definition release snapshot contains root `.template.config/template.json`
 - **AND** the release snapshot contains `.github/azure-functions-template.yaml`
 - **THEN** package generation fails with a redundant template ownership diagnostic
 
@@ -215,7 +303,7 @@ For each release snapshot, the pipeline SHALL accept exactly one template source
 
 ### Requirement: Authored template configuration is preserved and dry-run
 
-When the release snapshot contains root `.template.config/template.json` and no synthesis descriptor, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, workload constraints in the form defined by `template-engine-constraints` that require every stack its configuration actions declare, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
+For an authored definition, whether selected by the original root convention or the explicitly versioned multi-definition descriptor, the pipeline SHALL preserve the authored file byte-for-byte. It SHALL load and dry-run the template through Microsoft.TemplateEngine and require valid identity and short-name metadata, project template type, workload constraints in the form defined by `template-engine-constraints` that require every stack its configuration actions declare, at least one trusted Functions project configuration finalization action, valid resolved primary-output references, canonical stack and language values, no direct `.func/config.json` content effect, and no behavior rejected by the central safety policy. Invalid authored configuration SHALL fail package construction rather than being rewritten.
 
 #### Scenario: Valid authored template exists
 
@@ -244,7 +332,7 @@ When the release snapshot contains root `.template.config/template.json` and no 
 
 ### Requirement: Synthesized project declarations are safe and complete
 
-The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion: 1`, reject unknown properties, and require non-empty `identity`, `shortName`, `name`, `description`, and `projects`. Each project SHALL require `root`, `stack`, and `language`. `root` SHALL be `.` or a normalized `/`-separated repository-relative path. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots. The declared stack and language SHALL be canonical and compatible. The filtered release snapshot SHALL contain a regular `host.json` directly under each declared root.
+The original `.github/azure-functions-template.yaml` single-definition descriptor SHALL use `schemaVersion: 1`, reject unknown properties, and require non-empty `identity`, `shortName`, `name`, `description`, and `projects`. Extended definitions SHALL use an explicitly versioned strict schema rather than accept new fields under version 1. Each synthesized definition SHALL require the same metadata and non-empty project declarations. Each project SHALL require `root`, `stack`, and `language`. `root` SHALL be `.` or a normalized `/`-separated path relative to the validated template content scope. Project roots MUST NOT be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap as ancestor and descendant roots within the definition. The declared stack and language SHALL be canonical and compatible. Each scope SHALL contain a regular `host.json` directly under every declared root.
 
 #### Scenario: Descriptor metadata is incomplete
 
@@ -278,13 +366,19 @@ The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion:
 
 ### Requirement: Source descriptor is synthesized into template configuration
 
-When the release snapshot contains `.github/azure-functions-template.yaml` and does not contain root `.template.config/template.json`, the pipeline SHALL synthesize template configuration in staging using the descriptor's identity, short name, name, description, and projects. The synthesized template SHALL have project type and SHALL treat the complete filtered release snapshot as template content. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying the declared canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add the workload constraint defined by `template-engine-constraints`, derived from the declared project stacks.
+For each synthesized definition, the pipeline SHALL generate template configuration using that definition's identity, short name, name, description, and projects. The template SHALL have project type and SHALL use only its validated filtered content scope. The original single-root mode uses the complete filtered snapshot; an extended scoped definition MUST NOT copy unrelated sample folders. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and carrying canonical stack and language. It SHALL define no parameter symbols, replacements, or ordinary post-actions. It SHALL add workload constraints derived from every declared project stack.
 
 #### Scenario: Repository has no template configuration
 
-- **WHEN** the release snapshot lacks root `.template.config/template.json`
-- **AND** the release snapshot contains a valid `.github/azure-functions-template.yaml`
+- **WHEN** the original single-definition snapshot lacks root `.template.config/template.json`
+- **AND** it contains a valid single-definition synthesis descriptor
 - **THEN** the pipeline adds a minimal synthesized project template to staging
+
+#### Scenario: Extended descriptor selects authored subfolder definitions
+
+- **WHEN** a versioned descriptor selects authored configurations from subfolders
+- **THEN** those definitions remain authored and pass authored validation
+- **AND** absence of a root configuration does not trigger synthesis for them
 
 #### Scenario: Synthesized template is validated
 
@@ -309,7 +403,7 @@ When the release snapshot contains `.github/azure-functions-template.yaml` and d
 
 ### Requirement: Package licensing is release-specific and allowlisted
 
-The pipeline SHALL determine licensing from the exact release commit. It SHALL first use an explicit reviewed `licenseExpression` when present, otherwise use the GitHub repository-license API at the release commit, and otherwise inspect a root license file from the staged snapshot. Only SPDX expressions `MIT` and `Apache-2.0` SHALL be accepted. An explicit override SHALL NOT remove the requirement for a root license file.
+For each source unit, the pipeline SHALL determine licensing from the exact release commit. It SHALL first use an explicit reviewed `licenseExpression` when present, otherwise use the GitHub repository-license API at the release commit, and otherwise inspect the source root license file. Only source expressions `MIT` and `Apache-2.0` SHALL be accepted, and an override SHALL NOT remove the file requirement. Aggregate metadata SHALL instead use the reviewed accurate combined expression for its allowed member licenses and preserve all notices.
 
 #### Scenario: GitHub detects an allowed license
 
@@ -325,16 +419,16 @@ The pipeline SHALL determine licensing from the exact release commit. It SHALL f
 
 #### Scenario: License is unsupported
 
-- **WHEN** the effective license is not MIT or Apache-2.0
+- **WHEN** a source unit's effective license is not MIT or Apache-2.0
 - **THEN** package construction fails
 
 ### Requirement: NuGet packages have func template identity and provenance
 
-Each generated package SHALL use the explicit package ID, the release-derived package version, and package type `FuncTemplate`. NuGet metadata SHALL include the effective description and license, a project URL for the GitHub repository, repository type `git`, the canonical repository URL, the resolved commit SHA, and a release-notes link to the corresponding GitHub release. The root license file SHALL remain in template content.
+Each private source-unit package SHALL use its explicit onboarding package ID, release-derived version, `FuncTemplate` package type, effective source description/license, canonical source repository URL and resolved commit, and release URL. Its license SHALL remain with the relevant content. Each public aggregate SHALL instead use its approved recipe package ID and independent bundle version, with recipe repository metadata and complete per-template provenance and notices as required above. Both kinds SHALL exclude private pipeline identifiers.
 
 #### Scenario: Package metadata is inspected
 
-- **WHEN** a generated package is opened
+- **WHEN** a private source-unit package is opened
 - **THEN** its ID, version, package type, description, license, project URL, repository URL, commit, and release-notes link match the resolved release
 
 #### Scenario: Pipeline implementation metadata is inspected
@@ -358,37 +452,44 @@ Before publication, the pipeline SHALL inspect the completed `.nupkg`, load and 
 
 ### Requirement: Azure Artifacts staging is the publication checkpoint
 
-Every validated package SHALL first be published to the Azure Artifacts staging feed. The staging feed and NuGet.org SHALL be queried by package ID and version to determine publication state. Pipeline-run artifacts SHALL NOT be the durable publication record.
+Every validated private source unit SHALL be checkpointed in its internal staging feed and SHALL be complete there when provenance matches. Every validated public aggregate SHALL first be published to staging, and its staging feed and NuGet.org SHALL be queried by bundle ID/version and full provenance to determine public publication state. Private source units MUST NOT be queued for promotion because they are absent from NuGet.org. Pipeline-run artifacts SHALL NOT be the durable checkpoint for either kind.
 
 #### Scenario: Version is absent from both feeds
 
-- **WHEN** an eligible package version exists in neither feed
+- **WHEN** an eligible public aggregate version exists in neither public publication feed
 - **THEN** the pipeline builds, validates, and publishes it to staging
 
 #### Scenario: Version exists only in staging
 
-- **WHEN** the expected package version exists in staging but not NuGet.org
+- **WHEN** the expected public aggregate version exists in staging but not NuGet.org
 - **THEN** the pipeline reuses the staged package for promotion without rebuilding it
 
 #### Scenario: Version exists in both feeds
 
-- **WHEN** the expected package version exists in both feeds with matching provenance
+- **WHEN** the expected public aggregate version exists in both feeds with matching provenance
 - **THEN** the release is complete and skipped
 
 ### Requirement: One approval promotes the successful run set
 
-After all release candidates in a scheduled or manual run have been processed through staging, the pipeline SHALL present one summary and request one approval for all successfully staged packages in that run. Approval SHALL promote the exact staged `.nupkg` files to NuGet.org without rebuilding them. Releases that failed before staging SHALL be reported separately and SHALL NOT block approval or promotion of successful packages.
+After public aggregate candidates have been processed through staging, the pipeline SHALL request one approval for the successfully staged public bundles. Private source units SHALL be excluded from this approval set. Approval SHALL promote the exact staged bundle files without rebuilding them. Failed required source inputs SHALL block their dependent bundle, while unrelated completed bundles MAY still be approved and promoted.
 
 #### Scenario: Run has multiple successful packages
 
-- **WHEN** several packages reach staging in one run
-- **THEN** one approval authorizes promotion of the complete successful set
+- **WHEN** several completed public aggregates reach staging in one run
+- **THEN** one approval authorizes promotion of those public aggregates only
+- **AND** private source inputs are not included
 
 #### Scenario: Run has partial failure
 
-- **WHEN** some releases fail and others reach staging
-- **THEN** the approval includes the successfully staged packages
+- **WHEN** some bundle candidates fail and other public aggregates reach staging
+- **THEN** the approval includes only the successfully staged public aggregates
 - **AND** failures are reported separately
+
+#### Scenario: Private inputs stage but their dependent bundle fails
+
+- **WHEN** source units reach private staging but their aggregate fails validation
+- **THEN** none of those units enter a public approval set
+- **AND** public recovery waits for a completed validated aggregate
 
 #### Scenario: Approval is withheld
 
@@ -407,7 +508,7 @@ The pipeline SHALL retry transient GitHub, network, and feed failures with bound
 
 #### Scenario: Previous promotion was interrupted
 
-- **WHEN** a package is present in staging but absent from NuGet.org
+- **WHEN** a public aggregate is present in staging but absent from NuGet.org
 - **THEN** a later run can promote the staged artifact
 
 #### Scenario: Publication run overlaps
@@ -417,12 +518,13 @@ The pipeline SHALL retry transient GitHub, network, and feed failures with bound
 
 ### Requirement: Operators can target manual recovery
 
-The publication pipeline SHALL support a manual run filtered by onboarding ID and optional package version. Manual execution SHALL use the same discovery, validation, staging, approval, and immutable publication behavior as scheduled execution and SHALL NOT provide a force-overwrite mode.
+The pipeline SHALL support explicit manual recovery targets for source onboarding ID/release version and for public bundle ID/recipe version. Source recovery SHALL stop at private staging; bundle recovery SHALL use normal assembly, validation, staging, approval, and immutable promotion. Neither SHALL provide a force-overwrite mode.
 
 #### Scenario: Operator targets one entry
 
-- **WHEN** an operator starts a manual run for one onboarding ID
+- **WHEN** an operator starts a source recovery run for one onboarding ID
 - **THEN** unrelated entries are not processed
+- **AND** source staging does not authorize public bundle promotion
 
 #### Scenario: Operator requests an existing conflicting version
 
