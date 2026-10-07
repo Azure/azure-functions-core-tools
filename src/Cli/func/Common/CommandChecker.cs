@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
@@ -32,7 +32,8 @@ namespace Azure.Functions.Cli.Common
             }
             else
             {
-                return CheckExitCode("/bin/bash", $"-c \"command -v {command}\"");
+                var shell = File.Exists("/bin/sh") ? "/bin/sh" : "sh";
+                return CheckExitCode(shell, $"-c \"command -v {command}\"");
             }
         }
 
