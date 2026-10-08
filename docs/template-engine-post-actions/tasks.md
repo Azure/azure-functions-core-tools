@@ -9,7 +9,7 @@
 - [ ] 2.1 Validate raw action schemas before engine coercion, rejecting duplicate properties, non-string configuration arguments, and configuration actions in item templates. Project active declarations after final parameters and reject invalid arguments, unsupported actions, absent/ambiguous outputs, unsafe roots, stack/language conflicts, and direct configuration effects before mutation.
 - [ ] 2.2 Implement write-time path/link validation and atomic canonical stack/language persistence through injectable filesystem boundaries.
 - [ ] 2.3 Run mandatory actions before ordinary ones; stop/report partial completion without destructive rollback.
-- [ ] 2.4 Test multi-project/conditional/renamed outputs, raw-index identity, filtered-list traps, overlaps, links, force, partial writes, and cancellation.
+- [ ] 2.4 Test multi-project/conditional/renamed outputs, raw-index identity, filtered-list traps, active project with inactive action, both-inactive controls, mutually exclusive declarations and duplicate active finalization, overlaps, links, force, partial writes, and cancellation.
 
 ## 3. Ordinary Actions and Preview
 

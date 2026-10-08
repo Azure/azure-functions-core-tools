@@ -1,11 +1,11 @@
 ## Purpose
 
-Defines trusted Functions project finalization and supported ordinary post-actions without arbitrary template-controlled process execution.
+Defines trusted Functions project finalization and supported ordinary post-actions with CLI-owned launch commands. Package-manager hooks can still execute project code; this contract is not a sandbox.
 
 ## ADDED Requirements
 
 ### Requirement: Trusted project configuration declaration
-The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. It SHALL be mandatory when active, SHALL reject extra arguments or continue-on-error, and SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position.
+The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. Every active declared Functions project SHALL have exactly one active configuration action. Project/output activity SHALL be evaluated independently of action conditions using raw declared associations before filtering. The action SHALL be mandatory when active, SHALL reject extra arguments or continue-on-error, and SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position.
 
 #### Scenario: Conditional earlier output is inactive
 - **WHEN** an earlier primary output is suppressed and an active configuration action references a later authored index
@@ -18,6 +18,23 @@ The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-4
 #### Scenario: Configuration action is optional
 - **WHEN** a configuration action declares continue-on-error or an optional execution policy
 - **THEN** preflight rejects it
+
+#### Scenario: Active project has an inactive configuration action
+- **WHEN** a declared Functions project's output remains active but its only configuration action condition is false
+- **THEN** preflight rejects the unconfigured project before cleanup or creation
+
+#### Scenario: Project and its action are both inactive
+- **WHEN** both the declared project/output and its configuration action are inactive
+- **THEN** the pair does not require a configuration write
+- **AND** at least one other active project must still satisfy project-template creation requirements
+
+#### Scenario: Two active declarations configure the same root
+- **WHEN** multiple configuration actions are active for one resolved project root
+- **THEN** preflight rejects the ambiguity rather than writing configuration twice
+
+#### Scenario: Mutually exclusive declarations configure one active root
+- **WHEN** raw declarations reference one active project output and exactly one configuration action is active
+- **THEN** the active project is finalized exactly once
 
 ### Requirement: Raw action schema is validated
 Packaging and installed-template preflight SHALL validate raw action objects and arguments before engine normalization. Incorrect raw argument types and duplicate properties SHALL be rejected, even if engine projection would stringify or replace them. Item templates SHALL NOT declare trusted project configuration actions.
