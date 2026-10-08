@@ -98,6 +98,11 @@ internal interface IFileSystem
     /// </summary>
     public IReadOnlyList<string> GetFiles(string directoryPath);
 
+    /// <summary>
+    /// Returns the absolute path with existing symbolic links and junctions resolved.
+    /// </summary>
+    public string GetCanonicalPath(string path);
+
     // ── Archive operations ──────────────────────────────────────────────────
 
     /// <summary>

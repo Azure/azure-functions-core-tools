@@ -29,7 +29,7 @@ public sealed class InstallMethodDetectorTests
         string expectedUpdateInstruction)
     {
         var expectedKind = (InstallMethodKind)expectedKindValue;
-        var detector = new InstallMethodDetector(CreateOptions(processPath), Substitute.For<IProcessEnvironment>());
+        InstallMethodDetector detector = CreateDetector(processPath, Substitute.For<IProcessEnvironment>());
 
         InstallMethod result = detector.Detect();
 
@@ -45,7 +45,7 @@ public sealed class InstallMethodDetectorTests
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get(homeVariable).Returns(homePath);
-        var detector = new InstallMethodDetector(CreateOptions(processPath), environment);
+        InstallMethodDetector detector = CreateDetector(processPath, environment);
 
         InstallMethod result = detector.Detect();
 
@@ -60,7 +60,7 @@ public sealed class InstallMethodDetectorTests
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get("HOME").Returns(home);
-        var detector = new InstallMethodDetector(CreateOptions($"{home}/.azure-functions/func"), environment);
+        InstallMethodDetector detector = CreateDetector($"{home}/.azure-functions/func", environment);
 
         InstallMethod result = detector.Detect();
 
@@ -72,7 +72,7 @@ public sealed class InstallMethodDetectorTests
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get("HOME").Returns("/home/user");
-        var detector = new InstallMethodDetector(CreateOptions("/home/user/.AZURE-FUNCTIONS/func"), environment);
+        InstallMethodDetector detector = CreateDetector("/home/user/.AZURE-FUNCTIONS/func", environment);
 
         GracefulException exception = Assert.Throws<GracefulException>(detector.Detect);
 
@@ -84,7 +84,7 @@ public sealed class InstallMethodDetectorTests
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get("USERPROFILE").Returns("C:\\Users\\Me");
-        var detector = new InstallMethodDetector(CreateOptions("c:\\users\\me\\.AZURE-FUNCTIONS\\func.exe"), environment);
+        InstallMethodDetector detector = CreateDetector("c:\\users\\me\\.AZURE-FUNCTIONS\\func.exe", environment);
 
         InstallMethod result = detector.Detect();
 
@@ -97,7 +97,7 @@ public sealed class InstallMethodDetectorTests
         const string installDirectory = "/opt/homebrew/Cellar/azure-functions-core-tools/4.0.5000";
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns(installDirectory);
-        var detector = new InstallMethodDetector(CreateOptions($"{installDirectory}/func"), environment);
+        InstallMethodDetector detector = CreateDetector($"{installDirectory}/func", environment);
 
         InstallMethod result = detector.Detect();
 
@@ -109,11 +109,80 @@ public sealed class InstallMethodDetectorTests
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns("/opt/azure-functions-cli");
-        var detector = new InstallMethodDetector(CreateOptions("/opt/azure-functions-cli/func"), environment);
+        InstallMethodDetector detector = CreateDetector("/opt/azure-functions-cli/func", environment);
 
         InstallMethod result = detector.Detect();
 
         Assert.Equal(InstallMethodKind.Direct, result.Kind);
+    }
+
+    [Fact]
+    public void Detect_CanonicalAliases_ReturnsDirect()
+    {
+        const string processPath = "/alias/install/func";
+        const string installDirectory = "/real/install";
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns("/alias/install");
+        IFileSystem fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.GetCanonicalPath(processPath).Returns($"{installDirectory}/func");
+        fileSystem.GetCanonicalPath("/alias/install").Returns(installDirectory);
+        var detector = new InstallMethodDetector(CreateOptions(processPath), environment, fileSystem);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Direct, result.Kind);
+    }
+
+    [Fact]
+    public void Detect_PathCanonicalizationFailure_ThrowsGraceful()
+    {
+        const string processPath = "/alias/install/func";
+        IFileSystem fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.GetCanonicalPath(processPath).Returns(_ => throw new IOException("broken link"));
+        var detector = new InstallMethodDetector(
+            CreateOptions(processPath),
+            Substitute.For<IProcessEnvironment>(),
+            fileSystem);
+
+        GracefulException exception = Assert.Throws<GracefulException>(detector.Detect);
+
+        Assert.True(exception.IsUserError);
+        Assert.Contains(processPath, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Detect_SymlinkedExecutableOnUnix_ReturnsDirect()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string root = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        string installDirectory = Path.Combine(root, "install");
+        string installAlias = Path.Combine(root, "install-link");
+        string executablePath = Path.Combine(installDirectory, "func");
+        Directory.CreateDirectory(installDirectory);
+        File.WriteAllText(executablePath, string.Empty);
+        Directory.CreateSymbolicLink(installAlias, installDirectory);
+
+        try
+        {
+            IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+            environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns(installDirectory);
+            var detector = new InstallMethodDetector(
+                CreateOptions(Path.Combine(installAlias, "func")),
+                environment,
+                new PhysicalFileSystem());
+
+            InstallMethod result = detector.Detect();
+
+            Assert.Equal(InstallMethodKind.Direct, result.Kind);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Theory]
@@ -124,7 +193,7 @@ public sealed class InstallMethodDetectorTests
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get("HOME").Returns("/home/user");
-        var detector = new InstallMethodDetector(CreateOptions(processPath), environment);
+        InstallMethodDetector detector = CreateDetector(processPath, environment);
 
         GracefulException exception = Assert.Throws<GracefulException>(detector.Detect);
 
@@ -136,14 +205,31 @@ public sealed class InstallMethodDetectorTests
     public void Constructor_NullOptions_Throws()
     {
         Assert.Throws<ArgumentNullException>(
-            () => new InstallMethodDetector(null!, Substitute.For<IProcessEnvironment>()));
+            () => new InstallMethodDetector(null!, Substitute.For<IProcessEnvironment>(), Substitute.For<IFileSystem>()));
     }
 
     [Fact]
     public void Constructor_NullProcessEnvironment_Throws()
     {
         Assert.Throws<ArgumentNullException>(
-            () => new InstallMethodDetector(CreateOptions("/home/user/.azure-functions/func"), null!));
+            () => new InstallMethodDetector(CreateOptions("/home/user/.azure-functions/func"), null!, Substitute.For<IFileSystem>()));
+    }
+
+    [Fact]
+    public void Constructor_NullFileSystem_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => new InstallMethodDetector(
+                CreateOptions("/home/user/.azure-functions/func"),
+                Substitute.For<IProcessEnvironment>(),
+                null!));
+    }
+
+    private static InstallMethodDetector CreateDetector(string? processPath, IProcessEnvironment environment)
+    {
+        IFileSystem fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.GetCanonicalPath(Arg.Any<string>()).Returns(call => call.Arg<string>());
+        return new InstallMethodDetector(CreateOptions(processPath), environment, fileSystem);
     }
 
     private static IOptions<CliEnvironmentOptions> CreateOptions(string? processPath)

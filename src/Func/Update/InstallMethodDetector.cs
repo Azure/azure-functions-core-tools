@@ -9,12 +9,14 @@ namespace Azure.Functions.Cli.Update;
 /// <inheritdoc cref="IInstallMethodDetector" />
 internal sealed class InstallMethodDetector(
     IOptions<CliEnvironmentOptions> environmentOptions,
-    IProcessEnvironment processEnvironment) : IInstallMethodDetector
+    IProcessEnvironment processEnvironment,
+    IFileSystem fileSystem) : IInstallMethodDetector
 {
     internal const string InstallDirectoryEnvironmentVariable = "FUNC_CLI_INSTALL_DIR";
 
     private readonly CliEnvironmentOptions _environment = (environmentOptions ?? throw new ArgumentNullException(nameof(environmentOptions))).Value;
     private readonly IProcessEnvironment _processEnvironment = processEnvironment ?? throw new ArgumentNullException(nameof(processEnvironment));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public InstallMethod Detect()
     {
@@ -24,7 +26,7 @@ internal sealed class InstallMethodDetector(
             throw UnknownInstallation(processPath);
         }
 
-        string normalized = Normalize(processPath);
+        string normalized = Canonicalize(processPath);
 
         if (Contains(normalized, "/node_modules/"))
         {
@@ -69,7 +71,7 @@ internal sealed class InstallMethodDetector(
         }
 
         string? installDirectory = GetInstallDirectory();
-        if (installDirectory is not null && IsUnderDirectory(normalized, Normalize(installDirectory)))
+        if (installDirectory is not null && IsUnderDirectory(normalized, Canonicalize(installDirectory)))
         {
             return InstallMethod.Direct;
         }
@@ -101,6 +103,26 @@ internal sealed class InstallMethodDetector(
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
         return path.StartsWith(prefix, comparison);
+    }
+
+    private string Canonicalize(string path)
+    {
+        try
+        {
+            return Normalize(_fileSystem.GetCanonicalPath(path));
+        }
+        catch (ArgumentException)
+        {
+            throw UnknownInstallation(path);
+        }
+        catch (IOException)
+        {
+            throw UnknownInstallation(path);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw UnknownInstallation(path);
+        }
     }
 
     private static string Normalize(string path) => path.Replace('\\', '/').TrimEnd('/');

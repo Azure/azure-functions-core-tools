@@ -112,6 +112,28 @@ internal sealed class PhysicalFileSystem : IFileSystem
     public IReadOnlyList<string> GetFiles(string directoryPath) =>
         Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
 
+    public string GetCanonicalPath(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        string fullPath = Path.GetFullPath(path);
+        string root = Path.GetPathRoot(fullPath)
+            ?? throw new ArgumentException($"Path '{path}' does not have a root.", nameof(path));
+        string current = root;
+
+        foreach (string segment in fullPath[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string candidate = Path.Combine(current, segment);
+            FileSystemInfo fileSystemInfo = Directory.Exists(candidate)
+                ? new DirectoryInfo(candidate)
+                : new FileInfo(candidate);
+            FileSystemInfo? target = fileSystemInfo.ResolveLinkTarget(returnFinalTarget: true);
+            current = target?.FullName ?? candidate;
+        }
+
+        return Path.GetFullPath(current);
+    }
+
     // ── Archive operations ──────────────────────────────────────────────────
 
     public void ExtractZip(string zipPath, string destinationDirectory) =>
