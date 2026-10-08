@@ -18,7 +18,6 @@ public sealed class InstallMethodDetectorTests
     [InlineData("/opt/homebrew/Cellar/azure-functions-core-tools@4/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
     [InlineData("/usr/local/Cellar/azure-functions-core-tools/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
     [InlineData("/home/linuxbrew/.linuxbrew/Cellar/azure-functions-core-tools/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
-    [InlineData("C:\\ProgramData\\chocolatey\\lib\\azure-functions-core-tools\\tools\\func.exe", (int)InstallMethodKind.Chocolatey, "Chocolatey", "Run 'choco upgrade azure-functions-core-tools' to update.")]
     [InlineData("C:\\Users\\me\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Microsoft.AzureFunctionsCoreTools_Microsoft.Winget.Source_8wekyb3d8bbwe\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
     [InlineData("C:\\Program Files\\Microsoft\\Azure Functions Core Tools\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
     [InlineData("C:\\Program Files\\WindowsApps\\Microsoft.AzureFunctionsCoreTools_5.0.0_x64__8wekyb3d8bbwe\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
@@ -187,6 +186,7 @@ public sealed class InstallMethodDetectorTests
 
     [Theory]
     [InlineData("/home/user/tools/func")]
+    [InlineData("C:\\ProgramData\\chocolatey\\lib\\azure-functions-core-tools\\tools\\func.exe")]
     [InlineData("C:\\Program Files\\Azure Functions CLI\\func.exe")]
     [InlineData(null)]
     public void Detect_UnknownInstallPath_ThrowsGraceful(string? processPath)

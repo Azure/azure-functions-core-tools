@@ -47,16 +47,6 @@ internal sealed class InstallMethodDetector(
                 "Run 'brew upgrade azure-functions-core-tools' to update.");
         }
 
-        // Chocolatey shims live under %ChocolateyInstall%\bin\; the resolved
-        // process path points into lib\azure-functions-core-tools\tools\.
-        if (Contains(normalized, "/chocolatey/"))
-        {
-            return new InstallMethod(
-                InstallMethodKind.Chocolatey,
-                "Chocolatey",
-                "Run 'choco upgrade azure-functions-core-tools' to update.");
-        }
-
         // winget places packages under %LOCALAPPDATA%\Microsoft\WinGet\Packages\
         // by default; the resolved binary path contains that segment.
         if (Contains(normalized, "/WinGet/Packages/")

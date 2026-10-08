@@ -18,7 +18,6 @@ internal enum InstallMethodKind
 
     Npm,
     Homebrew,
-    Chocolatey,
     Winget,
 }
 
