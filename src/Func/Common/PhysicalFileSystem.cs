@@ -168,7 +168,10 @@ internal sealed class PhysicalFileSystem : IFileSystem
             TarEntry? entry;
             while ((entry = reader.GetNextEntry(copyData: false)) is not null)
             {
-                ValidateArchiveEntry(destinationDirectory, entry.Name);
+                ValidateArchiveEntry(
+                    destinationDirectory,
+                    entry.Name,
+                    allowRootDirectoryEntry: entry.EntryType == TarEntryType.Directory);
                 if (entry.EntryType is not TarEntryType.RegularFile
                     and not TarEntryType.V7RegularFile
                     and not TarEntryType.Directory)
@@ -214,7 +217,7 @@ internal sealed class PhysicalFileSystem : IFileSystem
         }
     }
 
-    private static void ValidateArchiveEntry(string destinationDirectory, string entryName)
+    private static void ValidateArchiveEntry(string destinationDirectory, string entryName, bool allowRootDirectoryEntry = false)
     {
         string normalizedName = entryName.Replace('\\', '/');
         if ((normalizedName.Length > 0 && normalizedName[0] == '/')
@@ -234,6 +237,20 @@ internal sealed class PhysicalFileSystem : IFileSystem
         StringComparison comparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
+        bool isDestination = string.Equals(
+            Path.TrimEndingDirectorySeparator(target),
+            Path.TrimEndingDirectorySeparator(destination),
+            comparison);
+        if (isDestination)
+        {
+            if (allowRootDirectoryEntry && normalizedName.Equals("./", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            throw new InvalidDataException($"Archive entry '{entryName}' resolves to the destination directory.");
+        }
+
         if (!target.StartsWith(destinationPrefix, comparison))
         {
             throw new InvalidDataException($"Archive entry '{entryName}' escapes the destination directory.");

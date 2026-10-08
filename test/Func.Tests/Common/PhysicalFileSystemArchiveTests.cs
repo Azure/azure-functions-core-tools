@@ -76,6 +76,45 @@ public sealed class PhysicalFileSystemArchiveTests
     }
 
     [Fact]
+    public void ExtractTarGz_RootDirectoryEntry_ExtractsContents()
+    {
+        using TempDirectory root = _fileSystem.CreateTempDirectory();
+        string destination = CreateDestination(root.Path);
+        string archivePath = Path.Combine(root.Path, "archive.tar.gz");
+        CreateTarGz(
+            archivePath,
+            new PaxTarEntry(TarEntryType.Directory, "./"),
+            new PaxTarEntry(TarEntryType.RegularFile, "payload.txt")
+            {
+                DataStream = Content("expected"),
+            });
+
+        _fileSystem.ExtractTarGz(archivePath, destination);
+
+        Assert.Equal("expected", File.ReadAllText(Path.Combine(destination, "payload.txt")));
+    }
+
+    [Fact]
+    public void ExtractTarGz_BareRootDirectoryEntry_DoesNotPartiallyExtract()
+    {
+        using TempDirectory root = _fileSystem.CreateTempDirectory();
+        string destination = CreateDestination(root.Path);
+        string payloadPath = Path.Combine(destination, "payload.txt");
+        string archivePath = Path.Combine(root.Path, "archive.tar.gz");
+        CreateTarGz(
+            archivePath,
+            new PaxTarEntry(TarEntryType.Directory, "."),
+            new PaxTarEntry(TarEntryType.RegularFile, "payload.txt")
+            {
+                DataStream = Content("unexpected"),
+            });
+
+        Assert.Throws<InvalidDataException>(() => _fileSystem.ExtractTarGz(archivePath, destination));
+
+        Assert.False(File.Exists(payloadPath));
+    }
+
+    [Fact]
     public void ExtractZip_ArchiveLink_DoesNotWriteOutsideDestination()
     {
         using TempDirectory root = _fileSystem.CreateTempDirectory();

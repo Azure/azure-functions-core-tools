@@ -29,7 +29,7 @@ internal sealed class InstallMethodDetector(
 
         string normalized = Canonicalize(processPath);
 
-        if (Contains(normalized, "/node_modules/"))
+        if (ContainsPathMarker(normalized, "/node_modules/"))
         {
             return new InstallMethod(
                 InstallMethodKind.Npm,
@@ -40,7 +40,7 @@ internal sealed class InstallMethodDetector(
         // Homebrew keg-only formulas live under Cellar/; the exposed binary is
         // usually a symlink from /opt/homebrew/bin or /usr/local/bin, which
         // canonicalization resolves to the real Cellar path.
-        string? homebrewFormula = GetHomebrewFormula(normalized);
+        string? homebrewFormula = IsWindowsPath(normalized) ? null : GetHomebrewFormula(normalized);
         if (homebrewFormula is not null)
         {
             return new InstallMethod(
@@ -51,10 +51,7 @@ internal sealed class InstallMethodDetector(
 
         // winget places packages under %LOCALAPPDATA%\Microsoft\WinGet\Packages\
         // by default; the resolved binary path contains that segment.
-        if (Contains(normalized, "/WinGet/Packages/")
-            || Contains(normalized, "/winget/packages/")
-            || Contains(normalized, "/WindowsApps/")
-            || Contains(normalized, "/Program Files/Microsoft/Azure Functions Core Tools/"))
+        if (IsWindowsManagedInstallPath(normalized))
         {
             return new InstallMethod(
                 InstallMethodKind.Winget,
@@ -124,29 +121,39 @@ internal sealed class InstallMethodDetector(
 
     private static bool IsWindowsPath(string path) =>
         path.StartsWith("//", StringComparison.Ordinal)
-        || (path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '/');
+        || IsWindowsDrivePath(path);
+
+    private static bool IsWindowsDrivePath(string path) =>
+        path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '/';
+
+    private static bool IsWindowsManagedInstallPath(string path) =>
+        IsWindowsDrivePath(path)
+        && (ContainsPathMarker(path, "/Microsoft/WinGet/Packages/")
+            || ContainsPathMarker(path, "/Microsoft/WindowsApps/")
+            || ContainsPathMarker(path, "/Program Files/WindowsApps/")
+            || ContainsPathMarker(path, "/Program Files/Microsoft/Azure Functions Core Tools/"));
 
     private static string? GetHomebrewFormula(string path)
     {
         string[] segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length < 4 || !segments[^1].Equals("func", StringComparison.OrdinalIgnoreCase))
+        if (segments.Length < 4 || !segments[^1].Equals("func", StringComparison.Ordinal))
         {
             return null;
         }
 
         string formula = segments[^3];
-        if (!segments[^4].Equals("Cellar", StringComparison.OrdinalIgnoreCase))
+        if (!segments[^4].Equals("Cellar", StringComparison.Ordinal))
         {
             return null;
         }
 
-        if (formula.Equals(HomebrewFormula, StringComparison.OrdinalIgnoreCase))
+        if (formula.Equals(HomebrewFormula, StringComparison.Ordinal))
         {
             return HomebrewFormula;
         }
 
         string versionedPrefix = HomebrewFormula + "@";
-        string version = formula.StartsWith(versionedPrefix, StringComparison.OrdinalIgnoreCase)
+        string version = formula.StartsWith(versionedPrefix, StringComparison.Ordinal)
             ? formula[versionedPrefix.Length..]
             : string.Empty;
         return version.Length > 0 && version.All(char.IsAsciiDigit)
@@ -154,8 +161,10 @@ internal sealed class InstallMethodDetector(
             : null;
     }
 
-    private static bool Contains(string haystack, string needle) =>
-        haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+    private static bool ContainsPathMarker(string path, string marker) =>
+        path.Contains(
+            marker,
+            IsWindowsPath(path) ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     private static InstallMethodDetectionException UnknownInstallation(string? processPath, Exception? innerException = null) =>
         new(
