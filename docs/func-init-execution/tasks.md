@@ -140,7 +140,7 @@
 - [ ] 12.11 Test forced dry-run cleanup ordering, `.git` preservation, overlap rejection, and unchanged filesystem.
 - [ ] 12.12 Test mandatory configuration ordering, default ordinary post-action execution, dry-run suppression, configuration-failure suppression, and cancellation.
 - [ ] 12.13 Test missing applicable templates never fall back to workload scaffolding.
-- [ ] 12.14 Add end-to-end initialization coverage for every in-repository stack-language project template.
+- [ ] 12.14 Add CLI-owned fixture regression coverage and representative compatibility sanity checks across supported stack/language initialization paths. Template authors own full production-template end-to-end coverage in their authoring repositories.
 
 ## 13. Documentation and Validation
 
@@ -151,4 +151,4 @@
 - [ ] 13.5 Document the breaking `IProjectInitializer` to `IProjectStack` workload migration.
 - [ ] 13.6 Run targeted abstraction, workload, init command, template integration, parser, renderer, and project-template tests.
 - [ ] 13.7 Run restore, the clean Release build with warnings treated as errors, and the full test suite.
-- [ ] 13.8 Keep fixture-based CLI regression suites separate from switch qualification. Before removing initializer fallback, verify default first-party project template packages are published and installable for every supported stack and pass baseline init smoke scenarios on fresh and upgraded machines against those published packages.
+- [ ] 13.8 Keep CLI fixture regressions, published-package compatibility sanity checks, and author-owned template end-to-end evidence separate. Before removing initializer fallback, verify published/installable first-party packages on fresh and upgraded machines, representative CLI interoperability, and author evidence tied to source/package/CLI versions without moving exhaustive template tests into CLI CI.
