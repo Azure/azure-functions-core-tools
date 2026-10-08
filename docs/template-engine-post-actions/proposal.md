@@ -19,8 +19,9 @@ Project templates must declare the Functions projects they create so the CLI can
 ### Modified Capabilities
 
 - `func-init-execution`: Use a concrete trusted configuration action and finalize projects before ordinary actions.
+- `func-new-execution`: Own create-mode ordinary action dispatch and partial outcomes while keeping dry-run non-executing.
 - `azure-samples-template-pipeline`: Validate trusted action declarations without executing repository-controlled code.
 
 ## Impact
 
-The proposal supplies the contract consumed by runtime projection, init orchestration, and template packaging. It does not implement processors, install language toolchains, execute arbitrary scripts, or change the CLI's general process-launching policy. The proposed action identifiers, initial restore managers, and ordinary-action defaults require team review before implementation.
+The proposal supplies the contract consumed by runtime projection, init/item orchestration, and template packaging. It does not implement processors, install language toolchains, execute actions in the central packager, or change the CLI's general process-launching policy. Restore-only processors do not add missing manifest dependencies or resolve the Durable template dependency bug; that requires an author fix or separately reviewed package-add contract. The proposed action identifiers, initial restore managers, item execution policy, and ordinary-action defaults require team review before implementation.

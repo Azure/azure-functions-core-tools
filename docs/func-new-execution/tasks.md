@@ -64,6 +64,7 @@
 - [ ] 7.5 Invoke the selected `ResolvedTemplate` for both create and dry-run modes without passing its identity back to `Templater`.
 - [ ] 7.6 Render dry-run create, modify, delete, and post-action effects with an explicit preview label in plain and JSON formats.
 - [ ] 7.7 Render successful creation, destructive conflicts, and known invocation failures from func-owned result models.
+- [ ] 7.8 After successful create-mode item invocation, dispatch only agreed ordinary actions and render partial file/action outcomes; preserve dry-run suppression and review the explicit-create/non-interactive default with command/security owners.
 
 ## 8. Legacy Path Removal and DI
 

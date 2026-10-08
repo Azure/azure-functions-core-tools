@@ -5,7 +5,7 @@ Defines trusted Functions project finalization and supported ordinary post-actio
 ## ADDED Requirements
 
 ### Requirement: Trusted project configuration declaration
-The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. Every active declared Functions project SHALL have exactly one active configuration action. Project/output activity SHALL be evaluated independently of action conditions using raw declared associations before filtering. The action SHALL be mandatory when active, SHALL reject extra arguments or continue-on-error, and SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position.
+The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. Every active Functions project root discovered independently from the resolved output/effect snapshot SHALL have exactly one active configuration action. The inventory SHALL include parent roots of resolved primary outputs and created/modified file effects named `host.json`, normalized and deduplicated using platform path comparison, rather than depend on configuration declarations. The action SHALL be mandatory when active, SHALL reject extra arguments or continue-on-error, and SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position. A referenced root absent from the independent inventory SHALL be rejected.
 
 #### Scenario: Conditional earlier output is inactive
 - **WHEN** an earlier primary output is suppressed and an active configuration action references a later authored index
@@ -22,6 +22,18 @@ The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-4
 #### Scenario: Active project has an inactive configuration action
 - **WHEN** a declared Functions project's output remains active but its only configuration action condition is false
 - **THEN** preflight rejects the unconfigured project before cleanup or creation
+
+#### Scenario: Generated project has no configuration declaration
+- **WHEN** the resolved effects contain `host.json` files for projects A and B but configuration is declared only for A
+- **THEN** the independent inventory contains both roots and preflight rejects B before cleanup or creation
+
+#### Scenario: Primary output omitted but file effect creates a project
+- **WHEN** a created or modified `host.json` effect has no matching primary-output declaration
+- **THEN** its parent remains in the independent project inventory and cannot escape finalization checks
+
+#### Scenario: Output and effect refer to the same host file
+- **WHEN** a resolved primary output and file effect identify the same normalized project root
+- **THEN** the inventory requires one finalization for that root rather than two
 
 #### Scenario: Project and its action are both inactive
 - **WHEN** both the declared project/output and its configuration action are inactive
@@ -127,6 +139,17 @@ Ordinary actions SHALL run under the command's existing execution policy after r
 #### Scenario: Cancellation follows a successful configuration write
 - **WHEN** cancellation is requested after one project is finalized
 - **THEN** the successful write remains, subsequent writes/processes stop, and cancellation is propagated
+
+### Requirement: Item execution has a command owner
+The proposed `func new` create-mode runner SHALL invoke the shared ordinary-action dispatcher only after successful item-template creation and SHALL report partial file/action outcomes on failure. Explicit create requests, including explicitly non-interactive requests, SHALL follow the reviewed default action policy without a new per-action prompt. Dry-run SHALL never execute actions. Required project configuration SHALL remain prohibited in item templates, and these processors SHALL NOT claim to add missing manifest dependencies.
+
+#### Scenario: Item creation succeeds before restore fails
+- **WHEN** an item template is created successfully and its supported restore action fails
+- **THEN** the command reports the created files and action failure, returns nonzero, and does not delete the generated item
+
+#### Scenario: Dependency is absent from the manifest
+- **WHEN** an authored item template needs a dependency not declared in the manager input
+- **THEN** the restore-only action does not claim to add it or fix that template's missing-dependency defect
 
 ### Requirement: Packaging validates without executing
 Central packaging SHALL validate action metadata and dry-run effects without executing source-controlled scripts, configuration actions, restore processors, or generated applications. Synthesized Samples templates SHALL have one mandatory configuration action per declared project and no ordinary actions. Template authors SHALL own real application end-to-end coverage.

@@ -23,7 +23,7 @@ Microsoft.TemplateEngine 10.0.301 directly supports preview through `TemplateCre
 
 - Design project-template discovery or `func init` execution.
 - Decide how missing or unsupported TemplateEngine `tags.type` values are classified; `func new` consumes only candidates classified as `TemplateType.Item`.
-- Define authorization or execution policy for real template post-actions. Dry-run reports but never executes them.
+- Define an independent ordinary post-action policy. This command consumes the reviewed `template-engine-post-actions` dispatch contract; dry-run reports but never executes actions.
 - Reproduce every `dotnet new` option or its exact command-tree mutation strategy.
 - Let `--force` bypass template type, constraints, argument validation, or selection ambiguity.
 
@@ -211,6 +211,8 @@ TemplateInvocationMode
 `ResolvedTemplate.InvokeAsync` maps `DryRun` to TemplateEngine's native `dryRun` argument. Both modes perform identical selection, constraint, argument, default, output-path, and conflict evaluation. The returned func-owned result always carries projected file changes and post-actions; create mode additionally carries applied creation outputs.
 
 Dry-run never creates the requested execution directory, writes files, or executes post-actions. Destructive effects are still returned. Without `--force`, they are rendered as changes that would block actual creation; `--force` remains orthogonal and changes conflict permission, not whether preview writes.
+
+For create mode, the proposed runner invokes the shared ordinary-action dispatcher after successful item-template creation, using validated action plans from the selected snapshot. The reviewed default follows an explicit create request without a new per-action prompt, including explicitly non-interactive requests. Unknown processors remain blocked, required project configuration is not an item action, and action failure returns a partial file/action result with nonzero exit rather than rolling back generated files. `template-engine-post-actions` owns safety, launch-time checks, cancellation, continued-failure behavior, and the command/security agreement required before implementation.
 
 The command renderer distinguishes create, modify, and delete effects and clearly labels the output as a preview. JSON and plain formatting consume the same result model.
 

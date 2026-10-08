@@ -6,7 +6,7 @@
 
 ## 2. Preflight and Finalization
 
-- [ ] 2.1 Validate raw action schemas before engine coercion, rejecting duplicate properties, non-string configuration arguments, and configuration actions in item templates. Project active declarations after final parameters and reject invalid arguments, unsupported actions, absent/ambiguous outputs, unsafe roots, stack/language conflicts, and direct configuration effects before mutation.
+- [ ] 2.1 Validate raw action schemas before engine coercion, rejecting duplicate properties, non-string configuration arguments, and configuration actions in item templates. Independently inventory normalized host-file roots from resolved primary outputs and created/modified effects, then compare active declarations against that inventory. Reject omitted/ambiguous finalization, unsupported actions, absent outputs, unsafe roots, stack/language conflicts, and direct configuration effects before mutation.
 - [ ] 2.2 Implement write-time path/link validation and atomic canonical stack/language persistence through injectable filesystem boundaries.
 - [ ] 2.3 Run mandatory actions before ordinary ones; stop/report partial completion without destructive rollback.
 - [ ] 2.4 Test multi-project/conditional/renamed outputs, raw-index identity, filtered-list traps, active project with inactive action, both-inactive controls, mutually exclusive declarations and duplicate active finalization, overlaps, links, force, partial writes, and cancellation.
@@ -23,3 +23,4 @@
 - [ ] 4.2 Document author-owned application E2E evidence separately from CLI processor/fixture tests.
 - [ ] 4.3 Run targeted and full CI-strict validation before command integration; keep legacy removal behind its independent readiness gates.
 - [ ] 4.4 Inventory standard actions in supported shared .NET item templates and qualify reviewed adapters/translations or replacement packages before provider removal. Do not treat an unknown-action refusal as preserved parity.
+- [ ] 4.5 Wire the agreed item create-mode dispatcher and partial outcomes into `func new`, document ordinary action authorization/defaults, and preserve dry-run suppression. Keep missing-dependency/package-add coverage explicitly separate from restore until its own contract is agreed.
