@@ -230,7 +230,7 @@ public sealed class InstallMethodDetectorTests
     }
 
     [Fact]
-    public void Detect_SymlinkedExecutableOnUnix_ReturnsDirect()
+    public void Detect_ExecutableUnderSymlinkedDirectoryOnUnix_ReturnsDirect()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -257,6 +257,42 @@ public sealed class InstallMethodDetectorTests
             InstallMethod result = detector.Detect();
 
             Assert.Equal(InstallMethodKind.Direct, result.Kind);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Detect_HomebrewExecutableSymlinkOnUnix_ReturnsVersionedFormula()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string root = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        string cellarDirectory = Path.Combine(root, "Cellar", "azure-functions-core-tools@4", "4.0.5000");
+        string executablePath = Path.Combine(cellarDirectory, "func");
+        string aliasDirectory = Path.Combine(root, "bin");
+        string aliasExecutable = Path.Combine(aliasDirectory, "func");
+        Directory.CreateDirectory(cellarDirectory);
+        Directory.CreateDirectory(aliasDirectory);
+        File.WriteAllText(executablePath, string.Empty);
+        File.CreateSymbolicLink(aliasExecutable, executablePath);
+
+        try
+        {
+            var detector = new InstallMethodDetector(
+                CreateOptions(aliasExecutable),
+                Substitute.For<IProcessEnvironment>(),
+                new PhysicalFileSystem());
+
+            InstallMethod result = detector.Detect();
+
+            Assert.Equal(InstallMethodKind.Homebrew, result.Kind);
+            Assert.Equal("Run 'brew upgrade azure-functions-core-tools@4' to update.", result.UpdateInstruction);
         }
         finally
         {
