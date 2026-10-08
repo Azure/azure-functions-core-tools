@@ -169,6 +169,37 @@ public sealed class PhysicalFileSystemArchiveTests
         Assert.False(File.Exists(outsidePath));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ExtractArchive_LinkedDestinationRoot_DoesNotWriteOutsideDestination(bool zip)
+    {
+        using TempDirectory root = _fileSystem.CreateTempDirectory();
+        string destination = Path.Combine(root.Path, "extract");
+        string outsideDirectory = Path.Combine(root.Path, "outside");
+        string outsidePath = Path.Combine(outsideDirectory, "payload.txt");
+        Directory.CreateDirectory(outsideDirectory);
+        Directory.CreateSymbolicLink(destination, outsideDirectory);
+
+        if (zip)
+        {
+            string archivePath = Path.Combine(root.Path, "archive.zip");
+            CreateZip(archivePath, ("payload.txt", "malicious"));
+            Assert.Throws<InvalidDataException>(() => _fileSystem.ExtractZip(archivePath, destination));
+        }
+        else
+        {
+            string archivePath = Path.Combine(root.Path, "archive.tar.gz");
+            CreateTarGz(archivePath, new PaxTarEntry(TarEntryType.RegularFile, "payload.txt")
+            {
+                DataStream = Content("malicious"),
+            });
+            Assert.Throws<InvalidDataException>(() => _fileSystem.ExtractTarGz(archivePath, destination));
+        }
+
+        Assert.False(File.Exists(outsidePath));
+    }
+
     private static string CreateDestination(string root)
     {
         string destination = Path.Combine(root, "extract");

@@ -139,6 +139,8 @@ internal sealed class PhysicalFileSystem : IFileSystem
 
     public void ExtractZip(string zipPath, string destinationDirectory)
     {
+        ValidateExtractionDestination(destinationDirectory);
+
         using (ZipArchive archive = ZipFile.OpenRead(zipPath))
         {
             foreach (ZipArchiveEntry entry in archive.Entries)
@@ -157,6 +159,8 @@ internal sealed class PhysicalFileSystem : IFileSystem
 
     public void ExtractTarGz(string tarGzPath, string destinationDirectory)
     {
+        ValidateExtractionDestination(destinationDirectory);
+
         using (FileStream validationFile = File.OpenRead(tarGzPath))
         using (var validationGzip = new GZipStream(validationFile, CompressionMode.Decompress))
         using (TarReader reader = new(validationGzip))
@@ -198,6 +202,15 @@ internal sealed class PhysicalFileSystem : IFileSystem
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
+        }
+    }
+
+    private static void ValidateExtractionDestination(string destinationDirectory)
+    {
+        var destination = new DirectoryInfo(Path.GetFullPath(destinationDirectory));
+        if (destination.LinkTarget is not null)
+        {
+            throw new InvalidDataException($"Archive destination '{destinationDirectory}' is a link.");
         }
     }
 
