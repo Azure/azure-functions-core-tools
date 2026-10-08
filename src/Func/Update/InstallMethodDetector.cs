@@ -104,17 +104,17 @@ internal sealed class InstallMethodDetector(
         {
             return Normalize(_fileSystem.GetCanonicalPath(path));
         }
-        catch (ArgumentException)
+        catch (ArgumentException ex)
         {
-            throw UnknownInstallation(path);
+            throw UnknownInstallation(path, ex);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
-            throw UnknownInstallation(path);
+            throw UnknownInstallation(path, ex);
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
-            throw UnknownInstallation(path);
+            throw UnknownInstallation(path, ex);
         }
     }
 
@@ -141,9 +141,9 @@ internal sealed class InstallMethodDetector(
     private static bool Contains(string haystack, string needle) =>
         haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
 
-    private static GracefulException UnknownInstallation(string? processPath) =>
+    private static InstallMethodDetectionException UnknownInstallation(string? processPath, Exception? innerException = null) =>
         new(
             $"Cannot update the Azure Functions CLI installation at '{processPath ?? "unknown"}' in place. " +
             "Reinstall it with the v5 installer at https://aka.ms/func-cli, or use the package manager that installed it.",
-            isUserError: true);
+            innerException);
 }

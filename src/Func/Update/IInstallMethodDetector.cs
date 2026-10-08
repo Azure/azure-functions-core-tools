@@ -15,9 +15,9 @@ internal interface IInstallMethodDetector
     /// <summary>
     /// Returns the detected install method.
     /// </summary>
-    /// <exception cref="Azure.Functions.Cli.Common.GracefulException">
+    /// <exception cref="InstallMethodDetectionException">
     /// The installation is not owned by a recognized package manager and is
-    /// outside the install-script directory.
+    /// outside the install-script directory, or its path cannot be resolved.
     /// </exception>
     public InstallMethod Detect();
 }

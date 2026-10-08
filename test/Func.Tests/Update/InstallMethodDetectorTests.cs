@@ -67,15 +67,15 @@ public sealed class InstallMethodDetectorTests
     }
 
     [Fact]
-    public void Detect_CaseOnlyDifferentDefaultInstallDirectoryOnUnix_ThrowsGraceful()
+    public void Detect_CaseOnlyDifferentDefaultInstallDirectoryOnUnix_ThrowsDetectionException()
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get("HOME").Returns("/home/user");
         InstallMethodDetector detector = CreateDetector("/home/user/.AZURE-FUNCTIONS/func", environment);
 
-        GracefulException exception = Assert.Throws<GracefulException>(detector.Detect);
+        InstallMethodDetectionException exception = Assert.Throws<InstallMethodDetectionException>(detector.Detect);
 
-        Assert.True(exception.IsUserError);
+        Assert.Contains("https://aka.ms/func-cli", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -116,27 +116,27 @@ public sealed class InstallMethodDetectorTests
     }
 
     [Fact]
-    public void Detect_PrefixCollision_ThrowsGraceful()
+    public void Detect_PrefixCollision_ThrowsDetectionException()
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get("HOME").Returns("/home/user");
         InstallMethodDetector detector = CreateDetector("/home/user/.azure-functions-other/func", environment);
 
-        Assert.Throws<GracefulException>(detector.Detect);
+        Assert.Throws<InstallMethodDetectionException>(detector.Detect);
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Detect_MissingOrBlankHomeVariables_ThrowsGraceful(string? value)
+    public void Detect_MissingOrBlankHomeVariables_ThrowsDetectionException(string? value)
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get("HOME").Returns(value);
         environment.Get("USERPROFILE").Returns(value);
         InstallMethodDetector detector = CreateDetector("/home/user/.azure-functions/func", environment);
 
-        Assert.Throws<GracefulException>(detector.Detect);
+        Assert.Throws<InstallMethodDetectionException>(detector.Detect);
     }
 
     [Theory]
@@ -212,20 +212,21 @@ public sealed class InstallMethodDetectorTests
     }
 
     [Fact]
-    public void Detect_PathCanonicalizationFailure_ThrowsGraceful()
+    public void Detect_PathCanonicalizationFailure_ThrowsDetectionExceptionWithCause()
     {
         const string processPath = "/alias/install/func";
+        var cause = new IOException("broken link");
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
-        fileSystem.GetCanonicalPath(processPath).Returns(_ => throw new IOException("broken link"));
+        fileSystem.GetCanonicalPath(processPath).Returns(_ => throw cause);
         var detector = new InstallMethodDetector(
             CreateOptions(processPath),
             Substitute.For<IProcessEnvironment>(),
             fileSystem);
 
-        GracefulException exception = Assert.Throws<GracefulException>(detector.Detect);
+        InstallMethodDetectionException exception = Assert.Throws<InstallMethodDetectionException>(detector.Detect);
 
-        Assert.True(exception.IsUserError);
         Assert.Contains(processPath, exception.Message, StringComparison.Ordinal);
+        Assert.Same(cause, exception.InnerException);
     }
 
     [Fact]
@@ -268,15 +269,14 @@ public sealed class InstallMethodDetectorTests
     [InlineData("C:\\ProgramData\\chocolatey\\lib\\azure-functions-core-tools\\tools\\func.exe")]
     [InlineData("C:\\Program Files\\Azure Functions CLI\\func.exe")]
     [InlineData(null)]
-    public void Detect_UnknownInstallPath_ThrowsGraceful(string? processPath)
+    public void Detect_UnknownInstallPath_ThrowsDetectionException(string? processPath)
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
         environment.Get("HOME").Returns("/home/user");
         InstallMethodDetector detector = CreateDetector(processPath, environment);
 
-        GracefulException exception = Assert.Throws<GracefulException>(detector.Detect);
+        InstallMethodDetectionException exception = Assert.Throws<InstallMethodDetectionException>(detector.Detect);
 
-        Assert.True(exception.IsUserError);
         Assert.Contains("https://aka.ms/func-cli", exception.Message, StringComparison.Ordinal);
     }
 
