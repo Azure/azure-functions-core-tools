@@ -692,8 +692,8 @@ namespace Azure.Functions.Cli.Helpers
         {
             if (string.IsNullOrEmpty(flexRuntime) || string.IsNullOrEmpty(flexRuntimeVersion))
             {
-                // Match if version is 3.13
-                return major == 3 && minor == 13;
+                // Match if version is 3.14
+                return major == 3 && minor == 14;
             }
 
             // Only validate for python.

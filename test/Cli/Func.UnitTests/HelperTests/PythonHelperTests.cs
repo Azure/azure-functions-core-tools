@@ -44,6 +44,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [Theory]
         [InlineData("DOCKER|mcr.microsoft.com/azure-functions/python", 3, 9, true)]
         [InlineData("", 3, 7, false)]
+        [InlineData("", 3, 13, false)]
+        [InlineData("", 3, 14, true)]
         [InlineData("PYTHON|3.6", 3, 6, true)]
         [InlineData("PYTHON|3.6", 3, 7, false)]
         [InlineData("PYTHON|3.7", 3, 6, false)]
@@ -65,6 +67,22 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             if (result != expectedResult)
             {
                 throw new Exception("Local version compatibility check failed (IsLocalVersionCompatibleWithLinuxFxVersion).");
+            }
+        }
+
+        [Theory]
+        [InlineData("", "", 3, 13, false)]
+        [InlineData("", "", 3, 14, true)]
+        [InlineData("python", "", 3, 14, true)]
+        [InlineData("", "3.14", 3, 14, true)]
+        [InlineData("python", "3.14", 3, 14, true)]
+        [InlineData("python", "3.14", 3, 13, false)]
+        public void ShouldHaveMatchingFlexPythonRuntimeVersion(string flexRuntime, string flexRuntimeVersion, int? major, int? minor, bool expectedResult)
+        {
+            bool result = PythonHelpers.IsFlexPythonRuntimeVersionMatched(flexRuntime, flexRuntimeVersion, major, minor);
+            if (result != expectedResult)
+            {
+                throw new Exception("Local version compatibility check failed (IsFlexPythonRuntimeVersionMatched).");
             }
         }
 

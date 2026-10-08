@@ -1727,8 +1727,8 @@
                                     "linuxRuntimeSettings": {
                                         "runtimeVersion": "Python|3.14",
                                         "remoteDebuggingSupported": false,
-                                        "isPreview": true,
-                                        "isDefault": false,
+                                        "isPreview": false,
+                                        "isDefault": true,
                                         "isHidden": false,
                                         "appInsightsSettings": {
                                             "isSupported": true
@@ -1767,7 +1767,7 @@
                                         "runtimeVersion": "Python|3.13",
                                         "remoteDebuggingSupported": false,
                                         "isPreview": false,
-                                        "isDefault": true,
+                                        "isDefault": false,
                                         "isHidden": false,
                                         "appInsightsSettings": {
                                             "isSupported": true
