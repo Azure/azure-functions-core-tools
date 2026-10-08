@@ -290,6 +290,8 @@ Known outcomes are rendered through `IInteractionService` or wrapped at the comm
 
 ## Migration Plan
 
+Routine CLI regression suites use fixture packages to isolate command behavior from independently released template content. The command switch also requires qualification against published first-party packages on fresh and upgraded machines. Those smoke tests establish package availability and working stack/template combinations; fixture results alone do not satisfy the published-package gate. This remains a switch prerequisite, not a requirement to test every production template in every routine CLI run.
+
 1. Add eligibility and declared projects to project-template catalog entries, and `TemplateType.Project` resolution, to the template integration.
 2. Add trusted project configuration action projection, primary-output resolution, and planned configuration effects while preserving item behavior.
 3. Introduce `IProjectStack` and migrate stack registrations, aliases, and tests from `IProjectInitializer`.

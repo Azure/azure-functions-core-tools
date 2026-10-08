@@ -117,7 +117,7 @@ Installed project templates rejected by workload constraints SHALL remain visibl
 #### Scenario: Template has an incompatible workload
 
 - **WHEN** an installed template is restricted by an installed workload version or other workload incompatibility
-- **THEN** the command displays the corresponding remediation guidance
+- **THEN** the command displays the constraint diagnostic and any call to action the constraint system supplies
 
 #### Scenario: Explicitly requested template is restricted
 

@@ -218,7 +218,7 @@ When the authored file is absent, `.github/azure-functions-template.yaml` suppli
 
 The generated template uses the descriptor's identity, short name, name, and description, sets `tags.type` to `project`, and treats the complete filtered snapshot as content. It defines no parameter symbols, replacements, or ordinary post-actions. It emits a singular language tag only when all declared projects have the same language; mixed-language topology is represented exclusively by the configuration actions.
 
-The packager also adds the workload constraint defined by `template-engine-constraints`, derived from the declared project stacks. The descriptor has no workload field, so requirements always follow the declared projects.
+The packager also adds one workload constraint per declared project stack, in the form `template-engine-constraints` defines. The descriptor has no workload field, so requirements always follow the declared projects.
 
 Both modes pass the same TemplateEngine load, dry-run, action, output-path, and package safety validation during release packaging. Onboarding PR validation does not acquire source releases or validate repository-owned template definitions.
 
