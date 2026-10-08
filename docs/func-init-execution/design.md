@@ -192,7 +192,7 @@ project root = parent(resolved primary output)
 config path  = project root/.func/config.json
 ```
 
-The action carries canonical stack and language. Values can differ between projects, and must match `--stack` or `--language` when supplied. The exact action ID, serialized argument schema, rename propagation, and TemplateEngine projection belong to `template-engine-post-actions`.
+The action carries canonical stack and language. Values can differ between projects, and must match `--stack` or `--language` when supplied. `template-engine-post-actions` proposes the trusted action ID, string-valued `primaryOutputIndex`/`stack`/`language` schema, raw-to-resolved output mapping, and restore processor boundary. Those details require agreement before implementation, and resolved references must preserve authored output identity after conditions and renames.
 
 Project template content cannot create or modify `.func/config.json` directly. The trusted action is template-declared topology but CLI-owned behavior: Func validates the declaration, computes the destination, and serializes the current CLI configuration schema.
 

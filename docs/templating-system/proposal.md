@@ -12,8 +12,8 @@ The func templating redesign spans integration, package lifecycle, command execu
   - `azure-samples-template-pipeline`
   - `func-init-quickstarts`
   - `template-engine-constraints`
-- Track these focused changes that still need specifications:
   - `template-engine-post-actions`
+- Track these focused changes that still need specifications:
   - `template-engine-bind-sources`
   - `func-new-search`
 - Define the responsibility and dependency boundaries between the focused changes.
