@@ -4,6 +4,8 @@
 - [ ] 1.2 Add a dependency-injected templater factory that creates one command-scoped `Templater` and internal engine session from the validated context.
 - [ ] 1.3 Replace the misleading bundle host parameter names with `func:bundle-id` and `func:bundle-version`, add the remaining func context parameters, and return the resolved command directory for `WorkingDirectory`.
 - [ ] 1.4 Add tests proving separate command scopes do not leak context and all phases within one scope share the same host defaults and engine environment.
+- [ ] 1.5 Agree the runtime/store read, exclusive-write, and isolated-preflight session handoff with the lifecycle owner, including disposal/cancellation, mounted-content lifetime, raw metadata/fingerprints, and fresh sessions after acquisition.
+- [ ] 1.6 Capture actual startup load/initialization outcomes in one immutable per-command workload availability input without changing startup registration/recovery or introducing a new compatibility scheme.
 
 ## 2. Func-Owned Template Models
 
@@ -17,6 +19,7 @@
 - [ ] 3.1 Centralize constraint evaluation so listing and resolution share raw declaration validation over current mounted configuration and one fail-closed representation of eligible, restricted, not-evaluated, and failed constraints. Evaluate the validated content snapshot, not stale declarations from the engine cache.
 - [ ] 3.2 Update `Templater.ListAsync` to return every installed template of the requested type with current-context eligibility and diagnostics.
 - [ ] 3.3 Add tests for mixed eligible and restricted catalogs, unevaluable constraints, exact context values, and listing templates hidden by host metadata.
+- [ ] 3.4 Test load versus initialization failure, installed-only/older runtime versions, RID-compatible content admission versus later consumer payload rejection, no evaluator-wide payload scan or feed I/O, cancellation release, read/write handoff, and isolated preflight avoiding nested live locks.
 
 ## 4. Template Group Resolution
 

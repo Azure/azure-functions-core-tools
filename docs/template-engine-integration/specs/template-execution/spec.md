@@ -57,6 +57,41 @@ The integration SHALL list the templates of the requested template type known to
 - **THEN** the entries and their eligibility come from the session that later invokes the picked template
 - **AND** the picked group is formed from those listed entries
 
+### Requirement: Store session handoff
+Runtime sessions SHALL consume the shared store's lease, raw content, metadata, and refresh boundaries rather than implement a second registry or lock protocol. A live runtime session SHALL retain a shared lease while mounted catalog/selection/preview/invocation content is in use and SHALL release it on disposal or cancellation cleanup. Lifecycle operations SHALL use an exclusive lease and SHALL NOT upgrade an active read lease in place. Isolated preflight SHALL use an isolated hive without acquiring a live read lease inside an exclusive operation.
+
+#### Scenario: Acquisition follows browsing
+- **WHEN** a caller explicitly acquires a package after reading a live catalog
+- **THEN** it disposes the read session before lifecycle mutation and creates a fresh runtime session afterward
+
+#### Scenario: Reader is canceled
+- **WHEN** a runtime command is canceled while holding a store lease
+- **THEN** disposal releases the lease without leaving the store locked
+
+#### Scenario: Writer is waiting during selection
+- **WHEN** a live reader retains mounted template content during an interactive selection
+- **THEN** a lifecycle writer waits for that reader to dispose rather than replacing its selected mount
+
+### Requirement: Usable workload snapshot
+Template workload evaluation SHALL use a per-command immutable snapshot of successfully loaded/initialized runtime versions, admitted content inventory, and installed-only diagnostic entries. A runtime workload SHALL NOT satisfy a template requirement if its selected version failed loading or initialization. Template evaluation SHALL NOT load workloads, contact a feed, select an older installed runtime version, or invent version-compatibility enforcement. Content versions SHALL follow the CLI's RID-compatible inventory boundary without a claim of payload-health validation. Existing consumer payload checks SHALL remain authoritative, and known rejection SHALL remain available as a diagnostic rather than be described as proven usability.
+
+#### Scenario: Initialization failed after assembly loading
+- **WHEN** a selected runtime workload loaded but its initialization failed
+- **THEN** it cannot satisfy `func-workload` and its CLI-owned failure diagnostic remains available
+
+#### Scenario: Older version could satisfy the range
+- **WHEN** the selected runtime version is unusable or outside the template range and an older installed version would satisfy it
+- **THEN** the evaluator does not activate or select that older version
+
+#### Scenario: Future compatibility rejection exists
+- **WHEN** the CLI's actual compatibility boundary rejects a workload
+- **THEN** the snapshot carries that rejection rather than duplicating or overriding its version policy
+
+#### Scenario: Content inventory admission is not payload proof
+- **WHEN** a RID-compatible content entry is admitted at startup but a consuming resolver later rejects its missing payload configuration
+- **THEN** the inventory match does not waive that resolver check or claim the payload was validated
+- **AND** the consumer failure remains visible without a new evaluator-wide filesystem scan
+
 ### Requirement: Deterministic template reference matching
 The integration SHALL first match a template reference against exact full template identities. If no full identity matches, it SHALL match exact short names case-insensitively. Full identity matching SHALL be the deterministic escape hatch from short-name ambiguity, but SHALL NOT bypass template type or constraints. Matching SHALL be scoped to the requested template type. TemplateEngine `tags.type` values `item` and `project` SHALL identify item and project templates, and a missing or unrecognized value SHALL match neither. A match of another type SHALL produce a wrong-type diagnostic and SHALL NOT enter the eligible group. A reference that matches only templates without a recognized type SHALL produce an authoring diagnostic rather than a not-found outcome.
 

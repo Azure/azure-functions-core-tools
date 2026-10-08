@@ -214,6 +214,8 @@ The transaction:
 
 All func template install, update, uninstall, listing, and execution entry points use the same lifecycle lock when opening or mutating package state. Read operations hold a shared lock; lifecycle mutations hold an exclusive lock. This prevents another func process from observing the transient provider state.
 
+The proposed runtime handoff in `template-engine-integration` retains a live read lease while mounted catalog/selection/preview/invocation content remains in use. Acquisition callers dispose that session before lifecycle mutation and create a new reader afterward; no read-to-write lock upgrade is supported. Preflight uses an isolated hive and must not acquire a nested live read lease inside an exclusive lifecycle operation. Raw bytes, package metadata, configuration inventory, and validation fingerprints come from the store boundary, while semantic validation remains a shared consumer service. Lock implementation and engine recovery spike results remain lifecycle-owner responsibilities.
+
 The transaction implementation depends on an injectable template-hive filesystem and lock abstraction. It does not deserialize or rewrite `packages.json`; restoring the exact snapshot avoids taking ownership of TemplateEngine's private persistence schema.
 
 Uninstall is not rolled back after a successful provider result because deletion is the requested outcome. First install, update, same-source version replacement, and forced cross-source replacement are rollback-protected. A failed first install restores the previous hive without leaving the new package registered.

@@ -32,6 +32,7 @@
 - [ ] 4.5 Validate actual acquired metadata and configuration against retained preflight evidence and the same declaration/shared-package rules before cache rebuild and transaction commit. Include first installs and trigger rollback on mismatch, validation/cache failure, or cancellation after live mutation begins.
 - [ ] 4.6 Add tests that inject failures during provider uninstall, acquisition, registration, content verification, cache rebuild, cancellation, and rollback, proving the previous package remains installed and usable. Include changed local archives and folders, same-identity/version content drift, added/removed configurations, first-install cleanup, and identical-content controls.
 - [ ] 4.7 Add concurrent reader/writer tests proving listing and execution cannot observe transient replacement state.
+- [ ] 4.8 Agree and test the shared runtime lease/raw-content handoff, cancellation/disposal release, fresh readers after acquisition, and isolated preflight without nested live read locks. Retain the pinned-engine replacement/cancellation/cache-rebuild spike as a separate prerequisite.
 
 ## 5. Templater Install Lifecycle
 
