@@ -44,6 +44,90 @@ Defines how `func init` discovers and runs installed quickstart project template
 - **WHEN** an uninstalled template could be identified as first-party
 - **THEN** the initial capability still does not install it implicitly
 
+### Requirement: Stack acquisition supplies basic companions only
+
+Explicit stack installation through setup or direct stack install SHALL acquire approved basic project/item companions under the acquisition design. It MUST NOT preinstall curated quickstarts or expose a curated preinstallation option. Existing installed quickstart packages SHALL NOT be removed by this policy change.
+
+#### Scenario: Fresh stack installation
+
+- **WHEN** a supported stack installation completes
+- **THEN** approved basic project and item templates are installed without separate package commands
+- **AND** no curated quickstart payload is acquired by that stack operation
+
+### Requirement: Curated discovery precedes payload acquisition
+
+CLI browse/search SHALL expose sanctioned available templates without requiring their packages to be installed. The discovery component SHALL own the package/template manifest and its configured-feed, curation, and freshness rules. Publishing onboarding and the installed TemplateEngine catalog SHALL remain separate from this cached metadata. Browsing/searching MUST NOT mutate installed package state.
+
+#### Scenario: Curated package is not installed
+
+- **WHEN** a valid discovery entry describes a sanctioned quickstart absent from the installed catalog
+- **THEN** the user can inspect and select it from metadata without downloading its payload
+- **AND** merely viewing or filtering the catalog does not install it
+
+### Requirement: Guided use has explicit acquisition authorization
+
+A guided use action SHALL show the concrete package ID, version, source, full template identity, and verified curation before acquisition through the lifecycle. It SHALL require confirmation or explicit non-interactive authorization and preserve installed source/pin choices. After acquisition it SHALL finish the lifecycle session, open a fresh init session under the shared-read contract, and bind the selected entry to the authorized package owner, actual installed version, recorded source, and approved artifact/provenance before validating constraints or creating files. A template name alone MUST NOT authorize selection from another package. Unknown curation, unexpected owners, or unverifiable artifacts SHALL block guided use. The verified entry SHALL remain authoritative through the integration's snapshot/locking rules. The flow MUST NOT silently update template packages or workloads.
+
+#### Scenario: User authorizes install and use
+
+- **WHEN** a user authorizes acquisition of a sanctioned discovery selection
+- **THEN** the lifecycle acquires the selected package under its source/version rules
+- **AND** the shared init path runs only after installed identity, parameters, constraints, and output effects are validated
+
+#### Scenario: Another installed package advertises the same template identity
+
+- **WHEN** a different installed package advertises the sanctioned template's identity or short name
+- **THEN** guided use verifies the concrete owning package against its authorized reference
+- **AND** rejects an unexpected owner rather than substitute its template
+- **AND** no project files are created from that substitution
+
+#### Scenario: Acquisition is declined or fails
+
+- **WHEN** the user declines, acquisition is cancelled, or installation fails
+- **THEN** project creation does not start and the target remains unchanged
+- **AND** the lifecycle retains its existing failure-safe package behavior
+
+#### Scenario: Non-interactive discovery lacks acquisition authorization
+
+- **WHEN** a non-interactive selection needs installation but no explicit acquisition authorization was supplied
+- **THEN** the flow provides an actionable authorization/install hint
+- **AND** does not acquire a package or create project files
+
+#### Scenario: Installed package conflicts with discovery version
+
+- **WHEN** discovery advertises a different version or source from the installed selection
+- **THEN** guided use does not silently override the installed version, source, or pin
+- **AND** any replacement requires an explicit lifecycle action under its existing policy
+
+### Requirement: Quickstart removal requires a qualified replacement
+
+The existing `func quickstart` command SHALL remain available until a pinned supported-entry inventory has usable published replacements, basic companion acquisition works on fresh and upgraded installs, guided metadata discovery/acquisition/creation and migration guidance are available, replacement regression tests pass, and the responsible owners agree the handoff. The command switch SHALL remove the old creation path rather than keep a permanent alias. It SHALL NOT remove the shared manifest from unrelated consumers.
+
+#### Scenario: Repository exposes separate subfolder samples
+
+- **WHEN** two supported manifest entries select different folders from one repository
+- **THEN** the replacement retains two independently selectable project templates
+- **AND** each generates its intended source scope rather than a combined solution
+
+#### Scenario: Source is not yet publishable
+
+- **WHEN** a supported sample lacks an eligible release, required template metadata, or a supported packaging scope
+- **THEN** that sample remains an unresolved migration dependency
+- **AND** the old command is not removed while its replacement coverage is incomplete
+
+#### Scenario: User discovers a sample outside installed companions
+
+- **WHEN** a user wants a sample not present in the installed catalog
+- **THEN** working CLI browse/search identifies the sample and offers the authorized guided use flow without requiring a known package ID
+- **AND** discovery exposes relevant language, resource, infrastructure-as-code, and sample information
+- **AND** `func init` does not install the selected package implicitly
+
+#### Scenario: Package remains at its installed version
+
+- **WHEN** a newer curated package is published but the installed package has not been updated
+- **THEN** initialization uses the installed version
+- **AND** this migration does not imply an automatic template or workload update
+
 ### Requirement: Interactive initialization is template-first
 
 When no template is supplied and prompting is available, `func init` SHALL present installed project-template groups, narrowed by any explicit stack and language filters, before resolving template variants or template parameters. After a template group is selected, the command SHALL resolve only the remaining choices required by that group.

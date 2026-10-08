@@ -61,3 +61,13 @@
 - [ ] 8.3 Document installed quickstart discovery, explicit package installation, whole-template filters, multi-project behavior, and the browse URL in `func init` help and user documentation.
 - [ ] 8.4 Document the primary-output and configuration-action authoring contract for template publishers.
 - [ ] 8.5 Run targeted init and TemplateEngine tests, then complete repository restore, release build, and test validation.
+
+## 9. Existing Quickstart Migration
+
+- [ ] 9.1 Pin the current supported quickstart manifest for migration tests and map each supported entry to source revision, content scope, replacement package, template identity, and short name.
+- [ ] 9.2 Preserve independent repository-subfolder choices and record publishing gaps, including release and source-metadata requirements.
+- [ ] 9.3 Qualify basic-only companion acquisition on fresh and upgraded setup/direct stack installations, without quickstart preinstallation or removal of existing user packages.
+- [ ] 9.4 Qualify metadata-only CLI browsing, curation proof, package/template mapping, sample information and filters, then explicitly authorized acquisition followed by shared init execution.
+- [ ] 9.5 Agree the content and publication handoff with the existing quickstart and publishing owners and document changed syntax, identifiers, and installed-version freshness.
+- [ ] 9.6 Remove the old command and its unused dispatch only in the qualified command switch, preserving unrelated consumers of the shared manifest.
+- [ ] 9.7 Test read-only browse, uninstalled sanctioned selections, rejected/cancelled acquisition, non-interactive authorization, offline behavior, installed-version conflicts, duplicate identities in another package, package-bound fresh-session handoff, and no silent workload upgrades.
