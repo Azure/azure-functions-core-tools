@@ -60,7 +60,7 @@ internal sealed class InstallMethodDetector(
                 "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.");
         }
 
-        string? installDirectory = GetInstallDirectory();
+        string? installDirectory = GetInstallDirectory(normalized);
         if (installDirectory is not null && IsUnderDirectory(normalized, Canonicalize(installDirectory)))
         {
             return InstallMethod.Direct;
@@ -69,7 +69,7 @@ internal sealed class InstallMethodDetector(
         throw UnknownInstallation(processPath);
     }
 
-    private string? GetInstallDirectory()
+    private string? GetInstallDirectory(string processPath)
     {
         string? configured = _processEnvironment.Get(InstallDirectoryEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(configured))
@@ -77,10 +77,13 @@ internal sealed class InstallMethodDetector(
             return configured;
         }
 
-        string? home = _processEnvironment.Get("USERPROFILE");
+        bool isWindowsPath = IsWindowsPath(processPath);
+        string primaryHomeVariable = isWindowsPath ? "USERPROFILE" : "HOME";
+        string fallbackHomeVariable = isWindowsPath ? "HOME" : "USERPROFILE";
+        string? home = _processEnvironment.Get(primaryHomeVariable);
         if (string.IsNullOrWhiteSpace(home))
         {
-            home = _processEnvironment.Get("HOME");
+            home = _processEnvironment.Get(fallbackHomeVariable);
         }
 
         return string.IsNullOrWhiteSpace(home) ? null : Path.Combine(home, ".azure-functions");

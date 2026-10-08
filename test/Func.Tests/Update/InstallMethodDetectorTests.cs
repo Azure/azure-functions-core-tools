@@ -116,6 +116,85 @@ public sealed class InstallMethodDetectorTests
     }
 
     [Fact]
+    public void Detect_PrefixCollision_ThrowsGraceful()
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get("HOME").Returns("/home/user");
+        InstallMethodDetector detector = CreateDetector("/home/user/.azure-functions-other/func", environment);
+
+        Assert.Throws<GracefulException>(detector.Detect);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Detect_MissingOrBlankHomeVariables_ThrowsGraceful(string? value)
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get("HOME").Returns(value);
+        environment.Get("USERPROFILE").Returns(value);
+        InstallMethodDetector detector = CreateDetector("/home/user/.azure-functions/func", environment);
+
+        Assert.Throws<GracefulException>(detector.Detect);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Detect_BlankInstallDirectoryOverride_FallsBackToDefault(string value)
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns(value);
+        environment.Get("HOME").Returns("/home/user");
+        InstallMethodDetector detector = CreateDetector("/home/user/.azure-functions/func", environment);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Direct, result.Kind);
+    }
+
+    [Theory]
+    [InlineData("/opt/azure-functions-cli/")]
+    [InlineData("/opt/azure-functions-cli////")]
+    public void Detect_InstallDirectoryOverrideWithTrailingSeparator_ReturnsDirect(string installDirectory)
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns(installDirectory);
+        InstallMethodDetector detector = CreateDetector("/opt/azure-functions-cli/func", environment);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Direct, result.Kind);
+    }
+
+    [Fact]
+    public void Detect_UnixPathWithHomeAndUserProfile_UsesHome()
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get("HOME").Returns("/home/unix-user");
+        environment.Get("USERPROFILE").Returns("/home/windows-user");
+        InstallMethodDetector detector = CreateDetector("/home/unix-user/.azure-functions/func", environment);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Direct, result.Kind);
+    }
+
+    [Fact]
+    public void Detect_WindowsPathWithHomeAndUserProfile_UsesUserProfile()
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get("HOME").Returns("C:\\Home");
+        environment.Get("USERPROFILE").Returns("C:\\Users\\me");
+        InstallMethodDetector detector = CreateDetector("C:\\Users\\me\\.azure-functions\\func.exe", environment);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Direct, result.Kind);
+    }
+
+    [Fact]
     public void Detect_CanonicalAliases_ReturnsDirect()
     {
         const string processPath = "/alias/install/func";
