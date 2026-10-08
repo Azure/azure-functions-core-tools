@@ -15,7 +15,7 @@ public sealed class InstallMethodDetectorTests
     [InlineData("/usr/local/lib/node_modules/azure-functions-core-tools/bin/func", (int)InstallMethodKind.Npm, "npm", "Reinstall Azure Functions CLI with the v5 installer at https://aka.ms/func-cli.")]
     [InlineData("C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\azure-functions-core-tools\\bin\\func.exe", (int)InstallMethodKind.Npm, "npm", "Reinstall Azure Functions CLI with the v5 installer at https://aka.ms/func-cli.")]
     [InlineData("/opt/homebrew/Cellar/azure-functions-core-tools/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
-    [InlineData("/opt/homebrew/Cellar/azure-functions-core-tools@4/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
+    [InlineData("/opt/homebrew/Cellar/azure-functions-core-tools@4/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools@4' to update.")]
     [InlineData("/usr/local/Cellar/azure-functions-core-tools/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
     [InlineData("/home/linuxbrew/.linuxbrew/Cellar/azure-functions-core-tools/4.0.5000/func", (int)InstallMethodKind.Homebrew, "Homebrew", "Run 'brew upgrade azure-functions-core-tools' to update.")]
     [InlineData("C:\\Users\\me\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Microsoft.AzureFunctionsCoreTools_Microsoft.Winget.Source_8wekyb3d8bbwe\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
@@ -278,6 +278,17 @@ public sealed class InstallMethodDetectorTests
         InstallMethodDetectionException exception = Assert.Throws<InstallMethodDetectionException>(detector.Detect);
 
         Assert.Contains("https://aka.ms/func-cli", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/opt/homebrew/Cellar/azure-functions-core-tools@/4.0.5000/func")]
+    [InlineData("/opt/homebrew/Cellar/azure-functions-core-tools@latest/4.0.5000/func")]
+    [InlineData("/opt/homebrew/Cellar/azure-functions-core-tools@4-beta/4.0.5000/func")]
+    public void Detect_MalformedVersionedHomebrewFormula_ThrowsDetectionException(string processPath)
+    {
+        InstallMethodDetector detector = CreateDetector(processPath, Substitute.For<IProcessEnvironment>());
+
+        Assert.Throws<InstallMethodDetectionException>(detector.Detect);
     }
 
     [Fact]

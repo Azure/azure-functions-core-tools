@@ -13,6 +13,7 @@ internal sealed class InstallMethodDetector(
     IFileSystem fileSystem) : IInstallMethodDetector
 {
     internal const string InstallDirectoryEnvironmentVariable = "FUNC_CLI_INSTALL_DIR";
+    private const string HomebrewFormula = "azure-functions-core-tools";
 
     private readonly CliEnvironmentOptions _environment = (environmentOptions ?? throw new ArgumentNullException(nameof(environmentOptions))).Value;
     private readonly IProcessEnvironment _processEnvironment = processEnvironment ?? throw new ArgumentNullException(nameof(processEnvironment));
@@ -37,14 +38,15 @@ internal sealed class InstallMethodDetector(
         }
 
         // Homebrew keg-only formulas live under Cellar/; the exposed binary is
-        // usually a symlink from /opt/homebrew/bin or /usr/local/bin, but
-        // ProcessPath resolves to the real Cellar path on macOS.
-        if (IsHomebrewInstallPath(normalized))
+        // usually a symlink from /opt/homebrew/bin or /usr/local/bin, which
+        // canonicalization resolves to the real Cellar path.
+        string? homebrewFormula = GetHomebrewFormula(normalized);
+        if (homebrewFormula is not null)
         {
             return new InstallMethod(
                 InstallMethodKind.Homebrew,
                 "Homebrew",
-                "Run 'brew upgrade azure-functions-core-tools' to update.");
+                $"Run 'brew upgrade {homebrewFormula}' to update.");
         }
 
         // winget places packages under %LOCALAPPDATA%\Microsoft\WinGet\Packages\
@@ -124,18 +126,32 @@ internal sealed class InstallMethodDetector(
         path.StartsWith("//", StringComparison.Ordinal)
         || (path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '/');
 
-    private static bool IsHomebrewInstallPath(string path)
+    private static string? GetHomebrewFormula(string path)
     {
         string[] segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length < 4 || !segments[^1].Equals("func", StringComparison.OrdinalIgnoreCase))
         {
-            return false;
+            return null;
         }
 
         string formula = segments[^3];
-        return segments[^4].Equals("Cellar", StringComparison.OrdinalIgnoreCase)
-            && (formula.Equals("azure-functions-core-tools", StringComparison.OrdinalIgnoreCase)
-                || formula.StartsWith("azure-functions-core-tools@", StringComparison.OrdinalIgnoreCase));
+        if (!segments[^4].Equals("Cellar", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (formula.Equals(HomebrewFormula, StringComparison.OrdinalIgnoreCase))
+        {
+            return HomebrewFormula;
+        }
+
+        string versionedPrefix = HomebrewFormula + "@";
+        string version = formula.StartsWith(versionedPrefix, StringComparison.OrdinalIgnoreCase)
+            ? formula[versionedPrefix.Length..]
+            : string.Empty;
+        return version.Length > 0 && version.All(char.IsAsciiDigit)
+            ? versionedPrefix + version
+            : null;
     }
 
     private static bool Contains(string haystack, string needle) =>
