@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
+using System.Formats.Tar;
 
 namespace Azure.Functions.Cli.Common;
 
@@ -136,15 +137,48 @@ internal sealed class PhysicalFileSystem : IFileSystem
 
     // ── Archive operations ──────────────────────────────────────────────────
 
-    public void ExtractZip(string zipPath, string destinationDirectory) =>
+    public void ExtractZip(string zipPath, string destinationDirectory)
+    {
+        using (ZipArchive archive = ZipFile.OpenRead(zipPath))
+        {
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                ValidateArchiveEntry(destinationDirectory, entry.FullName);
+                int unixFileType = (entry.ExternalAttributes >> 16) & 0xF000;
+                if (unixFileType == 0xA000)
+                {
+                    throw new InvalidDataException($"Archive entry '{entry.FullName}' is a symbolic link.");
+                }
+            }
+        }
+
         ZipFile.ExtractToDirectory(zipPath, destinationDirectory);
+    }
 
     public void ExtractTarGz(string tarGzPath, string destinationDirectory)
     {
+        using (FileStream validationFile = File.OpenRead(tarGzPath))
+        using (var validationGzip = new GZipStream(validationFile, CompressionMode.Decompress))
+        using (TarReader reader = new(validationGzip))
+        {
+            TarEntry? entry;
+            while ((entry = reader.GetNextEntry(copyData: false)) is not null)
+            {
+                ValidateArchiveEntry(destinationDirectory, entry.Name);
+                if (entry.EntryType is not TarEntryType.RegularFile
+                    and not TarEntryType.V7RegularFile
+                    and not TarEntryType.Directory)
+                {
+                    throw new InvalidDataException(
+                        $"Archive entry '{entry.Name}' has unsupported type '{entry.EntryType}'.");
+                }
+            }
+        }
+
         Directory.CreateDirectory(destinationDirectory);
         using FileStream fileStream = File.OpenRead(tarGzPath);
-        using var gzipStream = new System.IO.Compression.GZipStream(fileStream, CompressionMode.Decompress);
-        System.Formats.Tar.TarFile.ExtractToDirectory(gzipStream, destinationDirectory, overwriteFiles: true);
+        using var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress);
+        TarFile.ExtractToDirectory(gzipStream, destinationDirectory, overwriteFiles: true);
     }
 
     // ── Hash operations ─────────────────────────────────────────────────────
@@ -164,6 +198,47 @@ internal sealed class PhysicalFileSystem : IFileSystem
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
+        }
+    }
+
+    private static void ValidateArchiveEntry(string destinationDirectory, string entryName)
+    {
+        string normalizedName = entryName.Replace('\\', '/');
+        if ((normalizedName.Length > 0 && normalizedName[0] == '/')
+            || (normalizedName.Length >= 3
+                && char.IsAsciiLetter(normalizedName[0])
+                && normalizedName[1] == ':'
+                && normalizedName[2] == '/'))
+        {
+            throw new InvalidDataException($"Archive entry '{entryName}' has an absolute path.");
+        }
+
+        string destination = Path.GetFullPath(destinationDirectory);
+        string target = Path.GetFullPath(Path.Combine(
+            destination,
+            normalizedName.Replace('/', Path.DirectorySeparatorChar)));
+        string destinationPrefix = Path.TrimEndingDirectorySeparator(destination) + Path.DirectorySeparatorChar;
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (!target.StartsWith(destinationPrefix, comparison))
+        {
+            throw new InvalidDataException($"Archive entry '{entryName}' escapes the destination directory.");
+        }
+
+        string relativeTarget = Path.GetRelativePath(destination, target);
+        string current = destination;
+        foreach (string segment in relativeTarget.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            FileSystemInfo info = Directory.Exists(current)
+                ? new DirectoryInfo(current)
+                : new FileInfo(current);
+            if (info.LinkTarget is not null)
+            {
+                throw new InvalidDataException(
+                    $"Archive entry '{entryName}' traverses existing link '{current}'.");
+            }
         }
     }
 }
