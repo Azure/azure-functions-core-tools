@@ -222,6 +222,8 @@ The packager also adds one workload constraint per declared project stack, in th
 
 Both modes pass the same TemplateEngine load, dry-run, action, output-path, and package safety validation during release packaging. Onboarding PR validation does not acquire source releases or validate repository-owned template definitions.
 
+Template authors own the full end-to-end tests for their generated applications, normally in the source repositories. The central packager owns format, scope, provenance, action, path, and artifact safety checks, not execution of repository-controlled tests or generated application code. Release qualification can reference author-owned evidence tied to the exact source revision, package version, and tested CLI version. A source test pass is not proof that the packaged artifact preserves that source or that the CLI can consume it; packaging checks and CLI compatibility sanity checks remain separate. The evidence-report format and storage location are review decisions.
+
 **Alternative considered:** inject generated actions into an authored file. This changes source-owned behavior without a source PR and cannot safely reproduce authored conditions or rename behavior. It is rejected.
 
 **Alternative considered:** require the synthesis descriptor alongside authored templates as a topology assertion. That duplicates source-owned topology and creates conflicting authorities. It is rejected.

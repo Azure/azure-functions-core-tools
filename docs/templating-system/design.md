@@ -111,6 +111,8 @@ This prevents a completed proposal from being mistaken for shipped behavior and 
 
 ## Risks / Trade-offs
 
+Template authors own production-template end-to-end coverage, normally beside the authored templates. The CLI owns its engine/command contracts, fixture-based journeys, and representative compatibility sanity checks. The publisher owns artifact structure, provenance, and safety validation. These are independent signals: passing one does not waive another, and migration qualification must identify the exact source revision, package version, and CLI version covered by its evidence. The shared evidence format, storage location, and release-report integration remain proposals to agree with the CLI, publisher, and template owners.
+
 - **[The inventory can become stale]** -> Update this design and task list whenever a focused templating change is added, renamed, split, or removed.
 - **[Cross-change behavior can conflict]** -> Resolve overlap in the focused change that owns the responsibility and update dependent references.
 - **[The umbrella can become a duplicate backlog]** -> Track only specification readiness and cross-change coordination here; keep implementation checklists in focused changes.

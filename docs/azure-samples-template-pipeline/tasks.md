@@ -96,6 +96,7 @@
 - [ ] 11.4 Continue independent candidates after item failures, fail the final run when unresolved failures remain, and report discovered, staged, promoted, complete, skipped, and failed counts.
 - [ ] 11.5 Notify the central `func-templates` operations team after retries are exhausted and redact credentials and tokens from logs and summaries.
 - [ ] 11.6 Add end-to-end pipeline tests for scheduled discovery, filtered manual recovery, partial success, retries, cancellation, redaction, and notification.
+- [ ] 11.7 Define the handoff for author-owned template end-to-end evidence tied to source/package/CLI versions. Keep pipeline orchestration and artifact safety tests central, and do not execute source-controlled template tests or generated applications in the packager.
 
 ## 12. Deployment and Documentation
 
