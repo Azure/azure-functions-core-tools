@@ -295,14 +295,22 @@ public sealed class CliUpdaterTests
         Assert.Contains(actualChecksum, ex.Message, StringComparison.Ordinal);
 
         // Extract should never have been called
-        fileSystem.DidNotReceive().ExtractZip(Arg.Any<string>(), Arg.Any<string>());
-        fileSystem.DidNotReceive().ExtractTarGz(Arg.Any<string>(), Arg.Any<string>());
+        _ = fileSystem.DidNotReceive().ExtractZipAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        _ = fileSystem.DidNotReceive().ExtractTarGzAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
         fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
     public async Task UpdateAsync_MatchingChecksum_VerifiesBeforeExtraction()
     {
+        using var cancellationSource = new CancellationTokenSource();
+        CancellationToken cancellationToken = cancellationSource.Token;
         (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
@@ -313,19 +321,25 @@ public sealed class CliUpdaterTests
         fileSystem.FileExists(_fakeProcessPath).Returns(true);
 
         // Act
-        await updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None);
+        await updater.UpdateAsync(_stableRelease, progress: null, cancellationToken);
 
-        await fileSystem.Received(1).ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
+        await fileSystem.Received(1).ComputeSha256Async(Arg.Any<string>(), cancellationToken);
         Received.InOrder(() =>
         {
-            _ = fileSystem.ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
+            _ = fileSystem.ComputeSha256Async(Arg.Any<string>(), cancellationToken);
             if (Release.ArchiveExtension == "zip")
             {
-                fileSystem.ExtractZip(Arg.Any<string>(), _fakeExtractDir);
+                _ = fileSystem.ExtractZipAsync(
+                    Arg.Any<string>(),
+                    _fakeExtractDir,
+                    cancellationToken);
             }
             else
             {
-                fileSystem.ExtractTarGz(Arg.Any<string>(), _fakeExtractDir);
+                _ = fileSystem.ExtractTarGzAsync(
+                    Arg.Any<string>(),
+                    _fakeExtractDir,
+                    cancellationToken);
             }
         });
     }

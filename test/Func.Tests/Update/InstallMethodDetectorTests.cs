@@ -36,6 +36,7 @@ public sealed class InstallMethodDetectorTests
         Assert.Equal(expectedKind, result.Kind);
         Assert.Equal(expectedDisplayName, result.DisplayName);
         Assert.Equal(expectedUpdateInstruction, result.UpdateInstruction);
+        Assert.Equal(processPath, result.ExecutablePath);
     }
 
     [Theory]
@@ -51,6 +52,7 @@ public sealed class InstallMethodDetectorTests
 
         Assert.Equal(InstallMethodKind.Direct, result.Kind);
         Assert.Null(result.UpdateInstruction);
+        Assert.Equal(processPath, result.ExecutablePath);
     }
 
     [Theory]
@@ -65,6 +67,7 @@ public sealed class InstallMethodDetectorTests
         InstallMethod result = detector.Detect();
 
         Assert.Equal(InstallMethodKind.Direct, result.Kind);
+        Assert.Equal($"{home}/.azure-functions/func", result.ExecutablePath);
     }
 
     [Fact]
@@ -114,6 +117,7 @@ public sealed class InstallMethodDetectorTests
         InstallMethod result = detector.Detect();
 
         Assert.Equal(InstallMethodKind.Direct, result.Kind);
+        Assert.Equal("/opt/azure-functions-cli/func", result.ExecutablePath);
     }
 
     [Fact]
@@ -285,6 +289,7 @@ public sealed class InstallMethodDetectorTests
         InstallMethod result = detector.Detect();
 
         Assert.Equal(InstallMethodKind.Direct, result.Kind);
+        Assert.Equal($"{installDirectory}/func", result.ExecutablePath);
     }
 
     [Fact]
@@ -333,6 +338,46 @@ public sealed class InstallMethodDetectorTests
             InstallMethod result = detector.Detect();
 
             Assert.Equal(InstallMethodKind.Direct, result.Kind);
+            Assert.Equal(executablePath, result.ExecutablePath);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Detect_SymbolicLinkTargetWithIntermediateLinkOnUnix_ReturnsCanonicalExecutablePath()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string root = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        string physicalRoot = Path.Combine(root, "physical");
+        string installDirectory = Path.Combine(physicalRoot, "install");
+        string intermediateAlias = Path.Combine(root, "physical-link");
+        string installAlias = Path.Combine(root, "install-link");
+        string executablePath = Path.Combine(installDirectory, "func");
+        Directory.CreateDirectory(installDirectory);
+        File.WriteAllText(executablePath, string.Empty);
+        Directory.CreateSymbolicLink(intermediateAlias, physicalRoot);
+        Directory.CreateSymbolicLink(installAlias, Path.Combine(intermediateAlias, "install"));
+
+        try
+        {
+            IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+            environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns(installDirectory);
+            var detector = new InstallMethodDetector(
+                CreateOptions(Path.Combine(installAlias, "func")),
+                environment,
+                new PhysicalFileSystem());
+
+            InstallMethod result = detector.Detect();
+
+            Assert.Equal(InstallMethodKind.Direct, result.Kind);
+            Assert.Equal(executablePath, result.ExecutablePath);
         }
         finally
         {
@@ -369,6 +414,7 @@ public sealed class InstallMethodDetectorTests
 
             Assert.Equal(InstallMethodKind.Homebrew, result.Kind);
             Assert.Equal("Run 'brew upgrade azure-functions-core-tools@4' to update.", result.UpdateInstruction);
+            Assert.Equal(executablePath, result.ExecutablePath);
         }
         finally
         {

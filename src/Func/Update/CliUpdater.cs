@@ -55,7 +55,7 @@ internal sealed partial class CliUpdater(
             progress?.Report(new UpdateProgress(UpdatePhase.Extracting));
             try
             {
-                ExtractArchive(archivePath, extractDir.Path);
+                await ExtractArchiveAsync(archivePath, extractDir.Path, cancellationToken);
             }
             catch (InvalidDataException ex)
             {
@@ -274,15 +274,18 @@ internal sealed partial class CliUpdater(
         return false;
     }
 
-    private void ExtractArchive(string archivePath, string destinationDirectory)
+    private async Task ExtractArchiveAsync(
+        string archivePath,
+        string destinationDirectory,
+        CancellationToken cancellationToken)
     {
         if (archivePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
         {
-            _fileSystem.ExtractZip(archivePath, destinationDirectory);
+            await _fileSystem.ExtractZipAsync(archivePath, destinationDirectory, cancellationToken);
         }
         else if (archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
         {
-            _fileSystem.ExtractTarGz(archivePath, destinationDirectory);
+            await _fileSystem.ExtractTarGzAsync(archivePath, destinationDirectory, cancellationToken);
         }
         else
         {

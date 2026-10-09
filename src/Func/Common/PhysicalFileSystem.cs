@@ -9,6 +9,8 @@ namespace Azure.Functions.Cli.Common;
 /// <inheritdoc cref="IFileSystem" />
 internal sealed class PhysicalFileSystem : IFileSystem
 {
+    private const int MaxSymbolicLinkDepth = 64;
+
     // ── File operations ─────────────────────────────────────────────────────
 
     public bool FileExists(string path) => File.Exists(path);
@@ -117,34 +119,68 @@ internal sealed class PhysicalFileSystem : IFileSystem
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        string fullPath = Path.GetFullPath(path);
-        string root = Path.GetPathRoot(fullPath)
-            ?? throw new ArgumentException($"Path '{path}' does not have a root.", nameof(path));
-        string current = root;
+        string candidatePath = Path.GetFullPath(path);
+        StringComparer pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        var visitedPaths = new HashSet<string>(pathComparer);
 
-        foreach (string segment in fullPath[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        for (int depth = 0; depth < MaxSymbolicLinkDepth; depth++)
         {
-            string candidate = Path.Combine(current, segment);
-            FileSystemInfo fileSystemInfo = Directory.Exists(candidate)
-                ? new DirectoryInfo(candidate)
-                : new FileInfo(candidate);
-            FileSystemInfo? target = fileSystemInfo.ResolveLinkTarget(returnFinalTarget: true);
-            current = target?.FullName ?? candidate;
+            if (!visitedPaths.Add(candidatePath))
+            {
+                throw new IOException($"A symbolic link cycle was detected while resolving '{path}'.");
+            }
+
+            string root = Path.GetPathRoot(candidatePath)
+                ?? throw new ArgumentException($"Path '{path}' does not have a root.", nameof(path));
+            string current = root;
+            string[] segments = candidatePath[root.Length..]
+                .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            bool resolvedLink = false;
+
+            for (int index = 0; index < segments.Length; index++)
+            {
+                current = Path.Combine(current, segments[index]);
+                FileSystemInfo fileSystemInfo = Directory.Exists(current)
+                    ? new DirectoryInfo(current)
+                    : new FileInfo(current);
+                FileSystemInfo? target = fileSystemInfo.ResolveLinkTarget(returnFinalTarget: false);
+                if (target is null)
+                {
+                    continue;
+                }
+
+                candidatePath = target.FullName;
+                if (index + 1 < segments.Length)
+                {
+                    candidatePath = Path.Combine(candidatePath, Path.Combine(segments[(index + 1)..]));
+                }
+
+                candidatePath = Path.GetFullPath(candidatePath);
+                resolvedLink = true;
+                break;
+            }
+
+            if (!resolvedLink)
+            {
+                return candidatePath;
+            }
         }
 
-        return Path.GetFullPath(current);
+        throw new IOException($"More than {MaxSymbolicLinkDepth} symbolic links were encountered while resolving '{path}'.");
     }
 
     // ── Archive operations ──────────────────────────────────────────────────
 
-    public void ExtractZip(string zipPath, string destinationDirectory)
+    public async Task ExtractZipAsync(string zipPath, string destinationDirectory, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ValidateExtractionDestination(destinationDirectory);
 
         using (ZipArchive archive = ZipFile.OpenRead(zipPath))
         {
             foreach (ZipArchiveEntry entry in archive.Entries)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 ValidateArchiveEntry(destinationDirectory, entry.FullName);
                 int unixFileType = (entry.ExternalAttributes >> 16) & 0xF000;
                 if (unixFileType == 0xA000)
@@ -154,19 +190,20 @@ internal sealed class PhysicalFileSystem : IFileSystem
             }
         }
 
-        ZipFile.ExtractToDirectory(zipPath, destinationDirectory);
+        await ZipFile.ExtractToDirectoryAsync(zipPath, destinationDirectory, overwriteFiles: false, cancellationToken);
     }
 
-    public void ExtractTarGz(string tarGzPath, string destinationDirectory)
+    public async Task ExtractTarGzAsync(string tarGzPath, string destinationDirectory, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ValidateExtractionDestination(destinationDirectory);
 
-        using (FileStream validationFile = File.OpenRead(tarGzPath))
-        using (var validationGzip = new GZipStream(validationFile, CompressionMode.Decompress))
-        using (TarReader reader = new(validationGzip))
+        await using (FileStream validationFile = File.OpenRead(tarGzPath))
+        await using (var validationGzip = new GZipStream(validationFile, CompressionMode.Decompress))
+        await using (TarReader reader = new(validationGzip))
         {
             TarEntry? entry;
-            while ((entry = reader.GetNextEntry(copyData: false)) is not null)
+            while ((entry = await reader.GetNextEntryAsync(copyData: false, cancellationToken)) is not null)
             {
                 ValidateArchiveEntry(
                     destinationDirectory,
@@ -183,9 +220,9 @@ internal sealed class PhysicalFileSystem : IFileSystem
         }
 
         Directory.CreateDirectory(destinationDirectory);
-        using FileStream fileStream = File.OpenRead(tarGzPath);
-        using var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress);
-        TarFile.ExtractToDirectory(gzipStream, destinationDirectory, overwriteFiles: true);
+        await using FileStream fileStream = File.OpenRead(tarGzPath);
+        await using var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress);
+        await TarFile.ExtractToDirectoryAsync(gzipStream, destinationDirectory, overwriteFiles: true, cancellationToken);
     }
 
     // ── Hash operations ─────────────────────────────────────────────────────

@@ -27,14 +27,16 @@ internal sealed class InstallMethodDetector(
             throw UnknownInstallation(processPath);
         }
 
-        string normalized = Canonicalize(processPath);
+        string canonicalPath = Canonicalize(processPath);
+        string normalized = Normalize(canonicalPath);
 
         if (ContainsPathMarker(normalized, "/node_modules/"))
         {
             return new InstallMethod(
                 InstallMethodKind.Npm,
                 "npm",
-                "Reinstall Azure Functions CLI with the v5 installer at https://aka.ms/func-cli.");
+                "Reinstall Azure Functions CLI with the v5 installer at https://aka.ms/func-cli.",
+                canonicalPath);
         }
 
         // Homebrew keg-only formulas live under Cellar/; the exposed binary is
@@ -46,7 +48,8 @@ internal sealed class InstallMethodDetector(
             return new InstallMethod(
                 InstallMethodKind.Homebrew,
                 "Homebrew",
-                $"Run 'brew upgrade {homebrewFormula}' to update.");
+                $"Run 'brew upgrade {homebrewFormula}' to update.",
+                canonicalPath);
         }
 
         // winget places packages under %LOCALAPPDATA%\Microsoft\WinGet\Packages\
@@ -56,13 +59,14 @@ internal sealed class InstallMethodDetector(
             return new InstallMethod(
                 InstallMethodKind.Winget,
                 "winget",
-                "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.");
+                "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.",
+                canonicalPath);
         }
 
         string? installDirectory = GetInstallDirectory(normalized);
-        if (installDirectory is not null && IsUnderDirectory(normalized, Canonicalize(installDirectory)))
+        if (installDirectory is not null && IsUnderDirectory(normalized, Normalize(Canonicalize(installDirectory))))
         {
-            return InstallMethod.Direct;
+            return InstallMethod.Direct(canonicalPath);
         }
 
         throw UnknownInstallation(processPath);
@@ -101,7 +105,7 @@ internal sealed class InstallMethodDetector(
     {
         try
         {
-            return Normalize(_fileSystem.GetCanonicalPath(path));
+            return _fileSystem.GetCanonicalPath(path);
         }
         catch (ArgumentException ex)
         {

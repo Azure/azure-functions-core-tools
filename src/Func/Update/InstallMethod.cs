@@ -30,10 +30,12 @@ internal enum InstallMethodKind
 internal sealed record InstallMethod(
     InstallMethodKind Kind,
     string DisplayName,
-    string? UpdateInstruction)
+    string? UpdateInstruction,
+    string ExecutablePath)
 {
     /// <summary>
-    /// Gets the neutral, in-place install with no package manager detected.
+    /// Creates the neutral, in-place install with no package manager detected.
     /// </summary>
-    public static InstallMethod Direct { get; } = new(InstallMethodKind.Direct, "direct install", null);
+    public static InstallMethod Direct(string executablePath) =>
+        new(InstallMethodKind.Direct, "direct install", null, executablePath);
 }
