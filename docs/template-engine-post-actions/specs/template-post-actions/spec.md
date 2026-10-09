@@ -131,6 +131,41 @@ The proposed restore action SHALL use action ID `17a32346-c721-42cd-a520-4d1cada
 - **WHEN** creation or an earlier restore changes a later action's input or working directory into an escaping link
 - **THEN** launch-time validation rejects that action before launching its process
 
+### Requirement: Tool identity prevents template shadowing
+Every ordinary adapter SHALL resolve and validate absolute paths for its executable, interpreter, batch script, and launcher through the reviewed CLI tool boundary. Resolution SHALL NOT search the generated working directory. Resolved link/reparse targets SHALL NOT originate in the invocation output or template mount. Windows launchers SHALL invoke the exact validated absolute manager-script path rather than a bare command name. Launch-time checks SHALL preserve that tool identity. These checks SHALL NOT claim to sandbox manager hooks or project code.
+
+#### Scenario: Template creates a manager shim
+- **WHEN** generated content contains `npm.cmd`, `mvn.cmd`, `go.exe`, or a similarly named tool in the invocation output
+- **THEN** the adapter does not select it and invokes only the independently resolved absolute tool path
+
+#### Scenario: Tool link targets generated content
+- **WHEN** an apparent installed tool path resolves through a link to template-controlled output
+- **THEN** tool validation rejects it before launch
+
+#### Scenario: Valid Windows manager script
+- **WHEN** an approved installed manager script and launcher resolve to valid absolute paths outside template-controlled locations
+- **THEN** the reviewed launcher invokes that exact script with fixed arguments and tested quoting
+
+### Requirement: Go module tidy is distinct from restore
+The proposed Go module-tidy action SHALL use action ID `5080f899-da0c-404a-b80c-909df8e203b5` and exactly one required raw string `primaryOutputIndex` identifying an authored `go.mod` output. It SHALL preserve that output identity through condition filtering and renames and use the shared path/tool preflight and launch-time rules. The adapter SHALL invoke the absolute Go tool with fixed `mod`, `tidy` arguments from the resolved module root, without template flags or environment overrides. Module/checksum mutation SHALL be reported as ordinary action work, not restore-only behavior or transactional rollback. Legacy initializer-time tidy SHALL remain until default/skip behavior and module effects are qualified and Go/command owners approve the intentional nonzero failure outcome and cancellation contract. Startup-time behavior SHALL remain out of scope.
+
+#### Scenario: Tidy changes module requirements
+- **WHEN** the approved tidy action updates `go.mod` or `go.sum` for imports in generated source
+- **THEN** the command treats those changes as ordinary module-tidy effects, not a violation of the restore-only contract
+
+#### Scenario: User skips init-time tidy
+- **WHEN** the template's reviewed skip-tidy symbol suppresses the ordinary tidy action
+- **THEN** mandatory project configuration still completes and no tidy process launches
+
+#### Scenario: Go replacement is not yet qualified
+- **WHEN** the proposed tidy adapter lacks agreement or qualification for default/skip, module effects, and the approved failure/cancellation contract
+- **THEN** the Go initializer tidy path cannot be removed as completed migration work
+
+#### Scenario: Tidy returns a nonzero exit code
+- **WHEN** the approved replacement's tidy process returns nonzero after project creation
+- **THEN** the command reports ordinary-action failure with nonzero outcome and preserves generated/configured files
+- **AND** migration notes identify this as a change from legacy init's ignored tidy result, not unchanged failure behavior
+
 ### Requirement: Existing template action compatibility is qualified
 Before switching the current provider, the CLI SHALL inventory standard actions in supported shared item templates and qualify reviewed adapters/translations or replacement packages preserving their behavior. Unsupported actions SHALL remain blocked; silently ignoring them or rejecting current templates without a migration disposition SHALL NOT satisfy command-switch parity.
 

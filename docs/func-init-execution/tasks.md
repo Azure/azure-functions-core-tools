@@ -31,7 +31,7 @@
 - [ ] 3.2 Create .NET C# and F# project-template variants with `type=project`, language tags, target-framework symbols, and func host metadata.
 - [ ] 3.3 Create Node JavaScript and TypeScript project-template variants with language tags, bundle symbols, package-restore controls, and post-actions.
 - [ ] 3.4 Create Python project-template variants with language tags and bundle symbols.
-- [ ] 3.5 Create Go project-template variants with language tags, bundle symbols, module settings, and tidy post-actions.
+- [ ] 3.5 Create Go project-template variants with language tags, bundle symbols, module settings, and the separately reviewed Go module-tidy action, preserving the existing default/skip choice.
 - [ ] 3.6 Create PowerShell project-template variants with language tags and applicable project symbols.
 - [ ] 3.7 Create Java project-template variants with language tags, Maven project files, and bundle symbols.
 - [ ] 3.8 Move common bundle channel and no-bundle options from workload registrations into project-template symbols.
@@ -119,7 +119,7 @@
 - [ ] 11.2 Remove .NET workload initializer file-generation and nested `dotnet new` execution code.
 - [ ] 11.3 Remove Node workload project-file generation and package-install execution code migrated to templates and post-actions.
 - [ ] 11.4 Remove Python workload project-file generation code migrated to templates.
-- [ ] 11.5 Remove Go workload project-file generation and tidy execution code migrated to templates and post-actions.
+- [ ] 11.5 Remove Go workload project-file generation and initializer-time tidy only after the distinct module-tidy action is agreed, implemented, and qualified for default/skip and module/checksum effects, with explicit approval/migration notes for nonzero failure reporting and cancellation outcomes. Leave startup-time Go tidy/build behavior unchanged.
 - [ ] 11.6 Remove PowerShell workload initializer scaffolding code migrated to templates.
 - [ ] 11.7 Remove Java workload project-file generation code migrated to templates.
 - [ ] 11.8 Remove initializer dependencies from `func new`, template option hydration, and language group resolution in favor of `IProjectStack` or template-owned metadata.

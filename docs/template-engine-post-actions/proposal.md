@@ -6,6 +6,7 @@ Project templates must declare the Functions projects they create so the CLI can
 
 - Define a mandatory trusted Functions project configuration action tied to a primary output.
 - Define an initial ordinary package-restore action with CLI-owned adapters and fixed process argument construction.
+- Propose a separate Go module-tidy action rather than treat its manifest mutation as restore-only behavior, and bind all adapter launches to validated absolute tool identities.
 - Validate action structure, project roots, languages, combined file effects, and supported processors before mutation.
 - Project action effects for dry-run without executing configuration writes or restore commands.
 - Keep configuration finalization separate from ordinary action execution and report cancellation and partial completion accurately.
@@ -24,4 +25,4 @@ Project templates must declare the Functions projects they create so the CLI can
 
 ## Impact
 
-The proposal supplies the contract consumed by runtime projection, init/item orchestration, and template packaging. It does not implement processors, install language toolchains, execute actions in the central packager, or change the CLI's general process-launching policy. Restore-only processors do not add missing manifest dependencies or resolve the Durable template dependency bug; that requires an author fix or separately reviewed package-add contract. The proposed action identifiers, initial restore managers, item execution policy, and ordinary-action defaults require team review before implementation.
+The proposal supplies the contract consumed by runtime projection, init/item orchestration, and template packaging. It does not implement processors, provision missing language toolchains, execute actions in the central packager, or rewrite the CLI's general process-launching implementation. Restore-only processors do not add missing manifest dependencies or resolve the Durable template dependency bug; that requires an author fix or separately reviewed package-add contract. The distinct Go tidy action, absolute tool/launcher resolution, proposed action identifiers, initial managers, item execution policy, and ordinary-action defaults require team review before implementation.

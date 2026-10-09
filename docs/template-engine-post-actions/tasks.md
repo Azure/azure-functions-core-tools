@@ -13,9 +13,10 @@
 
 ## 3. Ordinary Actions and Preview
 
-- [ ] 3.1 Implement only approved manager adapters using existing process/tool boundaries and fixed argv without template shell text or environment overrides; separately prove Windows batch-launcher quoting and revalidate actual inputs/directories immediately before each launch.
+- [ ] 3.1 Implement only approved manager adapters using existing process/tool boundaries and fixed argv without template shell text or environment overrides. Resolve absolute executable/interpreter/script/launcher paths outside template-controlled roots, exclude generated working-directory search, prove Windows exact-script quoting, and revalidate tools/inputs/directories immediately before launch.
 - [ ] 3.2 Project dry-run intents and ordered configuration effects without writes, tool provisioning, or process execution.
-- [ ] 3.3 Test absent tools, unsupported managers/IDs, exact raw restore argument types/duplicates/extra keys, restore authored-index identity through inactive earlier outputs and renames, rejected inactive restore inputs, Windows batch quoting, argument injection, input/root changes between preflight and launch, continued/stopped failures, process cancellation, and ordinary suppression after finalization failure.
+- [ ] 3.3 Test absent tools, unsupported managers/IDs, exact raw restore argument types/duplicates/extra keys, restore authored-index identity through inactive earlier outputs and renames, rejected inactive restore inputs, generated manager shims, tool links into template output, valid absolute tool/script controls, Windows batch quoting, argument injection, input/root changes between preflight and launch, continued/stopped failures, process cancellation, and ordinary suppression after finalization failure.
+- [ ] 3.4 Agree and implement the distinct Go module-tidy action, raw `go.mod` output reference, absolute fixed-command launch, ordinary failure/cancellation, and module/checksum effects. Preserve init default/skip behavior, obtain explicit approval for nonzero failure reporting versus the legacy ignored result, and leave startup tidy/build untouched.
 
 ## 4. Authoring and Migration
 
@@ -24,3 +25,4 @@
 - [ ] 4.3 Run targeted and full CI-strict validation before command integration; keep legacy removal behind its independent readiness gates.
 - [ ] 4.4 Inventory standard actions in supported shared .NET item templates and qualify reviewed adapters/translations or replacement packages before provider removal. Do not treat an unknown-action refusal as preserved parity.
 - [ ] 4.5 Wire the agreed item create-mode dispatcher and partial outcomes into `func new`, document ordinary action authorization/defaults, and preserve dry-run suppression. Keep missing-dependency/package-add coverage explicitly separate from restore until its own contract is agreed.
+- [ ] 4.6 Qualify Go default and skip-tidy, module/checksum mutation, and missing-tool/failure/cancellation outcomes before removing initializer-time tidy. Document the approved failure change rather than asserting failure parity. Do not mark startup-time migration complete in this change.
