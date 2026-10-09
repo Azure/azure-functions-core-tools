@@ -185,16 +185,18 @@ FunctionsProjectConfiguration
 `- Language
 ```
 
-The referenced primary output is a file located directly in the Functions project root. TemplateEngine resolves its final relative path after source targets, `sourceName`, explicit renames, symbol `fileRename`, and conditions:
+Configuration actions supply stack/language metadata, not a complete project inventory. `template-engine-post-actions` derives active roots independently from the retained resolved host-file output/effect snapshot. An omitted or inactive action cannot remove a generated root from that inventory. Other non-Functions content remains opaque, while unrelated host-named files require the reviewed classification/exclusion contract.
+
+The referenced primary output is a file located directly in an independently inventoried Functions root. TemplateEngine resolves its final relative path after source targets, `sourceName`, explicit renames, symbol `fileRename`, and conditions:
 
 ```text
 project root = parent(resolved primary output)
 config path  = project root/.func/config.json
 ```
 
-The action carries canonical stack and language. Values can differ between projects, and must match `--stack` or `--language` when supplied. The exact action ID, serialized argument schema, rename propagation, and TemplateEngine projection belong to `template-engine-post-actions`.
+The action carries canonical stack and language. Values can differ between projects, and must match `--stack` or `--language` when supplied. `template-engine-post-actions` proposes the trusted action ID, string-valued `primaryOutputIndex`/`stack`/`language` schema, raw-to-resolved output mapping, and restore processor boundary. Those details require agreement before implementation, and resolved references must preserve authored output identity after conditions and renames.
 
-Project template content cannot create or modify `.func/config.json` directly. The trusted action is template-declared topology but CLI-owned behavior: Func validates the declaration, computes the destination, and serializes the current CLI configuration schema.
+Project template content cannot create or modify `.func/config.json` directly. The trusted action carries template-declared project metadata but CLI-owned behavior. Func validates exactly one active declaration per inventoried root, computes the destination, and serializes the current CLI configuration schema. A non-host primary-output anchor is valid only when its resolved parent matches that independent inventory.
 
 **Alternative considered:** add stack and language properties to `primaryOutputs`. TemplateEngine discards unknown properties from its public primary-output result, forcing Func to parse and correlate raw template JSON. It is rejected.
 
@@ -202,7 +204,7 @@ Project template content cannot create or modify `.func/config.json` directly. T
 
 ### Configuration declarations and effects are preflighted
 
-After candidate parameters are complete, init resolves active configuration actions and primary outputs during TemplateEngine effects evaluation. Before target modification, preflight rejects:
+After candidate parameters are complete, init uses the retained resolved output/effect snapshot to independently inventory the union of primary outputs whose final filename is `host.json` and created/modified file effects whose final filename is `host.json`. Normalize parent roots and deduplicate observations with platform path comparison, then match active configuration declarations to those roots. Completeness validation precedes authoritative whole-template filters and any cleanup. Before target modification, preflight rejects:
 
 - no active trusted configuration action;
 - optional or continue-on-error configuration behavior;
@@ -210,20 +212,23 @@ After candidate parameters are complete, init resolves active configuration acti
 - a resolved primary output outside the target;
 - empty or non-canonical stack/language, or a value that conflicts with an explicit filter;
 - a stack that is not installed, or a language its stack does not support;
-- duplicate resolved project roots;
+- active inventoried roots with no active configuration action, including omitted declarations or false action conditions;
+- configuration actions targeting absent/inactive inventoried roots;
+- multiple active configuration plans for one normalized root, not valid duplicate output/effect observations;
 - project template file effects targeting `.func/config.json`;
 - configuration output collisions with any other planned effect.
 
-Dry-run projects one planned `.func/config.json` write for each active action without executing the action. It preserves resolved primary outputs and reports ordinary post-actions separately.
+Both-inactive project/action pairs require no configuration write. Mutually exclusive declarations are valid when exactly one finalizes an active root, and at least one active project and configuration must remain. Dry-run applies the same inventory/completeness validation and projects one planned `.func/config.json` write per matched root without executing actions. It preserves resolved primary outputs and reports ordinary post-actions separately.
 
 Actual execution is ordered:
 
 ```text
-preflight template, actions, and combined paths
+retain evaluated topology and independently inventory host-file roots
+preflight template, inventory/action completeness, filters, and combined paths
 create project template
 for each configuration action in declared order:
   verify resolved primary-output file exists
-  derive its parent project root
+  verify its parent matches the inventoried project root
   atomically write .func/config.json
 run ordinary post-actions in declared order
 ```
@@ -249,7 +254,7 @@ The func-owned preview preserves phase and source so deletion followed by recrea
 
 ### Config persistence is mandatory
 
-`.func/config.json` is required CLI state, not a best-effort hint. Init reports success only after every active configuration action succeeds. Both stack and language are always written, replacing the current single-language omission behavior and preventing a later stack expansion from turning an initialized project into a partial state.
+`.func/config.json` is required CLI state, not a best-effort hint. Init reports success only after exactly one matched active configuration has succeeded for every independently inventoried active root. Both stack and language are always written, replacing the current single-language omission behavior and preventing a later stack expansion from turning an initialized project into a partial state.
 
 Adoption and healing use the same canonical configuration serialization rules but remain command-owned because no project `ResolvedTemplate` exists on those paths.
 

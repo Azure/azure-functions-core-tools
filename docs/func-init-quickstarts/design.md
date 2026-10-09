@@ -50,7 +50,7 @@ target/
 `- infra/            non-project content
 ```
 
-Only declared Functions project configuration actions participate in Func topology. Other generated content is opaque to init.
+Configuration actions declare canonical Functions stack/language metadata, but their absence is not proof that generated content contains no Functions project. After parameters resolve, `template-engine-post-actions` independently inventories host-file roots from resolved outputs/effects and compares active configuration declarations against that inventory. Other non-Functions content remains opaque; host-named content cannot be silently excluded from the proposed conservative validation convention without the separately reviewed classification contract.
 
 **Alternative considered:** use TemplateEngine `tags.type = solution`. This would create a second init template category without changing the invocation mechanism and would force users and authors to distinguish templates based on project count. It is rejected.
 
@@ -137,7 +137,7 @@ TemplateConstraintOutcome
    `- CallsToAction
 ```
 
-### Configuration actions are the project topology
+### Configuration actions declare project metadata, not a complete inventory
 
 Every generated Functions project is represented by one mandatory trusted configuration action. Conceptually, each action supplies:
 
@@ -155,7 +155,7 @@ project root = parent(resolved primary output)
 config path  = project root/.func/config.json
 ```
 
-The author can choose `host.json`, a project file, `package.json`, or another stable root file. Func does not impose a stack-specific filename.
+The author can choose `host.json`, a project file, `package.json`, or another stable root file as the configuration anchor. Its resolved parent must match a root in the independent host-file inventory defined by `template-engine-post-actions`; an arbitrary primary output does not by itself establish a Functions project. The host-file classification/exclusion convention is an explicit review point before implementation, not an inference of stack or language from filenames.
 
 The exact action ID, argument representation, rename propagation, and projection model belong to `template-engine-post-actions`. That capability must make the configuration action distinguishable from ordinary actions and expose its validated metadata before invocation.
 
@@ -167,7 +167,7 @@ The exact action ID, argument representation, rename propagation, and projection
 
 ### Configuration declarations are preflighted before scaffolding
 
-After candidate parameters are complete, init resolves active configuration actions and primary outputs during TemplateEngine effects evaluation. Preflight rejects:
+After candidate parameters are complete, init obtains the retained resolved output/effect snapshot, independently inventories active host-file roots under `template-engine-post-actions`, and then resolves active configuration actions against that inventory. Every inventoried active root requires exactly one active finalization; an omitted or inactive action cannot erase it. Preflight rejects:
 
 - no active configuration action;
 - unsupported or non-trusted action identity;
@@ -176,7 +176,9 @@ After candidate parameters are complete, init resolves active configuration acti
 - output outside the target;
 - output whose parent cannot be a project root;
 - empty or non-canonical stack/language;
-- duplicate resolved project roots;
+- active inventoried project roots with no configuration action;
+- active configuration actions targeting roots absent from the independent inventory;
+- multiple active configuration plans for one root, while valid duplicate inventory observations are deduplicated;
 - template file effects targeting `.func/config.json`;
 - configuration output collisions with another planned effect.
 
@@ -198,7 +200,7 @@ After active configuration actions are known:
 
 A heterogeneous template is valid when those singular filters are absent. Supplying a filter is an assertion about the whole generated topology, not a request to rewrite one or all action values.
 
-For conditional projects, only active configuration actions participate after final template parameter resolution. This may require completing template parameters before a filter can be authoritatively evaluated.
+For conditional projects, the independent output/effect inventory determines which roots remain active after final parameter resolution, and exactly one active configuration action supplies metadata for each. Inactive actions do not suppress generated projects. Filters operate on those matched configurations after completeness validation; an unconfigured active root is an authoring error rather than a project excluded from filtering. This may require completing template parameters before a filter can be authoritatively evaluated.
 
 Before a template is selected, the filters narrow the picker to templates that can still match. Every unconditional project must match all supplied filters, and at least one project must match them all. A conditional project that uses another value does not remove the template, because parameters can still turn it off. If it stays on, the check after parameters rejects the template and names that project. A group remains in the picker when any of its variants can still match, and the same rule narrows the variants of the selected group.
 

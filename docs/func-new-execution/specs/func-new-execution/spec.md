@@ -4,6 +4,21 @@ Defines how `func new` resolves an existing Functions project, selects and confi
 
 ## ADDED Requirements
 
+### Requirement: Item ordinary-action execution
+The proposed create-mode runner SHALL invoke the shared ordinary-action dispatcher after successful item-template creation, under the reviewed policy defined by `template-engine-post-actions`. Action plans SHALL pass target preflight before file creation. Initial restore inputs SHALL remain inside the invocation output root, not use the containing project root as an implicit wider boundary. Unsupported ancestor-manifest restore SHALL fail before item creation until a typed containing-project target is separately agreed and qualified. Explicit creation, including explicitly non-interactive requests, SHALL not introduce a new per-action prompt. Dry-run SHALL report but never execute actions. Item templates SHALL NOT finalize Functions project configuration, and action failure SHALL preserve generated files and return partial results with nonzero exit.
+
+#### Scenario: Nested item requests ancestor restore
+- **WHEN** an item's output is nested below the discovered project root and its restore input is at that ancestor root
+- **THEN** the unsupported target fails preflight without creating files or dispatching restore
+
+#### Scenario: Item restore fails after creation
+- **WHEN** item creation succeeds and its ordinary restore action fails
+- **THEN** the command reports created files and action failure without deleting those files
+
+#### Scenario: Item preview has ordinary actions
+- **WHEN** dry-run projects ordinary item actions
+- **THEN** the command launches no processor and performs no action writes
+
 ### Requirement: Item template command grammar
 `func new` SHALL accept a template reference as its primary positional argument and SHALL NOT interpret that argument as a filesystem path. The command SHALL accept `--path` as the directory in which the item template runs and SHALL accept `--template` / `-t` as an alternative explicit template selector. Supplying both selectors SHALL be an error.
 

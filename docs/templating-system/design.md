@@ -2,7 +2,7 @@
 
 See `proposal.md` for motivation and `specs/templating-system/spec.md` for the coordination contract.
 
-Seven focused templating changes currently have complete planning artifacts:
+Eight focused templating changes currently have complete planning artifacts:
 
 | Change | Responsibility | Artifact status |
 |---|---|---|
@@ -13,12 +13,12 @@ Seven focused templating changes currently have complete planning artifacts:
 | `azure-samples-template-pipeline` | Seamless conversion and release of Azure-Samples repositories as packages accepted by `func new install` | Complete |
 | `func-init-quickstarts` | Template-first `func init` selection, multi-project topology, and installed Azure-Samples quickstarts | Complete |
 | `template-engine-constraints` | Func workload and extension bundle constraints, eligibility results, and restriction guidance | Complete |
+| `template-engine-post-actions` | Trusted project configuration, supported restore actions, preflight, preview, and ordered execution | Complete |
 
-Three identified areas do not yet have focused changes:
+Two identified areas do not yet have focused changes:
 
 | Planned change | Responsibility | Artifact status |
 |---|---|---|
-| `template-engine-post-actions` | Func-supported actions such as npm install, NuGet restore, pip install, and package addition | Planned |
 | `template-engine-bind-sources` | Func-supported value sources such as MSBuild properties and npm package properties | Planned |
 | `func-new-search` | NuGet feed scanning, `FuncTemplate` discovery manifests, CDN publication, and `func new search` consumption | Planned |
 
@@ -105,7 +105,7 @@ Focused changes can progress independently when their required contracts are set
 
 ### Artifact and implementation status are tracked separately
 
-The umbrella task list marks the seven existing specification sets complete and leaves the three planned specification sets open. Product implementation continues to be tracked only in each focused change's own tasks.
+The umbrella task list marks the eight existing specification sets complete and leaves the two planned specification sets open. Product implementation continues to be tracked only in each focused change's own tasks. Complete artifacts do not mean proposed action IDs or processor choices are already agreed or implemented.
 
 This prevents a completed proposal from being mistaken for shipped behavior and keeps the umbrella stable as child implementation is split across branches or releases.
 
@@ -118,9 +118,9 @@ This prevents a completed proposal from being mistaken for shipped behavior and 
 
 ## Migration Plan
 
-1. Retain the seven existing focused changes as authoritative.
-2. Create `template-engine-post-actions`, `template-engine-bind-sources`, and `func-new-search` as separate OpenSpec changes.
-3. Reconcile their declared dependencies with the existing seven changes.
+1. Retain the eight existing focused changes as authoritative.
+2. Create `template-engine-bind-sources` and `func-new-search` as separate OpenSpec changes.
+3. Reconcile their declared dependencies with the existing eight changes.
 4. Mark the templating system fully specified only after all ten changes pass strict validation.
 
 There is no product rollback for this coordination change. Reverting it removes the umbrella inventory without altering focused specifications or implementation.
