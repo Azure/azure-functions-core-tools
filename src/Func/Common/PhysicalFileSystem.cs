@@ -2,12 +2,15 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
+using System.Formats.Tar;
 
 namespace Azure.Functions.Cli.Common;
 
 /// <inheritdoc cref="IFileSystem" />
 internal sealed class PhysicalFileSystem : IFileSystem
 {
+    private const int MaxSymbolicLinkDepth = 64;
+
     // ── File operations ─────────────────────────────────────────────────────
 
     public bool FileExists(string path) => File.Exists(path);
@@ -112,17 +115,114 @@ internal sealed class PhysicalFileSystem : IFileSystem
     public IReadOnlyList<string> GetFiles(string directoryPath) =>
         Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
 
+    public string GetCanonicalPath(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        string candidatePath = Path.GetFullPath(path);
+        StringComparer pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        var visitedPaths = new HashSet<string>(pathComparer);
+
+        for (int depth = 0; depth < MaxSymbolicLinkDepth; depth++)
+        {
+            if (!visitedPaths.Add(candidatePath))
+            {
+                throw new IOException($"A symbolic link cycle was detected while resolving '{path}'.");
+            }
+
+            string root = Path.GetPathRoot(candidatePath)
+                ?? throw new ArgumentException($"Path '{path}' does not have a root.", nameof(path));
+            string current = root;
+            string[] segments = candidatePath[root.Length..]
+                .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            bool resolvedLink = false;
+
+            for (int index = 0; index < segments.Length; index++)
+            {
+                current = Path.Combine(current, segments[index]);
+                FileSystemInfo fileSystemInfo = Directory.Exists(current)
+                    ? new DirectoryInfo(current)
+                    : new FileInfo(current);
+                FileSystemInfo? target = fileSystemInfo.ResolveLinkTarget(returnFinalTarget: false);
+                if (target is null)
+                {
+                    continue;
+                }
+
+                candidatePath = target.FullName;
+                if (index + 1 < segments.Length)
+                {
+                    candidatePath = Path.Combine(candidatePath, Path.Combine(segments[(index + 1)..]));
+                }
+
+                candidatePath = Path.GetFullPath(candidatePath);
+                resolvedLink = true;
+                break;
+            }
+
+            if (!resolvedLink)
+            {
+                return candidatePath;
+            }
+        }
+
+        throw new IOException($"More than {MaxSymbolicLinkDepth} symbolic links were encountered while resolving '{path}'.");
+    }
+
     // ── Archive operations ──────────────────────────────────────────────────
 
-    public void ExtractZip(string zipPath, string destinationDirectory) =>
-        ZipFile.ExtractToDirectory(zipPath, destinationDirectory);
-
-    public void ExtractTarGz(string tarGzPath, string destinationDirectory)
+    public async Task ExtractZipAsync(string zipPath, string destinationDirectory, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        ValidateExtractionDestination(destinationDirectory);
+
+        using (ZipArchive archive = ZipFile.OpenRead(zipPath))
+        {
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ValidateArchiveEntry(destinationDirectory, entry.FullName);
+                int unixFileType = (entry.ExternalAttributes >> 16) & 0xF000;
+                if (unixFileType == 0xA000)
+                {
+                    throw new InvalidDataException($"Archive entry '{entry.FullName}' is a symbolic link.");
+                }
+            }
+        }
+
+        await ZipFile.ExtractToDirectoryAsync(zipPath, destinationDirectory, overwriteFiles: false, cancellationToken);
+    }
+
+    public async Task ExtractTarGzAsync(string tarGzPath, string destinationDirectory, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ValidateExtractionDestination(destinationDirectory);
+
+        await using (FileStream validationFile = File.OpenRead(tarGzPath))
+        await using (var validationGzip = new GZipStream(validationFile, CompressionMode.Decompress))
+        await using (TarReader reader = new(validationGzip))
+        {
+            TarEntry? entry;
+            while ((entry = await reader.GetNextEntryAsync(copyData: false, cancellationToken)) is not null)
+            {
+                ValidateArchiveEntry(
+                    destinationDirectory,
+                    entry.Name,
+                    allowRootDirectoryEntry: entry.EntryType == TarEntryType.Directory);
+                if (entry.EntryType is not TarEntryType.RegularFile
+                    and not TarEntryType.V7RegularFile
+                    and not TarEntryType.Directory)
+                {
+                    throw new InvalidDataException(
+                        $"Archive entry '{entry.Name}' has unsupported type '{entry.EntryType}'.");
+                }
+            }
+        }
+
         Directory.CreateDirectory(destinationDirectory);
-        using FileStream fileStream = File.OpenRead(tarGzPath);
-        using var gzipStream = new System.IO.Compression.GZipStream(fileStream, CompressionMode.Decompress);
-        System.Formats.Tar.TarFile.ExtractToDirectory(gzipStream, destinationDirectory, overwriteFiles: true);
+        await using FileStream fileStream = File.OpenRead(tarGzPath);
+        await using var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress);
+        await TarFile.ExtractToDirectoryAsync(gzipStream, destinationDirectory, overwriteFiles: true, cancellationToken);
     }
 
     // ── Hash operations ─────────────────────────────────────────────────────
@@ -142,6 +242,70 @@ internal sealed class PhysicalFileSystem : IFileSystem
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
+        }
+    }
+
+    private static void ValidateExtractionDestination(string destinationDirectory)
+    {
+        var destination = new DirectoryInfo(Path.GetFullPath(destinationDirectory));
+        if (destination.LinkTarget is not null)
+        {
+            throw new InvalidDataException($"Archive destination '{destinationDirectory}' is a link.");
+        }
+    }
+
+    private static void ValidateArchiveEntry(string destinationDirectory, string entryName, bool allowRootDirectoryEntry = false)
+    {
+        string normalizedName = entryName.Replace('\\', '/');
+        if ((normalizedName.Length > 0 && normalizedName[0] == '/')
+            || (normalizedName.Length >= 3
+                && char.IsAsciiLetter(normalizedName[0])
+                && normalizedName[1] == ':'
+                && normalizedName[2] == '/'))
+        {
+            throw new InvalidDataException($"Archive entry '{entryName}' has an absolute path.");
+        }
+
+        string destination = Path.GetFullPath(destinationDirectory);
+        string target = Path.GetFullPath(Path.Combine(
+            destination,
+            normalizedName.Replace('/', Path.DirectorySeparatorChar)));
+        string destinationPrefix = Path.TrimEndingDirectorySeparator(destination) + Path.DirectorySeparatorChar;
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        bool isDestination = string.Equals(
+            Path.TrimEndingDirectorySeparator(target),
+            Path.TrimEndingDirectorySeparator(destination),
+            comparison);
+        if (isDestination)
+        {
+            if (allowRootDirectoryEntry && normalizedName.Equals("./", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            throw new InvalidDataException($"Archive entry '{entryName}' resolves to the destination directory.");
+        }
+
+        if (!target.StartsWith(destinationPrefix, comparison))
+        {
+            throw new InvalidDataException($"Archive entry '{entryName}' escapes the destination directory.");
+        }
+
+        string relativeTarget = Path.GetRelativePath(destination, target);
+        string current = destination;
+        foreach (string segment in relativeTarget.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            FileSystemInfo info = Directory.Exists(current)
+                ? new DirectoryInfo(current)
+                : new FileInfo(current);
+            if (info.LinkTarget is not null)
+            {
+                throw new InvalidDataException(
+                    $"Archive entry '{entryName}' traverses existing link '{current}'.");
+            }
         }
     }
 }

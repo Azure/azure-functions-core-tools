@@ -98,19 +98,24 @@ internal interface IFileSystem
     /// </summary>
     public IReadOnlyList<string> GetFiles(string directoryPath);
 
+    /// <summary>
+    /// Returns the absolute path with existing symbolic links and junctions resolved.
+    /// </summary>
+    public string GetCanonicalPath(string path);
+
     // ── Archive operations ──────────────────────────────────────────────────
 
     /// <summary>
     /// Extracts a ZIP archive at <paramref name="zipPath"/> into
     /// <paramref name="destinationDirectory"/>.
     /// </summary>
-    public void ExtractZip(string zipPath, string destinationDirectory);
+    public Task ExtractZipAsync(string zipPath, string destinationDirectory, CancellationToken cancellationToken);
 
     /// <summary>
     /// Extracts a gzipped tar archive at <paramref name="tarGzPath"/> into
     /// <paramref name="destinationDirectory"/>.
     /// </summary>
-    public void ExtractTarGz(string tarGzPath, string destinationDirectory);
+    public Task ExtractTarGzAsync(string tarGzPath, string destinationDirectory, CancellationToken cancellationToken);
 
     // ── Hash operations ─────────────────────────────────────────────────────
 

@@ -2,6 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Net;
+using System.Formats.Tar;
+using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
 using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Update;
@@ -291,14 +295,22 @@ public sealed class CliUpdaterTests
         Assert.Contains(actualChecksum, ex.Message, StringComparison.Ordinal);
 
         // Extract should never have been called
-        fileSystem.DidNotReceive().ExtractZip(Arg.Any<string>(), Arg.Any<string>());
-        fileSystem.DidNotReceive().ExtractTarGz(Arg.Any<string>(), Arg.Any<string>());
+        _ = fileSystem.DidNotReceive().ExtractZipAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        _ = fileSystem.DidNotReceive().ExtractTarGzAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
         fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
     public async Task UpdateAsync_MatchingChecksum_VerifiesBeforeExtraction()
     {
+        using var cancellationSource = new CancellationTokenSource();
+        CancellationToken cancellationToken = cancellationSource.Token;
         (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
@@ -309,19 +321,25 @@ public sealed class CliUpdaterTests
         fileSystem.FileExists(_fakeProcessPath).Returns(true);
 
         // Act
-        await updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None);
+        await updater.UpdateAsync(_stableRelease, progress: null, cancellationToken);
 
-        await fileSystem.Received(1).ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
+        await fileSystem.Received(1).ComputeSha256Async(Arg.Any<string>(), cancellationToken);
         Received.InOrder(() =>
         {
-            _ = fileSystem.ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
+            _ = fileSystem.ComputeSha256Async(Arg.Any<string>(), cancellationToken);
             if (Release.ArchiveExtension == "zip")
             {
-                fileSystem.ExtractZip(Arg.Any<string>(), _fakeExtractDir);
+                _ = fileSystem.ExtractZipAsync(
+                    Arg.Any<string>(),
+                    _fakeExtractDir,
+                    cancellationToken);
             }
             else
             {
-                fileSystem.ExtractTarGz(Arg.Any<string>(), _fakeExtractDir);
+                _ = fileSystem.ExtractTarGzAsync(
+                    Arg.Any<string>(),
+                    _fakeExtractDir,
+                    cancellationToken);
             }
         });
     }
@@ -429,6 +447,61 @@ public sealed class CliUpdaterTests
         fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
     }
 
+    [Fact]
+    public async Task UpdateAsync_RealTarGzOnUnix_PreservesExecutableModeAndRunsReplacement()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var fileSystem = new PhysicalFileSystem();
+        using TempDirectory root = fileSystem.CreateTempDirectory();
+        string installDirectory = Path.Combine(root.Path, "install");
+        Directory.CreateDirectory(installDirectory);
+        string executablePath = Path.Combine(installDirectory, "func");
+        await File.WriteAllTextAsync(executablePath, "#!/bin/sh\necho 4.0.0\n");
+        UnixFileMode executableMode =
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+            UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
+        File.SetUnixFileMode(executablePath, executableMode);
+
+        byte[] archive = CreateExecutableTarGz("#!/bin/sh\necho 5.1.0\n", executableMode);
+        string checksum = Convert.ToHexStringLower(SHA256.HashData(archive));
+        Release release = new(
+            SemVersion.Parse("5.1.0", SemVersionStyles.Strict),
+            new Uri("public/cli/v5/5.1.0/Azure.Functions.Cli.linux-x64.5.1.0.tar.gz", UriKind.Relative))
+        {
+            Sha256Checksum = checksum,
+        };
+        var handler = new StubHttpMessageHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(archive),
+        });
+        using var client = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://cdn.functions.azure.com/"),
+        };
+        IUpdateLockProvider lockProvider = Substitute.For<IUpdateLockProvider>();
+        lockProvider.Acquire(installDirectory).Returns(Substitute.For<IDisposable>());
+        CliUpdater updater = new(
+            client,
+            fileSystem,
+            Options.Create(new CliEnvironmentOptions { ProcessPath = executablePath }),
+            new ProcessRunner(),
+            lockProvider,
+            NullLogger<CliUpdater>.Instance);
+
+        await updater.UpdateAsync(release, progress: null, CancellationToken.None);
+
+        UnixFileMode installedMode = File.GetUnixFileMode(executablePath);
+        Assert.True(installedMode.HasFlag(UnixFileMode.UserExecute));
+        Assert.True(installedMode.HasFlag(UnixFileMode.GroupExecute));
+        Assert.True(installedMode.HasFlag(UnixFileMode.OtherExecute));
+        Assert.Contains("5.1.0", await File.ReadAllTextAsync(executablePath), StringComparison.Ordinal);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static (CliUpdater Updater, IFileSystem FileSystem, IProcessRunner ProcessRunner, CliEnvironmentOptions Environment)
@@ -488,6 +561,23 @@ public sealed class CliUpdaterTests
 
     private static ProcessOutcome OkOutcome(string stdout) =>
         new(ExitCode: 0, StandardOutput: stdout, StandardError: string.Empty, TimedOut: false, ExecutableNotFound: false);
+
+    private static byte[] CreateExecutableTarGz(string contents, UnixFileMode mode)
+    {
+        using MemoryStream archive = new();
+        using (GZipStream gzip = new(archive, CompressionLevel.SmallestSize, leaveOpen: true))
+        using (TarWriter writer = new(gzip, TarEntryFormat.Pax))
+        {
+            PaxTarEntry entry = new(TarEntryType.RegularFile, "func")
+            {
+                DataStream = new MemoryStream(Encoding.UTF8.GetBytes(contents)),
+                Mode = mode,
+            };
+            writer.WriteEntry(entry);
+        }
+
+        return archive.ToArray();
+    }
 
     private sealed class RecordingProgress : IProgress<UpdateProgress>
     {
