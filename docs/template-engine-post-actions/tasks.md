@@ -9,13 +9,13 @@
 - [ ] 2.1 Validate raw action schemas before engine coercion, rejecting duplicate properties, non-string configuration arguments, and configuration actions in item templates. Independently inventory normalized host-file roots from resolved primary outputs and created/modified effects, then compare active declarations against that inventory. Reject omitted/ambiguous finalization, unsupported actions, absent outputs, unsafe roots, stack/language conflicts, and direct configuration effects before mutation.
 - [ ] 2.2 Implement write-time path/link validation and atomic canonical stack/language persistence through injectable filesystem boundaries.
 - [ ] 2.3 Run mandatory actions before ordinary ones; stop/report partial completion without destructive rollback.
-- [ ] 2.4 Test multi-project/conditional/renamed outputs, raw-index identity, filtered-list traps, active project with inactive action, both-inactive controls, mutually exclusive declarations and duplicate active finalization, overlaps, links, force, partial writes, and cancellation.
+- [ ] 2.4 Test multi-project/conditional/renamed outputs, raw-index identity, filtered-list traps, active project with inactive action, both-inactive controls, mutually exclusive declarations, valid duplicate inventory observations versus invalid multiple active finalization plans, non-host primary outputs, overlaps, links, force, partial writes, and cancellation.
 
 ## 3. Ordinary Actions and Preview
 
 - [ ] 3.1 Implement only approved manager adapters using existing process/tool boundaries and fixed argv without template shell text or environment overrides; separately prove Windows batch-launcher quoting and revalidate actual inputs/directories immediately before each launch.
 - [ ] 3.2 Project dry-run intents and ordered configuration effects without writes, tool provisioning, or process execution.
-- [ ] 3.3 Test absent tools, unsupported managers/IDs, raw coercion/duplicates, Windows batch quoting, argument injection, input/root changes between preflight and launch, continued/stopped failures, process cancellation, and ordinary suppression after finalization failure.
+- [ ] 3.3 Test absent tools, unsupported managers/IDs, exact raw restore argument types/duplicates/extra keys, restore authored-index identity through inactive earlier outputs and renames, rejected inactive restore inputs, Windows batch quoting, argument injection, input/root changes between preflight and launch, continued/stopped failures, process cancellation, and ordinary suppression after finalization failure.
 
 ## 4. Authoring and Migration
 

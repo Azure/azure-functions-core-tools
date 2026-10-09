@@ -5,7 +5,7 @@ Defines trusted Functions project finalization and supported ordinary post-actio
 ## ADDED Requirements
 
 ### Requirement: Trusted project configuration declaration
-The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. Every active Functions project root discovered independently from the resolved output/effect snapshot SHALL have exactly one active configuration action. The inventory SHALL include parent roots of resolved primary outputs and created/modified file effects named `host.json`, normalized and deduplicated using platform path comparison, rather than depend on configuration declarations. The action SHALL be mandatory when active, SHALL reject extra arguments or continue-on-error, and SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position. A referenced root absent from the independent inventory SHALL be rejected.
+The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. Every active Functions project root discovered independently from the resolved output/effect snapshot SHALL have exactly one active configuration action. The inventory SHALL include parent roots of resolved primary outputs whose final filename is `host.json` and created/modified file effects whose final filename is `host.json`. Both sources SHALL use the retained resolved snapshot and SHALL be normalized and deduplicated using platform path comparison, rather than depend on configuration declarations. The action SHALL be mandatory when active, SHALL reject extra arguments or continue-on-error, and SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position. A referenced root absent from the independent inventory SHALL be rejected.
 
 #### Scenario: Conditional earlier output is inactive
 - **WHEN** an earlier primary output is suppressed and an active configuration action references a later authored index
@@ -34,6 +34,10 @@ The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-4
 #### Scenario: Output and effect refer to the same host file
 - **WHEN** a resolved primary output and file effect identify the same normalized project root
 - **THEN** the inventory requires one finalization for that root rather than two
+
+#### Scenario: Primary output is not a host file
+- **WHEN** a resolved primary output names `frontend/package.json` and no `host.json` output or effect identifies its parent root
+- **THEN** that primary output alone does not add the frontend directory to the Functions project inventory
 
 #### Scenario: Project and its action are both inactive
 - **WHEN** both the declared project/output and its configuration action are inactive
@@ -71,7 +75,7 @@ Preflight and actual creation SHALL use retained evaluated values for all parame
 - **THEN** configuration plans remain attached to those outputs without a second independent selection
 
 ### Requirement: Project roots and effects are validated
-The CLI SHALL resolve project roots from primary-output parents, validate canonical stack/language and combined template/configuration effects, and reject paths escaping the output root, duplicate roots, conflicting filters, direct template writes to `.func/config.json`, and unsupported processors before target mutation. Write-time path checks SHALL use injectable filesystem validation, including links/reparse points.
+The CLI SHALL resolve declared configuration roots from primary-output parents and require them to match the independent project inventory, validate canonical stack/language and combined template/configuration effects, and reject paths escaping the output root, multiple active configuration plans for one root, conflicting filters, direct template writes to `.func/config.json`, and unsupported processors before target mutation. Repeated output/effect observations of one root SHALL be deduplicated rather than rejected. Write-time path checks SHALL use injectable filesystem validation, including links/reparse points.
 
 #### Scenario: Mixed project stacks are valid
 - **WHEN** distinct active project roots declare installed supported Node and Python stacks without conflicting explicit filters
@@ -97,7 +101,19 @@ After successful creation, project configuration SHALL be written atomically in 
 - **THEN** supported ordinary actions can run in declaration order
 
 ### Requirement: Ordinary restore adapters are explicit
-The proposed restore action SHALL use action ID `17a32346-c721-42cd-a520-4d1cada22ba2` and `manager` plus `primaryOutputIndex` arguments. Only reviewed managers and CLI-owned executable/argv construction SHALL be supported. Templates SHALL NOT supply arbitrary executables, extra argv, shell fragments, environment overrides, or escaping paths. Windows batch launchers SHALL use a reviewed CLI-owned launcher and quoting contract rather than generic template shell fallback. Missing tools SHALL fail with guidance without automatic installation. Actual input files and working directories SHALL be revalidated for expected kind, containment, and links immediately before each launch.
+The proposed restore action SHALL use action ID `17a32346-c721-42cd-a520-4d1cada22ba2` and exactly the required raw string arguments `manager` and `primaryOutputIndex`. Manager SHALL name an approved adapter; the index SHALL be a nonnegative invariant-culture integer string. Raw validation SHALL reject missing, non-string, duplicate, or extra arguments before engine coercion. Projection SHALL bind the authored primary-output index before condition filtering and retain that same output identity through conditions and renames; an inactive, missing, ambiguous, or non-file resolved input SHALL fail preflight. Only reviewed managers and CLI-owned executable/argv construction SHALL be supported. Templates SHALL NOT supply arbitrary executables, extra argv, shell fragments, environment overrides, or escaping paths. Windows batch launchers SHALL use a reviewed CLI-owned launcher and quoting contract rather than generic template shell fallback. Missing tools SHALL fail with guidance without automatic installation. Actual input files and working directories SHALL be revalidated for expected kind, containment, and links immediately before each launch.
+
+#### Scenario: Restore index has the wrong raw type
+- **WHEN** a raw restore action supplies numeric `primaryOutputIndex` rather than the required string
+- **THEN** raw validation rejects it before the engine can coerce it to a string
+
+#### Scenario: Restore input follows a suppressed earlier output
+- **WHEN** an earlier authored primary output is inactive and an active restore action references a later authored output
+- **THEN** restore remains bound to that later output's identity and resolved renamed path, not its filtered-list position
+
+#### Scenario: Referenced restore input is inactive
+- **WHEN** an active restore action references an authored output that has no active resolved file
+- **THEN** preflight rejects the action before mutation or process execution
 
 #### Scenario: Restore has arbitrary process arguments
 - **WHEN** a restore declaration adds a shell command or extra executable arguments
