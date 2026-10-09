@@ -63,7 +63,7 @@
 
 - [x] 6.1 Prototype when filters are checked and when the template context is fixed for conditional topology, and record the decision in this design.
 - [ ] 6.2 Define immutable selection models for project-template groups, variants, and their projected configuration actions.
-- [ ] 6.3 Apply `--stack` and `--language` to every active project configuration, matching canonical names and `IProjectStack` aliases case-insensitively.
+- [ ] 6.3 After final parameters and independent-inventory completeness validation, apply `--stack` and `--language` to the configuration matched to every active root, matching canonical names and `IProjectStack` aliases case-insensitively. Missing finalization is an authoring failure, not a filtered-out project.
 - [ ] 6.4 Keep mixed-stack and mixed-language templates available when the corresponding filter is absent.
 - [ ] 6.5 Enforce project type with wrong-type diagnostics and report unknown filters, stack-language conflicts, and whole-template conflicts without substituting another template.
 - [ ] 6.6 Narrow groups and their variants by `--stack` and `--language` to templates whose unconditional projects all match every supplied filter and that declare at least one project matching them all.
@@ -94,7 +94,7 @@
 
 - [ ] 9.1 Plan deletion of all target content except `.git` for forced reinitialization.
 - [ ] 9.2 Confirm destructive cleanup interactively and treat non-interactive `--force` as explicit authorization.
-- [ ] 9.3 Complete template, filter, parsing, primary-output, configuration-action, and combined effect preflight before deleting target content.
+- [ ] 9.3 Retain the evaluated snapshot and independently inventory normalized host-file roots from resolved primary outputs and created/modified effects. Deduplicate observations, match exactly one active configuration per root, and complete template, filter, parsing, anchor, and combined effect checks before deleting target content.
 - [ ] 9.4 Invoke the selected project `ResolvedTemplate` with target path, canonical symbols, name, conflict policy, and create or dry-run mode.
 - [ ] 9.5 Combine forced cleanup, project-template, configuration-finalization, and ordinary post-action effects in deterministic execution order.
 - [ ] 9.6 Reconcile dry-run changes following planned cleanup so deletion and recreation are represented accurately.
@@ -102,6 +102,7 @@
 - [ ] 9.8 Execute mandatory configuration actions in declared order after scaffolding and run ordinary post-actions only after all configuration succeeds.
 - [ ] 9.9 Report partial initialization without deleting generated files or successful prior configurations if a configuration action fails.
 - [ ] 9.10 Dispose the command-scoped `Templater` and propagate cancellation through preflight, creation, configuration finalization, and ordinary post-actions.
+- [ ] 9.11 Test omitted/inactive actions on active roots, duplicate inventory observations versus multiple active finalizations, absent-root anchors, both-inactive controls, and mutually exclusive actions with exactly one active plan, including dry-run and forced initialization.
 
 ## 10. Rendering and Outcomes
 

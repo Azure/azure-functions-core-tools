@@ -176,7 +176,12 @@ Each active Functions root independently inventoried from the retained resolved 
 
 ### Requirement: Configuration action declarations are preflighted
 
-Before target modification, `func init` SHALL consume the independent project inventory and validate every active Functions project configuration action. It SHALL require exactly one supported trusted active action per inventoried root, a unique resolved primary-output reference in that root, a non-empty canonical stack and language, an installed stack that supports that language, and target containment. Repeated output/effect observations SHALL be deduplicated; multiple active configuration plans for one root SHALL be rejected. A template with no active inventoried project and configuration action SHALL be invalid for `func init`.
+Before target modification, `func init` SHALL consume the independent project inventory and validate every active Functions project configuration action. It SHALL require exactly one supported trusted active action per inventoried root, a unique resolved primary-output reference in that root, a non-empty canonical stack and language, an installed stack that supports that language, and target containment. Every active action SHALL match an inventoried active root, and actions targeting absent/inactive roots SHALL be rejected. Repeated output/effect observations SHALL be deduplicated. Multiple active configuration plans for one root SHALL be rejected. A template with no active inventoried project and configuration action SHALL be invalid for `func init`.
+
+#### Scenario: Active action targets an uninventoried directory
+
+- **WHEN** an active configuration action targets `frontend/package.json` but no resolved host-file output/effect inventories that parent root
+- **THEN** initialization rejects the action before cleanup or scaffolding even if another project is valid
 
 #### Scenario: Generated project omits its action
 

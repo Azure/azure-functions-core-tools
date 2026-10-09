@@ -177,6 +177,7 @@ After candidate parameters are complete, init obtains the retained resolved outp
 - output whose parent cannot be a project root;
 - empty or non-canonical stack/language;
 - active inventoried project roots with no configuration action;
+- active configuration actions targeting roots absent from the independent inventory;
 - multiple active configuration plans for one root, while valid duplicate inventory observations are deduplicated;
 - template file effects targeting `.func/config.json`;
 - configuration output collisions with another planned effect.

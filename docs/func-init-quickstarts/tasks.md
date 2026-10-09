@@ -36,7 +36,7 @@
 - [ ] 5.3 Reject template file effects that create or modify `.func/config.json`.
 - [ ] 5.4 Add planned `.func/config.json` writes to combined creation effects and dry-run rendering.
 - [ ] 5.5 Ensure every selection, constraint, topology, and effect check completes before destructive `--force` cleanup.
-- [ ] 5.6 Add preflight and dry-run tests for malformed/omitted/inactive actions on active roots, missing or renamed outputs, valid duplicate inventory observations versus multiple active plans, path traversal, collisions, both-inactive and mutually exclusive controls, conditional projects, and forced initialization.
+- [ ] 5.6 Add preflight and dry-run tests for malformed/omitted/inactive actions on active roots, active actions targeting absent roots, missing or renamed outputs, valid duplicate inventory observations versus multiple active plans, path traversal, collisions, both-inactive and mutually exclusive controls, conditional projects, and forced initialization.
 
 ## 6. Project Configuration Finalization
 
