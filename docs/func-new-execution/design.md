@@ -214,6 +214,8 @@ Dry-run never creates the requested execution directory, writes files, or execut
 
 For create mode, the proposed runner invokes the shared ordinary-action dispatcher after successful item-template creation, using validated action plans from the selected snapshot. The reviewed default follows an explicit create request without a new per-action prompt, including explicitly non-interactive requests. Unknown processors remain blocked, required project configuration is not an item action, and action failure returns a partial file/action result with nonzero exit rather than rolling back generated files. `template-engine-post-actions` owns safety, launch-time checks, cancellation, continued-failure behavior, and the command/security agreement required before implementation.
 
+Ordinary-action target validation happens before item creation. The initial restore action is output-local, so a nested `--path` does not authorize restoring a manifest at the discovered ancestor project root. Reject that unsupported plan before writing item files, while allowing a valid output-local input. A typed containing-project restore target remains a separate agreement and migration gate.
+
 The command renderer distinguishes create, modify, and delete effects and clearly labels the output as a preview. JSON and plain formatting consume the same result model.
 
 **Alternative considered:** implement dry-run by invoking against a temporary directory. This can differ from the real target's existing files and therefore misreport destructive effects. Native TemplateEngine dry-run is rejected only if the pinned API ceases to provide creation effects.

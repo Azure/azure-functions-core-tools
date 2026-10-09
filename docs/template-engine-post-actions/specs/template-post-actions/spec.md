@@ -5,7 +5,11 @@ Defines trusted Functions project finalization and supported ordinary post-actio
 ## ADDED Requirements
 
 ### Requirement: Trusted project configuration declaration
-The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. Every active Functions project root discovered independently from the resolved output/effect snapshot SHALL have exactly one active configuration action. The inventory SHALL include parent roots of resolved primary outputs whose final filename is `host.json` and created/modified file effects whose final filename is `host.json`. Both sources SHALL use the retained resolved snapshot and SHALL be normalized and deduplicated using platform path comparison, rather than depend on configuration declarations. The action SHALL be mandatory when active, SHALL reject extra arguments or continue-on-error, and SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position. A referenced root absent from the independent inventory SHALL be rejected.
+The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. The index SHALL be a nonnegative invariant-culture integer string, validated before engine coercion or output mapping. Every active Functions project root discovered independently from the resolved output/effect snapshot SHALL have exactly one active configuration action. The inventory SHALL include parent roots of resolved primary outputs whose final filename is `host.json` and created/modified file effects whose final filename is `host.json`. Both sources SHALL use the retained resolved snapshot and SHALL be normalized and deduplicated using platform path comparison, rather than depend on configuration declarations. The action SHALL be mandatory when active, SHALL reject extra arguments or continue-on-error, and SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position. A referenced root absent from the independent inventory SHALL be rejected.
+
+#### Scenario: Configuration index is malformed
+- **WHEN** a raw configuration index is `"-1"`, `"abc"`, or another invalid nonnegative integer string
+- **THEN** raw validation rejects it before engine coercion or mapping
 
 #### Scenario: Conditional earlier output is inactive
 - **WHEN** an earlier primary output is suppressed and an active configuration action references a later authored index
@@ -131,6 +135,17 @@ The proposed restore action SHALL use action ID `17a32346-c721-42cd-a520-4d1cada
 - **WHEN** creation or an earlier restore changes a later action's input or working directory into an escaping link
 - **THEN** launch-time validation rejects that action before launching its process
 
+### Requirement: Initial item restore scope is output-local
+The initial restore action SHALL target only an authored primary-output manager input inside the invocation output root. A containing project discovered above a nested item output SHALL NOT widen that boundary. Restore of an ancestor project manifest SHALL be unsupported and rejected before item creation, with an output-scope diagnostic. A separately agreed typed containing-project target and compatibility qualification SHALL be required before migrating legacy journeys that need ancestor-manifest restore. The item dispatcher SHALL consume only plans that passed this preflight.
+
+#### Scenario: Nested item needs ancestor manifest restore
+- **WHEN** an item runs in `project/functions/orders` and its restore plan targets a manager input at `project`
+- **THEN** preflight rejects the unsupported ancestor target without creating the item or launching restore
+
+#### Scenario: Nested item has an output-local restore input
+- **WHEN** the nested item has a valid authored manager input within its invocation output root
+- **THEN** that input can be restored under the unchanged output-local safety rules
+
 ### Requirement: Tool identity prevents template shadowing
 Every ordinary adapter SHALL resolve and validate absolute paths for its executable, interpreter, batch script, and launcher through the reviewed CLI tool boundary. Resolution SHALL NOT search the generated working directory. Resolved link/reparse targets SHALL NOT originate in the invocation output or template mount. Windows launchers SHALL invoke the exact validated absolute manager-script path rather than a bare command name. Launch-time checks SHALL preserve that tool identity. These checks SHALL NOT claim to sandbox manager hooks or project code.
 
@@ -147,7 +162,11 @@ Every ordinary adapter SHALL resolve and validate absolute paths for its executa
 - **THEN** the reviewed launcher invokes that exact script with fixed arguments and tested quoting
 
 ### Requirement: Go module tidy is distinct from restore
-The proposed Go module-tidy action SHALL use action ID `5080f899-da0c-404a-b80c-909df8e203b5` and exactly one required raw string `primaryOutputIndex` identifying an authored `go.mod` output. It SHALL preserve that output identity through condition filtering and renames and use the shared path/tool preflight and launch-time rules. The adapter SHALL invoke the absolute Go tool with fixed `mod`, `tidy` arguments from the resolved module root, without template flags or environment overrides. Module/checksum mutation SHALL be reported as ordinary action work, not restore-only behavior or transactional rollback. Legacy initializer-time tidy SHALL remain until default/skip behavior and module effects are qualified and Go/command owners approve the intentional nonzero failure outcome and cancellation contract. Startup-time behavior SHALL remain out of scope.
+The proposed Go module-tidy action SHALL use action ID `5080f899-da0c-404a-b80c-909df8e203b5` and exactly one required raw string `primaryOutputIndex` identifying an authored `go.mod` output. The index SHALL be a nonnegative invariant-culture integer string, validated before engine coercion or output mapping. It SHALL preserve that output identity through condition filtering and renames and use the shared path/tool preflight and launch-time rules. The adapter SHALL invoke the absolute Go tool with fixed `mod`, `tidy` arguments from the resolved module root, without template flags or environment overrides. Module/checksum mutation SHALL be reported as ordinary action work, not restore-only behavior or transactional rollback. Legacy initializer-time tidy SHALL remain until default/skip behavior and module effects are qualified and Go/command owners approve the intentional nonzero failure outcome and cancellation contract. Startup-time behavior SHALL remain out of scope.
+
+#### Scenario: Go index is malformed
+- **WHEN** a raw Go tidy index is `"-1"`, `"abc"`, or another invalid nonnegative integer string
+- **THEN** raw validation rejects it before engine coercion, mapping, or process execution
 
 #### Scenario: Tidy changes module requirements
 - **WHEN** the approved tidy action updates `go.mod` or `go.sum` for imports in generated source

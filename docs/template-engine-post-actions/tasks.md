@@ -17,6 +17,7 @@
 - [ ] 3.2 Project dry-run intents and ordered configuration effects without writes, tool provisioning, or process execution.
 - [ ] 3.3 Test absent tools, unsupported managers/IDs, exact raw restore argument types/duplicates/extra keys, restore authored-index identity through inactive earlier outputs and renames, rejected inactive restore inputs, generated manager shims, tool links into template output, valid absolute tool/script controls, Windows batch quoting, argument injection, input/root changes between preflight and launch, continued/stopped failures, process cancellation, and ordinary suppression after finalization failure.
 - [ ] 3.4 Agree and implement the distinct Go module-tidy action, raw `go.mod` output reference, absolute fixed-command launch, ordinary failure/cancellation, and module/checksum effects. Preserve init default/skip behavior, obtain explicit approval for nonzero failure reporting versus the legacy ignored result, and leave startup tidy/build untouched.
+- [ ] 3.5 Test malformed/negative configuration and Go indexes before engine coercion. Test nested item ancestor-manifest restore rejection before creation alongside valid output-local restore controls. Agree a separate typed containing-project target before qualifying any migration that needs that wider scope.
 
 ## 4. Authoring and Migration
 
