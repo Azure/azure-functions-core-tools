@@ -28,7 +28,7 @@ internal sealed class InstallMethodDetector(
         }
 
         string canonicalPath = Canonicalize(processPath);
-        string normalized = Normalize(canonicalPath);
+        string normalized = NormalizeForComparison(canonicalPath);
 
         if (ContainsPathMarker(normalized, "/node_modules/"))
         {
@@ -64,7 +64,8 @@ internal sealed class InstallMethodDetector(
         }
 
         string? installDirectory = GetInstallDirectory(normalized);
-        if (installDirectory is not null && IsUnderDirectory(normalized, Normalize(Canonicalize(installDirectory))))
+        if (installDirectory is not null
+            && IsUnderDirectory(normalized, NormalizeForComparison(Canonicalize(installDirectory))))
         {
             return InstallMethod.Direct(canonicalPath);
         }
@@ -121,7 +122,29 @@ internal sealed class InstallMethodDetector(
         }
     }
 
-    private static string Normalize(string path) => path.Replace('\\', '/').TrimEnd('/');
+    private static string NormalizeForComparison(string path)
+    {
+        string normalized = path.Replace('\\', '/');
+        if (normalized.StartsWith("//?/UNC/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = "//" + normalized[8..];
+        }
+        else if (normalized.StartsWith("//?/", StringComparison.Ordinal))
+        {
+            normalized = normalized[4..];
+        }
+
+        int minimumLength = normalized.Length >= 3 && char.IsAsciiLetter(normalized[0]) && normalized[1] == ':'
+            ? 3
+            : normalized.StartsWith('/') ? 1 : 0;
+        int length = normalized.Length;
+        while (length > minimumLength && normalized[length - 1] == '/')
+        {
+            length--;
+        }
+
+        return normalized[..length];
+    }
 
     private static bool IsWindowsPath(string path) =>
         path.StartsWith("//", StringComparison.Ordinal)

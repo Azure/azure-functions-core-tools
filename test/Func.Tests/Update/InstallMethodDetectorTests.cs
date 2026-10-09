@@ -21,6 +21,7 @@ public sealed class InstallMethodDetectorTests
     [InlineData("C:\\Users\\me\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Microsoft.AzureFunctionsCoreTools_Microsoft.Winget.Source_8wekyb3d8bbwe\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
     [InlineData("C:\\Users\\me\\AppData\\Local\\Microsoft\\WindowsApps\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
     [InlineData("C:\\Program Files\\Microsoft\\Azure Functions Core Tools\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
+    [InlineData("\\\\?\\C:\\Program Files\\Microsoft\\Azure Functions Core Tools\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
     [InlineData("C:\\Program Files\\WindowsApps\\Microsoft.AzureFunctionsCoreTools_5.0.0_x64__8wekyb3d8bbwe\\func.exe", (int)InstallMethodKind.Winget, "winget", "Run 'winget upgrade Microsoft.AzureFunctionsCoreTools' to update.")]
     public void Detect_KnownPackageManagerPath_ReturnsMatchingMethod(
         string processPath,
@@ -42,6 +43,7 @@ public sealed class InstallMethodDetectorTests
     [Theory]
     [InlineData("/home/user/.azure-functions/func", "HOME", "/home/user")]
     [InlineData("C:\\Users\\me\\.azure-functions\\func.exe", "USERPROFILE", "C:\\Users\\me")]
+    [InlineData("\\\\?\\C:\\Users\\me\\.azure-functions\\func.exe", "USERPROFILE", "C:\\Users\\me")]
     public void Detect_DefaultInstallScriptPath_ReturnsDirect(string processPath, string homeVariable, string homePath)
     {
         IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
@@ -171,6 +173,34 @@ public sealed class InstallMethodDetectorTests
         InstallMethod result = detector.Detect();
 
         Assert.Equal(InstallMethodKind.Direct, result.Kind);
+    }
+
+    [Fact]
+    public void Detect_DriveRootInstallDirectoryWithDifferentCase_ReturnsDirect()
+    {
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable).Returns("c:\\");
+        InstallMethodDetector detector = CreateDetector("C:\\func.exe", environment);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Direct, result.Kind);
+        Assert.Equal("C:\\func.exe", result.ExecutablePath);
+    }
+
+    [Fact]
+    public void Detect_ExtendedUncPathUnderConfiguredInstallDirectory_ReturnsDirect()
+    {
+        const string processPath = "\\\\?\\UNC\\server\\share\\azure-functions\\func.exe";
+        IProcessEnvironment environment = Substitute.For<IProcessEnvironment>();
+        environment.Get(InstallMethodDetector.InstallDirectoryEnvironmentVariable)
+            .Returns("\\\\server\\share\\azure-functions");
+        InstallMethodDetector detector = CreateDetector(processPath, environment);
+
+        InstallMethod result = detector.Detect();
+
+        Assert.Equal(InstallMethodKind.Direct, result.Kind);
+        Assert.Equal(processPath, result.ExecutablePath);
     }
 
     [Fact]
