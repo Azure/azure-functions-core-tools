@@ -20,6 +20,7 @@ Project templates must declare the Functions projects they create so the CLI can
 ### Modified Capabilities
 
 - `func-init-execution`: Use a concrete trusted configuration action and finalize projects before ordinary actions.
+- `func-init-quickstarts`: Consume independent resolved project inventory before matching configuration metadata and applying whole-template filters.
 - `func-new-execution`: Own create-mode ordinary action dispatch and partial outcomes while keeping dry-run non-executing.
 - `azure-samples-template-pipeline`: Validate trusted action declarations without executing repository-controlled code.
 
