@@ -118,7 +118,7 @@
 
 - [ ] 11.1 Remove `InitContext`, `IInitOptionRegistry`, `InitOptionRegistry`, and common workload init option factories after template migration.
 - [ ] 11.2 Remove .NET workload initializer file-generation and nested `dotnet new` execution code.
-- [ ] 11.3 Remove Node workload project-file generation and package-install execution code migrated to templates and post-actions.
+- [ ] 11.3 Remove Node workload project-file generation and initializer-time npm install only after default/skip, missing-tool/nonzero/cancellation, and file-preservation cases are qualified and Node/command owners approve the intentional change from best-effort nonzero results. Include migration notes rather than claiming failure parity.
 - [ ] 11.4 Remove Python workload project-file generation code migrated to templates.
 - [ ] 11.5 Remove Go workload project-file generation and initializer-time tidy only after the distinct module-tidy action is agreed, implemented, and qualified for default/skip and module/checksum effects, with explicit approval/migration notes for nonzero failure reporting and cancellation outcomes. Leave startup-time Go tidy/build behavior unchanged.
 - [ ] 11.6 Remove PowerShell workload initializer scaffolding code migrated to templates.

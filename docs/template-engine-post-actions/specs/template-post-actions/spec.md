@@ -202,6 +202,17 @@ Dry-run SHALL validate/project the same resolved action plans and ordered effect
 ### Requirement: Ordinary failure and cancellation are explicit
 Ordinary actions SHALL run under the command's existing execution policy after required finalization. A failed action SHALL stop later actions unless continue-on-error is true; continued failures SHALL remain reported and produce an overall nonzero outcome. Cancellation SHALL stop later work and pass through process adapters without a claim of atomic rollback of external package-manager state.
 
+Legacy Node initializer-time npm install SHALL remain until Node/command owners explicitly approve its change from best-effort nonzero results to the proposed ordinary-action nonzero command outcome. Default/skip behavior, missing-tool/nonzero/cancellation outcomes, and preserved generated/configured files SHALL be qualified, with migration notes identifying the intentional failure change rather than claiming parity.
+
+#### Scenario: Node replacement failure policy is not approved
+- **WHEN** the replacement npm action lacks owner approval, migration notes, or default/skip and failure qualification
+- **THEN** the legacy Node initializer install path cannot be removed as completed migration
+
+#### Scenario: Approved npm replacement fails after creation
+- **WHEN** the qualified Node replacement's npm process returns nonzero after scaffolding and configuration
+- **THEN** the approved dispatcher reports nonzero and preserves generated/configured files
+- **AND** migration notes identify the change from legacy Node's best-effort outcome
+
 #### Scenario: Continued restore failure
 - **WHEN** an ordinary action fails with continue-on-error true
 - **THEN** later actions run, the failure remains visible, and overall execution is nonzero

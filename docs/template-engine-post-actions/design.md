@@ -80,6 +80,8 @@ Only after all mandatory finalization succeeds do ordinary actions run in declar
 
 For item templates, `func-new-execution` owns invoking the ordinary-action dispatcher after successful create-mode template invocation and rendering its outcome. TemplateEngine creation itself does not authorize a hidden second runner. The proposed default matches init: an explicit create request executes supported active ordinary actions without a new per-action prompt, including explicitly non-interactive creation; dry-run never executes them. This policy and help disclosure require command/security agreement before implementation, and there is no new skip/consent option in this proposal. Item-action failure reports successful file creation plus failed/remaining actions rather than rolling back created files or claiming a fully successful command.
 
+Node initializer-time npm install is currently best-effort: a nonzero result leaves generated files without failing initialization. The proposed ordinary-action outcome intentionally changes that failure behavior, not only Go tidy's ignored result. Keep the Node initializer path until Node/command owners approve the new nonzero outcome, its default/skip choice and failure/cancellation cases are qualified, and migration notes call out the change. Do not describe the dispatcher as preserving legacy Node failure parity.
+
 ### Processor and packaging ownership
 
 Processors are DI-owned internal services. File writes, tool/interpreter resolution, and processes use existing injectable boundaries. Required finalization is invoked by init, not registered as an optional generic engine post-action runner. Ordinary actions use a func dispatcher over the projected action plan, with no implicit fallback to a shell processor.
