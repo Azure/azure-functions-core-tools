@@ -54,32 +54,37 @@ internal static class TemplateConstraintDeclarationReader
         List<TemplateConstraintDeclaration> declarations = [];
         foreach (JsonProperty property in constraints.Value.EnumerateObject())
         {
-            string label = ReadName(property);
-            string source = $"constraint '{label}'";
-            RequireObject(property.Value, source);
-            string type = RequireString(FindProperty(property.Value, "type", source), $"{source} type");
-            JsonElement? arguments = FindProperty(property.Value, "args", source);
-            bool funcType = type.StartsWith("func-", StringComparison.Ordinal);
-            if (shared && funcType)
-            {
-                throw Invalid($"{source} declares a func type in a package shared with another template host.");
-            }
-
-            if (project && type == "func-bundle")
-            {
-                throw Invalid($"{source} declares func-bundle in a project template.");
-            }
-
-            IReadOnlyList<TemplateConstraintAlternative> alternatives = type switch
-            {
-                "func-workload" => ReadAlternatives(arguments, workload: true, source),
-                "func-bundle" => ReadAlternatives(arguments, workload: false, source),
-                _ => [],
-            };
-            declarations.Add(new(label, type, arguments?.Clone(), alternatives));
+            declarations.Add(ReadDeclaration(property, shared, project));
         }
 
         return declarations.AsReadOnly();
+    }
+
+    private static TemplateConstraintDeclaration ReadDeclaration(JsonProperty property, bool shared, bool project)
+    {
+        string label = ReadName(property);
+        string source = $"constraint '{label}'";
+        RequireObject(property.Value, source);
+        string type = RequireString(FindProperty(property.Value, "type", source), $"{source} type");
+        JsonElement? arguments = FindProperty(property.Value, "args", source);
+        bool funcType = type.StartsWith("func-", StringComparison.Ordinal);
+        if (shared && funcType)
+        {
+            throw Invalid($"{source} declares a func type in a package shared with another template host.");
+        }
+
+        if (project && type == "func-bundle")
+        {
+            throw Invalid($"{source} declares func-bundle in a project template.");
+        }
+
+        IReadOnlyList<TemplateConstraintAlternative> alternatives = type switch
+        {
+            "func-workload" => ReadAlternatives(arguments, workload: true, source),
+            "func-bundle" => ReadAlternatives(arguments, workload: false, source),
+            _ => [],
+        };
+        return new(label, type, arguments?.Clone(), alternatives);
     }
 
     private static IReadOnlyList<TemplateConstraintAlternative> ReadAlternatives(JsonElement? arguments, bool workload, string source)

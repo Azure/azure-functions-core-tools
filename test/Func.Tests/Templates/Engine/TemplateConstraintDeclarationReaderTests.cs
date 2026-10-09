@@ -32,10 +32,10 @@ public sealed class TemplateConstraintDeclarationReaderTests
     }
 
     [Theory]
-    [InlineData("\"[4.20,)\"", null)]
-    [InlineData("{\"id\":\"Microsoft.Azure.Functions.ExtensionBundle.Preview\",\"version\":\"[4.29,)\"}", "Microsoft.Azure.Functions.ExtensionBundle.Preview")]
-    [InlineData("{}", null)]
-    public void Read_BundleArgument_ReturnsRequirement(string argument, string? identity)
+    [InlineData("\"[4.20,)\"", null, "4.20.0")]
+    [InlineData("{\"id\":\"Microsoft.Azure.Functions.ExtensionBundle.Preview\",\"version\":\"[4.29,)\"}", "Microsoft.Azure.Functions.ExtensionBundle.Preview", "4.29.0")]
+    [InlineData("{}", null, null)]
+    public void Read_BundleArgument_ReturnsRequirement(string argument, string? identity, string? minimumVersion)
     {
         string configuration = JsonSerializer.Serialize(new
         {
@@ -45,6 +45,54 @@ public sealed class TemplateConstraintDeclarationReaderTests
 
         declarations[0].Alternatives.Should().ContainSingle();
         declarations[0].Alternatives[0].Identity.Should().Be(identity);
+        string? parsedMinimumVersion = declarations[0].Alternatives[0].Version?.MinVersion?.ToNormalizedString();
+        parsedMinimumVersion.Should().Be(minimumVersion);
+    }
+
+    [Fact]
+    public void Read_SeveralDeclarations_ReturnsEveryDeclarationInOrder()
+    {
+        const string Configuration = """{"constraints":{"stack":{"type":"func-workload","args":"node"},"bundle":{"type":"func-bundle","args":{"id":"bundle-id","version":"[4.20,)"}}}}""";
+
+        var declarations = TemplateConstraintDeclarationReader.Read(Configuration);
+
+        declarations.Select(item => item.Label).Should().Equal("stack", "bundle");
+        declarations.Select(item => item.Type).Should().Equal("func-workload", "func-bundle");
+        declarations[0].Alternatives[0].Identity.Should().Be("node");
+        declarations[1].Alternatives[0].Identity.Should().Be("bundle-id");
+        declarations[1].Alternatives[0].Version!.MinVersion!.ToNormalizedString().Should().Be("4.20.0");
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"type\":\"func-workload\",\"args\":null}")]
+    public void Read_MalformedSecondDeclaration_RejectsWholeRead(string second)
+    {
+        string configuration = JsonSerializer.Serialize(new
+        {
+            constraints = new
+            {
+                first = new { type = "func-workload", args = "node" },
+                second = JsonSerializer.Deserialize<JsonElement>(second),
+            },
+        });
+        Action action = () => TemplateConstraintDeclarationReader.Read(configuration);
+
+        action.Should().Throw<InvalidTemplateMetadataException>();
+    }
+
+    [Fact]
+    public void Read_FloatingRange_PreservesBoundsAndFloatingInformation()
+    {
+        var declarations = TemplateConstraintDeclarationReader.Read("""{"constraints":{"bundle":{"type":"func-bundle","args":"[4.*,5.0.0)"}}}""");
+
+        var range = declarations[0].Alternatives[0].Version!;
+        range.MinVersion!.ToNormalizedString().Should().Be("4.0.0");
+        range.MaxVersion!.ToNormalizedString().Should().Be("5.0.0");
+        range.IsMinInclusive.Should().BeTrue();
+        range.IsMaxInclusive.Should().BeFalse();
+        range.IsFloating.Should().BeTrue();
+        range.Float!.ToString().Should().Be("4.*");
     }
 
     [Fact]
@@ -143,6 +191,8 @@ public sealed class TemplateConstraintDeclarationReaderTests
     [InlineData("{\"constraints\":{\"x\":{\"type\":\"func-workload\",\"args\":{}}}}")]
     [InlineData("{\"constraints\":{\"x\":{\"type\":\"func-workload\",\"args\":{\"id\":\"node\",\"version\":false}}}}")]
     [InlineData("{\"constraints\":{\"x\":{\"type\":\"func-workload\",\"args\":{\"id\":\"node\",\"version\":\"bad range\"}}}}")]
+    [InlineData("{\"constraints\":{\"x\":{\"type\":\"func-workload\",\"args\":{\"id\":\"node\",\"versoin\":\"1.0\"}}}}")]
+    [InlineData("{\"constraints\":{\"x\":{\"type\":\"func-workload\",\"args\":[\"node\",null]}}}")]
     [InlineData("{\"constraints\":{\"x\":{\"type\":\"func-bundle\",\"args\":true}}}")]
     public void Read_MalformedDeclarations_Throws(string configuration)
     {
