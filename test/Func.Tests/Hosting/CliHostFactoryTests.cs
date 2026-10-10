@@ -3,7 +3,9 @@
 
 using System.Text.Json;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Tests.Telemetry;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
@@ -27,9 +29,13 @@ public sealed class CliHostFactoryTests : IDisposable
     private const string ThrowingWorkloadType = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.ThrowingWorkload";
 
     private readonly string _home = Path.Combine(Path.GetTempPath(), "func-cli-tests", Guid.NewGuid().ToString("N"));
+    private readonly ITelemetryEnvironmentScope _telemetryEnvironment =
+        new CliTelemetryEnvironment(new InMemoryProcessEnvironment(), (_, _) => { });
 
     public void Dispose()
     {
+        _telemetryEnvironment.Dispose();
+
         if (Directory.Exists(_home))
         {
             try
@@ -47,7 +53,7 @@ public sealed class CliHostFactoryTests : IDisposable
     public void CreateBuilder_RegistersPlatform()
     {
         var interaction = new TestInteractionService();
-        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction, _telemetryEnvironment);
         using ServiceProvider provider = builder.Services.BuildServiceProvider();
 
         provider.GetRequiredService<IPlatform>().Should().NotBeNull();
@@ -57,10 +63,42 @@ public sealed class CliHostFactoryTests : IDisposable
     public void CreateBuilder_RegistersTemplaterFactory()
     {
         var interaction = new TestInteractionService();
-        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction, _telemetryEnvironment);
         using ServiceProvider provider = builder.Services.BuildServiceProvider();
 
         provider.GetRequiredService<ITemplaterFactory>().Should().BeOfType<TemplaterFactory>();
+    }
+
+    /// <summary>
+    /// The host's <see cref="ServiceProvider"/> only disposes services it
+    /// resolves; a singleton registered but never resolved from this
+    /// provider is never touched by provider disposal. Restoration of the
+    /// telemetry environment overrides must therefore come from the
+    /// caller's own disposal of the scope (as <c>Program.cs</c> does via
+    /// <c>using</c>), not from the host's lifetime.
+    /// </summary>
+    [Fact]
+    public void CreateBuilder_EnvironmentRestorationIsOwnedByCaller_NotByHostDisposal()
+    {
+        var environment = new InMemoryProcessEnvironment();
+        environment.Set(CliTelemetryEnvironment.SdkStatsDisabled, "false");
+        ITelemetryEnvironmentScope scope = new CliTelemetryEnvironment(environment, environment.Set);
+        scope.Apply();
+        var interaction = new TestInteractionService();
+
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction, scope);
+        using (ServiceProvider provider = builder.Services.BuildServiceProvider())
+        {
+            // Resolve something unrelated; never resolve the telemetry scope
+            // (or IProcessEnvironment) from this provider.
+            provider.GetRequiredService<IPlatform>();
+        }
+
+        environment.Get(CliTelemetryEnvironment.SdkStatsDisabled).Should().Be("true");
+
+        scope.Dispose();
+
+        environment.Get(CliTelemetryEnvironment.SdkStatsDisabled).Should().Be("false");
     }
 
     [Fact]
@@ -149,7 +187,11 @@ public sealed class CliHostFactoryTests : IDisposable
         var rootCommand = Parser.CreateCommand(host.Services);
 
         var workloads = host.Services.GetRequiredService<IWorkloadProvider>().GetWorkloads();
+        WorkloadBootTelemetry telemetry = host.Services.GetRequiredService<WorkloadBootTelemetry>();
         workloads.Should().BeEmpty();
+        telemetry.WorkloadCount.Should().Be(0);
+        telemetry.Duration.Should().BeGreaterThanOrEqualTo(TimeSpan.Zero);
+        telemetry.StartTime.Should().BeOnOrBefore(DateTimeOffset.UtcNow);
         rootCommand.Subcommands.Should().NotContain(c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
         interaction.Lines.Should().NotContain(l => l.StartsWith("WARNING:", StringComparison.Ordinal));
     }
@@ -212,9 +254,9 @@ public sealed class CliHostFactoryTests : IDisposable
     /// workload root without mutating the real process environment (which
     /// would leak across parallel xUnit runs).
     /// </summary>
-    private static HostApplicationBuilder CreateBuilderWithHome(TestInteractionService interaction, string home)
+    private HostApplicationBuilder CreateBuilderWithHome(TestInteractionService interaction, string home)
     {
-        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction, _telemetryEnvironment);
 
         // RegisterWorkloadsAsync's descriptor scan picks up this
         // ImplementationInstance and skips constructing a default

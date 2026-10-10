@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -30,14 +32,17 @@ internal static class HostApplicationBuilderExtensions
     /// on <see cref="HostApplicationBuilder.Services"/> after
     /// <see cref="CliHostFactory.CreateBuilder"/>.
     /// </remarks>
-    public static Task RegisterWorkloadsAsync(this HostApplicationBuilder builder, CancellationToken cancellationToken = default)
+    public static async Task RegisterWorkloadsAsync(this HostApplicationBuilder builder, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
         IInteractionService interaction = ResolveSingletonInstance<IInteractionService>(builder);
         WorkloadPathsOptions paths = TryResolveSingletonInstance<WorkloadPathsOptions>(builder)
             ?? new WorkloadPathsOptions();
-        return WorkloadRegistration.RegisterWorkloadsAsync(builder.Services, paths, interaction, cancellationToken);
+        DateTimeOffset startTime = DateTimeOffset.UtcNow;
+        var stopwatch = Stopwatch.StartNew();
+        int workloadCount = await WorkloadRegistration.RegisterWorkloadsAsync(builder.Services, paths, interaction, cancellationToken);
+        builder.Services.AddSingleton(new WorkloadBootTelemetry(workloadCount, startTime, stopwatch.Elapsed));
     }
 
     /// <summary>

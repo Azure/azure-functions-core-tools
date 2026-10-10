@@ -17,6 +17,8 @@ namespace Azure.Functions.Cli.Telemetry;
 /// </remarks>
 internal static class MeterExtensions
 {
+    private static readonly IReadOnlyList<KeyValuePair<string, object>> _commonAttributes = CliTelemetry.GetCommonAttributes();
+
     private static readonly Counter<long> _commandCount =
         CliTelemetry.Metric.CreateCounter<long>(
             TelemetryConventions.CommandCountInstrument,
@@ -49,11 +51,9 @@ internal static class MeterExtensions
         /// </remarks>
         public void RecordCommand(string commandName, int exitCode, long durationMs)
         {
-            var tags = new TagList
-            {
-                { TelemetryConventions.CliCommandName, commandName },
-                { TelemetryConventions.ProcessExitCode, exitCode },
-            };
+            TagList tags = CreateCommonTags();
+            tags.Add(TelemetryConventions.CliCommandName, commandName);
+            tags.Add(TelemetryConventions.ProcessExitCode, exitCode);
 
             _commandCount.Add(1, tags);
             _commandDuration.Record(durationMs, tags);
@@ -68,10 +68,8 @@ internal static class MeterExtensions
         /// </summary>
         public void RecordWorkloadBoot(int workloadCount, long durationMs, string? errorType = null)
         {
-            var tags = new TagList
-            {
-                { TelemetryConventions.CliWorkloadCount, workloadCount },
-            };
+            TagList tags = CreateCommonTags();
+            tags.Add(TelemetryConventions.CliWorkloadCount, workloadCount);
 
             if (!string.IsNullOrEmpty(errorType))
             {
@@ -80,5 +78,16 @@ internal static class MeterExtensions
 
             _workloadBootDuration.Record(durationMs, tags);
         }
+    }
+
+    private static TagList CreateCommonTags()
+    {
+        TagList tags = default;
+        foreach ((string key, object value) in _commonAttributes)
+        {
+            tags.Add(key, value);
+        }
+
+        return tags;
     }
 }

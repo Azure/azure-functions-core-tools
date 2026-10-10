@@ -22,6 +22,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Trace;
 
 namespace Azure.Functions.Cli.Hosting;
 
@@ -39,9 +40,10 @@ internal static class CliHostFactory
     /// Creates the builder, registers installed workloads, and builds the
     /// host. Caller is responsible for <see cref="IHost.StartAsync"/>.
     /// </summary>
-    public static async Task<IHost> CreateHostAsync(IInteractionService interaction, CancellationToken cancellationToken = default)
+    public static async Task<IHost> CreateHostAsync(IInteractionService interaction, ITelemetryEnvironmentScope telemetryEnvironment, CancellationToken cancellationToken = default)
     {
-        HostApplicationBuilder builder = CreateBuilder(interaction);
+        ArgumentNullException.ThrowIfNull(telemetryEnvironment);
+        HostApplicationBuilder builder = CreateBuilder(interaction, telemetryEnvironment);
         await builder.RegisterWorkloadsAsync(cancellationToken);
         return builder.Build();
     }
@@ -52,9 +54,16 @@ internal static class CliHostFactory
     /// before workloads register; production code should use
     /// <see cref="CreateHostAsync"/>.
     /// </summary>
-    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction)
+    /// <param name="telemetryEnvironment">
+    /// The telemetry environment scope. The caller owns this instance's
+    /// lifetime and is responsible for disposing it (restoring the
+    /// overridden environment variables), regardless of whether anything
+    /// resolves it from the built host's <see cref="IServiceProvider"/>.
+    /// </param>
+    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction, ITelemetryEnvironmentScope telemetryEnvironment)
     {
         ArgumentNullException.ThrowIfNull(interaction);
+        ArgumentNullException.ThrowIfNull(telemetryEnvironment);
 
         // Empty builder: skip the default config and logging providers a CLI
         // doesn't need. The host owns shared lifetimes (currently just the
@@ -73,25 +82,29 @@ internal static class CliHostFactory
         builder.Services.AddSingleton(configurationProvider);
         builder.Services.AddSingleton<ICliConfigurationProvider>(configurationProvider);
 
-        // Bridge the cli.workload.boot activity to the boot-duration histogram
-        // so callers only need to start the activity. Idempotent.
-        WorkloadBootMetricListener.EnsureRegistered();
-
         // Only wire OpenTelemetry when a connection string is available and the
         // user hasn't opted out; otherwise ActivitySource / Meter calls no-op.
         if (CliTelemetry.TryGetConnectionString(out string? connectionString))
         {
+            telemetryEnvironment.Apply();
             builder.Services.AddOpenTelemetry()
                 .ConfigureResource(r => CliTelemetry.ConfigureResource(r))
                 .WithTracing(t => t
                     .AddSource(CliTelemetry.SourceName)
-                    .AddAzureMonitorTraceExporter(o => o.ConnectionString = connectionString))
+                    .AddProcessor(new CliActivityEnrichmentProcessor(CliTelemetry.GetCommonAttributes()))
+                    .AddAzureMonitorTraceExporter(o => CliTelemetry.ConfigureExporter(o, connectionString)))
                 .WithMetrics(m => m
                     .AddMeter(CliTelemetry.SourceName)
-                    .AddAzureMonitorMetricExporter(o => o.ConnectionString = connectionString));
+                    .AddAzureMonitorMetricExporter(o => CliTelemetry.ConfigureExporter(o, connectionString)));
         }
 
-        builder.Services.AddSingleton<IProcessEnvironment, ProcessEnvironment>();
+        // Registered as an instance: the caller (see the `using` in
+        // Program.cs, or a test's own scope) owns this instance's lifetime
+        // and is responsible for disposing it to restore the overridden
+        // environment variables — disposal does not depend on anything
+        // resolving this registration from the built host.
+        builder.Services.AddSingleton(telemetryEnvironment);
+        builder.Services.AddSingleton<IProcessEnvironment>(sp => sp.GetRequiredService<ITelemetryEnvironmentScope>());
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerContentResolver, DefaultFunctionsWorkerContentResolver>();
