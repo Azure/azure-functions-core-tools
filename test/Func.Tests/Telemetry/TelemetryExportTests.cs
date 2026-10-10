@@ -11,6 +11,8 @@ using Azure.Core.Pipeline;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Monitor.OpenTelemetry.Exporter;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
@@ -149,6 +151,76 @@ public class TelemetryExportTests
         }
 
         payloads.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// End-to-end regression guard mirroring <c>Program.cs</c>'s actual
+    /// shutdown path: a real DI-hosted <see cref="IHost"/> wired the same
+    /// way <c>CliHostFactory.CreateBuilder</c> wires OpenTelemetry (batch
+    /// export processor, not <see cref="SimpleActivityExportProcessor"/>),
+    /// started via <c>host.StartAsync()</c>, with the command metric
+    /// recorded and the activity disposed before <c>host.Dispose()</c> —
+    /// the exact sequence in <c>Program.cs</c>'s <c>finally</c> block. This
+    /// would fail if that ordering regressed, unlike
+    /// <see cref="AzureMonitorExport_RecordedBeforeProviderDisposal_IsFlushedOnDispose"/>,
+    /// which builds its own providers by hand and never exercises the
+    /// batch-queued, host-owned pipeline.
+    /// </summary>
+    [Fact]
+    public async Task AzureMonitorExport_ThroughHostedPipeline_FlushesQueuedDataOnHostDispose()
+    {
+        var payloads = new ConcurrentQueue<string>();
+        using var client = new HttpClient(new RecordingHandler(payloads));
+        var options = new AzureMonitorExporterOptions();
+
+        // A distinct instrumentation key per call avoids colliding with the
+        // Azure Monitor exporter's process-wide per-key transmitter cache.
+        CliTelemetry.ConfigureExporter(options, $"InstrumentationKey={Guid.NewGuid()}");
+        options.Transport = new HttpClientTransport(client);
+        options.DisableOfflineStorage = true;
+
+        HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(null);
+        builder.Services.AddOpenTelemetry()
+            .ConfigureResource(r => CliTelemetry.ConfigureResource(r))
+            .WithTracing(t => t
+                .AddSource(CliTelemetry.SourceName)
+                .AddProcessor(new CliActivityEnrichmentProcessor(CliTelemetry.GetCommonAttributes()))
+                .AddAzureMonitorTraceExporter(o => CopyOptions(options, o)))
+            .WithMetrics(m => m
+                .AddMeter(CliTelemetry.SourceName)
+                .AddAzureMonitorMetricExporter(o => CopyOptions(options, o)));
+
+        IHost host = builder.Build();
+        await host.StartAsync();
+
+        Activity? activity = CliTelemetry.Trace.StartCommandActivity(DateTimeOffset.UtcNow);
+        activity?.SetCommandName("hosted-pipeline-regression-test");
+
+        // Mirrors Program.cs's finally block: record the metric, dispose
+        // the activity (stopping the span), then dispose the host —
+        // relying on disposal's implicit shutdown flush, no ForceFlush.
+        CliTelemetry.Metric.RecordCommand("hosted-pipeline-regression-test", exitCode: 0, durationMs: 1);
+        activity?.Dispose();
+        host.Dispose();
+
+        List<JsonElement> items = [.. payloads.SelectMany(ParseItems)];
+        items.Should().Contain(item => item.GetProperty("data").GetProperty("baseType").GetString() == "RemoteDependencyData");
+        items.Should().Contain(item =>
+            item.GetProperty("data").GetProperty("baseType").GetString() == "MetricData" &&
+            item.GetProperty("data").GetProperty("baseData").GetProperty("metrics").EnumerateArray()
+                .Any(metric => metric.GetProperty("name").GetString() == TelemetryConventions.CommandCountInstrument));
+    }
+
+    private static void CopyOptions(AzureMonitorExporterOptions source, AzureMonitorExporterOptions destination)
+    {
+        destination.ConnectionString = source.ConnectionString;
+        destination.TracesPerSecond = source.TracesPerSecond;
+        destination.SamplingRatio = source.SamplingRatio;
+        destination.EnableLiveMetrics = source.EnableLiveMetrics;
+        destination.EnableStandardMetrics = source.EnableStandardMetrics;
+        destination.EnablePerformanceCounters = source.EnablePerformanceCounters;
+        destination.Transport = source.Transport;
+        destination.DisableOfflineStorage = source.DisableOfflineStorage;
     }
 
     private static (TracerProvider Traces, MeterProvider Metrics) BuildProviders(ConcurrentQueue<string> payloads)

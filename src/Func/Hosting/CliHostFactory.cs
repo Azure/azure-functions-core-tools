@@ -54,10 +54,16 @@ internal static class CliHostFactory
     /// before workloads register; production code should use
     /// <see cref="CreateHostAsync"/>.
     /// </summary>
-    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction, ITelemetryEnvironmentScope? telemetryEnvironment = null)
+    /// <param name="telemetryEnvironment">
+    /// The telemetry environment scope. The caller owns this instance's
+    /// lifetime and is responsible for disposing it (restoring the
+    /// overridden environment variables), regardless of whether anything
+    /// resolves it from the built host's <see cref="IServiceProvider"/>.
+    /// </param>
+    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction, ITelemetryEnvironmentScope telemetryEnvironment)
     {
         ArgumentNullException.ThrowIfNull(interaction);
-        telemetryEnvironment ??= new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
+        ArgumentNullException.ThrowIfNull(telemetryEnvironment);
 
         // Empty builder: skip the default config and logging providers a CLI
         // doesn't need. The host owns shared lifetimes (currently just the
@@ -92,12 +98,13 @@ internal static class CliHostFactory
                     .AddAzureMonitorMetricExporter(o => CliTelemetry.ConfigureExporter(o, connectionString)));
         }
 
-        // Registered via factory (not AddSingleton(instance)) so the host's
-        // ServiceProvider takes ownership and restores the overridden
-        // environment variables on disposal, even for callers (e.g. tests)
-        // that invoke CreateBuilder without supplying their own scope.
-        builder.Services.AddSingleton(_ => telemetryEnvironment);
-        builder.Services.AddSingleton<IProcessEnvironment>(sp => (IProcessEnvironment)sp.GetRequiredService<ITelemetryEnvironmentScope>());
+        // Registered as an instance: the caller (see the `using` in
+        // Program.cs, or a test's own scope) owns this instance's lifetime
+        // and is responsible for disposing it to restore the overridden
+        // environment variables — disposal does not depend on anything
+        // resolving this registration from the built host.
+        builder.Services.AddSingleton(telemetryEnvironment);
+        builder.Services.AddSingleton<IProcessEnvironment>(sp => sp.GetRequiredService<ITelemetryEnvironmentScope>());
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerContentResolver, DefaultFunctionsWorkerContentResolver>();
