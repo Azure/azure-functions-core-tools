@@ -25,14 +25,15 @@
 
 ## 4. Hive Transaction and Concurrency
 
-- [ ] 4.1 Add injectable shared/exclusive template lifecycle locking under the func template settings directory.
+- [ ] 4.1 Add injectable shared/exclusive template lifecycle locking under the func template settings directory with cancelable acquisition and func-owned wait reasons for command rendering through `IInteractionService`.
 - [ ] 4.2 Update all `Templater` read and lifecycle entry points from `template-engine-integration` to acquire the appropriate shared or exclusive lifecycle lock.
 - [ ] 4.3 Implement opaque snapshots of TemplateEngine package registration, affected package mounts, and template cache state without parsing or rewriting the provider's persistence format.
 - [ ] 4.4 Implement commit, disposal-before-rollback, byte-for-byte restore, and engine-session recreation for failed replacement operations.
 - [ ] 4.5 Validate actual acquired metadata and configuration against retained preflight evidence and the same declaration/shared-package rules before cache rebuild and transaction commit. Include first installs and trigger rollback on mismatch, validation/cache failure, or cancellation after live mutation begins.
 - [ ] 4.6 Add tests that inject failures during provider uninstall, acquisition, registration, content verification, cache rebuild, cancellation, and rollback, proving the previous package remains installed and usable. Include changed local archives and folders, same-identity/version content drift, added/removed configurations, first-install cleanup, and identical-content controls.
-- [ ] 4.7 Add concurrent reader/writer tests proving listing and execution cannot observe transient replacement state.
+- [ ] 4.7 Add concurrent reader/writer tests proving listing and execution cannot observe transient replacement state. Include real reader/writer process termination, safe abandoned-ownership recovery, interrupted-transaction/cache recovery before reopening the hive, and a slow live owner or old lock metadata that must not be reclaimed by age alone.
 - [ ] 4.8 Agree and test the shared runtime lease/raw-content handoff, cancellation/disposal release, fresh readers after acquisition, and isolated preflight without nested live read locks. Retain the pinned-engine replacement/cancellation/cache-rebuild spike as a separate prerequisite.
+- [ ] 4.9 Test cancellation during shared/exclusive waits and acquisition races, no leaked lease or live mutation after observed cancellation, and command wait diagnostics identifying active readers or lifecycle work with cancellation guidance.
 
 ## 5. Templater Install Lifecycle
 

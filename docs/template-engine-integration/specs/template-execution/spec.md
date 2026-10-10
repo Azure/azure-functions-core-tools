@@ -60,6 +60,8 @@ The integration SHALL list the templates of the requested template type known to
 ### Requirement: Store session handoff
 Runtime sessions SHALL consume the shared store's lease, raw content, metadata, and refresh boundaries rather than implement a second registry or lock protocol. A live runtime session SHALL retain a shared lease while mounted catalog/selection/preview/invocation content is in use and SHALL release it on disposal or cancellation cleanup. Lifecycle operations SHALL use an exclusive lease and SHALL NOT upgrade an active read lease in place. Isolated preflight SHALL use an isolated hive without acquiring a live read lease inside an exclusive operation.
 
+Shared and exclusive lease acquisition SHALL honor the caller's cancellation token while waiting and during acquisition, without leaking ownership or starting mutation after observed cancellation. The store SHALL expose a func-owned wait reason for command rendering through `IInteractionService`, identifying active readers or lifecycle work and cancellation guidance without making the store a console renderer. Process termination SHALL release process-owned leases or permit safe abandoned-ownership recovery without requiring disposal. Wait duration or stale-looking lock metadata alone SHALL NOT justify evicting a live owner. Uncertain ownership SHALL fail closed with a diagnostic. After abandoned writer ownership is recovered, the store SHALL complete its interrupted-transaction/cache recovery or fail closed before exposing the live hive.
+
 #### Scenario: Acquisition follows browsing
 - **WHEN** a caller explicitly acquires a package after reading a live catalog
 - **THEN** it disposes the read session before lifecycle mutation and creates a fresh runtime session afterward
@@ -71,6 +73,27 @@ Runtime sessions SHALL consume the shared store's lease, raw content, metadata, 
 #### Scenario: Writer is waiting during selection
 - **WHEN** a live reader retains mounted template content during an interactive selection
 - **THEN** a lifecycle writer waits for that reader to dispose rather than replacing its selected mount
+- **AND** the waiting command reports the reason and cancellation guidance through its interaction service
+
+#### Scenario: Waiting writer is canceled
+- **WHEN** a writer is waiting for an interactive reader and cancellation is observed before mutation
+- **THEN** lease acquisition terminates with cancellation, retains no writer lease, and leaves the reader and live hive unchanged
+
+#### Scenario: Cancellation races with lease acquisition
+- **WHEN** cancellation is observed as a shared or exclusive lease becomes available
+- **THEN** the canceled acquisition releases any acquired ownership and does not begin live-store work
+
+#### Scenario: Reader process terminates during selection
+- **WHEN** a reader process crashes or is killed without disposing its session
+- **THEN** the process-owned lease releases or is safely reclaimed so it does not permanently block lifecycle work
+
+#### Scenario: Writer process terminates during replacement
+- **WHEN** a writer process terminates while package state or cache rebuilding is incomplete
+- **THEN** lease recovery does not expose that transitional state and a later session waits for store-owned recovery or receives a recovery diagnostic
+
+#### Scenario: Live owner is slow
+- **WHEN** a lease remains held by a live process beyond a wait threshold or lock metadata looks old
+- **THEN** elapsed time or metadata age alone does not authorize reclaiming that lease
 
 ### Requirement: Usable workload snapshot
 Template workload evaluation SHALL use a per-command immutable snapshot of successfully loaded/initialized runtime versions, admitted content inventory, and installed-only diagnostic entries. A runtime workload SHALL NOT satisfy a template requirement if its selected version failed loading or initialization. Template evaluation SHALL NOT load workloads, contact a feed, select an older installed runtime version, or invent version-compatibility enforcement. Content versions SHALL follow the CLI's RID-compatible inventory boundary without a claim of payload-health validation. Existing consumer payload checks SHALL remain authoritative, and known rejection SHALL remain available as a diagnostic rather than be described as proven usability.

@@ -4,8 +4,9 @@
 - [ ] 1.2 Add a dependency-injected templater factory that creates one command-scoped `Templater` and internal engine session from the validated context.
 - [ ] 1.3 Replace the misleading bundle host parameter names with `func:bundle-id` and `func:bundle-version`, add the remaining func context parameters, and return the resolved command directory for `WorkingDirectory`.
 - [ ] 1.4 Add tests proving separate command scopes do not leak context and all phases within one scope share the same host defaults and engine environment.
-- [ ] 1.5 Agree the runtime/store read, exclusive-write, and isolated-preflight session handoff with the lifecycle owner, including disposal/cancellation, mounted-content lifetime, raw metadata/fingerprints, and fresh sessions after acquisition.
+- [ ] 1.5 Agree the runtime/store read, exclusive-write, and isolated-preflight session handoff with the lifecycle owner, including cancelable acquisition, command-rendered wait reasons, disposal and process-termination ownership recovery, mounted-content lifetime, raw metadata/fingerprints, and fresh sessions after acquisition.
 - [ ] 1.6 Capture actual startup load/initialization outcomes in one immutable per-command workload availability input without changing startup registration/recovery or introducing a new compatibility scheme.
+- [ ] 1.7 Test shared/exclusive wait cancellation, acquisition races without leaked leases, command wait diagnostics, terminated readers, and interrupted writers that require store-owned recovery before the live hive is exposed. Keep real cross-process recovery qualification with the store owner and test that wait duration or old lock metadata cannot evict a live owner.
 
 ## 2. Func-Owned Template Models
 
