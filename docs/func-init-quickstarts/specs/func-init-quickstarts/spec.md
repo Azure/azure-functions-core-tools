@@ -56,7 +56,7 @@ Explicit stack installation through setup or direct stack install SHALL acquire 
 
 ### Requirement: Curated discovery precedes payload acquisition
 
-CLI browse/search SHALL expose sanctioned available templates without requiring their packages to be installed. The initial curated input SHALL use the reviewed existing source manifest at a pinned revision and verified publication references, preserving legacy fields/URL consumers. The discovery component SHALL own the package/template manifest, curation, and freshness rules. General community feed scanning SHALL NOT be a prerequisite for that initial flow. Publishing onboarding and the installed TemplateEngine catalog SHALL remain separate from cached discovery metadata. Browsing/searching MUST NOT mutate installed package state. Empty installed selection and unknown init references SHALL provide an actionable route to the agreed CLI discovery entry point without implicit acquisition.
+CLI browse/search SHALL expose sanctioned available templates without payload installation. The existing reviewed source manifest SHALL remain the curated registration and initial discovery authority, with an approved versioned publishing extension and verified publication references. It MUST NOT require a second manually maintained onboarding registry or general feed scanning for the initial curated GA flow. Legacy fields/URL/schema consumers SHALL be preserved or qualified through coordinated migration. Cached public metadata MUST NOT authorize publication or substitute for the installed TemplateEngine catalog. Generic explicit third-party package installation SHALL remain supported. Browsing/searching MUST NOT mutate installed package state, and empty/unknown init cases SHALL identify the agreed CLI discovery route without implicit acquisition.
 
 #### Scenario: Empty picker or unknown installed reference
 
@@ -105,6 +105,15 @@ A guided use action SHALL show the concrete package ID, version, source, full te
 - **THEN** guided use does not silently override the installed version, source, or pin
 - **AND** any replacement requires an explicit lifecycle action under its existing policy
 
+### Requirement: Guided dry-run does not acquire payloads
+
+Guided dry-run SHALL not download, install, update, or register template packages. An uninstalled selection SHALL report that explicit installation is required for full engine preview, while metadata/acquisition intent may be displayed read-only. Installed selections SHALL retain normal no-filesystem-write preview and approval rules. Force or dry-run SHALL NOT imply acquisition authorization.
+
+#### Scenario: Uninstalled selection is previewed
+
+- **WHEN** guided dry-run selects a sanctioned template whose payload is not installed
+- **THEN** it reports the installation requirement without mutating the global template store or target
+
 ### Requirement: Guided curation proof identifies the actual artifact
 
 Guided use SHALL validate authenticated approval evidence for the actual selected package ID, installed version, recorded source, artifact digest, and full template identity. Approval of only the latest advertised version or package family SHALL NOT authorize another installed artifact. Revoked, stale, unknown, or mismatched evidence SHALL block acquisition/creation. Offline proof SHALL be accepted only under an agreed policy validating the exact artifact and permitted freshness; otherwise the flow SHALL fail closed. Approval transport, revocation/freshness distribution, offline validity, and explicit script-authorization grammar SHALL be qualified before removing the legacy command.
@@ -127,6 +136,13 @@ Guided use SHALL validate authenticated approval evidence for the actual selecte
 ### Requirement: Quickstart removal requires a qualified replacement
 
 The existing `func quickstart` command SHALL remain available until a pinned supported-entry inventory has usable published replacements, basic companion acquisition works on fresh and upgraded installs, guided metadata discovery/acquisition/creation and migration guidance are available, replacement regression tests pass, and the responsible owners agree the handoff. Every currently supported entry SHALL record a source/scope, replacement reference or unresolved gap, owner, blocker, and reviewed disposition, including sources outside the initial publisher allowlist and independent subfolders. Unresolved coverage SHALL block removal, not narrow support or expand trust implicitly. The command switch SHALL remove the old creation path rather than keep a permanent alias. It SHALL NOT remove the shared manifest from unrelated consumers.
+
+The inventory SHALL be pinned from the reviewed production quickstart manifest, not test fixtures, and reconciled with the currently published legacy manifest immediately before removal. Newly supported entries SHALL receive qualified replacements/dispositions or block cutover; additions SHALL NOT be silently ignored or frozen without owner agreement.
+
+#### Scenario: Legacy manifest adds a supported entry after the pin
+
+- **WHEN** cutover reconciliation finds a currently supported entry absent from the earlier inventory
+- **THEN** removal is blocked until the new entry has a qualified replacement/disposition
 
 #### Scenario: Repository exposes separate subfolder samples
 
