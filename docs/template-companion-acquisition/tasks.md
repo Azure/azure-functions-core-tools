@@ -12,6 +12,8 @@
 - [ ] 2.3 Integrate the planner with setup and direct approved stack installation without changing non-stack installs.
 - [ ] 2.4 Reuse the templater lifecycle for validation, registration, and replacement safety.
 - [ ] 2.5 Support explicit companion repair when the stack itself is already installed.
+- [ ] 2.6 Validate shared companion requirements across existing and requested stack associations before any package mutation. Reject disjoint ranges even for an unpinned package, without claiming side-by-side installation or automatic replacement.
+- [ ] 2.7 Apply explicit/environment/default source precedence consistently to stack and companion requests, validate the effective feed against all reviewed mappings, and fail disallowed overrides before mutation without ignoring or changing feeds.
 
 ## 3. State And Failures
 
@@ -24,3 +26,4 @@
 - [ ] 4.1 Test fresh, repeated, upgraded, pinned, offline, cancelled, and partially completed basic acquisition, with no curated payload installation or removal.
 - [ ] 4.2 Document install/repair guidance and increased download size, without promising automatic updates.
 - [ ] 4.3 Qualify the acquisition path before the quickstart command replacement.
+- [ ] 4.4 Test disjoint shared ranges preserving an existing unpinned companion, overlapping-range controls still honoring pins/sources, explicit and environment feed-policy conflicts with no mutation, and allowed same-feed resolution.

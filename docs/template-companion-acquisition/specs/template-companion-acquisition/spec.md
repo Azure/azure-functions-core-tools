@@ -56,6 +56,41 @@ Acquisition SHALL use the owning lifecycle's version, source, locking, and repla
 - **THEN** the planner reuses the installed stack where valid
 - **AND** attempts the missing companion through its lifecycle
 
+### Requirement: Shared companion requirements are compatible before mutation
+
+The planner SHALL validate required companion ranges for the requested stack against the reviewed requirements of existing stack associations before deploying or replacing any planned package. Disjoint shared requirements SHALL fail before mutation even when the existing companion is unpinned. Overlapping ranges SHALL remain subject to existing source, pin, and replacement authorization rules. This requirement SHALL NOT imply side-by-side installations, reference-counted deletion, or automatic replacement.
+
+#### Scenario: Shared unpinned companion requirements conflict
+
+- **WHEN** existing stack A requires T `[1,2)` and requested stack B requires T `[2,3)` from the same source
+- **THEN** acquisition fails before installing B or replacing T
+- **AND** A and its existing companion remain unchanged even when T is unpinned
+
+#### Scenario: Shared ranges overlap
+
+- **WHEN** existing and requested stacks have an allowed common companion version
+- **THEN** the planner can continue normal version/source/pin validation without treating the overlap as replacement authorization
+
+### Requirement: Effective source is consistent and approved
+
+The planner SHALL resolve source precedence as explicit `--source`, then `FUNC_CLI_WORKLOADS_SOURCE`, then the normal default, and apply that effective source to stack and companion acquisition. Each companion mapping SHALL validate it against its approved feed policy before mutation. A disallowed source SHALL fail with a diagnostic rather than be ignored, replaced by another feed, or treated as implicit source approval.
+
+#### Scenario: Explicit private feed is disallowed for a companion
+
+- **WHEN** `--source` selects a private feed that the companion mapping does not approve
+- **THEN** the complete acquisition plan fails before package mutation
+- **AND** the planner does not fetch the companion from a different feed
+
+#### Scenario: Environment override is disallowed
+
+- **WHEN** no explicit source is supplied and the environment-selected feed violates the companion mapping
+- **THEN** the planner rejects that effective feed before mutation rather than silently using the default
+
+#### Scenario: Effective source is allowed
+
+- **WHEN** the selected feed satisfies every companion mapping and the other plan checks
+- **THEN** stack and companion resolution use that same feed through their owning acquisition boundaries
+
 ### Requirement: Partial completion remains observable and recoverable
 
 Acquisition SHALL resolve and validate the plan before writes, SHALL honor cancellation between operations, and SHALL rely on per-package rollback. It MUST NOT promise an atomic transaction across workload and template stores. Failure of a later requested package SHALL return non-zero, retain earlier valid installations, and report an idempotent recovery action.

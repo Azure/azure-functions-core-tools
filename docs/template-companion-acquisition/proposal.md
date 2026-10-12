@@ -8,6 +8,7 @@ Basic project scaffolding is moving out of stack workloads into `FuncTemplate` p
 - Acquire companions during explicit stack installation through setup and direct stack install, using the shared template lifecycle.
 - Exclude curated preinstallation and its flags, preserving existing user-installed packages.
 - Define source and version boundaries, repeat installation, fresh and upgraded machines, cancellation, and partial completion.
+- Reject incompatible shared-companion ranges before mutation and apply the selected source consistently only when every reviewed mapping permits it.
 - Keep template execution, curated discovery/guided use, automatic updates, and publication outside basic companion acquisition.
 
 ## Capabilities
