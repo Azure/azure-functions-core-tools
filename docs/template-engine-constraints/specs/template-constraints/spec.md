@@ -102,11 +102,16 @@ Func constraint types SHALL use the `func-` prefix. A template package that othe
 - **THEN** the shared-package rule permits that declaration
 
 ### Requirement: Workload requirements
-The `func-workload` constraint SHALL name a workload by alias or package ID with an optional version range. Names SHALL start with an ASCII letter or digit, SHALL contain only ASCII letters, digits, `.`, `-`, and `_`, SHALL NOT end in `.nupkg`, and SHALL compare case-insensitively with the aliases, package IDs, and published package IDs of the workloads the CLI loaded when the command started. The loaded workloads SHALL be the highest installed version of each runtime workload that loaded and every installed version of each content workload except packages built for another platform. The constraint SHALL be satisfied when a matching loaded workload has a version in the range. When a matching workload is installed but didn't load, the constraint SHALL be restricted without a next step. Evaluation SHALL NOT access the network or depend on project context.
+The `func-workload` constraint SHALL name a workload by alias or package ID with an optional version range. Names SHALL start with an ASCII letter or digit, SHALL contain only ASCII letters, digits, `.`, `-`, and `_`, SHALL NOT end in `.nupkg`, and SHALL compare case-insensitively with the aliases, package IDs, and published package IDs in the command's immutable availability snapshot. Runtime entries SHALL use the selected highest installed runtime version only when loading and initialization both succeeded. A runtime that loaded but failed initialization SHALL NOT satisfy a requirement, and evaluation SHALL NOT activate an older installed version as a fallback. Content entries SHALL include admitted installed versions except packages built for another platform, without treating inventory admission as proof of payload health. A matching usable entry SHALL satisfy the constraint when its version is in the range. An installed runtime that failed loading or initialization SHALL be restricted without an automatic next step and retain its CLI-owned diagnostic. Evaluation SHALL NOT access the network, load workload code, or depend on project context.
 
 #### Scenario: Required workload is loaded
-- **WHEN** a template requires `node` and a loaded `node` workload has a version in the declared range
+- **WHEN** a template requires `node` and the selected `node` runtime loaded and initialized successfully with a version in the declared range
 - **THEN** the constraint is satisfied
+
+#### Scenario: Runtime loads but initialization fails
+- **WHEN** a matching selected runtime assembly loaded but its initialization failed even though its version is in range
+- **THEN** it cannot satisfy the constraint and the template is restricted without an automatic install or update step
+- **AND** the CLI-owned initialization diagnostic is retained
 
 #### Scenario: Required workload is missing
 - **WHEN** no installed workload matches the required name

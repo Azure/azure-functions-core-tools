@@ -31,7 +31,7 @@ The integration SHALL make resolved context available to the template engine thr
 - **THEN** the host reports that parameter as unavailable rather than synthesizing or reusing a value
 
 ### Requirement: Per-command engine environment
-The integration SHALL create a fresh host and template engine environment for each command invocation and SHALL reuse that same environment for discovery, constraint evaluation, candidate metadata, selection, and invocation within the command. Persistent package registration and template cache data SHALL continue to use the shared func-owned settings location.
+The integration SHALL create a fresh host and template engine environment for each uninterrupted command-scoped runtime flow and SHALL reuse that same environment for discovery, constraint evaluation, candidate metadata, selection, and invocation within that flow. Lifecycle acquisition SHALL terminate the browsing flow before mutation, discarding its catalog, groups, parameter selection, and resolved-template capabilities. Any execution after acquisition SHALL start a fresh runtime flow with a newly resolved context, catalog, eligibility, and selection. It SHALL NOT transfer or invoke a selection from the disposed session. Persistent package registration and template cache data SHALL continue to use the shared func-owned settings location.
 
 #### Scenario: Consecutive commands target different projects
 - **WHEN** two commands in the same process resolve different project or bundle contexts
@@ -64,7 +64,13 @@ Shared and exclusive lease acquisition SHALL honor the caller's cancellation tok
 
 #### Scenario: Acquisition follows browsing
 - **WHEN** a caller explicitly acquires a package after reading a live catalog
-- **THEN** it disposes the read session before lifecycle mutation and creates a fresh runtime session afterward
+- **THEN** it terminates browsing and discards the old selection before disposing the read session and performing lifecycle mutation
+- **AND** later execution starts a fresh context, catalog, eligibility, and selection flow rather than transferring an old resolved template
+
+#### Scenario: Selected template predates acquisition
+- **WHEN** a resolved template was selected in a runtime flow that ended for package acquisition
+- **THEN** that capability remains disposed and cannot be invoked through the new session
+- **AND** any new selection is validated and invoked entirely within its own originating session
 
 #### Scenario: Reader is canceled
 - **WHEN** a runtime command is canceled while holding a store lease
@@ -97,6 +103,12 @@ Shared and exclusive lease acquisition SHALL honor the caller's cancellation tok
 
 ### Requirement: Usable workload snapshot
 Template workload evaluation SHALL use a per-command immutable snapshot of successfully loaded/initialized runtime versions, admitted content inventory, and installed-only diagnostic entries. A runtime workload SHALL NOT satisfy a template requirement if its selected version failed loading or initialization. Template evaluation SHALL NOT load workloads, contact a feed, select an older installed runtime version, or invent version-compatibility enforcement. Content versions SHALL follow the CLI's RID-compatible inventory boundary without a claim of payload-health validation. Existing consumer payload checks SHALL remain authoritative, and known rejection SHALL remain available as a diagnostic rather than be described as proven usability.
+
+The caller SHALL capture completed startup outcomes before constructing the runtime flow's `Templater`. Listing, resolution, preview, and invocation SHALL retain that same availability input, not recalculate it from a later installed inventory or lazy first evaluation.
+
+#### Scenario: Inventory changes after runtime-flow construction
+- **WHEN** installed inventory changes after the flow's immutable startup-outcome snapshot is captured
+- **THEN** that flow continues to evaluate the captured availability rather than lazily describing newly installed code as loaded
 
 #### Scenario: Initialization failed after assembly loading
 - **WHEN** a selected runtime workload loaded but its initialization failed

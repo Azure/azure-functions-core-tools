@@ -57,7 +57,7 @@ Project templates for `func init` carry func configuration actions, so they alre
 
 First-party templates that need func constraints ship in func-only packages. Packaging and isolated install/update preflight reject func constraint types when NuGet metadata also declares the standard `Template` package type or another host-sharing declaration supported by the CLI. Installed-template validation applies the same check to available package metadata, covering packages registered before the rule was introduced. A shared package without func constraint types remains supported. Folder installs have no NuGet package-type metadata and continue to use raw declaration validation without inventing a shared-package classification.
 
-### `func-workload` requires loaded workloads
+### `func-workload` requires usable workloads
 
 `func-workload` names a workload by alias or package ID and can add a version range:
 
@@ -67,7 +67,7 @@ First-party templates that need func constraints ship in func-only packages. Pac
 { "type": "func-workload", "args": [ "node", { "id": "python", "version": "1.2" } ] }
 ```
 
-The constraint checks the workloads the CLI loaded when the command started: the highest installed version of each runtime workload (kind `workload`) that loaded, and every installed version of each content workload (kind `content`), such as extension bundles, except packages built for another platform. A loaded workload matches when the name equals one of its aliases, its package ID, or the published package ID of a platform-specific workload, ignoring case. Checking loaded versions keeps eligibility aligned with the versions commands actually use.
+The constraint reads the command's immutable availability snapshot. A runtime workload (kind `workload`) contributes the selected highest installed version only when loading and initialization both succeeded. A loaded assembly whose `Configure` failed cannot satisfy a requirement, and evaluation does not activate an older installed runtime as a fallback. Content workloads (kind `content`), such as extension bundles, contribute admitted installed versions except packages built for another platform, without claiming their payloads have been validated. A usable entry matches its aliases, package ID, or published platform package ID case-insensitively. These rules keep eligibility aligned with the versions commands actually use.
 
 The snapshot contains only workloads that passed the CLI's applicable compatibility and activation checks. Installed entries that were rejected remain available for diagnostics but cannot satisfy a constraint. The workload subsystem owns managed-contract, packaging, and activation checks. The template subsystem owns package classification and supported template formats and features. Template constraints are additional eligibility checks, not replacements for either boundary.
 
@@ -140,7 +140,7 @@ A func constraint builds its message and next step from the parsed requirement, 
 | Result | When | Next step |
 |---|---|---|
 | Workload missing | No installed workload matches | `func setup --features <feature>` when a setup feature installs the workload, such as a stack's feature, `host`, or `runtime` for extension bundles, otherwise `func workload install <workload>` |
-| Workload not usable | A matching workload is installed but was rejected by compatibility checks or didn't load | None; retain the CLI's compatibility or load diagnostic rather than treating the workload as missing |
+| Workload not usable | A matching workload is installed but was rejected by compatibility checks or failed loading or initialization | None; retain the CLI-owned rejection, load, or initialization diagnostic rather than treating the workload as missing |
 | Workload outdated | Every matching loaded version is below the range | `func workload update <workload>` when the range has no upper bound, adding `--major` when the minimum is in a higher major version, otherwise none |
 | Workload incompatible | Every matching loaded version is outside the range and at least one is above it | None |
 | Bundle outdated | The resolved bundle version is below the range | Allow the required version in the `host.json` bundle range, or install a newer extension bundle |
