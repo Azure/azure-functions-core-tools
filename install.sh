@@ -427,7 +427,7 @@ else
         exit 1
     fi
 
-    cp -a "${PAYLOAD_DIR}/." "$INSTALL_DIR/"
+    cp -pR "${PAYLOAD_DIR}/." "$INSTALL_DIR/"
 
     if [[ "$OS" == "osx" ]]; then
         xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true

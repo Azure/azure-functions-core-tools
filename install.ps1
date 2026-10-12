@@ -103,6 +103,13 @@ function Write-InstallationMetadata {
 
         $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
         [System.IO.File]::WriteAllText($tempPath, "$Script:InstallationMetadataJson`n", $utf8WithoutBom)
+        if ($os -ne 'win') {
+            $metadataMode = [System.IO.UnixFileMode]::UserRead -bor
+                [System.IO.UnixFileMode]::UserWrite -bor
+                [System.IO.UnixFileMode]::GroupRead -bor
+                [System.IO.UnixFileMode]::OtherRead
+            [System.IO.File]::SetUnixFileMode($tempPath, $metadataMode)
+        }
 
         if ([System.IO.File]::Exists($metadataPath)) {
             [System.IO.File]::Replace($tempPath, $metadataPath, $backupPath)
@@ -420,7 +427,12 @@ try {
 
         New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
         Test-InstallationMetadataDestination -InstallPath $InstallPath
-        Get-ChildItem -LiteralPath $payloadPath -Force | Copy-Item -Destination $InstallPath -Recurse -Force
+        if ($os -eq 'win') {
+            Get-ChildItem -LiteralPath $payloadPath -Force | Copy-Item -Destination $InstallPath -Recurse -Force
+        } else {
+            & /bin/cp -pR (Join-Path $payloadPath '.') $InstallPath
+            if ($LASTEXITCODE -ne 0) { throw "Failed to publish the func CLI payload (cp exit $LASTEXITCODE)." }
+        }
 
         if ($os -eq 'osx') {
             xattr -d com.apple.quarantine (Join-Path $InstallPath 'func') 2>$null

@@ -140,18 +140,21 @@ function Invoke-BashInstaller {
         [Parameter(Mandatory)] [string] $HomePath,
         [Parameter(Mandatory)] [string] $FakeBinPath,
         [switch] $Force,
-        [switch] $FailDownload
+        [switch] $FailDownload,
+        [ValidateSet('Linux', 'Darwin')] [string] $OperatingSystem = 'Linux'
     )
 
     $previousEnvironment = @{
         Archive = $env:FUNC_INSTALLER_TEST_ARCHIVE
         Fail = $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD
         Home = $env:HOME
+        OperatingSystem = $env:FUNC_INSTALLER_TEST_OS
     }
 
     try {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = ($ArchivePath -replace '\\', '/')
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $FailDownload.ToString().ToLowerInvariant()
+        $env:FUNC_INSTALLER_TEST_OS = $OperatingSystem
         $env:HOME = ($HomePath -replace '\\', '/')
 
         $arguments = @(
@@ -174,6 +177,7 @@ function Invoke-BashInstaller {
     } finally {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $previousEnvironment.Archive
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $previousEnvironment.Fail
+        $env:FUNC_INSTALLER_TEST_OS = $previousEnvironment.OperatingSystem
         $env:HOME = $previousEnvironment.Home
     }
 }
@@ -297,7 +301,7 @@ cp "$FUNC_INSTALLER_TEST_ARCHIVE" "$output"
     @'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "-s" ]]; then
-    printf 'Linux\n'
+    printf '%s\n' "${FUNC_INSTALLER_TEST_OS:-Linux}"
 else
     printf 'x86_64\n'
 fi
@@ -312,8 +316,16 @@ fi
         'install.sh failed to install a valid payload.'
     Assert-True (Test-Path -LiteralPath (Join-Path $bashInstall 'func') -PathType Leaf) 'install.sh did not install func.'
     Assert-Metadata -InstallPath $bashInstall
-    $metadataMode = (& bash -c "stat -c '%a' '$((Join-Path $bashInstall 'func.installation.json') -replace '\\', '/')'").Trim()
+    $metadataPath = (Join-Path $bashInstall 'func.installation.json') -replace '\\', '/'
+    $metadataMode = (& bash -c 'stat -c "%a" "$1" 2>/dev/null || stat -f "%Lp" "$1"' -- $metadataPath).Trim()
     Assert-True ($metadataMode -eq '644') "install.sh wrote metadata with mode $metadataMode instead of 644."
+
+    $macInstall = Join-Path $testRoot 'custom-macos-install'
+    Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $macInstall -HomePath $bashHome -FakeBinPath $fakeBin -OperatingSystem Darwin) -eq 0) `
+        'install.sh failed through the macOS platform path.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $macInstall 'func') -PathType Leaf) `
+        'install.sh did not install func through the macOS platform path.'
+    Assert-Metadata -InstallPath $macInstall
 
     Set-Content -LiteralPath (Join-Path $bashInstall 'func.installation.json') -Value '{}' -Encoding ascii
     Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashInstall -HomePath $bashHome -FakeBinPath $fakeBin -Force) -eq 0) `
