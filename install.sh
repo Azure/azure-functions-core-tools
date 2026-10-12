@@ -62,6 +62,11 @@ write_installation_metadata() {
     local metadata_path="${INSTALL_DIR}/${INSTALLATION_METADATA_FILE}"
     local temp_path
 
+    if [[ -d "$metadata_path" ]]; then
+        say_error "Cannot write installation metadata because ${metadata_path} is a directory."
+        return 1
+    fi
+
     temp_path=$(mktemp "${INSTALL_DIR}/.${INSTALLATION_METADATA_FILE}.tmp.XXXXXX")
     if ! printf '%s\n' "$INSTALLATION_METADATA_JSON" > "$temp_path" || ! chmod 0644 "$temp_path"; then
         rm -f "$temp_path"
@@ -407,13 +412,22 @@ else
     validate_content_type "$DOWNLOAD_URL" || exit 1
     say_info "Downloading ${ASSET_NAME}..."
     secure_curl "$DOWNLOAD_URL" "${TEMP_DIR}/${ASSET_NAME}"
-    mkdir -p "$INSTALL_DIR"
-    tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$INSTALL_DIR"
+    PAYLOAD_DIR="${TEMP_DIR}/payload"
+    mkdir -p "$PAYLOAD_DIR"
+    tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$PAYLOAD_DIR"
 
-    if [[ ! -x "${INSTALL_DIR}/func" ]]; then
-        say_error "The downloaded archive did not install an executable func CLI at ${INSTALL_DIR}/func."
+    if [[ -L "${PAYLOAD_DIR}/func" || ! -f "${PAYLOAD_DIR}/func" || ! -x "${PAYLOAD_DIR}/func" ]]; then
+        say_error "The downloaded archive does not contain an executable func CLI."
         exit 1
     fi
+
+    mkdir -p "$INSTALL_DIR"
+    if [[ -d "${INSTALL_DIR}/${INSTALLATION_METADATA_FILE}" ]]; then
+        say_error "Cannot write installation metadata because ${INSTALL_DIR}/${INSTALLATION_METADATA_FILE} is a directory."
+        exit 1
+    fi
+
+    cp -a "${PAYLOAD_DIR}/." "$INSTALL_DIR/"
 
     if [[ "$OS" == "osx" ]]; then
         xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true

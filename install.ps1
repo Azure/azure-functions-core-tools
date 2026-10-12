@@ -94,16 +94,47 @@ function Write-InstallationMetadata {
 
     $metadataPath = Join-Path $InstallPath $Script:InstallationMetadataFile
     $tempPath = Join-Path $InstallPath ".$Script:InstallationMetadataFile.tmp.$([Guid]::NewGuid().ToString('N'))"
+    $backupPath = Join-Path $InstallPath ".$Script:InstallationMetadataFile.backup.$([Guid]::NewGuid().ToString('N'))"
 
     try {
+        if ([System.IO.Directory]::Exists($metadataPath)) {
+            throw "Cannot write installation metadata because $metadataPath is a directory."
+        }
+
         $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
         [System.IO.File]::WriteAllText($tempPath, "$Script:InstallationMetadataJson`n", $utf8WithoutBom)
 
-        Move-Item -LiteralPath $tempPath -Destination $metadataPath -Force
+        if ([System.IO.File]::Exists($metadataPath)) {
+            [System.IO.File]::Replace($tempPath, $metadataPath, $backupPath)
+            [System.IO.File]::Delete($backupPath)
+        } else {
+            [System.IO.File]::Move($tempPath, $metadataPath)
+        }
     } finally {
         if ([System.IO.File]::Exists($tempPath)) {
             [System.IO.File]::Delete($tempPath)
         }
+        if ([System.IO.File]::Exists($backupPath)) {
+            [System.IO.File]::Delete($backupPath)
+        }
+    }
+}
+
+function Test-InstallationMetadataDestination {
+    param([Parameter(Mandatory)] [string] $InstallPath)
+
+    $metadataPath = Join-Path $InstallPath $Script:InstallationMetadataFile
+    if ([System.IO.Directory]::Exists($metadataPath)) {
+        throw "Cannot write installation metadata because $metadataPath is a directory."
+    }
+
+    if ([System.IO.File]::Exists($metadataPath)) {
+        $probe = [System.IO.File]::Open(
+            $metadataPath,
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None)
+        $probe.Dispose()
     }
 }
 
@@ -358,18 +389,38 @@ try {
     if ($PSCmdlet.ShouldProcess($InstallPath, "Download $assetName and install func CLI")) {
         Write-Message "Downloading $assetName..."
         Invoke-SecureWebRequest -Uri $downloadUrl -OutFile $downloadPath -TimeoutSec $Script:ArchiveDownloadTimeoutSec | Out-Null
-        New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
+        $payloadPath = Join-Path $tempDir 'payload'
+        New-Item -ItemType Directory -Path $payloadPath | Out-Null
 
         if ($os -eq 'win') {
-            Expand-Archive -Path $downloadPath -DestinationPath $InstallPath -Force
+            Expand-Archive -Path $downloadPath -DestinationPath $payloadPath -Force
         } else {
-            tar -xzf $downloadPath -C $InstallPath
+            tar -xzf $downloadPath -C $payloadPath
             if ($LASTEXITCODE -ne 0) { throw "Failed to extract $assetName (tar exit $LASTEXITCODE)." }
         }
 
-        if (-not (Test-Path -LiteralPath $funcPath -PathType Leaf)) {
-            throw "The downloaded archive did not install the func CLI at $funcPath."
+        $payloadFuncPath = Join-Path $payloadPath $funcExe
+        if (-not (Test-Path -LiteralPath $payloadFuncPath -PathType Leaf)) {
+            throw "The downloaded archive does not contain the func CLI."
         }
+
+        if ($os -ne 'win') {
+            $payloadFunc = Get-Item -LiteralPath $payloadFuncPath -Force
+            if ($payloadFunc.LinkType) {
+                throw "The downloaded archive does not contain a regular func CLI executable."
+            }
+
+            $executeBits = [System.IO.UnixFileMode]::UserExecute -bor
+                [System.IO.UnixFileMode]::GroupExecute -bor
+                [System.IO.UnixFileMode]::OtherExecute
+            if (([System.IO.File]::GetUnixFileMode($payloadFuncPath) -band $executeBits) -eq 0) {
+                throw "The downloaded archive does not contain an executable func CLI."
+            }
+        }
+
+        New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
+        Test-InstallationMetadataDestination -InstallPath $InstallPath
+        Get-ChildItem -LiteralPath $payloadPath -Force | Copy-Item -Destination $InstallPath -Recurse -Force
 
         if ($os -eq 'osx') {
             xattr -d com.apple.quarantine (Join-Path $InstallPath 'func') 2>$null
