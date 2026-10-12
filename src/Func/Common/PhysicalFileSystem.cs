@@ -93,6 +93,7 @@ internal sealed class PhysicalFileSystem : IFileSystem
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxByteCount);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!File.Exists(path))
         {

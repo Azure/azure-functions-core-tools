@@ -8,6 +8,8 @@ namespace Azure.Functions.Cli.Update;
 /// <summary>
 /// Source-generated JSON metadata for the installer-authored installation contract.
 /// </summary>
-[JsonSourceGenerationOptions(UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
+[JsonSourceGenerationOptions(
+    AllowDuplicateProperties = false,
+    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(InstallationMetadataDocument))]
 internal sealed partial class InstallationMetadataJsonContext : JsonSerializerContext;

@@ -121,6 +121,9 @@ public sealed class InstallationMetadataReaderTests
     [InlineData("""{"schemaVersion":1,"updatePolicy":"in-place"}""")]
     [InlineData("""{"schemaVersion":1,"installMethod":"standalone"}""")]
     [InlineData("""{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place","future":true}""")]
+    [InlineData("""{"schemaVersion":2,"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}""")]
+    [InlineData("""{"schemaVersion":1,"installMethod":"npm","installMethod":"standalone","updatePolicy":"in-place"}""")]
+    [InlineData("""{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"external","updatePolicy":"in-place"}""")]
     [InlineData("null")]
     public async Task ReadAsync_MissingOrUnknownProperty_ThrowsInvalidInstallationMetadataException(string json)
     {
