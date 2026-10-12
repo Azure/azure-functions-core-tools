@@ -57,6 +57,22 @@ public sealed class CliUpdaterTests
     }
 
     [Fact]
+    public async Task UpdateAsync_VerificationOutputWithBuildMetadata_Succeeds()
+    {
+        (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
+            httpHandler: SuccessDownloadHandler());
+
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
+            .Returns(OkOutcome("5.1.0+abc1234\n"));
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
+
+        await updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None);
+
+        fileSystem.Received(1).CopyFile(_fakeExtractedBinary, _fakeProcessPath);
+    }
+
+    [Fact]
     public async Task UpdateAsync_WithProgress_ReportsDownloadBytesAndPipelinePhases()
     {
         (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
