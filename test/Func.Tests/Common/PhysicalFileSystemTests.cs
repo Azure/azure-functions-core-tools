@@ -164,6 +164,44 @@ public sealed partial class PhysicalFileSystemTests : IDisposable
     }
 
     [Fact]
+    public void ResolvePhysicalPath_RevisitedLinkWithDifferentRemainingPath_ResolvesPhysicalTarget()
+    {
+        // Arrange
+        string physicalDirectory = Path.Combine(_tempDirectory, "physical");
+        string versionDirectory = Path.Combine(physicalDirectory, "versions", "v1");
+        string binaryDirectory = Path.Combine(versionDirectory, "bin");
+        Directory.CreateDirectory(binaryDirectory);
+        string physicalExecutable = Path.Combine(binaryDirectory, OperatingSystem.IsWindows() ? "func.exe" : "func");
+        File.WriteAllText(physicalExecutable, string.Empty);
+
+        string prefixLink = Path.Combine(_tempDirectory, "prefix");
+        string currentLink = Path.Combine(physicalDirectory, "current");
+        string currentTarget = Path.Combine(prefixLink, "versions", "v1");
+        if (OperatingSystem.IsWindows())
+        {
+            CreateJunction(prefixLink, physicalDirectory);
+            CreateJunction(currentLink, currentTarget);
+        }
+        else
+        {
+            Directory.CreateSymbolicLink(prefixLink, physicalDirectory);
+            Directory.CreateSymbolicLink(currentLink, currentTarget);
+        }
+
+        string executablePath = Path.Combine(
+            prefixLink,
+            "current",
+            "bin",
+            Path.GetFileName(physicalExecutable));
+
+        // Act
+        string resolved = _fileSystem.ResolvePhysicalPath(executablePath);
+
+        // Assert
+        resolved.Should().Be(physicalExecutable);
+    }
+
+    [Fact]
     public void ResolvePhysicalPath_WindowsJunction_ResolvesPhysicalTarget()
     {
         if (!OperatingSystem.IsWindows())

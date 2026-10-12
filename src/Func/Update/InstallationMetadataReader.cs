@@ -23,6 +23,7 @@ internal sealed class InstallationMetadataReader(
     /// <inheritdoc />
     public async Task<InstallationMetadata> ReadAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         string metadataPath = GetMetadataPath();
         byte[]? json;
 

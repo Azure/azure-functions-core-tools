@@ -230,24 +230,21 @@ public sealed class InstallationMetadataReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_CancelledRead_PropagatesCancellation()
+    public async Task ReadAsync_PreCancelled_DoesNotResolveExecutablePath()
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
         using CancellationTokenSource cancellation = new();
         cancellation.Cancel();
-        fileSystem.ReadAllBytesIfExistsAsync(_metadataPath, Arg.Any<int>(), cancellation.Token)
-            .Returns(Task.FromCanceled<byte[]?>(cancellation.Token));
 
         // Act
         Func<Task> act = () => reader.ReadAsync(cancellation.Token);
 
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();
-        await fileSystem.Received(1).ReadAllBytesIfExistsAsync(
-            _metadataPath,
-            InstallationMetadataReader.MaximumMetadataByteCount,
-            cancellation.Token);
+        fileSystem.DidNotReceiveWithAnyArgs().ResolvePhysicalPath(default!);
+        await fileSystem.DidNotReceiveWithAnyArgs()
+            .ReadAllBytesIfExistsAsync(default!, default, default);
     }
 
     [Fact]

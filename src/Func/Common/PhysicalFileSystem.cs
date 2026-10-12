@@ -18,17 +18,17 @@ internal sealed class PhysicalFileSystem : IFileSystem
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-if (!Path.IsPathFullyQualified(path))
-{
-    throw new ArgumentException("Path must be fully qualified.", nameof(path));
-}
+        if (!Path.IsPathFullyQualified(path))
+        {
+            throw new ArgumentException("Path must be fully qualified.", nameof(path));
+        }
 
-string fullPath = Path.GetFullPath(path);
+        string fullPath = Path.GetFullPath(path);
 
         Queue<string> remainingSegments = new(GetPathSegments(fullPath));
         string resolvedPath = Path.GetPathRoot(fullPath)
             ?? throw new ArgumentException("Path does not have a root.", nameof(path));
-        HashSet<string> visitedLinks = new(GetPathComparer());
+        HashSet<string> resolutionStates = new(GetPathComparer()) { fullPath };
         int followedLinkCount = 0;
 
         while (remainingSegments.TryDequeue(out string? segment))
@@ -57,7 +57,7 @@ string fullPath = Path.GetFullPath(path);
                 continue;
             }
 
-            if (!visitedLinks.Add(candidatePath) || ++followedLinkCount > MaximumLinkCount)
+            if (++followedLinkCount > MaximumLinkCount)
             {
                 throw new IOException($"A symbolic-link or junction cycle was detected while resolving '{path}'.");
             }
@@ -69,6 +69,12 @@ string fullPath = Path.GetFullPath(path);
             while (remainingSegments.TryDequeue(out string? remainingSegment))
             {
                 targetSegments.Enqueue(remainingSegment);
+            }
+
+            string nextResolutionState = BuildPath(targetRoot, targetSegments);
+            if (!resolutionStates.Add(nextResolutionState))
+            {
+                throw new IOException($"A symbolic-link or junction cycle was detected while resolving '{path}'.");
             }
 
             remainingSegments = targetSegments;
@@ -248,6 +254,17 @@ string fullPath = Path.GetFullPath(path);
 
     private static StringComparer GetPathComparer() =>
         OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
+    private static string BuildPath(string root, IEnumerable<string> segments)
+    {
+        string path = root;
+        foreach (string segment in segments)
+        {
+            path = Path.Combine(path, segment);
+        }
+
+        return path;
+    }
 
     private static void EnsureParentDirectory(string filePath)
     {
