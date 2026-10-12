@@ -109,7 +109,7 @@ The `func-workload` constraint SHALL name a workload by alias or package ID with
 - **THEN** the constraint is satisfied
 
 #### Scenario: Runtime loads but initialization fails
-- **WHEN** a matching selected runtime assembly loaded but its initialization failed even though its version is in range
+- **WHEN** a matching selected runtime assembly loaded but initialization failed even though its version is in range and no matching usable entry or satisfied alternative exists
 - **THEN** it cannot satisfy the constraint and the template is restricted without an automatic install or update step
 - **AND** the CLI-owned initialization diagnostic is retained
 
@@ -119,25 +119,25 @@ The `func-workload` constraint SHALL name a workload by alias or package ID with
 - **AND** the next step installs it, through `func setup` when the workload belongs to a setup feature
 
 #### Scenario: Required workload is installed but not loaded
-- **WHEN** a matching workload is installed but didn't load
+- **WHEN** a matching runtime is installed but failed loading and no matching usable entry or satisfied alternative exists
 - **THEN** the template is restricted without a next step
 
-#### Scenario: Loaded workload is older than required
-- **WHEN** every matching loaded version is below a range that has no upper bound
+#### Scenario: Usable workload is older than required
+- **WHEN** at least one usable entry matches and every matching usable version is below a range that has no upper bound
 - **THEN** the template is restricted as outdated
 - **AND** the next step updates the workload
 
 #### Scenario: Outdated workload's range has an upper bound
-- **WHEN** every matching loaded version is below a range that has an upper bound
+- **WHEN** at least one usable entry matches and every matching usable version is below a range that has an upper bound
 - **THEN** the template is restricted as outdated without a next step
 
-#### Scenario: Loaded workload is newer than allowed
-- **WHEN** every matching loaded version is outside the range and at least one is above it
+#### Scenario: Usable workload is newer than allowed
+- **WHEN** at least one usable entry matches, every matching usable version is outside the range, and at least one is above it
 - **THEN** the template is restricted as incompatible without a next step
 
 #### Scenario: Older in-range version is installed beside a newer runtime workload
-- **WHEN** a runtime workload has an in-range version installed and a newer out-of-range version is loaded
-- **THEN** the constraint evaluates only the loaded version and is restricted as incompatible
+- **WHEN** a runtime workload has an older in-range version installed and its newer selected version loaded and initialized successfully outside the range
+- **THEN** the constraint evaluates only that selected usable version and is restricted as incompatible
 
 #### Scenario: Workload name isn't valid
 - **WHEN** a workload name contains a space, starts with `-`, or ends in `.nupkg`
@@ -146,7 +146,7 @@ The `func-workload` constraint SHALL name a workload by alias or package ID with
 
 #### Scenario: Platform-specific workload is named by its published package ID
 - **WHEN** a template names a platform-specific workload by the package ID it was published under
-- **THEN** the constraint matches the platform package that loaded
+- **THEN** the constraint matches the admitted usable platform entry rather than a diagnostic-only installed entry
 
 #### Scenario: No project exists yet
 - **WHEN** a workload constraint is evaluated before a project context exists

@@ -141,8 +141,8 @@ A func constraint builds its message and next step from the parsed requirement, 
 |---|---|---|
 | Workload missing | No installed workload matches | `func setup --features <feature>` when a setup feature installs the workload, such as a stack's feature, `host`, or `runtime` for extension bundles, otherwise `func workload install <workload>` |
 | Workload not usable | A matching workload is installed but was rejected by compatibility checks or failed loading or initialization | None; retain the CLI-owned rejection, load, or initialization diagnostic rather than treating the workload as missing |
-| Workload outdated | Every matching loaded version is below the range | `func workload update <workload>` when the range has no upper bound, adding `--major` when the minimum is in a higher major version, otherwise none |
-| Workload incompatible | Every matching loaded version is outside the range and at least one is above it | None |
+| Workload outdated | At least one usable entry matches and every matching usable version is below the range | `func workload update <workload>` when the range has no upper bound, adding `--major` when the minimum is in a higher major version, otherwise none |
+| Workload incompatible | At least one usable entry matches, every matching usable version is outside the range, and at least one is above it | None |
 | Bundle outdated | The resolved bundle version is below the range | Allow the required version in the `host.json` bundle range, or install a newer extension bundle |
 | Bundle mismatch | The resolved bundle has another identity or is above the range | None |
 | Bundle unavailable | The command resolved no bundle | None |
@@ -194,7 +194,7 @@ Constraints decide whether a template can run in the current context. Choosing w
 
 ### Func constraint factories come from command services
 
-The `func-workload` factory needs the loaded workload snapshot and the installed workload list, both captured when the command starts. The per-command engine session registers the func factories as built-in host components, and the templater factory receives them through dependency injection. Evaluation adds no network or file access beyond what the session already performs.
+The `func-workload` factory receives one immutable availability input captured before constructing the runtime flow's `Templater`. Its usable projection supplies satisfaction/version matches, while its installed-only entries supply failure and missing-versus-unusable diagnostics. The flow's engine session registers the func factories as built-in host components through dependency injection. No second installed-list lookup or lazy snapshot refresh occurs during evaluation, and evaluation adds no network or file access.
 
 ## Risks / Trade-offs
 
