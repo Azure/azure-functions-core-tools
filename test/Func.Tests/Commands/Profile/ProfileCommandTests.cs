@@ -359,6 +359,7 @@ public sealed class ProfileCommandTests : IDisposable
 
         // ── IFileSystem members not used by profile tests ───────────────────
         public bool FileExists(string path) => _files.ContainsKey(path);
+        public string ResolvePhysicalPath(string path) => throw new NotImplementedException();
         public Task SaveStreamToFileAsync(string filePath, Stream content, CancellationToken cancellationToken) => throw new NotImplementedException();
         public void MoveFile(string sourcePath, string destinationPath, bool overwrite = false) => throw new NotImplementedException();
         public void CopyFile(string sourcePath, string destinationPath) => throw new NotImplementedException();

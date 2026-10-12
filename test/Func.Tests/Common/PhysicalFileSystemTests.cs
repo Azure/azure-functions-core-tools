@@ -56,4 +56,99 @@ public sealed class PhysicalFileSystemTests : IDisposable
         // Assert
         await act.Should().ThrowAsync<InvalidDataException>();
     }
+
+    [Fact]
+    public void ResolvePhysicalPath_MissingComponent_ThrowsFileNotFoundException()
+    {
+        // Arrange
+        string missingPath = Path.Combine(_tempDirectory, "missing", "func");
+
+        // Act
+        Action act = () => _fileSystem.ResolvePhysicalPath(missingPath);
+
+        // Assert
+        act.Should().Throw<FileNotFoundException>();
+    }
+
+    [Fact]
+    public void ResolvePhysicalPath_UnixSymlinkChain_ResolvesEveryComponent()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // Arrange
+        string physicalDirectory = Path.Combine(_tempDirectory, "releases", "v1", "bin");
+        Directory.CreateDirectory(physicalDirectory);
+        string physicalExecutable = Path.Combine(physicalDirectory, "func");
+        File.WriteAllText(physicalExecutable, string.Empty);
+
+        string currentLink = Path.Combine(_tempDirectory, "current");
+        Directory.CreateSymbolicLink(currentLink, Path.Combine("releases", "v1"));
+        string executableLink = Path.Combine(_tempDirectory, "func");
+        File.CreateSymbolicLink(executableLink, Path.Combine("current", "bin", "func"));
+
+        // Act
+        string resolved = _fileSystem.ResolvePhysicalPath(executableLink);
+
+        // Assert
+        resolved.Should().Be(physicalExecutable);
+    }
+
+    [Fact]
+    public void ResolvePhysicalPath_UnixSymlinkCycle_ThrowsIOException()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // Arrange
+        string firstLink = Path.Combine(_tempDirectory, "first");
+        string secondLink = Path.Combine(_tempDirectory, "second");
+        File.CreateSymbolicLink(firstLink, secondLink);
+        File.CreateSymbolicLink(secondLink, firstLink);
+
+        // Act
+        Action act = () => _fileSystem.ResolvePhysicalPath(firstLink);
+
+        // Assert
+        act.Should().Throw<IOException>().WithMessage("*cycle*");
+    }
+
+    [Fact]
+    public void ResolvePhysicalPath_WindowsDirectoryReparsePoint_ResolvesWhenSupported()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // Arrange
+        string physicalDirectory = Path.Combine(_tempDirectory, "physical");
+        Directory.CreateDirectory(physicalDirectory);
+        string physicalExecutable = Path.Combine(physicalDirectory, "func.exe");
+        File.WriteAllText(physicalExecutable, string.Empty);
+        string directoryLink = Path.Combine(_tempDirectory, "linked");
+
+        try
+        {
+            Directory.CreateSymbolicLink(directoryLink, physicalDirectory);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return;
+        }
+        catch (IOException)
+        {
+            return;
+        }
+
+        // Act
+        string resolved = _fileSystem.ResolvePhysicalPath(Path.Combine(directoryLink, "func.exe"));
+
+        // Assert
+        resolved.Should().Be(physicalExecutable);
+    }
 }

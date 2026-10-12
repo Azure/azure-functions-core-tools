@@ -8,9 +8,74 @@ namespace Azure.Functions.Cli.Common;
 /// <inheritdoc cref="IFileSystem" />
 internal sealed class PhysicalFileSystem : IFileSystem
 {
+    private const int MaximumLinkCount = 64;
+
     // ── File operations ─────────────────────────────────────────────────────
 
     public bool FileExists(string path) => File.Exists(path);
+
+    public string ResolvePhysicalPath(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        string fullPath = Path.GetFullPath(path);
+        if (!Path.IsPathFullyQualified(fullPath))
+        {
+            throw new ArgumentException("Path must be fully qualified.", nameof(path));
+        }
+
+        Queue<string> remainingSegments = new(GetPathSegments(fullPath));
+        string resolvedPath = Path.GetPathRoot(fullPath)
+            ?? throw new ArgumentException("Path does not have a root.", nameof(path));
+        HashSet<string> visitedLinks = new(GetPathComparer());
+        int followedLinkCount = 0;
+
+        while (remainingSegments.TryDequeue(out string? segment))
+        {
+            string candidatePath = Path.Combine(resolvedPath, segment);
+            FileSystemInfo pathInfo = Directory.Exists(candidatePath)
+                ? new DirectoryInfo(candidatePath)
+                : new FileInfo(candidatePath);
+            FileSystemInfo? target = pathInfo.ResolveLinkTarget(returnFinalTarget: false);
+
+            if (target is null)
+            {
+                if (!pathInfo.Exists)
+                {
+                    throw new FileNotFoundException(
+                        $"Path component '{candidatePath}' does not exist while resolving '{path}'.",
+                        candidatePath);
+                }
+
+                if ((pathInfo.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new IOException($"Reparse point '{candidatePath}' cannot be resolved.");
+                }
+
+                resolvedPath = candidatePath;
+                continue;
+            }
+
+            if (!visitedLinks.Add(candidatePath) || ++followedLinkCount > MaximumLinkCount)
+            {
+                throw new IOException($"A symbolic-link or junction cycle was detected while resolving '{path}'.");
+            }
+
+            string targetPath = Path.GetFullPath(target.FullName);
+            string targetRoot = Path.GetPathRoot(targetPath)
+                ?? throw new IOException($"Link target '{targetPath}' does not have a root.");
+            Queue<string> targetSegments = new(GetPathSegments(targetPath));
+            while (remainingSegments.TryDequeue(out string? remainingSegment))
+            {
+                targetSegments.Enqueue(remainingSegment);
+            }
+
+            remainingSegments = targetSegments;
+            resolvedPath = targetRoot;
+        }
+
+        return resolvedPath;
+    }
 
     public async Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken)
     {
@@ -169,6 +234,18 @@ internal sealed class PhysicalFileSystem : IFileSystem
     }
 
     // ── Private helpers ─────────────────────────────────────────────────────
+
+    private static IEnumerable<string> GetPathSegments(string path)
+    {
+        string root = Path.GetPathRoot(path)
+            ?? throw new ArgumentException("Path does not have a root.", nameof(path));
+        return path[root.Length..].Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private static StringComparer GetPathComparer() =>
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     private static void EnsureParentDirectory(string filePath)
     {

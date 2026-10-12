@@ -40,7 +40,8 @@ internal sealed class InstallationMetadataReader(
         if (json is null)
         {
             throw new FileNotFoundException(
-                $"Installation metadata '{metadataPath}' was not found.",
+                $"Could not determine the installation method because metadata '{metadataPath}' was not found. " +
+                $"See {Constants.DocsUrl} for installation options.",
                 metadataPath);
         }
 
@@ -82,7 +83,8 @@ internal sealed class InstallationMetadataReader(
             throw new InvalidOperationException("The running CLI executable path is unavailable or is not fully qualified.");
         }
 
-        string? installationDirectory = Path.GetDirectoryName(processPath);
+        string physicalProcessPath = _fileSystem.ResolvePhysicalPath(processPath);
+        string? installationDirectory = Path.GetDirectoryName(physicalProcessPath);
         if (string.IsNullOrEmpty(installationDirectory))
         {
             throw new InvalidOperationException("The running CLI installation directory could not be determined.");

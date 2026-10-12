@@ -12,8 +12,10 @@ namespace Azure.Functions.Cli.Tests.Update;
 public sealed class InstallationMetadataReaderTests
 {
     private static readonly string _processPath = Path.GetFullPath(Path.Combine("fake", "install", "func"));
+    private static readonly string _physicalProcessPath =
+        Path.GetFullPath(Path.Combine("physical", "install", "func"));
     private static readonly string _metadataPath =
-        Path.Combine(Path.GetDirectoryName(_processPath)!, InstallationMetadataReader.MetadataFileName);
+        Path.Combine(Path.GetDirectoryName(_physicalProcessPath)!, InstallationMetadataReader.MetadataFileName);
     private static readonly byte[] _invalidUtf8 = [0xC3, 0x28];
 
     [Theory]
@@ -52,6 +54,7 @@ public sealed class InstallationMetadataReaderTests
         await reader.ReadAsync(cancellationToken);
 
         // Assert
+        fileSystem.Received(1).ResolvePhysicalPath(_processPath);
         await fileSystem.Received(1).ReadAllBytesIfExistsAsync(
             _metadataPath,
             InstallationMetadataReader.MaximumMetadataByteCount,
@@ -70,6 +73,8 @@ public sealed class InstallationMetadataReaderTests
         // Assert
         FileNotFoundException exception = (await act.Should().ThrowAsync<FileNotFoundException>()).Which;
         exception.FileName.Should().Be(_metadataPath);
+        exception.Message.Should().Contain("Could not determine the installation method");
+        exception.Message.Should().Contain(Constants.DocsUrl);
     }
 
     [Fact]
@@ -202,6 +207,26 @@ public sealed class InstallationMetadataReaderTests
     }
 
     [Fact]
+    public async Task ReadAsync_PhysicalPathResolutionFails_PropagatesIOExceptionWithoutReadingMetadata()
+    {
+        // Arrange
+        IFileSystem fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.ResolvePhysicalPath(_processPath)
+            .Returns<string>(_ => throw new IOException("link cycle"));
+        InstallationMetadataReader reader = new(
+            fileSystem,
+            Options.Create(new CliEnvironmentOptions { ProcessPath = _processPath }));
+
+        // Act
+        Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<IOException>().WithMessage("*link cycle*");
+        await fileSystem.DidNotReceiveWithAnyArgs()
+            .ReadAllBytesIfExistsAsync(default!, default, default);
+    }
+
+    [Fact]
     public async Task ReadAsync_CancelledRead_PropagatesCancellation()
     {
         // Arrange
@@ -249,6 +274,7 @@ public sealed class InstallationMetadataReaderTests
     private static (InstallationMetadataReader Reader, IFileSystem FileSystem) CreateReader()
     {
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.ResolvePhysicalPath(_processPath).Returns(_physicalProcessPath);
         fileSystem.ReadAllBytesIfExistsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns((byte[]?)null);
         InstallationMetadataReader reader = new(
