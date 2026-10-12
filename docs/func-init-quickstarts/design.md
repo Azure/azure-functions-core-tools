@@ -8,7 +8,7 @@ The existing templating program already separates concerns:
 
 - `template-engine-integration` owns installed catalog projection, constraint-aware resolution, primary outputs, dry-run, and invocation.
 - `template-package-install` owns explicit `FuncTemplate` package lifecycle.
-- `template-engine-constraints` will own workload constraint syntax, evaluation, diagnostics, and remediation.
+- `template-engine-constraints` owns workload constraint syntax, evaluation, diagnostics, and remediation.
 - `template-engine-post-actions` will own the trusted Functions project configuration action.
 - `azure-samples-template-pipeline` owns building and publishing quickstart packages.
 
@@ -120,9 +120,9 @@ Func does not infer package commands from constraint text. `template-engine-cons
 
 **Alternative considered:** hide restricted templates. Users would not know an installed quickstart exists or how to unblock it. It is rejected.
 
-### One aggregate workload constraint can cover heterogeneous projects
+### Workload constraints cover heterogeneous projects
 
-Project templates use the workload constraint capability defined elsewhere for all required stack, host, bundle, and related workload availability. Func init requires an eligible result before cleanup or scaffolding.
+Project templates declare workload constraints, as `template-engine-constraints` defines, for all required stack, host, bundle, and related workload availability. Func init requires an eligible result before cleanup or scaffolding.
 
 This change deliberately does not require an existing-project bundle constraint. A new project has no resolved bundle identity or version; bundle capability needed to use the generated solution is represented as workload availability.
 

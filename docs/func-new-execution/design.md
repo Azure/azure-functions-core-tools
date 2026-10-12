@@ -112,6 +112,8 @@ The effective language is canonicalized and validated before constructing `Templ
 
 Failure to discover a Functions project anywhere in the execution path's hierarchy is a command error with guidance to run `func init`. The command does not create an environment with guessed or ambient project defaults.
 
+For projects that use extension bundles, failure to resolve a declared bundle is a command error with bundle repair guidance before `Templater` is created or templates are listed. Projects without extension bundles, including .NET projects, remain supported with absent bundle context. A template that declares `func-bundle` is then restricted, while a template without that requirement can still be selected.
+
 **Alternative considered:** create `Templater` before language and bundle resolution and apply those values only as later filters. Constraints and bind symbols would observe incomplete context while selection observes different values. It is rejected.
 
 ### Candidate parsing distinguishes invalid input from missing input

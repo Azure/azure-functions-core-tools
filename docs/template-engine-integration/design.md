@@ -120,6 +120,10 @@ Failed(message, constraint type)
 
 `NotEvaluated` and recognized evaluation failures are fail-closed states. They are kept distinct from an ordinary restriction because they point to template or host configuration defects.
 
+`template-engine-constraints` defines the func constraint types, how engine results map to these states, and the diagnostic kept for each unmet constraint.
+
+Listing and resolution apply its raw declaration validation to current mounted template configuration, including already-installed packages and folder content. Engine scanning and cache entries cannot prove that no requirement was discarded. Eligibility uses the validated content snapshot, and invocation verifies that the selected template's configuration is still readable and unchanged before creation. A failed check blocks that selection with a diagnostic and rerun guidance, without resolving the reference again or replacing the selected template.
+
 ### Template type scopes listing and resolution
 
 `TemplateType` projects TemplateEngine's `tags.type` convention:
