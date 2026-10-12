@@ -26,14 +26,14 @@ internal sealed class CliTelemetryEnvironment(IProcessEnvironment environment, A
         return _originalValues.TryGetValue(name, out string? value) ? value : _environment.Get(name);
     }
 
-    void ITelemetryEnvironmentScope.Apply()
+    public void Apply()
     {
         Override(SdkStatsDisabled, "true");
         Override(StatsbeatDisabled, "true");
         Override(ResourceMetricsEnabled, "false");
     }
 
-    void ITelemetryEnvironmentScope.RestoreInheritedVariables(IDictionary<string, string?> environment)
+    public void RestoreInheritedVariables(IDictionary<string, string?> environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
 

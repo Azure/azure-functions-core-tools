@@ -102,9 +102,13 @@ internal static class CliHostFactory
         // Program.cs, or a test's own scope) owns this instance's lifetime
         // and is responsible for disposing it to restore the overridden
         // environment variables — disposal does not depend on anything
-        // resolving this registration from the built host.
+        // resolving this registration from the built host. IProcessEnvironment
+        // is registered separately (not as the same instance): a factory
+        // delegate resolving the telemetry scope would make the container
+        // track and dispose it whenever something resolves IProcessEnvironment,
+        // reintroducing host-owned disposal of a caller-owned scope.
         builder.Services.AddSingleton(telemetryEnvironment);
-        builder.Services.AddSingleton<IProcessEnvironment>(sp => sp.GetRequiredService<ITelemetryEnvironmentScope>());
+        builder.Services.AddSingleton<IProcessEnvironment, ProcessEnvironment>();
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerContentResolver, DefaultFunctionsWorkerContentResolver>();

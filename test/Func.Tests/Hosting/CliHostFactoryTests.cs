@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Templates.Engine;
@@ -92,6 +93,37 @@ public sealed class CliHostFactoryTests : IDisposable
             // Resolve something unrelated; never resolve the telemetry scope
             // (or IProcessEnvironment) from this provider.
             provider.GetRequiredService<IPlatform>();
+        }
+
+        environment.Get(CliTelemetryEnvironment.SdkStatsDisabled).Should().Be("true");
+
+        scope.Dispose();
+
+        environment.Get(CliTelemetryEnvironment.SdkStatsDisabled).Should().Be("false");
+    }
+
+    /// <summary>
+    /// <see cref="IProcessEnvironment"/> is a separate registration from the
+    /// telemetry scope (a plain <see cref="ProcessEnvironment"/>, not the
+    /// same instance). Resolving it and disposing the host must not affect
+    /// the telemetry scope's overrides — guards against reintroducing a
+    /// factory-delegate registration that would make the container track
+    /// and dispose the caller-owned scope whenever something resolves
+    /// <see cref="IProcessEnvironment"/>.
+    /// </summary>
+    [Fact]
+    public void CreateBuilder_ResolvingProcessEnvironment_DoesNotAffectTelemetryScope()
+    {
+        var environment = new InMemoryProcessEnvironment();
+        environment.Set(CliTelemetryEnvironment.SdkStatsDisabled, "false");
+        ITelemetryEnvironmentScope scope = new CliTelemetryEnvironment(environment, environment.Set);
+        scope.Apply();
+        var interaction = new TestInteractionService();
+
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction, scope);
+        using (ServiceProvider provider = builder.Services.BuildServiceProvider())
+        {
+            provider.GetRequiredService<IProcessEnvironment>().Should().NotBeSameAs(scope);
         }
 
         environment.Get(CliTelemetryEnvironment.SdkStatsDisabled).Should().Be("true");

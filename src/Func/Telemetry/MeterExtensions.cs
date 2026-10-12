@@ -61,20 +61,12 @@ internal static class MeterExtensions
 
         /// <summary>
         /// Records the duration of CLI startup workload loading + Configure
-        /// invocation, tagged with the number of workloads processed and,
-        /// on failure, the OTel <see cref="TelemetryConventions.ErrorType"/>.
-        /// A null or empty <paramref name="errorType"/> means success and
-        /// the tag is omitted.
+        /// invocation, tagged with the number of workloads processed.
         /// </summary>
-        public void RecordWorkloadBoot(int workloadCount, long durationMs, string? errorType = null)
+        public void RecordWorkloadBoot(int workloadCount, long durationMs)
         {
             TagList tags = CreateCommonTags();
             tags.Add(TelemetryConventions.CliWorkloadCount, workloadCount);
-
-            if (!string.IsNullOrEmpty(errorType))
-            {
-                tags.Add(TelemetryConventions.ErrorType, errorType);
-            }
 
             _workloadBootDuration.Record(durationMs, tags);
         }

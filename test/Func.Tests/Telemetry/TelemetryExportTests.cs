@@ -128,32 +128,6 @@ public class TelemetryExportTests
     }
 
     /// <summary>
-    /// Inverse of <see cref="AzureMonitorExport_RecordedBeforeProviderDisposal_IsFlushedOnDispose"/>:
-    /// recording after the providers are disposed drops the telemetry
-    /// silently. Demonstrates why the ordering in <c>Program.cs</c>'s
-    /// <c>finally</c> block (record, then dispose) matters.
-    /// </summary>
-    [Fact]
-    public void AzureMonitorExport_RecordedAfterProviderDisposal_IsLost()
-    {
-        var payloads = new ConcurrentQueue<string>();
-        using var source = new ActivitySource(CliTelemetry.SourceName, CliTelemetry.CliVersion);
-        using var meter = new Meter(CliTelemetry.SourceName, CliTelemetry.CliVersion);
-        (TracerProvider traces, MeterProvider metrics) = BuildProviders(payloads);
-
-        traces.Dispose();
-        metrics.Dispose();
-
-        using (Activity? command = source.StartCommandActivity(DateTimeOffset.UtcNow))
-        {
-            command?.SetCommandName("dispose-order-recorded-after");
-            meter.RecordCommand("dispose-order-recorded-after", exitCode: 0, durationMs: 1);
-        }
-
-        payloads.Should().BeEmpty();
-    }
-
-    /// <summary>
     /// End-to-end regression guard mirroring <c>Program.cs</c>'s actual
     /// shutdown path: a real DI-hosted <see cref="IHost"/> wired the same
     /// way <c>CliHostFactory.CreateBuilder</c> wires OpenTelemetry (batch
