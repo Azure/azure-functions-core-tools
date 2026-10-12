@@ -63,7 +63,7 @@ write_installation_metadata() {
     local temp_path
 
     temp_path=$(mktemp "${INSTALL_DIR}/.${INSTALLATION_METADATA_FILE}.tmp.XXXXXX")
-    if ! printf '%s\n' "$INSTALLATION_METADATA_JSON" > "$temp_path"; then
+    if ! printf '%s\n' "$INSTALLATION_METADATA_JSON" > "$temp_path" || ! chmod 0644 "$temp_path"; then
         rm -f "$temp_path"
         return 1
     fi
