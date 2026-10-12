@@ -6,16 +6,7 @@ namespace Azure.Functions.Cli.Update;
 /// <summary>
 /// Describes how the current CLI installation is managed.
 /// </summary>
-internal sealed record InstallationMetadata(InstallationMethod InstallMethod, InstallationUpdatePolicy UpdatePolicy);
-
-internal enum InstallationMethod
-{
-    Standalone,
-    Npm,
-    Homebrew,
-    Winget,
-    Msi,
-}
+internal sealed record InstallationMetadata(string InstallMethod, InstallationUpdatePolicy UpdatePolicy);
 
 internal enum InstallationUpdatePolicy
 {

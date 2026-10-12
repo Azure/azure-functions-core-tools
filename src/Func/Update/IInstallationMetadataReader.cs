@@ -29,7 +29,7 @@ internal interface IInstallationMetadataReader
     /// </exception>
     /// <exception cref="InvalidInstallationMetadataException">
     /// The metadata is malformed UTF-8 JSON, has missing or unknown properties,
-    /// contains unknown values, or declares a contradictory method/policy pair.
+    /// contains an invalid installation method, or declares an unknown update policy.
     /// </exception>
     /// <exception cref="IOException">
     /// The executable's physical path cannot be resolved, or the metadata file cannot be read.

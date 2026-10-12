@@ -19,15 +19,12 @@ public sealed class InstallationMetadataReaderTests
     private static readonly byte[] _invalidUtf8 = [0xC3, 0x28];
 
     [Theory]
-    [InlineData("standalone", "in-place", (int)InstallationMethod.Standalone, (int)InstallationUpdatePolicy.InPlace)]
-    [InlineData("npm", "external", (int)InstallationMethod.Npm, (int)InstallationUpdatePolicy.External)]
-    [InlineData("homebrew", "external", (int)InstallationMethod.Homebrew, (int)InstallationUpdatePolicy.External)]
-    [InlineData("winget", "external", (int)InstallationMethod.Winget, (int)InstallationUpdatePolicy.External)]
-    [InlineData("msi", "external", (int)InstallationMethod.Msi, (int)InstallationUpdatePolicy.External)]
-    public async Task ReadAsync_ValidPair_ReturnsMetadata(
+    [InlineData("standalone", "in-place", (int)InstallationUpdatePolicy.InPlace)]
+    [InlineData("future-package-manager", "external", (int)InstallationUpdatePolicy.External)]
+    [InlineData("future-installer", "in-place", (int)InstallationUpdatePolicy.InPlace)]
+    public async Task ReadAsync_ValidMetadata_ReturnsOpaqueInstallMethodAndPolicy(
         string method,
         string policy,
-        int expectedMethod,
         int expectedPolicy)
     {
         // Arrange
@@ -38,7 +35,7 @@ public sealed class InstallationMetadataReaderTests
         InstallationMetadata metadata = await reader.ReadAsync(CancellationToken.None);
 
         // Assert
-        metadata.InstallMethod.Should().Be((InstallationMethod)expectedMethod);
+        metadata.InstallMethod.Should().Be(method);
         metadata.UpdatePolicy.Should().Be((InstallationUpdatePolicy)expectedPolicy);
     }
 
@@ -155,13 +152,15 @@ public sealed class InstallationMetadataReaderTests
     }
 
     [Theory]
-    [InlineData("archive", "in-place")]
-    [InlineData("standalone", "managed")]
-    public async Task ReadAsync_UnknownWireValue_ThrowsInvalidInstallationMetadataException(string method, string policy)
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData(" npm")]
+    [InlineData("npm ")]
+    public async Task ReadAsync_InvalidInstallMethod_ThrowsInvalidInstallationMetadataException(string method)
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
-        SetMetadata(fileSystem, ValidJson(method, policy));
+        SetMetadata(fileSystem, ValidJson(method, "external"));
 
         // Act
         Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
@@ -170,17 +169,12 @@ public sealed class InstallationMetadataReaderTests
         await act.Should().ThrowAsync<InvalidInstallationMetadataException>();
     }
 
-    [Theory]
-    [InlineData("standalone", "external")]
-    [InlineData("npm", "in-place")]
-    [InlineData("homebrew", "in-place")]
-    [InlineData("winget", "in-place")]
-    [InlineData("msi", "in-place")]
-    public async Task ReadAsync_ContradictoryPair_ThrowsInvalidInstallationMetadataException(string method, string policy)
+    [Fact]
+    public async Task ReadAsync_UnknownUpdatePolicy_ThrowsInvalidInstallationMetadataException()
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
-        SetMetadata(fileSystem, ValidJson(method, policy));
+        SetMetadata(fileSystem, ValidJson("standalone", "managed"));
 
         // Act
         Func<Task> act = () => reader.ReadAsync(CancellationToken.None);

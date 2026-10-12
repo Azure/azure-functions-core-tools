@@ -69,11 +69,10 @@ internal sealed class InstallationMetadataReader(
                 $"Only schema version {SupportedSchemaVersion} is supported.");
         }
 
-        InstallationMethod installMethod = ParseInstallMethod(document.InstallMethod, metadataPath);
+        ValidateInstallMethod(document.InstallMethod, metadataPath);
         InstallationUpdatePolicy updatePolicy = ParseUpdatePolicy(document.UpdatePolicy, metadataPath);
-        ValidatePair(installMethod, updatePolicy, metadataPath);
 
-        return new InstallationMetadata(installMethod, updatePolicy);
+        return new InstallationMetadata(document.InstallMethod, updatePolicy);
     }
 
     private string GetMetadataPath()
@@ -94,16 +93,14 @@ internal sealed class InstallationMetadataReader(
         return Path.Combine(installationDirectory, MetadataFileName);
     }
 
-    private static InstallationMethod ParseInstallMethod(string value, string metadataPath) => value switch
+    private static void ValidateInstallMethod(string value, string metadataPath)
     {
-        "standalone" => InstallationMethod.Standalone,
-        "npm" => InstallationMethod.Npm,
-        "homebrew" => InstallationMethod.Homebrew,
-        "winget" => InstallationMethod.Winget,
-        "msi" => InstallationMethod.Msi,
-        _ => throw new InvalidInstallationMetadataException(
-            $"Installation metadata '{metadataPath}' contains unknown installMethod '{value}'."),
-    };
+        if (string.IsNullOrWhiteSpace(value) || !string.Equals(value, value.Trim(), StringComparison.Ordinal))
+        {
+            throw new InvalidInstallationMetadataException(
+                $"Installation metadata '{metadataPath}' contains an invalid installMethod.");
+        }
+    }
 
     private static InstallationUpdatePolicy ParseUpdatePolicy(string value, string metadataPath) => value switch
     {
@@ -113,25 +110,4 @@ internal sealed class InstallationMetadataReader(
             $"Installation metadata '{metadataPath}' contains unknown updatePolicy '{value}'."),
     };
 
-    private static void ValidatePair(
-        InstallationMethod installMethod,
-        InstallationUpdatePolicy updatePolicy,
-        string metadataPath)
-    {
-        bool isValid = (installMethod, updatePolicy) switch
-        {
-            (InstallationMethod.Standalone, InstallationUpdatePolicy.InPlace) => true,
-            (InstallationMethod.Npm, InstallationUpdatePolicy.External) => true,
-            (InstallationMethod.Homebrew, InstallationUpdatePolicy.External) => true,
-            (InstallationMethod.Winget, InstallationUpdatePolicy.External) => true,
-            (InstallationMethod.Msi, InstallationUpdatePolicy.External) => true,
-            _ => false,
-        };
-
-        if (!isValid)
-        {
-            throw new InvalidInstallationMetadataException(
-                $"Installation metadata '{metadataPath}' declares a contradictory installMethod/updatePolicy pair.");
-        }
-    }
 }
