@@ -105,3 +105,4 @@
 - [ ] 11.4 Update user-facing template documentation for strict template options, output-path semantics, preview behavior, and breaking grammar changes.
 - [ ] 11.5 Run targeted command, parser, template integration, and renderer tests.
 - [ ] 11.6 Run restore, the clean Release build with warnings treated as errors, and the full test suite.
+- [ ] 11.7 Keep CLI-owned fixture and representative item-template compatibility checks separate from author-owned production-template restore/build/start/invocation coverage. Record tested CLI and package versions for switch qualification.
