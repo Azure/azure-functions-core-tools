@@ -255,7 +255,7 @@ Before target modification, `func init` SHALL independently inventory the union 
 - **THEN** initialization fails before target modification, including with `--force`
 
 #### Scenario: Configuration action is optional
-- **WHEN** a template marks the required action optional or continue-on-error
+- **WHEN** a template makes configuration optional or supplies raw `continueOnError` true or a non-boolean value
 - **THEN** initialization fails before scaffolding
 
 #### Scenario: Project template content generates CLI configuration

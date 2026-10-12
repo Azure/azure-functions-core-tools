@@ -5,15 +5,15 @@ Defines how `func new` resolves an existing Functions project, selects and confi
 ## ADDED Requirements
 
 ### Requirement: Item ordinary-action execution
-The proposed create-mode runner SHALL invoke the shared ordinary-action dispatcher after successful item-template creation, under the reviewed policy defined by `template-engine-post-actions`. Action plans SHALL pass target preflight before file creation. Initial restore inputs SHALL remain inside the invocation output root, not use the containing project root as an implicit wider boundary. Unsupported ancestor-manifest restore SHALL fail before item creation until a typed containing-project target is separately agreed and qualified. Explicit creation, including explicitly non-interactive requests, SHALL not introduce a new per-action prompt. Dry-run SHALL report but never execute actions. Item templates SHALL NOT finalize Functions project configuration, and action failure SHALL preserve generated files and return partial results with nonzero exit.
+The initial new item execution path SHALL reject ordinary action declarations before file creation until the separate real-caller, containing-project target, and authorization/compatibility gates in `template-engine-post-actions` are qualified. It SHALL NOT silently ignore those declarations or infer a wider mutation boundary from project discovery. Existing supported legacy journeys requiring actions SHALL remain behind their migration qualification. Dry-run SHALL never execute actions, and item templates SHALL NOT finalize Functions project configuration.
 
 #### Scenario: Nested item requests ancestor restore
 - **WHEN** an item's output is nested below the discovered project root and its restore input is at that ancestor root
 - **THEN** the unsupported target fails preflight without creating files or dispatching restore
 
-#### Scenario: Item restore fails after creation
-- **WHEN** item creation succeeds and its ordinary restore action fails
-- **THEN** the command reports created files and action failure without deleting those files
+#### Scenario: Item has ordinary actions before qualification
+- **WHEN** a selected new-path item declares ordinary actions and its execution contract is not qualified
+- **THEN** preflight rejects it before creating files rather than silently drop actions
 
 #### Scenario: Item preview has ordinary actions
 - **WHEN** dry-run projects ordinary item actions

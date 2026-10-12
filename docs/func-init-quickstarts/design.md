@@ -171,7 +171,7 @@ After candidate parameters are complete, init obtains the retained resolved outp
 
 - no active configuration action;
 - unsupported or non-trusted action identity;
-- optional or continue-on-error configuration behavior;
+- optional configuration behavior, raw `continueOnError` true, or a non-boolean flag, while omitted/raw false remains valid;
 - missing, ambiguous, or inactive primary-output reference;
 - output outside the target;
 - output whose parent cannot be a project root;

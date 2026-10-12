@@ -2,10 +2,12 @@
 
 Defines trusted Functions project finalization and supported ordinary post-actions with CLI-owned launch commands. Package-manager hooks can still execute project code; this contract is not a sandbox.
 
+The project configuration action is the template-declared request for CLI-owned project metadata. It is mandatory when active. Its configuration plan is a validated projection and finalization is its execution phase. Neither term introduces another action, and trust in CLI-owned code does not make template declarations trusted input.
+
 ## ADDED Requirements
 
 ### Requirement: Trusted project configuration declaration
-The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. The index SHALL be a nonnegative invariant-culture integer string, validated before engine coercion or output mapping. Every active Functions project root discovered independently from the resolved output/effect snapshot SHALL have exactly one active configuration action. The inventory SHALL include parent roots of resolved primary outputs whose final filename is `host.json` and created/modified file effects whose final filename is `host.json`. Both sources SHALL use the retained resolved snapshot and SHALL be normalized and deduplicated using platform path comparison, rather than depend on configuration declarations. The action SHALL be mandatory when active, SHALL reject extra arguments or continue-on-error, and SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position. A referenced root absent from the independent inventory SHALL be rejected.
+The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` with required string arguments `primaryOutputIndex`, `stack`, and `language`. The index SHALL be a nonnegative invariant-culture integer string, validated before engine coercion or output mapping. Every active Functions project root discovered independently from the resolved output/effect snapshot SHALL have exactly one active configuration action. The inventory SHALL include parent roots of resolved primary outputs whose final filename is `host.json` and created/modified file effects whose final filename is `host.json`. Both sources SHALL use the retained resolved snapshot and SHALL be normalized and deduplicated using platform path comparison, rather than depend on configuration declarations. The action SHALL be mandatory when active, SHALL reject extra arguments, raw `continueOnError` true or non-boolean values, and SHALL allow an omitted flag or raw boolean false. It SHALL bind the raw authored primary-output index to the corresponding resolved file rather than a filtered-list position. A referenced root absent from the independent inventory SHALL be rejected.
 
 #### Scenario: Configuration index is malformed
 - **WHEN** a raw configuration index is `"-1"`, `"abc"`, or another invalid nonnegative integer string
@@ -20,8 +22,17 @@ The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-4
 - **THEN** preflight rejects it before cleanup or creation
 
 #### Scenario: Configuration action is optional
-- **WHEN** a configuration action declares continue-on-error or an optional execution policy
+- **WHEN** a configuration action declares raw `continueOnError` true, a non-boolean value, or an optional execution policy
 - **THEN** preflight rejects it
+
+#### Scenario: Configuration failure flag is explicitly false
+- **WHEN** a valid configuration action declares raw `continueOnError` false
+- **THEN** that flag passes raw validation and configuration remains mandatory
+
+#### Scenario: Configuration template is opened by a foreign host
+- **WHEN** a func-only configuration-action template is evaluated by a non-func host
+- **THEN** its required `host` compatibility rejects normal invocation rather than silently omit CLI configuration
+- **AND** forced bypass is unsupported, not a claim that the resulting project is qualified
 
 #### Scenario: Active project has an inactive configuration action
 - **WHEN** a declared Functions project's output remains active but its only configuration action condition is false
@@ -59,6 +70,8 @@ The proposed Functions configuration action SHALL use action ID `00e33184-ffc7-4
 ### Requirement: Raw action schema is validated
 Packaging and installed-template preflight SHALL validate raw action objects and arguments before engine normalization. Incorrect raw argument types and duplicate properties SHALL be rejected, even if engine projection would stringify or replace them. Item templates SHALL NOT declare trusted project configuration actions.
 
+Func-only configuration-action templates SHALL declare engine host compatibility for `func` and follow the existing func-only package/constraint boundary. Shared foreign-host templates SHALL NOT use those func-only actions.
+
 #### Scenario: Numeric authored index is coerced by the engine
 - **WHEN** a raw configuration action supplies numeric `primaryOutputIndex` rather than a string
 - **THEN** raw validation rejects it rather than accepting the engine's stringified value
@@ -77,6 +90,11 @@ Preflight and actual creation SHALL use retained evaluated values for all parame
 #### Scenario: Stable parameters drive renames
 - **WHEN** retained evaluated values determine the same authored outputs and renamed paths for preflight and creation
 - **THEN** configuration plans remain attached to those outputs without a second independent selection
+
+#### Scenario: Reusable evaluation is unavailable
+- **WHEN** the pinned-engine spike cannot establish reusable evaluated topology
+- **THEN** only an explicitly qualified stable-topology subset can proceed and unstable/unknown dependencies fail before cleanup
+- **AND** the switch remains blocked until a pinned impact inventory and supported/rejected counts are published
 
 ### Requirement: Project roots and effects are validated
 The CLI SHALL resolve declared configuration roots from primary-output parents and require them to match the independent project inventory, validate canonical stack/language and combined template/configuration effects, and reject paths escaping the output root, multiple active configuration plans for one root, conflicting filters, direct template writes to `.func/config.json`, and unsupported processors before target mutation. Repeated output/effect observations of one root SHALL be deduplicated rather than rejected. Write-time path checks SHALL use injectable filesystem validation, including links/reparse points.
@@ -135,16 +153,16 @@ The proposed restore action SHALL use action ID `17a32346-c721-42cd-a520-4d1cada
 - **WHEN** creation or an earlier restore changes a later action's input or working directory into an escaping link
 - **THEN** launch-time validation rejects that action before launching its process
 
-### Requirement: Initial item restore scope is output-local
-The initial restore action SHALL target only an authored primary-output manager input inside the invocation output root. A containing project discovered above a nested item output SHALL NOT widen that boundary. Restore of an ancestor project manifest SHALL be unsupported and rejected before item creation, with an output-scope diagnostic. A separately agreed typed containing-project target and compatibility qualification SHALL be required before migrating legacy journeys that need ancestor-manifest restore. The item dispatcher SHALL consume only plans that passed this preflight.
+### Requirement: Item ordinary actions are deferred
+The initial ordinary-action dispatcher SHALL serve project initialization only. Item action declarations in the new execution path SHALL fail preflight before file creation until a real supported item journey, typed containing-project target, and authorization/compatibility contract are agreed and qualified. Legacy item journeys needing actions SHALL remain behind their existing migration gates. Hypothetical output-local restore SHALL NOT justify shipping an item dispatcher, and skipped/unknown declarations SHALL NOT be silently accepted.
 
 #### Scenario: Nested item needs ancestor manifest restore
 - **WHEN** an item runs in `project/functions/orders` and its restore plan targets a manager input at `project`
 - **THEN** preflight rejects the unsupported ancestor target without creating the item or launching restore
 
-#### Scenario: Nested item has an output-local restore input
-- **WHEN** the nested item has a valid authored manager input within its invocation output root
-- **THEN** that input can be restored under the unchanged output-local safety rules
+#### Scenario: Item has an output-local restore declaration
+- **WHEN** an item declares an ordinary action even with an output-local input
+- **THEN** the new path rejects that unsupported item-action contract before file creation until qualification is complete
 
 ### Requirement: Tool identity prevents template shadowing
 Every ordinary adapter SHALL resolve and validate absolute paths for its executable, interpreter, batch script, and launcher through the reviewed CLI tool boundary. Resolution SHALL NOT search the generated working directory. Resolved link/reparse targets SHALL NOT originate in the invocation output or template mount. Windows launchers SHALL invoke the exact validated absolute manager-script path rather than a bare command name. Launch-time checks SHALL preserve that tool identity. These checks SHALL NOT claim to sandbox manager hooks or project code.
@@ -173,7 +191,7 @@ The proposed Go module-tidy action SHALL use action ID `5080f899-da0c-404a-b80c-
 - **THEN** the command treats those changes as ordinary module-tidy effects, not a violation of the restore-only contract
 
 #### Scenario: User skips init-time tidy
-- **WHEN** the template's reviewed skip-tidy symbol suppresses the ordinary tidy action
+- **WHEN** the user supplies the preserved CLI-owned `--skip-go-mod-tidy` option
 - **THEN** mandatory project configuration still completes and no tidy process launches
 
 #### Scenario: Go replacement is not yet qualified
@@ -221,12 +239,27 @@ Legacy Node initializer-time npm install SHALL remain until Node/command owners 
 - **WHEN** cancellation is requested after one project is finalized
 - **THEN** the successful write remains, subsequent writes/processes stop, and cancellation is propagated
 
-### Requirement: Item execution has a command owner
-The proposed `func new` create-mode runner SHALL invoke the shared ordinary-action dispatcher only after successful item-template creation and SHALL report partial file/action outcomes on failure. Explicit create requests, including explicitly non-interactive requests, SHALL follow the reviewed default action policy without a new per-action prompt. Dry-run SHALL never execute actions. Required project configuration SHALL remain prohibited in item templates, and these processors SHALL NOT claim to add missing manifest dependencies.
+### Requirement: Ordinary action skip controls are CLI-owned
+The proposed `--no-post-actions` SHALL suppress ordinary project actions only, without skipping project configuration, constraints, raw schema validation, or path safety. Legacy `--skip-npm-install` and `--skip-go-mod-tidy` SHALL retain their manager-specific meaning rather than suppress unrelated actions. Any future change to those names or scopes SHALL require owner approval and migration notes. Dry-run/result models SHALL report skipped intent without launching processes. Command/security qualification SHALL precede implementing this option surface.
 
-#### Scenario: Item creation succeeds before restore fails
-- **WHEN** an item template is created successfully and its supported restore action fails
-- **THEN** the command reports the created files and action failure, returns nonzero, and does not delete the generated item
+#### Scenario: All ordinary actions are skipped
+- **WHEN** project creation is requested with the reviewed ordinary-action skip control
+- **THEN** mandatory configuration still succeeds before the command reports skipped ordinary work
+
+#### Scenario: Legacy npm skip is supplied
+- **WHEN** the user supplies the legacy npm-only skip option
+- **THEN** npm intent is suppressed but unrelated approved ordinary actions are not silently skipped
+
+### Requirement: Initial restore adapters remain conservative
+Explicit manager selection SHALL be validated against its input kind rather than inferred from a filename. Initial npm behavior SHALL remain `npm install` even with a lockfile unless a separately approved command policy changes it. Yarn, pnpm, uv, poetry, and `pyproject.toml` inputs SHALL remain deferred. Pip adapter implementation SHALL be blocked until project-local venv/interpreter selection and its narrow tool-identity policy are agreed and qualified. A global interpreter or generated venv marker alone SHALL NOT authorize package installation.
+
+#### Scenario: Manager and input kind disagree
+- **WHEN** a declared manager does not accept the resolved input kind
+- **THEN** preflight rejects the action rather than guessing another manager
+
+#### Scenario: Pip has no qualified project-local interpreter
+- **WHEN** project-local interpreter identity cannot be established under the reviewed venv policy
+- **THEN** no pip process launches and the adapter does not silently use global site-packages
 
 #### Scenario: Dependency is absent from the manifest
 - **WHEN** an authored item template needs a dependency not declared in the manager input

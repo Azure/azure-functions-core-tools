@@ -3,6 +3,8 @@
 - [ ] 1.1 Review the proposed action IDs, arguments, initial managers, ordinary-action default, and continued-failure outcome with command, template, publisher, and security owners.
 - [ ] 1.2 Spike raw authored output indexes versus condition-filtered and renamed outputs and retention of topology-affecting evaluated parameter/bind/generated values on the pinned engine. Reject unsupported unstable topology before mutation and retain original selected-template identity throughout mapping.
 - [ ] 1.3 Define func-owned configuration/ordinary action plans and unsupported/malformed/path/mapping failure outcomes.
+- [ ] 1.4 Compare the existing engine restore ID with a func-specific ID on the pinned engine before finalizing authoring APIs. Qualify any stable-topology fallback with dependency inspection, pinned inventory, actual impact counts, and controls before a switch.
+- [ ] 1.5 Agree host-file exclusions jointly with runtime/command and publisher owners. Block affected ambiguous samples, not unambiguous fixture implementation, until omission-safe classification is qualified.
 
 ## 2. Preflight and Finalization
 
@@ -17,7 +19,9 @@
 - [ ] 3.2 Project dry-run intents and ordered configuration effects without writes, tool provisioning, or process execution.
 - [ ] 3.3 Test absent tools, unsupported managers/IDs, exact raw restore argument types/duplicates/extra keys, restore authored-index identity through inactive earlier outputs and renames, rejected inactive restore inputs, generated manager shims, tool links into template output, valid absolute tool/script controls, Windows batch quoting, argument injection, input/root changes between preflight and launch, continued/stopped failures, process cancellation, and ordinary suppression after finalization failure.
 - [ ] 3.4 Agree and implement the distinct Go module-tidy action, raw `go.mod` output reference, absolute fixed-command launch, ordinary failure/cancellation, and module/checksum effects. Preserve init default/skip behavior, obtain explicit approval for nonzero failure reporting versus the legacy ignored result, and leave startup tidy/build untouched.
-- [ ] 3.5 Test malformed/negative configuration and Go indexes before engine coercion. Test nested item ancestor-manifest restore rejection before creation alongside valid output-local restore controls. Agree a separate typed containing-project target before qualifying any migration that needs that wider scope.
+- [ ] 3.5 Test malformed/negative configuration and Go indexes before engine coercion and item-action rejection before creation. Defer new item dispatch until a real supported journey, typed containing-project target, and authorization/compatibility contract are qualified.
+- [ ] 3.6 Qualify CLI-owned ordinary-action skip control and legacy npm/Go target-specific scopes without bypassing configuration or safety. Test skipped intent, dry-run, and unchanged legacy option names before switching commands.
+- [ ] 3.7 Qualify manager/input pairing and conservative initial tool commands. Keep other managers/pyproject deferred and pip blocked on project-local venv/interpreter identity, without a global site-packages fallback.
 
 ## 4. Authoring and Migration
 
@@ -25,6 +29,7 @@
 - [ ] 4.2 Document author-owned application E2E evidence separately from CLI processor/fixture tests.
 - [ ] 4.3 Run targeted and full CI-strict validation before command integration; keep legacy removal behind its independent readiness gates.
 - [ ] 4.4 Inventory standard actions in supported shared .NET item templates and qualify reviewed adapters/translations or replacement packages before provider removal. Do not treat an unknown-action refusal as preserved parity.
-- [ ] 4.5 Wire the agreed item create-mode dispatcher and partial outcomes into `func new`, document ordinary action authorization/defaults, and preserve dry-run suppression. Keep missing-dependency/package-add coverage explicitly separate from restore until its own contract is agreed.
+- [ ] 4.5 Keep item dispatch outside initial implementation until caller/target/authorization qualification exists. Preserve legacy action journeys and dry-run suppression. Keep missing-dependency/package-add coverage separate from restore and do not claim provider-removal parity from rejecting supported items.
 - [ ] 4.6 Qualify Go default and skip-tidy, module/checksum mutation, and missing-tool/failure/cancellation outcomes before removing initializer-time tidy. Document the approved failure change rather than asserting failure parity. Do not mark startup-time migration complete in this change.
 - [ ] 4.7 Obtain Node/command-owner approval and migration notes for the npm nonzero outcome change from legacy best-effort init. Qualify default/skip, missing-tool/nonzero/cancellation, and file-preservation cases before removing the Node initializer install path.
+- [ ] 4.8 Require func-only host compatibility for configuration-action templates and test normal foreign-host rejection, without claiming forced foreign-host invocation is qualified.

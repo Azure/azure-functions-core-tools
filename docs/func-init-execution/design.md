@@ -207,7 +207,7 @@ Project template content cannot create or modify `.func/config.json` directly. T
 After candidate parameters are complete, init uses the retained resolved output/effect snapshot to independently inventory the union of primary outputs whose final filename is `host.json` and created/modified file effects whose final filename is `host.json`. Normalize parent roots and deduplicate observations with platform path comparison, then match active configuration declarations to those roots. Completeness validation precedes authoritative whole-template filters and any cleanup. Before target modification, preflight rejects:
 
 - no active trusted configuration action;
-- optional or continue-on-error configuration behavior;
+- optional configuration behavior, raw `continueOnError` true, or a non-boolean flag, while omitted/raw false remains valid;
 - a missing, ambiguous, inactive, or non-file primary-output reference;
 - a resolved primary output outside the target;
 - empty or non-canonical stack/language, or a value that conflicts with an explicit filter;

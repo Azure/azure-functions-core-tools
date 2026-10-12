@@ -10,6 +10,8 @@ Project templates must declare the Functions projects they create so the CLI can
 - Validate action structure, project roots, languages, combined file effects, and supported processors before mutation.
 - Project action effects for dry-run without executing configuration writes or restore commands.
 - Keep configuration finalization separate from ordinary action execution and report cancellation and partial completion accurately.
+- Keep initial ordinary dispatch project-scoped, propose CLI-owned skip controls preserving legacy npm/Go semantics, and defer item/Python adapters behind caller/target/tool-identity qualification.
+- Compare action-ID alternatives before finalization, require func-only host compatibility, and publish stable-topology fallback/impact evidence and classification ownership before affected switches.
 
 ## Capabilities
 
@@ -26,4 +28,4 @@ Project templates must declare the Functions projects they create so the CLI can
 
 ## Impact
 
-The proposal supplies the contract consumed by runtime projection, init/item orchestration, and template packaging. It does not implement processors, provision missing language toolchains, execute actions in the central packager, or rewrite the CLI's general process-launching implementation. Restore-only processors do not add missing manifest dependencies or resolve the Durable template dependency bug; that requires an author fix or separately reviewed package-add contract. The distinct Go tidy action, absolute tool/launcher resolution, proposed action identifiers, initial managers, item execution policy, and ordinary-action defaults require team review before implementation.
+The proposal supplies project-init action contracts and the preflight/migration gates consumed by item orchestration and template packaging. Item dispatch remains deferred. It does not implement processors, provision missing language toolchains, execute actions in the central packager, or rewrite the CLI's general process-launching implementation. Restore-only processors do not add missing manifest dependencies or resolve the Durable template dependency bug, which requires an author fix or separately reviewed package-add contract. Action identifiers, initial managers, skip/default behavior, tool/venv identity, classification, and engine fallback qualification require owner review before implementation.
