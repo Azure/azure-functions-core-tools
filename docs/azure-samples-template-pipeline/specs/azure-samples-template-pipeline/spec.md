@@ -113,61 +113,63 @@ Package provenance SHALL retain the source release/version/commit and selected d
 
 ### Requirement: The func-templates repository owns the packaging control plane
 
-The system SHALL use the `func-templates` repository in the `internal` project of the `azfunc` Azure DevOps organization as the source of truth for quickstart onboarding and release automation. It SHALL keep onboarding YAML under `src/Quickstarts/`, the onboarding JSON Schema at `src/Schema/quickstart.schema.json`, the source synthesis-descriptor JSON Schema at `src/Schema/azure-functions-template.schema.json`, and pipeline definitions under `eng/ci/`.
+The system SHALL keep publishing automation, publishing-input and source-descriptor schemas, tooling, and validation/promotion pipeline definitions in `func-templates`. Curated registration SHALL remain in the existing reviewed `azure-functions-templates` source manifest. It MUST NOT require another manually maintained YAML registration list. A generated internal projection MAY be used only when reproducible from its pinned source/policy revisions.
 
 #### Scenario: Repository layout is validated
 
 - **WHEN** the control-plane repository is validated
-- **THEN** onboarding sources are read from `src/Quickstarts/*.yaml`
-- **AND** the schemas are read from `src/Schema/quickstart.schema.json` and `src/Schema/azure-functions-template.schema.json`
+- **THEN** automation consumes the approved existing source-manifest revision
+- **AND** it retains centrally owned publishing-input and repository-descriptor validation
 - **AND** `eng/ci/validate-onboarding.yaml` and `eng/ci/publish-releases.yaml` define the validation and publication pipelines
 
-### Requirement: Onboarding is PR-reviewed YAML
+### Requirement: Registration uses the approved existing source manifest
 
-Each file directly under `src/Quickstarts/` with the `.yaml` extension SHALL use a centrally supported schema version and contain a `quickstarts` array. Version 1 retains its original single-package semantics; scoped assignments SHALL require an explicitly supported extension. The scanner SHALL combine matching files without using filenames as identity.
+Publishing SHALL consume a pinned reviewed commit and approved publishing-policy revision from the existing registration authority. A mutable CDN response, source override, author label, or package prefix MUST NOT authorize publication. Legacy IDs, source/ref/folder fields, browsing metadata, and URL/schema clients SHALL be preserved or migrated only through qualified consumer changes. Publishing-enabled entries SHALL use a supported extension; unextended entries remain legacy discovery records.
 
-#### Scenario: Multiple onboarding files are combined
+#### Scenario: Legacy entry lacks publishing approval
 
-- **WHEN** multiple `.yaml` files contain valid quickstart entries
-- **THEN** the system validates and processes their entries as one logical manifest
+- **WHEN** a valid current entry has no approved publishing extension
+- **THEN** it is not a package-publication candidate
+- **AND** it remains available to its existing legacy consumers
 
-#### Scenario: Empty onboarding file is accepted
+#### Scenario: Pipeline receives only a CDN catalog copy
 
-- **WHEN** a valid onboarding file contains an empty `quickstarts` array
-- **THEN** validation succeeds for that file
+- **WHEN** the source cannot be tied to an approved pinned registration/policy revision
+- **THEN** publication stops before candidate acquisition or package mutation
 
-#### Scenario: Nested and alternate-extension files are not scanned
+#### Scenario: Existing consumer reads extended metadata
 
-- **WHEN** a YAML file is nested below `src/Quickstarts/` or uses an extension other than `.yaml`
-- **THEN** the onboarding scanner does not treat it as an onboarding source
+- **WHEN** package-aware fields are introduced
+- **THEN** legacy field meaning and supported URL/schema behavior are covered by compatibility qualification
+- **AND** existing tools are not forced to execute quickstarts through the CLI to read the catalog
 
 ### Requirement: The onboarding schema is strict
 
-Every onboarding file SHALL validate against its centrally owned supported schema. Unknown fields and unsupported versions SHALL be rejected. Extended assignments SHALL NOT reinterpret version 1 or move project topology into onboarding.
+The legacy discovery schema SHALL remain authoritative for existing fields. The publishing extension SHALL validate against its supported strict schema, rejecting unknown publishing fields/versions. Source scopes and project topology SHALL remain repository-owned; the extension MAY select named definition IDs but MUST NOT redefine their topology. Invalid publishing inputs SHALL fail whole-manifest validation before accepting candidates.
 
 #### Scenario: Unknown field is rejected
 
-- **WHEN** an onboarding file or entry contains a property not defined by schema version 1
-- **THEN** PR validation fails with the file and property identified
+- **WHEN** a publishing extension contains a field not defined by its supported schema
+- **THEN** validation fails with the entry and property identified
 
 #### Scenario: Unsupported schema version is rejected
 
-- **WHEN** an onboarding file declares a version not supported by the central schema
+- **WHEN** a publishing extension declares an unsupported version
 - **THEN** PR validation fails
 
 ### Requirement: Each onboarding entry has stable package and release identity
 
-Each entry SHALL require a stable `id`, an `Azure-Samples/<repository>` slug, a `packageId` beginning with `Azure.Functions.Templates.`, and `release.minimumVersion`. `enabled` SHALL default to `true`, and `release.includePrerelease` SHALL default to `false`. Onboarding entries MUST NOT contain template metadata or project topology.
+A publishing-approved entry SHALL preserve its stable manifest `id` and require a persisted reviewed `packageId` under `Azure.Functions.Templates.`, approved source policy, source-definition assignment, explicit enabled state, and minimum-version/backfill and prerelease rules for eligible-release enumeration. A reviewed license override MAY be supplied. Legacy discovery refs SHALL NOT imply publishing consent. Unsupported sources SHALL remain explicit migration blockers rather than become trusted through registration alone.
 
 #### Scenario: Minimal entry is accepted
 
-- **WHEN** an entry supplies all required fields and omits optional fields
-- **THEN** validation applies the documented defaults
+- **WHEN** a registration has every required approved publishing input and no optional license override
+- **THEN** source-release license detection remains available under the normal allowlist
 
 #### Scenario: Repository outside Azure-Samples is rejected
 
-- **WHEN** an entry identifies an owner other than `Azure-Samples`
-- **THEN** validation fails
+- **WHEN** the initial publisher encounters a supported catalog source outside its approved Azure-Samples policy
+- **THEN** it reports the coverage blocker without silently expanding that policy or dropping the catalog entry
 
 #### Scenario: Package ID has the wrong prefix
 
@@ -176,35 +178,40 @@ Each entry SHALL require a stable `id`, an `Azure-Samples/<repository>` slug, a 
 
 #### Scenario: Disabled entry is not scanned
 
-- **WHEN** an entry has `enabled: false`
+- **WHEN** its approved publishing policy is disabled
 - **THEN** scheduled release discovery skips that entry without removing previously published packages
 
 #### Scenario: Onboarding contains template metadata
 
-- **WHEN** an onboarding entry contains a `template` property or project path
-- **THEN** schema validation fails because the release snapshot owns template definition
+- **WHEN** a publishing extension tries to define project topology or overwrite source-owned template metadata
+- **THEN** validation fails while existing legacy discovery metadata remains governed by its own schema
 
 ### Requirement: Onboarding identities are globally unique
 
-Onboarding and package IDs SHALL be globally unique case-insensitively. Version 1 SHALL also enforce repository uniqueness. A supported scoped extension MAY reference one repository in several assignments only when their named template-definition ownership is disjoint. Moving entries between files MUST NOT change identity.
+Manifest entry IDs SHALL stay stable and unique. Entries MAY share a repository or reference one consistent package assignment containing several source definitions. References to the same package assignment SHALL agree on source, release policy, complete definition selection, and package identity. Conflicting assignments or competing ownership of one template identity SHALL fail validation. Proposed generated package IDs SHALL be reviewed and persisted once after legal encoding, collision, and namespace checks rather than regenerated from mutable names during builds.
 
 #### Scenario: Duplicate value exists in another file
 
-- **WHEN** entries collide on ID/package identity, violate original-mode repository uniqueness, or assign one template definition to competing packages
+- **WHEN** entries collide on registration identity, disagree on a shared package assignment, or give one template competing package owners
 - **THEN** PR validation fails and identifies both entries
+
+#### Scenario: Several entries share one valid package assignment
+
+- **WHEN** distinct quickstart entries reference different definitions in one identical reviewed assignment
+- **THEN** publishing deduplicates the package candidate without losing independent template selection
 
 ### Requirement: PR validation is atomic
 
-`eng/ci/validate-onboarding.yaml` SHALL parse and validate every onboarding file and apply repository-wide onboarding invariants before accepting a PR. A malformed file, invalid entry, or central identity collision SHALL fail the complete validation run. Onboarding validation SHALL NOT require acquiring a source release or validating repository-owned template definitions.
+Manifest extension validation and `eng/ci/validate-onboarding.yaml` SHALL validate the pinned input and whole-manifest publishing invariants. Malformed input, invalid approved entries, or identity/assignment conflicts SHALL fail the validation run rather than accept a partial registry. Input validation SHALL NOT acquire source releases or pretend repository-owned templates have already been validated.
 
 #### Scenario: One file is malformed
 
-- **WHEN** any scanned onboarding file cannot be parsed
-- **THEN** PR validation fails without treating the remaining files as an accepted manifest
+- **WHEN** the approved source-manifest revision cannot be parsed
+- **THEN** validation fails without accepting a partial registry
 
 #### Scenario: All files and global invariants are valid
 
-- **WHEN** every scanned file passes schema and repository-wide onboarding validation
+- **WHEN** the input passes legacy-compatibility, publishing-schema, and whole-manifest assignment validation
 - **THEN** PR validation succeeds
 
 #### Scenario: Source repository has no eligible release
@@ -215,7 +222,7 @@ Onboarding and package IDs SHALL be globally unique case-insensitively. Version 
 
 ### Requirement: Scheduled discovery scans GitHub releases
 
-`eng/ci/publish-releases.yaml` SHALL run daily and enumerate all published GitHub releases for every enabled onboarding entry, following pagination. It SHALL ignore drafts and SHALL NOT treat a Git tag without a GitHub release as a release candidate.
+`eng/ci/publish-releases.yaml` SHALL enumerate eligible published releases only for approved enabled assignments under their declared minimum-version/prerelease policy, following pagination. It SHALL ignore drafts and SHALL NOT treat a tag without an eligible published release as a candidate. A legacy discovery record or branch ref MUST NOT imply publication approval.
 
 #### Scenario: Published release is discovered
 
@@ -234,7 +241,7 @@ Onboarding and package IDs SHALL be globally unique case-insensitively. Version 
 
 ### Requirement: Eligible releases use unambiguous SemVer tags
 
-An eligible release tag SHALL be `v` followed by a valid SemVer 2.0 version. The package version SHALL be the tag with the leading `v` removed. Build metadata SHALL be rejected. The version SHALL be greater than or equal to `release.minimumVersion`, and a GitHub prerelease SHALL be eligible only when `release.includePrerelease` is `true`.
+An eligible release tag SHALL be `v` followed by a valid SemVer 2.0 version. The package version SHALL remove the leading `v`; build metadata SHALL be rejected. The version SHALL meet the approved minimum/backfill policy. GitHub prereleases SHALL require explicit approval under that policy.
 
 #### Scenario: Stable release is eligible
 
@@ -244,7 +251,7 @@ An eligible release tag SHALL be `v` followed by a valid SemVer 2.0 version. The
 
 #### Scenario: Version predates onboarding boundary
 
-- **WHEN** a release version is lower than `release.minimumVersion`
+- **WHEN** an enumerated release is below its approved minimum version
 - **THEN** the release is skipped
 
 #### Scenario: Prerelease is not enabled
@@ -432,7 +439,7 @@ For each package, licensing SHALL come from the exact source release through rev
 #### Scenario: Detection fails but override is valid
 
 - **WHEN** automatic detection does not identify an allowed license
-- **AND** YAML supplies an allowed expression
+- **AND** its reviewed publishing extension supplies an allowed expression
 - **AND** the release snapshot contains a root license file
 - **THEN** the reviewed override is used
 

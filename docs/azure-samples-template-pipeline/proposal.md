@@ -7,10 +7,11 @@ The source-scope extension preserves independent subfolder samples without manda
 ## What Changes
 
 - Establish `https://dev.azure.com/azfunc/internal/_git/func-templates` as the control-plane repository for Azure-Samples template packaging.
-- Add PR-reviewed onboarding sources under `src/Quickstarts/*.yaml` plus centrally owned onboarding and synthesis-descriptor schemas under `src/Schema/`.
-- Add `eng/ci/validate-onboarding.yaml` to validate every onboarding file and enforce repository-wide onboarding uniqueness.
+- Reuse the existing reviewed quickstart source manifest for curated registration and discovery, with an approved versioned publishing extension and preserved legacy consumer fields/URL.
+- Keep publisher validation/promotion pipeline YAML and repository-owned template descriptors, but do not require a second author-maintained central YAML registration list.
+- Add `eng/ci/validate-onboarding.yaml` to validate a pinned approved manifest revision, publishing policy, and compatible package assignments before candidate acquisition.
 - Add `eng/ci/publish-releases.yaml` to scan onboarded GitHub repositories daily for eligible releases.
-- Require published releases to use `v` followed by SemVer 2.0, support prereleases only through explicit opt-in, and use a required minimum version as the initial backfill boundary.
+- Retain published SemVer releases and minimum-version/prerelease policy through an approved publishing extension rather than infer publishing consent from a discovery ref.
 - Build packages from the exact commit referenced by each eligible release tag without executing repository-controlled code.
 - Preserve and dry-run a valid authored root `.template.config/template.json`, or synthesize a project template from the release-owned `.github/azure-functions-template.yaml` descriptor with one required `.func/config.json` finalization action per declared project and one workload constraint per declared stack.
 - Read the synthesis descriptor before excluding `.git`, `.github`, generated build output, credentials, and unsafe links from package content.
@@ -22,6 +23,7 @@ The source-scope extension preserves independent subfolder samples without manda
 - Keep independent roots disjoint and require explicit shared-file membership with each consumer's effective digest, provenance, and license evidence.
 - Validate every selected definition from the completed package, retaining independent groups, source-scope provenance, and notices.
 - Supply verified publication evidence to the separate discovery component rather than treating package labels as curation proof.
+- Populate package-aware curated browsing references from publication results, without making general feed scanning a GA prerequisite or removing generic third-party package installation.
 
 ## Capabilities
 
@@ -35,9 +37,9 @@ None.
 
 ## Impact
 
-- Introduces the separate internal `func-templates` Azure DevOps repository and its source, schema, tooling, tests, and pipeline layout.
+- Retains the internal `func-templates` automation repository, with publishing-input/descriptor schemas, central tooling, tests, and pipelines consuming the existing registration source.
 - Requires read-only GitHub API access, an Azure Artifacts staging feed, and NuGet.org publication credentials protected by an approval-gated environment.
 - Produces packages compatible with the `FuncTemplate` ownership contract from `template-package-install`.
 - Depends on `template-engine-constraints` for the workload constraint form and on `template-engine-post-actions` for the trusted configuration finalization action.
-- Does not change Azure Functions CLI commands, package installation behavior, quickstart catalogs, or template discovery manifests.
-- Leaves versioned descriptor/assignment shape, package grouping, allowlist coverage, publication evidence, and identity migration as review questions.
+- Requires coordinated source-manifest extension and legacy-client compatibility tests; it does not implement CLI browsing or create a general package-scanning catalog.
+- Leaves exact publishing-extension/descriptor shape, grouping, source-allowlist coverage, evidence transport, and identity migration to the owning design review.

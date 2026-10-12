@@ -1,31 +1,31 @@
 ## 1. Repository and Tooling Foundation
 
-- [ ] 1.1 Create the `func-templates` repository in `azfunc/internal` with `src/Quickstarts`, `src/Schema`, central tooling and test projects, and `eng/ci`.
+- [ ] 1.1 Keep `func-templates` automation schemas/tooling/tests/pipelines and consume the existing reviewed source manifest rather than create another registration list.
 - [ ] 1.2 Add dependency restore, build, test, and code-quality configuration for the central packaging tooling.
 - [ ] 1.3 Add shared typed models for onboarding entries, effective metadata, GitHub releases, package provenance, feed state, and per-release outcomes.
 - [ ] 1.4 Add dependency-injected boundaries for filesystem, GitHub API, source acquisition, TemplateEngine validation, NuGet packing, feeds, time, retries, and reporting.
 
 ## 2. Onboarding Schema and Loading
 
-- [ ] 2.1 Author strict versioned onboarding schemas for original and scoped assignments, with source/release policy and named definition selection but no project topology.
-- [ ] 2.2 Implement non-recursive ordinal scanning of `src/Quickstarts/*.yaml` and combine zero-or-more entries from each file into one logical manifest.
+- [ ] 2.1 Agree and validate the existing manifest's publishing extension with manifest and consumer owners, without reinterpreting legacy fields or owning project topology.
+- [ ] 2.2 Load a pinned approved source revision and publishing-policy revision; reject mutable CDN/unreviewed inputs as publication authority.
 - [ ] 2.3 Implement schema validation with file, entry, property, and source-location diagnostics.
-- [ ] 2.4 Resolve defaults for enablement, prerelease policy, and license.
+- [ ] 2.4 Require explicit enabled/release-selection policy and retain optional reviewed license overrides with source detection.
 - [ ] 2.5 Implement canonical GitHub repository URL construction.
-- [ ] 2.6 Enforce ID/package uniqueness, original-mode repository uniqueness, and disjoint template ownership for extended scoped assignments.
-- [ ] 2.7 Add unit tests for minimal entries, rejected template fields, malformed YAML, unknown fields, invalid formats, defaults, and every onboarding collision.
+- [ ] 2.6 Preserve entry IDs, validate persisted package IDs, deduplicate consistent shared assignments, and reject competing identity/source/definition ownership.
+- [ ] 2.7 Test unextended legacy records, disabled publishing, malformed input, unknown extensions, incompatible consumers, shared assignments, generated-ID collisions, and explicit source/release policy.
 
 ## 3. Pull Request Validation
 
-- [ ] 3.1 Add a validation command that parses every onboarding source and applies schema and repository-wide rules atomically.
+- [ ] 3.1 Validate the approved manifest and its complete publishing assignments atomically, not a second YAML registration registry.
 - [ ] 3.2 Keep onboarding validation independent of source-release availability and repository-owned template definitions.
 - [ ] 3.3 Create `eng/ci/validate-onboarding.yaml` as the required PR pipeline.
-- [ ] 3.4 Validate all onboarding files and central identities atomically without acquiring source repositories.
-- [ ] 3.5 Add pipeline fixtures proving malformed YAML, invalid entries, rejected template fields, and conflicting onboarding identities fail the complete validation result.
+- [ ] 3.4 Validate pinned registration/policy provenance and assignments without acquiring source repositories.
+- [ ] 3.5 Add failure and legacy-compatibility fixtures, including refusal to infer publishing consent from an existing catalog row.
 
 ## 4. GitHub Release Discovery
 
-- [ ] 4.1 Implement authenticated, paginated release enumeration for enabled `Azure-Samples` repositories.
+- [ ] 4.1 Implement paginated eligible-release enumeration only for approved enabled publishing assignments, preserving minimum/prerelease rules, source policy, and migration blockers.
 - [ ] 4.2 Filter drafts, tag-only refs, versions below `minimumVersion`, and prereleases not explicitly enabled.
 - [ ] 4.3 Parse `v`-prefixed SemVer 2.0 tags, reject build metadata, and derive the NuGet version.
 - [ ] 4.4 Resolve each eligible release tag to an exact commit independently of `target_commitish`.
@@ -43,7 +43,7 @@
 
 ## 6. License Resolution
 
-- [ ] 6.1 Implement license resolution from reviewed YAML override, GitHub repository-license API at the release commit, and root release license-file inspection.
+- [ ] 6.1 Resolve licensing from the reviewed publishing override or exact-release detection and root source license inspection.
 - [ ] 6.2 Allow only SPDX `MIT` and `Apache-2.0`, require source-root license files, and retain notices for selected subfolder scopes.
 - [ ] 6.3 Preserve the root license file as template content and project the effective expression into package metadata.
 - [ ] 6.4 Add tests for both allowed licenses, GitHub detection, file fallback, valid override, missing file, unknown detection, and unsupported expressions.

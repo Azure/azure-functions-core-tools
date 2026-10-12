@@ -6,16 +6,14 @@ Azure-Samples repositories release independently through GitHub. The package bui
 
 This draft extends the original single-template model so independent quickstarts can come from different folders of one repository. It does not require per-stack aggregation or private intermediate packages. Metadata browsing and authorized guided use provide the streamlined UX without prescribing package boundaries. Scope schemas and identity ownership remain under publishing review.
 
-The control plane lives separately from both Azure-Samples and Azure Functions Core Tools:
+Publishing automation lives in the separate `func-templates` repository. Curated registration remains in the existing [reviewed source manifest](https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json); it is not migrated to another manually maintained onboarding list:
 
 ```text
 https://dev.azure.com/azfunc/internal/_git/func-templates
 |
 +-- src/
-|   +-- Quickstarts/
-|   |   `-- *.yaml
 |   `-- Schema/
-|       +-- quickstart.schema.json
+|       +-- publishing-input.schema.json
 |       `-- azure-functions-template.schema.json
 `-- eng/
     `-- ci/
@@ -29,7 +27,7 @@ The Azure Functions CLI, general template discovery, quickstart catalog generati
 
 **Goals:**
 
-- Make onboarding reviewable, deterministic, and safe to divide across files.
+- Keep onboarding reviewable and deterministic without duplicating curated registrations.
 - Convert eligible release snapshots into valid project template packages without executing source-controlled code.
 - Use package feeds as the durable publication checkpoint rather than maintaining a parallel release ledger.
 - Promote the exact validated artifact through a single approval gate.
@@ -48,35 +46,25 @@ The Azure Functions CLI, general template discovery, quickstart catalog generati
 
 ## Decisions
 
-### YAML files form one logical source manifest
+### The existing curated manifest owns registration
 
-Onboarding sources use this shape:
+The pipeline consumes a pinned, approved commit of the existing source manifest in `azure-functions-templates`. A CDN response, an arbitrary manifest override, an `author` string, or a package prefix is not authorization to publish. The source revision and approved publishing-policy revision are recorded with every package candidate.
 
-```yaml
-schemaVersion: 1
+Preserve existing entry IDs, names, repository URLs, folder paths, Git refs, and the legacy CDN URL/schema contract for CLI, editor, and other consumers. The source manifest gains a supported publishing extension; unknown extension versions fail validation rather than silently reinterpret legacy fields. Exact extension placement and schema versioning require the manifest and publishing owners' agreement and compatibility tests before rollout.
 
-quickstarts:
-  - id: python-openai-chat
-    repository: Azure-Samples/functions-python-openai-chat
-    packageId: Azure.Functions.Templates.PythonOpenAIChat
-    enabled: true
-
-    release:
-      minimumVersion: 1.0.0
-      includePrerelease: false
-
-    licenseExpression: MIT
-```
-
-`schemaVersion`, `quickstarts`, `id`, `repository`, `packageId`, and `release.minimumVersion` are always required. Onboarding contains no template metadata or project paths.
-
-Onboarding defaults are resolved before validation:
+Conceptually, one reviewed record carries:
 
 ```text
-enabled                    -> true
-release.includePrerelease  -> false
-licenseExpression          -> detection from release commit
+existing sample id, repositoryUrl, folderPath, gitRef, display/filter metadata
+  + explicit publishing approval and stable package assignment
+  + named source-definition selection and release policy
 ```
+
+An entry without the approved extension remains a legacy discovery record. It neither becomes a publication candidate nor disappears from older consumers. Approved publishing inputs require a stable `packageId`, named definition selection where needed, explicit enabled state, and release-selection policy. A reviewed license override is optional; source-release detection remains the default. Adding an unreviewed optional field does not grant approval.
+
+The approved extension explicitly authorizes eligible-release enumeration with a minimum version/backfill boundary and prerelease policy. Retain the existing GitHub release, SemVer, source-allowlist, and pinned-commit checks. A legacy discovery `gitRef` neither authorizes publication nor supplies a minimum-version policy; mutable branch refs are not eligible package snapshots.
+
+The extension selects source-owned definition IDs, not Functions project topology. Existing `folderPath` remains discovery/content-scope metadata; a publishing candidate must verify its relationship to the selected source definition and reject mismatches. Do not duplicate `name`, `shortName`, project declarations, or authored parameters as separately authoritative publishing definitions.
 
 The exact release snapshot owns synthesis metadata in `.github/azure-functions-template.yaml`:
 
@@ -104,19 +92,17 @@ language  canonical language recognized by that stack
 
 The root project uses `.`. Other roots use normalized `/`-separated relative paths. Roots cannot be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap through ancestor/descendant nesting. The staged release must contain a regular `host.json` directly under every declared root.
 
-The onboarding JSON Schema owns control-plane structure and rejects unknown fields. A separate centrally owned descriptor schema validates `.github/azure-functions-template.yaml`. Repository-wide onboarding validation owns central identity collisions, GitHub slug restrictions, SemVer validation, package-prefix policy, and license policy. Release packaging owns descriptor metadata, project path safety, canonical stack/language pairs, and TemplateEngine validation against the exact tagged content.
+The existing manifest schema continues to govern legacy discovery fields. The publishing-input schema validates the approved extension and rejects unknown publishing fields/versions without pretending to change every existing consumer. The source descriptor schema validates repository-owned definitions. Whole-manifest validation owns registration collisions, source policy, package assignments, release policy, and license overrides; release packaging owns actual scopes, projects, raw constraints, and TemplateEngine validation.
 
-Files are scanned non-recursively in ordinal filename order. The order exists only for deterministic diagnostics; it does not establish precedence. Duplicate values are errors rather than last-write-wins behavior.
+The pipeline may generate an internal normalized input from that one reviewed source, but it must be reproducible from the pinned revision and policy. A generated projection is not a second author-maintained registry. Invalid input fails as a whole before package candidates are accepted.
 
-**Alternative considered:** keep every repository in one YAML file. This creates a merge hotspot and makes ownership grouping difficult. It is rejected.
-
-**Alternative considered:** require one repository per file. The filename would become an accidental identity surface and would complicate grouping and migration. Files therefore contain zero or more entries.
+**Alternative considered:** require authors to copy the current registrations into central YAML. That duplicates curation and forces a registration migration unrelated to package-backed execution. Existing pipeline YAML and repository-owned synthesis descriptors remain; only the competing central registration list is removed.
 
 ### Explicit operational and package identities remain stable
 
-The onboarding `id` is an internal operational key. `packageId` is explicitly reviewed and must use the reserved `Azure.Functions.Templates.` prefix. Neither is derived from mutable GitHub metadata.
+The existing manifest entry `id` stays a stable registration/discovery key, not a new internal ID replacing it. A publishing `packageId` is explicit, persisted, reviewed, and reserved under `Azure.Functions.Templates.`. Tooling may propose an initial ID from the stable entry ID, but must validate legal encoding, case-insensitive collisions, and namespace ownership before persisting it. Repository/display/template-name changes must not regenerate public package IDs during a build.
 
-Onboarding and package IDs remain globally unique case-insensitively. The original schema retains repository uniqueness. An explicitly versioned extension may select named source definitions for separate packages from one repository or several definitions for one package. It validates disjoint package-to-template assignments instead of silently accepting duplicate repositories under the old schema. Competing packages must not publish the same template identity without an explicit migration plan.
+Entries may share a repository or point to separate subfolders. One package assignment may include several source definitions, and several catalog entries may reference that same assignment. Those references must agree on source, release policy, complete selected-definition set, and package identity. Conflicting assignments or one template identity owned by competing packages are rejected. A separate reviewed identity migration is required for intentional ownership changes.
 
 ### Independent source scopes preserve sample choices
 
@@ -138,7 +124,9 @@ Functions declarations remain authoritative. A Python Functions sample with a Ja
 
 ### Publication supplies evidence, not the discovery manifest
 
-The pipeline publishes validated packages and source provenance. The initial curated discovery handoff uses the existing reviewed source manifest at a pinned revision and records verified package/version/source/template references without breaking legacy fields or URL consumers. Updating package-aware discovery metadata belongs to the discovery owner and uses publication evidence, not an assumption that a named package was approved. General community feed scanning remains separate work. Onboarding YAML is not the public index or the installed TemplateEngine catalog.
+The reviewed source manifest is the single curated registration and discovery authority. Publishing consumes its approved extension and emits validated package/provenance results. The manifest/discovery owner adds package-aware browsing references only after verified publication, preserving legacy fields and URL consumers. Generated results must not overwrite reviewed policy or manufacture approval for unpublished packages. The public CDN view is distribution output, not a second source of publishing authorization or the installed TemplateEngine catalog.
+
+General feed scanning is not a dependency of this initial curated flow. Broader discovery may later scan our and third-party packages under its own policies. Generic explicit template package installation remains available; this is not a ban on community-authored packages or a requirement to preinstall quickstarts.
 
 The approval record must identify the published artifact digest, package/version, source definitions, and reviewed publication so discovery can verify sanction. A self-declared tag or reserved prefix is not proof. Evidence transport and authentication belong to discovery and publisher-trust review; this draft does not invent a signed-index protocol or broaden the source allowlist.
 
@@ -148,9 +136,9 @@ The approval record must identify the published artifact digest, package/version
 
 **Alternative considered:** keep synthesized template metadata or project paths in onboarding. That makes repository structure and template presentation depend on a separately versioned control-plane file. It is rejected so the release commit atomically owns its content and synthesis descriptor.
 
-### The minimum version is the backfill boundary
+### Explicit release policy governs discovery and backfill
 
-The daily pipeline enumerates all published releases rather than tracking only the newest release. `minimumVersion` establishes the first eligible version and makes onboarding backfill explicit and repeatable.
+For approved enabled assignments, the scheduled pipeline enumerates published releases with the configured minimum version/backfill boundary. This preserves the original release-discovery behavior without inferring enumeration consent from a legacy discovery record alone.
 
 Release eligibility is:
 
@@ -159,7 +147,7 @@ published GitHub release
 + non-draft
 + tag matches v<SemVer 2.0>
 + no SemVer build metadata
-+ version >= minimumVersion
++ version >= approved minimumVersion
 + prerelease enabled when GitHub marks it prerelease
 ```
 
@@ -261,7 +249,7 @@ Template authors own the full end-to-end tests for their generated applications,
 The allowlist contains SPDX `MIT` and `Apache-2.0`. Detection order is:
 
 ```text
-reviewed YAML licenseExpression
+reviewed publishing license override
   -> GitHub repository-license API with ref=<release commit>
   -> inspect root license file in staged release snapshot
   -> fail
