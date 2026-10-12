@@ -385,7 +385,7 @@ The original `.github/azure-functions-template.yaml` single-definition descripto
 
 ### Requirement: Source descriptor is synthesized into template configuration
 
-For each synthesized definition, the pipeline SHALL generate template configuration using that definition's identity, short name, name, description, and projects. The template SHALL have project type and SHALL use only its validated filtered content scope. The original single-root mode uses the complete filtered snapshot; an extended scoped definition MUST NOT copy unrelated sample folders. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and carrying canonical stack and language. It SHALL define no parameter symbols, replacements, or ordinary post-actions. It SHALL add workload constraints derived from every declared project stack.
+For each synthesized definition, the pipeline SHALL generate template configuration using that definition's identity, short name, name, description, and projects. The template SHALL have project type and SHALL use only its validated effective content scope, including explicitly declared shared inputs. The original single-root mode uses the complete filtered snapshot, while an extended scoped definition MUST NOT copy unrelated sample folders. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add one workload constraint, in the form defined by `template-engine-constraints`, for each distinct declared project stack.
 
 #### Scenario: Repository has no template configuration
 
@@ -418,7 +418,7 @@ For each synthesized definition, the pipeline SHALL generate template configurat
 #### Scenario: Synthesized projects use mixed stacks
 
 - **WHEN** declared projects use different canonical stacks
-- **THEN** the synthesized workload constraint requires the workloads for every declared stack
+- **THEN** the synthesized template has a workload constraint for every declared stack
 
 ### Requirement: Package licensing is release-specific and allowlisted
 

@@ -4,7 +4,7 @@
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Thrown when a template's func host metadata is malformed or gives its parameters unusable aliases.
+/// Thrown when func host metadata or raw constraint declarations are malformed or unusable.
 /// </summary>
 internal sealed class InvalidTemplateMetadataException(string message, Exception? innerException = null)
     : Exception(message, innerException);
