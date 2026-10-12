@@ -57,6 +57,8 @@ $Script:HeadRequestTimeoutSec = 60
 $Script:DefaultInstallDir = Join-Path $HOME '.azure-functions'
 $Script:DownloadBaseUrl = 'https://cdn.functions.azure.com'
 $Script:VersionManifestUrl = "$Script:DownloadBaseUrl/public/cli/v5/version.json"
+$Script:InstallationMetadataFile = 'func.installation.json'
+$Script:InstallationMetadataJson = '{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}'
 
 # True when invoked as a file (pwsh -File ... or .\install.ps1), false when piped
 # into iex. We use this so a piped 'exit' doesn't kill the user's pwsh session.
@@ -84,6 +86,24 @@ function Write-Message {
         'Success' { if ($hasWriteHost) { Write-Host $Message -ForegroundColor Green } else { Write-Output "SUCCESS: $Message" } }
         'Warning' { Write-Warning $Message }
         'Error'   { Write-Error $Message }
+    }
+}
+
+function Write-InstallationMetadata {
+    param([Parameter(Mandatory)] [string] $InstallPath)
+
+    $metadataPath = Join-Path $InstallPath $Script:InstallationMetadataFile
+    $tempPath = Join-Path $InstallPath ".$Script:InstallationMetadataFile.tmp.$([Guid]::NewGuid().ToString('N'))"
+
+    try {
+        $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($tempPath, "$Script:InstallationMetadataJson`n", $utf8WithoutBom)
+
+        Move-Item -LiteralPath $tempPath -Destination $metadataPath -Force
+    } finally {
+        if ([System.IO.File]::Exists($tempPath)) {
+            [System.IO.File]::Delete($tempPath)
+        }
     }
 }
 
@@ -346,6 +366,11 @@ try {
             tar -xzf $downloadPath -C $InstallPath
             if ($LASTEXITCODE -ne 0) { throw "Failed to extract $assetName (tar exit $LASTEXITCODE)." }
         }
+
+        if (-not (Test-Path -LiteralPath $funcPath -PathType Leaf)) {
+            throw "The downloaded archive did not install the func CLI at $funcPath."
+        }
+
         if ($os -eq 'osx') {
             xattr -d com.apple.quarantine (Join-Path $InstallPath 'func') 2>$null
         }
@@ -367,6 +392,8 @@ try {
             [System.IO.File]::WriteAllText($wrapperPath, $body)
             chmod +x $wrapperPath
         }
+
+        Write-InstallationMetadata -InstallPath $InstallPath
     }
 } finally {
     if (-not $KeepArchive) {

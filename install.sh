@@ -15,6 +15,8 @@ readonly HEAD_REQUEST_TIMEOUT_SEC=60
 readonly DEFAULT_INSTALL_DIR="$HOME/.azure-functions"
 readonly DOWNLOAD_BASE_URL="https://cdn.functions.azure.com"
 readonly VERSION_MANIFEST_URL="${DOWNLOAD_BASE_URL}/public/cli/v5/version.json"
+readonly INSTALLATION_METADATA_FILE="func.installation.json"
+readonly INSTALLATION_METADATA_JSON='{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}'
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
@@ -53,6 +55,22 @@ say_error() {
 say_verbose() {
     if [[ "$VERBOSE" == true ]]; then
         echo -e "${YELLOW}$1${RESET}" >&2
+    fi
+}
+
+write_installation_metadata() {
+    local metadata_path="${INSTALL_DIR}/${INSTALLATION_METADATA_FILE}"
+    local temp_path
+
+    temp_path=$(mktemp "${INSTALL_DIR}/.${INSTALLATION_METADATA_FILE}.tmp.XXXXXX")
+    if ! printf '%s\n' "$INSTALLATION_METADATA_JSON" > "$temp_path"; then
+        rm -f "$temp_path"
+        return 1
+    fi
+
+    if ! mv -f "$temp_path" "$metadata_path"; then
+        rm -f "$temp_path"
+        return 1
     fi
 }
 
@@ -392,6 +410,11 @@ else
     mkdir -p "$INSTALL_DIR"
     tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$INSTALL_DIR"
 
+    if [[ ! -x "${INSTALL_DIR}/func" ]]; then
+        say_error "The downloaded archive did not install an executable func CLI at ${INSTALL_DIR}/func."
+        exit 1
+    fi
+
     if [[ "$OS" == "osx" ]]; then
         xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
     fi
@@ -402,6 +425,7 @@ else
 exec "$(dirname "$0")/func" "$@"
 EOF
     chmod +x "${INSTALL_DIR}/func5"
+    write_installation_metadata
 fi
 
 # --- PATH / shell profile ---
@@ -553,4 +577,3 @@ if [[ "$SKIP_PATH" != true && -n "$UPDATED_PROFILE" ]]; then
     say_info "To use the func CLI in new terminal sessions, restart your terminal or run:"
     say_info "  source ${UPDATED_PROFILE}"
 fi
-
