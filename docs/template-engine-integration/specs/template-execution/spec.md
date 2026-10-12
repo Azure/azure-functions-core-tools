@@ -102,10 +102,19 @@ Shared and exclusive lease acquisition SHALL honor the caller's cancellation tok
 - **WHEN** a lease remains held by a live process beyond a wait threshold or lock metadata looks old
 - **THEN** elapsed time or metadata age alone does not authorize reclaiming that lease
 
+#### Scenario: New readers arrive behind a queued writer
+- **WHEN** a lifecycle writer is queued and new reader commands continue arriving
+- **THEN** admission prevents indefinite overtaking after existing conflicting owners release
+- **AND** cancellation removes a queued waiter without leaked ownership or eviction of a live owner
+
+Lifecycle admission SHALL be starvation-free for queued writers under reader churn. This SHALL NOT promise a deadline while an existing conflicting live owner remains active. The store owner SHALL qualify the shared admission protocol across processes.
+
 ### Requirement: Usable workload snapshot
 Template workload evaluation SHALL use a per-command immutable snapshot of successfully loaded/initialized runtime versions, admitted content inventory, and installed-only diagnostic entries. A runtime workload SHALL NOT satisfy a template requirement if its selected version failed loading or initialization. Template evaluation SHALL NOT load workloads, contact a feed, select an older installed runtime version, or invent version-compatibility enforcement. Content versions SHALL follow the CLI's RID-compatible inventory boundary without a claim of payload-health validation. Existing consumer payload checks SHALL remain authoritative, and known rejection SHALL remain available as a diagnostic rather than be described as proven usability.
 
 The caller SHALL capture completed startup outcomes before constructing the runtime flow's `Templater`. Listing, resolution, preview, and invocation SHALL retain that same availability input, not recalculate it from a later installed inventory or lazy first evaluation.
+
+Installed-but-unselected runtime versions SHALL remain diagnostic-only entries rather than fallback candidates. Missing SHALL be derived against a requirement identity when evaluation finds no matching installed or usable entry, not represented as an invented startup entry.
 
 #### Scenario: Inventory changes after runtime-flow construction
 - **WHEN** installed inventory changes after the flow's immutable startup-outcome snapshot is captured

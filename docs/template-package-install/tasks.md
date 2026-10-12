@@ -34,6 +34,7 @@
 - [ ] 4.7 Add concurrent reader/writer tests proving listing and execution cannot observe transient replacement state. Include real reader/writer process termination, safe abandoned-ownership recovery, interrupted-transaction/cache recovery before reopening the hive, and a slow live owner or old lock metadata that must not be reclaimed by age alone.
 - [ ] 4.8 Agree and test the shared runtime lease/raw-content handoff, cancellation/disposal release, fresh readers after acquisition, and isolated preflight without nested live read locks. Retain the pinned-engine replacement/cancellation/cache-rebuild spike as a separate prerequisite.
 - [ ] 4.9 Test cancellation during shared/exclusive waits and acquisition races, no leaked lease or live mutation after observed cancellation, and command wait diagnostics identifying active readers or lifecycle work with cancellation guidance.
+- [ ] 4.10 Qualify starvation-free queued-writer admission under cross-process reader churn, canceled waiters, and slow live owners, without age-based eviction or a wall-clock completion promise while existing ownership remains active.
 
 ## 5. Templater Install Lifecycle
 
