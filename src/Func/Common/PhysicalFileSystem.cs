@@ -18,11 +18,12 @@ internal sealed class PhysicalFileSystem : IFileSystem
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        string fullPath = Path.GetFullPath(path);
-        if (!Path.IsPathFullyQualified(fullPath))
-        {
-            throw new ArgumentException("Path must be fully qualified.", nameof(path));
-        }
+if (!Path.IsPathFullyQualified(path))
+{
+    throw new ArgumentException("Path must be fully qualified.", nameof(path));
+}
+
+string fullPath = Path.GetFullPath(path);
 
         Queue<string> remainingSegments = new(GetPathSegments(fullPath));
         string resolvedPath = Path.GetPathRoot(fullPath)
