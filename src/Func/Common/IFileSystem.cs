@@ -22,6 +22,15 @@ internal interface IFileSystem
     public Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Reads at most <paramref name="maxByteCount"/> bytes from a file; returns
+    /// <c>null</c> when the file is absent.
+    /// </summary>
+    /// <exception cref="InvalidDataException">
+    /// The file exceeds <paramref name="maxByteCount"/>.
+    /// </exception>
+    public Task<byte[]?> ReadAllBytesIfExistsAsync(string path, int maxByteCount, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Writes <paramref name="contents"/> to <paramref name="path"/> atomically
     /// (via temp-file-and-rename), creating parent directories if needed.
     /// </summary>

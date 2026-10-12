@@ -332,6 +332,9 @@ public sealed class ProfileCommandTests : IDisposable
             return Task.FromResult(contents);
         }
 
+        public Task<byte[]?> ReadAllBytesIfExistsAsync(string path, int maxByteCount, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
         public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
