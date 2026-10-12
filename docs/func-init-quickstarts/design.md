@@ -60,7 +60,7 @@ Only declared Functions project configuration actions participate in Func topolo
 
 The existing v5 `func quickstart` command is replaced by `func init`, not retained as a second scaffolding engine or introduced as an init subcommand. A basic project and a curated sample both use `func init --template <name>` or the installed project-template picker. Individual function templates remain under `func new`.
 
-This follows the [original quickstart proposal's handoff to the template designs](https://github.com/Azure/azure-functions-core-tools/pull/5026#issuecomment-5298569474). Consolidation changes command syntax, but must not introduce a separate manual template-install step for the curated content users already receive through their installed stack.
+This composes the [original quickstart proposal's install-then-init handoff](https://github.com/Azure/azure-functions-core-tools/pull/5026#issuecomment-5298569474), but intentionally replaces its separate manual acquisition step with explicitly authorized guided acquisition. Current stacks register a provider, not an installed curated payload. Consolidation changes command syntax while preserving on-selection acquisition rather than implying stack installation already supplies sample contents.
 
 Today, a supported stack registers its quickstart provider, the CLI reads the CDN manifest, and scaffolding fetches the selected tagged repository snapshot. The [current manifest](https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json) can register independent samples from different folders of one repository. For example, the Python connectors repository exposes [Office 365](https://github.com/Azure-Samples/functions-connectors-python/tree/v1.0.1/office365App) and [SharePoint](https://github.com/Azure-Samples/functions-connectors-python/tree/v1.0.1/sharepointApp) as separate choices. Their replacements must remain independently selectable and generate only their intended content, not become one combined solution.
 
@@ -101,6 +101,12 @@ Without a remote discovery index, an uninstalled short name cannot be mapped rel
 A first-party guided use flow requires verifiable curation, source policy, consent, offline behavior, and lifecycle ownership in the discovery contract. It is an explicit acquisition action composed with init after installation, not permission for init to install an unknown name implicitly or for search to mutate package state.
 
 **Alternative considered:** automatically query and install NuGet.org after an unknown reference. This makes init mutate global package state, introduces trust ambiguity, and couples command execution to remote search. It is rejected initially.
+
+### Force migration preserves destruction, not failed fetch timing
+
+Legacy `func quickstart --force` warns/confirms interactively, allows explicit force when input is unavailable, removes all non-`.git` target content, and then fetches/scaffolds. The replacement preserves the destructive non-`.git` cleanup and explicit non-interactive force authorization under `func-init-execution`. Interactive refusal or cancellation before cleanup leaves existing contents unchanged, and dry-run reports deletions without performing them.
+
+Guided acquisition, exact-artifact approval, selection/parameter/constraint checks, and combined effects preflight finish before cleanup. This deliberately changes the legacy fetch-failure boundary: an acquisition or preflight failure does not delete the old target. After authorized cleanup begins, creation, configuration, or ordinary-action failure can leave old contents deleted and new contents partially created/configured. Return nonzero, identify completed/failed work, preserve remaining generated files, and do not promise restoration of the original target. Migration notes and regression tests must qualify both sides of that boundary before removing the old command.
 
 ### The browse URL is an indirection contract
 

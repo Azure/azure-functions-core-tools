@@ -42,4 +42,4 @@ None.
 - Requires publishing to preserve independently selectable source scopes and discovery to map sanctioned templates to package/version/source references and own guided acquisition.
 - Keeps onboarding YAML, the CDN discovery manifest, and the installed TemplateEngine catalog separate; the publishing pipeline is not the discovery-index producer.
 - Leaves automatic updates and freshness policy separate from command migration, and does not claim installed packages track CDN manifest changes automatically.
-- Does not define remote template search, a gallery implementation, implicit installation, package publication, workload acquisition, or multi-project adoption.
+- Defines discovery/acquisition requirements and migration gates, but leaves remote search command grammar, trust transport, gallery implementation, and service details to their owners. It does not implement implicit installation, package publication, workload acquisition, or multi-project adoption.

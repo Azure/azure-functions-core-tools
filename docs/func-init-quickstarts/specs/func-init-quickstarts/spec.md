@@ -153,6 +153,25 @@ The existing `func quickstart` command SHALL remain available until a pinned sup
 - **THEN** initialization uses the installed version
 - **AND** this migration does not imply an automatic template or workload update
 
+### Requirement: Force migration has explicit failure boundaries
+
+The replacement SHALL preserve removal of non-`.git` target contents under explicit `--force`, interactive warning/confirmation, and explicit non-interactive force authorization. Dry-run SHALL not delete content. Guided acquisition, approval and combined execution preflight SHALL finish before cleanup. Failures or declined/canceled authorization before cleanup SHALL preserve the old target. Failures after cleanup begins SHALL return nonzero and report partial state without claiming rollback or restoration of original files. This sequencing change from legacy fetch-after-cleanup SHALL be documented and qualified before command removal.
+
+#### Scenario: Acquisition fails before forced cleanup
+
+- **WHEN** a forced guided request cannot acquire or approve its package before cleanup
+- **THEN** the existing target contents remain unchanged
+
+#### Scenario: Creation fails after forced cleanup
+
+- **WHEN** authorized non-`.git` cleanup completes and template creation or configuration then fails
+- **THEN** the command reports nonzero partial state and does not claim restoration of deleted originals
+
+#### Scenario: Forced cleanup is declined or previewed
+
+- **WHEN** the user declines cleanup, cancellation is observed before deletion, or dry-run is requested
+- **THEN** no target content is deleted
+
 ### Requirement: Interactive initialization is template-first
 
 When no template is supplied and prompting is available, `func init` SHALL present installed project-template groups, narrowed by any explicit stack and language filters, before resolving template variants or template parameters. After a template group is selected, the command SHALL resolve only the remaining choices required by that group.
