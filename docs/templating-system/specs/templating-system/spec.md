@@ -45,8 +45,14 @@ Each focused change SHALL own detailed requirements for its assigned capability.
 - **THEN** `template-engine-constraints`, `template-engine-post-actions`, or `template-engine-bind-sources`, respectively, is the authoritative focused change
 
 #### Scenario: Template discovery behavior is specified
-- **WHEN** behavior concerns scanning NuGet feeds for `FuncTemplate` packages, producing a searchable manifest, or publishing that manifest to the CDN
+- **WHEN** behavior concerns adapting the reviewed curated manifest, distributing/querying metadata, or separately scoped broader feed discovery
 - **THEN** `func-new-search` is the authoritative focused change
+
+#### Scenario: Initial curated discovery is qualified
+
+- **WHEN** the curated GA experience is qualified
+- **THEN** it uses the existing reviewed registration authority and verified publication references without requiring a second manual registry or general feed scanner
+- **AND** legacy consumer compatibility, explicit acquisition, and artifact/trust/freshness gates still apply
 
 #### Scenario: Azure-Samples packaging behavior is specified
 - **WHEN** behavior concerns turning Azure-Samples repositories into releasable template packages accepted by `func new install`

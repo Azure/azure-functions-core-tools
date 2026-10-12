@@ -20,7 +20,7 @@ Three identified areas do not yet have focused changes:
 |---|---|---|
 | `template-engine-post-actions` | Func-supported actions such as npm install, NuGet restore, pip install, and package addition | Planned |
 | `template-engine-bind-sources` | Func-supported value sources such as MSBuild properties and npm package properties | Planned |
-| `func-new-search` | NuGet feed scanning, `FuncTemplate` discovery manifests, CDN publication, and `func new search` consumption | Planned |
+| `func-new-search` | Curated manifest adaptation, read-only CLI discovery, explicit guided acquisition, and separately scoped broader feed discovery | Planned |
 
 The [template-companion-acquisition proposal](../template-companion-acquisition/design.md) is an additional focused change covering how approved basic project/item companions are acquired with a stack. Its mapping, ownership, and upgrade contracts remain under review. Curated payloads are not preinstalled: discovery owns metadata browsing and an explicitly authorized guided use action, while init execution consumes installed templates. Overall readiness includes the basic acquisition and guided discovery boundaries, not just the original ten artifact sets.
 
@@ -86,7 +86,7 @@ templating-system
 
 `template-engine-bind-sources` owns how templates read values from project ecosystems and expose them to TemplateEngine binding. It does not own command-line parameters or host defaults already assigned to the integration and command execution changes.
 
-`func-new-search` owns generation, publication, retrieval, and querying of a discovery manifest built by scanning NuGet feeds for `FuncTemplate` packages. It follows the role of .NET's TemplateEngineDiscovery while keeping the manifest format, CDN lifecycle, feed policy, trust model, freshness, and CLI search experience specific to func.
+`func-new-search` owns the initial curated adapter over the existing reviewed registration manifest, verified package references, metadata distribution/cache, read-only CLI browsing/search, and explicitly authorized guided acquisition. It does not require a second manual sample registry or general NuGet scanning for curated GA. Broader feed discovery/catalog work remains separately scoped; generic third-party package installation remains supported. Manifest compatibility, source/trust/freshness, browse ownership, and exact-artifact authorization are still required discovery contracts.
 
 `azure-samples-template-pipeline` owns the release path that transforms eligible Azure-Samples repositories into valid, versioned `FuncTemplate` packages consumable by `func new install`. It includes repository conventions, validation, packaging, release automation, provenance, and failure reporting, but does not own CLI package-install semantics.
 
