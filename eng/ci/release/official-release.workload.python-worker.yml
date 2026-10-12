@@ -15,3 +15,9 @@ extends:
     folder: workloads/python-worker
     projects: |
       $(Build.SourcesDirectory)/src/Workloads/Workers/Python/Workloads.Workers.Python.csproj
+    postPackSteps:
+    - pwsh: |
+        ./eng/scripts/validate-python-worker-packages.ps1 `
+          -PackageDirectory '$(Build.ArtifactStagingDirectory)/pkg' `
+          -PythonVersion 3.15
+      displayName: Validate Python 3.15 worker packages
