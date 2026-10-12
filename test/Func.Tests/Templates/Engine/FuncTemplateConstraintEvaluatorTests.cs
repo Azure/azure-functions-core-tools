@@ -88,7 +88,7 @@ public sealed class FuncTemplateConstraintEvaluatorTests
     public void Evaluate_NullWorkloads_Throws()
     {
         var declaration = TemplateConstraintDeclarationReader.Read("""{"constraints":{"node":{"type":"func-workload","args":"node"}}}""")[0];
-        Action action = () => _evaluator.Evaluate(declaration, null!);
+        Action action = () => _evaluator.Evaluate(declaration, (IReadOnlyCollection<TemplateConstraintWorkload>)null!);
 
         action.Should().Throw<ArgumentNullException>().WithParameterName("workloads");
     }
