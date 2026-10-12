@@ -19,6 +19,7 @@ The source-scope extension preserves independent subfolder samples without manda
 - Stage validated packages, request one approval for successful candidates, and promote their exact artifacts without rebuilding.
 - Process independent package candidates, retry transient failures, and recover from feed state without silently omitting a selected definition.
 - Extend source-owned definitions through a versioned schema to support multiple independently selectable scopes, while retaining authored/synthesized ownership and the no-source-code-execution rule.
+- Keep independent roots disjoint and require explicit shared-file membership with each consumer's effective digest, provenance, and license evidence.
 - Validate every selected definition from the completed package, retaining independent groups, source-scope provenance, and notices.
 - Supply verified publication evidence to the separate discovery component rather than treating package labels as curation proof.
 

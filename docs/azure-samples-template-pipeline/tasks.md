@@ -110,8 +110,8 @@
 
 - [ ] 13.1 Agree versioned source descriptors and package assignments without mandatory stack grouping or private intermediate packages.
 - [ ] 13.2 Map supported manifest entries to definition identities/scopes and reviewed package references, including subfolder choices and allowlist/release/metadata gaps.
-- [ ] 13.3 Validate authored/synthesized ownership and every content/project scope without executing source code.
+- [ ] 13.3 Validate authored/synthesized ownership, disjoint normalized independent roots, and every content/project scope without executing source code. Require explicit per-definition shared-file membership with contained source/destination paths, link/exclusion/license checks, and no local/shared destination collisions.
 - [ ] 13.4 Verify all selected definitions remain independent choices and reject duplicated identities/groups, unintended effects, or silently reduced packages.
-- [ ] 13.5 Record source release/commit, definition IDs, scopes, digests, and license notices outside scaffolded roots.
-- [ ] 13.6 Define publication evidence consumed by discovery's curation policy without generating the CDN manifest in this pipeline.
-- [ ] 13.7 Test original-mode controls, separate scoped assignments, multi-definition packages, mixed Functions topology, identity migration, invalid definitions, moved tags, and interrupted promotion.
+- [ ] 13.5 Record source release/commit, definition IDs, effective scopes including every shared input, per-consumer digests, membership provenance, and license notices outside scaffolded roots.
+- [ ] 13.6 Define publication evidence consumed by the initial reviewed curated-manifest handoff, preserving existing fields/URL clients, without generating the CDN manifest in this pipeline or requiring general community feed scanning.
+- [ ] 13.7 Test original-mode controls, separate scoped assignments, multi-definition packages, identical/nested/link-aliased root rejection, explicit shared-file controls, missing/escaping/excluded shared inputs, destination collisions, shared-content changes affecting every consumer's immutable evidence, mixed Functions topology, identity migration, invalid definitions, moved tags, and interrupted promotion.

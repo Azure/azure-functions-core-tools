@@ -30,6 +30,31 @@ The extended descriptor SHALL use a supported explicit schema version to define 
 - **WHEN** a declared template content root or linked content escapes the acquired source boundary
 - **THEN** source validation fails before assembly
 
+### Requirement: Independent roots and shared inputs have explicit ownership
+
+Independent definition content roots SHALL be disjoint after normalization and link resolution. Identical or ancestor/descendant roots SHALL fail validation. Shared files SHALL require explicit membership in every consuming definition under the supported versioned descriptor, with validated source and isolated definition-relative destination paths. Shared membership SHALL NOT permit root overlap, implicit sibling content, escaping links, excluded inputs, or destination collisions. Each consumer's effective content digest, provenance, and relevant license evidence SHALL include all shared inputs. Missing or invalid membership SHALL fail the affected package, not silently reduce its contents.
+
+#### Scenario: Independent roots overlap
+
+- **WHEN** two independent definitions use identical or nested normalized content roots
+- **THEN** validation rejects the overlap even if they are assigned to different packages
+
+#### Scenario: Two definitions share an explicit helper file
+
+- **WHEN** disjoint definitions each declare valid membership for the same contained helper file and safe isolated destinations
+- **THEN** each definition includes that input in its content digest, provenance, and license evidence
+- **AND** selecting either definition does not copy the other definition's local content
+
+#### Scenario: Shared input changes
+
+- **WHEN** a declared shared input changes under an existing package identity/version
+- **THEN** every affected consumer's changed evidence participates in immutable-conflict checks
+
+#### Scenario: Shared destination collides
+
+- **WHEN** a shared destination conflicts with local output or another shared input
+- **THEN** the affected package fails scope validation before assembly
+
 ### Requirement: Package assignments select a complete source definition set
 
 Each assignment SHALL identify an approved source release and a complete set of named source-owned definitions. A missing or invalid selected definition MUST NOT be silently omitted. Changed definitions or source content under an existing package ID/version SHALL be immutable conflicts. Unrelated valid package candidates MAY continue.
@@ -83,7 +108,8 @@ Package provenance SHALL retain the source release/version/commit and selected d
 
 - **WHEN** approved packages are publicly available
 - **THEN** their publication evidence identifies exact artifacts and source scopes
-- **AND** the separate discovery component applies its feed/curation policy and publishes browsing metadata
+- **AND** the discovery owner can extend the existing reviewed curated manifest from verified publication while preserving legacy fields and URL consumers
+- **AND** general community feed scanning is not required for this initial curated flow
 
 ### Requirement: The func-templates repository owns the packaging control plane
 

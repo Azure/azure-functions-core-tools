@@ -126,6 +126,10 @@ A versioned repository-owned descriptor enumerates named definitions, normalized
 
 Acquire an exact eligible source release and validate each scope against traversal, links, exclusions, and collisions. Project roots are relative to that scope. Preserve authored configuration byte-for-byte; synthesized actions cover only its declared projects. Retain source-root license material even when a selected folder has no local license. Isolated template roots prevent Office 365 selection from copying SharePoint or unrelated source folders.
 
+Independent definition content roots must be disjoint: identical or ancestor/descendant roots are rejected after normalization, including aliases introduced by links. Shared source files require explicit membership in the versioned descriptor for every consuming definition, with normalized source paths and destination paths relative to that definition's isolated output. Shared membership does not allow root overlap or implicit copying of a sibling definition. Apply containment, link, exclusion, destination-collision, and license checks to the shared inputs as well as each local scope.
+
+Each definition's effective content set includes all declared shared inputs. Its content digest, package provenance, and relevant license notices must identify those inputs, so changing one shared file changes every consuming definition's evidence. Missing or invalid shared membership fails the affected package rather than silently omitting content. Exact field names and schema-version rollout remain publishing-owner decisions, but these ownership and isolation rules are required by the proposal.
+
 The completed package must discover exactly its reviewed definitions and keep independent samples in distinct groups. Shared groups are allowed only for intentional variants of one definition. Reject duplicate identities, ambiguous short names, missing definitions, invalid actions, and unintended output scopes. One selected definition's failure blocks its package; unrelated valid packages can continue.
 
 Package versions remain source-release-derived. Provenance records selected definition IDs, normalized scopes, source commit, and content digests outside scaffolded roots. Changed scope or content under an existing package ID/version is an immutable conflict. No private source-unit feed or independent aggregate version is required.
@@ -134,7 +138,7 @@ Functions declarations remain authoritative. A Python Functions sample with a Ja
 
 ### Publication supplies evidence, not the discovery manifest
 
-The pipeline publishes validated packages and source provenance. The separate discovery component scans configured feeds under its curation policy, maps templates to exact package/version/source references, and publishes the CLI's cached metadata manifest. Onboarding YAML is not the public index or the installed TemplateEngine catalog.
+The pipeline publishes validated packages and source provenance. The initial curated discovery handoff uses the existing reviewed source manifest at a pinned revision and records verified package/version/source/template references without breaking legacy fields or URL consumers. Updating package-aware discovery metadata belongs to the discovery owner and uses publication evidence, not an assumption that a named package was approved. General community feed scanning remains separate work. Onboarding YAML is not the public index or the installed TemplateEngine catalog.
 
 The approval record must identify the published artifact digest, package/version, source definitions, and reviewed publication so discovery can verify sanction. A self-declared tag or reserved prefix is not proof. Evidence transport and authentication belong to discovery and publisher-trust review; this draft does not invent a signed-index protocol or broaden the source allowlist.
 
