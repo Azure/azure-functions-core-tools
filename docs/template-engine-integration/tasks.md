@@ -1,11 +1,11 @@
 ## 1. Context and Engine Lifetime
 
 - [ ] 1.1 Add immutable template engine context models for command directory, resolved project stack and language, and resolved extension bundle identity and version.
-- [ ] 1.2 Add a dependency-injected templater factory that creates one command-scoped `Templater` and internal engine session from the validated context.
+- [ ] 1.2 Add a dependency-injected templater factory that creates one `Templater` and internal engine session per uninterrupted command-scoped runtime flow from its validated context.
 - [ ] 1.3 Replace the misleading bundle host parameter names with `func:bundle-id` and `func:bundle-version`, add the remaining func context parameters, and return the resolved command directory for `WorkingDirectory`.
-- [ ] 1.4 Add tests proving separate command scopes do not leak context and all phases within one scope share the same host defaults and engine environment.
+- [ ] 1.4 Add tests proving separate runtime flows do not leak context, all phases within one uninterrupted flow share host defaults/environment, and acquisition ends that flow before a fresh context/session is created without transferring capabilities.
 - [ ] 1.5 Agree the runtime/store read, exclusive-write, and isolated-preflight session handoff with the lifecycle owner, including cancelable acquisition, command-rendered wait reasons, disposal and process-termination ownership recovery, mounted-content lifetime, raw metadata/fingerprints, and termination of browsing/selection before acquisition. Later execution starts a fresh context/catalog/eligibility/selection flow without capability transfer.
-- [ ] 1.6 Capture actual startup load/initialization outcomes in one immutable per-command workload availability input without changing startup registration/recovery or introducing a new compatibility scheme.
+- [ ] 1.6 Capture actual completed startup load/initialization outcomes in one immutable availability input before constructing each runtime flow. Keep usable satisfaction entries and installed-only diagnostics distinct within that input, without changing startup registration/recovery or introducing a new compatibility scheme.
 - [ ] 1.7 Test shared/exclusive wait cancellation, acquisition races without leaked leases, command wait diagnostics, terminated readers, and interrupted writers that require store-owned recovery before the live hive is exposed. Keep real cross-process recovery qualification with the store owner and test that wait duration or old lock metadata cannot evict a live owner.
 
 ## 2. Func-Owned Template Models

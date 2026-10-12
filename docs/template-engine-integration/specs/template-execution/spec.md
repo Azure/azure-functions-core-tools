@@ -5,7 +5,7 @@ Defines the context-aware contract for discovering, evaluating, selecting, and i
 ## ADDED Requirements
 
 ### Requirement: Command-scoped execution context
-The integration SHALL operate from one immutable execution context containing the resolved command directory and any resolved project root, stack, language, extension bundle ID, and extension bundle version. The caller SHALL resolve this context before creating the integration, and the integration SHALL NOT read ambient process state as a substitute for a supplied value.
+The integration SHALL operate from one immutable execution context per uninterrupted command-scoped runtime flow, containing the resolved command directory and any resolved project root, stack, language, extension bundle ID, and extension bundle version. The caller SHALL resolve this context before creating the flow's integration, and the integration SHALL NOT read ambient process state as a substitute for a supplied value.
 
 #### Scenario: Context is resolved before engine creation
 - **WHEN** a command targets a directory other than the process current directory
@@ -13,7 +13,8 @@ The integration SHALL operate from one immutable execution context containing th
 
 #### Scenario: Context remains stable
 - **WHEN** project or environment state changes after the integration has been created
-- **THEN** all operations in that command invocation continue to use the original context snapshot
+- **THEN** all operations in that uninterrupted runtime flow continue to use its original context snapshot
+- **AND** lifecycle acquisition ends that flow rather than refreshing its context in place
 
 ### Requirement: Func host context parameters
 The integration SHALL make resolved context available to the template engine through the `WorkingDirectory`, `func:project-root`, `func:stack`, `func:language`, `func:bundle-id`, and `func:bundle-version` host parameters. The `func:` names form a func-owned namespace, and values SHALL preserve the canonical representations supplied by the context.
@@ -38,7 +39,7 @@ The integration SHALL create a fresh host and template engine environment for ea
 - **THEN** each command evaluates templates using only its own context
 
 #### Scenario: One command evaluates multiple candidates
-- **WHEN** a command discovers, filters, and invokes among multiple template candidates
+- **WHEN** one uninterrupted command-scoped runtime flow discovers, filters, and invokes among multiple template candidates
 - **THEN** every phase uses the same host defaults and engine environment
 
 ### Requirement: Installed template catalog

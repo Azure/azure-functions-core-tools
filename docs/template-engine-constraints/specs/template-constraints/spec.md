@@ -153,7 +153,7 @@ The `func-workload` constraint SHALL name a workload by alias or package ID with
 - **THEN** it gives the same result it gives inside a project
 
 ### Requirement: Compatibility and eligibility boundaries
-The workload subsystem SHALL own applicable CLI/workload contract, packaging, and activation checks. The template subsystem SHALL own template package classification and supported format and feature checks. The workload snapshot used by `func-workload` SHALL exclude workloads rejected by applicable compatibility or activation checks. Template constraints SHALL NOT replace or bypass those checks, select replacement package versions, or acquire packages.
+The workload subsystem SHALL own applicable CLI/workload contract, packaging, and activation checks. The template subsystem SHALL own template package classification and supported format and feature checks. The combined immutable availability input SHALL retain installed-only rejection, load-failure, and initialization-failure diagnostics. Its usable-workload projection SHALL exclude those entries, and only that projection SHALL participate in `func-workload` satisfaction. Template constraints SHALL NOT replace or bypass those checks, select replacement package versions, or acquire packages.
 
 #### Scenario: Installed workload was rejected before activation
 - **WHEN** a matching workload is installed but rejected by compatibility checks and no matching usable workload is present
