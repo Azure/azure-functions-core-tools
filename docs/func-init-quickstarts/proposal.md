@@ -9,6 +9,7 @@ Azure-Samples quickstarts will be distributed as ordinary `FuncTemplate` package
 - Replace the existing `func quickstart` workflow only after supported samples, independent subfolder choices, basic companion acquisition, guided CLI discovery/use, and regression coverage are ready.
 - Acquire basic project/item companions with stacks, but do not preinstall quickstarts or add a quickstart preinstallation option.
 - Preserve curated availability through a cached metadata catalog and an explicitly authorized acquire-and-create action, without making search or ordinary init implicitly install packages.
+- Use the existing reviewed curated manifest as the first discovery input, preserving legacy fields/URL clients, and require exact actual-artifact approval plus explicit script authorization and complete supported-entry gap dispositions before legacy removal.
 - Require explicit template package installation; an unknown template reference provides browse and `func new install` guidance rather than installing implicitly.
 - Show a stable Functions-owned browse URL alongside the installed-template experience without defining the backing gallery or catalog in this change.
 - Keep workload-restricted installed templates visible as unavailable, show a concise restriction summary, and render actionable remediation supplied by the constraint system.

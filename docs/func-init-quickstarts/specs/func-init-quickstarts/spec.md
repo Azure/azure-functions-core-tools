@@ -56,7 +56,13 @@ Explicit stack installation through setup or direct stack install SHALL acquire 
 
 ### Requirement: Curated discovery precedes payload acquisition
 
-CLI browse/search SHALL expose sanctioned available templates without requiring their packages to be installed. The discovery component SHALL own the package/template manifest and its configured-feed, curation, and freshness rules. Publishing onboarding and the installed TemplateEngine catalog SHALL remain separate from this cached metadata. Browsing/searching MUST NOT mutate installed package state.
+CLI browse/search SHALL expose sanctioned available templates without requiring their packages to be installed. The initial curated input SHALL use the reviewed existing source manifest at a pinned revision and verified publication references, preserving legacy fields/URL consumers. The discovery component SHALL own the package/template manifest, curation, and freshness rules. General community feed scanning SHALL NOT be a prerequisite for that initial flow. Publishing onboarding and the installed TemplateEngine catalog SHALL remain separate from cached discovery metadata. Browsing/searching MUST NOT mutate installed package state. Empty installed selection and unknown init references SHALL provide an actionable route to the agreed CLI discovery entry point without implicit acquisition.
+
+#### Scenario: Empty picker or unknown installed reference
+
+- **WHEN** init has no installed selection or the requested template is not installed
+- **THEN** its guidance identifies the agreed CLI discovery route and stable browse destination
+- **AND** viewing that route does not authorize installation
 
 #### Scenario: Curated package is not installed
 
@@ -99,9 +105,28 @@ A guided use action SHALL show the concrete package ID, version, source, full te
 - **THEN** guided use does not silently override the installed version, source, or pin
 - **AND** any replacement requires an explicit lifecycle action under its existing policy
 
+### Requirement: Guided curation proof identifies the actual artifact
+
+Guided use SHALL validate authenticated approval evidence for the actual selected package ID, installed version, recorded source, artifact digest, and full template identity. Approval of only the latest advertised version or package family SHALL NOT authorize another installed artifact. Revoked, stale, unknown, or mismatched evidence SHALL block acquisition/creation. Offline proof SHALL be accepted only under an agreed policy validating the exact artifact and permitted freshness; otherwise the flow SHALL fail closed. Approval transport, revocation/freshness distribution, offline validity, and explicit script-authorization grammar SHALL be qualified before removing the legacy command.
+
+#### Scenario: Installed artifact is older than the approved catalog entry
+
+- **WHEN** an older installed artifact lacks valid approval for its own exact version/source/digest
+- **THEN** guided use rejects it rather than borrow the newer entry's approval or silently update it
+
+#### Scenario: Approval is revoked or unverifiable
+
+- **WHEN** current approval is revoked, stale, unknown, or does not identify the actual artifact
+- **THEN** guided use fails before project creation with an approval diagnostic
+
+#### Scenario: Offline proof policy is not satisfied
+
+- **WHEN** offline guided use cannot establish valid cached exact-artifact evidence under the agreed policy
+- **THEN** it does not acquire or create the project merely because metadata or a package is cached
+
 ### Requirement: Quickstart removal requires a qualified replacement
 
-The existing `func quickstart` command SHALL remain available until a pinned supported-entry inventory has usable published replacements, basic companion acquisition works on fresh and upgraded installs, guided metadata discovery/acquisition/creation and migration guidance are available, replacement regression tests pass, and the responsible owners agree the handoff. The command switch SHALL remove the old creation path rather than keep a permanent alias. It SHALL NOT remove the shared manifest from unrelated consumers.
+The existing `func quickstart` command SHALL remain available until a pinned supported-entry inventory has usable published replacements, basic companion acquisition works on fresh and upgraded installs, guided metadata discovery/acquisition/creation and migration guidance are available, replacement regression tests pass, and the responsible owners agree the handoff. Every currently supported entry SHALL record a source/scope, replacement reference or unresolved gap, owner, blocker, and reviewed disposition, including sources outside the initial publisher allowlist and independent subfolders. Unresolved coverage SHALL block removal, not narrow support or expand trust implicitly. The command switch SHALL remove the old creation path rather than keep a permanent alias. It SHALL NOT remove the shared manifest from unrelated consumers.
 
 #### Scenario: Repository exposes separate subfolder samples
 
