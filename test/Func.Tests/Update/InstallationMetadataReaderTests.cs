@@ -51,7 +51,7 @@ public sealed class InstallationMetadataReaderTests
         await reader.ReadAsync(cancellationToken);
 
         // Assert
-        fileSystem.Received(1).ResolvePhysicalPath(_processPath);
+        fileSystem.Received(1).ResolveFileLinkTarget(_processPath);
         await fileSystem.Received(1).ReadAllBytesIfExistsAsync(
             _metadataPath,
             InstallationMetadataReader.MaximumMetadataByteCount,
@@ -204,11 +204,11 @@ public sealed class InstallationMetadataReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_PhysicalPathResolutionFails_PropagatesIOExceptionWithoutReadingMetadata()
+    public async Task ReadAsync_ExecutableLinkResolutionFails_PropagatesIOExceptionWithoutReadingMetadata()
     {
         // Arrange
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
-        fileSystem.ResolvePhysicalPath(_processPath)
+        fileSystem.ResolveFileLinkTarget(_processPath)
             .Returns<string>(_ => throw new IOException("link cycle"));
         InstallationMetadataReader reader = new(
             fileSystem,
@@ -236,7 +236,7 @@ public sealed class InstallationMetadataReaderTests
 
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();
-        fileSystem.DidNotReceiveWithAnyArgs().ResolvePhysicalPath(default!);
+        fileSystem.DidNotReceiveWithAnyArgs().ResolveFileLinkTarget(default!);
         await fileSystem.DidNotReceiveWithAnyArgs()
             .ReadAllBytesIfExistsAsync(default!, default, default);
     }
@@ -268,7 +268,7 @@ public sealed class InstallationMetadataReaderTests
     private static (InstallationMetadataReader Reader, IFileSystem FileSystem) CreateReader()
     {
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
-        fileSystem.ResolvePhysicalPath(_processPath).Returns(_physicalProcessPath);
+        fileSystem.ResolveFileLinkTarget(_processPath).Returns(_physicalProcessPath);
         fileSystem.ReadAllBytesIfExistsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns((byte[]?)null);
         InstallationMetadataReader reader = new(

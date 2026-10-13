@@ -8,13 +8,11 @@ namespace Azure.Functions.Cli.Common;
 /// <inheritdoc cref="IFileSystem" />
 internal sealed class PhysicalFileSystem : IFileSystem
 {
-    private const int MaximumLinkCount = 64;
-
     // ── File operations ─────────────────────────────────────────────────────
 
     public bool FileExists(string path) => File.Exists(path);
 
-    public string ResolvePhysicalPath(string path)
+    public string ResolveFileLinkTarget(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
@@ -24,64 +22,35 @@ internal sealed class PhysicalFileSystem : IFileSystem
         }
 
         string fullPath = Path.GetFullPath(path);
-
-        Queue<string> remainingSegments = new(GetPathSegments(fullPath));
-        string resolvedPath = Path.GetPathRoot(fullPath)
-            ?? throw new ArgumentException("Path does not have a root.", nameof(path));
-        HashSet<string> resolutionStates = new(GetPathComparer()) { fullPath };
-        int followedLinkCount = 0;
-
-        while (remainingSegments.TryDequeue(out string? segment))
+        FileInfo file = new(fullPath);
+        FileSystemInfo? target;
+        try
         {
-            string candidatePath = Path.Combine(resolvedPath, segment);
-            FileSystemInfo pathInfo = Directory.Exists(candidatePath)
-                ? new DirectoryInfo(candidatePath)
-                : new FileInfo(candidatePath);
-            FileSystemInfo? target = pathInfo.ResolveLinkTarget(returnFinalTarget: false);
-
-            if (target is null)
-            {
-                if (!pathInfo.Exists)
-                {
-                    throw new FileNotFoundException(
-                        $"Path component '{candidatePath}' does not exist while resolving '{path}'.",
-                        candidatePath);
-                }
-
-                if ((pathInfo.Attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    throw new IOException($"Reparse point '{candidatePath}' cannot be resolved.");
-                }
-
-                resolvedPath = candidatePath;
-                continue;
-            }
-
-            if (++followedLinkCount > MaximumLinkCount)
-            {
-                throw new IOException($"A symbolic-link or junction cycle was detected while resolving '{path}'.");
-            }
-
-            string targetPath = Path.GetFullPath(target.FullName);
-            string targetRoot = Path.GetPathRoot(targetPath)
-                ?? throw new IOException($"Link target '{targetPath}' does not have a root.");
-            Queue<string> targetSegments = new(GetPathSegments(targetPath));
-            while (remainingSegments.TryDequeue(out string? remainingSegment))
-            {
-                targetSegments.Enqueue(remainingSegment);
-            }
-
-            string nextResolutionState = BuildPath(targetRoot, targetSegments);
-            if (!resolutionStates.Add(nextResolutionState))
-            {
-                throw new IOException($"A symbolic-link or junction cycle was detected while resolving '{path}'.");
-            }
-
-            remainingSegments = targetSegments;
-            resolvedPath = targetRoot;
+            target = file.ResolveLinkTarget(returnFinalTarget: true);
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            throw new FileNotFoundException($"Executable '{fullPath}' does not exist.", fullPath, ex);
         }
 
-        return resolvedPath;
+        if (target is null)
+        {
+            if (!file.Exists)
+            {
+                throw new FileNotFoundException($"Executable '{fullPath}' does not exist.", fullPath);
+            }
+
+            return fullPath;
+        }
+
+        if (!target.Exists)
+        {
+            throw new FileNotFoundException(
+                $"Executable link target '{target.FullName}' does not exist.",
+                target.FullName);
+        }
+
+        return Path.GetFullPath(target.FullName);
     }
 
     public async Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken)
@@ -242,29 +211,6 @@ internal sealed class PhysicalFileSystem : IFileSystem
     }
 
     // ── Private helpers ─────────────────────────────────────────────────────
-
-    private static IEnumerable<string> GetPathSegments(string path)
-    {
-        string root = Path.GetPathRoot(path)
-            ?? throw new ArgumentException("Path does not have a root.", nameof(path));
-        return path[root.Length..].Split(
-            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
-            StringSplitOptions.RemoveEmptyEntries);
-    }
-
-    private static StringComparer GetPathComparer() =>
-        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-
-    private static string BuildPath(string root, IEnumerable<string> segments)
-    {
-        string path = root;
-        foreach (string segment in segments)
-        {
-            path = Path.Combine(path, segment);
-        }
-
-        return path;
-    }
 
     private static void EnsureParentDirectory(string filePath)
     {

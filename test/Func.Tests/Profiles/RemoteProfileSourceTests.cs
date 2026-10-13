@@ -319,7 +319,7 @@ public class RemoteProfileSourceTests
 
         // ── IFileSystem members not used by remote profile tests ────────────
         public bool FileExists(string path) => Files.ContainsKey(path);
-        public string ResolvePhysicalPath(string path) => throw new NotImplementedException();
+        public string ResolveFileLinkTarget(string path) => throw new NotImplementedException();
         public Task SaveStreamToFileAsync(string filePath, Stream content, CancellationToken cancellationToken) => throw new NotImplementedException();
         public void MoveFile(string sourcePath, string destinationPath, bool overwrite = false) => throw new NotImplementedException();
         public void CopyFile(string sourcePath, string destinationPath) => throw new NotImplementedException();

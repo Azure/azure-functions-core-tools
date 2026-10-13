@@ -83,8 +83,8 @@ internal sealed class InstallationMetadataReader(
             throw new InvalidOperationException("The running CLI executable path is unavailable or is not fully qualified.");
         }
 
-        string physicalProcessPath = _fileSystem.ResolvePhysicalPath(processPath);
-        string? installationDirectory = Path.GetDirectoryName(physicalProcessPath);
+        string executableTargetPath = _fileSystem.ResolveFileLinkTarget(processPath);
+        string? installationDirectory = Path.GetDirectoryName(executableTargetPath);
         if (string.IsNullOrEmpty(installationDirectory))
         {
             throw new InvalidOperationException("The running CLI installation directory could not be determined.");
