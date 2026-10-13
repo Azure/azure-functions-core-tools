@@ -10,19 +10,14 @@ namespace Azure.Functions.Cli.Templates.Engine;
 
 internal sealed record TemplateProjectConfigurationDeclaration(int PrimaryOutputIndex, string Path, string Stack, string Language);
 
-internal sealed class TemplateProjectConfigurationPlanner
+internal sealed class TemplateProjectConfigurationPlanner(IEnumerable<IProjectInitializer> initializers)
 {
     internal const string ConfigurationActionId = "00e33184-ffc7-43ef-bec0-b1684df8ad56";
-    private readonly IReadOnlyList<StackDefinition> _stacks;
-    private readonly StringComparer _pathComparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-
-    public TemplateProjectConfigurationPlanner(IEnumerable<IProjectInitializer> initializers)
-    {
-        ArgumentNullException.ThrowIfNull(initializers);
-        _stacks = Array.AsReadOnly<StackDefinition>([.. initializers.Select(initializer => new StackDefinition(initializer.Stack,
+    private readonly IReadOnlyList<StackDefinition> _stacks = Array.AsReadOnly<StackDefinition>(
+        [.. (initializers ?? throw new ArgumentNullException(nameof(initializers))).Select(initializer => new StackDefinition(initializer.Stack,
             Array.AsReadOnly<string>([.. initializer.SupportedLanguages]),
             initializer.SupportedLanguageAliases.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<string>)Array.AsReadOnly<string>([.. pair.Value]), StringComparer.Ordinal)))]);
-    }
+    private readonly StringComparer _pathComparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     public IReadOnlyList<TemplateProjectConfigurationDeclaration> Read(string configuration)
     {

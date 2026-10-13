@@ -213,6 +213,14 @@ public sealed class TemplateEngineSessionTests : IDisposable
     }
 
     [Fact]
+    public void ProjectConfigurationPlanner_NullInitializers_Throws()
+    {
+        Action construct = () => new TemplateProjectConfigurationPlanner(null!);
+
+        construct.Should().Throw<ArgumentNullException>().WithParameterName("initializers");
+    }
+
+    [Fact]
     public async Task WriteProjectConfigurationAsync_NullPlan_ThrowsWithoutFileSystemCalls()
     {
         var fileSystem = Substitute.For<IFileSystem>();
