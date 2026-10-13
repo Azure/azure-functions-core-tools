@@ -96,8 +96,6 @@ internal sealed class TemplateProjectConfigurationPlanner
                 string[] languages = [.. stack.Languages.Where(language => string.Equals(language, languageValue, StringComparison.OrdinalIgnoreCase)
                     || (stack.Aliases.TryGetValue(language, out IReadOnlyList<string>? aliases) && aliases.Any(alias => string.Equals(alias, languageValue, StringComparison.OrdinalIgnoreCase))))];
                 Require(languages.Length == 1, "Configuration language must identify exactly one supported stack language.");
-                Require(_pathComparer.Equals(Path.GetFileName(paths[index]), "host.json"),
-                    "The bounded project path requires configuration to reference host.json.");
                 declarations.Add(new(index, paths[index], stack.Name, languages[0]));
             }
 

@@ -123,6 +123,40 @@ public sealed class TemplaterTests : IDisposable
         options.Language.Should().Be("Python");
     }
 
+    [Theory]
+    [InlineData("package.json", true)]
+    [InlineData("other/package.json", false)]
+    public async Task ProjectJourney_PrimaryOutputAnchor_MustBelongToIndependentHostRoot(string relativeAnchor, bool valid)
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var configPath = Path.Combine(package, "project", ".template.config", "template.json");
+        var configuration = JsonNode.Parse(File.ReadAllText(configPath))!;
+        configuration["primaryOutputs"] = new JsonArray(new JsonObject { ["path"] = relativeAnchor });
+        File.WriteAllText(configPath, configuration.ToJsonString());
+        var anchorPath = Path.Combine(package, "project", relativeAnchor.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(anchorPath)!);
+        File.WriteAllText(anchorPath, "{}");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateProjectTemplater();
+        var resolution = await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
+        resolution.Status.Should().Be(TemplateResolutionStatus.Success);
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "root-anchor-output"));
+
+        var result = await resolution.Group![0].InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        result.Status.Should().Be(valid ? TemplateInvocationStatus.Success : TemplateInvocationStatus.InvalidTemplate);
+        if (valid)
+        {
+            File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
+            File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeTrue();
+            result.ConfiguredProjects.Should().ContainSingle().Which.Should().Be(output.Info.FullName);
+        }
+        else
+        {
+            Directory.Exists(output.Info.FullName).Should().BeFalse();
+        }
+    }
+
     [Fact]
     public async Task ProjectJourney_UndeclaredHostRoot_FailsBeforeCreation()
     {
