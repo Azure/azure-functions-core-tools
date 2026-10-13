@@ -3,12 +3,16 @@
 
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Xml;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.Mount;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 using Microsoft.TemplateEngine.Edge.Template;
+using NuGet.Packaging;
+using NuGet.Packaging.Core;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -20,7 +24,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// session instead of building a new environment. Once disposed, the session refuses further use rather than
 /// letting callers create a replacement environment without the command context.
 /// </remarks>
-internal sealed class TemplateEngineSession : IDisposable
+internal class TemplateEngineSession : IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
     private readonly TemplatePackageManager _packageManager;
@@ -60,7 +64,7 @@ internal sealed class TemplateEngineSession : IDisposable
         }
     }
 
-    public async Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
+    public virtual async Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(template);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -92,11 +96,49 @@ internal sealed class TemplateEngineSession : IDisposable
         return new(configuration, fingerprint);
     }
 
-    public async Task<TemplateConstraintEvaluation> EvaluateConstraintsAsync(string configuration, CancellationToken cancellationToken)
+    public async Task<IReadOnlyCollection<string>> ReadPackageTypesAsync(ITemplatePackage? package, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (package is not IManagedTemplatePackage || _settings.Host.FileSystem.DirectoryExists(package.MountPointUri))
+        {
+            return [];
+        }
+
+        try
+        {
+            using Stream stream = _settings.Host.FileSystem.OpenRead(package.MountPointUri);
+            using var reader = new PackageArchiveReader(stream);
+            IEnumerable<NuGet.Packaging.Core.PackageType> types = await reader.GetPackageTypesAsync(cancellationToken);
+            return Array.AsReadOnly<string>([.. types.Select(type => type.Name)]);
+        }
+        catch (IOException exception)
+        {
+            throw new InvalidTemplateMetadataException("Installed package host metadata could not be read.", exception);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            throw new InvalidTemplateMetadataException("Installed package host metadata could not be read.", exception);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new InvalidTemplateMetadataException("Installed package host metadata is invalid.", exception);
+        }
+        catch (PackagingException exception)
+        {
+            throw new InvalidTemplateMetadataException("Installed package host metadata is invalid.", exception);
+        }
+        catch (XmlException exception)
+        {
+            throw new InvalidTemplateMetadataException("Installed package host metadata is invalid.", exception);
+        }
+    }
+
+    public async Task<TemplateConstraintEvaluation> EvaluateConstraintsAsync(string configuration, CancellationToken cancellationToken, IReadOnlyCollection<string>? packageTypes = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ObjectDisposedException.ThrowIf(_disposed, this);
-        IReadOnlyList<TemplateConstraintDeclaration> declarations = TemplateConstraintDeclarationReader.Read(configuration);
+        IReadOnlyList<TemplateConstraintDeclaration> declarations = TemplateConstraintDeclarationReader.Read(configuration, packageTypes);
         using var document = JsonDocument.Parse(configuration, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
         if (document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.EnumerateObject().Any(property =>
             string.Equals(property.Name, "additionalConfigFiles", StringComparison.OrdinalIgnoreCase)
@@ -151,6 +193,10 @@ internal sealed class TemplateEngineSession : IDisposable
         {
             return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable: {exception.Message}");
         }
+        catch (UnauthorizedAccessException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
+        }
 
         if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
         {
@@ -180,14 +226,10 @@ internal sealed class TemplateEngineSession : IDisposable
             return new(TemplateInvocationStatus.Failed, changes, "Template would change existing files. Explicit file-conflict force is required.");
         }
 
-        foreach (TemplateFileChange change in changes)
+        string? outputFailure = ValidateOutputPaths(output, changes);
+        if (outputFailure is not null)
         {
-            string path = Path.GetFullPath(Path.Combine(output, change.Path));
-            string relative = Path.GetRelativePath(output, path);
-            if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            {
-                return new(TemplateInvocationStatus.Failed, [], "Template output escapes the requested output directory.");
-            }
+            return new(TemplateInvocationStatus.Failed, [], outputFailure);
         }
 
         if (request.DryRun)
@@ -196,10 +238,32 @@ internal sealed class TemplateEngineSession : IDisposable
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        current = await ReadConfigurationAsync(template, cancellationToken);
+        try
+        {
+            current = await ReadConfigurationAsync(template, cancellationToken);
+        }
+        catch (InvalidTemplateMetadataException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], exception.Message);
+        }
+        catch (IOException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}");
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}");
+        }
+
         if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
         {
             return new(TemplateInvocationStatus.Failed, [], "Selected template configuration changed after preview. Rerun selection.");
+        }
+
+        outputFailure = ValidateOutputPaths(output, changes);
+        if (outputFailure is not null)
+        {
+            return new(TemplateInvocationStatus.Failed, [], outputFailure);
         }
 
         ITemplateCreationResult created = await _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, output, parameters,
@@ -207,6 +271,52 @@ internal sealed class TemplateEngineSession : IDisposable
         return created.Status == CreationResultStatus.Success
             ? new(TemplateInvocationStatus.Success, changes)
             : new(TemplateInvocationStatus.Failed, changes, created.ErrorMessage ?? created.Status.ToString());
+    }
+
+    private string? ValidateOutputPaths(string output, IReadOnlyList<TemplateFileChange> changes)
+    {
+        foreach (TemplateFileChange change in changes)
+        {
+            string? path = Path.GetFullPath(Path.Combine(output, change.Path));
+            string relative = Path.GetRelativePath(output, path);
+            if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            {
+                return "Template output escapes the requested output directory.";
+            }
+
+            while (path is not null)
+            {
+                try
+                {
+                    if ((_settings.Host.FileSystem.GetFileAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        return "Template output uses a symbolic link or reparse point. Choose an unlinked output directory.";
+                    }
+                }
+                catch (FileNotFoundException)
+                {
+                    path = Path.GetDirectoryName(path);
+                    continue;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    path = Path.GetDirectoryName(path);
+                    continue;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return "Template output path cannot be checked safely.";
+                }
+                catch (IOException)
+                {
+                    return "Template output path cannot be checked safely.";
+                }
+
+                path = Path.GetDirectoryName(path);
+            }
+        }
+
+        return null;
     }
 
     public void Dispose()
