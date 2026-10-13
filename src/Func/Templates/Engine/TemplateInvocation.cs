@@ -11,6 +11,13 @@ internal enum TemplateInvocationStatus
 {
     Success,
     Failed,
+    InvalidArguments,
+    MissingRequiredParameters,
+    FileConflict,
+    TemplateChanged,
+    TemplateUnavailable,
+    InvalidTemplate,
+    EngineFailure,
 }
 
 internal sealed record TemplateFileChange(string Path, string Kind);
