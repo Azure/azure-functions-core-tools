@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Template;
 using NuGet.Versioning;
 
@@ -503,6 +504,31 @@ public sealed class TemplaterTests : IDisposable
         result.Diagnostics.Should().HaveCount(allUnavailable ? 2 : 1);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ListAsync_MultipleItemsInArchive_ReadsPackageMetadataOnce(bool malformed)
+    {
+        var package = TemplateFixtures.WriteSharedJourneyPackage(_root, shared: false, packageTypeVersion: malformed ? "invalid-version" : null, multiple: true);
+        await TemplateFixtures.InstallAsync(package, _hive);
+        var session = new CountingPackageSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        using Templater templater = new(session);
+
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+
+        entries.Should().HaveCount(2);
+        session.PackageReads.Should().Be(1);
+        if (malformed)
+        {
+            entries.Should().OnlyContain(entry => entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Failed);
+        }
+
+        var freshSession = new CountingPackageSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        using Templater fresh = new(freshSession);
+        await fresh.ListAsync(TemplateType.Item, CancellationToken.None);
+        freshSession.PackageReads.Should().Be(1);
+    }
+
     [Fact]
     public async Task CreateGroupAsync_ForeignFlowEntry_RejectsUncheckedReplacement()
     {
@@ -697,6 +723,17 @@ public sealed class TemplaterTests : IDisposable
 
     private Templater CreateTemplater(TemplateConstraintEvaluationSnapshot? snapshot = null)
         => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
+
+    private sealed class CountingPackageSession(TemplateEngineContext context, string hive) : TemplateEngineSession(context, hive)
+    {
+        public int PackageReads { get; private set; }
+
+        public override Task<IReadOnlyCollection<string>> ReadPackageTypesAsync(ITemplatePackage? package, CancellationToken cancellationToken)
+        {
+            PackageReads++;
+            return base.ReadPackageTypesAsync(package, cancellationToken);
+        }
+    }
 
     private sealed class DenyingConfigurationSession(TemplateEngineContext context, string hive) : TemplateEngineSession(context, hive)
     {

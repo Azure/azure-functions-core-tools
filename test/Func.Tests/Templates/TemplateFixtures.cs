@@ -215,9 +215,17 @@ internal static class TemplateFixtures
         return packageDirectory;
     }
 
-    public static string WriteSharedJourneyPackage(string parentDirectory, bool shared = true, string? packageTypeVersion = null)
+    public static string WriteSharedJourneyPackage(string parentDirectory, bool shared = true, string? packageTypeVersion = null, bool multiple = false)
     {
         string folder = WriteJourneyPackage(parentDirectory);
+        if (multiple)
+        {
+            WriteTemplate(
+                Path.Combine(folder, "second-item"),
+                """{"identity":"Func.Tests.SecondItem","name":"Second item","shortName":"func-tests-second-item","tags":{"type":"item"},"sourceName":"SecondFunction"}""",
+                ("SecondFunction.txt", "SecondFunction content"));
+        }
+
         string nuspec = """
             <?xml version="1.0"?>
             <package>
