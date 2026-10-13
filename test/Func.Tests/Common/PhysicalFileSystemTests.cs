@@ -22,57 +22,34 @@ public sealed class PhysicalFileSystemTests : IDisposable
     }
 
     [Fact]
-    public async Task ReadAllBytesIfExistsAsync_FileAtLimit_ReturnsAllBytes()
+    public async Task OpenReadIfExists_ExistingFile_ReturnsReadableStream()
     {
         // Arrange
         string path = Path.Combine(_tempDirectory, "metadata.json");
-        byte[] expected = new byte[InstallationMetadataReader.MaximumMetadataByteCount];
+        byte[] expected = [1, 2, 3];
         await File.WriteAllBytesAsync(path, expected, CancellationToken.None);
 
         // Act
-        byte[]? actual = await _fileSystem.ReadAllBytesIfExistsAsync(
-            path,
-            InstallationMetadataReader.MaximumMetadataByteCount,
-            CancellationToken.None);
+        await using Stream? stream = _fileSystem.OpenReadIfExists(path);
 
         // Assert
-        actual.Should().Equal(expected);
+        stream.Should().NotBeNull();
+        using MemoryStream actual = new();
+        await stream!.CopyToAsync(actual, CancellationToken.None);
+        actual.ToArray().Should().Equal(expected);
     }
 
     [Fact]
-    public async Task ReadAllBytesIfExistsAsync_FileOverLimit_ThrowsInvalidDataException()
-    {
-        // Arrange
-        string path = Path.Combine(_tempDirectory, "metadata.json");
-        byte[] contents = new byte[InstallationMetadataReader.MaximumMetadataByteCount + 1];
-        await File.WriteAllBytesAsync(path, contents, CancellationToken.None);
-
-        // Act
-        Func<Task> act = async () => await _fileSystem.ReadAllBytesIfExistsAsync(
-            path,
-            InstallationMetadataReader.MaximumMetadataByteCount,
-            CancellationToken.None);
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidDataException>();
-    }
-
-    [Fact]
-    public async Task ReadAllBytesIfExistsAsync_PreCancelledMissingFile_ThrowsOperationCanceledException()
+    public void OpenReadIfExists_MissingFile_ReturnsNull()
     {
         // Arrange
         string path = Path.Combine(_tempDirectory, "missing.json");
-        using CancellationTokenSource cancellation = new();
-        cancellation.Cancel();
 
         // Act
-        Func<Task> act = async () => await _fileSystem.ReadAllBytesIfExistsAsync(
-            path,
-            InstallationMetadataReader.MaximumMetadataByteCount,
-            cancellation.Token);
+        Stream? stream = _fileSystem.OpenReadIfExists(path);
 
         // Assert
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        stream.Should().BeNull();
     }
 
     [Fact]
@@ -172,13 +149,13 @@ public sealed class PhysicalFileSystemTests : IDisposable
 
         // Act
         string resolved = _fileSystem.ResolveFileLinkTarget(executablePath);
-        byte[]? metadata = await _fileSystem.ReadAllBytesIfExistsAsync(
-            Path.Combine(Path.GetDirectoryName(resolved)!, InstallationMetadataReader.MetadataFileName),
-            InstallationMetadataReader.MaximumMetadataByteCount,
-            CancellationToken.None);
+        await using Stream? metadataStream = _fileSystem.OpenReadIfExists(
+            Path.Combine(Path.GetDirectoryName(resolved)!, InstallationMetadataReader.MetadataFileName));
+        using MemoryStream metadata = new();
+        await metadataStream!.CopyToAsync(metadata, CancellationToken.None);
 
         // Assert
         resolved.Should().Be(executablePath);
-        metadata.Should().Equal(expected);
+        metadata.ToArray().Should().Equal(expected);
     }
 }

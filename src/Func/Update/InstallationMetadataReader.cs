@@ -25,20 +25,8 @@ internal sealed class InstallationMetadataReader(
     {
         cancellationToken.ThrowIfCancellationRequested();
         string metadataPath = GetMetadataPath();
-        byte[]? json;
-
-        try
-        {
-            json = await _fileSystem.ReadAllBytesIfExistsAsync(metadataPath, MaximumMetadataByteCount, cancellationToken);
-        }
-        catch (InvalidDataException ex)
-        {
-            throw new InstallationMetadataTooLargeException(
-                $"Installation metadata '{metadataPath}' exceeds the {MaximumMetadataByteCount}-byte limit.",
-                ex);
-        }
-
-        if (json is null)
+        Stream? source = _fileSystem.OpenReadIfExists(metadataPath);
+        if (source is null)
         {
             throw new FileNotFoundException(
                 $"Could not determine the installation method because metadata '{metadataPath}' was not found. " +
@@ -47,13 +35,21 @@ internal sealed class InstallationMetadataReader(
         }
 
         InstallationMetadataDocument document;
+        await using SizeLimitedReadStream json = new(source, MaximumMetadataByteCount);
         try
         {
-            document = JsonSerializer.Deserialize(
+            document = await JsonSerializer.DeserializeAsync(
                 json,
-                InstallationMetadataJsonContext.Default.InstallationMetadataDocument)
+                InstallationMetadataJsonContext.Default.InstallationMetadataDocument,
+                cancellationToken)
                 ?? throw new InvalidInstallationMetadataException(
                     $"Installation metadata '{metadataPath}' contains the JSON null value.");
+        }
+        catch (InvalidDataException ex)
+        {
+            throw new InstallationMetadataTooLargeException(
+                $"Installation metadata '{metadataPath}' exceeds the {MaximumMetadataByteCount}-byte limit.",
+                ex);
         }
         catch (JsonException ex)
         {

@@ -65,39 +65,28 @@ internal sealed class PhysicalFileSystem : IFileSystem
         return await File.ReadAllTextAsync(path, cancellationToken);
     }
 
-    public async Task<byte[]?> ReadAllBytesIfExistsAsync(string path, int maxByteCount, CancellationToken cancellationToken)
+    public Stream? OpenReadIfExists(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxByteCount);
-        cancellationToken.ThrowIfCancellationRequested();
 
-        if (!File.Exists(path))
+        try
+        {
+            return new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 4096,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+        }
+        catch (FileNotFoundException)
         {
             return null;
         }
-
-        await using FileStream stream = new(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read,
-            bufferSize: 4096,
-            FileOptions.Asynchronous | FileOptions.SequentialScan);
-
-        byte[] buffer = new byte[maxByteCount + 1];
-        int bytesRead = 0;
-        while (bytesRead < buffer.Length)
+        catch (DirectoryNotFoundException)
         {
-            int count = await stream.ReadAsync(buffer.AsMemory(bytesRead), cancellationToken);
-            if (count == 0)
-            {
-                return buffer[..bytesRead];
-            }
-
-            bytesRead += count;
+            return null;
         }
-
-        throw new InvalidDataException($"File '{path}' exceeds the {maxByteCount}-byte read limit.");
     }
 
     public async Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)

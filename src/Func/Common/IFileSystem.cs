@@ -35,13 +35,10 @@ internal interface IFileSystem
     public Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Reads at most <paramref name="maxByteCount"/> bytes from a file; returns
-    /// <c>null</c> when the file is absent.
+    /// Opens a file for asynchronous sequential reading; returns <c>null</c>
+    /// when the file is absent.
     /// </summary>
-    /// <exception cref="InvalidDataException">
-    /// The file exceeds <paramref name="maxByteCount"/>.
-    /// </exception>
-    public Task<byte[]?> ReadAllBytesIfExistsAsync(string path, int maxByteCount, CancellationToken cancellationToken);
+    public Stream? OpenReadIfExists(string path);
 
     /// <summary>
     /// Writes <paramref name="contents"/> to <paramref name="path"/> atomically

@@ -52,10 +52,7 @@ public sealed class InstallationMetadataReaderTests
 
         // Assert
         fileSystem.Received(1).ResolveFileLinkTarget(_processPath);
-        await fileSystem.Received(1).ReadAllBytesIfExistsAsync(
-            _metadataPath,
-            InstallationMetadataReader.MaximumMetadataByteCount,
-            cancellationToken);
+        fileSystem.Received(1).OpenReadIfExists(_metadataPath);
     }
 
     [Fact]
@@ -79,11 +76,8 @@ public sealed class InstallationMetadataReaderTests
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
-        fileSystem.ReadAllBytesIfExistsAsync(
-                _metadataPath,
-                InstallationMetadataReader.MaximumMetadataByteCount,
-                Arg.Any<CancellationToken>())
-            .Returns<Task<byte[]?>>(_ => throw new InvalidDataException("too large"));
+        fileSystem.OpenReadIfExists(_metadataPath)
+            .Returns(new MemoryStream(new byte[InstallationMetadataReader.MaximumMetadataByteCount + 1]));
 
         // Act
         Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
@@ -100,8 +94,7 @@ public sealed class InstallationMetadataReaderTests
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
-        fileSystem.ReadAllBytesIfExistsAsync(_metadataPath, Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(payload);
+        fileSystem.OpenReadIfExists(_metadataPath).Returns(new MemoryStream(payload));
 
         // Act
         Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
@@ -199,8 +192,7 @@ public sealed class InstallationMetadataReaderTests
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>();
-        await fileSystem.DidNotReceiveWithAnyArgs()
-            .ReadAllBytesIfExistsAsync(default!, default, default);
+        fileSystem.DidNotReceiveWithAnyArgs().OpenReadIfExists(default!);
     }
 
     [Fact]
@@ -219,8 +211,7 @@ public sealed class InstallationMetadataReaderTests
 
         // Assert
         await act.Should().ThrowAsync<IOException>().WithMessage("*link cycle*");
-        await fileSystem.DidNotReceiveWithAnyArgs()
-            .ReadAllBytesIfExistsAsync(default!, default, default);
+        fileSystem.DidNotReceiveWithAnyArgs().OpenReadIfExists(default!);
     }
 
     [Fact]
@@ -237,8 +228,7 @@ public sealed class InstallationMetadataReaderTests
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();
         fileSystem.DidNotReceiveWithAnyArgs().ResolveFileLinkTarget(default!);
-        await fileSystem.DidNotReceiveWithAnyArgs()
-            .ReadAllBytesIfExistsAsync(default!, default, default);
+        fileSystem.DidNotReceiveWithAnyArgs().OpenReadIfExists(default!);
     }
 
     [Fact]
@@ -269,8 +259,7 @@ public sealed class InstallationMetadataReaderTests
     {
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
         fileSystem.ResolveFileLinkTarget(_processPath).Returns(_physicalProcessPath);
-        fileSystem.ReadAllBytesIfExistsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns((byte[]?)null);
+        fileSystem.OpenReadIfExists(Arg.Any<string>()).Returns((Stream?)null);
         InstallationMetadataReader reader = new(
             fileSystem,
             Options.Create(new CliEnvironmentOptions { ProcessPath = _processPath }));
@@ -279,8 +268,8 @@ public sealed class InstallationMetadataReaderTests
 
     private static void SetMetadata(IFileSystem fileSystem, string json)
     {
-        fileSystem.ReadAllBytesIfExistsAsync(_metadataPath, Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(Encoding.UTF8.GetBytes(json));
+        fileSystem.OpenReadIfExists(_metadataPath)
+            .Returns(_ => new MemoryStream(Encoding.UTF8.GetBytes(json)));
     }
 
     private static string ValidJson(string method, string policy) =>

@@ -302,8 +302,7 @@ public class RemoteProfileSourceTests
             return Task.FromResult(Files.TryGetValue(path, out string? content) ? content : null);
         }
 
-        public Task<byte[]?> ReadAllBytesIfExistsAsync(string path, int maxByteCount, CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
+        public Stream? OpenReadIfExists(string path) => throw new NotImplementedException();
 
         public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
         {
