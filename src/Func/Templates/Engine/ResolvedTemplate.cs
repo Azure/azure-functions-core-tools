@@ -28,9 +28,10 @@ internal sealed class ResolvedTemplate
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.OutputDirectory);
         ArgumentNullException.ThrowIfNull(request.Parameters);
+        cancellationToken.ThrowIfCancellationRequested();
         if (request.Parameters.Keys.Any(key => !Parameters.Any(parameter => string.Equals(parameter.CanonicalName, key, StringComparison.Ordinal))))
         {
-            return Task.FromResult(new TemplateInvocationResult(TemplateInvocationStatus.Failed, [], "Invocation values must use declared canonical parameter names."));
+            return Task.FromResult(new TemplateInvocationResult(TemplateInvocationStatus.InvalidArguments, [], "Invocation values must use declared canonical parameter names."));
         }
 
         request = request with { Parameters = new Dictionary<string, string?>(request.Parameters, StringComparer.Ordinal) };
