@@ -33,8 +33,8 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
         IReadOnlyList<Candidate> candidates = await GetCandidatesAsync(cancellationToken);
-        Candidate[] matches = [.. candidates.Where(candidate => string.Equals(candidate.Entry.Identity, reference, StringComparison.OrdinalIgnoreCase))];
-        MalformedTypeDescriptor[] malformed = [.. _malformedTypes.Where(template => string.Equals(template.Identity, reference, StringComparison.OrdinalIgnoreCase))];
+        Candidate[] matches = [.. candidates.Where(candidate => string.Equals(candidate.Entry.Identity, reference, StringComparison.Ordinal))];
+        MalformedTypeDescriptor[] malformed = [.. _malformedTypes.Where(template => string.Equals(template.Identity, reference, StringComparison.Ordinal))];
         if (matches.Length == 0 && malformed.Length == 0)
         {
             matches = [.. candidates.Where(candidate => candidate.Entry.ShortNames.Any(name => string.Equals(name, reference, StringComparison.OrdinalIgnoreCase)))];
@@ -158,6 +158,13 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
 
                 IReadOnlyCollection<string> packageTypes = await metadata;
                 TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Content, cancellationToken, packageTypes);
+                if (entry.Type == TemplateType.Project && evaluation.Status == TemplateConstraintEvaluationStatus.Eligible)
+                {
+                    evaluation = new(TemplateConstraintEvaluationStatus.NotEvaluated,
+                        [new("project-configuration", "configuration", TemplateConstraintEvaluationStatus.NotEvaluated,
+                            "Project invocation requires qualified mandatory configuration actions and is unavailable in this item-only flow.", "Use the existing project initializer until project-template creation is qualified.")]);
+                }
+
                 candidates.Add(new(template, entry with { ConstraintEvaluation = evaluation }, configuration));
             }
             catch (InvalidTemplateMetadataException exception)

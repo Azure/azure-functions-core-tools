@@ -530,6 +530,57 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task ListAsync_PermissiveFuncArgs_RemainEligible()
+    {
+        var package = TemplateFixtures.WriteConstraintPackage(_root, """{"stack":{"type":"func-workload","args":[/* fixture */"node",]}}""");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater(new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]));
+
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+
+        entries.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Eligible);
+    }
+
+    [Fact]
+    public async Task ResolveGroupAsync_CaseDifferentIdentity_DoesNotPreemptShortName()
+    {
+        var basic = TemplateFixtures.WriteBasicPackage(Path.Combine(_root, "identity-package"));
+        var alias = TemplateFixtures.WriteJourneyPackage(Path.Combine(_root, "alias-package"));
+        var aliasConfig = Path.Combine(alias, "item", ".template.config", "template.json");
+        var reference = TemplateFixtures.ItemTemplateIdentity.ToLowerInvariant();
+        File.WriteAllText(aliasConfig, File.ReadAllText(aliasConfig).Replace("func-tests-journey", reference, StringComparison.Ordinal));
+        await TemplateFixtures.InstallAsync(basic, _hive);
+        await TemplateFixtures.InstallAsync(alias, _hive);
+        using Templater templater = CreateTemplater(new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]));
+
+        var result = await templater.ResolveGroupAsync(reference, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Success);
+        result.Group.Should().ContainSingle().Which.Entry.Identity.Should().Be("Func.Tests.Journey");
+
+        var exact = await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None);
+        exact.Group.Should().ContainSingle().Which.Entry.Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
+        var aliasCase = await templater.ResolveGroupAsync("FUNC-TESTS-ITEM", TemplateType.Item, CancellationToken.None);
+        aliasCase.Group.Should().ContainSingle().Which.Entry.Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
+    }
+
+    [Fact]
+    public async Task ResolveGroupAsync_ProjectInItemOnlyFlow_DoesNotGrantInvocation()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Unavailable);
+        result.Group.Should().BeEmpty();
+        var entries = await templater.ListAsync(TemplateType.Project, CancellationToken.None);
+        var picked = await templater.CreateGroupAsync(entries, CancellationToken.None);
+        picked.Status.Should().Be(TemplateResolutionStatus.Unavailable);
+        picked.Group.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task CreateGroupAsync_ForeignFlowEntry_RejectsUncheckedReplacement()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
