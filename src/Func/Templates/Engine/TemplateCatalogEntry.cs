@@ -33,7 +33,10 @@ internal sealed record TemplateCatalogEntry(
     TemplatePackageInfo? Package,
     bool IsHidden,
     IReadOnlyList<TemplateParameterDefinition> Parameters,
-    string? MetadataDiagnostic);
+    string? MetadataDiagnostic)
+{
+    public TemplateConstraintEvaluation ConstraintEvaluation { get; init; } = TemplateConstraintEvaluation.NotEvaluated;
+}
 
 /// <summary>
 /// Installed template package that provides a template.

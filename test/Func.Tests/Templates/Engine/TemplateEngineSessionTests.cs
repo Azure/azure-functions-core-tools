@@ -5,6 +5,8 @@ using System.Reflection;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Constraints;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -43,7 +45,7 @@ public sealed class TemplateEngineSessionTests : IDisposable
         MethodInfo tryGetComponent = typeof(IComponentManager)
             .GetMethod(nameof(IComponentManager.TryGetComponent))!;
 
-        foreach ((Type Type, IIdentifiedComponent Instance) in FuncTemplateComponents.AllComponents)
+        foreach ((Type Type, IIdentifiedComponent Instance) in FuncTemplateComponents.Create(new([])))
         {
             object?[] args = [Instance.Id, null];
             bool resolved = (bool)tryGetComponent
@@ -52,6 +54,67 @@ public sealed class TemplateEngineSessionTests : IDisposable
 
             resolved.Should().BeTrue($"{Instance.GetType().Name} should be resolvable as {Type.Name}");
         }
+    }
+
+    [Fact]
+    public async Task Constraints_SeparateSessionSnapshots_DoNotShareEligibility()
+    {
+        var usable = new TemplateConstraintEvaluationSnapshot([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]);
+        var installedOnly = new TemplateConstraintEvaluationSnapshot([new("node-package", NuGetVersion.Parse("1.0"), ["node"], false)]);
+        using TemplateEngineSession node = new(CommandContext("node"), Hive, usable);
+        using TemplateEngineSession diagnostic = new(CommandContext("diagnostic"), Hive, installedOnly);
+        var nodeFactory = node.Settings.Components.OfType<ITemplateConstraintFactory>().Single(factory => factory.Type == "func-workload");
+        var diagnosticFactory = diagnostic.Settings.Components.OfType<ITemplateConstraintFactory>().Single(factory => factory.Type == "func-workload");
+        var nodeConstraint = await nodeFactory.CreateTemplateConstraintAsync(node.Settings, CancellationToken.None);
+        var diagnosticConstraint = await diagnosticFactory.CreateTemplateConstraintAsync(diagnostic.Settings, CancellationToken.None);
+
+        var nodeResult = nodeConstraint.Evaluate("\"node\"");
+        var diagnosticResult = diagnosticConstraint.Evaluate("\"node\"");
+
+        nodeResult.EvaluationStatus.Should().Be(TemplateConstraintResult.CreateAllowed(nodeConstraint).EvaluationStatus);
+        diagnosticResult.EvaluationStatus.Should().Be(TemplateConstraintResult.CreateRestricted(diagnosticConstraint, "unavailable").EvaluationStatus);
+        nodeFactory.Should().NotBeSameAs(diagnosticFactory);
+    }
+
+    [Theory]
+    [InlineData("4.20", true)]
+    [InlineData("4.10", false)]
+    [InlineData(null, false)]
+    public async Task Constraints_Bundle_UsesResolvedCommandContext(string? version, bool allowed)
+    {
+        var context = new TemplateEngineContext(DirectoryUnderRoot("bundle"), bundle: version is null ? null : new("bundle", version));
+        using TemplateEngineSession session = new(context, Hive);
+        var factory = session.Settings.Components.OfType<ITemplateConstraintFactory>().Single(factory => factory.Type == "func-bundle");
+        var constraint = await factory.CreateTemplateConstraintAsync(session.Settings, CancellationToken.None);
+
+        var result = constraint.Evaluate("\"[4.20,5.0)\"");
+
+        result.EvaluationStatus.Should().Be(allowed
+            ? TemplateConstraintResult.CreateAllowed(constraint).EvaluationStatus
+            : TemplateConstraintResult.CreateRestricted(constraint, "unavailable").EvaluationStatus);
+    }
+
+    [Fact]
+    public void Constructor_ConflictingBundleSnapshot_Throws()
+    {
+        var snapshot = new TemplateConstraintEvaluationSnapshot([], "bundle", NuGetVersion.Parse("4.20"));
+        Action action = () => new TemplateEngineSession(CommandContext("no-bundle"), Hive, snapshot);
+
+        action.Should().Throw<ArgumentException>().WithParameterName("snapshot");
+    }
+
+    [Fact]
+    public async Task Constraints_MalformedOrMissingArguments_FailClosed()
+    {
+        using TemplateEngineSession session = new(CommandContext("invalid"), Hive);
+        var factory = session.Settings.Components.OfType<ITemplateConstraintFactory>().Single(factory => factory.Type == "func-workload");
+        var constraint = await factory.CreateTemplateConstraintAsync(session.Settings, CancellationToken.None);
+
+        var missing = constraint.Evaluate(null);
+        var malformed = constraint.Evaluate("{not json");
+
+        missing.EvaluationStatus.Should().Be(TemplateConstraintResult.Status.NotEvaluated);
+        malformed.EvaluationStatus.Should().Be(TemplateConstraintResult.Status.NotEvaluated);
     }
 
     [Fact]

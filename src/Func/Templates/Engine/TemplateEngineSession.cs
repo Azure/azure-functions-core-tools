@@ -1,9 +1,14 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Constraints;
+using Microsoft.TemplateEngine.Abstractions.Mount;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
+using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -19,16 +24,20 @@ internal sealed class TemplateEngineSession : IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
     private readonly TemplatePackageManager _packageManager;
+    private readonly TemplateConstraintManager _constraintManager;
+    private readonly TemplateCreator _creator;
     private bool _disposed;
 
-    public TemplateEngineSession(TemplateEngineContext context, string settingsLocation)
+    public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
 
         Context = context;
-        _settings = new(new FuncTemplateEngineHost(context), settingsLocation: settingsLocation);
+        _settings = new(new FuncTemplateEngineHost(context, snapshot), settingsLocation: settingsLocation);
         _packageManager = new(_settings);
+        _constraintManager = new(_settings);
+        _creator = new(_settings);
     }
 
     public TemplateEngineContext Context { get; }
@@ -51,6 +60,155 @@ internal sealed class TemplateEngineSession : IDisposable
         }
     }
 
+    public async Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
+        {
+            throw new InvalidTemplateMetadataException($"Template '{template.Identity}' has no registered generator.");
+        }
+
+        ITemplate? loaded = await generator.LoadTemplateAsync(_settings, template, null, cancellationToken);
+        if (loaded is null)
+        {
+            throw new InvalidTemplateMetadataException($"Template '{template.Identity}' could not be loaded from its mounted content.");
+        }
+
+        using var lifetime = loaded as IDisposable;
+        if (loaded.Configuration is not IFile configurationFile)
+        {
+            throw new InvalidTemplateMetadataException($"Template '{template.Identity}' configuration is not a mounted file.");
+        }
+
+        using Stream stream = configurationFile.OpenRead();
+        using var content = new MemoryStream();
+        await stream.CopyToAsync(content, cancellationToken);
+        string fingerprint = Convert.ToHexString(SHA256.HashData(content.GetBuffer().AsSpan(0, checked((int)content.Length))));
+        content.Position = 0;
+        using var reader = new StreamReader(content);
+        string configuration = await reader.ReadToEndAsync(cancellationToken);
+        return new(configuration, fingerprint);
+    }
+
+    public async Task<TemplateConstraintEvaluation> EvaluateConstraintsAsync(string configuration, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        IReadOnlyList<TemplateConstraintDeclaration> declarations = TemplateConstraintDeclarationReader.Read(configuration);
+        using var document = JsonDocument.Parse(configuration, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+        if (document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.EnumerateObject().Any(property =>
+            string.Equals(property.Name, "additionalConfigFiles", StringComparison.OrdinalIgnoreCase)
+            && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
+        {
+            throw new InvalidTemplateMetadataException("Supplemental template configuration requires a qualified complete configuration inventory before this flow can use it.");
+        }
+
+        List<TemplateConstraintDiagnostic> diagnostics = [];
+        TemplateConstraintEvaluationStatus status = TemplateConstraintEvaluationStatus.Eligible;
+        foreach (TemplateConstraintDeclaration declaration in declarations)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TemplateConstraintResult result = await _constraintManager.EvaluateConstraintAsync(declaration.Type, declaration.Arguments?.GetRawText(), cancellationToken);
+            if (result.EvaluationStatus == TemplateConstraintResult.Status.Allowed)
+            {
+                continue;
+            }
+
+            bool recognized = _settings.Components.OfType<ITemplateConstraintFactory>().Any(factory => factory.Type == declaration.Type);
+            TemplateConstraintEvaluationStatus current = result.EvaluationStatus == TemplateConstraintResult.Status.Restricted
+                ? TemplateConstraintEvaluationStatus.Restricted
+                : recognized ? TemplateConstraintEvaluationStatus.Failed : TemplateConstraintEvaluationStatus.NotEvaluated;
+            if (current > status)
+            {
+                status = current;
+            }
+
+            diagnostics.Add(new(declaration.Label, declaration.Type, current, result.LocalizedErrorMessage ?? "Constraint could not be evaluated.", result.CallToAction));
+        }
+
+        return new(status, diagnostics.AsReadOnly());
+    }
+
+    public async Task<TemplateInvocationResult> InvokeAsync(ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(request);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        TemplateConfigurationSnapshot current;
+        try
+        {
+            current = await ReadConfigurationAsync(template, cancellationToken);
+        }
+        catch (InvalidTemplateMetadataException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], exception.Message);
+        }
+        catch (IOException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable: {exception.Message}");
+        }
+
+        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
+        {
+            return new(TemplateInvocationStatus.Failed, [], "Selected template configuration changed. Rerun selection.");
+        }
+
+        using var document = JsonDocument.Parse(current.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+        if (document.RootElement.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
+            && property.Value.ValueKind != JsonValueKind.Null && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
+        {
+            return new(TemplateInvocationStatus.Failed, [], "Item post-actions require a qualified dispatcher and are not supported by this invocation path.");
+        }
+
+        Dictionary<string, string?> parameters = new(request.Parameters, StringComparer.Ordinal);
+        string output = request.OutputDirectory.Info.FullName;
+        ITemplateCreationResult preview = await _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, output, parameters,
+            forceCreation: request.Force, dryRun: true, cancellationToken: cancellationToken);
+        if (preview.Status != CreationResultStatus.Success)
+        {
+            return new(TemplateInvocationStatus.Failed, [], preview.ErrorMessage ?? preview.Status.ToString());
+        }
+
+        IReadOnlyList<TemplateFileChange> changes = Array.AsReadOnly<TemplateFileChange>(
+            [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+        if (!request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal)))
+        {
+            return new(TemplateInvocationStatus.Failed, changes, "Template would change existing files. Explicit file-conflict force is required.");
+        }
+
+        foreach (TemplateFileChange change in changes)
+        {
+            string path = Path.GetFullPath(Path.Combine(output, change.Path));
+            string relative = Path.GetRelativePath(output, path);
+            if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            {
+                return new(TemplateInvocationStatus.Failed, [], "Template output escapes the requested output directory.");
+            }
+        }
+
+        if (request.DryRun)
+        {
+            return new(TemplateInvocationStatus.Success, changes);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        current = await ReadConfigurationAsync(template, cancellationToken);
+        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
+        {
+            return new(TemplateInvocationStatus.Failed, [], "Selected template configuration changed after preview. Rerun selection.");
+        }
+
+        ITemplateCreationResult created = await _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, output, parameters,
+            forceCreation: request.Force, cancellationToken: cancellationToken);
+        return created.Status == CreationResultStatus.Success
+            ? new(TemplateInvocationStatus.Success, changes)
+            : new(TemplateInvocationStatus.Failed, changes, created.ErrorMessage ?? created.Status.ToString());
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -59,6 +217,7 @@ internal sealed class TemplateEngineSession : IDisposable
         }
 
         _disposed = true;
+        _constraintManager.Dispose();
         _packageManager.Dispose();
         _settings.Dispose();
     }
