@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.IO.Compression;
+using System.Xml.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
@@ -211,6 +213,42 @@ internal static class TemplateFixtures
             """,
             ("ItemFunction.txt", "ItemFunction GREETING"));
         return packageDirectory;
+    }
+
+    public static string WriteSharedJourneyPackage(string parentDirectory, bool shared = true, string? packageTypeVersion = null)
+    {
+        string folder = WriteJourneyPackage(parentDirectory);
+        string nuspec = """
+            <?xml version="1.0"?>
+            <package>
+              <metadata>
+                <id>Func.Tests.Shared</id>
+                <version>1.0.0</version>
+                <authors>func-tests</authors>
+                <description>Shared host fixture.</description>
+                <packageTypes>
+                  <packageType name="Template" />
+                  <packageType name="FuncTemplate" />
+                </packageTypes>
+              </metadata>
+            </package>
+            """;
+        var metadata = XDocument.Parse(nuspec);
+        XElement types = metadata.Root!.Element("metadata")!.Element("packageTypes")!;
+        if (!shared)
+        {
+            types.Elements("packageType").Single(type => type.Attribute("name")!.Value == "Template").Remove();
+        }
+
+        if (packageTypeVersion is not null)
+        {
+            types.Elements("packageType").First().SetAttributeValue("version", packageTypeVersion);
+        }
+
+        File.WriteAllText(Path.Combine(folder, "Func.Tests.Shared.nuspec"), metadata.ToString());
+        string package = Path.Combine(parentDirectory, "Func.Tests.Shared.1.0.0.nupkg");
+        ZipFile.CreateFromDirectory(folder, package);
+        return package;
     }
 
     /// <summary>

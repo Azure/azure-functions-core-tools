@@ -320,6 +320,101 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task InvokeAsync_LinkedOutputChild_RejectsExternalWrites()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        var item = Path.Combine(package, "item");
+        Directory.CreateDirectory(Path.Combine(item, "link"));
+        File.Move(Path.Combine(item, "ItemFunction.txt"), Path.Combine(item, "link", "ItemFunction.txt"));
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "linked-output"));
+        var outside = Path.Combine(_root, "outside-output");
+        Directory.CreateDirectory(output.Info.FullName);
+        Directory.CreateDirectory(outside);
+        Directory.CreateSymbolicLink(Path.Combine(output.Info.FullName, "link"), outside);
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Linked"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        File.Exists(Path.Combine(outside, "Linked.txt")).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task InvokeAsync_PermissionDeniedConfiguration_ReturnsFailureWithoutWrites(int deniedRead)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        var session = new DenyingConfigurationSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        using Templater templater = new(session);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "denied-config-output"));
+        session.DeniedRead = deniedRead;
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Denied"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ListAsync_NuGetPackageTypes_EnforceHostSharing(bool shared)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteSharedJourneyPackage(_root, shared), _hive);
+        using Templater templater = CreateTemplater(new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]));
+
+        var result = await templater.ResolveGroupAsync("Func.Tests.Journey", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(shared ? TemplateResolutionStatus.Unavailable : TemplateResolutionStatus.Success);
+        result.Group.Should().HaveCount(shared ? 0 : 1);
+        result.Diagnostics.Should().HaveCount(shared ? 1 : 0);
+        if (shared)
+        {
+            result.Diagnostics[0].ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Failed);
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_LinkIntroducedAfterPreview_RejectsExternalWrites()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        var item = Path.Combine(package, "item");
+        Directory.CreateDirectory(Path.Combine(item, "link"));
+        File.Move(Path.Combine(item, "ItemFunction.txt"), Path.Combine(item, "link", "ItemFunction.txt"));
+        await TemplateFixtures.InstallAsync(package, _hive);
+        var session = new DenyingConfigurationSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        using Templater templater = new(session);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "late-linked-output"));
+        var outside = Path.Combine(_root, "late-outside-output");
+        Directory.CreateDirectory(output.Info.FullName);
+        Directory.CreateDirectory(outside);
+        session.AfterPreview = () => Directory.CreateSymbolicLink(Path.Combine(output.Info.FullName, "link"), outside);
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "LateLinked"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        File.Exists(Path.Combine(outside, "LateLinked.txt")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ListAsync_InvalidPackageTypeMetadata_PreservesHealthyCatalogEntries()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(Path.Combine(_root, "healthy")), _hive);
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteSharedJourneyPackage(Path.Combine(_root, "malformed"), packageTypeVersion: "invalid-version"), _hive);
+        using Templater templater = CreateTemplater(new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]));
+
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+
+        entries.Should().ContainSingle(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity && entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible);
+        entries.Should().ContainSingle(entry => entry.Identity == "Func.Tests.Journey" && entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Failed);
+    }
+
+    [Fact]
     public async Task CreateGroupAsync_ForeignFlowEntry_RejectsUncheckedReplacement()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
@@ -513,4 +608,32 @@ public sealed class TemplaterTests : IDisposable
 
     private Templater CreateTemplater(TemplateConstraintEvaluationSnapshot? snapshot = null)
         => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
+
+    private sealed class DenyingConfigurationSession(TemplateEngineContext context, string hive) : TemplateEngineSession(context, hive)
+    {
+        private int _readsAfterSelection;
+
+        public int? DeniedRead { get; set; }
+
+        public Action? AfterPreview { get; set; }
+
+        public override Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
+        {
+            if (DeniedRead is not null || AfterPreview is not null)
+            {
+                _readsAfterSelection++;
+                if (_readsAfterSelection == DeniedRead)
+                {
+                    throw new UnauthorizedAccessException("Fixture configuration access denied.");
+                }
+
+                if (_readsAfterSelection == 2)
+                {
+                    AfterPreview?.Invoke();
+                }
+            }
+
+            return base.ReadConfigurationAsync(template, cancellationToken);
+        }
+    }
 }
