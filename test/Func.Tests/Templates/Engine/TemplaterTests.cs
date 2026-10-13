@@ -194,6 +194,19 @@ public sealed class TemplaterTests : IDisposable
         Directory.Exists(destination).Should().BeFalse();
     }
 
+    [Fact]
+    public async Task FixtureInstallAsync_PreCancelled_DoesNotCreateHive()
+    {
+        var package = TemplateFixtures.WriteRunnableNodeProjectPackage(_root);
+        var hive = Path.Combine(_root, "cancelled-install-hive");
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        Func<Task> action = () => TemplateFixtures.InstallAsync(package, hive, cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        Directory.Exists(hive).Should().BeFalse();
+    }
+
     public static async Task<string> ExportNodeSmokeProjectAsync(string parentDirectory, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(parentDirectory);
@@ -215,7 +228,7 @@ public sealed class TemplaterTests : IDisposable
     private static async Task<(WorkingDirectory Output, TemplateInvocationResult Preview, TemplateInvocationResult Created, bool PreviewCreatedDirectory)> CreateNodeProjectAsync(string parentDirectory, CancellationToken cancellationToken)
     {
         string hive = Path.Combine(parentDirectory, "hive");
-        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteRunnableNodeProjectPackage(parentDirectory), hive);
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteRunnableNodeProjectPackage(parentDirectory), hive, cancellationToken);
         var initializer = Substitute.For<IProjectInitializer>();
         initializer.Stack.Returns("node");
         initializer.SupportedLanguages.Returns(["JavaScript"]);

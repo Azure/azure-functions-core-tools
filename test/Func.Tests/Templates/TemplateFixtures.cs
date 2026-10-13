@@ -320,13 +320,15 @@ internal static class TemplateFixtures
     /// <summary>
     /// Installs a folder package into the template engine settings at <paramref name="settingsLocation"/>.
     /// </summary>
-    public static async Task InstallAsync(string packageDirectory, string settingsLocation)
+    public static async Task InstallAsync(string packageDirectory, string settingsLocation, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(packageDirectory));
         using TemplateEngineSession session = new(context, settingsLocation);
 
         IManagedTemplatePackageProvider provider = session.PackageManager.GetBuiltInManagedProvider(InstallationScope.Global);
-        IReadOnlyList<InstallResult> results = await provider.InstallAsync([new InstallRequest(packageDirectory)], CancellationToken.None);
+      IReadOnlyList<InstallResult> results = await provider.InstallAsync([new InstallRequest(packageDirectory)], cancellationToken);
+      cancellationToken.ThrowIfCancellationRequested();
 
         InstallResult result = results.Should().ContainSingle().Subject;
         result.Success.Should().BeTrue(result.ErrorMessage ?? string.Empty);

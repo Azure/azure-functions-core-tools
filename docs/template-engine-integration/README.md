@@ -35,10 +35,10 @@ foreach ($project in @("Stacks/Node/Workloads.Node", "Workers/Node/Workloads.Wor
 }
 $env:FUNC_CLI_HOME = Join-Path $smoke "cli-home"
 $env:FUNC_CLI_WORKLOADS_HOME = Join-Path $smoke "workloads-home"
-$env:FUNC_CLI_WORKLOADS_SOURCE = $feed
+Remove-Item Env:FUNC_CLI_WORKLOADS_SOURCE -ErrorAction SilentlyContinue
 $cli = Join-Path $smoke "cli/func.exe"
 foreach ($package in Get-ChildItem $feed -Filter *.nupkg) {
-	& $cli workload install $package.FullName --source $feed
+	& $cli workload install $package.FullName
 	if ($LASTEXITCODE -ne 0) { throw "Isolated workload install failed." }
 }
 & dotnet run --file eng/scripts/project-template-smoke.cs -c Release -r win-x64 -p:SelfContained=true -- (Join-Path $smoke "template")
