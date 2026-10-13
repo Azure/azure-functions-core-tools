@@ -213,8 +213,8 @@ internal class TemplateEngineSession : IDisposable
 
         Dictionary<string, string?> parameters = new(request.Parameters, StringComparer.Ordinal);
         string output = request.OutputDirectory.Info.FullName;
-        ITemplateCreationResult preview = await _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, output, parameters,
-            forceCreation: request.Force, dryRun: true, cancellationToken: cancellationToken);
+        ITemplateCreationResult preview = await InstantiateAsync(template, request, parameters, true, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (preview.Status != CreationResultStatus.Success)
         {
             return new(TemplateInvocationStatus.Failed, [], preview.ErrorMessage ?? preview.Status.ToString());
@@ -222,7 +222,8 @@ internal class TemplateEngineSession : IDisposable
 
         IReadOnlyList<TemplateFileChange> changes = Array.AsReadOnly<TemplateFileChange>(
             [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
-        if (!request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal)))
+        bool requiresForce = !request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal));
+        if (!request.DryRun && requiresForce)
         {
             return new(TemplateInvocationStatus.Failed, changes, "Template would change existing files. Explicit file-conflict force is required.");
         }
@@ -235,7 +236,7 @@ internal class TemplateEngineSession : IDisposable
 
         if (request.DryRun)
         {
-            return new(TemplateInvocationStatus.Success, changes);
+            return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -267,12 +268,16 @@ internal class TemplateEngineSession : IDisposable
             return new(TemplateInvocationStatus.Failed, [], outputFailure);
         }
 
-        ITemplateCreationResult created = await _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, output, parameters,
-            forceCreation: request.Force, cancellationToken: cancellationToken);
+        ITemplateCreationResult created = await InstantiateAsync(template, request, parameters, false, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         return created.Status == CreationResultStatus.Success
             ? new(TemplateInvocationStatus.Success, changes)
             : new(TemplateInvocationStatus.Failed, changes, created.ErrorMessage ?? created.Status.ToString());
     }
+
+    protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+        => _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName, parameters,
+            forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
 
     private string? ValidateOutputPaths(string output, IReadOnlyList<TemplateFileChange> changes)
     {
