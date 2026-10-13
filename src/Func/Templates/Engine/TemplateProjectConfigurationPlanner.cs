@@ -114,10 +114,14 @@ internal sealed class TemplateProjectConfigurationPlanner
         IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = Read(configuration);
         string[] primaryOutputs = [.. effects.CreationResult.PrimaryOutputs.Select(output => Path.GetFullPath(Path.Combine(outputDirectory, output.Path)))];
         string[] changedOutputs = [.. effects.FileChanges.Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
+        string[] generatedOutputs = [.. effects.FileChanges.Where(change => change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite)
+            .Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
         Require(!changedOutputs.Any(path => string.Equals(Path.GetFileName(path), "config.json", StringComparison.OrdinalIgnoreCase)
             && string.Equals(Path.GetFileName(Path.GetDirectoryName(path)), ".func", StringComparison.OrdinalIgnoreCase)),
             "Template content must not write CLI-owned project configuration.");
-        string[] roots = [.. primaryOutputs.Concat(changedOutputs).Where(path => _pathComparer.Equals(Path.GetFileName(path), "host.json"))
+        Require(primaryOutputs.Where(path => _pathComparer.Equals(Path.GetFileName(path), "host.json"))
+            .All(path => generatedOutputs.Contains(path, _pathComparer)), "Declared host.json outputs must correspond to generated files.");
+        string[] roots = [.. generatedOutputs.Where(path => _pathComparer.Equals(Path.GetFileName(path), "host.json"))
             .Select(path => Path.GetDirectoryName(path)!).Distinct(_pathComparer)];
         Require(roots.Length > 0, "Project creation must produce an active host.json root.");
         List<TemplateProjectConfigurationPlan> plans = [];
@@ -125,7 +129,7 @@ internal sealed class TemplateProjectConfigurationPlanner
         {
             string path = Path.GetFullPath(Path.Combine(outputDirectory, declaration.Path));
             Require(primaryOutputs.Count(output => _pathComparer.Equals(output, path)) == 1
-                && changedOutputs.Contains(path, _pathComparer), "Configuration references must bind to one resolved, generated primary output.");
+                && generatedOutputs.Contains(path, _pathComparer), "Configuration references must bind to one resolved, generated primary output.");
             plans.Add(new(path, declaration.Stack, declaration.Language));
         }
 

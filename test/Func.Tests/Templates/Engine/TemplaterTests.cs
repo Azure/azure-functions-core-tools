@@ -158,6 +158,53 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task ProjectJourney_DeclaredButUngeneratedHost_FailsBeforeCreation()
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var configPath = Path.Combine(package, "project", ".template.config", "template.json");
+        var configuration = JsonNode.Parse(File.ReadAllText(configPath))!;
+        configuration["primaryOutputs"] = new JsonArray(new JsonObject { ["path"] = "host.json" }, new JsonObject { ["path"] = "package.json" });
+        configuration["postActions"]![0]!["args"]!["primaryOutputIndex"] = "1";
+        File.WriteAllText(configPath, configuration.ToJsonString());
+        File.Delete(Path.Combine(package, "project", "host.json"));
+        File.WriteAllText(Path.Combine(package, "project", "package.json"), "{}");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateProjectTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "unproduced-host-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectJourney_ExistingHostOverwrite_RequiresForceAndFinalizesConfiguration()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        using Templater templater = CreateProjectTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "existing-produced-host-output"));
+        Directory.CreateDirectory(output.Info.FullName);
+        var host = Path.Combine(output.Info.FullName, "host.json");
+        File.WriteAllText(host, "original");
+        var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>());
+
+        var refused = await selected.InvokeAsync(request, CancellationToken.None);
+
+        refused.Status.Should().Be(TemplateInvocationStatus.FileConflict);
+        File.ReadAllText(host).Should().Be("original");
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeFalse();
+
+        var created = await selected.InvokeAsync(request with { Force = true }, CancellationToken.None);
+
+        created.Status.Should().Be(TemplateInvocationStatus.Success);
+        File.ReadAllText(host).Should().Be("{\"version\":\"2.0\"}");
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ProjectJourney_UndeclaredHostRoot_FailsBeforeCreation()
     {
         var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
