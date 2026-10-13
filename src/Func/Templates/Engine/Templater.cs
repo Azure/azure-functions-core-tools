@@ -135,6 +135,7 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
         _malformedTypes = Array.AsReadOnly<MalformedTypeDescriptor>([.. templates.Where(template => TemplateCatalogProjector.GetTemplateType(template) is null)
             .Select(template => new MalformedTypeDescriptor(template.Identity, Array.AsReadOnly<string>([.. template.ShortNameList])))]);
         List<Candidate> candidates = [];
+        Dictionary<string, Task<IReadOnlyCollection<string>>> packageMetadata = new(StringComparer.Ordinal);
         foreach (ITemplateInfo template in templates.Where(template => TemplateCatalogProjector.GetTemplateType(template) is not null))
         {
             ITemplatePackage? package = packages.FirstOrDefault(package => package.MountPointUri == template.MountPointUri);
@@ -149,7 +150,13 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
             try
             {
                 TemplateConfigurationSnapshot configuration = await _session.ReadConfigurationAsync(template, cancellationToken);
-                IReadOnlyCollection<string> packageTypes = await _session.ReadPackageTypesAsync(package, cancellationToken);
+                if (!packageMetadata.TryGetValue(template.MountPointUri, out Task<IReadOnlyCollection<string>>? metadata))
+                {
+                    metadata = _session.ReadPackageTypesAsync(package, cancellationToken);
+                    packageMetadata.Add(template.MountPointUri, metadata);
+                }
+
+                IReadOnlyCollection<string> packageTypes = await metadata;
                 TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Content, cancellationToken, packageTypes);
                 candidates.Add(new(template, entry with { ConstraintEvaluation = evaluation }, configuration));
             }
