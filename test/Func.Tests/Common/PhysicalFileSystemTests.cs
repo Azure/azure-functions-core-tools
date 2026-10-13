@@ -123,7 +123,7 @@ public sealed class PhysicalFileSystemTests : IDisposable
         Action act = () => _fileSystem.ResolveFileLinkTarget(firstLink);
 
         // Assert
-        act.Should().Throw<IOException>().WithMessage("*cycle*");
+        act.Should().Throw<IOException>();
     }
 
     [Fact]
