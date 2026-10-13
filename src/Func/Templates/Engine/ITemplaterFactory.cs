@@ -11,10 +11,13 @@ internal interface ITemplaterFactory
     /// <summary>
     /// Creates a templater bound to <paramref name="context"/>. The caller disposes it when the command is finished.
     /// </summary>
-    public Templater Create(TemplateEngineContext context);
+    public Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken,
+        Action<TemplateStoreWaitReason>? waiting = null);
 
-    public Templater Create(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot);
+    public Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+        CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null);
 
-    public Templater CreateProject(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
-        TemplateProjectConfigurationPlanner planner, TemplateProjectConfigurationWriter writer);
+    public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+        TemplateProjectConfigurationPlanner planner, TemplateProjectConfigurationWriter writer, CancellationToken cancellationToken,
+        Action<TemplateStoreWaitReason>? waiting = null);
 }

@@ -32,10 +32,13 @@ internal class TemplateEngineSession : IDisposable
     private readonly TemplateCreator _creator;
     private readonly TemplateProjectConfigurationPlanner? _projectPlanner;
     private readonly TemplateProjectConfigurationWriter? _configurationWriter;
+    private readonly IDisposable? _ownership;
+    private readonly TemplateStoreEngineDiagnostics? _diagnostics;
     private bool _disposed;
 
     public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null,
-        TemplateProjectConfigurationPlanner? projectPlanner = null, TemplateProjectConfigurationWriter? configurationWriter = null)
+        TemplateProjectConfigurationPlanner? projectPlanner = null, TemplateProjectConfigurationWriter? configurationWriter = null,
+        IDisposable? ownership = null, TemplateStoreEngineDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
@@ -52,7 +55,9 @@ internal class TemplateEngineSession : IDisposable
         Context = context;
         _projectPlanner = projectPlanner;
         _configurationWriter = configurationWriter;
-        _settings = new(new FuncTemplateEngineHost(context, snapshot), settingsLocation: settingsLocation);
+        _ownership = ownership;
+        _diagnostics = diagnostics;
+        _settings = new(new FuncTemplateEngineHost(context, snapshot, diagnostics), settingsLocation: settingsLocation);
         _packageManager = new(_settings);
         _constraintManager = new(_settings);
         _creator = new(_settings);
@@ -90,6 +95,22 @@ internal class TemplateEngineSession : IDisposable
             return _packageManager;
         }
     }
+
+    internal async Task RebuildCacheAsync(CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _packageManager.RebuildTemplateCacheAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        _diagnostics?.ThrowIfCacheFailed();
+        string cache = Path.Combine(_settings.Paths.HostVersionSettingsDir, "templatecache.json");
+        if (!_settings.Host.FileSystem.FileExists(cache))
+        {
+            throw new IOException("The template engine did not persist its rebuilt cache.");
+        }
+    }
+
+    internal void CheckStoreDiagnostics() => _diagnostics?.ThrowIfCacheFailed();
 
     public virtual async Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
     {
@@ -462,8 +483,27 @@ internal class TemplateEngineSession : IDisposable
         }
 
         _disposed = true;
-        _constraintManager.Dispose();
-        _packageManager.Dispose();
-        _settings.Dispose();
+        try
+        {
+            _constraintManager.Dispose();
+        }
+        finally
+        {
+            try
+            {
+                _packageManager.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    _settings.Dispose();
+                }
+                finally
+                {
+                    _ownership?.Dispose();
+                }
+            }
+        }
     }
 }
