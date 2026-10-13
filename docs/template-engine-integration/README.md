@@ -16,6 +16,14 @@ Preview reports template and configuration effects without writing. Creation fin
 
 The fixture action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` remains proposed, not a stable public authoring contract. These tests qualify controlled runtime fixtures and configuration compatibility, not production template packages or a public command switch. Ordinary restores, reusable native evaluation, wider topology, live-hive leases and hostile concurrent filesystem mutation remain outside this qualified subset.
 
+## Existing-project configuration persistence
+
+The public `func init` adoption and language-repair paths remain independent of template discovery and invocation. Their configuration writes now use the existing atomic filesystem writer and must finish before init reports success. A write failure is a non-zero, actionable error rather than a warning followed by successful adoption or repair. Repair preserves unrelated configuration keys and refuses missing, malformed or non-object configuration instead of synthesizing replacement metadata. Cancellation is passed through configuration reads and writes and stops subsequent success output or initializer dispatch.
+
+The same mandatory writer is used by the current workload-backed creation path before initializer dispatch. This does not change scaffolding order, language omission for single-language stacks, or introduce rollback; a later initializer failure can still leave configuration behind. File-level atomic writes do not provide concurrent-edit isolation or a transaction covering the entire project.
+
+This is preparatory failure qualification, not the public template-first switch. Stack metadata migration, shared strict parsing, stable configuration-action authoring, template acquisition and all-six-stack package qualification remain separate gates.
+
 ## Runnable Node Smoke
 
 The opt-in exporter reuses the native installed-template path exercised by `ProjectJourney_NodeHttpFixture_GeneratesFunctionAndCanonicalConfiguration`. It supplies controlled Node initializer metadata, previews without creating the output directory, generates a dependency-free JavaScript HTTP function and finalizes canonical CLI configuration. Unit tests do not launch the host.
