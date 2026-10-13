@@ -415,6 +415,95 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task ResolveGroupAsync_MixedTypeShortName_PreservesWrongTypeDiagnostic()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        var project = Path.Combine(package, "project", ".template.config", "template.json");
+        File.WriteAllText(project, File.ReadAllText(project).Replace(TemplateFixtures.ProjectTemplateShortName, TemplateFixtures.ItemTemplateShortName, StringComparison.Ordinal));
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateShortName, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Success);
+        result.Group.Should().ContainSingle().Which.Entry.Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
+        result.Diagnostics.Should().ContainSingle().Which.Type.Should().Be(TemplateType.Project);
+        result.Group!.Diagnostics.Should().BeEquivalentTo(result.Diagnostics);
+    }
+
+    [Theory]
+    [InlineData(TemplateFixtures.OtherTypeTemplateIdentity)]
+    [InlineData(TemplateFixtures.UntypedTemplateIdentity)]
+    public async Task ResolveGroupAsync_MalformedType_ReportsAuthoringDiagnostic(string identity)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync(identity, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.InvalidTemplateType);
+        result.Diagnostic.Should().Contain(identity);
+        result.Group.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ListAsync_UnreadableCandidate_PreservesHealthyCatalogEntries(bool ioFailure)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteJourneyPackage(_root), _hive);
+        var session = new DenyingConfigurationSession(new(WorkingDirectory.FromExplicit(_root)), _hive) { DeniedIdentity = "Func.Tests.Journey", DeniedWithIo = ioFailure };
+        using Templater templater = new(session);
+
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+
+        entries.Should().ContainSingle(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity && entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible);
+        entries.Should().ContainSingle(entry => entry.Identity == "Func.Tests.Journey" && entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Failed);
+    }
+
+    [Fact]
+    public async Task ResolveGroupAsync_MalformedIdentityBeforeValidAlias_ReportsAuthoringDiagnostic()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        var item = Path.Combine(package, "item", ".template.config", "template.json");
+        File.WriteAllText(item, File.ReadAllText(item).Replace(TemplateFixtures.ItemTemplateShortName, TemplateFixtures.OtherTypeTemplateIdentity, StringComparison.Ordinal));
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync(TemplateFixtures.OtherTypeTemplateIdentity, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.InvalidTemplateType);
+        result.Group.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ResolveGroupAsync_RejectedGroups_DoNotCreateEligibleAmbiguity(bool allUnavailable)
+    {
+        var basic = TemplateFixtures.WriteBasicPackage(Path.Combine(_root, "basic-family"));
+        if (allUnavailable)
+        {
+            var config = Path.Combine(basic, "item", ".template.config", "template.json");
+            File.WriteAllText(config, File.ReadAllText(config).Replace("\"sourceName\": \"ItemFunction\"", "\"sourceName\": \"ItemFunction\", \"constraints\":{\"stack\":{\"type\":\"func-workload\",\"args\":\"python\"}}", StringComparison.Ordinal));
+        }
+
+        var restricted = TemplateFixtures.WriteJourneyPackage(Path.Combine(_root, "restricted-family"));
+        var restrictedConfig = Path.Combine(restricted, "item", ".template.config", "template.json");
+        File.WriteAllText(restrictedConfig, File.ReadAllText(restrictedConfig).Replace("func-tests-journey", TemplateFixtures.ItemTemplateShortName, StringComparison.Ordinal));
+        await TemplateFixtures.InstallAsync(basic, _hive);
+        await TemplateFixtures.InstallAsync(restricted, _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateShortName, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(allUnavailable ? TemplateResolutionStatus.Unavailable : TemplateResolutionStatus.Success);
+        result.Group.Should().HaveCount(allUnavailable ? 0 : 1);
+        result.Diagnostics.Should().HaveCount(allUnavailable ? 2 : 1);
+    }
+
+    [Fact]
     public async Task CreateGroupAsync_ForeignFlowEntry_RejectsUncheckedReplacement()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
@@ -617,8 +706,22 @@ public sealed class TemplaterTests : IDisposable
 
         public Action? AfterPreview { get; set; }
 
+        public string? DeniedIdentity { get; set; }
+
+        public bool DeniedWithIo { get; set; }
+
         public override Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
         {
+            if (template.Identity == DeniedIdentity)
+            {
+                if (DeniedWithIo)
+                {
+                    throw new IOException("Fixture candidate read failed.");
+                }
+
+                throw new UnauthorizedAccessException("Fixture candidate access denied.");
+            }
+
             if (DeniedRead is not null || AfterPreview is not null)
             {
                 _readsAfterSelection++;

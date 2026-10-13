@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -70,6 +71,41 @@ public sealed class TemplaterFactoryTests : IDisposable
         Action act = () => factory.Create(null!);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("context");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Create_SuppliedSnapshot_ControlsConstraintEligibility(bool usable)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteJourneyPackage(_root), Path.Combine(Home, "templates"));
+        ITemplaterFactory factory = new TemplaterFactory(new(Home));
+        var snapshot = new TemplateConstraintEvaluationSnapshot([new("node-package", NuGetVersion.Parse("1.0"), ["node"], usable)]);
+
+        using Templater templater = factory.Create(Context("snapshot"), snapshot);
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+
+        entries.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(usable
+            ? TemplateConstraintEvaluationStatus.Eligible
+            : TemplateConstraintEvaluationStatus.Restricted);
+    }
+
+    [Fact]
+    public void Create_SnapshotOverloadNullContext_Throws()
+    {
+        ITemplaterFactory factory = new TemplaterFactory(new(Home));
+        Action action = () => factory.Create(null!, new([]));
+
+        action.Should().Throw<ArgumentNullException>().WithParameterName("context");
+    }
+
+    [Fact]
+    public void Create_NullSnapshot_Throws()
+    {
+        ITemplaterFactory factory = new TemplaterFactory(new(Home));
+        Action action = () => factory.Create(Context("snapshot"), null!);
+
+        action.Should().Throw<ArgumentNullException>().WithParameterName("snapshot");
     }
 
     [Fact]
