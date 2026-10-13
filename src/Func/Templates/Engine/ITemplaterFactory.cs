@@ -14,4 +14,7 @@ internal interface ITemplaterFactory
     public Templater Create(TemplateEngineContext context);
 
     public Templater Create(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot);
+
+    public Templater CreateProject(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+        TemplateProjectConfigurationPlanner planner, TemplateProjectConfigurationWriter writer);
 }

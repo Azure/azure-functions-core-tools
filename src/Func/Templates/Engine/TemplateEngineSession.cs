@@ -30,14 +30,23 @@ internal class TemplateEngineSession : IDisposable
     private readonly TemplatePackageManager _packageManager;
     private readonly TemplateConstraintManager _constraintManager;
     private readonly TemplateCreator _creator;
+    private readonly TemplateProjectConfigurationPlanner? _projectPlanner;
+    private readonly TemplateProjectConfigurationWriter? _configurationWriter;
     private bool _disposed;
 
-    public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null)
+    public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null,
+        TemplateProjectConfigurationPlanner? projectPlanner = null, TemplateProjectConfigurationWriter? configurationWriter = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
+        if ((projectPlanner is null) != (configurationWriter is null))
+        {
+            throw new ArgumentException("Project planning and mandatory configuration persistence must be supplied together.", nameof(configurationWriter));
+        }
 
         Context = context;
+        _projectPlanner = projectPlanner;
+        _configurationWriter = configurationWriter;
         _settings = new(new FuncTemplateEngineHost(context, snapshot), settingsLocation: settingsLocation);
         _packageManager = new(_settings);
         _constraintManager = new(_settings);
@@ -45,6 +54,19 @@ internal class TemplateEngineSession : IDisposable
     }
 
     public TemplateEngineContext Context { get; }
+
+    public bool ProjectTemplatesEnabled => _projectPlanner is not null;
+
+    public void ValidateProjectConfiguration(string configuration)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_projectPlanner is null)
+        {
+            throw new InvalidTemplateMetadataException("Mandatory project configuration is not enabled in this template flow.");
+        }
+
+        _projectPlanner.Read(configuration);
+    }
 
     public IEngineEnvironmentSettings Settings
     {
@@ -205,7 +227,19 @@ internal class TemplateEngineSession : IDisposable
         }
 
         using var document = JsonDocument.Parse(current.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
-        if (document.RootElement.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
+        bool isProject = TemplateCatalogProjector.GetTemplateType(template) == TemplateType.Project;
+        if (isProject)
+        {
+            try
+            {
+                ValidateProjectConfiguration(current.Content);
+            }
+            catch (InvalidTemplateMetadataException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
+        }
+        else if (document.RootElement.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
             && property.Value.ValueKind != JsonValueKind.Null && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
         {
             return new(TemplateInvocationStatus.Failed, [], "Item post-actions require a qualified dispatcher and are not supported by this invocation path.");
@@ -222,6 +256,32 @@ internal class TemplateEngineSession : IDisposable
 
         IReadOnlyList<TemplateFileChange> changes = Array.AsReadOnly<TemplateFileChange>(
             [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+        IReadOnlyList<TemplateProjectConfigurationPlan> configurationPlans = [];
+        if (isProject)
+        {
+            try
+            {
+                if (preview.CreationEffects is null)
+                {
+                    return new(TemplateInvocationStatus.InvalidTemplate, [], "Project preview did not produce a configuration plan.");
+                }
+
+                configurationPlans = _projectPlanner!.CreatePlans(current.Content, preview.CreationEffects, output);
+                if (configurationPlans.Any(plan => _settings.Host.FileSystem.FileExists(plan.ConfigurationPath)
+                    || _settings.Host.FileSystem.DirectoryExists(plan.ConfigurationPath)))
+                {
+                    return new(TemplateInvocationStatus.FileConflict, changes, "Existing project configuration is user-owned. Use the existing initializer to adopt or repair it.");
+                }
+
+                changes = Array.AsReadOnly<TemplateFileChange>([.. changes,
+                    .. configurationPlans.Select(plan => new TemplateFileChange(Path.GetRelativePath(output, plan.ConfigurationPath), "Create"))]);
+            }
+            catch (InvalidTemplateMetadataException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
+        }
+
         bool requiresForce = !request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal));
         if (!request.DryRun && requiresForce)
         {
@@ -270,9 +330,39 @@ internal class TemplateEngineSession : IDisposable
 
         ITemplateCreationResult created = await InstantiateAsync(template, request, parameters, false, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return created.Status == CreationResultStatus.Success
-            ? new(TemplateInvocationStatus.Success, changes)
-            : new(MapCreationStatus(created.Status, cancellationToken), changes, created.ErrorMessage ?? created.Status.ToString());
+        if (created.Status != CreationResultStatus.Success)
+        {
+            return new(MapCreationStatus(created.Status, cancellationToken), changes, created.ErrorMessage ?? created.Status.ToString());
+        }
+
+        List<string> configuredProjects = [];
+        foreach (TemplateProjectConfigurationPlan plan in configurationPlans)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            outputFailure = ValidateOutputPaths(output, changes);
+            if (outputFailure is not null)
+            {
+                return new(TemplateInvocationStatus.ConfigurationFailure, changes, outputFailure) { ConfiguredProjects = configuredProjects.AsReadOnly() };
+            }
+
+            try
+            {
+                await _configurationWriter!.WriteAsync(plan, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return new(TemplateInvocationStatus.ConfigurationFailure, changes, $"Mandatory project configuration failed. Generated files were preserved: {exception.Message}")
+                {
+                    ConfiguredProjects = configuredProjects.AsReadOnly(),
+                };
+            }
+
+            configuredProjects.Add(plan.Root);
+        }
+
+        return new(TemplateInvocationStatus.Success, changes) { ConfiguredProjects = configuredProjects.AsReadOnly() };
     }
 
     private static TemplateInvocationStatus MapCreationStatus(CreationResultStatus status, CancellationToken cancellationToken)
@@ -297,6 +387,7 @@ internal class TemplateEngineSession : IDisposable
         foreach (TemplateFileChange change in changes)
         {
             string? path = Path.GetFullPath(Path.Combine(output, change.Path));
+            string target = path;
             string relative = Path.GetRelativePath(output, path);
             if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             {
@@ -307,9 +398,15 @@ internal class TemplateEngineSession : IDisposable
             {
                 try
                 {
-                    if ((_settings.Host.FileSystem.GetFileAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                    FileAttributes attributes = _settings.Host.FileSystem.GetFileAttributes(path);
+                    if ((attributes & FileAttributes.ReparsePoint) != 0)
                     {
                         return "Template output uses a symbolic link or reparse point. Choose an unlinked output directory.";
+                    }
+
+                    if (!string.Equals(path, target, StringComparison.Ordinal) && (attributes & FileAttributes.Directory) == 0)
+                    {
+                        return "A template output directory ancestor is an existing file. Choose an output directory without file collisions.";
                     }
                 }
                 catch (FileNotFoundException)

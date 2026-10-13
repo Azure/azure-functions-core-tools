@@ -3,7 +3,9 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
+using NSubstitute;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
@@ -106,6 +108,45 @@ public sealed class TemplaterFactoryTests : IDisposable
         Action action = () => factory.Create(Context("snapshot"), null!);
 
         action.Should().Throw<ArgumentNullException>().WithParameterName("snapshot");
+    }
+
+    [Fact]
+    public async Task CreateProject_ExplicitSupport_EnablesOnlyTheProjectFlow()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), Path.Combine(Home, "templates"));
+        ITemplaterFactory factory = new TemplaterFactory(new(Home));
+        var initializer = Substitute.For<IProjectInitializer>();
+        initializer.Stack.Returns("python");
+        initializer.SupportedLanguages.Returns(["Python"]);
+        initializer.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["Python"] = ["py"] });
+        TemplateProjectConfigurationPlanner planner = new([initializer]);
+        TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
+
+        using Templater project = factory.CreateProject(Context("project"), new([]), planner, writer);
+        using Templater ordinary = factory.Create(Context("ordinary"));
+        var eligible = await project.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
+        var gated = await ordinary.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
+
+        eligible.Status.Should().Be(TemplateResolutionStatus.Success);
+        gated.Status.Should().Be(TemplateResolutionStatus.Unavailable);
+        project.Context.CommandDirectory.Should().NotBe(ordinary.Context.CommandDirectory);
+    }
+
+    [Theory]
+    [InlineData("context")]
+    [InlineData("snapshot")]
+    [InlineData("planner")]
+    [InlineData("writer")]
+    public void CreateProject_NullDependency_Throws(string argument)
+    {
+        ITemplaterFactory factory = new TemplaterFactory(new(Home));
+        TemplateProjectConfigurationPlanner planner = new([]);
+        TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
+
+        Action create = () => factory.CreateProject(argument == "context" ? null! : Context("project"),
+            argument == "snapshot" ? null! : new([]), argument == "planner" ? null! : planner, argument == "writer" ? null! : writer);
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName(argument);
     }
 
     [Fact]

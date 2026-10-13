@@ -2,7 +2,11 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.Extensions.Configuration;
+using System.Text.Json.Nodes;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Template;
@@ -82,6 +86,270 @@ public sealed class TemplaterTests : IDisposable
 
         created.Status.Should().Be(TemplateInvocationStatus.Success);
         File.ReadAllText(Path.Combine(output.Info.FullName, "Journey.txt")).Should().Be("Journey welcome");
+    }
+
+    [Fact]
+    public async Task ProjectJourney_ListSelectPreviewCreate_PersistsMandatoryCliConfiguration()
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        await TemplateFixtures.InstallAsync(package, _hive);
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project-journey-output"));
+        using Templater templater = CreateProjectTemplater();
+        var entries = await templater.ListAsync(TemplateType.Project, CancellationToken.None);
+        var resolution = await templater.CreateGroupAsync(entries, CancellationToken.None);
+        var selected = resolution.Group!.Should().ContainSingle().Subject;
+        var request = new TemplateInvocationRequest(output, new Dictionary<string, string?> { ["Greeting"] = "welcome" }, "Project", DryRun: true);
+
+        var preview = await selected.InvokeAsync(request, CancellationToken.None);
+
+        resolution.Status.Should().Be(TemplateResolutionStatus.Success);
+        selected.Entry.Should().BeSameAs(entries[0]);
+        preview.Status.Should().Be(TemplateInvocationStatus.Success);
+        preview.Changes.Should().Contain(change => change.Path.EndsWith("config.json", StringComparison.Ordinal));
+        preview.Changes.Should().Contain(change => change.Path.EndsWith("Project.txt", StringComparison.Ordinal));
+        preview.ConfiguredProjects.Should().BeEmpty();
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+
+        var created = await selected.InvokeAsync(request with { DryRun = false }, CancellationToken.None);
+
+        created.Status.Should().Be(TemplateInvocationStatus.Success);
+        created.ConfiguredProjects.Should().ContainSingle().Which.Should().Be(output.Info.FullName);
+        File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
+        File.ReadAllText(Path.Combine(output.Info.FullName, "Project.txt")).Should().Be("Project welcome");
+        var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(output.Info.FullName, ".func", "config.json")).Build();
+        StackOptions options = new();
+        new StackOptionsSetup(configuration).Configure(options);
+        options.Runtime.Should().Be("python");
+        options.Language.Should().Be("Python");
+    }
+
+    [Fact]
+    public async Task ProjectJourney_UndeclaredHostRoot_FailsBeforeCreation()
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        Directory.CreateDirectory(Path.Combine(package, "project", "extra"));
+        File.WriteAllText(Path.Combine(package, "project", "extra", "host.json"), "{}");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateProjectTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "missing-project-config-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
+        result.Diagnostic.Should().Contain("exactly one");
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectJourney_AuthoredCliConfiguration_FailsBeforeCreation()
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        Directory.CreateDirectory(Path.Combine(package, "project", ".func"));
+        File.WriteAllText(Path.Combine(package, "project", ".func", "config.json"), "{}");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateProjectTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "authored-config-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
+        result.Diagnostic.Should().Contain("CLI-owned");
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(".func")]
+    [InlineData(".func/config.json/extra.txt")]
+    public async Task ProjectJourney_ConfigPathCollision_FailsBeforeCreation(string relativePath)
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var path = Path.Combine(package, "project", relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "collision");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateProjectTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "config-collision-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectJourney_ExistingFileAtConfigDirectory_FailsBeforeCreation()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        using Templater templater = CreateProjectTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "existing-config-directory-file"));
+        Directory.CreateDirectory(output.Info.FullName);
+        File.WriteAllText(Path.Combine(output.Info.FullName, ".func"), "user-owned");
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        result.Status.Should().NotBe(TemplateInvocationStatus.Success);
+        File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeFalse();
+        File.ReadAllText(Path.Combine(output.Info.FullName, ".func")).Should().Be("user-owned");
+    }
+
+    [Fact]
+    public async Task ProjectJourney_MalformedUnicodeCandidate_PreservesHealthyCatalogEntry()
+    {
+        var healthy = TemplateFixtures.WriteProjectJourneyPackage(Path.Combine(_root, "healthy"));
+        var malformed = TemplateFixtures.WriteProjectJourneyPackage(Path.Combine(_root, "malformed"));
+        var path = Path.Combine(malformed, "project", ".template.config", "template.json");
+        var configuration = File.ReadAllText(path).TrimEnd().Replace(TemplateFixtures.ProjectTemplateIdentity, "Func.Tests.MalformedProject", StringComparison.Ordinal);
+        File.WriteAllText(path, configuration[..^1] + ",\"extra\":{\"\\uD800\":1}}");
+        await TemplateFixtures.InstallAsync(healthy, _hive);
+        await TemplateFixtures.InstallAsync(malformed, _hive);
+        using Templater templater = CreateProjectTemplater();
+
+        var entries = await templater.ListAsync(TemplateType.Project, CancellationToken.None);
+
+        entries.Should().ContainSingle(entry => entry.Identity == TemplateFixtures.ProjectTemplateIdentity)
+            .Which.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Eligible);
+        entries.Should().ContainSingle(entry => entry.Identity == "Func.Tests.MalformedProject")
+            .Which.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Failed);
+    }
+
+    [Fact]
+    public async Task ProjectJourney_LinkedConfigurationDirectory_FailsBeforeCreation()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        using Templater templater = CreateProjectTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "linked-config-output"));
+        var external = Path.Combine(_root, "external-config");
+        Directory.CreateDirectory(output.Info.FullName);
+        Directory.CreateDirectory(external);
+        Directory.CreateSymbolicLink(Path.Combine(output.Info.FullName, ".func"), external);
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        result.Status.Should().NotBe(TemplateInvocationStatus.Success);
+        result.Diagnostic.Should().Contain("link");
+        File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeFalse();
+        Directory.GetFiles(external).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ProjectJourney_ExistingUserConfiguration_ForceDoesNotOverwriteIt()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        using Templater templater = CreateProjectTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "user-config-output"));
+        var config = Path.Combine(output.Info.FullName, ".func", "config.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(config)!);
+        File.WriteAllText(config, "user-owned");
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), Force: true), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.FileConflict);
+        File.ReadAllText(config).Should().Be("user-owned");
+        File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectJourney_ConfigurationWriteFailure_PreservesGeneratedFilesAndReportsFailure()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        var fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.FileExists(Arg.Any<string>()).Returns(call => Path.GetFileName((string)call[0]) == "host.json");
+        fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(new IOException("controlled atomic write failure")));
+        using Templater templater = CreateProjectTemplater(fileSystem);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "failed-config-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.ConfigurationFailure);
+        result.Diagnostic.Should().Contain("preserved");
+        result.ConfiguredProjects.Should().BeEmpty();
+        File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectJourney_ConfigurationReturnsAfterCancellation_PropagatesCancellation()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        using CancellationTokenSource cancellation = new();
+        var fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.FileExists(Arg.Any<string>()).Returns(call => Path.GetFileName((string)call[0]) == "host.json");
+        fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async _ => await cancellation.CancelAsync());
+        using Templater templater = CreateProjectTemplater(fileSystem);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canceled-config-output"));
+
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>()), cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectJourney_ConfigurationFaultsAfterCancellation_PropagatesCancellation()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        using CancellationTokenSource cancellation = new();
+        var fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.FileExists(Arg.Any<string>()).Returns(call => Path.GetFileName((string)call[0]) == "host.json");
+        fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async _ =>
+        {
+            await cancellation.CancelAsync();
+            throw new IOException("controlled write failure after cancellation");
+        });
+        using Templater templater = CreateProjectTemplater(fileSystem);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canceled-fault-config-output"));
+
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>()), cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectJourney_TwoRoots_FinalizesInOrderAndPreservesPartialCompletion(bool failSecond)
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var path = Path.Combine(package, "project", ".template.config", "template.json");
+        var configuration = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        configuration["primaryOutputs"]!.AsArray().Add(new JsonObject { ["path"] = "second/host.json" });
+        var action = configuration["postActions"]!.AsArray()[0]!.DeepClone();
+        action["args"]!["primaryOutputIndex"] = "1";
+        configuration["postActions"]!.AsArray().Add(action);
+        File.WriteAllText(path, configuration.ToJsonString());
+        Directory.CreateDirectory(Path.Combine(package, "project", "second"));
+        File.WriteAllText(Path.Combine(package, "project", "second", "host.json"), "{}");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        PhysicalFileSystem physical = new();
+        var fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.FileExists(Arg.Any<string>()).Returns(call => physical.FileExists((string)call[0]));
+        fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(call =>
+            failSecond && ((string)call[0]).Contains($"second{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                ? Task.FromException(new IOException("second project finalization failed"))
+                : physical.WriteAllTextAsync((string)call[0], (string)call[1], (CancellationToken)call[2]));
+        using Templater templater = CreateProjectTemplater(fileSystem);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "two-project-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        result.Status.Should().Be(failSecond ? TemplateInvocationStatus.ConfigurationFailure : TemplateInvocationStatus.Success);
+        IReadOnlyList<string> expectedProjects = failSecond ? [output.Info.FullName] : [output.Info.FullName, Path.Combine(output.Info.FullName, "second")];
+        result.ConfiguredProjects.Should().Equal(expectedProjects);
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeTrue();
+        File.Exists(Path.Combine(output.Info.FullName, "second", ".func", "config.json")).Should().Be(!failSecond);
+        File.Exists(Path.Combine(output.Info.FullName, "second", "host.json")).Should().BeTrue();
     }
 
     [Fact]
@@ -920,6 +1188,17 @@ public sealed class TemplaterTests : IDisposable
 
     private Templater CreateTemplater(TemplateConstraintEvaluationSnapshot? snapshot = null)
         => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
+
+    private Templater CreateProjectTemplater(IFileSystem? fileSystem = null)
+    {
+        var initializer = Substitute.For<IProjectInitializer>();
+        initializer.Stack.Returns("python");
+        initializer.SupportedLanguages.Returns(["Python"]);
+        initializer.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["Python"] = ["py"] });
+        TemplateProjectConfigurationPlanner planner = new([initializer]);
+        TemplateProjectConfigurationWriter writer = new(fileSystem ?? new PhysicalFileSystem());
+        return new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, projectPlanner: planner, configurationWriter: writer));
+    }
 
     private sealed class FailingEngineSession(TemplateEngineContext context, string hive, CreationResultStatus nativeStatus, bool failCreation = false) : TemplateEngineSession(context, hive)
     {

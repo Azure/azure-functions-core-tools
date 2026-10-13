@@ -30,4 +30,15 @@ internal sealed class TemplaterFactory(CliConfigurationPathsOptions configuratio
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
         return new Templater(new TemplateEngineSession(context, settingsLocation, snapshot));
     }
+
+    public Templater CreateProject(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+        TemplateProjectConfigurationPlanner planner, TemplateProjectConfigurationWriter writer)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(planner);
+        ArgumentNullException.ThrowIfNull(writer);
+        string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
+        return new(new TemplateEngineSession(context, settingsLocation, snapshot, planner, writer));
+    }
 }

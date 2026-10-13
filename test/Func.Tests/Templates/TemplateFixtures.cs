@@ -215,6 +215,26 @@ internal static class TemplateFixtures
         return packageDirectory;
     }
 
+      public static string WriteProjectJourneyPackage(string parentDirectory)
+      {
+        string packageDirectory = Path.Combine(parentDirectory, "project-journey-templates");
+        WriteTemplate(Path.Combine(packageDirectory, "project"),
+          """
+          {
+            "identity":"Func.Tests.Project","name":"Project journey","shortName":"func-tests-project",
+            "tags":{"type":"project"},"sourceName":"FuncProject",
+            "constraints":{"host":{"type":"host","args":[{"hostname":"func"}]}},
+            "primaryOutputs":[{"path":"host.json"}],
+            "symbols":{"Greeting":{"type":"parameter","datatype":"string","defaultValue":"hello","replaces":"GREETING"}},
+            "postActions":[{"actionId":"00e33184-ffc7-43ef-bec0-b1684df8ad56",
+            "args":{"primaryOutputIndex":"0","stack":"python","language":"py"}}]
+          }
+          """,
+            ("host.json", "{\"version\":\"2.0\"}"));
+          File.WriteAllText(Path.Combine(packageDirectory, "project", "FuncProject.txt"), "FuncProject GREETING");
+        return packageDirectory;
+      }
+
     public static string WriteSharedJourneyPackage(string parentDirectory, bool shared = true, string? packageTypeVersion = null, bool multiple = false)
     {
         string folder = WriteJourneyPackage(parentDirectory);
