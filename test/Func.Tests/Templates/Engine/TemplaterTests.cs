@@ -1,12 +1,12 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.Extensions.Configuration;
-using System.Text.Json.Nodes;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Template;
@@ -121,6 +121,116 @@ public sealed class TemplaterTests : IDisposable
         new StackOptionsSetup(configuration).Configure(options);
         options.Runtime.Should().Be("python");
         options.Language.Should().Be("Python");
+    }
+
+    [Fact]
+    public async Task ProjectJourney_NodeHttpFixture_GeneratesFunctionAndCanonicalConfiguration()
+    {
+        var (output, preview, created, previewCreatedDirectory) = await CreateNodeProjectAsync(_root, CancellationToken.None);
+
+        preview.Status.Should().Be(TemplateInvocationStatus.Success);
+        previewCreatedDirectory.Should().BeFalse();
+        created.Status.Should().Be(TemplateInvocationStatus.Success);
+        created.ConfiguredProjects.Should().ContainSingle().Which.Should().Be(output.Info.FullName);
+        var function = JsonNode.Parse(File.ReadAllText(Path.Combine(output.Info.FullName, "Hello", "function.json")))!;
+        function["bindings"]!.AsArray().Should().Contain(binding => binding!["type"]!.GetValue<string>() == "httpTrigger");
+        File.ReadAllText(Path.Combine(output.Info.FullName, "Hello", "index.js")).Should().Contain("Hello from GeneratedApp").And.NotContain("GREETING");
+        var settings = JsonNode.Parse(File.ReadAllText(Path.Combine(output.Info.FullName, "local.settings.json")))!;
+        settings["Values"]!["AzureWebJobsStorage"]!.GetValue<string>().Should().Be("UseDevelopmentStorage=true");
+        var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(output.Info.FullName, ".func", "config.json")).Build();
+        StackOptions options = new();
+        new StackOptionsSetup(configuration).Configure(options);
+        options.Runtime.Should().Be("node");
+        options.Language.Should().Be("JavaScript");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task ExportNodeSmokeProjectAsync_BlankDestination_RejectsArgument(string? destination)
+    {
+        Func<Task> action = () => ExportNodeSmokeProjectAsync(destination!, CancellationToken.None);
+
+        await action.Should().ThrowAsync<ArgumentException>().WithParameterName("parentDirectory");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExportNodeSmokeProjectAsync_NonemptyDestination_PreservesExistingContent(bool directory)
+    {
+        var destination = Path.Combine(_root, "export");
+        Directory.CreateDirectory(destination);
+        var sentinel = Path.Combine(destination, "sentinel");
+        if (directory)
+        {
+            Directory.CreateDirectory(sentinel);
+        }
+        else
+        {
+            File.WriteAllText(sentinel, "user content");
+        }
+
+        Func<Task> action = () => ExportNodeSmokeProjectAsync(destination, CancellationToken.None);
+
+        await action.Should().ThrowAsync<ArgumentException>().WithParameterName("parentDirectory");
+        Directory.EnumerateFileSystemEntries(destination).Should().ContainSingle().Which.Should().Be(sentinel);
+        if (!directory)
+        {
+            File.ReadAllText(sentinel).Should().Be("user content");
+        }
+    }
+
+    [Fact]
+    public async Task ExportNodeSmokeProjectAsync_PreCancelled_DoesNotWriteFixture()
+    {
+        var destination = Path.Combine(_root, "cancelled-export");
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        Func<Task> action = () => ExportNodeSmokeProjectAsync(destination, cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        Directory.Exists(destination).Should().BeFalse();
+    }
+
+    public static async Task<string> ExportNodeSmokeProjectAsync(string parentDirectory, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(parentDirectory);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Directory.Exists(parentDirectory) && Directory.EnumerateFileSystemEntries(parentDirectory).Any())
+        {
+            throw new ArgumentException("The smoke fixture requires an empty output directory.", nameof(parentDirectory));
+        }
+
+        var (output, preview, created, previewCreatedDirectory) = await CreateNodeProjectAsync(parentDirectory, cancellationToken);
+        if (preview.Status != TemplateInvocationStatus.Success || created.Status != TemplateInvocationStatus.Success || previewCreatedDirectory)
+        {
+            throw new InvalidOperationException($"Smoke project generation failed: {created.Diagnostic ?? preview.Diagnostic}");
+        }
+
+        return output.Info.FullName;
+    }
+
+    private static async Task<(WorkingDirectory Output, TemplateInvocationResult Preview, TemplateInvocationResult Created, bool PreviewCreatedDirectory)> CreateNodeProjectAsync(string parentDirectory, CancellationToken cancellationToken)
+    {
+        string hive = Path.Combine(parentDirectory, "hive");
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteRunnableNodeProjectPackage(parentDirectory), hive);
+        var initializer = Substitute.For<IProjectInitializer>();
+        initializer.Stack.Returns("node");
+        initializer.SupportedLanguages.Returns(["JavaScript"]);
+        initializer.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["JavaScript"] = ["js"] });
+        var output = WorkingDirectory.FromExplicit(Path.Combine(parentDirectory, "generated"));
+        TemplateProjectConfigurationPlanner planner = new([initializer]);
+        TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
+        using Templater templater = new(new TemplateEngineSession(new(output), hive, projectPlanner: planner, configurationWriter: writer));
+        var resolution = await templater.ResolveGroupAsync("Func.Tests.RunnableNodeProject", TemplateType.Project, cancellationToken);
+        var selected = resolution.Group!.Single();
+        var request = new TemplateInvocationRequest(output, new Dictionary<string, string?> { ["Greeting"] = "Hello" }, "GeneratedApp", DryRun: true);
+        var preview = await selected.InvokeAsync(request, cancellationToken);
+        bool previewCreatedDirectory = Directory.Exists(output.Info.FullName);
+        var created = await selected.InvokeAsync(request with { DryRun = false }, cancellationToken);
+        return (output, preview, created, previewCreatedDirectory);
     }
 
     [Theory]

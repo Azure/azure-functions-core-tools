@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
+using System.Text.Json.Nodes;
 using System.Xml.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
@@ -234,6 +235,43 @@ internal static class TemplateFixtures
           File.WriteAllText(Path.Combine(packageDirectory, "project", "FuncProject.txt"), "FuncProject GREETING");
         return packageDirectory;
       }
+
+    public static string WriteRunnableNodeProjectPackage(string parentDirectory)
+    {
+      string package = WriteProjectJourneyPackage(parentDirectory);
+      string project = Path.Combine(package, "project");
+      string configurationPath = Path.Combine(project, ".template.config", "template.json");
+      JsonNode configuration = JsonNode.Parse(File.ReadAllText(configurationPath))!;
+      configuration["identity"] = "Func.Tests.RunnableNodeProject";
+      configuration["shortName"] = "func-tests-runnable-node";
+      configuration["tags"]!["language"] = "JavaScript";
+      configuration["postActions"]![0]!["args"]!["stack"] = "node";
+      configuration["postActions"]![0]!["args"]!["language"] = "js";
+      File.WriteAllText(configurationPath, configuration.ToJsonString());
+      File.Delete(Path.Combine(project, "FuncProject.txt"));
+      File.WriteAllText(Path.Combine(project, "package.json"), """{"name":"funcproject","version":"1.0.0","private":true}""");
+      File.WriteAllText(Path.Combine(project, "local.settings.json"),
+        """{"IsEncrypted":false,"Values":{"AzureWebJobsStorage":"UseDevelopmentStorage=true","FUNCTIONS_WORKER_RUNTIME":"node"}}""");
+      string function = Path.Combine(project, "Hello");
+      Directory.CreateDirectory(function);
+      File.WriteAllText(Path.Combine(function, "function.json"),
+        """
+        {
+          "bindings":[
+          {"authLevel":"anonymous","type":"httpTrigger","direction":"in","name":"req","methods":["get"],"route":"hello"},
+          {"type":"http","direction":"out","name":"res"}
+          ],
+          "scriptFile":"index.js"
+        }
+        """);
+      File.WriteAllText(Path.Combine(function, "index.js"),
+        """
+        module.exports = async function (context) {
+          context.res = { status: 200, body: "GREETING from FuncProject" };
+        };
+        """);
+      return package;
+    }
 
     public static string WriteSharedJourneyPackage(string parentDirectory, bool shared = true, string? packageTypeVersion = null, bool multiple = false)
     {
