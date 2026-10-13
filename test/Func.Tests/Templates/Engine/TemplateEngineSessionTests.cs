@@ -204,6 +204,85 @@ public sealed class TemplateEngineSessionTests : IDisposable
         File.ReadAllText(host).Should().Be("{\"version\":\"2.0\"}");
     }
 
+    [Fact]
+    public void ProjectConfigurationWriter_NullFileSystem_Throws()
+    {
+        Action construct = () => new TemplateProjectConfigurationWriter(null!);
+
+        construct.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_NullPlan_ThrowsWithoutFileSystemCalls()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+
+        Func<Task> write = () => writer.WriteAsync(null!, CancellationToken.None);
+
+        await write.Should().ThrowAsync<ArgumentNullException>().WithParameterName("plan");
+        fileSystem.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("PrimaryOutput", null)]
+    [InlineData("PrimaryOutput", "")]
+    [InlineData("PrimaryOutput", " ")]
+    [InlineData("Stack", null)]
+    [InlineData("Stack", "")]
+    [InlineData("Stack", " ")]
+    [InlineData("Language", null)]
+    [InlineData("Language", "")]
+    [InlineData("Language", " ")]
+    public async Task WriteProjectConfigurationAsync_InvalidField_ThrowsWithoutFileSystemCalls(string field, string? invalid)
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+        TemplateProjectConfigurationPlan plan = new(field == "PrimaryOutput" ? invalid! : Path.Combine(_root, "host.json"),
+            field == "Stack" ? invalid! : "python", field == "Language" ? invalid! : "Python");
+
+        Func<Task> write = () => writer.WriteAsync(plan, CancellationToken.None);
+
+        if (invalid is null)
+        {
+            await write.Should().ThrowAsync<ArgumentNullException>().WithParameterName($"plan.{field}");
+        }
+        else
+        {
+            await write.Should().ThrowAsync<ArgumentException>().WithParameterName($"plan.{field}");
+        }
+
+        fileSystem.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_RelativePrimaryOutput_ThrowsWithoutFileSystemCalls()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+        TemplateProjectConfigurationPlan plan = new("host.json", "python", "Python");
+
+        Func<Task> write = () => writer.WriteAsync(plan, CancellationToken.None);
+
+        await write.Should().ThrowAsync<ArgumentException>().WithParameterName("plan");
+        fileSystem.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_PreCanceled_ThrowsWithoutFileSystemCalls()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+        TemplateProjectConfigurationPlan plan = new(Path.Combine(_root, "host.json"), "python", "Python");
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        Func<Task> write = () => writer.WriteAsync(plan, cancellation.Token);
+
+        await write.Should().ThrowAsync<OperationCanceledException>();
+        fileSystem.ReceivedCalls().Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData("\"0\"", "false", true)]
     [InlineData("0", "false", false)]
