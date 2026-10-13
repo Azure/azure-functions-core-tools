@@ -14,11 +14,8 @@ namespace Azure.Functions.Cli.Telemetry;
 /// conventions: <see cref="ActivityKind.Internal"/> kind, fixed operation
 /// name <c>"cli.command"</c>, and the <c>cli.command.name</c> attribute
 /// applied via <see cref="SetCommandName"/> once parsing resolves the
-/// invoked command path. Resource-level attributes
-/// (<c>service.name</c>, <c>service.version</c>, <c>os.*</c>,
-/// <c>process.runtime.*</c>) are configured once on the
-/// <see cref="OpenTelemetry.Resources.ResourceBuilder"/> and inherited by
-/// every span — they should not be set per span here.
+/// invoked command path. Common dimensions are added by
+/// <see cref="CliActivityEnrichmentProcessor"/>.
 /// </remarks>
 internal static class ActivityExtensions
 {
@@ -36,20 +33,26 @@ internal static class ActivityExtensions
         /// Call <see cref="SetCommandName"/> once parsing resolves the
         /// invoked command path.
         /// </summary>
-        public Activity? StartCommandActivity()
+        public Activity? StartCommandActivity(DateTimeOffset startTime = default)
         {
-            return source.StartActivity(CommandActivityName, ActivityKind.Internal);
+            return source.StartActivity(CommandActivityName, ActivityKind.Internal, default(ActivityContext), startTime: startTime);
         }
 
         /// <summary>
-        /// Starts an <see cref="Activity"/> that represents the workload load
-        /// + Configure phase at CLI startup. The activity is also picked up
-        /// by <see cref="WorkloadBootMetricListener"/>, which translates its
-        /// stop into the boot-duration metric so trace and metric stay in
-        /// sync. Returns <c>null</c> when no listener is subscribed.
+        /// Emits the measured boot span after the telemetry provider has started.
         /// </summary>
-        public Activity? StartWorkloadBootActivity()
-            => source.StartActivity(TelemetryConventions.WorkloadBootActivityName, ActivityKind.Internal);
+        public void RecordWorkloadBootActivity(WorkloadBootTelemetry telemetry)
+        {
+            ArgumentNullException.ThrowIfNull(telemetry);
+
+            using Activity? activity = source.StartActivity(
+                TelemetryConventions.WorkloadBootActivityName,
+                ActivityKind.Internal,
+                default(ActivityContext),
+                startTime: telemetry.StartTime);
+            activity?.SetTag(TelemetryConventions.CliWorkloadCount, telemetry.WorkloadCount);
+            activity?.SetEndTime((telemetry.StartTime + telemetry.Duration).UtcDateTime);
+        }
     }
 
     extension(Activity activity)

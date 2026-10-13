@@ -33,6 +33,8 @@ catch (System.IO.IOException)
 DefaultTheme theme = new();
 SpectreInteractionService interaction = new(theme);
 
+using var telemetryEnvironment = new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
+
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.
 using var cts = new CancellationTokenSource();
@@ -56,6 +58,7 @@ Console.CancelKeyPress += (_, e) =>
 Task<string?> versionCheckTask = Task.FromResult<string?>(null);
 bool allowAdvisories = false;
 
+DateTimeOffset commandStartTime = DateTimeOffset.UtcNow;
 var stopwatch = Stopwatch.StartNew();
 int exitCode = 0;
 
@@ -66,86 +69,110 @@ int exitCode = 0;
 string commandName = "unknown";
 
 FuncAliasNudge? aliasNudge = null;
-using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
+IHost? host = null;
+Activity? activity = null;
+FuncRootCommand? rootCommand = null;
+ParseResult? commandParseResult = null;
+try
 {
-    FuncRootCommand? rootCommand = null;
-    ParseResult? commandParseResult = null;
+    host = await CliHostFactory.CreateHostAsync(interaction, telemetryEnvironment, cts.Token);
+    await host.StartAsync(cts.Token);
+    activity = CliTelemetry.Trace.StartCommandActivity(commandStartTime);
+
+    WorkloadBootTelemetry bootTelemetry = host.Services.GetRequiredService<WorkloadBootTelemetry>();
+    CliTelemetry.Trace.RecordWorkloadBootActivity(bootTelemetry);
+    CliTelemetry.Metric.RecordWorkloadBoot(bootTelemetry.WorkloadCount, (long)bootTelemetry.Duration.TotalMilliseconds);
+
+    // Capture nudge before host disposal so it can run after the
+    // version notice. Its dependencies (interaction, version
+    // provider) are stateless singletons that outlive the host.
+    aliasNudge = host.Services.GetRequiredService<FuncAliasNudge>();
+
+    rootCommand = Parser.CreateCommand(host.Services);
+    string[] normalizedArgs = LegacyStartArgumentNormalizer.Normalize(args);
+
+    // Pre-parse hydration for `func new -t <id>`: the user can pass
+    // per-template options (e.g. --auth-level) that NewCommand learns
+    // about only after the hydrator runs against the chosen template.
+    // Attach them to NewCommand BEFORE the parser sees argv so SCL
+    // treats them as known options instead of erroring out via
+    // PathArgument's unrecognized-token guard.
+    NewCommandArgPreparer.PrepareIfFuncNew(normalizedArgs, host.Services, rootCommand);
+
+    // Disable POSIX bundling so single-dash typos like `-name` surface as unrecognized options.
+    var parserConfiguration = new ParserConfiguration { EnablePosixBundling = false };
+    commandParseResult = rootCommand.Parse(normalizedArgs, parserConfiguration);
+    allowAdvisories = !SetupCommand.ShouldSuppressAdvisories(commandParseResult);
+    if (allowAdvisories)
+    {
+        versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
+    }
+
+    commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
+    activity?.SetCommandName(commandName);
+
+    IFirstRunCoordinator firstRunCoordinator = host.Services.GetRequiredService<IFirstRunCoordinator>();
+    int? firstRunExitCode = await firstRunCoordinator.EnsureFirstRunPromptedAsync(commandName, commandParseResult, cts.Token);
+    if (firstRunExitCode is int firstRunResult)
+    {
+        exitCode = firstRunResult;
+    }
+    else
+    {
+        var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
+        exitCode = await commandParseResult.InvokeAsync(config, cts.Token);
+    }
+}
+catch (OperationCanceledException)
+{
+    // SIGINT — not a failure to record on the activity.
+    exitCode = 130;
+}
+catch (GracefulException ex)
+{
+    activity?.Fail(ex);
+    interaction.WriteError(ex.Message);
+
+    if (ex.VerboseMessage is not null
+        && rootCommand is not null
+        && commandParseResult?.GetValue(rootCommand.VerboseOption) is true)
+    {
+        interaction.WriteHint(ex.VerboseMessage);
+    }
+
+    exitCode = 1;
+}
+catch (Exception ex)
+{
+    activity?.Fail(ex);
+    interaction.WriteError($"An unexpected error occurred: {ex.Message}");
+    exitCode = 1;
+}
+finally
+{
+    stopwatch.Stop();
     try
     {
-        using IHost host = await CliHostFactory.CreateHostAsync(interaction, cts.Token);
-        await host.StartAsync(cts.Token);
-
-        // Capture nudge before host disposal so it can run after the
-        // version notice. Its dependencies (interaction, version
-        // provider) are stateless singletons that outlive the host.
-        aliasNudge = host.Services.GetRequiredService<FuncAliasNudge>();
-
-        rootCommand = Parser.CreateCommand(host.Services);
-        string[] normalizedArgs = LegacyStartArgumentNormalizer.Normalize(args);
-
-        // Pre-parse hydration for `func new -t <id>`: the user can pass
-        // per-template options (e.g. --auth-level) that NewCommand learns
-        // about only after the hydrator runs against the chosen template.
-        // Attach them to NewCommand BEFORE the parser sees argv so SCL
-        // treats them as known options instead of erroring out via
-        // PathArgument's unrecognized-token guard.
-        NewCommandArgPreparer.PrepareIfFuncNew(normalizedArgs, host.Services, rootCommand);
-
-        // Disable POSIX bundling so single-dash typos like `-name` surface as unrecognized options.
-        var parserConfiguration = new ParserConfiguration { EnablePosixBundling = false };
-        commandParseResult = rootCommand.Parse(normalizedArgs, parserConfiguration);
-        allowAdvisories = !SetupCommand.ShouldSuppressAdvisories(commandParseResult);
-        if (allowAdvisories)
+        activity?.SetTag(TelemetryConventions.ProcessExitCode, exitCode);
+        if (exitCode is not (0 or 130) && activity?.Status != ActivityStatusCode.Error)
         {
-            versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
+            activity?.SetStatus(ActivityStatusCode.Error);
         }
 
-        commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
-        activity?.SetCommandName(commandName);
-
-        IFirstRunCoordinator firstRunCoordinator = host.Services.GetRequiredService<IFirstRunCoordinator>();
-        int? firstRunExitCode = await firstRunCoordinator.EnsureFirstRunPromptedAsync(commandName, commandParseResult, cts.Token);
-        if (firstRunExitCode is int firstRunResult)
-        {
-            exitCode = firstRunResult;
-        }
-        else
-        {
-            var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
-            exitCode = await commandParseResult.InvokeAsync(config, cts.Token);
-        }
-    }
-    catch (OperationCanceledException)
-    {
-        // SIGINT — not a failure to record on the activity.
-        exitCode = 130;
-    }
-    catch (GracefulException ex)
-    {
-        activity?.Fail(ex);
-        interaction.WriteError(ex.Message);
-
-        if (ex.VerboseMessage is not null
-            && rootCommand is not null
-            && commandParseResult?.GetValue(rootCommand.VerboseOption) is true)
-        {
-            interaction.WriteHint(ex.VerboseMessage);
-        }
-
-        exitCode = 1;
-    }
-    catch (Exception ex)
-    {
-        activity?.Fail(ex);
-        interaction.WriteError($"An unexpected error occurred: {ex.Message}");
-        exitCode = 1;
+        CliTelemetry.Metric.RecordCommand(commandName, exitCode, stopwatch.ElapsedMilliseconds);
     }
     finally
     {
-        stopwatch.Stop();
-        CliTelemetry.Metric.RecordCommand(commandName, exitCode, stopwatch.ElapsedMilliseconds);
+        try
+        {
+            activity?.Dispose();
+        }
+        finally
+        {
+            host?.Dispose();
+        }
     }
-} // activity disposed (and stopped) here, before host shutdown flushes
+}
 
 // Skip trailing advisories for check/JSON setup, including after failures.
 // Other commands retain the bounded version notice unless cancelled.
@@ -155,9 +182,6 @@ if (allowAdvisories && exitCode != 130)
     aliasNudge?.TryPrint(exitCode, commandName);
 }
 
-// Container disposal (triggered by `using var host` going out of scope)
-// disposes the OTel providers, which flushes pending telemetry. No explicit
-// flush needed here.
 return exitCode;
 
 /// <summary>
