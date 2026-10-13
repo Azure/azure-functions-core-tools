@@ -144,14 +144,10 @@ internal sealed class FileTemplateStoreLock : ITemplateStoreLock
         List<string> live = [];
         foreach (string path in Directory.GetFiles(directory, "*.writer").Order(StringComparer.Ordinal))
         {
-            using FileStream? abandoned = TryOpen(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None,
-                out bool missing, FileOptions.DeleteOnClose);
+            using FileStream? abandoned = TryOwnMarker(path);
             if (abandoned is null)
             {
-                if (!missing)
-                {
-                    live.Add(path);
-                }
+                live.Add(path);
             }
         }
 
@@ -162,14 +158,10 @@ internal sealed class FileTemplateStoreLock : ITemplateStoreLock
     {
         foreach (string path in Directory.GetFiles(directory, "*.intent"))
         {
-            using FileStream? abandoned = TryOpen(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None,
-                out bool missing, FileOptions.DeleteOnClose);
+            using FileStream? abandoned = TryOwnMarker(path);
             if (abandoned is null)
             {
-                if (!missing)
-                {
-                    return true;
-                }
+                return true;
             }
         }
 
@@ -177,28 +169,20 @@ internal sealed class FileTemplateStoreLock : ITemplateStoreLock
     }
 
     private FileStream? TryOpen(string path, FileMode mode, FileAccess access, FileShare share, FileOptions options = FileOptions.None)
-        => TryOpen(path, mode, access, share, out _, options);
-
-    private FileStream? TryOpen(string path, FileMode mode, FileAccess access, FileShare share,
-        out bool missing, FileOptions options = FileOptions.None)
     {
-        missing = false;
         try
         {
             return new(path, mode, access, share, bufferSize: 1, options);
-        }
-        catch (FileNotFoundException) when (mode == FileMode.Open
-            && (path.EndsWith(".writer", StringComparison.Ordinal) || path.EndsWith(".intent", StringComparison.Ordinal)))
-        {
-            // The ticket owner can cancel or exit between enumeration and inspection.
-            missing = true;
-            return null;
         }
         catch (IOException exception) when (IsContention(exception))
         {
             return null;
         }
     }
+
+    // Revalidate Unix pathname/inode identity before deletion, including inspection after another owner unlinks.
+    private FileStream? TryOwnMarker(string path)
+        => TryOpen(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, FileOptions.DeleteOnClose);
 
     private static bool IsContention(IOException exception)
         => OperatingSystem.IsWindows() ? exception.HResult == unchecked((int)0x80070020)
@@ -226,7 +210,7 @@ internal sealed class FileTemplateStoreLock : ITemplateStoreLock
         {
             cancellationToken.ThrowIfCancellationRequested();
             // OpenOrCreate lets Unix revalidate the pathname after locking; None is required for an exclusive flock.
-            FileStream? intent = TryOpen(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, FileOptions.DeleteOnClose);
+            FileStream? intent = TryOwnMarker(path);
             if (intent is not null)
             {
                 if (cancellationToken.IsCancellationRequested)

@@ -445,6 +445,48 @@ public sealed class TemplateStoreTests : IDisposable
         }
     }
 
+    [WindowsFact]
+    public async Task QueuedWriter_MarkerPathsRemainLinkedAndExclusiveUntilCancellation()
+    {
+        var control = Path.Combine(_root, ".template-store");
+        var storeLock = new FileTemplateStoreLock();
+        using var reader = await storeLock.AcquireAsync(control, TemplateStoreAccess.Read, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource();
+        var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = storeLock.AcquireAsync(control, TemplateStoreAccess.Write, cancellation.Token, _ => waiting.TrySetResult());
+        await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            var markers = Directory.GetFiles(control, "*.intent").Concat(Directory.GetFiles(control, "*.writer")).ToArray();
+            markers.Should().HaveCount(2);
+            foreach (var marker in markers)
+            {
+                Action inspect = () =>
+                {
+                    using var forbidden = new FileStream(marker, FileMode.OpenOrCreate, FileAccess.ReadWrite,
+                        FileShare.None, bufferSize: 1, FileOptions.DeleteOnClose);
+                };
+                Action unlink = () => File.Delete(marker);
+                Action rename = () => File.Move(marker, marker + ".moved");
+
+                inspect.Should().Throw<IOException>();
+                unlink.Should().Throw<IOException>();
+                rename.Should().Throw<IOException>();
+                File.Exists(marker).Should().BeTrue();
+            }
+        }
+        finally
+        {
+            await cancellation.CancelAsync();
+            Func<Task> canceled = () => pending;
+            await canceled.Should().ThrowAsync<OperationCanceledException>();
+        }
+
+        Directory.GetFiles(control, "*.intent").Should().BeEmpty();
+        Directory.GetFiles(control, "*.writer").Should().BeEmpty();
+        using var later = await storeLock.AcquireAsync(control, TemplateStoreAccess.Read, CancellationToken.None);
+    }
+
     [Fact]
     public async Task PrivateRuntimeCacheFailure_DoesNotBecomeSuccessfulCatalog()
     {
@@ -506,7 +548,7 @@ public sealed class TemplateStoreTests : IDisposable
         {
             if (!OperatingSystem.IsWindows())
             {
-                Skip = "Windows read-only marker access semantics; Unix permission behavior requires separate qualification.";
+                Skip = "Windows mandatory namespace/access protection; Unix permission and interleaving behavior require separate qualification.";
             }
         }
     }
