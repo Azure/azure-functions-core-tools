@@ -3,6 +3,9 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Edge.Template;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -31,6 +34,305 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task NativeEngine_InstalledItem_PreviewIsReadOnlyAndCreationUsesSameTemplate()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        var output = Path.Combine(_root, "generated");
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(output)), _hive);
+        IReadOnlyList<ITemplateInfo> templates = await session.PackageManager.GetTemplatesAsync(CancellationToken.None);
+        var selected = templates.Should().ContainSingle(template => template.Identity == TemplateFixtures.ItemTemplateIdentity).Subject;
+        TemplateCreator creator = new(session.Settings);
+
+        var preview = await creator.InstantiateAsync(selected, "Welcome", "Welcome", output, new Dictionary<string, string?>(), dryRun: true, cancellationToken: CancellationToken.None);
+
+        preview.Status.Should().Be(CreationResultStatus.Success);
+        var change = preview.CreationEffects!.FileChanges.Should().ContainSingle().Subject;
+        Path.GetFullPath(Path.Combine(output, change.TargetRelativePath)).Should().Be(Path.Combine(output, "Welcome.txt"));
+        Directory.Exists(output).Should().BeFalse();
+
+        var created = await creator.InstantiateAsync(selected, "Welcome", "Welcome", output, new Dictionary<string, string?>(), cancellationToken: CancellationToken.None);
+
+        created.Status.Should().Be(CreationResultStatus.Success);
+        File.ReadAllText(Path.Combine(output, "Welcome.txt")).Should().Be("Welcome content");
+    }
+
+    [Fact]
+    public async Task ItemJourney_ListSelectPreviewCreate_UsesFuncOwnedPath()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteJourneyPackage(_root), _hive);
+        var snapshot = new TemplateConstraintEvaluationSnapshot([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]);
+        using Templater templater = CreateTemplater(snapshot);
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "journey-output"));
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+        var resolution = await templater.CreateGroupAsync(entries, CancellationToken.None);
+        var selected = resolution.Group!.Should().ContainSingle().Subject;
+        var request = new TemplateInvocationRequest(output, new Dictionary<string, string?> { ["Greeting"] = "welcome" }, "Journey", DryRun: true);
+
+        var preview = await selected.InvokeAsync(request, CancellationToken.None);
+
+        resolution.Status.Should().Be(TemplateResolutionStatus.Success);
+        selected.Entry.Should().BeSameAs(entries[0]);
+        preview.Status.Should().Be(TemplateInvocationStatus.Success);
+        preview.Changes.Should().ContainSingle().Which.Path.Should().EndWith("Journey.txt");
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+
+        var created = await selected.InvokeAsync(request with { DryRun = false }, CancellationToken.None);
+
+        created.Status.Should().Be(TemplateInvocationStatus.Success);
+        File.ReadAllText(Path.Combine(output.Info.FullName, "Journey.txt")).Should().Be("Journey welcome");
+    }
+
+    [Fact]
+    public async Task ResolveGroupAsync_RestrictedTemplate_DoesNotExposeInvocableItem()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteJourneyPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync("FUNC-TESTS-JOURNEY", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Unavailable);
+        result.Group.Should().BeEmpty();
+        result.Diagnostics.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Restricted);
+    }
+
+    [Fact]
+    public async Task ResolveGroupAsync_WrongType_DoesNotExposeGroup()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.WrongType);
+        result.Group.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResolveGroupAsync_SharedShortNameAcrossGroups_ReportsAmbiguity()
+    {
+        var first = TemplateFixtures.WriteBasicPackage(Path.Combine(_root, "first"));
+        var second = TemplateFixtures.WriteBasicPackage(Path.Combine(_root, "second"));
+        var config = Path.Combine(second, "item", ".template.config", "template.json");
+        File.WriteAllText(config, File.ReadAllText(config).Replace(TemplateFixtures.ItemTemplateIdentity, "Func.Tests.OtherItem", StringComparison.Ordinal));
+        await TemplateFixtures.InstallAsync(first, _hive);
+        await TemplateFixtures.InstallAsync(second, _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateShortName, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.AmbiguousGroup);
+        result.Group.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ListAsync_RawDuplicateConstraintTypes_FailsBeforeResolution()
+    {
+        var package = TemplateFixtures.WriteConstraintPackage(_root, """{"stack":{"type":"func-workload","args":"node"}}""");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        var config = Path.Combine(package, "item", ".template.config", "template.json");
+        File.WriteAllText(config, File.ReadAllText(config).Replace("\"type\":\"func-workload\"", "\"type\":\"func-workload\",\"type\":\"func-workload\"", StringComparison.Ordinal));
+        using Templater templater = CreateTemplater();
+
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+        var resolved = await templater.CreateGroupAsync(entries, CancellationToken.None);
+
+        entries.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Failed);
+        resolved.Status.Should().Be(TemplateResolutionStatus.Unavailable);
+        resolved.Group.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ConfigurationChangedAfterSelection_FailsWithoutWrites()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var config = Path.Combine(package, "item", ".template.config", "template.json");
+        File.AppendAllText(config, " ");
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "changed-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Changed"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Diagnostic.Should().Contain("changed");
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_DisposedFlow_ThrowsWithoutWrites()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "disposed-output"));
+        templater.Dispose();
+
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Disposed"), CancellationToken.None);
+
+        await action.Should().ThrowAsync<ObjectDisposedException>();
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_CanceledFlow_ThrowsWithoutWrites()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canceled-output"));
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Canceled"), cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_UnknownCanonicalParameter_FailsWithoutWrites()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "invalid-parameter-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?> { ["unknown"] = "value" }, "Invalid"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Diagnostic.Should().Contain("canonical");
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_FileConflict_RequiresExplicitForce()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "conflict-output"));
+        Directory.CreateDirectory(output.Info.FullName);
+        var target = Path.Combine(output.Info.FullName, "Conflict.txt");
+        File.WriteAllText(target, "original");
+        var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>(), "Conflict");
+
+        var refused = await selected.InvokeAsync(request, CancellationToken.None);
+
+        refused.Status.Should().Be(TemplateInvocationStatus.Failed);
+        File.ReadAllText(target).Should().Be("original");
+
+        var forced = await selected.InvokeAsync(request with { Force = true }, CancellationToken.None);
+
+        forced.Status.Should().Be(TemplateInvocationStatus.Success);
+        File.ReadAllText(target).Should().Be("Conflict content");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_UnsupportedPostAction_FailsWithoutWrites()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        var config = Path.Combine(package, "item", ".template.config", "template.json");
+        File.WriteAllText(config, File.ReadAllText(config).Replace("\"sourceName\": \"ItemFunction\"", "\"sourceName\": \"ItemFunction\", \"postActions\": [{\"actionId\":\"3A7C4B45-1F5D-4A30-959A-51B88E82B5D2\",\"description\":\"fixture\"}]", StringComparison.Ordinal));
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "post-action-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Action"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Diagnostic.Should().Contain("post-actions");
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ListAsync_SupplementalConfiguration_DoesNotHideUnvalidatedRequirements()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        var configDirectory = Path.Combine(package, "item", ".template.config");
+        var config = Path.Combine(configDirectory, "template.json");
+        File.WriteAllText(config, File.ReadAllText(config).Replace("\"sourceName\": \"ItemFunction\"", "\"sourceName\": \"ItemFunction\", \"additionalConfigFiles\": [\"extra.template.json\"]", StringComparison.Ordinal));
+        File.WriteAllText(Path.Combine(configDirectory, "extra.template.json"), """{"constraints":{"stack":{"type":"func-workload","args":"node"}}}""");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Unavailable);
+        result.Group.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ResolvedTemplate_ParameterMetadata_CannotBeMutated()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteJourneyPackage(_root), _hive);
+        using Templater templater = CreateTemplater(new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]));
+        var selected = (await templater.ResolveGroupAsync("func-tests-journey", TemplateType.Item, CancellationToken.None)).Group![0];
+
+        Action changeParameter = () => ((IList<TemplateParameterDefinition>)selected.Parameters)[0] = selected.Parameters[0] with { CanonicalName = "Changed" };
+
+        changeParameter.Should().Throw<NotSupportedException>();
+        selected.Parameters.Should().ContainSingle(parameter => parameter.CanonicalName == "Greeting");
+    }
+
+    [Fact]
+    public async Task TemplateGroup_Filters_PreserveSelectedCapability()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteJourneyPackage(_root), _hive);
+        using Templater templater = CreateTemplater(new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]));
+        var group = (await templater.ResolveGroupAsync("func-tests-journey", TemplateType.Item, CancellationToken.None)).Group!;
+
+        var filtered = group.FilterByLanguage("csharp").FilterByArguments(new HashSet<string> { "Func.Tests.Journey" }).FilterToHighestPrecedence();
+
+        filtered.Should().ContainSingle().Which.Should().BeSameAs(group[0]);
+        group.Should().ContainSingle();
+        group.FilterByLanguage("Python").Should().BeEmpty();
+        group.FilterByArguments(new HashSet<string>()).FilterToHighestPrecedence().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ResolveGroupAsync_UnknownReference_ReportsNotFound()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+
+        var result = await templater.ResolveGroupAsync("missing", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.NotFound);
+        result.Group.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_DeletedConfiguration_FailsWithoutWrites()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        File.Delete(Path.Combine(package, "item", ".template.config", "template.json"));
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "deleted-config-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Missing"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreateGroupAsync_ForeignFlowEntry_RejectsUncheckedReplacement()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater first = CreateTemplater();
+        using Templater second = CreateTemplater();
+        var entries = await first.ListAsync(TemplateType.Item, CancellationToken.None);
+
+        Func<Task> action = () => second.CreateGroupAsync(entries, CancellationToken.None);
+
+        await action.Should().ThrowAsync<ArgumentException>().WithParameterName("entries");
+    }
+
+    [Fact]
     public async Task ListAsync_Item_ReturnsItemTemplateEntries()
     {
         string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);
@@ -51,7 +353,35 @@ public sealed class TemplaterTests : IDisposable
             Package: new TemplatePackageInfo(packageDirectory, Version: null),
             IsHidden: false,
             Parameters: [],
-            MetadataDiagnostic: null));
+            MetadataDiagnostic: null) { ConstraintEvaluation = TemplateConstraintEvaluation.Eligible });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ListAsync_FuncWorkload_UsesCapturedUsability(bool usable)
+    {
+        string package = TemplateFixtures.WriteConstraintPackage(_root, """{"stack":{"type":"func-workload","args":"node"}}""");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        var snapshot = new TemplateConstraintEvaluationSnapshot([new("node-package", NuGetVersion.Parse("1.0"), ["node"], usable)]);
+        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
+
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+
+        var entry = entries.Should().ContainSingle().Subject;
+        entry.ConstraintEvaluation.Status.Should().Be(usable ? TemplateConstraintEvaluationStatus.Eligible : TemplateConstraintEvaluationStatus.Restricted);
+        entry.ConstraintEvaluation.Diagnostics.Should().HaveCount(usable ? 0 : 1);
+    }
+
+    [Fact]
+    public async Task ListAsync_UnknownConstraint_RemainsVisibleAndUnavailable()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteConstraintPackage(_root, """{"future":{"type":"future-constraint","args":{}}}"""), _hive);
+        using Templater templater = CreateTemplater();
+
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+
+        entries.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.NotEvaluated);
     }
 
     [Fact]
@@ -181,6 +511,6 @@ public sealed class TemplaterTests : IDisposable
     private static TemplateCatalogEntry Entry(IReadOnlyList<TemplateCatalogEntry> entries, string identity)
         => entries.Should().ContainSingle(candidate => candidate.Identity == identity).Subject;
 
-    private Templater CreateTemplater()
-        => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive));
+    private Templater CreateTemplater(TemplateConstraintEvaluationSnapshot? snapshot = null)
+        => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
 }
