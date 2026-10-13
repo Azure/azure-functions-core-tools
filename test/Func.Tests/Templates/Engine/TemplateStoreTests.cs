@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
@@ -196,6 +197,60 @@ public sealed class TemplateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task CancellationAfterSnapshotIsArmed_DoesNotStartNativeMutation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var physical = new PhysicalFileSystem();
+        var fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.DirectoryExists(Arg.Any<string>()).Returns(call => physical.DirectoryExists(call.Arg<string>()));
+        fileSystem.When(fs => fs.CreateDirectory(Arg.Any<string>())).Do(call => physical.CreateDirectory(call.Arg<string>()));
+        fileSystem.When(fs => fs.DeleteFile(Arg.Any<string>())).Do(call => physical.DeleteFile(call.Arg<string>()));
+        fileSystem.CreateTempDirectory(Arg.Any<string>()).Returns(call => physical.CreateTempDirectory(call.Arg<string>()));
+        fileSystem.ReadAllTextIfExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => physical.ReadAllTextIfExistsAsync(call.Arg<string>(), call.Arg<CancellationToken>()));
+        fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async call =>
+        {
+            await physical.WriteAllTextAsync(call.ArgAt<string>(0), call.ArgAt<string>(1), call.Arg<CancellationToken>());
+            await cancellation.CancelAsync();
+        });
+        var store = new TemplateStore(new(_root), fileSystem, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        using var transaction = await store.OpenWriteAsync(Context(), cancellation.Token);
+        var mutated = false;
+        Func<Task> execute = () => transaction.ExecuteAsync((_, _) =>
+        {
+            mutated = true;
+            return Task.CompletedTask;
+        }, ValidateTemplatesAsync, cancellation.Token);
+
+        await execute.Should().ThrowAsync<OperationCanceledException>();
+
+        mutated.Should().BeFalse();
+        transaction.State.Should().Be(TemplateStoreTransactionState.Restored);
+        Directory.Exists(store.Hive).Should().BeFalse();
+        File.Exists(store.Journal).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CancellationDuringReadBootstrap_DisposesEngineAndSharedLeaseBeforeReturning()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var loggerFactory = Substitute.For<ILoggerFactory>();
+        loggerFactory.CreateLogger(Arg.Any<string>()).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return NullLogger.Instance;
+        });
+        var store = new TemplateStore(new(_root), new PhysicalFileSystem(), new FileTemplateStoreLock(), loggerFactory);
+        Func<Task> open = () => store.OpenReadAsync(Context(), cancellation.Token);
+
+        await open.Should().ThrowAsync<OperationCanceledException>();
+
+        using var writer = await Store().OpenWriteAsync(Context(), CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+        loggerFactory.DidNotReceive().Dispose();
+        Directory.Exists(store.Hive).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task NativeCacheWriteFailure_IsVisibleAndRestoresPriorBytes()
     {
         var store = Store();
@@ -308,6 +363,59 @@ public sealed class TemplateStoreTests : IDisposable
 
         Directory.Exists(store.Hive).Should().BeFalse();
         Directory.Exists(store.ControlDirectory).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Open_NullContext_ThrowsBeforeAcquiringOwnership(bool write)
+    {
+        var store = Store();
+        Func<Task> open = () => write
+            ? store.OpenWriteAsync(null!, CancellationToken.None)
+            : store.OpenReadAsync(null!, CancellationToken.None);
+
+        await open.Should().ThrowAsync<ArgumentNullException>().WithParameterName("context");
+
+        Directory.Exists(store.ControlDirectory).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("store")]
+    [InlineData("context")]
+    [InlineData("lease")]
+    public void WriteSession_NullDependency_Throws(string argument)
+    {
+        Action construct = () => new TemplateStoreWriteSession(argument == "store" ? null! : Store(),
+            argument == "context" ? null! : Context(), argument == "lease" ? null! : Substitute.For<IDisposable>());
+
+        construct.Should().Throw<ArgumentNullException>().WithParameterName(argument);
+    }
+
+    [Theory]
+    [InlineData("mutate")]
+    [InlineData("validate")]
+    public async Task ExecuteAsync_NullCallback_ThrowsBeforeCreatingHive(string argument)
+    {
+        var store = Store();
+        using var transaction = await store.OpenWriteAsync(Context(), CancellationToken.None);
+        Func<TemplateEngineSession, CancellationToken, Task> callback = (_, _) => Task.CompletedTask;
+        Func<Task> execute = () => transaction.ExecuteAsync(argument == "mutate" ? null! : callback,
+            argument == "validate" ? null! : callback, CancellationToken.None);
+
+        await execute.Should().ThrowAsync<ArgumentNullException>().WithParameterName(argument);
+
+        transaction.State.Should().Be(TemplateStoreTransactionState.Ready);
+        Directory.Exists(store.Hive).Should().BeFalse();
+        File.Exists(store.Journal).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Diagnostics_NullLoggerFactory_Throws()
+    {
+        Action construct = () => new TemplateStoreEngineDiagnostics(null!);
+
+        construct.Should().Throw<ArgumentNullException>().WithParameterName("loggerFactory");
     }
 
     [Fact]

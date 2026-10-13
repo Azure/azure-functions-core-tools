@@ -53,6 +53,12 @@ internal sealed class TemplateStore(CliConfigurationPathsOptions paths, IFileSys
                     TemplateEngineSession session = new(context, settings.Value.Path, snapshot, planner, writer,
                         new ReadOwnership(settings.Value, lease), new TemplateStoreEngineDiagnostics(_loggerFactory));
                     transferred = true;
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        session.Dispose();
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+
                     return session;
                 }
             }

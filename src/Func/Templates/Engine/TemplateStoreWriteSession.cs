@@ -52,7 +52,9 @@ internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEng
             TemplateEngineSession? engine = null;
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 engine = _store.CreateWriteEngine(_context);
+                cancellationToken.ThrowIfCancellationRequested();
                 await mutate(engine, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
                 await validate(engine, cancellationToken);
