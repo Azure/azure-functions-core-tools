@@ -117,6 +117,20 @@ public sealed class TemplateEngineSessionTests : IDisposable
         malformed.EvaluationStatus.Should().Be(TemplateConstraintResult.Status.NotEvaluated);
     }
 
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"constraints\":{\"stack\":{\"type\":\"func-workload\",\"args\":\"node\"}}}")]
+    public async Task EvaluateConstraintsAsync_PreCanceledToken_ThrowsForEveryConfiguration(string configuration)
+    {
+        using TemplateEngineSession session = new(CommandContext("canceled-evaluation"), Hive);
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        Func<Task> action = () => session.EvaluateConstraintsAsync(configuration, cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+    }
+
     [Fact]
     public void Settings_UseTheSuppliedSettingsLocation()
     {
