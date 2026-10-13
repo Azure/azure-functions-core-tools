@@ -473,6 +473,141 @@ public sealed class TemplateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task ConcurrentExecution_ClaimsOneTransactionAndRetainsLeaseThroughCompletion()
+    {
+        var lease = Substitute.For<IDisposable>();
+        using var transaction = new TemplateStoreWriteSession(Store(), Context(), lease);
+        using var start = new Barrier(9);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mutations = 0;
+        var executions = Enumerable.Range(0, 8).Select(_ => Task.Factory.StartNew(async () =>
+        {
+            start.SignalAndWait();
+            try
+            {
+                await transaction.ExecuteAsync(async (_, _) =>
+                {
+                    Interlocked.Increment(ref mutations);
+                    entered.TrySetResult();
+                    await finish.Task;
+                }, (_, _) => Task.CompletedTask, CancellationToken.None);
+                return true;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap()).ToArray();
+        start.SignalAndWait();
+        bool[] results = [];
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Action dispose = transaction.Dispose;
+
+            dispose.Should().Throw<InvalidOperationException>();
+            lease.DidNotReceive().Dispose();
+        }
+        finally
+        {
+            finish.TrySetResult();
+            results = await Task.WhenAll(executions);
+        }
+
+        results.Count(success => success).Should().Be(1);
+        mutations.Should().Be(1);
+        transaction.State.Should().Be(TemplateStoreTransactionState.Committed);
+        transaction.Dispose();
+        lease.Received(1).Dispose();
+    }
+
+    [Fact]
+    public async Task ConcurrentDisposal_ReleasesLeaseOnceAndPreventsLaterExecution()
+    {
+        var lease = Substitute.For<IDisposable>();
+        using var transaction = new TemplateStoreWriteSession(Store(), Context(), lease);
+        using var start = new Barrier(9);
+        var disposals = Enumerable.Range(0, 8).Select(_ => Task.Factory.StartNew(() =>
+        {
+            start.SignalAndWait();
+            transaction.Dispose();
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
+        start.SignalAndWait();
+
+        await Task.WhenAll(disposals);
+        Func<Task> execute = () => transaction.ExecuteAsync((_, _) => Task.CompletedTask, ValidateTemplatesAsync, CancellationToken.None);
+
+        await execute.Should().ThrowAsync<ObjectDisposedException>();
+        lease.Received(1).Dispose();
+        Directory.Exists(Store().Hive).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ConcurrentExecutionAndDisposal_NeverMutatesAfterLeaseRelease()
+    {
+        for (var iteration = 0; iteration < 12; iteration++)
+        {
+            var releases = 0;
+            var mutations = 0;
+            var lease = Substitute.For<IDisposable>();
+            lease.When(value => value.Dispose()).Do(_ => Interlocked.Increment(ref releases));
+            using var transaction = new TemplateStoreWriteSession(Store(), Context(), lease);
+            using var start = new Barrier(3);
+            var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var execution = Task.Factory.StartNew(async () =>
+            {
+                start.SignalAndWait();
+                try
+                {
+                    await transaction.ExecuteAsync(async (_, _) =>
+                    {
+                        Volatile.Read(ref releases).Should().Be(0);
+                        Interlocked.Increment(ref mutations);
+                        await finish.Task;
+                        Volatile.Read(ref releases).Should().Be(0);
+                    }, (_, _) => Task.CompletedTask, CancellationToken.None);
+                    return true;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return false;
+                }
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
+            var disposal = Task.Factory.StartNew(() =>
+            {
+                start.SignalAndWait();
+                try
+                {
+                    transaction.Dispose();
+                    return true;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            start.SignalAndWait();
+            bool disposed;
+            try
+            {
+                disposed = await disposal.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            finally
+            {
+                finish.TrySetResult();
+            }
+
+            var executed = await execution.WaitAsync(TimeSpan.FromSeconds(10));
+
+            executed.Should().NotBe(disposed);
+            mutations.Should().Be(executed ? 1 : 0);
+            transaction.Dispose();
+            releases.Should().Be(1);
+        }
+    }
+
+    [Fact]
     public async Task RestoreFailure_RemainsVisibleAndNextOwnerRetriesBeforeReading()
     {
         var store = Store();

@@ -19,9 +19,8 @@ internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEng
     private readonly TemplateStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));
     private readonly IDisposable _lease = lease ?? throw new ArgumentNullException(nameof(lease));
-    private bool _started;
-    private bool _running;
-    private bool _disposed;
+    private readonly object _lifetimeGate = new();
+    private LifetimeState _lifetime;
 
     public TemplateStoreTransactionState State { get; private set; }
 
@@ -36,14 +35,16 @@ internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEng
     {
         ArgumentNullException.ThrowIfNull(mutate);
         ArgumentNullException.ThrowIfNull(validate);
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_started)
+        lock (_lifetimeGate)
         {
-            throw new InvalidOperationException("A template-store write session permits only one transaction. Open a fresh session to retry.");
-        }
+            ObjectDisposedException.ThrowIf(_lifetime == LifetimeState.Disposed, this);
+            if (_lifetime != LifetimeState.Ready)
+            {
+                throw new InvalidOperationException("A template-store write session permits only one transaction. Open a fresh session to retry.");
+            }
 
-        _started = true;
-        _running = true;
+            _lifetime = LifetimeState.Running;
+        }
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -86,21 +87,38 @@ internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEng
         }
         finally
         {
-            _running = false;
+            lock (_lifetimeGate)
+            {
+                _lifetime = LifetimeState.Finished;
+            }
         }
     }
 
     public void Dispose()
     {
-        if (_running)
+        lock (_lifetimeGate)
         {
-            throw new InvalidOperationException("Await the template-store transaction and recovery before disposing its exclusive lease.");
+            if (_lifetime == LifetimeState.Running)
+            {
+                throw new InvalidOperationException("Await the template-store transaction and recovery before disposing its exclusive lease.");
+            }
+
+            if (_lifetime == LifetimeState.Disposed)
+            {
+                return;
+            }
+
+            _lifetime = LifetimeState.Disposed;
         }
 
-        if (!_disposed)
-        {
-            _disposed = true;
-            _lease.Dispose();
-        }
+        _lease.Dispose();
+    }
+
+    private enum LifetimeState
+    {
+        Ready,
+        Running,
+        Finished,
+        Disposed,
     }
 }

@@ -53,9 +53,10 @@ public sealed class TemplateStoreProcessTests : IDisposable
     {
         await using var reader = OwnedProcess.Start("read", _root);
         await reader.WaitForAsync("READY");
-        await using var writer = OwnedProcess.Start("write", _root, cancelAfterMilliseconds: 1500);
+        await using var writer = OwnedProcess.Start("cancelable-write", _root);
         await writer.WaitForAsync("WAITING:ActiveReaders");
 
+        await writer.CancelAsync();
         await writer.WaitForAsync("CANCELED");
         await writer.WaitForExitAsync();
         await using var later = OwnedProcess.Start("read", _root);
@@ -161,7 +162,7 @@ public sealed class TemplateStoreProcessTests : IDisposable
 
         public bool HasExited => _process.HasExited;
 
-        public static OwnedProcess Start(string mode, string home, int? cancelAfterMilliseconds = null)
+        public static OwnedProcess Start(string mode, string home)
         {
             string directory = AppContext.BaseDirectory;
             ProcessStartInfo start = new("dotnet")
@@ -180,11 +181,6 @@ public sealed class TemplateStoreProcessTests : IDisposable
             })
             {
                 start.ArgumentList.Add(argument);
-            }
-
-            if (cancelAfterMilliseconds is { } timeout)
-            {
-                start.ArgumentList.Add(timeout.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
 
             return new(Process.Start(start) ?? throw new InvalidOperationException("The test helper could not be started."));
@@ -216,6 +212,12 @@ public sealed class TemplateStoreProcessTests : IDisposable
             await _process.StandardInput.WriteLineAsync("release");
             await _process.StandardInput.FlushAsync();
             await WaitForExitAsync();
+        }
+
+        public async Task CancelAsync()
+        {
+            await _process.StandardInput.WriteLineAsync("cancel");
+            await _process.StandardInput.FlushAsync();
         }
 
         public async Task WaitForExitAsync()

@@ -18,11 +18,6 @@ internal sealed class Program
         string mode = args[0];
         string home = args[1];
         using CancellationTokenSource cancellation = new();
-        if (args.Length > 2)
-        {
-            cancellation.CancelAfter(TimeSpan.FromMilliseconds(int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture)));
-        }
-
         CancellationToken token = cancellation.Token;
         FileTemplateStoreLock storeLock = new();
         TemplateStore store = new(new(home), new PhysicalFileSystem(), storeLock, NullLoggerFactory.Instance);
@@ -100,6 +95,21 @@ internal sealed class Program
                 }
 
                 return;
+            }
+
+            if (mode == "cancelable-write")
+            {
+                Task<IDisposable> acquisition = storeLock.AcquireAsync(store.ControlDirectory, TemplateStoreAccess.Write,
+                    token, reason => TestConsole.WriteLine($"WAITING:{reason}"));
+                string? signal = await TestConsole.In.ReadLineAsync(token);
+                if (signal != "cancel")
+                {
+                    throw new InvalidOperationException("The parent must explicitly cancel the queued writer.");
+                }
+
+                await cancellation.CancelAsync();
+                using IDisposable unexpected = await acquisition;
+                throw new InvalidOperationException("The incumbent reader must prevent writer admission.");
             }
 
             using IDisposable lease = await storeLock.AcquireAsync(store.ControlDirectory,
