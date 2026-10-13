@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Workloads.PowerShell;
 /// <c>profile.ps1</c>, <c>.gitignore</c>) and optionally enables managed dependencies
 /// with a <c>requirements.psd1</c>.
 /// </summary>
-internal sealed class PowerShellProjectInitializer : IProjectInitializer
+internal sealed class PowerShellProjectInitializer(PowerShellProjectStack stack) : IProjectInitializer
 {
     private const string AzModuleName = "Az";
     private const string PowerShellGalleryFindPackagesByIdUri = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id=";
@@ -28,21 +28,18 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
     private static readonly string[] _supportedRuntimeVersions = ["7.4", "7.6"];
 
     private static readonly Assembly _assembly = typeof(PowerShellProjectInitializer).Assembly;
+    private readonly PowerShellProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
 
     // Internal seam so tests can stub the Az module version lookup.
     internal Func<CancellationToken, Task<string?>> GetLatestAzModuleMajorVersion { get; set; } = DefaultGetLatestAzModuleMajorVersion;
 
-    public string Stack => "powershell";
+    public string Stack => _stack.Stack;
 
-    public string DisplayName => "PowerShell";
+    public string DisplayName => _stack.DisplayName;
 
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
-        new Dictionary<string, IReadOnlyList<string>>()
-        {
-            { "PowerShell", ["pwsh", "ps"] }
-        };
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
 
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
+    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<bool> ManagedDependenciesOption { get; private set; } = default!;
 
@@ -237,4 +234,3 @@ internal sealed class PowerShellProjectInitializer : IProjectInitializer
         }
     }
 }
-

@@ -48,6 +48,13 @@ The target directory continues to use the optional positional `[path]` argument 
 
 ### `IProjectStack` replaces behavioral initializers
 
+The additive first step is tracked in #5648 and documented in the
+[current stack inventory](stack-inventory.md). It introduces the metadata
+contract and catalog alongside existing initializers without switching
+`func init`. The removal below describes the later template-backed switch.
+Workloads referencing the new contract must ship only after a CLI containing
+it; CLI/workload compatibility gating remains unresolved in #5413.
+
 Workload assemblies register metadata-only `IProjectStack` implementations:
 
 ```text

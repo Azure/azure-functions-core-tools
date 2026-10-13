@@ -15,26 +15,24 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// for JS or TS, merges the default extension bundle into <c>host.json</c>,
 /// and optionally runs <c>npm install</c>.
 /// </summary>
-internal sealed class NodeProjectInitializer : IProjectInitializer
+internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectInitializer
 {
     private const string ProjectNamePlaceholder = "__PROJECT_NAME__";
     private static readonly Assembly _assembly = typeof(NodeProjectInitializer).Assembly;
 
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>()
-    {
-        { "JavaScript", ["js"] },
-        { "TypeScript", ["ts"] }
-    };
+    private readonly NodeProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
+
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
 
     // Internal seam so tests can stub out the `npm install` invocation
     // without spawning real processes.
     internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunNpmInstall { get; set; } = DefaultRunNpmInstall;
 
-    public string Stack => "node";
+    public string Stack => _stack.Stack;
 
-    public string DisplayName => "Node.js";
+    public string DisplayName => _stack.DisplayName;
 
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
+    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
 

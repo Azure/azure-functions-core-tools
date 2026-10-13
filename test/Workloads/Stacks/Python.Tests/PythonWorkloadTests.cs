@@ -23,6 +23,17 @@ public class PythonWorkloadTests
         initializer.Should().BeOfType<PythonProjectInitializer>();
         initializer.Stack.Should().Be("python");
         initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("Python");
+
+        IProjectStack stack = provider.GetRequiredService<IProjectStack>();
+        stack.Should().BeOfType<PythonProjectStack>();
+        stack.Should().BeSameAs(provider.GetRequiredService<PythonProjectStack>());
+        stack.Should().NotBeAssignableTo<IProjectInitializer>();
+        stack.Stack.Should().Be(initializer.Stack);
+        stack.DisplayName.Should().Be("Python").And.Be(initializer.DisplayName);
+        stack.WorkerRuntimeAliases.Should().BeEmpty().And.Equal(initializer.WorkerRuntimeAliases);
+        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
+        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
+        stack.SupportedLanguageAliases["Python"].Should().Equal("py");
     }
 
     [Fact]

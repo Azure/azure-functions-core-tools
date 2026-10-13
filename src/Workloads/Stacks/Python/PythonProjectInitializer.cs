@@ -12,20 +12,19 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// <summary>
 /// Scaffolds a Python (v2 model) Functions project and merges the default extension bundle into <c>host.json</c>.
 /// </summary>
-internal sealed class PythonProjectInitializer : IProjectInitializer
+internal sealed class PythonProjectInitializer(PythonProjectStack stack) : IProjectInitializer
 {
     private static readonly Assembly _assembly = typeof(PythonProjectInitializer).Assembly;
 
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>()
-    {
-        { "Python", ["py"] }
-    };
+    private readonly PythonProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
 
-    public string Stack => "python";
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
 
-    public string DisplayName => "Python";
+    public string Stack => _stack.Stack;
 
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
+    public string DisplayName => _stack.DisplayName;
+
+    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
 

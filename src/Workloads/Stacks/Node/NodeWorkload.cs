@@ -23,6 +23,8 @@ public sealed class NodeWorkload : Workload
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.AddSingleton<NodeProjectStack>();
+        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<NodeProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, NodeQuickstartProvider>();
         builder.AddProjectFactory(new NodeProjectFactory());

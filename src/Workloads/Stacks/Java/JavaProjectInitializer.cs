@@ -14,25 +14,22 @@ namespace Azure.Functions.Cli.Workloads.Java;
 /// trigger under <c>src/main/java/com/function</c>, <c>host.json</c>,
 /// <c>local.settings.json</c>, <c>.gitignore</c>, and <c>.funcignore</c>).
 /// </summary>
-internal sealed class JavaProjectInitializer : IProjectInitializer
+internal sealed class JavaProjectInitializer(JavaProjectStack stack) : IProjectInitializer
 {
     private const string ArtifactIdPlaceholder = "{ArtifactId}";
     private const string FunctionAppNamePlaceholder = "{FunctionAppName}";
     private const string DefaultArtifactId = "azure-functions-java";
 
     private static readonly Assembly _assembly = typeof(JavaProjectInitializer).Assembly;
+    private readonly JavaProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
 
-    public string Stack => "java";
+    public string Stack => _stack.Stack;
 
-    public string DisplayName => "Java";
+    public string DisplayName => _stack.DisplayName;
 
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
-        new Dictionary<string, IReadOnlyList<string>>()
-        {
-            { "Java", [] }
-        };
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
 
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
+    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
 
