@@ -1432,6 +1432,55 @@ public class InitCommandTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task InitCommand_CancelledAfterConfigCommit_PreservesConfigWithoutSuccessOrScaffolding(bool adopt, bool heal)
+    {
+        using var cancellation = new CancellationTokenSource();
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            const string original = """{"stack":{"runtime":"node"},"custom":"keep"}""";
+            if (adopt || heal) File.WriteAllText(Path.Combine(directory, "host.json"), "{}");
+            if (heal) File.WriteAllText(configPath, original);
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>()).Returns(original);
+            fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async call =>
+            {
+                var forwarded = call.Arg<CancellationToken>();
+                forwarded.CanBeCanceled.Should().BeTrue();
+                await new PhysicalFileSystem().WriteAllTextAsync(configPath, call.ArgAt<string>(1), forwarded);
+                cancellation.Cancel();
+                forwarded.IsCancellationRequested.Should().BeTrue();
+            });
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token))
+                .Should().ThrowAsync<OperationCanceledException>();
+
+            AssertConfigJsonHasShape(directory, expectedStack: "node", expectedLanguage: "javascript");
+            if (heal)
+            {
+                using var config = JsonDocument.Parse(File.ReadAllText(configPath));
+                config.RootElement.GetProperty("custom").GetString().Should().Be("keep");
+            }
+            Directory.GetFiles(Path.Combine(directory, ".func"), "config.json.tmp.*").Should().BeEmpty();
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+            await fileSystem.Received(1).WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task InitCommand_CancelledAfterLanguageDetection_DoesNotStartConfigWrite(bool heal)
