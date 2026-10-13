@@ -11,6 +11,8 @@ internal sealed class NodeProjectStack : IProjectStack
 
     public string DisplayName => "Node.js";
 
+    public IReadOnlyList<string> WorkerRuntimeAliases => [];
+
     public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
 
     public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>

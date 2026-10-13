@@ -37,6 +37,8 @@ internal sealed class PowerShellProjectInitializer(PowerShellProjectStack stack)
 
     public string DisplayName => _stack.DisplayName;
 
+    public IReadOnlyList<string> WorkerRuntimeAliases => _stack.WorkerRuntimeAliases;
+
     public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
 
     public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;

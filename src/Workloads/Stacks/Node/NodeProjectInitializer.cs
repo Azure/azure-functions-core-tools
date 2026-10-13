@@ -32,6 +32,8 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
 
     public string DisplayName => _stack.DisplayName;
 
+    public IReadOnlyList<string> WorkerRuntimeAliases => _stack.WorkerRuntimeAliases;
+
     public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<bool> NoBundleOption { get; private set; } = default!;
