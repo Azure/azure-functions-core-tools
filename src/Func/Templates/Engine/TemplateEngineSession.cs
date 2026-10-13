@@ -201,7 +201,7 @@ internal class TemplateEngineSession : IDisposable
 
         if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
         {
-            return new(TemplateInvocationStatus.Failed, [], "Selected template configuration changed. Rerun selection.");
+            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed. Rerun selection.");
         }
 
         using var document = JsonDocument.Parse(current.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
@@ -217,7 +217,7 @@ internal class TemplateEngineSession : IDisposable
         cancellationToken.ThrowIfCancellationRequested();
         if (preview.Status != CreationResultStatus.Success)
         {
-            return new(TemplateInvocationStatus.Failed, [], preview.ErrorMessage ?? preview.Status.ToString());
+            return new(MapCreationStatus(preview.Status, cancellationToken), [], preview.ErrorMessage ?? preview.Status.ToString());
         }
 
         IReadOnlyList<TemplateFileChange> changes = Array.AsReadOnly<TemplateFileChange>(
@@ -225,7 +225,7 @@ internal class TemplateEngineSession : IDisposable
         bool requiresForce = !request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal));
         if (!request.DryRun && requiresForce)
         {
-            return new(TemplateInvocationStatus.Failed, changes, "Template would change existing files. Explicit file-conflict force is required.");
+            return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.");
         }
 
         string? outputFailure = ValidateOutputPaths(output, changes);
@@ -259,7 +259,7 @@ internal class TemplateEngineSession : IDisposable
 
         if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
         {
-            return new(TemplateInvocationStatus.Failed, [], "Selected template configuration changed after preview. Rerun selection.");
+            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed after preview. Rerun selection.");
         }
 
         outputFailure = ValidateOutputPaths(output, changes);
@@ -272,8 +272,21 @@ internal class TemplateEngineSession : IDisposable
         cancellationToken.ThrowIfCancellationRequested();
         return created.Status == CreationResultStatus.Success
             ? new(TemplateInvocationStatus.Success, changes)
-            : new(TemplateInvocationStatus.Failed, changes, created.ErrorMessage ?? created.Status.ToString());
+            : new(MapCreationStatus(created.Status, cancellationToken), changes, created.ErrorMessage ?? created.Status.ToString());
     }
+
+    private static TemplateInvocationStatus MapCreationStatus(CreationResultStatus status, CancellationToken cancellationToken)
+        => status switch
+        {
+            CreationResultStatus.Success => TemplateInvocationStatus.Success,
+            CreationResultStatus.InvalidParamValues => TemplateInvocationStatus.InvalidArguments,
+            CreationResultStatus.MissingMandatoryParam => TemplateInvocationStatus.MissingRequiredParameters,
+            CreationResultStatus.DestructiveChangesDetected => TemplateInvocationStatus.FileConflict,
+            CreationResultStatus.NotFound => TemplateInvocationStatus.TemplateUnavailable,
+            CreationResultStatus.TemplateIssueDetected or CreationResultStatus.CondtionsEvaluationMismatch => TemplateInvocationStatus.InvalidTemplate,
+            CreationResultStatus.Cancelled => throw new OperationCanceledException(cancellationToken),
+            _ => TemplateInvocationStatus.EngineFailure,
+        };
 
     protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
         => _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName, parameters,

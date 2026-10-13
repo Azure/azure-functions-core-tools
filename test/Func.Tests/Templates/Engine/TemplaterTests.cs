@@ -156,7 +156,7 @@ public sealed class TemplaterTests : IDisposable
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Changed"), CancellationToken.None);
 
-        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Status.Should().Be(TemplateInvocationStatus.TemplateChanged);
         result.Diagnostic.Should().Contain("changed");
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
@@ -202,7 +202,7 @@ public sealed class TemplaterTests : IDisposable
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?> { ["unknown"] = "value" }, "Invalid"), CancellationToken.None);
 
-        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Status.Should().Be(TemplateInvocationStatus.InvalidArguments);
         result.Diagnostic.Should().Contain("canonical");
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
@@ -221,7 +221,7 @@ public sealed class TemplaterTests : IDisposable
 
         var refused = await selected.InvokeAsync(request, CancellationToken.None);
 
-        refused.Status.Should().Be(TemplateInvocationStatus.Failed);
+        refused.Status.Should().Be(TemplateInvocationStatus.FileConflict);
         refused.Changes.Should().ContainSingle();
         File.ReadAllText(target).Should().Be("original");
 
@@ -607,6 +607,126 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task InvokeAsync_PreCanceledUnknownParameter_PropagatesCancellation()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canceled-unknown-output"));
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?> { ["unknown"] = "value" }, "Canceled"), cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(CreationResultStatus.InvalidParamValues, "InvalidArguments")]
+    [InlineData(CreationResultStatus.MissingMandatoryParam, "MissingRequiredParameters")]
+    [InlineData(CreationResultStatus.CreateFailed, "EngineFailure")]
+    [InlineData(CreationResultStatus.DestructiveChangesDetected, "FileConflict")]
+    [InlineData(CreationResultStatus.NotFound, "TemplateUnavailable")]
+    [InlineData(CreationResultStatus.TemplateIssueDetected, "InvalidTemplate")]
+    [InlineData(CreationResultStatus.CondtionsEvaluationMismatch, "InvalidTemplate")]
+    public async Task InvokeAsync_NativeFailure_PreservesStructuredCategory(CreationResultStatus nativeStatus, string expected)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        var session = new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, nativeStatus);
+        using Templater templater = new(session);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "native-failure-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Failure"), CancellationToken.None);
+
+        result.Status.ToString().Should().Be(expected);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_PreflightFailures_PreserveStructuredCategories()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "typed-failure-output"));
+        Directory.CreateDirectory(output.Info.FullName);
+        File.WriteAllText(Path.Combine(output.Info.FullName, "Typed.txt"), "original");
+        var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>(), "Typed");
+
+        var invalid = await selected.InvokeAsync(request with { Parameters = new Dictionary<string, string?> { ["unknown"] = "value" } }, CancellationToken.None);
+        var conflict = await selected.InvokeAsync(request, CancellationToken.None);
+        File.AppendAllText(Path.Combine(package, "item", ".template.config", "template.json"), " ");
+        var changed = await selected.InvokeAsync(request with { Force = true }, CancellationToken.None);
+
+        invalid.Status.ToString().Should().Be("InvalidArguments");
+        conflict.Status.ToString().Should().Be("FileConflict");
+        changed.Status.ToString().Should().Be("TemplateChanged");
+        File.ReadAllText(Path.Combine(output.Info.FullName, "Typed.txt")).Should().Be("original");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_NativeCancelledStatus_PropagatesCancellation()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = new(new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, CreationResultStatus.Cancelled));
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "native-cancelled-output"));
+
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Cancelled"), CancellationToken.None);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_RealParameterValidation_PreservesInvalidAndMissingCategories()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        var config = Path.Combine(package, "item", ".template.config", "template.json");
+        File.WriteAllText(config, File.ReadAllText(config).Replace("\"sourceName\": \"ItemFunction\"", "\"sourceName\": \"ItemFunction\", \"symbols\":{\"Mode\":{\"type\":\"parameter\",\"datatype\":\"choice\",\"isRequired\":true,\"choices\":[{\"choice\":\"safe\"}]}}", StringComparison.Ordinal));
+        await TemplateFixtures.InstallAsync(package, _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "invalid-values-output"));
+
+        var invalid = await selected.InvokeAsync(new(output, new Dictionary<string, string?> { ["Mode"] = "unknown" }, "Invalid"), CancellationToken.None);
+        var missing = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Missing"), CancellationToken.None);
+
+        invalid.Status.Should().Be(TemplateInvocationStatus.InvalidArguments);
+        missing.Status.Should().Be(TemplateInvocationStatus.MissingRequiredParameters);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(CreationResultStatus.CreateFailed)]
+    [InlineData(CreationResultStatus.Cancelled)]
+    public async Task InvokeAsync_CreationFailureAfterSuccessfulPreview_PreservesCategory(CreationResultStatus nativeStatus)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = new(new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, nativeStatus, true));
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "creation-failure-output"));
+        var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>(), "Failure");
+
+        if (nativeStatus == CreationResultStatus.Cancelled)
+        {
+            Func<Task> action = () => selected.InvokeAsync(request, CancellationToken.None);
+            await action.Should().ThrowAsync<OperationCanceledException>();
+        }
+        else
+        {
+            var result = await selected.InvokeAsync(request, CancellationToken.None);
+            result.Status.Should().Be(TemplateInvocationStatus.EngineFailure);
+            result.Changes.Should().ContainSingle();
+        }
+
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task CreateGroupAsync_ForeignFlowEntry_RejectsUncheckedReplacement()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
@@ -800,6 +920,21 @@ public sealed class TemplaterTests : IDisposable
 
     private Templater CreateTemplater(TemplateConstraintEvaluationSnapshot? snapshot = null)
         => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
+
+    private sealed class FailingEngineSession(TemplateEngineContext context, string hive, CreationResultStatus nativeStatus, bool failCreation = false) : TemplateEngineSession(context, hive)
+    {
+        protected override Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+        {
+            if (dryRun && failCreation)
+            {
+                return base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+            }
+
+            var result = Substitute.For<ITemplateCreationResult>();
+            result.Status.Returns(nativeStatus);
+            return Task.FromResult(result);
+        }
+    }
 
     private sealed class CancelingEngineSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, bool cancelPreview) : TemplateEngineSession(context, hive)
     {
