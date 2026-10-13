@@ -7,6 +7,7 @@ using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Template;
 using NuGet.Versioning;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -221,6 +222,13 @@ public sealed class TemplaterTests : IDisposable
         var refused = await selected.InvokeAsync(request, CancellationToken.None);
 
         refused.Status.Should().Be(TemplateInvocationStatus.Failed);
+        refused.Changes.Should().ContainSingle();
+        File.ReadAllText(target).Should().Be("original");
+
+        var preview = await selected.InvokeAsync(request with { DryRun = true }, CancellationToken.None);
+        preview.Status.Should().Be(TemplateInvocationStatus.Success);
+        preview.Changes.Should().ContainSingle().Which.Path.Should().EndWith("Conflict.txt");
+        preview.Diagnostic.Should().Contain("requires explicit");
         File.ReadAllText(target).Should().Be("original");
 
         var forced = await selected.InvokeAsync(request with { Force = true }, CancellationToken.None);
@@ -580,6 +588,24 @@ public sealed class TemplaterTests : IDisposable
         picked.Group.Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task InvokeAsync_EngineReturnsAfterCancellation_PropagatesCancellation(bool cancelPreview)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using CancellationTokenSource cancellation = new();
+        var session = new CancelingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation, cancelPreview);
+        using Templater templater = new(session);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "engine-canceled-output"));
+
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Canceled", DryRun: cancelPreview), cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
     [Fact]
     public async Task CreateGroupAsync_ForeignFlowEntry_RejectsUncheckedReplacement()
     {
@@ -774,6 +800,22 @@ public sealed class TemplaterTests : IDisposable
 
     private Templater CreateTemplater(TemplateConstraintEvaluationSnapshot? snapshot = null)
         => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
+
+    private sealed class CancelingEngineSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, bool cancelPreview) : TemplateEngineSession(context, hive)
+    {
+        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+        {
+            if (dryRun == cancelPreview)
+            {
+                await cancellation.CancelAsync();
+                var result = Substitute.For<ITemplateCreationResult>();
+                result.Status.Returns(CreationResultStatus.Success);
+                return result;
+            }
+
+            return await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+        }
+    }
 
     private sealed class CountingPackageSession(TemplateEngineContext context, string hive) : TemplateEngineSession(context, hive)
     {
