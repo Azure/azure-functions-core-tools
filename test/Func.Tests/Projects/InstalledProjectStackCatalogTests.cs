@@ -151,6 +151,19 @@ public class InstalledProjectStackCatalogTests
     [InlineData("")]
     [InlineData(" ")]
     [InlineData(" padded ")]
+    public void Constructor_InvalidDisplayName_Throws(string? displayName)
+    {
+        IProjectStack stack = CreateStack("go", "Go", "golang");
+        stack.DisplayName.Returns(displayName);
+
+        FluentActions.Invoking(() => new InstalledProjectStackCatalog([stack])).Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData(" padded ")]
     public void Constructor_InvalidLanguageName_Throws(string? language)
     {
         IProjectStack stack = CreateStack("go", "Go", "golang");

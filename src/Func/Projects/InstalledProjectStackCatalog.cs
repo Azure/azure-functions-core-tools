@@ -69,7 +69,7 @@ internal sealed class InstalledProjectStackCatalog(IEnumerable<IProjectStack> st
         {
             ArgumentNullException.ThrowIfNull(stack, nameof(stacks));
             ValidateName(stack.Stack);
-            ArgumentException.ThrowIfNullOrWhiteSpace(stack.DisplayName, nameof(stacks));
+            ValidateName(stack.DisplayName);
             ArgumentNullException.ThrowIfNull(stack.WorkerRuntimeAliases, nameof(stacks));
             ArgumentNullException.ThrowIfNull(stack.SupportedLanguages, nameof(stacks));
             ArgumentNullException.ThrowIfNull(stack.SupportedLanguageAliases, nameof(stacks));
