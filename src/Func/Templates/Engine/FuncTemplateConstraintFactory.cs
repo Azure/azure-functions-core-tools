@@ -41,7 +41,7 @@ internal sealed class FuncTemplateConstraintFactory(string type, FuncTemplateCon
 
             try
             {
-                using var arguments = JsonDocument.Parse(args);
+                using var arguments = JsonDocument.Parse(args, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
                 using var stream = new MemoryStream();
                 using (Utf8JsonWriter writer = new(stream))
                 {
