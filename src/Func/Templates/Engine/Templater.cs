@@ -116,7 +116,8 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
         List<Candidate> candidates = [];
         foreach (ITemplateInfo template in templates.Where(template => TemplateCatalogProjector.GetTemplateType(template) is not null))
         {
-            TemplateCatalogEntry entry = TemplateCatalogProjector.Project(template, packages.FirstOrDefault(package => package.MountPointUri == template.MountPointUri));
+            ITemplatePackage? package = packages.FirstOrDefault(package => package.MountPointUri == template.MountPointUri);
+            TemplateCatalogEntry entry = TemplateCatalogProjector.Project(template, package);
             entry = entry with
             {
                 ShortNames = Array.AsReadOnly<string>([.. entry.ShortNames]),
@@ -127,7 +128,8 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
             try
             {
                 TemplateConfigurationSnapshot configuration = await _session.ReadConfigurationAsync(template, cancellationToken);
-                TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Content, cancellationToken);
+                IReadOnlyCollection<string> packageTypes = await _session.ReadPackageTypesAsync(package, cancellationToken);
+                TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Content, cancellationToken, packageTypes);
                 candidates.Add(new(template, entry with { ConstraintEvaluation = evaluation }, configuration));
             }
             catch (InvalidTemplateMetadataException exception)
