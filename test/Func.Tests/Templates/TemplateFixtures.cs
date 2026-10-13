@@ -92,6 +92,25 @@ internal static class TemplateFixtures
         return packageDirectory;
     }
 
+    public static string WriteConstraintPackage(string parentDirectory, string constraints)
+    {
+      string packageDirectory = Path.Combine(parentDirectory, "constraint-templates");
+      WriteTemplate(
+        Path.Combine(packageDirectory, "item"),
+        $$"""
+        {
+          "identity": "Func.Tests.ConstrainedItem",
+          "name": "Func Tests Constrained Item",
+          "shortName": "func-tests-constrained-item",
+          "tags": { "type": "item" },
+          "sourceName": "ItemFunction",
+          "constraints": {{constraints}}
+        }
+        """,
+        ("ItemFunction.txt", "ItemFunction content"));
+      return packageDirectory;
+    }
+
     /// <summary>
     /// Writes a folder package whose templates exercise func host metadata, and returns its path.
     /// </summary>
@@ -169,6 +188,28 @@ internal static class TemplateFixtures
             ("Hidden.txt", "Hidden content"),
             ("func.host.json", """{ "isHidden": true }"""));
 
+        return packageDirectory;
+    }
+
+    public static string WriteJourneyPackage(string parentDirectory)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "journey-templates");
+        WriteTemplate(
+            Path.Combine(packageDirectory, "item"),
+            """
+            {
+              "identity": "Func.Tests.Journey",
+              "name": "Func Tests Journey",
+              "shortName": "func-tests-journey",
+              "tags": { "type": "item", "language": "CSharp" },
+              "sourceName": "ItemFunction",
+              "constraints": { "stack": { "type": "func-workload", "args": "node" } },
+              "symbols": {
+                "Greeting": { "type": "parameter", "datatype": "string", "defaultValue": "hello", "replaces": "GREETING" }
+              }
+            }
+            """,
+            ("ItemFunction.txt", "ItemFunction GREETING"));
         return packageDirectory;
     }
 
