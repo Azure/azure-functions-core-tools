@@ -103,7 +103,7 @@ internal sealed class TemplateProjectConfigurationPlanner
         }
         catch (JsonException exception)
         {
-            throw new InvalidTemplateMetadataException($"Project configuration metadata is invalid: {exception.Message}");
+            throw new InvalidTemplateMetadataException($"Project configuration metadata is invalid: {exception.Message}", exception);
         }
     }
 
@@ -168,7 +168,7 @@ internal sealed class TemplateProjectConfigurationPlanner
         }
         catch (InvalidOperationException exception)
         {
-            throw new InvalidTemplateMetadataException($"Project configuration contains invalid Unicode text: {exception.Message}");
+            throw new InvalidTemplateMetadataException($"Project configuration contains invalid Unicode text: {exception.Message}", exception);
         }
     }
 
@@ -180,7 +180,7 @@ internal sealed class TemplateProjectConfigurationPlanner
         }
         catch (InvalidOperationException exception)
         {
-            throw new InvalidTemplateMetadataException($"Project configuration contains an invalid Unicode property name: {exception.Message}");
+            throw new InvalidTemplateMetadataException($"Project configuration contains an invalid Unicode property name: {exception.Message}", exception);
         }
     }
 

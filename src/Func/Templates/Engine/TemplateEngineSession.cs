@@ -39,9 +39,14 @@ internal class TemplateEngineSession : IDisposable
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
-        if ((projectPlanner is null) != (configurationWriter is null))
+        if (projectPlanner is not null)
         {
-            throw new ArgumentException("Project planning and mandatory configuration persistence must be supplied together.", nameof(configurationWriter));
+            ArgumentNullException.ThrowIfNull(configurationWriter);
+        }
+
+        if (configurationWriter is not null)
+        {
+            ArgumentNullException.ThrowIfNull(projectPlanner);
         }
 
         Context = context;
@@ -350,19 +355,33 @@ internal class TemplateEngineSession : IDisposable
                 await _configurationWriter!.WriteAsync(plan, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+            catch (IOException exception)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                return new(TemplateInvocationStatus.ConfigurationFailure, changes, $"Mandatory project configuration failed. Generated files were preserved: {exception.Message}")
-                {
-                    ConfiguredProjects = configuredProjects.AsReadOnly(),
-                };
+                return ConfigurationFailure(exception, changes, configuredProjects, cancellationToken);
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                return ConfigurationFailure(exception, changes, configuredProjects, cancellationToken);
+            }
+            catch (InvalidOperationException exception)
+            {
+                return ConfigurationFailure(exception, changes, configuredProjects, cancellationToken);
             }
 
             configuredProjects.Add(plan.Root);
         }
 
         return new(TemplateInvocationStatus.Success, changes) { ConfiguredProjects = configuredProjects.AsReadOnly() };
+    }
+
+    private static TemplateInvocationResult ConfigurationFailure(Exception exception, IReadOnlyList<TemplateFileChange> changes,
+        List<string> configuredProjects, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return new(TemplateInvocationStatus.ConfigurationFailure, changes, $"Mandatory project configuration failed. Generated files were preserved: {exception.Message}")
+        {
+            ConfiguredProjects = configuredProjects.AsReadOnly(),
+        };
     }
 
     private static TemplateInvocationStatus MapCreationStatus(CreationResultStatus status, CancellationToken cancellationToken)

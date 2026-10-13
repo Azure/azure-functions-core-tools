@@ -279,6 +279,21 @@ public sealed class TemplateEngineSessionTests : IDisposable
     }
 
     [Theory]
+    [InlineData("{", typeof(JsonException))]
+    [InlineData("{\"extra\":{\"\\uD800\":1}}", typeof(InvalidOperationException))]
+    [InlineData("{\"constraints\":{\"host\":{\"type\":\"host\",\"args\":[{\"hostname\":\"func\"}]}},\"primaryOutputs\":[{\"path\":\"host.json\"}],\"sourceName\":\"\\uD800\"}", typeof(InvalidOperationException))]
+    public void ReadProjectConfiguration_ParserFailure_PreservesInnerException(string configuration, Type exceptionType)
+    {
+        TemplateProjectConfigurationPlanner planner = new([]);
+
+        Action read = () => planner.Read(configuration);
+
+        var exception = read.Should().Throw<InvalidTemplateMetadataException>().Which;
+        exception.InnerException.Should().BeAssignableTo(exceptionType);
+        exception.InnerException!.StackTrace.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Theory]
     [InlineData("sources", "[]")]
     [InlineData("Sources", "[]")]
     [InlineData("Symbols", "{}")]
@@ -353,6 +368,21 @@ public sealed class TemplateEngineSessionTests : IDisposable
         Action act = () => _ = new TemplateEngineSession(null!, Hive);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("context");
+    }
+
+    [Theory]
+    [InlineData("projectPlanner")]
+    [InlineData("configurationWriter")]
+    public void Constructor_MissingProjectSupportDependency_IdentifiesMissingArgument(string missing)
+    {
+        TemplateProjectConfigurationPlanner planner = new([]);
+        TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
+
+        Action construct = () => new TemplateEngineSession(CommandContext("missing-project-dependency"), Hive,
+            projectPlanner: missing == "projectPlanner" ? null : planner,
+            configurationWriter: missing == "configurationWriter" ? null : writer);
+
+        construct.Should().Throw<ArgumentNullException>().WithParameterName(missing);
     }
 
     [Theory]

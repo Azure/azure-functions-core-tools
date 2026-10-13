@@ -288,13 +288,22 @@ public sealed class TemplaterTests : IDisposable
         File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeFalse();
     }
 
-    [Fact]
-    public async Task ProjectJourney_ConfigurationWriteFailure_PreservesGeneratedFilesAndReportsFailure()
+    [Theory]
+    [InlineData("io")]
+    [InlineData("unauthorized")]
+    [InlineData("state")]
+    public async Task ProjectJourney_ConfigurationWriteFailure_PreservesGeneratedFilesAndReportsFailure(string failure)
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
         var fileSystem = Substitute.For<IFileSystem>();
         fileSystem.FileExists(Arg.Any<string>()).Returns(call => Path.GetFileName((string)call[0]) == "host.json");
-        fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(new IOException("controlled atomic write failure")));
+        Exception exception = failure switch
+        {
+            "unauthorized" => new UnauthorizedAccessException("controlled atomic write failure"),
+            "state" => new InvalidOperationException("controlled atomic write failure"),
+            _ => new IOException("controlled atomic write failure"),
+        };
+        fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(exception));
         using Templater templater = CreateProjectTemplater(fileSystem);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "failed-config-output"));
