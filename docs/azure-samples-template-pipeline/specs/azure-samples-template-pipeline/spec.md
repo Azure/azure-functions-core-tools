@@ -278,7 +278,7 @@ The `.github/azure-functions-template.yaml` descriptor SHALL use `schemaVersion:
 
 ### Requirement: Source descriptor is synthesized into template configuration
 
-When the release snapshot contains `.github/azure-functions-template.yaml` and does not contain root `.template.config/template.json`, the pipeline SHALL synthesize template configuration in staging using the descriptor's identity, short name, name, description, and projects. The synthesized template SHALL have project type and SHALL treat the complete filtered release snapshot as template content. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying the declared canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add the workload constraint defined by `template-engine-constraints`, derived from the declared project stacks.
+When the release snapshot contains `.github/azure-functions-template.yaml` and does not contain root `.template.config/template.json`, the pipeline SHALL synthesize template configuration in staging using the descriptor's identity, short name, name, description, and projects. The synthesized template SHALL have project type and SHALL treat the complete filtered release snapshot as template content. For each declared project, it SHALL add `<root>/host.json` as a primary output and add one mandatory trusted Functions project configuration finalization action referencing that output and supplying the declared canonical stack and language. It SHALL define no parameter symbols, content replacements, or ordinary post-actions. It SHALL add one workload constraint, in the form defined by `template-engine-constraints`, for each distinct declared project stack.
 
 #### Scenario: Repository has no template configuration
 
@@ -305,7 +305,7 @@ When the release snapshot contains `.github/azure-functions-template.yaml` and d
 #### Scenario: Synthesized projects use mixed stacks
 
 - **WHEN** declared projects use different canonical stacks
-- **THEN** the synthesized workload constraint requires the workloads for every declared stack
+- **THEN** the synthesized template has a workload constraint for every declared stack
 
 ### Requirement: Package licensing is release-specific and allowlisted
 

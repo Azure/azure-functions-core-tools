@@ -1,3 +1,10 @@
+parameters:
+- name: npmPackageNames
+  type: object
+  default:
+  - azure-functions-core-tools
+  - azure-functions-cli
+
 resources:
   repositories:
   - repository: 1es
@@ -44,7 +51,9 @@ extends:
       - template: /eng/ci/templates/jobs/build.yml@self
         parameters:
           sign: false
-          artifacts: ['publish']
+          artifacts: ['publish', 'npm']
+          npmPackageDirectory: eng/tools/publish-tools/npm
+          npmPackageNames: ${{ parameters.npmPackageNames }}
           projects: |
             src/Func/Func.csproj
             test/Func.Tests/Func.Tests.csproj
@@ -56,11 +65,12 @@ extends:
       - template: /eng/ci/templates/jobs/stage-cli-artifacts.yml@self
         parameters:
           sign: true
+          includeNpmPackage: true
 
-    - stage: PublishCdn
-      displayName: Publish CLI to CDN
+    - stage: Publish
       dependsOn: Release
       jobs:
-      - template: /ci/release-cdn-artifacts.yml@eng
+      - template: /ci/publish-cli.yml@eng
         parameters:
           version: $(Build.BuildNumber)
+          npmPackageNames: ${{ parameters.npmPackageNames }}
