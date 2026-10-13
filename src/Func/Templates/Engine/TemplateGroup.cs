@@ -58,6 +58,7 @@ internal enum TemplateResolutionStatus
     WrongType,
     Unavailable,
     AmbiguousGroup,
+    InvalidTemplateType,
 }
 
-internal sealed record TemplateResolutionResult(TemplateResolutionStatus Status, TemplateGroup? Group, IReadOnlyList<TemplateCatalogEntry> Diagnostics);
+internal sealed record TemplateResolutionResult(TemplateResolutionStatus Status, TemplateGroup? Group, IReadOnlyList<TemplateCatalogEntry> Diagnostics, string? Diagnostic = null);

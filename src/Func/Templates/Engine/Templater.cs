@@ -15,6 +15,7 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
 {
     private readonly TemplateEngineSession _session = session ?? throw new ArgumentNullException(nameof(session));
     private IReadOnlyList<Candidate>? _candidates;
+    private IReadOnlyList<MalformedTypeDescriptor> _malformedTypes = [];
 
     public TemplateEngineContext Context => _session.Context;
 
@@ -33,9 +34,16 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
         IReadOnlyList<Candidate> candidates = await GetCandidatesAsync(cancellationToken);
         Candidate[] matches = [.. candidates.Where(candidate => string.Equals(candidate.Entry.Identity, reference, StringComparison.OrdinalIgnoreCase))];
-        if (matches.Length == 0)
+        MalformedTypeDescriptor[] malformed = [.. _malformedTypes.Where(template => string.Equals(template.Identity, reference, StringComparison.OrdinalIgnoreCase))];
+        if (matches.Length == 0 && malformed.Length == 0)
         {
             matches = [.. candidates.Where(candidate => candidate.Entry.ShortNames.Any(name => string.Equals(name, reference, StringComparison.OrdinalIgnoreCase)))];
+            malformed = [.. _malformedTypes.Where(template => template.ShortNames.Any(name => string.Equals(name, reference, StringComparison.OrdinalIgnoreCase)))];
+        }
+
+        if (malformed.Length > 0 && matches.Length == 0)
+        {
+            return new(TemplateResolutionStatus.InvalidTemplateType, null, [], $"Installed template '{malformed[0].Identity}' must declare an item or project type.");
         }
 
         if (matches.Length == 0)
@@ -44,18 +52,29 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
         }
 
         Candidate[] typed = [.. matches.Where(candidate => candidate.Entry.Type == type)];
+        IReadOnlyList<TemplateCatalogEntry> wrongType = Array.AsReadOnly<TemplateCatalogEntry>([.. matches.Where(candidate => candidate.Entry.Type != type).Select(candidate => candidate.Entry)]);
         if (typed.Length == 0)
         {
             return new(TemplateResolutionStatus.WrongType, null, Array.AsReadOnly<TemplateCatalogEntry>([.. matches.Select(candidate => candidate.Entry)]));
         }
 
-        IGrouping<string, Candidate>[] groups = [.. typed.GroupBy(candidate => candidate.Entry.GroupIdentity ?? candidate.Entry.Identity, StringComparer.Ordinal)];
-        if (groups.Length != 1)
+        Candidate[] eligible = [.. typed.Where(IsEligible)];
+        if (eligible.Length == 0)
         {
-            return new(TemplateResolutionStatus.AmbiguousGroup, null, Array.AsReadOnly<TemplateCatalogEntry>([.. typed.Select(candidate => candidate.Entry)]));
+            return CreateGroup(typed, wrongType);
         }
 
-        return CreateGroup([.. groups[0]]);
+        IGrouping<string, Candidate>[] groups = [.. eligible.GroupBy(candidate => candidate.Entry.GroupIdentity ?? candidate.Entry.Identity, StringComparer.Ordinal)];
+        if (groups.Length != 1)
+        {
+            return new(TemplateResolutionStatus.AmbiguousGroup, null, Array.AsReadOnly<TemplateCatalogEntry>([.. typed.Select(candidate => candidate.Entry), .. wrongType]));
+        }
+
+        string selectedGroup = groups[0].Key;
+        Candidate[] selected = [.. typed.Where(candidate => string.Equals(candidate.Entry.GroupIdentity ?? candidate.Entry.Identity, selectedGroup, StringComparison.Ordinal))];
+        IReadOnlyList<TemplateCatalogEntry> rejectedGroups = Array.AsReadOnly<TemplateCatalogEntry>([.. wrongType,
+            .. typed.Where(candidate => !string.Equals(candidate.Entry.GroupIdentity ?? candidate.Entry.Identity, selectedGroup, StringComparison.Ordinal)).Select(candidate => candidate.Entry)]);
+        return CreateGroup(selected, rejectedGroups);
     }
 
     public async Task<TemplateResolutionResult> CreateGroupAsync(IReadOnlyList<TemplateCatalogEntry> entries, CancellationToken cancellationToken = default)
@@ -83,13 +102,13 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
         return CreateGroup(selected);
     }
 
-    private TemplateResolutionResult CreateGroup(IReadOnlyList<Candidate> candidates)
+    private TemplateResolutionResult CreateGroup(IReadOnlyList<Candidate> candidates, IReadOnlyList<TemplateCatalogEntry>? additionalDiagnostics = null)
     {
         List<ResolvedTemplate> items = [];
-        List<TemplateCatalogEntry> diagnostics = [];
+        List<TemplateCatalogEntry> diagnostics = [.. additionalDiagnostics ?? []];
         foreach (Candidate candidate in candidates.OrderBy(candidate => candidate.Entry.Identity, StringComparer.Ordinal))
         {
-            if (candidate.Entry.ConstraintEvaluation.Status != TemplateConstraintEvaluationStatus.Eligible || candidate.Entry.MetadataDiagnostic is not null)
+            if (!IsEligible(candidate))
             {
                 diagnostics.Add(candidate.Entry);
                 continue;
@@ -113,6 +132,8 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
 
         IReadOnlyList<ITemplateInfo> templates = await packageManager.GetTemplatesAsync(cancellationToken);
         IReadOnlyList<ITemplatePackage> packages = await packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
+        _malformedTypes = Array.AsReadOnly<MalformedTypeDescriptor>([.. templates.Where(template => TemplateCatalogProjector.GetTemplateType(template) is null)
+            .Select(template => new MalformedTypeDescriptor(template.Identity, Array.AsReadOnly<string>([.. template.ShortNameList])))]);
         List<Candidate> candidates = [];
         foreach (ITemplateInfo template in templates.Where(template => TemplateCatalogProjector.GetTemplateType(template) is not null))
         {
@@ -134,11 +155,15 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
             }
             catch (InvalidTemplateMetadataException exception)
             {
-                candidates.Add(new(template, entry with
-                {
-                    ConstraintEvaluation = new(TemplateConstraintEvaluationStatus.Failed,
-                        [new("template.json", "configuration", TemplateConstraintEvaluationStatus.Failed, exception.Message, "Correct the template configuration and rerun selection.")]),
-                }, null));
+                candidates.Add(FailedCandidate(template, entry, exception.Message));
+            }
+            catch (IOException exception)
+            {
+                candidates.Add(FailedCandidate(template, entry, $"Template configuration is unreadable: {exception.Message}"));
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                candidates.Add(FailedCandidate(template, entry, $"Template configuration is unreadable: {exception.Message}"));
             }
         }
 
@@ -148,5 +173,17 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
 
     public void Dispose() => _session.Dispose();
 
+    private static bool IsEligible(Candidate candidate)
+        => candidate.Entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible && candidate.Entry.MetadataDiagnostic is null && candidate.Configuration is not null;
+
+    private static Candidate FailedCandidate(ITemplateInfo template, TemplateCatalogEntry entry, string message)
+        => new(template, entry with
+        {
+            ConstraintEvaluation = new(TemplateConstraintEvaluationStatus.Failed,
+                [new("template.json", "configuration", TemplateConstraintEvaluationStatus.Failed, message, "Correct the template configuration and rerun selection.")]),
+        }, null);
+
     private sealed record Candidate(ITemplateInfo Template, TemplateCatalogEntry Entry, TemplateConfigurationSnapshot? Configuration);
+
+    private sealed record MalformedTypeDescriptor(string Identity, IReadOnlyList<string> ShortNames);
 }
