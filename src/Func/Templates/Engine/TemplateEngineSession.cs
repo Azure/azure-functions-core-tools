@@ -296,7 +296,10 @@ internal class TemplateEngineSession : IDisposable
                 if (configurationPlans.Any(plan => _settings.Host.FileSystem.FileExists(plan.ConfigurationPath)
                     || _settings.Host.FileSystem.DirectoryExists(plan.ConfigurationPath)))
                 {
-                    return new(TemplateInvocationStatus.FileConflict, changes, "Existing project configuration is user-owned. Use the existing initializer to adopt or repair it.");
+                    return new(TemplateInvocationStatus.FileConflict, changes, "Existing project configuration is user-owned. Use the existing initializer to adopt or repair it.")
+                    {
+                        ProjectConfigurations = configurationPlans,
+                    };
                 }
 
                 changes = Array.AsReadOnly<TemplateFileChange>([.. changes,
@@ -304,20 +307,26 @@ internal class TemplateEngineSession : IDisposable
             }
             catch (InvalidTemplateMetadataException exception)
             {
-                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message)
+                {
+                    ProjectConfigurations = configurationPlans,
+                };
             }
         }
 
         bool requiresForce = !request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal));
         if (!request.DryRun && requiresForce)
         {
-            return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.");
+            return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
 
         string? outputFailure = ValidateOutputPaths(output, changes);
         if (outputFailure is not null)
         {
-            return new(TemplateInvocationStatus.Failed, [], outputFailure);
+            return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
         }
 
         if (request.DryRun)
@@ -335,26 +344,35 @@ internal class TemplateEngineSession : IDisposable
         }
         catch (InvalidTemplateMetadataException exception)
         {
-            return new(TemplateInvocationStatus.Failed, [], exception.Message);
+            return new(TemplateInvocationStatus.Failed, [], exception.Message) { ProjectConfigurations = configurationPlans };
         }
         catch (IOException exception)
         {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}");
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
         catch (UnauthorizedAccessException exception)
         {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}");
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
 
         if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
         {
-            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed after preview. Rerun selection.");
+            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed after preview. Rerun selection.")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
 
         outputFailure = ValidateOutputPaths(output, changes);
         if (outputFailure is not null)
         {
-            return new(TemplateInvocationStatus.Failed, [], outputFailure);
+            return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
         }
 
         ITemplateCreationResult created = await InstantiateAsync(template, request, parameters, false, cancellationToken);

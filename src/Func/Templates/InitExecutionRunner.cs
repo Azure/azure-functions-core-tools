@@ -167,6 +167,7 @@ internal sealed class InitExecutionRunner(
             }
         }
 
+        TemplateCatalogEntry[] unavailable = [.. considered.Where(entry => !IsUsable(entry) && CanMatch(entry))];
         if (groups.Count == 0)
         {
             return InitExecutionResult.Reject("noCompatibleTemplates",
@@ -174,10 +175,10 @@ internal sealed class InitExecutionRunner(
             {
                 Templates = considered.AsReadOnly(),
                 ArgumentResults = parsed.AsReadOnly(),
+                UnavailableTemplates = unavailable,
             };
         }
 
-        TemplateCatalogEntry[] unavailable = [.. considered.Where(entry => !IsUsable(entry) && CanMatch(entry))];
         TemplateGroup selectedGroup;
         if (groups.Count > 1 || (request.TemplateReference is null && canPrompt && unavailable.Length > 0))
         {
@@ -187,10 +188,11 @@ internal sealed class InitExecutionRunner(
                 {
                     Templates = Array.AsReadOnly<TemplateCatalogEntry>([.. groups.SelectMany(group => group).Select(template => template.Entry)]),
                     ArgumentResults = parsed.AsReadOnly(),
+                    UnavailableTemplates = unavailable,
                 };
             }
 
-            if (unavailable.Length > 0)
+            if (unavailable.Length > 0 && !request.JsonOutput)
             {
                 _renderer.RenderUnavailable(unavailable);
             }
@@ -213,6 +215,7 @@ internal sealed class InitExecutionRunner(
                 "No project candidate accepts these template arguments. Correct the reported aliases and values.") with
             {
                 ArgumentResults = parsed.AsReadOnly(),
+                UnavailableTemplates = unavailable,
             };
         }
 
@@ -226,6 +229,7 @@ internal sealed class InitExecutionRunner(
                 {
                     Templates = Array.AsReadOnly<TemplateCatalogEntry>([.. narrowed.Select(template => template.Entry)]),
                     ArgumentResults = parsed.AsReadOnly(),
+                    UnavailableTemplates = unavailable,
                 };
             }
 
@@ -244,6 +248,7 @@ internal sealed class InitExecutionRunner(
             {
                 SelectedTemplate = selected.Entry,
                 ArgumentResults = [initial],
+                UnavailableTemplates = unavailable,
             };
         }
 
@@ -255,6 +260,7 @@ internal sealed class InitExecutionRunner(
             {
                 SelectedTemplate = selected.Entry,
                 ArgumentResults = [final],
+                UnavailableTemplates = unavailable,
             };
         }
 
@@ -274,6 +280,7 @@ internal sealed class InitExecutionRunner(
                 SelectedTemplate = selected.Entry,
                 ArgumentResults = [final],
                 Invocation = preview,
+                UnavailableTemplates = unavailable,
             };
         }
 
@@ -286,7 +293,13 @@ internal sealed class InitExecutionRunner(
         cancellationToken.ThrowIfCancellationRequested();
         if (targetFailure is not null)
         {
-            return targetFailure with { SelectedTemplate = selected.Entry, ArgumentResults = [final] };
+            return targetFailure with
+            {
+                SelectedTemplate = selected.Entry,
+                ArgumentResults = [final],
+                Invocation = preview,
+                UnavailableTemplates = unavailable,
+            };
         }
 
         TemplateInvocationResult created = await selected.InvokeAsync(invocationRequest with { DryRun = false }, cancellationToken);
@@ -300,6 +313,7 @@ internal sealed class InitExecutionRunner(
             ArgumentResults = [final],
             Invocation = invocation,
             Diagnostics = invocation.Diagnostic is null ? [] : [invocation.Diagnostic],
+            UnavailableTemplates = unavailable,
         };
 
         bool CanMatch(TemplateCatalogEntry entry) => entry.ProjectConfigurations is not { } declarations

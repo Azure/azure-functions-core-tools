@@ -27,6 +27,8 @@ internal sealed record InitExecutionResult(string Kind, bool Succeeded)
 
     public IReadOnlyList<TemplateCatalogEntry> Templates { get; init; } = [];
 
+    public IReadOnlyList<TemplateCatalogEntry> UnavailableTemplates { get; init; } = [];
+
     public IReadOnlyList<TemplateCandidateParseResult> ArgumentResults { get; init; } = [];
 
     public TemplateCatalogEntry? SelectedTemplate { get; init; }

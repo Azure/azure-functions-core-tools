@@ -658,6 +658,20 @@ public sealed class InitExecutionJourneyTests : IDisposable
         harness.Result!.Kind.Should().Be("unsupportedTarget");
         File.ReadAllText(Path.Combine(Target, "appeared.txt")).Should().Be("keep");
         File.Exists(Path.Combine(Target, "host.json")).Should().BeFalse();
+        harness.Result.Invocation.Should().NotBeNull();
+        harness.Result.Invocation!.ProjectConfigurations.Should().ContainSingle();
+        harness.Result.Invocation.ConfiguredProjects.Should().BeEmpty();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+
+        int rendered = new InitExecutionRenderer(new SpectreInteractionService(new DefaultTheme(), stdout, stderr))
+            .Render(harness.Result, jsonOutput: true);
+
+        rendered.Should().Be(1);
+        using var json = JsonDocument.Parse(stdout.Output);
+        json.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
+        json.RootElement.GetProperty("invocation").GetProperty("plannedConfigurations").GetArrayLength().Should().Be(1);
+        json.RootElement.GetProperty("invocation").GetProperty("configuredProjects").GetArrayLength().Should().Be(0);
         await AssertDisposedAsync(harness.Factory);
     }
 
@@ -672,6 +686,147 @@ public sealed class InitExecutionJourneyTests : IDisposable
         harness.Result!.Kind.Should().Be("noCompatibleTemplates");
         harness.Result.Diagnostics.Single().Should().Contain("func new install <package>");
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectMetadataFailure_PreservesClassificationWithoutHostMetadataConflation(bool restricted)
+    {
+        var configuration = WriteProject("invalid", Low,
+            parameters: """{"Value":{"type":"parameter","datatype":"string","defaultValue":"keep"}}""",
+            extraConstraint: restricted ? """ "missing":{"type":"func-workload","args":"java"} """ : null);
+        configuration.Remove("postActions");
+        SaveConfiguration("invalid", configuration);
+        await InstallAsync();
+        var harness = CreateHarness();
+        using var templater = await OpenProjectFlowAsync(harness);
+
+        var entries = await templater.ListAsync(TemplateType.Project);
+        var entry = entries.Should().ContainSingle().Subject;
+        var resolution = await templater.CreateGroupAsync(entries);
+
+        entry.ProjectConfigurationDiagnostic.Should().NotBeNullOrWhiteSpace();
+        entry.MetadataDiagnostic.Should().BeNull();
+        entry.Parameters.Should().ContainSingle(parameter => parameter.CanonicalName == "Value");
+        entry.ConstraintEvaluation.Status.Should().Be(restricted
+            ? TemplateConstraintEvaluationStatus.Restricted : TemplateConstraintEvaluationStatus.Failed);
+        if (restricted)
+        {
+            entry.ConstraintEvaluation.Diagnostics.Should().Contain(diagnostic => diagnostic.Type == "func-workload");
+        }
+
+        resolution.Status.Should().Be(TemplateResolutionStatus.Unavailable);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    public async Task ProjectConflictResult_RetainsComputedPlansButNeverClaimsCompletion(bool existingConfiguration, bool dryRun)
+    {
+        WriteProject("valid", Low);
+        await InstallAsync();
+        var harness = CreateHarness();
+        using var templater = await OpenProjectFlowAsync(harness);
+        var selected = (await templater.ResolveGroupAsync(Low, TemplateType.Project)).Group![0];
+        string existing = existingConfiguration ? Path.Combine(Target, ".func", "config.json") : Path.Combine(Target, "host.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(existing)!);
+        File.WriteAllText(existing, existingConfiguration ? """{"user":"keep"}""" : """{"version":"user-owned"}""");
+        string before = File.ReadAllText(existing);
+
+        var result = await selected.InvokeAsync(new(WorkingDirectory.FromExplicit(Target), new Dictionary<string, string?>(), DryRun: dryRun));
+
+        result.Status.Should().Be(TemplateInvocationStatus.FileConflict);
+        result.ProjectConfigurations.Should().ContainSingle().Which.Should()
+            .Be(new TemplateProjectConfigurationPlan(Path.Combine(Target, "host.json"), "node", "JavaScript"));
+        result.ConfiguredProjects.Should().BeEmpty();
+        File.ReadAllText(existing).Should().Be(before);
+        File.Exists(Path.Combine(Target, "package.json")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectResult_BeforePlanning_DoesNotInventConfigurationPlans()
+    {
+        WriteProject("valid", Low);
+        await InstallAsync();
+        var harness = CreateHarness();
+        using var templater = await OpenProjectFlowAsync(harness);
+        var selected = (await templater.ResolveGroupAsync(Low, TemplateType.Project)).Group![0];
+
+        var result = await selected.InvokeAsync(new(WorkingDirectory.FromExplicit(Target),
+            new Dictionary<string, string?> { ["NotDeclared"] = "invalid" }));
+
+        result.Status.Should().Be(TemplateInvocationStatus.InvalidArguments);
+        result.ProjectConfigurations.Should().BeEmpty();
+        result.ConfiguredProjects.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_InteractiveJsonUnavailableDiscovery_WritesOnlyOneStructuredResult(bool invalidArguments)
+    {
+        WriteProject("valid", Low);
+        WriteProject("restricted", "Func.Init.Restricted", extraConstraint: """ "missing":{"type":"func-workload","args":"java"} """);
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        stderr.Enqueue(ConsoleKey.Enter);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+        string[] tail = invalidArguments ? ["--unknown", "invalid"] : [];
+
+        int exit = await harness.InvokeAsync([Target, "--output", "json", "--dry-run", .. tail]);
+
+        exit.Should().Be(invalidArguments ? 1 : 0);
+        using var json = JsonDocument.Parse(stdout.Output);
+        json.RootElement.GetProperty("kind").GetString().Should().Be(invalidArguments ? "invalidArguments" : "previewed");
+        var unavailable = json.RootElement.GetProperty("unavailableTemplates").EnumerateArray().Should().ContainSingle().Subject;
+        unavailable.GetProperty("identity").GetString().Should().Be("Func.Init.Restricted");
+        unavailable.GetProperty("constraints").GetArrayLength().Should().BeGreaterThan(0);
+        stderr.Output.Should().Contain("Select a project-template family:");
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Command_JsonNoEligibleTemplates_RemainsOneStructuredFailureWithoutPrompt()
+    {
+        WriteProject("restricted", Low, extraConstraint: """ "missing":{"type":"func-workload","args":"java"} """);
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+
+        int exit = await harness.InvokeAsync([Target, "--output", "json"]);
+
+        exit.Should().Be(1);
+        using var json = JsonDocument.Parse(stdout.Output);
+        json.RootElement.GetProperty("kind").GetString().Should().Be("noCompatibleTemplates");
+        json.RootElement.GetProperty("templates").GetArrayLength().Should().Be(1);
+        stderr.Reads.Should().Be(0);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Command_InteractiveJsonCancellation_DoesNotWriteDiscoveryOrSuccessToStdout()
+    {
+        WriteProject("valid", Low);
+        WriteProject("restricted", "Func.Init.Restricted", extraConstraint: """ "missing":{"type":"func-workload","args":"java"} """);
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        stderr.Enqueue(ConsoleKey.C, '\u0003', control: true);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+
+        Func<Task> act = () => harness.InvokeAsync([Target, "--output", "json", "--dry-run"]);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        stdout.Output.Should().BeEmpty();
+        harness.Result.Should().BeNull();
+        Directory.Exists(Target).Should().BeFalse();
+        await AssertDisposedAsync(harness.Factory);
     }
 
     public void Dispose()
@@ -817,6 +972,12 @@ public sealed class InitExecutionJourneyTests : IDisposable
     }
 
     private Task InstallAsync() => TemplateFixtures.InstallAsync(Package, Path.Combine(Home, "templates"), CancellationToken.None);
+
+    private Task<Templater> OpenProjectFlowAsync(Harness harness) => harness.Factory.CreateProjectAsync(
+        new(WorkingDirectory.FromExplicit(Target), new(WorkingDirectory.FromExplicit(Target), stack: null)),
+        new([new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true)]),
+        harness.Provider.GetRequiredService<TemplateProjectConfigurationPlanner>(),
+        harness.Provider.GetRequiredService<TemplateProjectConfigurationWriter>(), CancellationToken.None);
 
     private Dictionary<string, string> SnapshotHome() => Directory.GetFiles(Path.Combine(Home, "templates"), "*", SearchOption.AllDirectories)
         .ToDictionary(path => Path.GetRelativePath(Home, path), File.ReadAllText);

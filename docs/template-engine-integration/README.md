@@ -35,12 +35,18 @@ strict argument parser. In a project-enabled flow, catalog entries expose
 the planner; malformed declarations retain separate project and constraint
 diagnostics and cannot become a selected capability. Item entries and item-only
 flows do not acquire project declarations.
+Project errors do not populate the func host `MetadataDiagnostic` field or erase
+projected parameters. Previously eligible project-validation failures retain
+their failed classification; an independent project-diagnostic guard also blocks
+group and capability creation.
 
 Project invocation results additionally expose `ProjectConfigurations`, the
 already computed native/preflight plans, separately from `ConfiguredProjects`,
 the successfully finalized roots. Plans do not imply completion, including on
 configuration failure. Neither projection changes the provisional action schema,
 native creation order, failure file-change reporting or path/type validation.
+Once planning succeeds, later conflict and revalidation results retain the same
+ordered plans; failures before planning do not invent plans.
 
 ## Existing-project configuration persistence
 

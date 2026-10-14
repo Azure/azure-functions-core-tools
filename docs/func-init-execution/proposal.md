@@ -74,6 +74,17 @@ Plain and JSON output distinguish **planned** configurations/effects from
 `ConfiguredProjects`, the actually finalized subset. Configuration failure is
 nonzero, preserves generated content and completed roots, and stops subsequent
 finalization. Cancellation releases the flow and never reports success.
+Every result after successful plan computation retains that ordered planned
+metadata, including subsequent conflict or revalidation failures; a result
+before planning has no synthetic plan. Project configuration diagnostics remain
+separate from func host metadata diagnostics and block capability creation.
+
+In JSON mode, unavailable discovery entries and their diagnostics travel as
+`unavailableTemplates` data rather than a pre-rendered table. Prompts stay on
+stderr and complete stdout is one JSON result, or empty when cancellation
+prevents a result. The shared Spectre adapter writes unchanged serialized JSON
+through its existing raw stdout writer, honoring both injected and default
+stdout without markup rendering.
 
 The installed-fixture tests compose actual Node workload metadata, native project
 creation, canonical configuration, project resolution, and `ProfileResolver`.

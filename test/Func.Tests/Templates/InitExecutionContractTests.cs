@@ -210,6 +210,21 @@ public sealed class InitExecutionContractTests
         typeof(InitExecutionCommand).GetInterfaces().Should().NotContain(typeof(IBuiltInCommand));
     }
 
+    [Fact]
+    public void ResolvedTemplate_ProjectDiagnosticWithoutOtherRestrictions_CannotBecomeInvocable()
+    {
+        TemplateCatalogEntry entry = new("invalid", "invalid", null, TemplateType.Project, ["invalid"], null, null, 0, null, false, [], null)
+        {
+            ConstraintEvaluation = new(TemplateConstraintEvaluationStatus.Eligible, []),
+            ProjectConfigurationDiagnostic = "Invalid project declaration.",
+        };
+
+        Action act = () => _ = new ResolvedTemplate(entry,
+            (_, _) => Task.FromResult(new TemplateInvocationResult(TemplateInvocationStatus.Success, [])));
+
+        act.Should().Throw<ArgumentException>().WithParameterName("entry");
+    }
+
     private InitExecutionRunner CreateRunner(IReadOnlyList<IProjectInitializer> initializers) => new(
         _factory, _arguments, new(_arguments, _interaction), _interaction, new(_interaction),
         _targets, initializers, new(initializers), new(new PhysicalFileSystem()));

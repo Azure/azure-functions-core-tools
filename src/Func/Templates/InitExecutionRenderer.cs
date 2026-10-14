@@ -26,6 +26,7 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
                 bundle = result.Context?.Bundle,
                 result.Diagnostics,
                 templates = result.Templates.Select(ProjectTemplate),
+                unavailableTemplates = result.UnavailableTemplates.Select(ProjectTemplate),
                 selectedTemplate = result.SelectedTemplate is { } selected ? ProjectTemplate(selected) : null,
                 argumentResults = result.ArgumentResults.Select(parsed => new
                 {

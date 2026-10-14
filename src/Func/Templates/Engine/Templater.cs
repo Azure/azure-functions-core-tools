@@ -167,11 +167,11 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
                     }
                     catch (InvalidTemplateMetadataException exception)
                     {
-                        entry = entry with
+                        entry = entry with { ProjectConfigurationDiagnostic = exception.Message };
+                        if (evaluation.Status == TemplateConstraintEvaluationStatus.Eligible)
                         {
-                            ProjectConfigurationDiagnostic = exception.Message,
-                            MetadataDiagnostic = entry.MetadataDiagnostic ?? exception.Message,
-                        };
+                            evaluation = evaluation with { Status = TemplateConstraintEvaluationStatus.Failed };
+                        }
                     }
                 }
                 else if (entry.Type == TemplateType.Project && evaluation.Status == TemplateConstraintEvaluationStatus.Eligible)
@@ -204,7 +204,8 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
     public void Dispose() => _session.Dispose();
 
     private static bool IsEligible(Candidate candidate)
-        => candidate.Entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible && candidate.Entry.MetadataDiagnostic is null && candidate.Configuration is not null;
+        => candidate.Entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible
+            && candidate.Entry.MetadataDiagnostic is null && candidate.Entry.ProjectConfigurationDiagnostic is null && candidate.Configuration is not null;
 
     private static Candidate FailedCandidate(ITemplateInfo template, TemplateCatalogEntry entry, string message)
         => new(template, entry with
