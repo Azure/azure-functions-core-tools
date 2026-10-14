@@ -4,16 +4,16 @@ See `proposal.md` for motivation and `specs/azure-samples-template-pipeline/spec
 
 Azure-Samples repositories release independently through GitHub. The package builder must consume those repositories as untrusted content, produce packages accepted by the `FuncTemplate` contract, and preserve a traceable connection to an immutable Git release without requiring packaging infrastructure in each source repository.
 
-The control plane lives separately from both Azure-Samples and Azure Functions Core Tools:
+This draft extends the original single-template model so independent quickstarts can come from different folders of one repository. It does not require per-stack aggregation or private intermediate packages. Metadata browsing and authorized guided use provide the streamlined UX without prescribing package boundaries. Scope schemas and identity ownership remain under publishing review.
+
+Publishing automation lives in the separate `func-templates` repository. Curated registration remains in the existing [reviewed source manifest](https://github.com/Azure/azure-functions-templates/blob/dev/Functions.Templates/Template-Manifest/manifest.json); it is not migrated to another manually maintained onboarding list:
 
 ```text
 https://dev.azure.com/azfunc/internal/_git/func-templates
 |
 +-- src/
-|   +-- Quickstarts/
-|   |   `-- *.yaml
 |   `-- Schema/
-|       +-- quickstart.schema.json
+|       +-- publishing-input.schema.json
 |       `-- azure-functions-template.schema.json
 `-- eng/
     `-- ci/
@@ -27,7 +27,7 @@ The Azure Functions CLI, general template discovery, quickstart catalog generati
 
 **Goals:**
 
-- Make onboarding reviewable, deterministic, and safe to divide across files.
+- Keep onboarding reviewable and deterministic without duplicating curated registrations.
 - Convert eligible release snapshots into valid project template packages without executing source-controlled code.
 - Use package feeds as the durable publication checkpoint rather than maintaining a parallel release ledger.
 - Promote the exact validated artifact through a single approval gate.
@@ -46,35 +46,25 @@ The Azure Functions CLI, general template discovery, quickstart catalog generati
 
 ## Decisions
 
-### YAML files form one logical source manifest
+### The existing curated manifest owns registration
 
-Onboarding sources use this shape:
+The pipeline consumes a pinned, approved commit of the existing source manifest in `azure-functions-templates`. A CDN response, an arbitrary manifest override, an `author` string, or a package prefix is not authorization to publish. The source revision and approved publishing-policy revision are recorded with every package candidate.
 
-```yaml
-schemaVersion: 1
+Preserve existing entry IDs, names, repository URLs, folder paths, Git refs, and the legacy CDN URL/schema contract for CLI, editor, and other consumers. The source manifest gains a supported publishing extension; unknown extension versions fail validation rather than silently reinterpret legacy fields. Exact extension placement and schema versioning require the manifest and publishing owners' agreement and compatibility tests before rollout.
 
-quickstarts:
-  - id: python-openai-chat
-    repository: Azure-Samples/functions-python-openai-chat
-    packageId: Azure.Functions.Templates.PythonOpenAIChat
-    enabled: true
-
-    release:
-      minimumVersion: 1.0.0
-      includePrerelease: false
-
-    licenseExpression: MIT
-```
-
-`schemaVersion`, `quickstarts`, `id`, `repository`, `packageId`, and `release.minimumVersion` are always required. Onboarding contains no template metadata or project paths.
-
-Onboarding defaults are resolved before validation:
+Conceptually, one reviewed record carries:
 
 ```text
-enabled                    -> true
-release.includePrerelease  -> false
-licenseExpression          -> detection from release commit
+existing sample id, repositoryUrl, folderPath, gitRef, display/filter metadata
+  + explicit publishing approval and stable package assignment
+  + named source-definition selection and release policy
 ```
+
+An entry without the approved extension remains a legacy discovery record. It neither becomes a publication candidate nor disappears from older consumers. Approved publishing inputs require a stable `packageId`, named definition selection where needed, explicit enabled state, and release-selection policy. A reviewed license override is optional; source-release detection remains the default. Adding an unreviewed optional field does not grant approval.
+
+The approved extension explicitly authorizes eligible-release enumeration with a minimum version/backfill boundary and prerelease policy. Retain the existing GitHub release, SemVer, source-allowlist, and pinned-commit checks. A legacy discovery `gitRef` neither authorizes publication nor supplies a minimum-version policy; mutable branch refs are not eligible package snapshots.
+
+The extension selects source-owned definition IDs, not Functions project topology. Existing `folderPath` remains discovery/content-scope metadata; a publishing candidate must verify its relationship to the selected source definition and reject mismatches. Do not duplicate `name`, `shortName`, project declarations, or authored parameters as separately authoritative publishing definitions.
 
 The exact release snapshot owns synthesis metadata in `.github/azure-functions-template.yaml`:
 
@@ -102,27 +92,53 @@ language  canonical language recognized by that stack
 
 The root project uses `.`. Other roots use normalized `/`-separated relative paths. Roots cannot be absolute, contain `..`, use excluded directories, collide case-insensitively, or overlap through ancestor/descendant nesting. The staged release must contain a regular `host.json` directly under every declared root.
 
-The onboarding JSON Schema owns control-plane structure and rejects unknown fields. A separate centrally owned descriptor schema validates `.github/azure-functions-template.yaml`. Repository-wide onboarding validation owns central identity collisions, GitHub slug restrictions, SemVer validation, package-prefix policy, and license policy. Release packaging owns descriptor metadata, project path safety, canonical stack/language pairs, and TemplateEngine validation against the exact tagged content.
+The existing manifest schema continues to govern legacy discovery fields. The publishing-input schema validates the approved extension and rejects unknown publishing fields/versions without pretending to change every existing consumer. The source descriptor schema validates repository-owned definitions. Whole-manifest validation owns registration collisions, source policy, package assignments, release policy, and license overrides; release packaging owns actual scopes, projects, raw constraints, and TemplateEngine validation.
 
-Files are scanned non-recursively in ordinal filename order. The order exists only for deterministic diagnostics; it does not establish precedence. Duplicate values are errors rather than last-write-wins behavior.
+The pipeline may generate an internal normalized input from that one reviewed source, but it must be reproducible from the pinned revision and policy. A generated projection is not a second author-maintained registry. Invalid input fails as a whole before package candidates are accepted.
 
-**Alternative considered:** keep every repository in one YAML file. This creates a merge hotspot and makes ownership grouping difficult. It is rejected.
-
-**Alternative considered:** require one repository per file. The filename would become an accidental identity surface and would complicate grouping and migration. Files therefore contain zero or more entries.
+**Alternative considered:** require authors to copy the current registrations into central YAML. That duplicates curation and forces a registration migration unrelated to package-backed execution. Existing pipeline YAML and repository-owned synthesis descriptors remain; only the competing central registration list is removed.
 
 ### Explicit operational and package identities remain stable
 
-The onboarding `id` is an internal operational key. `packageId` is explicitly reviewed and must use the reserved `Azure.Functions.Templates.` prefix. Neither is derived from mutable GitHub metadata.
+The existing manifest entry `id` stays a stable registration/discovery key, not a new internal ID replacing it. A publishing `packageId` is explicit, persisted, reviewed, and reserved under `Azure.Functions.Templates.`. Tooling may propose an initial ID from the stable entry ID, but must validate legal encoding, case-insensitive collisions, and namespace ownership before persisting it. Repository/display/template-name changes must not regenerate public package IDs during a build.
 
-Repository, package ID, and onboarding ID are unique case-insensitively. Repository uniqueness intentionally limits one package to one repository in the initial design. A future need for multiple packaging scopes requires an explicit schema revision rather than duplicate entries.
+Entries may share a repository or point to separate subfolders. One package assignment may include several source definitions, and several catalog entries may reference that same assignment. Those references must agree on source, release policy, complete selected-definition set, and package identity. Conflicting assignments or one template identity owned by competing packages are rejected. A separate reviewed identity migration is required for intentional ownership changes.
+
+### Independent source scopes preserve sample choices
+
+The [Python connectors source](https://github.com/Azure-Samples/functions-connectors-python/tree/v1.0.1) exposes [Office 365](https://github.com/Azure-Samples/functions-connectors-python/tree/v1.0.1/office365App) and [SharePoint](https://github.com/Azure-Samples/functions-connectors-python/tree/v1.0.1/sharepointApp) as separate samples. They remain independent templates, whether published together or in separate scoped packages. Discovery maps each choice to its actual package reference. Basic project/item companions remain outside this producer.
+
+A versioned repository-owned descriptor enumerates named definitions, normalized content roots, and exactly one authored or synthesized configuration per definition. Each owns its identity, short name, and Functions project topology. Extended onboarding may select definition IDs for a package, but cannot supply project paths or overwrite source-owned metadata. The exact schema and package-grouping policy remain review questions.
+
+Acquire an exact eligible source release and validate each scope against traversal, links, exclusions, and collisions. Project roots are relative to that scope. Preserve authored configuration byte-for-byte; synthesized actions cover only its declared projects. Retain source-root license material even when a selected folder has no local license. Isolated template roots prevent Office 365 selection from copying SharePoint or unrelated source folders.
+
+Independent definition content roots must be disjoint: identical or ancestor/descendant roots are rejected after normalization, including aliases introduced by links. Shared source files require explicit membership in the versioned descriptor for every consuming definition, with normalized source paths and destination paths relative to that definition's isolated output. Shared membership does not allow root overlap or implicit copying of a sibling definition. Apply containment, link, exclusion, destination-collision, and license checks to the shared inputs as well as each local scope.
+
+Each definition's effective content set includes all declared shared inputs. Its content digest, package provenance, and relevant license notices must identify those inputs, so changing one shared file changes every consuming definition's evidence. Missing or invalid shared membership fails the affected package rather than silently omitting content. Exact field names and schema-version rollout remain publishing-owner decisions, but these ownership and isolation rules are required by the proposal.
+
+The completed package must discover exactly its reviewed definitions and keep independent samples in distinct groups. Shared groups are allowed only for intentional variants of one definition. Reject duplicate identities, ambiguous short names, missing definitions, invalid actions, and unintended output scopes. One selected definition's failure blocks its package; unrelated valid packages can continue.
+
+Package versions remain source-release-derived. Provenance records selected definition IDs, normalized scopes, source commit, and content digests outside scaffolded roots. Changed scope or content under an existing package ID/version is an immutable conflict. No private source-unit feed or independent aggregate version is required.
+
+Functions declarations remain authoritative. A Python Functions sample with a JavaScript frontend is not automatically mixed-stack. A sample with Python and Node Functions projects keeps both constraints rather than an arbitrary primary-stack label or duplicated identities. Discovery can describe those requirements without changing the package boundary.
+
+### Publication supplies evidence, not the discovery manifest
+
+The reviewed source manifest is the single curated registration and discovery authority. Publishing consumes its approved extension and emits validated package/provenance results. The manifest/discovery owner adds package-aware browsing references only after verified publication, preserving legacy fields and URL consumers. Generated results must not overwrite reviewed policy or manufacture approval for unpublished packages. The public CDN view is distribution output, not a second source of publishing authorization or the installed TemplateEngine catalog.
+
+General feed scanning is not a dependency of this initial curated flow. Broader discovery may later scan our and third-party packages under its own policies. Generic explicit template package installation remains available; this is not a ban on community-authored packages or a requirement to preinstall quickstarts.
+
+The approval record must identify the published artifact digest, package/version, source definitions, and reviewed publication so discovery can verify sanction. A self-declared tag or reserved prefix is not proof. Evidence transport and authentication belong to discovery and publisher-trust review; this draft does not invent a signed-index protocol or broaden the source allowlist.
+
+**Alternative considered:** require every quickstart in one package per stack. Guided use can acquire the selected package without manual package-ID discovery, so aggregation is not needed for that UX. A future aggregation policy may be separate work, but is not a prerequisite here.
 
 **Alternative considered:** derive package ID from repository name. Repository renames, normalization collisions, and NuGet namespace ownership would make package identity unstable. It is rejected.
 
 **Alternative considered:** keep synthesized template metadata or project paths in onboarding. That makes repository structure and template presentation depend on a separately versioned control-plane file. It is rejected so the release commit atomically owns its content and synthesis descriptor.
 
-### The minimum version is the backfill boundary
+### Explicit release policy governs discovery and backfill
 
-The daily pipeline enumerates all published releases rather than tracking only the newest release. `minimumVersion` establishes the first eligible version and makes onboarding backfill explicit and repeatable.
+For approved enabled assignments, the scheduled pipeline enumerates published releases with the configured minimum version/backfill boundary. This preserves the original release-discovery behavior without inferring enumeration consent from a legacy discovery record alone.
 
 Release eligibility is:
 
@@ -131,7 +147,7 @@ published GitHub release
 + non-draft
 + tag matches v<SemVer 2.0>
 + no SemVer build metadata
-+ version >= minimumVersion
++ version >= approved minimumVersion
 + prerelease enabled when GitHub marks it prerelease
 ```
 
@@ -143,7 +159,7 @@ The tag is resolved to an exact commit independently of `target_commitish`. The 
 
 ### Feed state replaces a separate processing ledger
 
-The staging feed and NuGet.org provide the durable state machine:
+The staging feed and NuGet.org provide the durable state machine for published template packages:
 
 ```text
 absent from staging, absent from NuGet.org
@@ -156,7 +172,7 @@ present in staging, present in NuGet.org
   -> complete
 ```
 
-Every query includes package ID and version and verifies repository commit metadata. A package at the expected identity with another commit is a conflict. Immutable package versions are never overwritten.
+Every query includes package ID/version and verifies source commit and selected-definition provenance. Changed definitions or content under an existing identity are conflicts even when the repository commit is unchanged. Staging-only state is resumable promotion of the same validated package.
 
 This design does not use Azure Pipeline artifacts as state because their lifetime follows run retention. It also avoids a separate database whose records could diverge from actual feed publication.
 
@@ -196,9 +212,9 @@ neither present
   -> fail: no template can be generated
 ```
 
-Both locations are fixed conventions; onboarding does not point to arbitrary template configuration or descriptor paths. Supporting lists of paths would imply multiple templates per package and ambiguous content roots, which are outside the initial design.
+These fixed locations describe the original single-definition mode. The versioned extension declares multiple source-owned definitions and roots. Extended onboarding selects named definition IDs rather than arbitrary project/configuration paths. Each follows authored-or-synthesized ownership and safe scope validation.
 
-A root authored configuration is preserved byte-for-byte. The central validator loads and dry-runs it through Microsoft.TemplateEngine and requires:
+A root authored configuration is preserved byte-for-byte. The same validation applies to an authored configuration selected by the extended source descriptor. A versioned multi-definition descriptor may enumerate authored configurations in subfolders, but cannot synthesize or override the same definition as well. The original single-root coexistence rejection remains limited to the original mode. The central validator loads and dry-runs each authored definition through Microsoft.TemplateEngine and requires:
 
 - valid identity and short-name metadata;
 - `tags.type` equal to `project`;
@@ -208,7 +224,7 @@ A root authored configuration is preserved byte-for-byte. The central validator 
 - no direct `.func/config.json` template content;
 - no behavior rejected by the centrally defined safety policy.
 
-The authored file owns template metadata, project topology, parameters, conditions, primary outputs, and post-actions. The synthesis descriptor MUST NOT coexist with it. An invalid authored configuration fails packaging and is never rewritten or replaced with synthesis.
+Each authored definition owns its metadata, topology, parameters, conditions, outputs, and actions and cannot also be synthesized. A multi-definition descriptor may reference an authored subfolder configuration but cannot overwrite it. The original single-root coexistence restriction remains limited to original mode. Invalid authored definitions are rejected rather than replaced with synthesis.
 
 When the authored file is absent, `.github/azure-functions-template.yaml` supplies the complete synthesized template metadata and project topology. For each project, the packager:
 
@@ -216,7 +232,7 @@ When the authored file is absent, `.github/azure-functions-template.yaml` suppli
 2. Adds `<root>/host.json` as a primary output.
 3. Adds one mandatory trusted configuration finalization action referencing that primary output and carrying the declared canonical stack and language.
 
-The generated template uses the descriptor's identity, short name, name, and description, sets `tags.type` to `project`, and treats the complete filtered snapshot as content. It defines no parameter symbols, replacements, or ordinary post-actions. It emits a singular language tag only when all declared projects have the same language; mixed-language topology is represented exclusively by the configuration actions.
+The generated template uses the definition's identity, short name, name, and description, sets `tags.type` to `project`, and treats its filtered content scope as content. For the original single-root form this is the complete filtered snapshot. It defines no parameter symbols, replacements, or ordinary post-actions. It emits a singular language tag only when all declared projects have the same language; mixed-language topology is represented exclusively by the configuration actions.
 
 The packager also adds one workload constraint per declared project stack, in the form `template-engine-constraints` defines. The descriptor has no workload field, so requirements always follow the declared projects.
 
@@ -233,13 +249,13 @@ Template authors own the full end-to-end tests for their generated applications,
 The allowlist contains SPDX `MIT` and `Apache-2.0`. Detection order is:
 
 ```text
-reviewed YAML licenseExpression
+reviewed publishing license override
   -> GitHub repository-license API with ref=<release commit>
   -> inspect root license file in staged release snapshot
   -> fail
 ```
 
-An override handles recognized license text that GitHub cannot classify, but a root license file is still required. The package uses a NuGet license expression and retains the source license as template content.
+An override handles recognized license text that GitHub cannot classify, but a source-root license file is still required. Scoped packages retain the release license and notices even when a selected folder has no license. This proposal does not combine independently licensed repositories or expand the source-license allowlist.
 
 Default-branch license metadata is not authoritative because it may differ from the packaged release.
 
@@ -247,7 +263,7 @@ Default-branch license metadata is not authoritative because it may differ from 
 
 ### NuGet metadata carries public provenance
 
-The central packager generates package metadata:
+The central packager generates package metadata from the reviewed assignment and exact source release. Multi-definition packages also carry their selected-definition/scope provenance:
 
 | NuGet value | Source |
 |---|---|
@@ -279,9 +295,11 @@ discover
   -> push unchanged packages to NuGet.org
 ```
 
-One failed release does not prevent unrelated releases from staging or promotion. The run ultimately reports failure when unresolved failures remain, but its successful set can pass through the shared approval.
+One failed selected definition blocks its package, but unrelated valid packages may stage and pass through the shared approval. The final run reports failure when unresolved failures remain.
 
 Promotion never rebuilds. Revalidation confirms staged identity, hash, provenance, and package safety before pushing the same bytes to NuGet.org.
+
+Approval identifies completed packages, exact source revisions, and selected definitions. It never authorizes a silently reduced package. Discovery publication remains a separate operation after approved packages exist.
 
 **Alternative considered:** require approval for each package. Daily batches would create unnecessary approval load without improving artifact isolation. It is rejected.
 
@@ -289,7 +307,7 @@ Promotion never rebuilds. Revalidation confirms staged identity, hash, provenanc
 
 ### Recovery reuses normal pipeline behavior
 
-Transient GitHub and feed calls use bounded exponential backoff. Later daily runs discover incomplete work naturally from feed state. Manual runs can filter by onboarding ID and optional version but use the same validation, staging, approval, and promotion path.
+Transient GitHub and feed calls use bounded exponential backoff. Daily runs recover incomplete publication from feed state. Manual recovery targets onboarding/package ID and optional release version, including the reviewed definition selection, and uses the same validation, approval, and immutable state rules without force overwrite.
 
 Only one publication run holds the feed mutation lock. A manual run never bypasses immutable identity checks and no force-overwrite option exists.
 
@@ -307,6 +325,8 @@ Every run reports discovered, staged, promoted, already-complete, skipped, and f
 
 ## Migration Plan
 
+Before scoped publication, agree versioned descriptor/assignment schemas and validate independent subfolder examples without publication. Map every supported manifest entry to a package/template reference and record release, license, authoring, source-allowlist, and mixed-stack gaps. Preserve published identities or plan their transition explicitly. The original one-definition publisher is not equivalent merely because the engine supports several templates.
+
 1. Create the `func-templates` repository with source, schema, central tooling, tests, and both pipeline definitions.
 2. Reserve and configure the `Azure.Functions.Templates.` prefix and package ownership on NuGet.org.
 3. Provision the Azure Artifacts staging feed, GitHub read identity, feed publication identities, approval-gated NuGet.org environment, mutation lock, and central notifications.
@@ -316,3 +336,11 @@ Every run reports discovered, staged, promoted, already-complete, skipped, and f
 7. Enable the daily schedule after end-to-end publication succeeds.
 
 Rollback disables the scheduled pipeline and promotion environment. Packages already published remain immutable; unlisting and incident response are owned outside this design.
+
+## Review Questions
+
+1. What versioned descriptor and package-assignment shape selects named scopes without duplicating topology?
+2. When should definitions share a package versus use separate scoped packages, and how are duplicate installed identities prevented?
+3. What approval evidence should discovery consume to verify curation and exact artifacts?
+4. Which approved path covers supported sources outside the initial Azure-Samples-only policy?
+5. How should published identities transition while preserving sample names and mixed-stack requirements?
