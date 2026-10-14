@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
@@ -24,7 +25,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     {
         _paths = new WorkloadPathsOptions(Path.Combine(_root, ".azure-functions"));
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _deploymentService = new WorkloadDeploymentService(_paths, _store, _metadataReader);
+        _deploymentService = new WorkloadDeploymentService(_paths, _store, _metadataReader, new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem());
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
@@ -57,8 +58,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         Directory.CreateDirectory(currentPath);
         Directory.CreateDirectory(reusablePath);
         _metadataReader.Read(reusablePath).Returns(Metadata("win-x64"));
-        _store.MoveLogicalOwnershipAsync(
-                current.PackageId, current.PackageVersion, Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>())
+        _store.MoveLogicalOwnershipAsync(Arg.Any<IWorkloadOperation>(), current.PackageId, current.PackageVersion, Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>())
             .Returns(call => new WorkloadOwnershipMoveResult(call.Arg<WorkloadEntry>(), PreviousEntryRemoved: true));
 
         WorkloadInstallResult? result =
@@ -80,7 +80,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         string installPath = _paths.GetInstallDirectory(existing.PackageId, existing.PackageVersion);
         Directory.CreateDirectory(installPath);
         _metadataReader.Read(installPath).Returns(Metadata(existing.RuntimeIdentifier!));
-        _store.AddOwnershipAsync(Arg.Any<WorkloadEntry>(), WorkloadOwnershipKind.Logical, Arg.Any<CancellationToken>())
+        _store.AddOwnershipAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<WorkloadEntry>(), WorkloadOwnershipKind.Logical, Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<WorkloadEntry>());
 
         WorkloadInstallResult? result = await _deploymentService.TryReuseImplementationAsync(
@@ -112,8 +112,9 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         const string source = "https://new.example.test/v3/index.json";
         WorkloadPackageIdentity identity = new(
             packageId, version, [WorkloadPackageTypes.RuntimeIdentifierPackage], ["new-alias"], ["win-x64"], "Nuspec title", "Nuspec description");
-        InspectedWorkloadPackage package = new(
-            BuildPackage(packageId, version), identity, metadata, WorkloadPackageRole.RuntimeIdentifierImplementation);
+        string archive = BuildPackage(packageId, version);
+        InspectedWorkloadPackage package = new(archive, identity, metadata, WorkloadPackageRole.RuntimeIdentifierImplementation,
+            await new PhysicalFileSystem().ComputeSha256Async(archive, CancellationToken.None));
 
         WorkloadInstallResult result = await _deploymentService.InstallAsync(
             package, source, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true);
@@ -134,7 +135,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             EntryPoint = entryPoint,
         };
         result.Entry.Should().BeEquivalentTo(expected);
-        await _store.Received(1).SaveWorkloadAsync(result.Entry, Arg.Any<CancellationToken>());
+        await _store.Received(1).SaveWorkloadAsync(Arg.Any<IWorkloadOperation>(), result.Entry, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -171,8 +172,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         WorkloadEntry entry = Entry("example.workload", "1.0.0", explicitlyInstalled: true);
         string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
         Directory.CreateDirectory(installPath);
-        _store.RemoveOwnershipAsync(
-                entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
+        _store.RemoveOwnershipAsync(Arg.Any<IWorkloadOperation>(), entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
             .Returns(new WorkloadOwnershipRemovalResult(OwnershipRemoved: true, EntryRemoved: true, Entry: null));
 
         bool removed = await _deploymentService.UninstallAsync(entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit);

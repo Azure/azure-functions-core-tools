@@ -892,6 +892,91 @@ Prune never removes the live version of any package id. To revert to
 an older installed version, run `func workload uninstall <package>`
 (or `--version <newer>`) first; the older version then becomes live.
 
+### 6.8 Participating workload-operation coordination (implementation draft)
+
+The install-root locking requirement is implemented by an injected
+`IWorkloadOperationCoordinator`. Its explicit disposable capability is shared by
+installer commits, direct deployment install/update/uninstall and implementation
+reuse/ownership moves, and all registry save/remove/replace/add/remove/move
+writers. Existing owning entry points remain available; internal prepared/leased
+methods require the capability and validate its physical-store identity.
+The published workload abstractions are unchanged. Internal interface
+implementations and test doubles must implement the added methods; this is not a
+binary-compatibility promise for the CLI's internal implementation types.
+
+The sequence is **prepare privately → acquire workload operation → revalidate
+authoritative state → workload effects → protected template completion,
+rollback/recovery and disposal → release workload operation**. Exact pointer,
+implementation, source, extracted-file digests, and advisory target/ownership
+state are represented in preparation. No catalog access, replacement downloads,
+private engine preflight or user prompts run under the live operation. A changed
+target, ownership, source, prepared payload or consent snapshot returns a visible
+replan conflict rather than silently resolving different bytes. Unrelated package
+installs can commit independently without overwriting each other's rows.
+Reuse also carries the selected destination row and cached-file digests, including
+logical updates. Every prepared companion digest is rechecked under workload
+admission before stack effects, and again before protected native commit.
+
+The lock identity is the configured physical workload home and registry, not the
+working directory, package id, template home or CLI binary directory. Lexical
+normalization and existing directory-link resolution are used; equivalent paths
+to the same control directory share its persistent exclusive file handle.
+Different stores are independent. The `.workload-operations/operation.lock` file
+is not deleted on close; OS handle ownership is released on process termination.
+Recognized contention waits cancelably; unsupported exclusive locking fails
+explicitly. This draft does not guarantee protection against older/nonparticipating
+CLIs, malicious alias replacement, arbitrary network filesystems or backends that
+do not enforce the locking semantics.
+
+Lock order is **workload before template**. All advisory template sessions are
+disposed before workload admission; native expected-content and ownership checks
+remain inside the protected template transaction. Standalone template flows need
+no workload operation when they mutate no workload state. Inventory and runtime
+readers remain outside this writer protocol and may observe an old or new
+registry. They are not given a payload+registry snapshot transaction.
+
+BASIC plans re-read **every retained stack requirement** under the operation,
+including side-by-side and unselected rows, but repair **only the requested
+stack's companions**. A fresh companion transport/preflight failure now leaves
+the stack untouched. After verified stack commit, a later companion failure or
+cancellation retains that stack and its compatibility requirements. Legacy
+workload verbs keep their existing acquisition/reuse policy; serialized writers
+alone do not enforce a new global companion compatibility policy. Such an
+all-verb product policy needs separate integration and approval. The empty
+production companion catalog and unregistered public New/Init proposals remain
+unchanged.
+
+Before the first live directory or registry mutation the owning operation writes
+and flushes `.workload-operations/dirty.intent`. Registry read-back and deployed
+payload verification precede completion of the workload dirty phase. Registry
+file replacement still provides old/new registry bytes, **not atomic payload+
+registry replacement or payload rollback**. If a writer dies, the next participant
+checks the intent under the lease and fails `WorkloadRecoveryRequiredException`.
+This minimal intent has insufficient evidence to prove arbitrary reconciliation:
+there is no automatic intent deletion, stack deletion, registry reset, orphan GC,
+backup format or recovery command. The workload owner must reconcile payloads
+and registry before authorizing removal of the intent. Even a malformed or
+truncated intent blocks mutation. This is conservative detection, not universal
+power-loss durability or an automatic payload restoration guarantee.
+An intent-cleanup failure preserves an already registered payload. Cleanup after
+an ambiguous registry failure requires an authoritative read proving the new
+payload is unregistered; a failed inspection leaves it for the workload owner.
+
+Once verified stack commit clears that intent, interrupted template work is
+owned by the existing native template journal. Recovery must settle before
+release/reuse of the protected template store. Coordination is deliberately not
+a cross-store all-or-nothing rollback.
+
+Qualification uses private store roots and owned helper processes with phase
+signals rather than timing sleeps. Local Windows execution covers contending
+registry writes and ownership moves, independent prepared installs, direct
+deployment update/uninstall/reuse participation, canceled admission, killed
+clean owners, directory-before-registry recovery-required detection, and
+stack-before-template native-journal recovery. The BASIC stale-plan/live-failure
+producer-consumer race also runs against real stores and native validation.
+Linux/macOS locking paths and existing-link identity handling need actual runtime
+qualification on those platforms; RID publishing is not that proof.
+
 ## 7. Error handling requirements
 
 | Scenario                                    | Required behavior                                                                                  |

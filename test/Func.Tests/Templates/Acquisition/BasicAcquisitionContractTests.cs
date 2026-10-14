@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Workloads.Storage;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
@@ -27,21 +28,23 @@ public sealed class BasicAcquisitionContractTests
             () => new BasicTemplateLifecycle(fixture.Templates, fixture.Payload, inspector, null!, fileSystem),
             () => new BasicTemplateLifecycle(fixture.Templates, fixture.Payload, inspector, fixture.Ownership, null!),
             () => new BasicAcquisitionRunner(null!, new(), fixture.SourceProvider, fixture.Store, fixture.Paths, fixture.Installer,
-                Substitute.For<IBasicTemplateLifecycle>(), fileSystem),
+                Substitute.For<IBasicTemplateLifecycle>(), fileSystem, new FileWorkloadOperationCoordinator(fixture.Paths)),
             () => new BasicAcquisitionRunner(fixture.Catalog, null!, fixture.SourceProvider, fixture.Store, fixture.Paths, fixture.Installer,
-                Substitute.For<IBasicTemplateLifecycle>(), fileSystem),
+                Substitute.For<IBasicTemplateLifecycle>(), fileSystem, new FileWorkloadOperationCoordinator(fixture.Paths)),
             () => new BasicAcquisitionRunner(fixture.Catalog, new(), null!, fixture.Store, fixture.Paths, fixture.Installer,
-                Substitute.For<IBasicTemplateLifecycle>(), fileSystem),
+                Substitute.For<IBasicTemplateLifecycle>(), fileSystem, new FileWorkloadOperationCoordinator(fixture.Paths)),
             () => new BasicAcquisitionRunner(fixture.Catalog, new(), fixture.SourceProvider, null!, fixture.Paths, fixture.Installer,
-                Substitute.For<IBasicTemplateLifecycle>(), fileSystem),
+                Substitute.For<IBasicTemplateLifecycle>(), fileSystem, new FileWorkloadOperationCoordinator(fixture.Paths)),
             () => new BasicAcquisitionRunner(fixture.Catalog, new(), fixture.SourceProvider, fixture.Store, null!, fixture.Installer,
-                Substitute.For<IBasicTemplateLifecycle>(), fileSystem),
+                Substitute.For<IBasicTemplateLifecycle>(), fileSystem, new FileWorkloadOperationCoordinator(fixture.Paths)),
             () => new BasicAcquisitionRunner(fixture.Catalog, new(), fixture.SourceProvider, fixture.Store, fixture.Paths, null!,
-                Substitute.For<IBasicTemplateLifecycle>(), fileSystem),
+                Substitute.For<IBasicTemplateLifecycle>(), fileSystem, new FileWorkloadOperationCoordinator(fixture.Paths)),
             () => new BasicAcquisitionRunner(fixture.Catalog, new(), fixture.SourceProvider, fixture.Store, fixture.Paths, fixture.Installer,
-                null!, fileSystem),
+                null!, fileSystem, new FileWorkloadOperationCoordinator(fixture.Paths)),
             () => new BasicAcquisitionRunner(fixture.Catalog, new(), fixture.SourceProvider, fixture.Store, fixture.Paths, fixture.Installer,
-                Substitute.For<IBasicTemplateLifecycle>(), null!),
+                Substitute.For<IBasicTemplateLifecycle>(), null!, new FileWorkloadOperationCoordinator(fixture.Paths)),
+            () => new BasicAcquisitionRunner(fixture.Catalog, new(), fixture.SourceProvider, fixture.Store, fixture.Paths, fixture.Installer,
+                Substitute.For<IBasicTemplateLifecycle>(), fileSystem, null!),
         ];
 
         foreach (var constructor in constructors)

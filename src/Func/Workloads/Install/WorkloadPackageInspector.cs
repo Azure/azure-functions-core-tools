@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Security.Cryptography;
 using Azure.Functions.Cli.Workloads.Discovery;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
@@ -17,6 +18,7 @@ internal sealed class WorkloadPackageInspector(IWorkloadMetadataReader metadataR
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
+        string digest = await ComputeDigestAsync(path, cancellationToken);
         using PackageArchiveReader reader = OpenPackage(path);
         NuspecReader nuspec = reader.NuspecReader;
         WorkloadPackageIdentity identity = new(
@@ -36,7 +38,12 @@ internal sealed class WorkloadPackageInspector(IWorkloadMetadataReader metadataR
             WorkloadMetadata metadata = _metadataReader.Read(inspectionDirectory);
             IReadOnlyList<string> files = [.. await reader.GetFilesAsync(cancellationToken)];
             WorkloadPackageRole role = ValidatePackage(identity, metadata, files);
-            return new InspectedWorkloadPackage(path, identity, metadata, role);
+            if (await ComputeDigestAsync(path, cancellationToken) != digest)
+            {
+                throw new InvalidWorkloadException("The workload archive changed during inspection. Re-run the command with stable package bytes.");
+            }
+
+            return new InspectedWorkloadPackage(path, identity, metadata, role, digest);
         }
         finally
         {
@@ -62,6 +69,12 @@ internal sealed class WorkloadPackageInspector(IWorkloadMetadataReader metadataR
             // An unreadable sibling cannot be the implementation being located.
             return false;
         }
+    }
+
+    private async Task<string> ComputeDigestAsync(string path, CancellationToken cancellationToken)
+    {
+        await using FileStream stream = File.OpenRead(path);
+        return Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, cancellationToken));
     }
 
     public void ValidateIdentity(WorkloadPackageIdentity identity, string expectedPackageId, string expectedVersion)

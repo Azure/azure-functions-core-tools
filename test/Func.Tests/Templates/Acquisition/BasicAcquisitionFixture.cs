@@ -34,7 +34,7 @@ internal sealed class BasicAcquisitionFixture : IDisposable
     {
         Root = Directory.CreateTempSubdirectory("func-basic-acquisition-").FullName;
         Paths = new(Path.Combine(Root, "workloads-home"));
-        Store = new(Paths);
+        Store = new(Paths, new FileWorkloadOperationCoordinator(Paths));
         Templates = new(new(Path.Combine(Root, "cli-home")), _fileSystem, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
         Payload = new(_archives);
         Ownership = new();
@@ -71,7 +71,8 @@ internal sealed class BasicAcquisitionFixture : IDisposable
         var selector = new WorkloadRidPackageSelector(_runtime);
         var inspector = new WorkloadPackageInspector(metadata, selector);
         Installer = new(new WorkloadPackageSource(_workloadCatalog, inspector, Options.Create(new WorkloadCatalogOptions())),
-            inspector, selector, new WorkloadDeploymentService(Paths, Store, metadata));
+            inspector, selector, new WorkloadDeploymentService(Paths, Store, metadata, new FileWorkloadOperationCoordinator(Paths), _fileSystem),
+            new FileWorkloadOperationCoordinator(Paths), Store, _fileSystem);
         Catalog = new(ReadFixtureJson());
         SourceProvider = new(Options.Create(new WorkloadCatalogOptions()));
     }
@@ -87,15 +88,17 @@ internal sealed class BasicAcquisitionFixture : IDisposable
     public FixtureOwnership Ownership { get; }
     public List<string> Downloads { get; } = [];
     public Exception? StackTransportFailure { get; set; }
+    public IWorkloadCatalog WorkloadCatalog => _workloadCatalog;
 
     public BasicAcquisitionRequest Request(string id = "Fixture.StackA", string version = "1.0.0", bool check = false, bool offline = false)
         => new(id, NuGetVersion.Parse(version), WorkingDirectory.FromExplicit(Root), Source, check, offline);
 
     public BasicAcquisitionRunner Runner(IBasicArtifactInspector? inspector = null, IBasicTemplateOwnership? ownership = null,
-        IPackageSourceProvider? source = null, IBasicPackagePayloadSource? payload = null, IBasicCompanionCatalog? catalog = null)
-        => new(catalog ?? Catalog, new BasicAcquisitionPlanner(), source ?? SourceProvider, new WorkloadStore(Paths), Paths, Installer,
+        IPackageSourceProvider? source = null, IBasicPackagePayloadSource? payload = null, IBasicCompanionCatalog? catalog = null,
+        IWorkloadOperationCoordinator? coordinator = null)
+        => new(catalog ?? Catalog, new BasicAcquisitionPlanner(), source ?? SourceProvider, new WorkloadStore(Paths, new FileWorkloadOperationCoordinator(Paths)), Paths, Installer,
             new BasicTemplateLifecycle(Templates, payload ?? Payload, inspector ?? new BasicArtifactInspector(_fileSystem), ownership ?? Ownership, _fileSystem),
-            _fileSystem);
+            _fileSystem, coordinator ?? new FileWorkloadOperationCoordinator(Paths));
 
     public BasicTemplateArtifact Artifact(string version = "1.0.0")
         => new BasicCompanionManifestReader().Read(Catalog.Json).Artifacts.Single(a => a.Version.ToNormalizedString() == version);

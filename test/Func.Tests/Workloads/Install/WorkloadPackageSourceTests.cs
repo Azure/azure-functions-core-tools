@@ -239,5 +239,5 @@ public sealed class WorkloadPackageSourceTests : IDisposable
                 Schema = WorkloadManifestSchema.PackageManifestV1Schema,
                 Kind = WorkloadKind.RidPointer,
             },
-            WorkloadPackageRole.Pointer);
+            WorkloadPackageRole.Pointer, "shape-only-pointer");
 }
