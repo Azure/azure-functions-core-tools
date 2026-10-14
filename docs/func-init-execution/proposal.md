@@ -54,11 +54,47 @@ before variant parsing. The shared strict parser, literal prompts and required
 completion are also used by staged NEW; argument compatibility precedes variant
 precedence, and host name remains outside canonical template parameters.
 
-The target must be absent or empty. Existing content, adoption, repair and
-`--force` cleanup are explicitly unqualified by this harness and rejected without
-deletion. Public init retains those behaviors. The directory becomes both command
-directory and prospective project root before opening one protected project flow;
-stack, language, bundle and existing-project profile defaults remain unavailable.
+The state boundary is resolved before any template discovery. An absent/empty
+target enters the installed-project template path. A root `host.json` without
+`.func/config.json` enters adoption. Existing CLI configuration with an installed
+multi-language runtime but no language enters repair. Complete configuration,
+legacy runtime-only single-language configuration and unsupported partial shapes
+refuse without modification. Malformed or unreadable CLI configuration is an
+explicit failure, not an empty-config fallback. Nested projects are not adopted
+recursively. `--force` remains unsupported and never deletes content.
+
+Adoption/repair reads `local.settings.json`, the existing root-project resolver,
+and the initializer's read-only stack/language metadata. It never opens a
+`Templater`, performs template/package discovery or acquisition, invokes an
+initializer, or executes a configuration post-action. Explicit invalid filters,
+conflicting runtime ownership, ambiguous aliases and unresolvable input fail
+without silently choosing metadata. Missing adoption stack prompts even when
+only one stack is installed; redirected/non-interactive callers supply `--stack`.
+`--template`, `--name` and raw template arguments are rejected on these paths
+rather than ignored.
+
+Successful staged adoption/repair always persists canonical stack and language,
+including a single-language adoption. Unlike public init's incomplete-language
+adoption, an unresolved multi-language project requires `--language` or an
+interactive language selection. Runtime-only single-language configs retain the
+public initialized-state refusal. The public command's behavior is unchanged.
+The only shared extraction is pure create/merge JSON serialization from its
+existing persistence helpers; public init retains its I/O order, optional fields,
+error causes and cancellation checks. Both paths still use `IFileSystem`'s
+atomic file writer. Repair merges the latest readable input, preserves profiles
+and unknown keys, and refuses if it disappeared, became invalid, changed runtime
+ownership or acquired a language while input was being resolved.
+
+Existing-project dry-run reports the planned configuration path, canonical
+metadata and create/modify operation with `written=false`; it writes neither
+configuration nor source and opens no template store. Actual success is
+`adopted` or `repaired` only after persistence and cancellation checks. Cancellation
+after a committed write preserves that file but renders no success. These checks
+do not promise a transaction across concurrent external edits or output writes.
+
+On the empty-target path, the directory becomes both command directory and
+prospective project root before opening one protected project flow; stack,
+language, bundle and existing-project profile defaults remain unavailable.
 
 Project catalog entries carry the existing planner's unconditional declarations
 from that flow's configuration snapshot. Whole-template filters use their
@@ -93,6 +129,15 @@ mixed-language unconditional roots. This is not qualification of conditional
 topology, renaming, remapped sources, supplemental configuration or ordinary
 post-actions: the existing planner rejects those. The fixture configuration
 action GUID and its input schema remain provisional, not a public authoring ABI.
+
+Separate private-root adoption/repair fixtures compose the registered Node
+project factory, physical existing files, CLI configuration readers and default
+or custom profile resolution with no template packages installed. They exercise
+no-write preview, initialized/repeat refusal, missing/invalid input, literal
+Spectre prompts, structured redirected and interactive errors, persistence
+failures and cancellation before and after a relevant write. Multiple profiles
+without a default remain ambiguous to `ProfileResolver`; init neither picks one
+nor rewrites their selection.
 
 The temporary metadata source is the same `IProjectInitializer` projection already
 required by the project planner; no initializer behavior is invoked. The approved

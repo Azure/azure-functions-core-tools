@@ -20,7 +20,7 @@ internal sealed class InitExecutionCommand : FuncCliCommand
     private readonly TemplateConstraintEvaluationSnapshot _availability;
 
     public InitExecutionCommand(IInitExecutionRunner runner, InitExecutionRenderer renderer, TemplateConstraintEvaluationSnapshot availability)
-        : base("init", "Create or preview an installed project template in an empty directory.")
+        : base("init", "Create, adopt or repair a Functions project; preview without writing.")
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
@@ -39,7 +39,7 @@ internal sealed class InitExecutionCommand : FuncCliCommand
 
     public Argument<string?> TargetArgument { get; } = new("path")
     {
-        Description = "Empty target directory (defaults to the current directory); not a template reference.",
+        Description = "Target project directory (defaults to the current directory); not a template reference.",
         Arity = ArgumentArity.ZeroOrOne,
     };
 

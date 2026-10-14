@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
@@ -18,11 +19,12 @@ public sealed class InitExecutionContractTests
     private readonly ITemplaterFactory _factory = Substitute.For<ITemplaterFactory>();
     private readonly ITemplateArgumentParser _arguments = new TemplateArgumentParser();
     private readonly IInteractionService _interaction = Substitute.For<IInteractionService>();
-    private readonly InitExecutionTargetInspector _targets = Substitute.For<InitExecutionTargetInspector>();
+    private readonly InitExecutionTargetInspector _targets = Substitute.For<InitExecutionTargetInspector>(new PhysicalFileSystem());
 
     public InitExecutionContractTests()
     {
         _targets.GetDiagnostic(Arg.Any<WorkingDirectory>()).Returns((string?)null);
+        _targets.InspectAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>()).Returns(new InitExecutionTarget(InitExecutionTargetState.Empty));
     }
 
     [Theory]
@@ -35,6 +37,9 @@ public sealed class InitExecutionContractTests
     [InlineData("initializers")]
     [InlineData("planner")]
     [InlineData("writer")]
+    [InlineData("fileSystem")]
+    [InlineData("localSettings")]
+    [InlineData("projects")]
     public void Runner_NullDependencies_RejectsProgrammerErrors(string dependency)
     {
         Action act = () => _ = new InitExecutionRunner(
@@ -46,7 +51,10 @@ public sealed class InitExecutionContractTests
             dependency == "targets" ? null! : _targets,
             dependency == "initializers" ? null! : [],
             dependency == "planner" ? null! : new([]),
-            dependency == "writer" ? null! : new(new PhysicalFileSystem()));
+            dependency == "writer" ? null! : new(new PhysicalFileSystem()),
+            dependency == "fileSystem" ? null! : new PhysicalFileSystem(),
+            dependency == "localSettings" ? null! : Substitute.For<ILocalSettingsProvider>(),
+            dependency == "projects" ? null! : Substitute.For<IFunctionsProjectResolver>());
 
         act.Should().Throw<ArgumentNullException>().WithParameterName(dependency);
     }
@@ -145,7 +153,7 @@ public sealed class InitExecutionContractTests
     public async Task Execute_TargetInspectionFailure_IsStructuredWithoutEngine(bool denied)
     {
         Exception failure = denied ? new UnauthorizedAccessException("controlled inspection") : new IOException("controlled inspection");
-        _targets.GetDiagnostic(Arg.Any<WorkingDirectory>()).Returns(_ => throw failure);
+        _targets.InspectAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>()).Returns(Task.FromException<InitExecutionTarget>(failure));
 
         var result = await CreateRunner([]).ExecuteAsync(Request(), new([]), CancellationToken.None);
 
@@ -157,7 +165,8 @@ public sealed class InitExecutionContractTests
     [Fact]
     public async Task Execute_UnexpectedInspectionDefect_IsNotHiddenAsUserError()
     {
-        _targets.GetDiagnostic(Arg.Any<WorkingDirectory>()).Returns(_ => throw new InvalidOperationException("unexpected"));
+        _targets.InspectAsync(Arg.Any<WorkingDirectory>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<InitExecutionTarget>(new InvalidOperationException("unexpected")));
 
         Func<Task> act = () => CreateRunner([]).ExecuteAsync(Request(), new([]), CancellationToken.None);
 
@@ -190,12 +199,29 @@ public sealed class InitExecutionContractTests
         var renderer = new InitExecutionRenderer(_interaction);
         Action result = () => renderer.Render(null!, jsonOutput: false);
         Action entries = () => renderer.RenderUnavailable(null!);
-        Action target = () => new InitExecutionTargetInspector().GetDiagnostic(null!);
+        Action target = () => new InitExecutionTargetInspector(new PhysicalFileSystem()).GetDiagnostic(null!);
 
         result.Should().Throw<ArgumentNullException>().WithParameterName("result");
         entries.Should().Throw<ArgumentNullException>().WithParameterName("entries");
         target.Should().Throw<ArgumentNullException>().WithParameterName("target");
         _interaction.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Inspector_NullDependencyOrTargetAndPreCanceled_RejectsWithoutReadingFiles()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        Action dependency = () => _ = new InitExecutionTargetInspector(null!);
+        var inspector = new InitExecutionTargetInspector(fileSystem);
+        Func<Task> target = () => inspector.InspectAsync(null!, CancellationToken.None);
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        Func<Task> canceled = () => inspector.InspectAsync(WorkingDirectory.FromCwd(), cancellation.Token);
+
+        dependency.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
+        await target.Should().ThrowAsync<ArgumentNullException>().WithParameterName("target");
+        await canceled.Should().ThrowAsync<OperationCanceledException>();
+        fileSystem.ReceivedCalls().Should().BeEmpty();
     }
 
     [Fact]
@@ -227,7 +253,8 @@ public sealed class InitExecutionContractTests
 
     private InitExecutionRunner CreateRunner(IReadOnlyList<IProjectInitializer> initializers) => new(
         _factory, _arguments, new(_arguments, _interaction), _interaction, new(_interaction),
-        _targets, initializers, new(initializers), new(new PhysicalFileSystem()));
+        _targets, initializers, new(initializers), new(new PhysicalFileSystem()), new PhysicalFileSystem(),
+        Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>());
 
     private static InitExecutionRequest Request() => new(
         WorkingDirectory.FromCwd(), null, null, null, null, false, true, false, false, [], new HashSet<string>());
