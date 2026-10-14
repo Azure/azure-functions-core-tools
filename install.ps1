@@ -127,24 +127,6 @@ function Write-InstallationMetadata {
     }
 }
 
-function Test-InstallationMetadataDestination {
-    param([Parameter(Mandatory)] [string] $InstallPath)
-
-    $metadataPath = Join-Path $InstallPath $Script:InstallationMetadataFile
-    if ([System.IO.Directory]::Exists($metadataPath)) {
-        throw "Cannot write installation metadata because $metadataPath is a directory."
-    }
-
-    if ([System.IO.File]::Exists($metadataPath)) {
-        $probe = [System.IO.File]::Open(
-            $metadataPath,
-            [System.IO.FileMode]::Open,
-            [System.IO.FileAccess]::ReadWrite,
-            [System.IO.FileShare]::None)
-        $probe.Dispose()
-    }
-}
-
 # --- Help ---
 
 # We expose a custom -Help switch because PowerShell's built-in -? and
@@ -410,6 +392,9 @@ try {
         if (-not (Test-Path -LiteralPath $payloadFuncPath -PathType Leaf)) {
             throw "The downloaded archive does not contain the func CLI."
         }
+        if (Test-Path -LiteralPath (Join-Path $payloadPath $Script:InstallationMetadataFile)) {
+            throw "The downloaded archive must not contain installation metadata."
+        }
 
         if ($os -ne 'win') {
             $payloadFunc = Get-Item -LiteralPath $payloadFuncPath -Force
@@ -426,37 +411,82 @@ try {
         }
 
         New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
-        Test-InstallationMetadataDestination -InstallPath $InstallPath
+        $publicationBackupPath = Join-Path $tempDir 'publication-backup'
+        New-Item -ItemType Directory -Path $publicationBackupPath | Out-Null
+        $publicationNames = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        Get-ChildItem -LiteralPath $payloadPath -Force | ForEach-Object {
+            [void] $publicationNames.Add($_.Name)
+        }
+        [void] $publicationNames.Add('func5')
         if ($os -eq 'win') {
-            Get-ChildItem -LiteralPath $payloadPath -Force | Copy-Item -Destination $InstallPath -Recurse -Force
-        } else {
-            & /bin/cp -pR (Join-Path $payloadPath '.') $InstallPath
-            if ($LASTEXITCODE -ne 0) { throw "Failed to publish the func CLI payload (cp exit $LASTEXITCODE)." }
+            [void] $publicationNames.Add('func5.cmd')
         }
 
-        if ($os -eq 'osx') {
-            xattr -d com.apple.quarantine (Join-Path $InstallPath 'func') 2>$null
+        $backedUpNames = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($name in $publicationNames) {
+            $destinationPath = Join-Path $InstallPath $name
+            if (Test-Path -LiteralPath $destinationPath) {
+                if ($os -eq 'win') {
+                    Copy-Item -LiteralPath $destinationPath -Destination $publicationBackupPath -Recurse -Force
+                } else {
+                    & /bin/cp -pR $destinationPath $publicationBackupPath
+                    if ($LASTEXITCODE -ne 0) { throw "Failed to back up $destinationPath (cp exit $LASTEXITCODE)." }
+                }
+                [void] $backedUpNames.Add($name)
+            }
         }
 
-        # Drop func5 wrappers so v5 can be invoked side-by-side with a v4 'func' on PATH.
-        if ($os -eq 'win') {
-            # cmd.exe / PowerShell wrapper
-            $cmdWrapperPath = Join-Path $InstallPath 'func5.cmd'
-            @('@echo off', '"%~dp0\func.exe" %*') -join "`r`n" |
-                Set-Content -Path $cmdWrapperPath -Encoding Ascii -NoNewline
+        try {
+            if ($os -eq 'win') {
+                Get-ChildItem -LiteralPath $payloadPath -Force | Copy-Item -Destination $InstallPath -Recurse -Force
+            } else {
+                & /bin/cp -pR (Join-Path $payloadPath '.') $InstallPath
+                if ($LASTEXITCODE -ne 0) { throw "Failed to publish the func CLI payload (cp exit $LASTEXITCODE)." }
+            }
 
-            # Extensionless wrapper for Git Bash / MSYS2 shells
-            $bashWrapperPath = Join-Path $InstallPath 'func5'
-            $bashBody = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func.exe`" `"`$@`"`n"
-            [System.IO.File]::WriteAllText($bashWrapperPath, $bashBody)
-        } else {
-            $wrapperPath = Join-Path $InstallPath 'func5'
-            $body = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func`" `"`$@`"`n"
-            [System.IO.File]::WriteAllText($wrapperPath, $body)
-            chmod +x $wrapperPath
+            if ($os -eq 'osx') {
+                xattr -d com.apple.quarantine (Join-Path $InstallPath 'func') 2>$null
+            }
+
+            # Drop func5 wrappers so v5 can be invoked side-by-side with a v4 'func' on PATH.
+            if ($os -eq 'win') {
+                # cmd.exe / PowerShell wrapper
+                $cmdWrapperPath = Join-Path $InstallPath 'func5.cmd'
+                @('@echo off', '"%~dp0\func.exe" %*') -join "`r`n" |
+                    Set-Content -Path $cmdWrapperPath -Encoding Ascii -NoNewline
+
+                # Extensionless wrapper for Git Bash / MSYS2 shells
+                $bashWrapperPath = Join-Path $InstallPath 'func5'
+                $bashBody = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func.exe`" `"`$@`"`n"
+                [System.IO.File]::WriteAllText($bashWrapperPath, $bashBody)
+            } else {
+                $wrapperPath = Join-Path $InstallPath 'func5'
+                $body = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func`" `"`$@`"`n"
+                [System.IO.File]::WriteAllText($wrapperPath, $body)
+                chmod +x $wrapperPath
+            }
+
+            Write-InstallationMetadata -InstallPath $InstallPath
+        } catch {
+            foreach ($name in $publicationNames) {
+                $destinationPath = Join-Path $InstallPath $name
+                if (Test-Path -LiteralPath $destinationPath) {
+                    Remove-Item -LiteralPath $destinationPath -Recurse -Force
+                }
+            }
+            foreach ($name in $backedUpNames) {
+                $backupPath = Join-Path $publicationBackupPath $name
+                if ($os -eq 'win') {
+                    Copy-Item -LiteralPath $backupPath -Destination $InstallPath -Recurse -Force
+                } else {
+                    & /bin/cp -pR $backupPath $InstallPath
+                    if ($LASTEXITCODE -ne 0) { throw "Failed to restore $name after installation failed (cp exit $LASTEXITCODE)." }
+                }
+            }
+            throw
         }
-
-        Write-InstallationMetadata -InstallPath $InstallPath
     }
 } finally {
     if (-not $KeepArchive) {

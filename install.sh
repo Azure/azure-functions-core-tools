@@ -420,26 +420,65 @@ else
         say_error "The downloaded archive does not contain an executable func CLI."
         exit 1
     fi
-
-    mkdir -p "$INSTALL_DIR"
-    if [[ -d "${INSTALL_DIR}/${INSTALLATION_METADATA_FILE}" ]]; then
-        say_error "Cannot write installation metadata because ${INSTALL_DIR}/${INSTALLATION_METADATA_FILE} is a directory."
+    if [[ -e "${PAYLOAD_DIR}/${INSTALLATION_METADATA_FILE}" || -L "${PAYLOAD_DIR}/${INSTALLATION_METADATA_FILE}" ]]; then
+        say_error "The downloaded archive must not contain installation metadata."
         exit 1
     fi
 
-    cp -pR "${PAYLOAD_DIR}/." "$INSTALL_DIR/"
+    mkdir -p "$INSTALL_DIR"
+    PUBLICATION_BACKUP_DIR="${TEMP_DIR}/publication-backup"
+    mkdir "$PUBLICATION_BACKUP_DIR"
+    PUBLICATION_NAMES=("func5")
+    while IFS= read -r -d '' payload_entry; do
+        payload_name="${payload_entry#"${PAYLOAD_DIR}/"}"
+        if [[ "$payload_name" != "func5" ]]; then
+            PUBLICATION_NAMES+=("$payload_name")
+        fi
+    done < <(find "$PAYLOAD_DIR" -mindepth 1 -maxdepth 1 -print0)
 
-    if [[ "$OS" == "osx" ]]; then
-        xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
-    fi
+    BACKED_UP_NAMES=()
+    for publication_name in "${PUBLICATION_NAMES[@]}"; do
+        destination_path="${INSTALL_DIR}/${publication_name}"
+        if [[ -e "$destination_path" || -L "$destination_path" ]]; then
+            cp -pR "$destination_path" "$PUBLICATION_BACKUP_DIR/"
+            BACKED_UP_NAMES+=("$publication_name")
+        fi
+    done
 
-    # Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
-    cat > "${INSTALL_DIR}/func5" <<'EOF'
+    publish_installation() {
+        cp -pR "${PAYLOAD_DIR}/." "$INSTALL_DIR/" || return 1
+
+        if [[ "$OS" == "osx" ]]; then
+            xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
+        fi
+
+        # Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
+        cat > "${INSTALL_DIR}/func5" <<'EOF'
 #!/usr/bin/env bash
 exec "$(dirname "$0")/func" "$@"
 EOF
-    chmod +x "${INSTALL_DIR}/func5"
-    write_installation_metadata
+        chmod +x "${INSTALL_DIR}/func5" || return 1
+        write_installation_metadata
+    }
+
+    rollback_installation() {
+        local publication_name
+        for publication_name in "${PUBLICATION_NAMES[@]}"; do
+            rm -rf -- "${INSTALL_DIR:?}/${publication_name}"
+        done
+        for publication_name in "${BACKED_UP_NAMES[@]}"; do
+            cp -pR "${PUBLICATION_BACKUP_DIR}/${publication_name}" "$INSTALL_DIR/" || return 1
+        done
+    }
+
+    if ! publish_installation; then
+        if ! rollback_installation; then
+            say_error "Installation failed and the previous installation could not be fully restored."
+            exit 1
+        fi
+        say_error "Installation failed; the previous installation was restored."
+        exit 1
+    fi
 fi
 
 # --- PATH / shell profile ---

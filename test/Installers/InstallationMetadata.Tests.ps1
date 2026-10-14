@@ -141,12 +141,14 @@ function Invoke-BashInstaller {
         [Parameter(Mandatory)] [string] $FakeBinPath,
         [switch] $Force,
         [switch] $FailDownload,
+        [switch] $FailMetadataPublish,
         [ValidateSet('Linux', 'Darwin')] [string] $OperatingSystem = 'Linux'
     )
 
     $previousEnvironment = @{
         Archive = $env:FUNC_INSTALLER_TEST_ARCHIVE
         Fail = $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD
+        FailMetadataPublish = $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH
         Home = $env:HOME
         OperatingSystem = $env:FUNC_INSTALLER_TEST_OS
     }
@@ -154,6 +156,7 @@ function Invoke-BashInstaller {
     try {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = ($ArchivePath -replace '\\', '/')
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $FailDownload.ToString().ToLowerInvariant()
+        $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH = $FailMetadataPublish.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_OS = $OperatingSystem
         $env:HOME = ($HomePath -replace '\\', '/')
 
@@ -177,6 +180,7 @@ function Invoke-BashInstaller {
     } finally {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $previousEnvironment.Archive
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $previousEnvironment.Fail
+        $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH = $previousEnvironment.FailMetadataPublish
         $env:FUNC_INSTALLER_TEST_OS = $previousEnvironment.OperatingSystem
         $env:HOME = $previousEnvironment.Home
     }
@@ -213,6 +217,8 @@ try {
     Assert-Metadata -InstallPath $windowsInstall
 
     Set-Content -LiteralPath (Join-Path $windowsInstall 'func.exe') -Value 'existing executable' -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $windowsInstall 'func5') -Value 'existing bash wrapper' -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $windowsInstall 'func5.cmd') -Value 'existing cmd wrapper' -Encoding ascii
     Assert-True ((Invoke-PowerShellInstaller -ArchivePath $invalidWindowsArchive -InstallPath $windowsInstall -Force) -ne 0) `
         'install.ps1 accepted an upgrade archive without func.exe.'
     Assert-Metadata -InstallPath $windowsInstall
@@ -223,7 +229,11 @@ try {
         'install.ps1 replaced locked metadata instead of failing atomically.'
     Assert-Metadata -InstallPath $windowsInstall
     Assert-True ((Get-Content -LiteralPath (Join-Path $windowsInstall 'func.exe') -Raw).Trim() -eq 'existing executable') `
-        'install.ps1 modified the existing executable before detecting locked metadata.'
+        'install.ps1 did not restore the executable after late metadata failure.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $windowsInstall 'func5') -Raw).Trim() -eq 'existing bash wrapper') `
+        'install.ps1 did not restore the bash wrapper after late metadata failure.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $windowsInstall 'func5.cmd') -Raw).Trim() -eq 'existing cmd wrapper') `
+        'install.ps1 did not restore the cmd wrapper after late metadata failure.'
 
     $windowsFailedInstall = Join-Path $testRoot 'failed windows install'
     Assert-True ((Invoke-PowerShellInstaller -ArchivePath $windowsArchive -InstallPath $windowsFailedInstall -FailDownload) -ne 0) `
@@ -309,6 +319,20 @@ fi
     & bash -c "chmod +x '$($fakeUname -replace '\\', '/')'"
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake uname executable.'
 
+    $fakeMv = Join-Path $fakeBin 'mv'
+    @'
+#!/usr/bin/env bash
+set -euo pipefail
+destination="${!#}"
+if [[ "${FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH:-false}" == true &&
+      "$destination" == */func.installation.json ]]; then
+    exit 73
+fi
+exec /usr/bin/mv "$@"
+'@ | Set-Content -LiteralPath $fakeMv -Encoding utf8NoBOM
+    & bash -c "chmod +x '$($fakeMv -replace '\\', '/')'"
+    Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake mv executable.'
+
     $bashHome = Join-Path $testRoot 'bash-home'
     New-Item -ItemType Directory -Path $bashHome | Out-Null
     $bashInstall = Join-Path $testRoot 'custom-bash-install'
@@ -337,6 +361,7 @@ fi
     Assert-Metadata -InstallPath $bashInstall
 
     Set-Content -LiteralPath (Join-Path $bashInstall 'func') -Value 'existing executable' -Encoding utf8NoBOM
+    Set-Content -LiteralPath (Join-Path $bashInstall 'func5') -Value 'existing wrapper' -Encoding utf8NoBOM
     Assert-True ((Invoke-BashInstaller -ArchivePath $invalidBashArchive -InstallPath $bashInstall -HomePath $bashHome -FakeBinPath $fakeBin -Force) -ne 0) `
         'install.sh accepted an upgrade archive without func.'
     Assert-Metadata -InstallPath $bashInstall
@@ -348,6 +373,15 @@ fi
     Assert-Metadata -InstallPath $bashInstall
     Assert-True ((Get-Content -LiteralPath (Join-Path $bashInstall 'func') -Raw).Trim() -eq 'existing executable') `
         'install.sh modified the existing executable before rejecting a directory payload.'
+
+    Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashInstall -HomePath $bashHome `
+        -FakeBinPath $fakeBin -Force -FailMetadataPublish) -ne 0) `
+        'install.sh unexpectedly succeeded after a late metadata publication failure.'
+    Assert-Metadata -InstallPath $bashInstall
+    Assert-True ((Get-Content -LiteralPath (Join-Path $bashInstall 'func') -Raw).Trim() -eq 'existing executable') `
+        'install.sh did not restore the executable after late metadata failure.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $bashInstall 'func5') -Raw).Trim() -eq 'existing wrapper') `
+        'install.sh did not restore the wrapper after late metadata failure.'
 
     $bashFailedInstall = Join-Path $testRoot 'failed-bash-install'
     Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashFailedInstall -HomePath $bashHome -FakeBinPath $fakeBin -FailDownload) -ne 0) `
