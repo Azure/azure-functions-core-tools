@@ -84,6 +84,12 @@ internal sealed class WorkloadEntry
     public string? RuntimeIdentifier { get; init; }
 
     /// <summary>
+    /// Records whether the validated physical artifact requires bundled-template registration.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool BundledTemplatesDeclared { get; init; }
+
+    /// <summary>
     /// Whether this physical package lacks an explicit install owner. Defaults
     /// to false so registry rows written by older CLIs retain their ownership.
     /// </summary>

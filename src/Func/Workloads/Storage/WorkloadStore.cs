@@ -314,6 +314,7 @@ internal class WorkloadStore(IWorkloadPaths paths, IWorkloadOperationCoordinator
             Description = entry.Description,
             Source = entry.Source,
             RuntimeIdentifier = entry.RuntimeIdentifier,
+            BundledTemplatesDeclared = entry.BundledTemplatesDeclared,
             IsImplicitlyInstalled = isImplicitlyInstalled,
             LogicalPackage = logicalPackage,
             InstallRefCount = installRefCount,

@@ -33,7 +33,7 @@ public sealed class WorkloadOperationTests
                 throw new IOException("Owned post-persistence read-back failure.");
             });
         WorkloadDeploymentService deployment = new(fixture.Paths, faultingStore, new WorkloadMetadataReader(),
-            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem());
+            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem(), Substitute.For<IBundledTemplateInstaller>());
         using var operation = await new FileWorkloadOperationCoordinator(fixture.Paths).AcquireAsync(CancellationToken.None);
 
         Func<Task> commit = () => deployment.InstallPreparedAsync(operation, prepared.Deployment!, null, CancellationToken.None);
@@ -83,7 +83,7 @@ public sealed class WorkloadOperationTests
         runtime.Current.Returns("test-rid");
         WorkloadRidPackageSelector selector = new(runtime);
         WorkloadPackageInspector inspector = new(metadata, selector);
-        WorkloadDeploymentService deployment = new(fixture.Paths, fixture.Store, metadata, gate, fileSystem);
+        WorkloadDeploymentService deployment = new(fixture.Paths, fixture.Store, metadata, gate, fileSystem, Substitute.For<IBundledTemplateInstaller>());
         WorkloadInstaller installer = new(new WorkloadPackageSource(fixture.WorkloadCatalog, inspector, Options.Create(new WorkloadCatalogOptions())),
             inspector, selector, deployment, gate, fixture.Store, fileSystem);
         Task<WorkloadUpdateResult> update = installer.UpdateAsync("Fixture.StackA", null, BasicAcquisitionFixture.Source, false, false,
@@ -127,7 +127,7 @@ public sealed class WorkloadOperationTests
             writer.Write("different selected bytes");
         }
         WorkloadDeploymentService deployment = new(fixture.Paths, fixture.Store, new WorkloadMetadataReader(),
-            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem());
+            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem(), Substitute.For<IBundledTemplateInstaller>());
 
         Func<Task> prepare = () => deployment.PrepareAsync(inspected, archive, WorkloadOwnershipKind.Explicit, null, false, null, CancellationToken.None);
 
@@ -269,8 +269,9 @@ public sealed class WorkloadOperationTests
             () => new FileWorkloadOperationCoordinator(null!),
             () => new WorkloadStore(null!, coordinator),
             () => new WorkloadStore(fixture.Paths, null!),
-            () => new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), null!, fileSystem),
-            () => new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), coordinator, null!),
+            () => new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), null!, fileSystem, Substitute.For<IBundledTemplateInstaller>()),
+            () => new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), coordinator, null!, Substitute.For<IBundledTemplateInstaller>()),
+            () => new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), coordinator, fileSystem, null!),
         ];
 
         foreach (var call in calls)

@@ -71,7 +71,8 @@ internal sealed class BasicAcquisitionFixture : IDisposable
         var selector = new WorkloadRidPackageSelector(_runtime);
         var inspector = new WorkloadPackageInspector(metadata, selector);
         Installer = new(new WorkloadPackageSource(_workloadCatalog, inspector, Options.Create(new WorkloadCatalogOptions())),
-            inspector, selector, new WorkloadDeploymentService(Paths, Store, metadata, new FileWorkloadOperationCoordinator(Paths), _fileSystem),
+            inspector, selector, new WorkloadDeploymentService(Paths, Store, metadata, new FileWorkloadOperationCoordinator(Paths), _fileSystem,
+                new BundledTemplateInstaller(Templates, new BasicArtifactInspector(_fileSystem), _fileSystem, new(Path.Combine(Root, "cli-home")))),
             new FileWorkloadOperationCoordinator(Paths), Store, _fileSystem);
         Catalog = new(ReadFixtureJson());
         SourceProvider = new(Options.Create(new WorkloadCatalogOptions()));

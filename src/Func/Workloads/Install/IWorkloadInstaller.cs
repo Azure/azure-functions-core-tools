@@ -13,6 +13,18 @@ namespace Azure.Functions.Cli.Workloads.Install;
 /// </summary>
 internal interface IWorkloadInstaller
 {
+    /// <summary>
+    /// Reads an advisory declaration flag; it does not establish package validity or installation completeness.
+    /// </summary>
+    public bool HasBundledTemplates(WorkloadEntry entry);
+
+    /// <summary>
+    /// Revalidates an installed stack and verifies or repairs its locally declared templates without catalog acquisition.
+    /// </summary>
+    /// <exception cref="Discovery.InvalidWorkloadException">Declared assets or native ownership are invalid, or check-only finds missing templates.</exception>
+    /// <exception cref="BundledTemplateRegistrationException">The retained stack's template registration failed after protected recovery.</exception>
+    /// <exception cref="BundledTemplateRegistrationCanceledException">Cancellation retained the stack after native recovery settled.</exception>
+    public Task<WorkloadInstallResult> EnsureInstalledAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool checkOnly = false);
     public Task<PreparedWorkloadInstall> PrepareFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
         bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken);
     public Task<WorkloadInstallResult> CommitPreparedAsync(IWorkloadOperation operation, PreparedWorkloadInstall prepared,

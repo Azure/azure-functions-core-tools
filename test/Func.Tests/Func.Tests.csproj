@@ -71,4 +71,9 @@
           SkipUnchangedFiles="true" />
   </Target>
 
+  <Target Name="PackBundledNodeForTests" AfterTargets="Build">
+    <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" Targets="Pack"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-node-artifacts" />
+  </Target>
+
 </Project>

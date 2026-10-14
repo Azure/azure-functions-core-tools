@@ -22,7 +22,11 @@ internal sealed class PreparedWorkloadInstall(string packageId, string version, 
     public PreparedWorkloadDeployment? Deployment { get; } = deployment;
     public string ExpectedState { get; } = expectedState;
     public PreparedWorkloadReuse? Reuse { get; init; }
-    public void Dispose() => Deployment?.Dispose();
+    public void Dispose()
+    {
+        Deployment?.Dispose();
+        Reuse?.Dispose();
+    }
 
     public string CaptureState(IReadOnlyList<WorkloadEntry> installed)
         => WorkloadStateSnapshot.CaptureAffected(installed, PackageId, LogicalPackage?.PackageId);

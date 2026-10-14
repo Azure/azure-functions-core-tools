@@ -22,9 +22,14 @@ internal sealed class PreparedWorkloadDeployment(TempDirectory staging, Inspecte
     public bool Force { get; } = force;
     public IReadOnlyDictionary<string, string> Hashes { get; } = hashes;
     public string ExpectedState { get; } = expectedState;
+    public PreparedBundledTemplates? BundledTemplates { get; init; }
     public string CaptureState(IReadOnlyList<WorkloadEntry> installed)
         => WorkloadStateSnapshot.CaptureAffected(installed, Package.Identity.PackageId, LogicalPackage?.PackageId);
-    public void Dispose() => staging.Dispose();
+    public void Dispose()
+    {
+        BundledTemplates?.Dispose();
+        staging.Dispose();
+    }
 }
 
 internal static class WorkloadStateSnapshot

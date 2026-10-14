@@ -399,6 +399,57 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_InstalledBundledDependency_VerifiesOrRepairsBeforeSatisfied(bool check)
+    {
+        var entry = new WorkloadEntry { PackageId = _hostPackageId, PackageVersion = "4.0.0", Aliases = ["host"],
+            Kind = WorkloadKind.Content, BundledTemplatesDeclared = true };
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+        _installer.EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), check).Returns(new WorkloadInstallResult(entry, true));
+        SetupRunner runner = CreateRunner(Catalog());
+
+        var result = await runner.RunAsync(Options(features: ["host"], installPolicy: SetupInstallPolicy.IfNeeded, check: check), CancellationToken.None);
+
+        result.ExitCode.Should().Be(0);
+        await _installer.Received(1).EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), check);
+    }
+
+    [Fact]
+    public async Task RunAsync_BundledRegistrationFailure_DoesNotReportInstalledStackAsSatisfied()
+    {
+        var entry = new WorkloadEntry { PackageId = _hostPackageId, PackageVersion = "4.0.0", Aliases = ["host"],
+            Kind = WorkloadKind.Content, BundledTemplatesDeclared = true };
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+        _installer.EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), false)
+            .Returns(Task.FromException<WorkloadInstallResult>(new BundledTemplateRegistrationException(entry, new IOException("receipt failed"))));
+        SetupRunner runner = CreateRunner(Catalog());
+
+        var result = await runner.RunAsync(Options(features: ["host"], installPolicy: SetupInstallPolicy.IfNeeded), CancellationToken.None);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.Lines.Should().Contain(line => line.Contains("remains installed", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunAsync_BundledRegistrationCancellation_ReportsPartialStateBeforePropagating()
+    {
+        var entry = new WorkloadEntry { PackageId = _hostPackageId, PackageVersion = "4.0.0", Aliases = ["host"],
+            Kind = WorkloadKind.Content, BundledTemplatesDeclared = true };
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+        using var cancel = new CancellationTokenSource();
+        cancel.Cancel();
+        var failure = new BundledTemplateRegistrationCanceledException(entry, new OperationCanceledException(cancel.Token), cancel.Token);
+        _installer.EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), false).Returns(Task.FromException<WorkloadInstallResult>(failure));
+        SetupRunner runner = CreateRunner(Catalog());
+        Func<Task> run = () => runner.RunAsync(Options(features: ["host"], installPolicy: SetupInstallPolicy.IfNeeded), CancellationToken.None);
+
+        var error = (await run.Should().ThrowAsync<BundledTemplateRegistrationCanceledException>()).Which;
+        error.CancellationToken.Should().Be(cancel.Token);
+        _interaction.Lines.Should().Contain(line => line.Contains("remains installed", StringComparison.Ordinal) && line.Contains("Retry", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task RunAsync_Check_RecognizesExactRidPointerWorkloadVersion()
     {

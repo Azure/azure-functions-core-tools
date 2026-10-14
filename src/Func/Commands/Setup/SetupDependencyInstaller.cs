@@ -54,6 +54,12 @@ internal sealed class SetupDependencyInstaller(
         if (options.InstallPolicy == SetupInstallPolicy.IfNeeded && compatibleInstalled.Count > 0)
         {
             InstalledCandidate selected = compatibleInstalled[0];
+            string? failure = await EnsureBundledAsync(selected.Entry, options.Check, options.Source, dependency.PackageId, cancellationToken);
+            if (failure is not null)
+            {
+                return SetupDependencyResult.Failed(dependency, failure);
+            }
+
             return SetupDependencyResult.Satisfied(
                 dependency,
                 selected.Entry.PackageId,
@@ -67,6 +73,12 @@ internal sealed class SetupDependencyInstaller(
             if (compatibleInstalled.Count > 0)
             {
                 InstalledCandidate selected = compatibleInstalled[0];
+                string? failure = await EnsureBundledAsync(selected.Entry, options.Check, options.Source, dependency.PackageId, cancellationToken);
+                if (failure is not null)
+                {
+                    return SetupDependencyResult.Failed(dependency, failure);
+                }
+
                 return SetupDependencyResult.SatisfiedFallback(
                     dependency,
                     selected.Entry.PackageId,
@@ -92,11 +104,17 @@ internal sealed class SetupDependencyInstaller(
         // encodes the channel, so this stays correct when a channeled dependency
         // fell back to the stable channel (where the installed version's channel
         // no longer equals dependency.Channel).
-        bool exactInstalled = IsExactVersionInstalled(installed, dependency, package.Version);
+        WorkloadEntry? exactInstalled = FindExactInstalled(installed, dependency, package.Version);
 
         string targetVersion = package.Version.ToNormalizedString();
-        if (exactInstalled)
+        if (exactInstalled is not null)
         {
+            string? failure = await EnsureBundledAsync(exactInstalled, options.Check, package.Source.Source, package.PackageId, cancellationToken);
+            if (failure is not null)
+            {
+                return SetupDependencyResult.Failed(dependency, failure);
+            }
+
             return SetupDependencyResult.Satisfied(
                 dependency,
                 package.PackageId,
@@ -149,6 +167,11 @@ internal sealed class SetupDependencyInstaller(
                     installedVersion,
                     $"Installed {dependency.DisplayName} {installedVersion}.") with { Warning = channelWarning };
         }
+        catch (BundledTemplateRegistrationCanceledException ex)
+        {
+            _interaction.WriteWarning(ex.Message);
+            throw;
+        }
         catch (WorkloadPackageNotFoundException ex)
         {
             return SetupDependencyResult.Failed(dependency, ex.Message);
@@ -158,6 +181,10 @@ internal sealed class SetupDependencyInstaller(
             return SetupDependencyResult.Failed(dependency, ex.Message);
         }
         catch (InvalidWorkloadException ex)
+        {
+            return SetupDependencyResult.Failed(dependency, ex.Message);
+        }
+        catch (BundledTemplateRegistrationException ex)
         {
             return SetupDependencyResult.Failed(dependency, ex.Message);
         }
@@ -309,7 +336,42 @@ internal sealed class SetupDependencyInstaller(
         return candidates;
     }
 
-    private static bool IsExactVersionInstalled(IReadOnlyList<WorkloadEntry> installed, SetupDependency dependency, NuGetVersion version)
+    private async Task<string?> EnsureBundledAsync(WorkloadEntry entry, bool checkOnly, string? requestedSource,
+        string requestedPackageId, CancellationToken cancellationToken)
+    {
+        if (!entry.BundledTemplatesDeclared)
+        {
+            return null;
+        }
+
+        string actualSource = entry.LogicalPackage is { } logical
+            && string.Equals(requestedPackageId, logical.PackageId, StringComparison.OrdinalIgnoreCase) ? logical.Source : entry.Source;
+        if (requestedSource is not null && !string.Equals(requestedSource, actualSource, StringComparison.Ordinal))
+        {
+            return "The requested source conflicts with the installed bundled stack's validated origin. Use its original source to repair it.";
+        }
+
+        try
+        {
+            await _workloadInstaller.EnsureInstalledAsync(entry, cancellationToken, checkOnly);
+            return null;
+        }
+        catch (BundledTemplateRegistrationCanceledException exception)
+        {
+            _interaction.WriteWarning(exception.Message);
+            throw;
+        }
+        catch (BundledTemplateRegistrationException exception)
+        {
+            return exception.Message;
+        }
+        catch (InvalidWorkloadException exception)
+        {
+            return exception.Message;
+        }
+    }
+
+    private static WorkloadEntry? FindExactInstalled(IReadOnlyList<WorkloadEntry> installed, SetupDependency dependency, NuGetVersion version)
     {
         foreach (WorkloadEntry entry in installed)
         {
@@ -317,11 +379,11 @@ internal sealed class SetupDependencyInstaller(
                 && NuGetVersion.TryParse(entry.PackageVersion, out NuGetVersion? installedVersion)
                 && installedVersion.Equals(version))
             {
-                return true;
+                return entry;
             }
         }
 
-        return false;
+        return null;
     }
 
     private static bool MatchesDependency(WorkloadEntry entry, SetupDependency dependency)

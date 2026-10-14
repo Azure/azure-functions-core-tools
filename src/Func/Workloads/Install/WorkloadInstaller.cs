@@ -25,6 +25,21 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     private readonly IWorkloadStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
+    public bool HasBundledTemplates(WorkloadEntry entry) => _deploymentService.HasBundledTemplates(entry);
+
+    public async Task<WorkloadInstallResult> EnsureInstalledAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool checkOnly = false)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        using PreparedWorkloadReuse prepared = await _deploymentService.PrepareReuseAsync(entry, cancellationToken);
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        await _deploymentService.ValidateReuseAsync(operation, prepared, cancellationToken, checkOnly);
+        if (!checkOnly)
+        {
+            await _deploymentService.CommitBundledReuseAsync(operation, prepared, entry, cancellationToken);
+        }
+        return new(entry, true);
+    }
+
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(string nupkgPath, bool force = false,
         IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default)
     {
@@ -170,6 +185,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
                     prepared.RuntimeIdentifier!, prepared.LogicalPackage, cancellationToken))
                 ?? throw new WorkloadPlanChangedException();
             operation.CompleteMutation();
+            await _deploymentService.CommitBundledReuseAsync(operation, reuse, result.Entry, cancellationToken);
         }
 
         return result;
@@ -190,6 +206,12 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         InspectedWorkloadPackage? pointer, string? pointerHash, string? runtimeIdentifier, LogicalPackage? logicalPackage,
         CancellationToken cancellationToken, WorkloadEntry? reusableEntry = null)
     {
+        if (reusableEntry is not null && _deploymentService.HasBundledTemplates(reusableEntry)
+            && !string.Equals(source, reusableEntry.Source, StringComparison.Ordinal))
+        {
+            throw new InvalidWorkloadException("The requested source conflicts with the installed bundled stack's validated origin. No repair or replacement was performed.");
+        }
+
         PreparedWorkloadInstall plan = new(packageId, version, source, pointer, pointerHash, runtimeIdentifier, logicalPackage, null, string.Empty);
         string expected = plan.CaptureState(await _store.GetWorkloadsAsync(cancellationToken));
         return new(packageId, version, source, pointer, pointerHash, runtimeIdentifier, logicalPackage, null, expected)
@@ -245,13 +267,13 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         if (resolved is null)
         {
-            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, currentEntry, cancellationToken);
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, currentEntry, cancellationToken, source);
             return new WorkloadUpdateResult(currentEntry, currentEntry.PackageVersion, true, true);
         }
 
         if (resolved.Version <= currentVersion)
         {
-            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, currentEntry, cancellationToken);
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, currentEntry, cancellationToken, resolved.Source.Source);
             return new WorkloadUpdateResult(currentEntry, currentEntry.PackageVersion, true);
         }
 
@@ -287,13 +309,13 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         if (pointerResolved is null)
         {
-            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken, effectiveSource);
             return new WorkloadUpdateResult(currentEntry, currentLogical.PackageVersion, true, true);
         }
 
         if (pointerResolved.Version < currentVersion)
         {
-            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken, pointerResolved.Source.Source);
             return new WorkloadUpdateResult(currentEntry, currentLogical.PackageVersion, true);
         }
 
@@ -314,7 +336,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         if (pointerResolved.Version == currentVersion && !ridPivot)
         {
-            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken, pointerResolved.Source.Source);
             return new WorkloadUpdateResult(currentEntry, currentLogical.PackageVersion, true);
         }
 
@@ -324,7 +346,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         if (reusable is not null)
         {
-            PreparedWorkloadReuse preparedReuse = await _deploymentService.PrepareReuseAsync(reusable, cancellationToken);
+            using PreparedWorkloadReuse preparedReuse = await _deploymentService.PrepareReuseAsync(reusable, cancellationToken);
             using IWorkloadOperation reuseOperation = await _coordinator.AcquireAsync(cancellationToken);
             await RevalidateTargetAsync(reuseOperation, packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
             await _deploymentService.ValidateReuseAsync(reuseOperation, preparedReuse, cancellationToken);
@@ -332,6 +354,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
                 selection.PackageId, pointer.Identity.Version, selection.RuntimeIdentifier, newLogical, cancellationToken)
                 ?? throw new WorkloadPlanChangedException();
             reuseOperation.CompleteMutation();
+            await _deploymentService.CommitBundledReuseAsync(reuseOperation, preparedReuse, result.Entry, cancellationToken);
             return new WorkloadUpdateResult(result.Entry, currentLogical.PackageVersion, false);
         }
 
@@ -350,10 +373,22 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     }
 
     private async Task RevalidateTargetAsync(string packageId, NuGetVersion? targetInstalledVersion, WorkloadOwnershipKind ownership,
-        WorkloadEntry expected, CancellationToken cancellationToken)
+        WorkloadEntry expected, CancellationToken cancellationToken, string? requestedSource)
     {
+        bool bundled = _deploymentService.HasBundledTemplates(expected);
+        string actualSource = ownership == WorkloadOwnershipKind.Logical ? expected.LogicalPackage!.Source : expected.Source;
+        if (bundled && requestedSource is not null && !string.Equals(requestedSource, actualSource, StringComparison.Ordinal))
+        {
+            throw new InvalidWorkloadException("The requested source conflicts with the installed bundled stack's validated origin. Use its original source to verify or repair it.");
+        }
+
+        using PreparedWorkloadReuse? prepared = bundled ? await _deploymentService.PrepareReuseAsync(expected, cancellationToken) : null;
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
         await RevalidateTargetAsync(operation, packageId, targetInstalledVersion, ownership, expected, cancellationToken);
+        if (prepared is not null)
+        {
+            await _deploymentService.ValidateReuseAsync(operation, prepared, cancellationToken, checkOnly: true);
+        }
     }
 
     private async Task RevalidateTargetAsync(IWorkloadOperation operation, string packageId, NuGetVersion? targetInstalledVersion,
