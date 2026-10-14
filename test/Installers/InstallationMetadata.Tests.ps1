@@ -142,6 +142,7 @@ function Invoke-BashInstaller {
         [switch] $Force,
         [switch] $FailDownload,
         [switch] $FailMetadataPublish,
+        [switch] $FailWrapperPublish,
         [ValidateSet('Linux', 'Darwin')] [string] $OperatingSystem = 'Linux'
     )
 
@@ -149,6 +150,7 @@ function Invoke-BashInstaller {
         Archive = $env:FUNC_INSTALLER_TEST_ARCHIVE
         Fail = $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD
         FailMetadataPublish = $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH
+        FailWrapperPublish = $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH
         Home = $env:HOME
         OperatingSystem = $env:FUNC_INSTALLER_TEST_OS
     }
@@ -157,6 +159,7 @@ function Invoke-BashInstaller {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = ($ArchivePath -replace '\\', '/')
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $FailDownload.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH = $FailMetadataPublish.ToString().ToLowerInvariant()
+        $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH = $FailWrapperPublish.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_OS = $OperatingSystem
         $env:HOME = ($HomePath -replace '\\', '/')
 
@@ -181,6 +184,7 @@ function Invoke-BashInstaller {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $previousEnvironment.Archive
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $previousEnvironment.Fail
         $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH = $previousEnvironment.FailMetadataPublish
+        $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH = $previousEnvironment.FailWrapperPublish
         $env:FUNC_INSTALLER_TEST_OS = $previousEnvironment.OperatingSystem
         $env:HOME = $previousEnvironment.Home
     }
@@ -333,6 +337,18 @@ exec /usr/bin/mv "$@"
     & bash -c "chmod +x '$($fakeMv -replace '\\', '/')'"
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake mv executable.'
 
+    $fakeCat = Join-Path $fakeBin 'cat'
+    @'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH:-false}" == true && $# -eq 0 ]]; then
+    exit 74
+fi
+exec /usr/bin/cat "$@"
+'@ | Set-Content -LiteralPath $fakeCat -Encoding utf8NoBOM
+    & bash -c "chmod +x '$($fakeCat -replace '\\', '/')'"
+    Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake cat executable.'
+
     $bashHome = Join-Path $testRoot 'bash-home'
     New-Item -ItemType Directory -Path $bashHome | Out-Null
     $bashInstall = Join-Path $testRoot 'custom-bash-install'
@@ -382,6 +398,15 @@ exec /usr/bin/mv "$@"
         'install.sh did not restore the executable after late metadata failure.'
     Assert-True ((Get-Content -LiteralPath (Join-Path $bashInstall 'func5') -Raw).Trim() -eq 'existing wrapper') `
         'install.sh did not restore the wrapper after late metadata failure.'
+
+    Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashInstall -HomePath $bashHome `
+        -FakeBinPath $fakeBin -Force -FailWrapperPublish) -ne 0) `
+        'install.sh unexpectedly succeeded after wrapper publication failed.'
+    Assert-Metadata -InstallPath $bashInstall
+    Assert-True ((Get-Content -LiteralPath (Join-Path $bashInstall 'func') -Raw).Trim() -eq 'existing executable') `
+        'install.sh did not restore the executable after wrapper publication failed.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $bashInstall 'func5') -Raw).Trim() -eq 'existing wrapper') `
+        'install.sh did not restore the wrapper after wrapper publication failed.'
 
     $bashFailedInstall = Join-Path $testRoot 'failed-bash-install'
     Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashFailedInstall -HomePath $bashHome -FakeBinPath $fakeBin -FailDownload) -ne 0) `

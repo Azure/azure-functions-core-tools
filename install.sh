@@ -453,22 +453,31 @@ else
         fi
 
         # Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
-        cat > "${INSTALL_DIR}/func5" <<'EOF'
+        if ! cat > "${INSTALL_DIR}/func5" <<'EOF'
 #!/usr/bin/env bash
 exec "$(dirname "$0")/func" "$@"
 EOF
+        then
+            return 1
+        fi
         chmod +x "${INSTALL_DIR}/func5" || return 1
-        write_installation_metadata
+        write_installation_metadata || return 1
     }
 
     rollback_installation() {
         local publication_name
+        local rollback_failed=false
         for publication_name in "${PUBLICATION_NAMES[@]}"; do
-            rm -rf -- "${INSTALL_DIR:?}/${publication_name}"
+            if ! rm -rf -- "${INSTALL_DIR:?}/${publication_name}"; then
+                rollback_failed=true
+            fi
         done
         for publication_name in "${BACKED_UP_NAMES[@]}"; do
-            cp -pR "${PUBLICATION_BACKUP_DIR}/${publication_name}" "$INSTALL_DIR/" || return 1
+            if ! cp -pR "${PUBLICATION_BACKUP_DIR}/${publication_name}" "$INSTALL_DIR/"; then
+                rollback_failed=true
+            fi
         done
+        [[ "$rollback_failed" == false ]]
     }
 
     if ! publish_installation; then

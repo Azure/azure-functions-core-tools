@@ -95,6 +95,7 @@ function Write-InstallationMetadata {
     $metadataPath = Join-Path $InstallPath $Script:InstallationMetadataFile
     $tempPath = Join-Path $InstallPath ".$Script:InstallationMetadataFile.tmp.$([Guid]::NewGuid().ToString('N'))"
     $backupPath = Join-Path $InstallPath ".$Script:InstallationMetadataFile.backup.$([Guid]::NewGuid().ToString('N'))"
+    $metadataCommitted = $false
 
     try {
         if ([System.IO.Directory]::Exists($metadataPath)) {
@@ -113,16 +114,27 @@ function Write-InstallationMetadata {
 
         if ([System.IO.File]::Exists($metadataPath)) {
             [System.IO.File]::Replace($tempPath, $metadataPath, $backupPath)
-            [System.IO.File]::Delete($backupPath)
         } else {
             [System.IO.File]::Move($tempPath, $metadataPath)
         }
+        $metadataCommitted = $true
     } finally {
         if ([System.IO.File]::Exists($tempPath)) {
-            [System.IO.File]::Delete($tempPath)
+            try {
+                [System.IO.File]::Delete($tempPath)
+            } catch {
+                # Temporary-file cleanup must not mask the publication result.
+            }
         }
         if ([System.IO.File]::Exists($backupPath)) {
-            [System.IO.File]::Delete($backupPath)
+            try {
+                [System.IO.File]::Delete($backupPath)
+            } catch {
+                # Once metadata is committed, backup cleanup cannot roll the transaction back.
+                if (-not $metadataCommitted) {
+                    Write-Message "Could not remove the installation metadata backup at $backupPath." -Level Warning
+                }
+            }
         }
     }
 }
