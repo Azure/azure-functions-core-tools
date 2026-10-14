@@ -162,25 +162,32 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
     }
 
-    public async Task CommitBundledReuseAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared,
-        WorkloadEntry admitted, CancellationToken cancellationToken)
+    public async Task<WorkloadInstallResult> CommitPreparedReuseAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared,
+        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prepared);
-        ArgumentNullException.ThrowIfNull(admitted);
+        ArgumentNullException.ThrowIfNull(admitWorkload);
         ValidateOperation(operation);
         if (prepared.BundledTemplates is null)
         {
-            if (HasBundledTemplates(admitted))
+            if (HasBundledTemplates(prepared.Entry))
             {
                 throw new InvalidWorkloadException("Required bundled-template preparation evidence is missing. No registration was performed.");
             }
 
-            return;
+            await ValidateReuseAsync(operation, prepared, cancellationToken);
+            return await admitWorkload(cancellationToken);
         }
 
-        await ValidateCurrentEntryAsync(operation, admitted, cancellationToken);
-        await ValidateHashesAsync(prepared.Hashes, _paths.GetInstallDirectory(admitted.PackageId, admitted.PackageVersion), cancellationToken);
-        await CompleteBundledAsync(prepared.BundledTemplates, admitted, cancellationToken);
+        return await _bundledTemplates.CommitAsync(prepared.BundledTemplates, async token =>
+        {
+            await ValidateReuseAsync(operation, prepared, token);
+            WorkloadInstallResult admitted = await admitWorkload(token);
+            await ValidateCurrentEntryAsync(operation, admitted.Entry, CancellationToken.None);
+            await ValidateHashesAsync(prepared.Hashes, _paths.GetInstallDirectory(admitted.Entry.PackageId, admitted.Entry.PackageVersion),
+                CancellationToken.None);
+            return admitted;
+        }, cancellationToken);
     }
 
     public async Task<WorkloadInstallResult?> TryReuseImplementationAsync(string packageId, string version, string runtimeIdentifier,
@@ -294,6 +301,17 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
     {
         ValidateOperation(operation);
         ArgumentNullException.ThrowIfNull(prepared);
+        return prepared.BundledTemplates is null
+            ? await InstallPreparedCoreAsync(operation, prepared, progress, cancellationToken)
+            : await _bundledTemplates.CommitAsync(prepared.BundledTemplates,
+                token => InstallPreparedCoreAsync(operation, prepared, progress, token), cancellationToken);
+    }
+
+    private async Task<WorkloadInstallResult> InstallPreparedCoreAsync(IWorkloadOperation operation, PreparedWorkloadDeployment prepared,
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
+    {
+        ValidateOperation(operation);
+        ArgumentNullException.ThrowIfNull(prepared);
         await ValidatePreparedAsync(prepared, cancellationToken);
         InspectedWorkloadPackage package = prepared.Package;
         WorkloadOwnershipKind ownership = prepared.Ownership;
@@ -329,16 +347,19 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             throw new InvalidWorkloadException("Side-by-side installation involving bundled stack versions is not supported. Preserve the existing installation.");
         }
 
-        if (prepared.BundledTemplates is not null)
+        bool existingValid = !prepared.Force && existing is not null && IsExistingInstallationValid(existing, package.Metadata);
+        if (existing is not null && HasBundledTemplates(existing) && !existingValid)
         {
-            if (existing is not null && !HasBundledTemplates(existing))
-            {
-                throw new InvalidWorkloadException("Replacing an unbundled stack with bundled content is not supported in this fresh-install phase. Nothing was changed.");
-            }
-
+            throw new InvalidWorkloadException("The retained bundled workload payload or manifest is damaged. " +
+                "Replacement is not supported; preserve the installation and request explicit repair.");
         }
 
-        if (!prepared.Force && existing is not null && IsExistingInstallationValid(existing, package.Metadata))
+        if (prepared.BundledTemplates is not null && existing is not null && !HasBundledTemplates(existing))
+        {
+            throw new InvalidWorkloadException("Replacing an unbundled stack with bundled content is not supported in this fresh-install phase. Nothing was changed.");
+        }
+
+        if (!prepared.Force && existing is not null && existingValid)
         {
             if (prepared.BundledTemplates is not null)
             {
@@ -347,7 +368,6 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
             WorkloadInstallResult attached = await AttachOwnershipAsync(operation, existing, ownership, logicalPackage, currentLogicalOwner, cancellationToken);
             operation.CompleteMutation();
-            await CompleteBundledAsync(prepared.BundledTemplates, attached.Entry, cancellationToken);
             return attached;
         }
 
@@ -383,7 +403,6 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
                 await ValidatePayloadAsync(prepared, installPath, CancellationToken.None);
                 operation.CompleteMutation();
-                await CompleteBundledAsync(prepared.BundledTemplates, moved.Entry, cancellationToken);
                 return new WorkloadInstallResult(moved.Entry, false);
             }
 
@@ -391,7 +410,6 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             registered = true;
             await ValidatePayloadAsync(prepared, installPath, CancellationToken.None);
             operation.CompleteMutation();
-            await CompleteBundledAsync(prepared.BundledTemplates, entry, cancellationToken);
             return new WorkloadInstallResult(entry, false);
         }
         catch
@@ -613,28 +631,6 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         if (destructive && entry is not null && HasBundledTemplates(entry))
         {
             throw new InvalidWorkloadException("Bundled stack replacement is not supported yet. Preserve the existing installation; no ownership or payload was changed.");
-        }
-    }
-
-    private async Task CompleteBundledAsync(PreparedBundledTemplates? templates, WorkloadEntry entry, CancellationToken cancellationToken)
-    {
-        if (templates is null)
-        {
-            return;
-        }
-
-        try
-        {
-            await _bundledTemplates.CommitAsync(templates, cancellationToken);
-        }
-        catch (OperationCanceledException exception)
-        {
-            throw new BundledTemplateRegistrationCanceledException(entry, exception, cancellationToken);
-        }
-        catch (Exception exception) when (exception is InvalidWorkloadException or Azure.Functions.Cli.Templates.Acquisition.BasicAcquisitionException
-            or Azure.Functions.Cli.Templates.Engine.InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
-        {
-            throw new BundledTemplateRegistrationException(entry, exception);
         }
     }
 

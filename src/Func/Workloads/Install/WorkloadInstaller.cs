@@ -32,12 +32,14 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         ArgumentNullException.ThrowIfNull(entry);
         using PreparedWorkloadReuse prepared = await _deploymentService.PrepareReuseAsync(entry, cancellationToken);
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
-        await _deploymentService.ValidateReuseAsync(operation, prepared, cancellationToken, checkOnly);
-        if (!checkOnly)
+        if (checkOnly)
         {
-            await _deploymentService.CommitBundledReuseAsync(operation, prepared, entry, cancellationToken);
+            await _deploymentService.ValidateReuseAsync(operation, prepared, cancellationToken, checkOnly: true);
+            return new(entry, true);
         }
-        return new(entry, true);
+
+        return await _deploymentService.CommitPreparedReuseAsync(operation, prepared, _ => Task.FromResult(new WorkloadInstallResult(entry, true)),
+            cancellationToken);
     }
 
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(string nupkgPath, bool force = false,
@@ -178,14 +180,16 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         {
             PreparedWorkloadReuse reuse = prepared.Reuse
                 ?? throw new ArgumentException("A prepared reuse plan must carry destination verification evidence.", nameof(prepared));
-            await _deploymentService.ValidateReuseAsync(operation, reuse, cancellationToken);
-            result = (prepared.LogicalPackage is null
-                ? await _deploymentService.TryReuseExplicitAsync(operation, prepared.PackageId, prepared.Version, cancellationToken)
-                : await _deploymentService.TryReuseImplementationAsync(operation, prepared.PackageId, prepared.Version,
-                    prepared.RuntimeIdentifier!, prepared.LogicalPackage, cancellationToken))
-                ?? throw new WorkloadPlanChangedException();
-            operation.CompleteMutation();
-            await _deploymentService.CommitBundledReuseAsync(operation, reuse, result.Entry, cancellationToken);
+            result = await _deploymentService.CommitPreparedReuseAsync(operation, reuse, async token =>
+            {
+                WorkloadInstallResult admitted = (prepared.LogicalPackage is null
+                    ? await _deploymentService.TryReuseExplicitAsync(operation, prepared.PackageId, prepared.Version, token)
+                    : await _deploymentService.TryReuseImplementationAsync(operation, prepared.PackageId, prepared.Version,
+                        prepared.RuntimeIdentifier!, prepared.LogicalPackage, token))
+                    ?? throw new WorkloadPlanChangedException();
+                operation.CompleteMutation();
+                return admitted;
+            }, cancellationToken);
         }
 
         return result;
@@ -349,12 +353,14 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
             using PreparedWorkloadReuse preparedReuse = await _deploymentService.PrepareReuseAsync(reusable, cancellationToken);
             using IWorkloadOperation reuseOperation = await _coordinator.AcquireAsync(cancellationToken);
             await RevalidateTargetAsync(reuseOperation, packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
-            await _deploymentService.ValidateReuseAsync(reuseOperation, preparedReuse, cancellationToken);
-            WorkloadInstallResult result = await _deploymentService.TryReuseImplementationForUpdateAsync(reuseOperation, currentEntry,
-                selection.PackageId, pointer.Identity.Version, selection.RuntimeIdentifier, newLogical, cancellationToken)
-                ?? throw new WorkloadPlanChangedException();
-            reuseOperation.CompleteMutation();
-            await _deploymentService.CommitBundledReuseAsync(reuseOperation, preparedReuse, result.Entry, cancellationToken);
+            WorkloadInstallResult result = await _deploymentService.CommitPreparedReuseAsync(reuseOperation, preparedReuse, async token =>
+            {
+                WorkloadInstallResult admitted = await _deploymentService.TryReuseImplementationForUpdateAsync(reuseOperation, currentEntry,
+                    selection.PackageId, pointer.Identity.Version, selection.RuntimeIdentifier, newLogical, token)
+                    ?? throw new WorkloadPlanChangedException();
+                reuseOperation.CompleteMutation();
+                return admitted;
+            }, cancellationToken);
             return new WorkloadUpdateResult(result.Entry, currentLogical.PackageVersion, false);
         }
 

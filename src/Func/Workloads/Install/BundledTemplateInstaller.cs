@@ -20,7 +20,14 @@ namespace Azure.Functions.Cli.Workloads.Install;
 internal interface IBundledTemplateInstaller
 {
     public Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin, CancellationToken cancellationToken);
-    public Task CommitAsync(PreparedBundledTemplates prepared, CancellationToken cancellationToken);
+    /// <summary>
+    /// Checks every native owner before admitting the workload, retaining native protection through registration and recovery.
+    /// </summary>
+    /// <exception cref="InvalidWorkloadException">Native ownership conflicts before workload admission.</exception>
+    /// <exception cref="BundledTemplateRegistrationException">Registration fails after workload admission and native recovery.</exception>
+    /// <exception cref="BundledTemplateRegistrationCanceledException">Cancellation retains the admitted stack after native recovery.</exception>
+    public Task<WorkloadInstallResult> CommitAsync(PreparedBundledTemplates prepared,
+        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken);
     public Task ValidateInstalledAsync(PreparedBundledTemplates prepared, CancellationToken cancellationToken);
 }
 
@@ -112,7 +119,15 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
                 }
 
                 string archive = Path.Combine(staging.Path, $"{assets.Count}.nupkg");
-                _fileSystem.CopyFile(Path.Combine(directory, asset.Path.Replace('/', Path.DirectorySeparatorChar)), archive);
+                try
+                {
+                    _fileSystem.CopyFile(Path.Combine(directory, asset.Path.Replace('/', Path.DirectorySeparatorChar)), archive);
+                }
+                catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+                {
+                    throw new InvalidWorkloadException($"Declared bundled archive '{asset.Path}' for '{asset.PackageId}' is missing. " +
+                        "Preserve the installation and request explicit repair using its original complete workload artifact.", exception);
+                }
                 BasicTemplateArtifact artifact = new(asset.PackageId, version, origin.Source, asset.Sha256, origin.Sha256, asset.Templates);
                 await ValidateArtifactAsync(archive, artifact, cancellationToken);
 
@@ -152,34 +167,61 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
         }
     }
 
-    public async Task CommitAsync(PreparedBundledTemplates prepared, CancellationToken cancellationToken)
+    public async Task<WorkloadInstallResult> CommitAsync(PreparedBundledTemplates prepared,
+        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prepared);
+        ArgumentNullException.ThrowIfNull(admitWorkload);
         foreach ((string archive, BasicTemplateArtifact artifact) in prepared.Assets)
         {
             await ValidateArtifactAsync(archive, artifact, cancellationToken);
         }
 
-        using TemplateStoreWriteSession transaction = await _store.OpenWriteAsync(Context(_paths.Home), cancellationToken);
-        await transaction.ExecuteAsync(async (session, token) =>
+        WorkloadInstallResult? admitted = null;
+        try
         {
-            foreach ((string archive, BasicTemplateArtifact artifact) in prepared.Assets)
+            using TemplateStoreWriteSession transaction = await _store.OpenWriteAsync(Context(_paths.Home), cancellationToken);
+            await transaction.ExecuteAsync(async (session, token) =>
             {
-                if (!await CheckIncumbentAsync(session, prepared.Origin, artifact, token))
+                List<bool> reused = [];
+                foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
                 {
-                    await InstallAsync(session, archive, token);
+                    reused.Add(await CheckIncumbentAsync(session, prepared.Origin, artifact, token));
                 }
-            }
-        }, async (session, token) =>
-        {
-            foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
+
+                token.ThrowIfCancellationRequested();
+                admitted = await admitWorkload(token)
+                    ?? throw new InvalidOperationException("The workload admission callback returned no result.");
+                for (int index = 0; index < prepared.Assets.Count; index++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (!reused[index])
+                    {
+                        await InstallAsync(session, prepared.Assets[index].Archive, token);
+                    }
+                }
+            }, async (session, token) =>
             {
-                await ValidateInstalledAsync(session, artifact, token);
-                BundledTemplateOwner owner = new(prepared.Origin, artifact.PackageId, artifact.Version.ToNormalizedString(), artifact.Sha256);
-                await _fileSystem.WriteAllTextAsync(OwnerPath(artifact.PackageId),
-                    JsonSerializer.Serialize(owner, BundledTemplateJsonContext.Default.BundledTemplateOwner), token);
-            }
-        }, cancellationToken);
+                foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
+                {
+                    await ValidateInstalledAsync(session, artifact, token);
+                    BundledTemplateOwner owner = new(prepared.Origin, artifact.PackageId, artifact.Version.ToNormalizedString(), artifact.Sha256);
+                    await _fileSystem.WriteAllTextAsync(OwnerPath(artifact.PackageId),
+                        JsonSerializer.Serialize(owner, BundledTemplateJsonContext.Default.BundledTemplateOwner), token);
+                }
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException exception) when (admitted is not null)
+        {
+            throw new BundledTemplateRegistrationCanceledException(admitted.Entry, exception, cancellationToken);
+        }
+        catch (Exception exception) when (admitted is not null
+            && exception is InvalidWorkloadException or BasicAcquisitionException or InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
+        {
+            throw new BundledTemplateRegistrationException(admitted.Entry, exception);
+        }
+
+        return admitted ?? throw new InvalidOperationException("The protected bundled transaction completed without workload admission.");
     }
 
     public async Task ValidateInstalledAsync(PreparedBundledTemplates prepared, CancellationToken cancellationToken)

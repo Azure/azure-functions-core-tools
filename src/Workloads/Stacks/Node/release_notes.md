@@ -6,6 +6,9 @@
   the Node stack artifact, registering declared archives locally during install.
   Template-first commands remain staged; creation-time npm actions and bundled
   replacement/removal are not yet supported.
+- Preserve damaged bundled installations, report missing declared archives as
+  workload errors, and hold native ownership continuously across workload
+  admission, local registration and protected recovery.
 - `func init` adopt mode now reports the project language (JavaScript or TypeScript) to the CLI so it gets written to `.func/config.json`.
 
 ## 1.0.0-preview.1

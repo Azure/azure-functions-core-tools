@@ -35,7 +35,7 @@ using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
-public sealed class BundledNodeTemplateTests : IDisposable
+public sealed partial class BundledNodeTemplateTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("func-bundled-node-").FullName;
     private readonly PhysicalFileSystem _files = new();
@@ -91,7 +91,7 @@ public sealed class BundledNodeTemplateTests : IDisposable
         Func<Task>[] calls =
         [
             () => installer.PrepareAsync(_root, null!, CancellationToken.None),
-            () => installer.CommitAsync(null!, CancellationToken.None),
+            () => installer.CommitAsync(null!, _ => Task.FromResult<WorkloadInstallResult>(null!), CancellationToken.None),
             () => installer.ValidateInstalledAsync(null!, CancellationToken.None),
             () => _installer.EnsureInstalledAsync(null!, CancellationToken.None),
         ];

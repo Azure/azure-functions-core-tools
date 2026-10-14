@@ -117,13 +117,25 @@ warning to stderr, then propagate cancellation so the public process retains
 exit code 130. Incoming undeclared archives cannot complete a retained bundled
 stack, enter side-by-side with it, or overwrite a bundled update destination.
 A different requested catalog source cannot silently repair from stored bytes.
-Reuse validation never registers packages. Explicit bundle registration follows
-accepted workload ownership completion, under the same participating operation,
-including protected native completion, recovery and write-session disposal.
+Reuse validation never registers packages. After workload-operation acquisition,
+one existing protected native write transaction checks **all** declared package,
+template-identity and receipt ownership before invoking the validated workload
+admission callback. The callback completes accepted workload ownership before
+native registration. The same native session and participating operation remain
+held through registration, receipt/final-content validation, recovery and session
+disposal. A competing native writer cannot enter between admission and registration.
+Conflicts discovered after private preparation refuse before stack effects.
+Protected snapshot/recovery bookkeeping may run, but refusal preserves workload
+payloads, registry rows, native packages and receipts.
 Setup applies the requested resolved physical or logical origin before ensure.
 Bundled no-op updates verify payload, requested origin and actual native
 completeness without repair. Cached ownership reuse applies the same bundled
 family admission as prepared updates before changing any owner.
+Missing or malformed retained bundled manifests cannot authorize the destructive
+reinstall fallback, even without `--force` and even after a prior partial failure.
+Missing declared archives are typed workload errors preserving their original
+missing-file/directory cause, so setup check reports a failed dependency and its
+normal JSON terminal result instead of aborting with an unclassified path error.
 
 This phase supports **fresh installs and exact-origin repeats** only. Bundled
 force replacement, destructive upgrades, side-by-side versions and uninstall
