@@ -82,6 +82,11 @@ consumer in tests; it does not replace `new [path]` in this command tree. See th
 [staged consumer boundary](func-new-execution/proposal.md#staged-native-item-consumer)
 for its grammar, dependency handoff and public-cutover exclusions.
 
+The unregistered `InitExecutionCommand` similarly composes installed PROJECT
+templates, shared strict parsing and mandatory CLI configuration in a protected
+flow for absent/empty targets. It does not replace public `init [path]` or change
+adoption, repair or scaffolding. See its [staged consumer boundary](func-init-execution/proposal.md#staged-installed-project-consumer).
+
 ## Command Architecture
 
 All commands extend `FuncCliCommand` → `System.CommandLine.Command`.

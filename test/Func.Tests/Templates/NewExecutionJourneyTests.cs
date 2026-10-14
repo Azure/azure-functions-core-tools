@@ -56,6 +56,10 @@ public sealed class NewExecutionJourneyTests : IDisposable
         preview.Context.Project.Language.Should().Be("JavaScript");
         preview.Context.Bundle.Should().Be(new TemplateEngineBundleContext(BundleHelpers.StableBundleId, "4.35.0"));
         preview.Invocation!.Changes.Should().ContainSingle(change => change.Path.EndsWith("Generated.txt", StringComparison.Ordinal));
+        preview.Invocation.ProjectConfigurations.Should().BeEmpty();
+        preview.Invocation.ConfiguredProjects.Should().BeEmpty();
+        preview.SelectedTemplate.ProjectConfigurations.Should().BeNull();
+        preview.SelectedTemplate.ProjectConfigurationDiagnostic.Should().BeNull();
         Snapshot().Should().BeEquivalentTo(before);
         Directory.Exists(Target).Should().BeFalse();
         var parsed = preview.ArgumentResults.Should().ContainSingle().Subject;

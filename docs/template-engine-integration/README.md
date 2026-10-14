@@ -26,6 +26,22 @@ Preview reports template and configuration effects without writing. Creation fin
 
 The fixture action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` remains proposed, not a stable public authoring contract. These tests qualify controlled runtime fixtures and configuration compatibility, not production template packages or a public command switch. Ordinary restores, reusable native evaluation, wider topology, live-hive leases and hostile concurrent filesystem mutation remain outside this qualified subset.
 
+## Staged project consumer projections
+
+The unregistered [staged INIT consumer](../func-init-execution/proposal.md#staged-installed-project-consumer)
+composes this project runtime with template-first command binding and the shared
+strict argument parser. In a project-enabled flow, catalog entries expose
+`ProjectConfigurations` declarations from the same snapshot already validated by
+the planner; malformed declarations retain separate project and constraint
+diagnostics and cannot become a selected capability. Item entries and item-only
+flows do not acquire project declarations.
+
+Project invocation results additionally expose `ProjectConfigurations`, the
+already computed native/preflight plans, separately from `ConfiguredProjects`,
+the successfully finalized roots. Plans do not imply completion, including on
+configuration failure. Neither projection changes the provisional action schema,
+native creation order, failure file-change reporting or path/type validation.
+
 ## Existing-project configuration persistence
 
 The public `func init` adoption and language-repair paths remain independent of template discovery and invocation. Their configuration writes now use the existing atomic filesystem writer and must finish before init reports success. A write failure is a non-zero, actionable error rather than a warning followed by successful adoption or repair. Repair preserves unrelated configuration keys and refuses missing, malformed or non-object configuration instead of synthesizing replacement metadata. Cancellation is passed through configuration reads and writes and stops subsequent success output or initializer dispatch.

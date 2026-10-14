@@ -159,18 +159,26 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
 
                 IReadOnlyCollection<string> packageTypes = await metadata;
                 TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Content, cancellationToken, packageTypes);
-                if (entry.Type == TemplateType.Project && evaluation.Status == TemplateConstraintEvaluationStatus.Eligible)
+                if (entry.Type == TemplateType.Project && _session.ProjectTemplatesEnabled)
                 {
-                    if (_session.ProjectTemplatesEnabled)
+                    try
                     {
-                        _session.ValidateProjectConfiguration(configuration.Content);
+                        entry = entry with { ProjectConfigurations = _session.ValidateProjectConfiguration(configuration.Content) };
                     }
-                    else
+                    catch (InvalidTemplateMetadataException exception)
                     {
-                        evaluation = new(TemplateConstraintEvaluationStatus.NotEvaluated,
-                            [new("project-configuration", "configuration", TemplateConstraintEvaluationStatus.NotEvaluated,
-                                "Project invocation requires qualified mandatory configuration actions and is unavailable in this item-only flow.", "Use the existing project initializer until project-template creation is qualified.")]);
+                        entry = entry with
+                        {
+                            ProjectConfigurationDiagnostic = exception.Message,
+                            MetadataDiagnostic = entry.MetadataDiagnostic ?? exception.Message,
+                        };
                     }
+                }
+                else if (entry.Type == TemplateType.Project && evaluation.Status == TemplateConstraintEvaluationStatus.Eligible)
+                {
+                    evaluation = new(TemplateConstraintEvaluationStatus.NotEvaluated,
+                        [new("project-configuration", "configuration", TemplateConstraintEvaluationStatus.NotEvaluated,
+                            "Project invocation requires qualified mandatory configuration actions and is unavailable in this item-only flow.", "Use the existing project initializer until project-template creation is qualified.")]);
                 }
 
                 candidates.Add(new(template, entry with { ConstraintEvaluation = evaluation }, configuration));

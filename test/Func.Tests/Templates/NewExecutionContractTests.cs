@@ -25,10 +25,12 @@ public sealed class NewExecutionContractTests
     [Fact]
     public void Constructors_NullDependencies_RejectProgrammerErrors()
     {
-        Action context = () => _ = new NewExecutionRunner(null!, _factory, _arguments, _interaction);
-        Action factory = () => _ = new NewExecutionRunner(_contexts, null!, _arguments, _interaction);
-        Action arguments = () => _ = new NewExecutionRunner(_contexts, _factory, null!, _interaction);
-        Action interaction = () => _ = new NewExecutionRunner(_contexts, _factory, _arguments, null!);
+        TemplateExecutionInteraction prompts = new(_arguments, _interaction);
+        Action context = () => _ = new NewExecutionRunner(null!, _factory, _arguments, _interaction, prompts);
+        Action factory = () => _ = new NewExecutionRunner(_contexts, null!, _arguments, _interaction, prompts);
+        Action arguments = () => _ = new NewExecutionRunner(_contexts, _factory, null!, _interaction, prompts);
+        Action interaction = () => _ = new NewExecutionRunner(_contexts, _factory, _arguments, null!, prompts);
+        Action nullPrompts = () => _ = new NewExecutionRunner(_contexts, _factory, _arguments, _interaction, null!);
         Action renderer = () => _ = new NewExecutionRenderer(null!);
         Action command = () => _ = new NewExecutionCommand(null!, new(_interaction), new([]));
 
@@ -36,6 +38,7 @@ public sealed class NewExecutionContractTests
         factory.Should().Throw<ArgumentNullException>().WithParameterName("factory");
         arguments.Should().Throw<ArgumentNullException>().WithParameterName("arguments");
         interaction.Should().Throw<ArgumentNullException>().WithParameterName("interaction");
+        nullPrompts.Should().Throw<ArgumentNullException>().WithParameterName("prompts");
         renderer.Should().Throw<ArgumentNullException>().WithParameterName("interaction");
         command.Should().Throw<ArgumentNullException>().WithParameterName("runner");
     }
@@ -69,7 +72,7 @@ public sealed class NewExecutionContractTests
     [Fact]
     public async Task ExecuteAsync_NullRequestOrAvailability_StopsBeforeContextAndFactory()
     {
-        NewExecutionRunner runner = new(_contexts, _factory, _arguments, _interaction);
+        NewExecutionRunner runner = new(_contexts, _factory, _arguments, _interaction, new(_arguments, _interaction));
         NewExecutionRequest request = new(WorkingDirectory.FromCwd(), null, null, null, false, true, false, false, false, [], new HashSet<string>());
 
         Func<Task> nullRequest = () => runner.ExecuteAsync(null!, new([]), CancellationToken.None);
@@ -84,7 +87,7 @@ public sealed class NewExecutionContractTests
     [Fact]
     public async Task ExecuteAsync_PreCanceled_StopsBeforeContextOrFactory()
     {
-        NewExecutionRunner runner = new(_contexts, _factory, _arguments, _interaction);
+        NewExecutionRunner runner = new(_contexts, _factory, _arguments, _interaction, new(_arguments, _interaction));
         NewExecutionRequest request = new(WorkingDirectory.FromCwd(), null, null, null, false, true, false, false, false, [], new HashSet<string>());
         using CancellationTokenSource cancellation = new();
         cancellation.Cancel();

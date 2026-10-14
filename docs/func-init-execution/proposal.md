@@ -34,3 +34,69 @@ None.
 - Follows `func-init-quickstarts` for template-first selection, whole-template filters, and multi-project topology.
 - Requires project template packages for every supported installed stack and language.
 - Does not define a new authorization policy for ordinary post-actions; mandatory project configuration actions cannot be skipped or marked continue-on-error.
+
+## Staged installed-project consumer
+
+`InitExecutionCommand` is an unregistered, invocation-scoped harness for the
+installed-project subset. It does not replace public `InitCommand`, alter its
+adoption/healing or workload scaffolding, add a feature flag, or remove providers.
+Its proposed grammar is:
+
+```text
+init [path] --template <identity-or-short-name> [--stack <stack>] [--language <language>]
+     [--name <name>] [--non-interactive] [--dry-run] [--output plain|json] [template options]
+```
+
+Put an explicit target before template options. The optional positional value is
+always a target, never a template reference. Omitted templates are selected
+automatically only when one applicable family remains, or through a family picker
+before variant parsing. The shared strict parser, literal prompts and required
+completion are also used by staged NEW; argument compatibility precedes variant
+precedence, and host name remains outside canonical template parameters.
+
+The target must be absent or empty. Existing content, adoption, repair and
+`--force` cleanup are explicitly unqualified by this harness and rejected without
+deletion. Public init retains those behaviors. The directory becomes both command
+directory and prospective project root before opening one protected project flow;
+stack, language, bundle and existing-project profile defaults remain unavailable.
+
+Project catalog entries carry the existing planner's unconditional declarations
+from that flow's configuration snapshot. Whole-template filters use their
+installed canonical stack/language metadata before selection. Restricted entries
+and their diagnostics remain visible alongside the interactive picker, but are
+never offered as selectable choices. After required completion, native preview
+supplies the actual configuration plans for the authoritative whole-template
+assertion. Preview and creation invoke the exact selected capability in the same
+protected flow. Creation alone finalizes through the existing runtime and atomic
+configuration writer; there is no secondary creation or initializer fallback.
+
+Plain and JSON output distinguish **planned** configurations/effects from
+`ConfiguredProjects`, the actually finalized subset. Configuration failure is
+nonzero, preserves generated content and completed roots, and stops subsequent
+finalization. Cancellation releases the flow and never reports success.
+
+The installed-fixture tests compose actual Node workload metadata, native project
+creation, canonical configuration, project resolution, and `ProfileResolver`.
+They exercise a literal two-root layout as well as homogeneous variants and
+mixed-language unconditional roots. This is not qualification of conditional
+topology, renaming, remapped sources, supplemental configuration or ordinary
+post-actions: the existing planner rejects those. The fixture configuration
+action GUID and its input schema remain provisional, not a public authoring ABI.
+
+The temporary metadata source is the same `IProjectInitializer` projection already
+required by the project planner; no initializer behavior is invoked. The approved
+metadata-only `IProjectStack` migration is a separate owning change and must replace
+this adapter when composed. Package acquisition, production default templates for
+all six stacks, fresh/upgraded installability, and a Functions-owned browse URL
+remain switch gates. Missing-template diagnostics give explicit
+`func new install <package>` guidance without inventing a package ID or URL.
+
+The published lower runtime still has pending mounted-type/output-topology work.
+This stage neither repairs nor clears that dependency, and its controlled
+fixtures do not establish general type, path or platform safety. The additive
+declaration/result projection hunks in `Templater.GetCandidatesAsync`,
+`TemplateEngineSession.ValidateProjectConfiguration` / project result initializers,
+`TemplateCatalogEntry` and `TemplateInvocationResult` are explicit future
+composition conflict surfaces; snapshot shape, mounted-type authorization,
+read-snapshot validation, effect/path guards and native invocation order are
+unchanged. No completed public INIT switch or milestone is claimed.
