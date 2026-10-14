@@ -100,6 +100,8 @@ Expected user failures are represented by specific domain exceptions from the te
 
 The runner depends on the existing `IPackageSourceProvider`. For a NuGet operation it calls `GetSource(explicitSource)` and places the resulting absolute feed URL in `InstallRequest.Details` using `InstallerConstants.NuGetSourcesKey`.
 
+The [companion acquisition proposal](../template-companion-acquisition/design.md) coordinates these same lifecycle operations with explicit stack installation. It does not create another package provider or registry, infer trust from a package prefix, or authorize cross-source replacement on behalf of an unrelated install request.
+
 This preserves:
 
 ```text
