@@ -2,11 +2,16 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Profiles;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using NSubstitute;
+using Microsoft.Extensions.Options;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -33,6 +38,32 @@ public sealed class NewExecutionContractTests
         interaction.Should().Throw<ArgumentNullException>().WithParameterName("interaction");
         renderer.Should().Throw<ArgumentNullException>().WithParameterName("interaction");
         command.Should().Throw<ArgumentNullException>().WithParameterName("runner");
+    }
+
+    [Fact]
+    public void ContextResolver_NullDependencies_RejectsEachConstructorArgument()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        var projects = Substitute.For<IFunctionsProjectResolver>();
+        var profiles = Substitute.For<IProfileResolver>();
+        var stackOptions = Substitute.For<IOptionsMonitor<StackOptions>>();
+        var hostReader = Substitute.For<IHostJsonBundleSectionReader>();
+        var bundles = Substitute.For<IExtensionBundleResolver>();
+        Action nullFileSystem = () => _ = new NewExecutionContextResolver(null!, projects, profiles, stackOptions, [], hostReader, bundles);
+        Action nullProjects = () => _ = new NewExecutionContextResolver(fileSystem, null!, profiles, stackOptions, [], hostReader, bundles);
+        Action nullProfiles = () => _ = new NewExecutionContextResolver(fileSystem, projects, null!, stackOptions, [], hostReader, bundles);
+        Action nullStackOptions = () => _ = new NewExecutionContextResolver(fileSystem, projects, profiles, null!, [], hostReader, bundles);
+        Action nullInitializers = () => _ = new NewExecutionContextResolver(fileSystem, projects, profiles, stackOptions, null!, hostReader, bundles);
+        Action nullHostReader = () => _ = new NewExecutionContextResolver(fileSystem, projects, profiles, stackOptions, [], null!, bundles);
+        Action nullBundles = () => _ = new NewExecutionContextResolver(fileSystem, projects, profiles, stackOptions, [], hostReader, null!);
+
+        nullFileSystem.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
+        nullProjects.Should().Throw<ArgumentNullException>().WithParameterName("projects");
+        nullProfiles.Should().Throw<ArgumentNullException>().WithParameterName("profiles");
+        nullStackOptions.Should().Throw<ArgumentNullException>().WithParameterName("stackOptions");
+        nullInitializers.Should().Throw<ArgumentNullException>().WithParameterName("initializers");
+        nullHostReader.Should().Throw<ArgumentNullException>().WithParameterName("hostReader");
+        nullBundles.Should().Throw<ArgumentNullException>().WithParameterName("bundles");
     }
 
     [Fact]

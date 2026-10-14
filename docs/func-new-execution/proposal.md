@@ -89,6 +89,12 @@ interactive versus redirected input, required completion, invalid input,
 conflicts/force, cancellation/disposal, preview/create and an empty no-op item.
 These are controlled consumer tests, **not** production template qualification.
 
+Prompt titles and selection labels use the existing literal markup escaping;
+selected labels map back to unchanged native values before canonical validation.
+Required boolean prompting accepts the shared parser's case-insensitive scalar
+spellings. Multiple-profile guidance uses the existing `defaultProfile` setting
+or `func profile set`, not an unsupported `--profile` option.
+
 Public cutover still requires production native `FuncTemplate` inventory and
 package lifecycle/trust wiring; .NET/Node/Python restore/build/start/invocation
 baselines and replacement coverage; template-specific help integration; and a

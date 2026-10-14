@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates.Engine;
+using Spectre.Console;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -205,15 +206,16 @@ internal sealed class NewExecutionRunner(
             string value;
             if (definition.Choices.Count > 0)
             {
-                value = await _interaction.PromptForSelectionAsync(label, definition.Choices.Select(choice => choice.Value), cancellationToken);
+                value = await PromptForLiteralSelectionAsync(label, definition.Choices.Select(choice => choice.Value), cancellationToken);
             }
-            else if (definition.DataType is "bool" or "boolean")
+            else if (definition.DataType.Equals("bool", StringComparison.OrdinalIgnoreCase)
+                || definition.DataType.Equals("boolean", StringComparison.OrdinalIgnoreCase))
             {
-                value = await _interaction.PromptForSelectionAsync(label, ["true", "false"], cancellationToken);
+                value = await PromptForLiteralSelectionAsync(label, ["true", "false"], cancellationToken);
             }
             else
             {
-                value = await _interaction.PromptForInputAsync(label, cancellationToken: cancellationToken);
+                value = await _interaction.PromptForInputAsync(Markup.Escape(label), cancellationToken: cancellationToken);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -264,11 +266,20 @@ internal sealed class NewExecutionRunner(
     {
         cancellationToken.ThrowIfCancellationRequested();
         var byLabel = choices.ToDictionary(label, StringComparer.Ordinal);
-        string selected = await _interaction.PromptForSelectionAsync(title, byLabel.Keys, cancellationToken);
+        string selected = await PromptForLiteralSelectionAsync(title, byLabel.Keys, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return byLabel.TryGetValue(selected, out T? value)
             ? value
             : throw new InvalidOperationException("The interaction service returned a choice that was not offered.");
+    }
+
+    private async Task<string> PromptForLiteralSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var rawByLabel = choices.ToDictionary(Markup.Escape, StringComparer.Ordinal);
+        string selected = await _interaction.PromptForSelectionAsync(Markup.Escape(title), rawByLabel.Keys, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return rawByLabel.TryGetValue(selected, out string? raw) ? raw : selected;
     }
 
     private static string GroupIdentity(TemplateCatalogEntry entry) => entry.GroupIdentity ?? entry.Identity;

@@ -8,11 +8,13 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -504,22 +506,244 @@ public sealed class NewExecutionJourneyTests : IDisposable
         harness.Result!.SelectedTemplate!.Identity.Should().Be(Low);
     }
 
-    [Fact]
-    public async Task Command_NonInteractiveProfileSelection_FailsBeforeFactoryInsteadOfPrompting()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_NonInteractiveProfileSelection_FailsBeforeFactoryInsteadOfPrompting(bool explicitSwitch)
     {
         await InstallAsync();
         File.WriteAllText(Path.Combine(Project, ".func", "config.json"), """
             {"stack":{"runtime":"node","language":"js"},"profiles":["first","second"]}
             """);
-        var interaction = Interactive();
+        IInteractionService interaction = explicitSwitch ? Interactive() : _interaction;
         var harness = CreateHarness(interaction);
+        var before = Snapshot();
+        string[] flags = explicitSwitch ? ["--non-interactive"] : [];
 
-        int exit = await harness.InvokeAsync(["--path", Target, "--list", "--non-interactive"]);
+        int exit = await harness.InvokeAsync(["--path", Target, "--list", .. flags, "--output", "json"]);
 
         exit.Should().Be(1);
         harness.Result!.Kind.Should().Be("invalidProfile");
+        harness.Result.Diagnostics.Single().Should().NotContain("--profile").And.Contain("defaultProfile").And.Contain("func profile set");
         harness.Factory.Contexts.Should().BeEmpty();
-        interaction.ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name.StartsWith("Prompt", StringComparison.Ordinal));
+        Snapshot().Should().BeEquivalentTo(before);
+        if (explicitSwitch)
+        {
+            interaction.ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name.StartsWith("Prompt", StringComparison.Ordinal));
+        }
+        else
+        {
+            AssertJsonKind("invalidProfile");
+            _interaction.AllOutput.Should().NotContain("--profile");
+        }
+    }
+
+    [Theory]
+    [InlineData("bool")]
+    [InlineData("Bool")]
+    [InlineData("boolean")]
+    [InlineData("Boolean")]
+    [InlineData("BOOLEAN")]
+    public async Task Command_RequiredBooleanCasing_UsesActualTrueFalseSelector(string dataType)
+    {
+        WritePromptTemplate(dataType);
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        stderr.Enqueue(ConsoleKey.DownArrow);
+        stderr.Enqueue(ConsoleKey.Enter);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+        var before = Snapshot();
+
+        int exit = await harness.InvokeAsync(["Func.Consumer.Prompt", "--path", Target, "--dry-run"]);
+
+        exit.Should().Be(0);
+        harness.Result!.ArgumentResults.Single().ValuesByCanonicalName.Should().Contain("Value", "false");
+        stderr.Reads.Should().Be(2);
+        stderr.Output.Should().Contain($"--Value ({dataType})").And.Contain("true").And.Contain("false");
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("string", "value[bad]", null)]
+    [InlineData("string", "value[red]styled[/]", null)]
+    [InlineData("choice", "value[bad]", "choice[unknown]")]
+    [InlineData("choice", "value[red]styled[/]", "choice[red]styled[/]")]
+    public async Task Command_RequiredPromptMetadata_RendersLiteralAndPreservesCanonicalValue(string dataType, string alias, string? choice)
+    {
+        WritePromptTemplate(dataType, alias, choice is null ? null : [choice]);
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        if (choice is null)
+        {
+            stderr.Enqueue(ConsoleKey.X, 'x');
+        }
+
+        stderr.Enqueue(ConsoleKey.Enter);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+        var before = Snapshot();
+
+        int exit = await harness.InvokeAsync(["Func.Consumer.Prompt", "--path", Target, "--dry-run"]);
+
+        exit.Should().Be(0);
+        stderr.Output.Should().Contain($"--{alias} ({dataType})");
+        if (choice is not null)
+        {
+            stderr.Output.Should().Contain(choice);
+        }
+
+        harness.Result!.ArgumentResults.Single().ValuesByCanonicalName.Should().Contain("Value", choice ?? "x");
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Command_ProfileDefaultRemediation_UsesExistingConfigControlWithoutChangingUnknownArguments()
+    {
+        await InstallAsync();
+        File.WriteAllText(Path.Combine(Project, ".func", "config.json"), """
+            {"stack":{"runtime":"node","language":"js"},"profiles":["flex","linux-premium"]}
+            """);
+        var harness = CreateHarness();
+
+        int missingExit = await harness.InvokeAsync(["--path", Target, "--list"]);
+
+        missingExit.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("defaultProfile").And.Contain("func profile set").And.NotContain("--profile");
+        await new ProjectProfileConfigStore(new PhysicalFileSystem()).SetDefaultProfileAsync(new(Project), "flex", CancellationToken.None);
+        var repaired = CreateHarness();
+
+        int repairedExit = await repaired.InvokeAsync(["--path", Target, "--list"]);
+        int unknownExit = await repaired.InvokeAsync([Low, "--path", Target, "--greeting", "hello", "--profile", "flex", "--output", "json"]);
+
+        repairedExit.Should().Be(0);
+        unknownExit.Should().Be(1);
+        repaired.Result!.Kind.Should().Be("invalidArguments");
+        repaired.Result.ArgumentResults.Single().InvalidInputDiagnostics.Should().Contain(diagnostic =>
+            diagnostic.Message.Contains("--profile", StringComparison.Ordinal));
+        AssertJsonKind("invalidArguments");
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Command_UnknownConfiguredProfile_PreservesSpecificFailureInsteadOfReplacingItWithSelectionGuidance()
+    {
+        await InstallAsync();
+        File.WriteAllText(Path.Combine(Project, ".func", "config.json"), """
+            {"stack":{"runtime":"node","language":"js"},"defaultProfile":"not-installed"}
+            """);
+        var harness = CreateHarness();
+        var before = Snapshot();
+
+        int exit = await harness.InvokeAsync(["--path", Target, "--list", "--output", "json"]);
+
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("invalidProfile");
+        harness.Result.Diagnostics.Single().Should().Contain("not-installed").And.NotContain("func profile set");
+        harness.Factory.Contexts.Should().BeEmpty();
+        Snapshot().Should().BeEquivalentTo(before);
+        AssertJsonKind("invalidProfile");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_FamilyAndCandidateLabels_AreLiteralAndSelectTheExactRawIdentity(bool sameFamily)
+    {
+        string? group = sameFamily ? "Group[bad]" : null;
+        WritePromptTemplate("string", identity: "Func.Consumer.[bad]", group: group);
+        WritePromptTemplate("string", identity: "Func.Consumer.[red]styled[/]", group: group, folder: "prompt-other");
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        stderr.Enqueue(ConsoleKey.DownArrow);
+        stderr.Enqueue(ConsoleKey.Enter);
+        stderr.Enqueue(ConsoleKey.X, 'x');
+        stderr.Enqueue(ConsoleKey.Enter);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+        var before = Snapshot();
+
+        int exit = await harness.InvokeAsync(["prompt", "--path", Target, "--dry-run"]);
+
+        exit.Should().Be(0);
+        stderr.Output.Should().Contain("Func.Consumer.[bad]").And.Contain("Func.Consumer.[red]styled[/]");
+        harness.Result!.SelectedTemplate!.Identity.Should().Be("Func.Consumer.[red]styled[/]");
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("string")]
+    [InlineData("choice")]
+    [InlineData("Bool")]
+    public async Task Command_ActualLiteralPromptCancellation_ReleasesFlowAndDoesNotInvoke(string dataType)
+    {
+        WritePromptTemplate(dataType, "value[bad]", dataType == "choice" ? ["choice[bad]"] : null);
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        stderr.Enqueue(ConsoleKey.C, '\u0003', control: true);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+        var before = Snapshot();
+
+        Func<Task> act = () => harness.InvokeAsync(["Func.Consumer.Prompt", "--path", Target]);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        stderr.Reads.Should().Be(1);
+        harness.Result.Should().BeNull();
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+        Func<Task> useDisposed = () => harness.Factory.Templaters.Single().ListAsync(TemplateType.Item);
+        await useDisposed.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public async Task Command_UnexpectedChoiceAnswer_FailsFinalCanonicalValidationWithoutUnescapingInvalidInput()
+    {
+        WritePromptTemplate("choice", choices: ["choice[bad]"]);
+        await InstallAsync();
+        var interaction = Interactive();
+        interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns("not-offered[[bad]]");
+        interaction.When(service => service.WriteJson(Arg.Any<object>())).Do(call => _interaction.WriteJson(call.Arg<object>()));
+        var harness = CreateHarness(interaction);
+        var before = Snapshot();
+
+        int exit = await harness.InvokeAsync(["Func.Consumer.Prompt", "--path", Target, "--output", "json"]);
+
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("invalidCompletion");
+        harness.Result.ArgumentResults.Single().InvalidInputDiagnostics.Should().Contain(diagnostic =>
+            diagnostic.Message.Contains("not-offered[[bad]]", StringComparison.Ordinal) && diagnostic.TokenIndices.Count == 0);
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+        AssertJsonKind("invalidCompletion");
+        _interaction.AllOutput.Should().Contain("not-offered[[bad]]");
+    }
+
+    [Theory]
+    [InlineData("choice", "not-offered")]
+    [InlineData("Boolean", "not-a-bool")]
+    public async Task Command_InvalidExplicitPromptValue_FailsWithoutReadingInteractiveInput(string dataType, string value)
+    {
+        WritePromptTemplate(dataType, "value[bad]", dataType == "choice" ? ["choice[bad]"] : null);
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+        var before = Snapshot();
+
+        int exit = await harness.InvokeAsync(["Func.Consumer.Prompt", "--path", Target, "--value[bad]", value]);
+
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("invalidArguments");
+        harness.Result.ArgumentResults.Single().InvalidInputDiagnostics.Should().Contain(diagnostic =>
+            diagnostic.Message.Contains(value, StringComparison.Ordinal) && diagnostic.TokenIndices.Count > 0);
+        stderr.Reads.Should().Be(0);
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
     }
 
     [Fact]
@@ -691,6 +915,29 @@ public sealed class NewExecutionJourneyTests : IDisposable
         version = "2.0",
         extensionBundle = new { id = BundleHelpers.StableBundleId, version = range },
     }));
+
+    private void WritePromptTemplate(string dataType, string alias = "Value", string[]? choices = null,
+        string identity = "Func.Consumer.Prompt", string? group = null, string folder = "prompt")
+    {
+        Dictionary<string, object> symbol = new() { ["type"] = "parameter", ["datatype"] = dataType, ["isRequired"] = true };
+        if (choices is not null)
+        {
+            symbol["choices"] = choices.Select(choice => new { choice });
+        }
+
+        WriteTemplate(folder, JsonSerializer.Serialize(new
+        {
+            identity,
+            groupIdentity = group,
+            name = "Prompt",
+            shortName = "prompt",
+            tags = new { type = "item", language = "JavaScript" },
+            symbols = new Dictionary<string, object> { ["Value"] = symbol },
+        }), "prompt.txt", "prompt", JsonSerializer.Serialize(new
+        {
+            symbolInfo = new { Value = new { longName = alias } },
+        }));
+    }
 
     private void WriteTemplate(string folder, string configuration, string? file = null, string? content = null, string? host = null)
     {

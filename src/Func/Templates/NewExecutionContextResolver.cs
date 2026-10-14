@@ -129,7 +129,10 @@ internal sealed class NewExecutionContextResolver(
         }
         catch (ProfileConfigurationException exception)
         {
-            return Fail("invalidProfile", exception.Message);
+            return Fail("invalidProfile", exception.Message.Replace(
+                "Specify --profile or set defaultProfile in .func/config.json.",
+                "Set defaultProfile in .func/config.json, or run 'func profile set <name> <project-directory>' to choose a project default.",
+                StringComparison.Ordinal));
         }
 
         HostJsonBundleSection? section;
