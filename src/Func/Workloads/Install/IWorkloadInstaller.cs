@@ -125,4 +125,10 @@ internal interface IWorkloadInstaller
 
     public Task<bool> UninstallAsync(string packageId, string version,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes the specified ownership under an operation that already protects the caller's authoritative selection.
+    /// </summary>
+    public Task<bool> UninstallAsync(IWorkloadOperation operation, string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken);
 }

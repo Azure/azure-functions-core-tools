@@ -361,7 +361,15 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        return await UninstallAsync(operation, packageId, version, ownership, cancellationToken);
+    }
+
+    public async Task<bool> UninstallAsync(IWorkloadOperation operation, string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
+    {
         ValidateOperation(operation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
 
         string physicalPackageId = packageId;
         string physicalVersion = version;

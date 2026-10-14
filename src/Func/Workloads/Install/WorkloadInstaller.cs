@@ -227,6 +227,15 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         return await _deploymentService.UninstallAsync(packageId, version, ownership, cancellationToken);
     }
 
+    public async Task<bool> UninstallAsync(IWorkloadOperation operation, string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        return await _deploymentService.UninstallAsync(operation, packageId, version, ownership, cancellationToken);
+    }
+
     private async Task<WorkloadUpdateResult> UpdateExplicitAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
         bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
     {

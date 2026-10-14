@@ -900,6 +900,10 @@ installer commits, direct deployment install/update/uninstall and implementation
 reuse/ownership moves, and all registry save/remove/replace/add/remove/move
 writers. Existing owning entry points remain available; internal prepared/leased
 methods require the capability and validate its physical-store identity.
+Prune acquires that operation before resolving its current ownership groups and
+highest versions, retaining it through every leased removal. Its existing
+selection algorithm is unchanged, and ordinary uninstall remains a separate
+user-authorized operation that may remove a live version.
 The published workload abstractions are unchanged. Internal interface
 implementations and test doubles must implement the added methods; this is not a
 binary-compatibility promise for the CLI's internal implementation types.

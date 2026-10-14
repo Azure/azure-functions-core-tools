@@ -48,4 +48,6 @@ internal interface IWorkloadDeploymentService
         CancellationToken cancellationToken = default);
 
     public Task<bool> UninstallAsync(string packageId, string version, WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default);
+    public Task<bool> UninstallAsync(IWorkloadOperation operation, string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken);
 }

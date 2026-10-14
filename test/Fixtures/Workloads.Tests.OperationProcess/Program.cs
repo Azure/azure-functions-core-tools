@@ -23,7 +23,7 @@ internal sealed class Program
         SignalingCoordinator coordinator = new(new FileWorkloadOperationCoordinator(paths));
         PhysicalFileSystem fileSystem = new();
         WorkloadMetadataReader metadata = new();
-        WorkloadStore store = mode is "save" or "move" or "directory-crash"
+        WorkloadStore store = mode is "save" or "move" or "directory-crash" or "uninstall-held"
             ? new PausingStore(paths, coordinator) : new WorkloadStore(paths, coordinator);
         WorkloadDeploymentService deployment = new(paths, store, metadata, coordinator, fileSystem);
         using CancellationTokenSource cancellation = new();
@@ -56,10 +56,13 @@ internal sealed class Program
                 return;
             }
 
-            if (mode == "uninstall")
+            if (mode is "uninstall" or "uninstall-held")
             {
                 TestConsole.WriteLine("STARTING");
-                bool removed = await deployment.UninstallAsync(args[2], "1.0.0", WorkloadOwnershipKind.Explicit, token);
+                string version = args.Length > 3 ? args[3] : "1.0.0";
+                WorkloadOwnershipKind ownership = args.Length > 4 && args[4] == "logical"
+                    ? WorkloadOwnershipKind.Logical : WorkloadOwnershipKind.Explicit;
+                bool removed = await deployment.UninstallAsync(args[2], version, ownership, token);
                 TestConsole.WriteLine(removed ? "REMOVED" : "ABSENT");
                 return;
             }
