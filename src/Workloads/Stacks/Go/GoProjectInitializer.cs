@@ -14,29 +14,26 @@ namespace Azure.Functions.Cli.Workloads.Go;
 /// Scaffolds a Go Functions project (<c>go.mod</c>, <c>main.go</c>, <c>.funcignore</c>, <c>.gitignore</c>,
 /// <c>local.settings.json</c>) targeting the Go worker SDK, then optionally runs <c>go mod tidy</c>.
 /// </summary>
-internal sealed class GoProjectInitializer : IProjectInitializer
+internal sealed class GoProjectInitializer(GoProjectStack stack) : IProjectInitializer
 {
     private const string ModuleNamePlaceholder = "{ModuleName}";
     private const string DefaultModuleName = "app";
     private static readonly Assembly _assembly = typeof(GoProjectInitializer).Assembly;
+    private readonly GoProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
 
     // Internal seam so tests can stub out the `go mod tidy` invocation
     // without spawning real processes.
     internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunGoModTidy { get; set; } = DefaultRunGoModTidy;
 
-    public string Stack => "go";
+    public string Stack => _stack.Stack;
 
-    public string DisplayName => "Go";
+    public string DisplayName => _stack.DisplayName;
 
-    public IReadOnlyList<string> WorkerRuntimeAliases { get; } = ["native"];
+    public IReadOnlyList<string> WorkerRuntimeAliases => _stack.WorkerRuntimeAliases;
 
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } =
-        new Dictionary<string, IReadOnlyList<string>>()
-        {
-            { "Go", ["golang"] }
-        };
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
 
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
+    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<bool> SkipGoModTidyOption { get; private set; } = default!;
 

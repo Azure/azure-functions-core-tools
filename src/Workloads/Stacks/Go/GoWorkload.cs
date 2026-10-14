@@ -22,6 +22,8 @@ public sealed class GoWorkload : Workload
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.AddSingleton<GoProjectStack>();
+        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<GoProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, GoProjectInitializer>();
         builder.AddProjectFactory(new GoProjectFactory());
     }
