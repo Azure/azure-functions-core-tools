@@ -1,0 +1,78 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Engine;
+using NSubstitute;
+
+namespace Azure.Functions.Cli.Tests.Templates;
+
+public sealed class NewExecutionContractTests
+{
+    private readonly INewExecutionContextResolver _contexts = Substitute.For<INewExecutionContextResolver>();
+    private readonly ITemplaterFactory _factory = Substitute.For<ITemplaterFactory>();
+    private readonly ITemplateArgumentParser _arguments = new TemplateArgumentParser();
+    private readonly IInteractionService _interaction = Substitute.For<IInteractionService>();
+
+    [Fact]
+    public void Constructors_NullDependencies_RejectProgrammerErrors()
+    {
+        Action context = () => _ = new NewExecutionRunner(null!, _factory, _arguments, _interaction);
+        Action factory = () => _ = new NewExecutionRunner(_contexts, null!, _arguments, _interaction);
+        Action arguments = () => _ = new NewExecutionRunner(_contexts, _factory, null!, _interaction);
+        Action interaction = () => _ = new NewExecutionRunner(_contexts, _factory, _arguments, null!);
+        Action renderer = () => _ = new NewExecutionRenderer(null!);
+        Action command = () => _ = new NewExecutionCommand(null!, new(_interaction), new([]));
+
+        context.Should().Throw<ArgumentNullException>().WithParameterName("contexts");
+        factory.Should().Throw<ArgumentNullException>().WithParameterName("factory");
+        arguments.Should().Throw<ArgumentNullException>().WithParameterName("arguments");
+        interaction.Should().Throw<ArgumentNullException>().WithParameterName("interaction");
+        renderer.Should().Throw<ArgumentNullException>().WithParameterName("interaction");
+        command.Should().Throw<ArgumentNullException>().WithParameterName("runner");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NullRequestOrAvailability_StopsBeforeContextAndFactory()
+    {
+        NewExecutionRunner runner = new(_contexts, _factory, _arguments, _interaction);
+        NewExecutionRequest request = new(WorkingDirectory.FromCwd(), null, null, null, false, true, false, false, false, [], new HashSet<string>());
+
+        Func<Task> nullRequest = () => runner.ExecuteAsync(null!, new([]), CancellationToken.None);
+        Func<Task> nullAvailability = () => runner.ExecuteAsync(request, null!, CancellationToken.None);
+
+        await nullRequest.Should().ThrowAsync<ArgumentNullException>().WithParameterName("request");
+        await nullAvailability.Should().ThrowAsync<ArgumentNullException>().WithParameterName("availability");
+        _contexts.ReceivedCalls().Should().BeEmpty();
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PreCanceled_StopsBeforeContextOrFactory()
+    {
+        NewExecutionRunner runner = new(_contexts, _factory, _arguments, _interaction);
+        NewExecutionRequest request = new(WorkingDirectory.FromCwd(), null, null, null, false, true, false, false, false, [], new HashSet<string>());
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+
+        Func<Task> act = () => runner.ExecuteAsync(request, new([]), cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _contexts.ReceivedCalls().Should().BeEmpty();
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Render_NullResult_RejectsBeforeOutput()
+    {
+        NewExecutionRenderer renderer = new(_interaction);
+
+        Action act = () => renderer.Render(null!, jsonOutput: true);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("result");
+        _interaction.ReceivedCalls().Should().BeEmpty();
+    }
+}

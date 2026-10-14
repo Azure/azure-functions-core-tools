@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" />
     <ProjectReference Include="../Fixtures/Templates.Tests.StoreProcess/Templates.Tests.StoreProcess.csproj"
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
