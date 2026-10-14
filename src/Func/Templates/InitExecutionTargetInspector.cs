@@ -68,7 +68,7 @@ internal class InitExecutionTargetInspector(IFileSystem fileSystem)
             }
         }
 
-        return _fileSystem.DirectoryExists(target.Info.FullName) && Directory.EnumerateFileSystemEntries(target.Info.FullName).Any()
+        return _fileSystem.DirectoryExists(target.Info.FullName) && _fileSystem.GetFileSystemEntries(target.Info.FullName).Count > 0
             ? "The target is not empty and is not an adoptable root Functions project. Supply a root with host.json or use a new empty target; nothing was deleted."
             : null;
     }

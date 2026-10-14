@@ -15,6 +15,7 @@ using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Console;
+using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -749,6 +750,227 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         _factory.ReceivedCalls().Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_ExplicitLanguageWithConflictingRecognizedStack_RefusesBeforeAdoptionOrRepair(bool repair)
+    {
+        WriteProject();
+        File.WriteAllText(Path.Combine(Target, "local.settings.json"), """{"Values":{"FUNCTIONS_WORKER_RUNTIME":"other"}}""");
+        if (repair)
+        {
+            WriteConfig("""{"stack":{"runtime":"other"},"custom":"keep"}""");
+        }
+
+        var before = Snapshot();
+        var other = Metadata("other", ["JavaScript", "TypeScript"]);
+        var harness = CreateHarness(new TestInteractionService(), additionalInitializers: [other]);
+        var recognized = await harness.Provider.GetRequiredService<IFunctionsProjectResolver>()
+            .ResolveProjectAsync(new(WorkingDirectory.FromExplicit(Target)), CancellationToken.None);
+        recognized.Should().BeOfType<ProjectResolutionResult.Resolved>().Which.Project.StackName.Should().Be("node");
+
+        int exit = await harness.InvokeAsync([Target, "--stack", "other", "--language", "JavaScript", "--non-interactive"]);
+
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("projectStackConflict");
+        Snapshot().Should().BeEquivalentTo(before);
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Command_AlternateFilesystemOnlyProject_AdoptsWithoutConsultingHostDirectoryContents()
+    {
+        Directory.Exists(Target).Should().BeFalse();
+        var fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.DirectoryExists(Target).Returns(true);
+        fileSystem.FileExists(Path.Combine(Target, "host.json")).Returns(true);
+        fileSystem.GetFileSystemEntries(Target).Returns([Path.Combine(Target, "host.json")]);
+        string? written = null;
+        fileSystem.WriteAllTextAsync(Config, Arg.Do<string>(json => written = json), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        var harness = CreateHarness(new TestInteractionService(), fileSystem);
+
+        int exit = await harness.InvokeAsync([Target, "--stack", "node", "--language", "js"]);
+
+        exit.Should().Be(0);
+        harness.Result!.Kind.Should().Be("adopted");
+        JsonNode.Parse(written!)!["stack"]!["language"]!.GetValue<string>().Should().Be("JavaScript");
+        Directory.Exists(Target).Should().BeFalse();
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Inspector_AlternateEmptyDirectory_IgnoresUnrelatedPhysicalContents()
+    {
+        WriteProject();
+        var fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.DirectoryExists(Target).Returns(true);
+        fileSystem.GetFileSystemEntries(Target).Returns([]);
+        var inspector = new InitExecutionTargetInspector(fileSystem);
+
+        var observed = await inspector.InspectAsync(WorkingDirectory.FromExplicit(Target), CancellationToken.None);
+
+        observed.State.Should().Be(InitExecutionTargetState.Empty);
+        File.Exists(Path.Combine(Target, "host.json")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Command_MatchingRealStack_ExplicitLanguageOverridesDetectedLanguageWithoutPrompt()
+    {
+        WriteProject();
+        var interaction = new TestInteractionService();
+        var harness = CreateHarness(interaction);
+        var detected = await harness.Provider.GetRequiredService<IFunctionsProjectResolver>()
+            .ResolveProjectAsync(new(WorkingDirectory.FromExplicit(Target)), CancellationToken.None);
+        detected.Should().BeOfType<ProjectResolutionResult.Resolved>().Which.Project.Language.Should().Be("JavaScript");
+
+        int exit = await harness.InvokeAsync([Target, "--stack", "node", "--language", "ts"]);
+
+        exit.Should().Be(0);
+        AssertCanonicalConfiguration(harness, "TypeScript");
+        interaction.AllOutput.Should().NotContain("SELECT:").And.NotContain("INPUT:");
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_RegisteredFactoryHasNoLanguage_ExplicitLanguageDoesNotAddAPrompt(bool recognizesProject)
+    {
+        WriteProject(fingerprint: false);
+        var factory = Substitute.For<IFunctionsProjectFactory>();
+        var project = Substitute.For<FunctionsProject>();
+        project.StackName.Returns("node");
+        project.Language.Returns((string?)null);
+        factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>()).Returns(recognizesProject
+            ? ProjectCreationResults.Created(project, "controlled registered factory has no language")
+            : ProjectCreationResults.NotCreated("controlled factory does not recognize this root"));
+        var interaction = new TestInteractionService();
+        var harness = CreateHarness(interaction, projectFactory: factory);
+
+        int exit = await harness.InvokeAsync([Target, "--language", "js"]);
+
+        exit.Should().Be(0);
+        AssertCanonicalConfiguration(harness, "JavaScript");
+        await factory.Received(1).TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>());
+        interaction.AllOutput.Should().NotContain("SELECT:").And.NotContain("INPUT:");
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Command_RegisteredFactoryFailure_ExplicitLanguageDoesNotHideRecognitionFailure()
+    {
+        WriteProject();
+        var factory = Substitute.For<IFunctionsProjectFactory>();
+        var failure = new ProjectCreationFailure.WorkerNotResolved(
+            new FunctionsWorkerResolutionFailure.NotInstalled(new("node"), "controlled worker is missing"), "controlled recognition failure");
+        factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectCreationResults.Failed(failure));
+        var before = Snapshot();
+        var harness = CreateHarness(new TestInteractionService(), projectFactory: factory);
+
+        int exit = await harness.InvokeAsync([Target, "--language", "js"]);
+
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("invalidProjectMetadata");
+        harness.Result.Diagnostics.Single().Should().Be("controlled recognition failure");
+        Snapshot().Should().BeEquivalentTo(before);
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_RegisteredFactoryReadError_ExplicitLanguageDoesNotHideIt(bool denied)
+    {
+        WriteProject();
+        var factory = Substitute.For<IFunctionsProjectFactory>();
+        Exception failure = denied ? new UnauthorizedAccessException("controlled metadata read failure") : new IOException("controlled metadata read failure");
+        factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ProjectCreationResult>(failure));
+        var before = Snapshot();
+        var harness = CreateHarness(new TestInteractionService(), projectFactory: factory);
+
+        int exit = await harness.InvokeAsync([Target, "--language", "js"]);
+
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("invalidProjectMetadata");
+        harness.Result.Diagnostics.Single().Should().Contain("controlled metadata read failure");
+        Snapshot().Should().BeEquivalentTo(before);
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Command_RegisteredFactoryCancels_ExplicitLanguageDoesNotStartConfigurationWrite()
+    {
+        WriteProject();
+        var factory = Substitute.For<IFunctionsProjectFactory>();
+        using CancellationTokenSource cancellation = new();
+        factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return Task.FromResult(ProjectCreationResults.NotCreated("controlled cancellation"));
+        });
+        var fileSystem = FileSystem();
+        var harness = CreateHarness(new TestInteractionService(), fileSystem, projectFactory: factory);
+
+        Func<Task> act = () => harness.InvokeAsync([Target, "--language", "js"], cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+        File.Exists(Config).Should().BeFalse();
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(".hidden")]
+    [InlineData("empty-subdirectory")]
+    public async Task Inspector_PhysicalAndAlternateEntries_AreBothNonEmptyWithoutProjectMarkers(string entryName)
+    {
+        Directory.CreateDirectory(Target);
+        string entry = Path.Combine(Target, entryName);
+        if (entryName == ".hidden")
+        {
+            File.WriteAllText(entry, "keep");
+        }
+        else
+        {
+            Directory.CreateDirectory(entry);
+        }
+
+        var alternate = Substitute.For<IFileSystem>();
+        alternate.DirectoryExists(Target).Returns(true);
+        alternate.GetFileSystemEntries(Target).Returns([entry]);
+        var physical = new InitExecutionTargetInspector(new PhysicalFileSystem());
+        var injected = new InitExecutionTargetInspector(alternate);
+
+        var physicalResult = await physical.InspectAsync(WorkingDirectory.FromExplicit(Target), CancellationToken.None);
+        var alternateResult = await injected.InspectAsync(WorkingDirectory.FromExplicit(Target), CancellationToken.None);
+
+        physicalResult.State.Should().Be(InitExecutionTargetState.Unsupported);
+        alternateResult.Should().Be(physicalResult);
+        alternate.Received(1).GetFileSystemEntries(Target);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_DirectoryEntryFailure_IsNotTreatedAsAnEmptyTarget(bool denied)
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.DirectoryExists(Target).Returns(true);
+        Exception failure = denied ? new UnauthorizedAccessException("controlled entry read failure") : new IOException("controlled entry read failure");
+        fileSystem.GetFileSystemEntries(Target).Returns(_ => throw failure);
+        var harness = CreateHarness(new TestInteractionService(), fileSystem);
+
+        int exit = await harness.InvokeAsync([Target, "--stack", "node", "--language", "js"]);
+
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("invalidTarget");
+        harness.Result.Diagnostics.Single().Should().Contain("controlled entry read failure");
+        await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
     public void Dispose()
     {
         foreach (var scope in _scopes)
@@ -768,7 +990,8 @@ public sealed class InitExecutionAdoptionTests : IDisposable
     }
 
     private Harness CreateHarness(IInteractionService interaction, IFileSystem? fileSystem = null,
-        IReadOnlyList<IProjectInitializer>? initializers = null, IFunctionsProjectResolver? resolver = null)
+        IReadOnlyList<IProjectInitializer>? initializers = null, IFunctionsProjectResolver? resolver = null,
+        IReadOnlyList<IProjectInitializer>? additionalInitializers = null, IFunctionsProjectFactory? projectFactory = null)
     {
         ServiceCollection services = new();
         services.AddLogging();
@@ -786,7 +1009,18 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         services.AddSingleton<IProfileSource, ProjectProfileSource>();
         services.AddSingleton<IProfileCatalog, ProfileCatalog>();
         services.AddSingleton<IProfileResolver, ProfileResolver>();
-        new NodeWorkload().Configure(new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo("Controlled.Node")));
+        var builder = new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo("Controlled.Node"));
+        if (projectFactory is not null)
+        {
+            builder.AddProjectFactory(projectFactory);
+        }
+
+        new NodeWorkload().Configure(builder);
+        foreach (var initializer in additionalInitializers ?? [])
+        {
+            services.AddSingleton(initializer);
+        }
+
         if (initializers is not null)
         {
             foreach (var registration in services.Where(descriptor => descriptor.ServiceType == typeof(IProjectInitializer)).ToArray())
@@ -871,6 +1105,7 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         var fileSystem = Substitute.For<IFileSystem>();
         fileSystem.FileExists(Arg.Any<string>()).Returns(call => physical.FileExists(call.Arg<string>()));
         fileSystem.DirectoryExists(Arg.Any<string>()).Returns(call => physical.DirectoryExists(call.Arg<string>()));
+        fileSystem.GetFileSystemEntries(Arg.Any<string>()).Returns(call => physical.GetFileSystemEntries(call.Arg<string>()));
         fileSystem.ReadAllTextIfExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => physical.ReadAllTextIfExistsAsync(call.ArgAt<string>(0), call.ArgAt<CancellationToken>(1)));
         fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())

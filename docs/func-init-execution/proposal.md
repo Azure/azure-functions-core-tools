@@ -70,8 +70,14 @@ initializer, or executes a configuration post-action. Explicit invalid filters,
 conflicting runtime ownership, ambiguous aliases and unresolvable input fail
 without silently choosing metadata. Missing adoption stack prompts even when
 only one stack is installed; redirected/non-interactive callers supply `--stack`.
+Explicit language still overrides detected language, but does not suppress
+validation of a known project stack or hide resolver failures and cancellation.
 `--template`, `--name` and raw template arguments are rejected on these paths
 rather than ignored.
+
+Target existence and immediate entries come from the same injected filesystem,
+including empty subdirectories and hidden entries. An inaccessible or unreadable
+directory fails explicitly rather than being treated as empty.
 
 Successful staged adoption/repair always persists canonical stack and language,
 including a single-language adoption. Unlike public init's incomplete-language

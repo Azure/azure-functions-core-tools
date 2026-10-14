@@ -209,34 +209,31 @@ internal sealed class InitExecutionRunner(
 
         string? language = request.ExplicitLanguage;
         cancellationToken.ThrowIfCancellationRequested();
-        if (language is null)
+        ProjectResolutionResult resolution;
+        try
         {
-            ProjectResolutionResult resolution;
-            try
+            resolution = await _projects.ResolveProjectAsync(new(request.WorkingDirectory), cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return InitExecutionResult.Reject("invalidProjectMetadata",
+                $"Cannot read existing project metadata. Check the project files and access, then retry. {exception.Message}");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (resolution is ProjectResolutionResult.Resolved resolved)
+        {
+            if (!string.Equals(resolved.Project.StackName, selected.Stack, StringComparison.OrdinalIgnoreCase))
             {
-                resolution = await _projects.ResolveProjectAsync(new(request.WorkingDirectory), cancellationToken);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                return InitExecutionResult.Reject("invalidProjectMetadata",
-                    $"Cannot read existing project metadata. Check the project files and access, then retry. {exception.Message}");
+                return InitExecutionResult.Reject("projectStackConflict",
+                    $"Existing files identify stack '{resolved.Project.StackName}', not '{selected.Stack}'. Supply matching project metadata; nothing was changed.");
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            if (resolution is ProjectResolutionResult.Resolved resolved)
-            {
-                if (!string.Equals(resolved.Project.StackName, selected.Stack, StringComparison.OrdinalIgnoreCase))
-                {
-                    return InitExecutionResult.Reject("projectStackConflict",
-                        $"Existing files identify stack '{resolved.Project.StackName}', not '{selected.Stack}'. Supply matching project metadata; nothing was changed.");
-                }
-
-                language = resolved.Project.Language;
-            }
-            else if (resolution is ProjectResolutionResult.NotResolved { Failure: not null } failed)
-            {
-                return InitExecutionResult.Reject("invalidProjectMetadata", failed.Message);
-            }
+            language ??= resolved.Project.Language;
+        }
+        else if (resolution is ProjectResolutionResult.NotResolved { Failure: not null } failed)
+        {
+            return InitExecutionResult.Reject("invalidProjectMetadata", failed.Message);
         }
 
         string[] supported = [.. selected.SupportedLanguages.Where(candidate => language is null
