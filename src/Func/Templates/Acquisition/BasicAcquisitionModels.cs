@@ -51,6 +51,10 @@ internal enum BasicAcquisitionFailure
 
 internal sealed record BasicAcquisitionStep(string PackageId, string Version, bool Reused);
 
+/// <summary>
+/// Reports the requested stack's acquisition or repair, not whole-machine companion completeness.
+/// Retained stacks constrain compatibility but are not additional repair targets.
+/// </summary>
 internal sealed record BasicAcquisitionResult(BasicAcquisitionStatus Status, string? Revision, string? Source,
     IReadOnlyList<BasicAcquisitionStep> Completed, BasicAcquisitionFailure? Failure = null, string? Message = null, Exception? Cause = null);
 

@@ -577,4 +577,43 @@ public sealed class BasicAcquisitionJourneyTests
         fixture.Payload.Opened.Should().BeEmpty();
         fixture.HiveHashes().Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task RunAsync_TargetedBWithIndependentU_DoesNotRestoreRetainedAOnlyT_ExplicitARepairDoes()
+    {
+        using var fixture = new BasicAcquisitionFixture();
+        fixture.Payload.Missing = true;
+        var partialA = await fixture.Runner().RunAsync(fixture.Request(), CancellationToken.None);
+        var retainedA = (await new WorkloadStore(fixture.Paths).GetWorkloadsAsync()).Single();
+        fixture.UseIndependentBCompanion();
+        fixture.Payload.Missing = false;
+
+        var requestedB = await fixture.Runner().RunAsync(fixture.Request("Fixture.StackB"), CancellationToken.None);
+        var afterBDownloads = fixture.Downloads.Count;
+        var repeatedB = await fixture.Runner().RunAsync(fixture.Request("Fixture.StackB"), CancellationToken.None);
+        var afterBTemplates = await fixture.ReadTemplatesAsync();
+        var requestedAfterB = fixture.Payload.Requested.ToArray();
+        var repairedA = await fixture.Runner().RunAsync(fixture.Request(), CancellationToken.None);
+
+        partialA.Status.Should().Be(BasicAcquisitionStatus.PartialFailure);
+        partialA.Completed.Should().ContainSingle().Which.PackageId.Should().Be("Fixture.StackA");
+        requestedB.Status.Should().Be(BasicAcquisitionStatus.Completed, "completion describes B's targeted operation, not all machine companions");
+        requestedB.Completed.Select(step => step.PackageId).Should().Equal("Fixture.StackB", "Fixture.Unrelated");
+        repeatedB.Status.Should().Be(BasicAcquisitionStatus.Completed);
+        repeatedB.Completed.Should().OnlyContain(step => step.Reused);
+        requestedAfterB.Should().Equal("Fixture.Unrelated/1.0.0");
+        afterBTemplates.Should().ContainSingle().Which.Identity.Should().Be("Fixture.Unrelated.Item");
+        repairedA.Status.Should().Be(BasicAcquisitionStatus.Completed);
+        repairedA.Completed.Should().BeEquivalentTo(new BasicAcquisitionStep[]
+        {
+            new("Fixture.StackA", "1.0.0", true), new("Fixture.Basic", "1.0.0", false),
+        });
+        fixture.Payload.Requested.Should().Equal("Fixture.Unrelated/1.0.0", "Fixture.Basic/1.0.0");
+        fixture.Downloads.Should().HaveCount(afterBDownloads, "repeat B and explicit A repair reuse their persisted stack rows");
+        var finalRows = await new WorkloadStore(fixture.Paths).GetWorkloadsAsync();
+        finalRows.Should().HaveCount(2);
+        finalRows.Single(row => row.LogicalPackage!.PackageId == "fixture.stacka").Should().BeEquivalentTo(retainedA);
+        (await fixture.ReadTemplatesAsync()).Select(template => template.Identity).Should().BeEquivalentTo(
+            ["Fixture.Unrelated.Item", "Fixture.Basic.Item"]);
+    }
 }

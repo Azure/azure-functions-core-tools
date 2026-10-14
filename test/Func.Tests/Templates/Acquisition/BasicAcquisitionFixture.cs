@@ -135,6 +135,35 @@ internal sealed class BasicAcquisitionFixture : IDisposable
         }
     }
 
+    public void UseIndependentBCompanion()
+    {
+        const string id = "Fixture.Unrelated";
+        string archive = Path.Combine(Root, $"{id}.1.0.0.nupkg");
+        using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
+        {
+            WriteEntry(zip, $"{id}.nuspec", Nuspec(id, "1.0.0", "FuncTemplate"));
+            WriteEntry(zip, "unrelated/.template.config/template.json",
+                """{"identity":"Fixture.Unrelated.Item","name":"Independent basic fixture","shortName":"fixture-unrelated","tags":{"type":"item"}}""");
+            WriteEntry(zip, "unrelated/Independent.txt", "B-only basic content, not A's missing companion.");
+        }
+
+        _archives[Key(id, "1.0.0")] = archive;
+        string hash = Hash(archive);
+        JsonNode manifest = JsonNode.Parse(Catalog.Json)!;
+        JsonNode stackB = manifest["stacks"]!.AsArray().Single(stack => stack!["packageId"]!.GetValue<string>() == "Fixture.StackB")!;
+        stackB["companions"]![0]!["packageId"] = id;
+        stackB["companions"]![0]!["versions"] = "[1.0.0]";
+        manifest["artifacts"]!.AsArray().Add(JsonNode.Parse($$"""
+            {
+              "packageId":"Fixture.Unrelated","version":"1.0.0","source":"https://fixtures.invalid/v3/index.json",
+              "sha256":"{{hash}}","contentRevision":"fixture-independent-basic-source","basicOnly":true,
+              "templates":[{"path":"unrelated/.template.config/template.json","identity":"Fixture.Unrelated.Item","type":"item"}]
+            }
+            """));
+        Catalog.Json = manifest.ToJsonString();
+        Ownership.OtherEntries[$"{id}/1.0.0/{hash}"] = new(Source, null);
+    }
+
     public void Dispose() => Directory.Delete(Root, recursive: true);
 
     private string ReadFixtureJson()
@@ -226,6 +255,7 @@ internal sealed class FixturePayloadSource(Dictionary<string, string> archives) 
     public Action<CancellationToken>? Opening { get; set; }
     public bool Missing { get; set; }
     public List<string> Opened { get; } = [];
+    public List<string> Requested { get; } = [];
 
     public Task<Stream> OpenAsync(BasicTemplateArtifact artifact, bool offline, CancellationToken cancellationToken)
     {
@@ -237,6 +267,7 @@ internal sealed class FixturePayloadSource(Dictionary<string, string> archives) 
         }
 
         Opened.Add(artifact.Version.ToNormalizedString());
+        Requested.Add($"{artifact.PackageId}/{artifact.Version.ToNormalizedString()}");
         return Task.FromResult<Stream>(File.OpenRead(archives[$"{artifact.PackageId}/{artifact.Version.ToNormalizedString()}"]));
     }
 }
@@ -245,10 +276,12 @@ internal sealed class FixtureOwnership : IBasicTemplateOwnership
 {
     public Dictionary<string, BasicTemplateOwner> Entries { get; } = [];
     public Dictionary<string, string> Digests { get; } = [];
+    public Dictionary<string, BasicTemplateOwner> OtherEntries { get; } = [];
     public Task<BasicTemplateOwner?> GetAsync(string packageId, string version, string sha256, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(packageId.Equals(BasicAcquisitionFixture.BasicId, StringComparison.OrdinalIgnoreCase)
-            && Digests.GetValueOrDefault(version) == sha256 ? Entries.GetValueOrDefault(version) : null);
+            && Digests.GetValueOrDefault(version) == sha256 ? Entries.GetValueOrDefault(version)
+            : OtherEntries.GetValueOrDefault($"{packageId}/{version}/{sha256}"));
     }
 }

@@ -342,6 +342,19 @@ release-bound data. Producers must retain historical mapping records and their
 requirements unchanged across CLI releases; this draft cannot compare artifacts
 from releases it has never received.
 
+The user selected **"Repair only the requested stack; retain all compatibility
+constraints (Recommended)"**. This is targeted repair, not machine-wide repair.
+All retained requirements still constrain shared ranges before any deployment,
+but only the requested stack's companions are acquisition targets. If retained A
+needs missing T and requested B needs independent U, B acquires U without
+installing/restoring T. `Completed` describes B's requested operation, not the
+completeness of every installed stack. Repeating B remains idempotent, while a
+later explicit A repair may restore T. The fixture journey keeps A's actual
+persisted row through those operations and checks native U-only visibility before
+explicit A repair. Existing shared-T intersection/conflict controls remain
+unchanged. This decision clarifies the result scope without broadening side effects
+or treating a reviewer-requested union as acquisition authorization.
+
 The runner resolves the existing `IPackageSourceProvider` once and passes its
 effective explicit/environment/default source to stack installation and companion
 selection. Each contributing mapping must approve it; disallowed overrides fail
@@ -394,3 +407,36 @@ not add a cross-store transaction or serialize another process changing workload
 after planning. Curated registration/proof/grammar remains #5640/#5653/#5651; no
 curated preinstallation, general scanner or second sample registry is introduced.
 This increment is not M5 or production acquisition completion.
+
+### Unresolved shared workload mutation protocol
+
+The single-writer fixture journey does not qualify concurrent workload state.
+`BasicAcquisitionRunner` reads an installed snapshot before planning;
+`WorkloadDeploymentService.InstallAsync` can later replace the physical directory
+and call `SaveWorkloadAsync` or move logical ownership. `WorkloadStore` reads,
+modifies and atomically renames the registry without a lease spanning that
+read-modify-write. Two writers can therefore publish stale aggregate state or add
+a disjoint retained requirement after acquisition has planned. Atomic file
+replacement prevents partial serialization, not lost updates or stale planning.
+The new composition inherits and exposes that risk. The template-hive lease does
+not protect workload directories or the workload registry.
+
+Before production activation or landing as a concurrent-safe acquisition feature,
+the workload/lifecycle owners must agree a cohesive protocol covering every local
+and catalog install, update, uninstall, explicit/logical ownership attach/remove/
+move, and direct registry save/remove/replace, including setup and this runner.
+No acquisition-private lock can establish safety while other mutators ignore it.
+Francisco's lifecycle/store review is required, coordinated with workload owners.
+The next protocol proposal must answer:
+
+1. Which authoritative workload lease or snapshot revision spans validation and
+   deployment, and how do every mutator and retained-row reader participate?
+2. What is the global order between workload ownership and template read/write
+   admission? Can slow payload acquisition happen before admission with a
+   mandatory recheck, without deadlock or accepting a changed requirement?
+3. What completed-state and recovery evidence survives cancellation/process death
+   after stack persistence or during companion commit, and which owner repairs it
+   without silently removing a working stack or publishing a stale registry?
+
+These are unresolved landing/activation questions, not a locking implementation
+or a claim that `Completed` guarantees concurrent machine-wide consistency.
