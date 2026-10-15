@@ -52,6 +52,10 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfilePython314BuildEnv => GetValue("Dockerfile.python3.14-buildenv");
 
+        public static Task<string> DockerfilePython315 => GetValue("Dockerfile.python3.15");
+
+        public static Task<string> DockerfilePython315BuildEnv => GetValue("Dockerfile.python3.15-buildenv");
+
         public static Task<string> DockerfilePowershell7 => GetValue("Dockerfile.powershell7");
 
         public static Task<string> DockerfilePowershell72 => GetValue("Dockerfile.powershell7.2");

@@ -94,6 +94,12 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.14-buildenv">
       <LogicalName>$(AssemblyName).Dockerfile.python3.14-buildenv</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.15">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.15</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.15-buildenv">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.15-buildenv</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.javascript">
       <LogicalName>$(AssemblyName).Dockerfile.javascript</LogicalName>
     </EmbeddedResource>
