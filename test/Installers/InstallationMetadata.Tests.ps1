@@ -11,16 +11,23 @@ $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) "func-installer-metadata
 $isWindowsHost = $IsWindows -or $env:OS -eq 'Windows_NT'
 $bashCommand = if ($isWindowsHost) {
     $candidates = @(
-        (Join-Path $env:ProgramFiles 'Git/bin/bash.exe'),
-        (Get-Command bash -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1)
+        (Join-Path $env:ProgramFiles 'Git/bin/bash.exe')
+        (Get-Command bash -All -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)
     )
-    $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
+    $candidates |
+        Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Where-Object {
+            & $_ -c 'command -v cygpath >/dev/null 2>&1' 2>$null
+            $LASTEXITCODE -eq 0
+        } |
+        Select-Object -First 1
 } else {
     (Get-Command bash -ErrorAction Stop).Source
 }
 
 if ($null -eq $bashCommand) {
-    throw 'Bash is required to run the installer tests.'
+    $requirement = if ($isWindowsHost) { 'Git Bash' } else { 'Bash' }
+    throw "$requirement is required to run the installer tests."
 }
 
 function ConvertTo-BashPath {
