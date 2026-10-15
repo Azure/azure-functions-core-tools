@@ -144,6 +144,47 @@ Users install, update, uninstall, and list the pointer identity. The CLI records
 
 > **Pack scope.** The package must contain the publish output (workload `.dll`, `.deps.json`, optional `.pdb`, every transitive managed dependency, and any `runtimes/<rid>/` assets the dependencies ship). Use the Workload SDK's `PackAsWorkload` targets rather than manually copying only the primary assembly when a workload has a runtime dependency closure.
 
+### Bundling native template archives
+
+Import `$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets` in a physical
+stack project to pack its native templates inside the workload:
+
+```xml
+<PropertyGroup>
+  <NoDefaultExcludes>true</NoDefaultExcludes>
+  <BundledTemplatesProject>$(MSBuildProjectDirectory)/NativeTemplates/Workloads.Example.Templates.csproj</BundledTemplatesProject>
+  <BundledTemplatesPackageId>Azure.Functions.Templates.Example</BundledTemplatesPackageId>
+  <BundledTemplatesPackagePath>templates/example.nupkg</BundledTemplatesPackagePath>
+</PropertyGroup>
+<ItemGroup>
+  <ProjectReference Include="$(BundledTemplatesProject)" ReferenceOutputAssembly="false" Private="false" />
+</ItemGroup>
+<Import Project="$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets" />
+```
+
+The native project must pack a `FuncTemplate` archive. Its configuration and
+package version follow the physical workload build. The shared target selects
+the exact `$(BundledTemplatesPackageId).$(PackageVersion).nupkg` output; set
+`BundledTemplatesArchiveFileName` only if the native project's pack target
+produces a different filename. It removes the selected staged archive before
+packing and fails if that invocation does not recreate it, rather than picking
+a stale package or scanning a directory.
+
+`BundledTemplatesPackagePath` is relative to the physical `tools/any/` or
+`tools/<rid>/` content root. Only `WorkloadKind=workload` runs the target;
+RID pointers do not carry native bytes or `bundled-templates.json`. The outer
+package retains its workload package type. The generated root declaration
+records the embedded archive's actual nuspec ID/version, SHA-256, and complete
+raw template configuration inventory. Inner package contents, license, and
+source/provenance metadata are not rewritten.
+
+For existing Node callers, omitted properties retain
+`NativeTemplates/Workloads.Node.Templates.csproj`,
+`Azure.Functions.Templates.Node.Basic`, and `templates/node-basic.nupkg`.
+`_PackBundledNodeTemplates` remains an alias for `_PackBundledTemplates`.
+This is a packaging contract, not a new feed, release, admission policy, or
+public command route; installed archives still require the existing validation.
+
 Add a sibling `Directory.Version.props` for the workload version:
 
 ```xml

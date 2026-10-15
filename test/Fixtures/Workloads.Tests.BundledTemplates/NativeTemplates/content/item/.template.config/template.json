@@ -1,0 +1,10 @@
+{
+  "author": "Microsoft",
+  "identity": "Azure.Functions.Cli.Tests.Controlled.Item",
+  "name": "Controlled packaging item",
+  "shortName": "pack-fixture-item",
+  "tags": {
+    "language": "Controlled",
+    "type": "item"
+  }
+}

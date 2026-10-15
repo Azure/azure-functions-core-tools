@@ -1,21 +1,30 @@
 <Project>
   <UsingTask TaskName="WriteBundledTemplatesJson" AssemblyFile="$(BaseOutputPath)../Workloads.Sdk/$(Configuration.ToLowerInvariant())/Azure.Functions.Cli.Workloads.Sdk.dll" TaskFactory="TaskHostFactory" />
   <PropertyGroup>
-    <PackWorkloadDependsOn>$(PackWorkloadDependsOn);_PackBundledNodeTemplates</PackWorkloadDependsOn>
+    <BundledTemplatesProject Condition="'$(BundledTemplatesProject)' == ''">$(MSBuildProjectDirectory)/NativeTemplates/Workloads.Node.Templates.csproj</BundledTemplatesProject>
+    <BundledTemplatesPackageId Condition="'$(BundledTemplatesPackageId)' == ''">Azure.Functions.Templates.Node.Basic</BundledTemplatesPackageId>
+    <BundledTemplatesPackagePath Condition="'$(BundledTemplatesPackagePath)' == ''">templates/node-basic.nupkg</BundledTemplatesPackagePath>
+    <PackWorkloadDependsOn>$(PackWorkloadDependsOn);_PackBundledTemplates</PackWorkloadDependsOn>
   </PropertyGroup>
-  <Target Name="_PackBundledNodeTemplates" DependsOnTargets="_SetWorkloadProperties" Condition="'$(WorkloadKind)' == 'workload'">
+  <Target Name="_PackBundledTemplates" DependsOnTargets="_SetWorkloadProperties" Condition="'$(WorkloadKind)' == 'workload'">
     <PropertyGroup>
+      <BundledTemplatesArchiveFileName Condition="'$(BundledTemplatesArchiveFileName)' == ''">$(BundledTemplatesPackageId).$(PackageVersion).nupkg</BundledTemplatesArchiveFileName>
       <_BundledTemplatesOutput>$(IntermediateOutputPath)bundled-templates/</_BundledTemplatesOutput>
-      <_BundledNodeArchive>$(_BundledTemplatesOutput)Azure.Functions.Templates.Node.Basic.$(PackageVersion).nupkg</_BundledNodeArchive>
+      <_BundledTemplatesArchive>$(_BundledTemplatesOutput)$(BundledTemplatesArchiveFileName)</_BundledTemplatesArchive>
+      <_BundledTemplatesPackagePath>$(_WorkloadPackageContentRoot)$(BundledTemplatesPackagePath)</_BundledTemplatesPackagePath>
       <_BundledTemplatesManifest>$(IntermediateOutputPath)bundled-templates.json</_BundledTemplatesManifest>
     </PropertyGroup>
-    <MSBuild Projects="$(MSBuildProjectDirectory)/NativeTemplates/Workloads.Node.Templates.csproj"
+    <Delete Files="$(_BundledTemplatesArchive);$(_BundledTemplatesManifest)" />
+    <MSBuild Projects="$(BundledTemplatesProject)"
       Targets="Pack" Properties="Configuration=$(Configuration);PackageOutputPath=$([System.IO.Path]::GetFullPath('$(_BundledTemplatesOutput)'));PackageVersion=$(PackageVersion)" />
-    <WriteBundledTemplatesJson Archive="$(_BundledNodeArchive)" ArchivePath="$(_WorkloadPackageContentRoot)templates/node-basic.nupkg"
+    <Error Condition="!Exists('$(_BundledTemplatesArchive)')"
+      Text="Bundled templates project '$(BundledTemplatesProject)' did not produce '$(BundledTemplatesArchiveFileName)'. Check BundledTemplatesPackageId and BundledTemplatesArchiveFileName." />
+    <WriteBundledTemplatesJson Archive="$(_BundledTemplatesArchive)" ArchivePath="$(_BundledTemplatesPackagePath)"
       OutputPath="$(_BundledTemplatesManifest)" />
     <ItemGroup>
-      <TfmSpecificPackageFile Include="$(_BundledNodeArchive)" PackagePath="$(_WorkloadPackageContentRoot)templates/node-basic.nupkg" />
+      <TfmSpecificPackageFile Include="$(_BundledTemplatesArchive)" PackagePath="$(_BundledTemplatesPackagePath)" />
       <TfmSpecificPackageFile Include="$(_BundledTemplatesManifest)" PackagePath="bundled-templates.json" />
     </ItemGroup>
   </Target>
+  <Target Name="_PackBundledNodeTemplates" DependsOnTargets="_PackBundledTemplates" />
 </Project>
