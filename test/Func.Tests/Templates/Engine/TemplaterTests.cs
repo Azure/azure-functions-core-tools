@@ -603,13 +603,103 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
-    public async Task ProjectJourney_ConfigurationReturnsAfterCancellation_PropagatesCancellation()
+    public async Task ProjectJourney_FinalConfigurationCommitsBeforeCancellation_ReturnsCompletedSuccess()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        using CancellationTokenSource cancellation = new();
+        CancelAfterConfigurationCommitFileSystem fileSystem = new(cancellation, cancelOnCommit: 1);
+        using Templater templater = CreateProjectTemplater(fileSystem);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "commit-then-cancel-output"));
+
+        TemplateInvocationResult? result = null;
+        var failure = await Record.ExceptionAsync(async () =>
+            result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Project"), cancellation.Token));
+
+        cancellation.IsCancellationRequested.Should().BeTrue();
+        fileSystem.CommittedConfigurations.Should().Equal(Path.Combine(output.Info.FullName, ".func", "config.json"));
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeTrue();
+        failure.Should().BeNull("the final configuration was physically committed before cancellation");
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(TemplateInvocationStatus.Success);
+        result.ConfiguredProjects.Should().Equal(output.Info.FullName);
+        result.Changes.Select(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path))).Should().BeEquivalentTo(
+            Path.Combine(output.Info.FullName, "host.json"), Path.Combine(output.Info.FullName, "Project.txt"),
+            Path.Combine(output.Info.FullName, ".func", "config.json"));
+        result.Changes.Should().OnlyContain(change => change.Kind == "Create");
+        var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(output.Info.FullName, ".func", "config.json")).Build();
+        StackOptions options = new();
+        new StackOptionsSetup(configuration).Configure(options);
+        options.Runtime.Should().Be("python");
+        options.Language.Should().Be("Python");
+    }
+
+    [Fact]
+    public async Task ProjectJourney_LastOfTwoConfigurationsCommitsBeforeCancellation_ReportsBothCompletedRoots()
+    {
+        await TemplateFixtures.InstallAsync(WriteTwoRootProjectPackage(), _hive);
+        using CancellationTokenSource cancellation = new();
+        CancelAfterConfigurationCommitFileSystem fileSystem = new(cancellation, cancelOnCommit: 2);
+        using Templater templater = CreateProjectTemplater(fileSystem);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "last-commit-then-cancel-output"));
+        var firstConfiguration = Path.Combine(output.Info.FullName, ".func", "config.json");
+        var secondConfiguration = Path.Combine(output.Info.FullName, "second", ".func", "config.json");
+
+        TemplateInvocationResult? result = null;
+        var failure = await Record.ExceptionAsync(async () =>
+            result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Project"), cancellation.Token));
+
+        cancellation.IsCancellationRequested.Should().BeTrue();
+        fileSystem.CommittedConfigurations.Should().Equal(firstConfiguration, secondConfiguration);
+        File.Exists(firstConfiguration).Should().BeTrue();
+        File.Exists(secondConfiguration).Should().BeTrue();
+        failure.Should().BeNull("both configurations were physically committed before cancellation");
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(TemplateInvocationStatus.Success);
+        result.ConfiguredProjects.Should().Equal(output.Info.FullName, Path.Combine(output.Info.FullName, "second"));
+        result.Changes.Select(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path))).Should().BeEquivalentTo(
+            Path.Combine(output.Info.FullName, "host.json"), Path.Combine(output.Info.FullName, "Project.txt"),
+            Path.Combine(output.Info.FullName, "second", "host.json"), firstConfiguration, secondConfiguration);
+        result.Changes.Should().OnlyContain(change => File.Exists(Path.Combine(output.Info.FullName, change.Path)));
+    }
+
+    [Fact]
+    public async Task ProjectJourney_FirstConfigurationCommitsBeforeCancellation_DoesNotStartSecondPlan()
+    {
+        await TemplateFixtures.InstallAsync(WriteTwoRootProjectPackage(), _hive);
+        using CancellationTokenSource cancellation = new();
+        CancelAfterConfigurationCommitFileSystem fileSystem = new(cancellation, cancelOnCommit: 1);
+        using Templater templater = CreateProjectTemplater(fileSystem);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "partial-commit-then-cancel-output"));
+        var firstConfiguration = Path.Combine(output.Info.FullName, ".func", "config.json");
+        var secondConfiguration = Path.Combine(output.Info.FullName, "second", ".func", "config.json");
+
+        Func<Task> invoke = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Project"), cancellation.Token);
+
+        var exception = (await invoke.Should().ThrowAsync<OperationCanceledException>()).Which;
+        exception.CancellationToken.Should().Be(cancellation.Token);
+        fileSystem.CommittedConfigurations.Should().Equal(firstConfiguration);
+        File.Exists(firstConfiguration).Should().BeTrue();
+        File.Exists(secondConfiguration).Should().BeFalse();
+        Directory.Exists(Path.GetDirectoryName(secondConfiguration)).Should().BeFalse();
+        File.ReadAllText(Path.Combine(output.Info.FullName, "host.json")).Should().Be("{\"version\":\"2.0\"}");
+        File.ReadAllText(Path.Combine(output.Info.FullName, "second", "host.json")).Should().Be("{}");
+    }
+
+    [Fact]
+    public async Task ProjectJourney_ConfigurationCanceledBeforePhysicalWrite_PropagatesCancellationWithoutConfiguration()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
         using CancellationTokenSource cancellation = new();
         var fileSystem = Substitute.For<IFileSystem>();
         fileSystem.FileExists(Arg.Any<string>()).Returns(call => Path.GetFileName((string)call[0]) == "host.json");
-        fileSystem.CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async _ => await cancellation.CancelAsync());
+        fileSystem.CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async call =>
+        {
+            await cancellation.CancelAsync();
+            await new PhysicalFileSystem().CreateAllTextAsync((string)call[0], (string)call[1], (CancellationToken)call[2]);
+        });
         using Templater templater = CreateProjectTemplater(fileSystem);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canceled-config-output"));
@@ -619,6 +709,7 @@ public sealed class TemplaterTests : IDisposable
         await action.Should().ThrowAsync<OperationCanceledException>();
         File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
         File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeFalse();
+        Directory.Exists(Path.Combine(output.Info.FullName, ".func")).Should().BeFalse();
     }
 
     [Fact]
@@ -648,16 +739,7 @@ public sealed class TemplaterTests : IDisposable
     [InlineData(true)]
     public async Task ProjectJourney_TwoRoots_FinalizesInOrderAndPreservesPartialCompletion(bool failSecond)
     {
-        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
-        var path = Path.Combine(package, "project", ".template.config", "template.json");
-        var configuration = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
-        configuration["primaryOutputs"]!.AsArray().Add(new JsonObject { ["path"] = "second/host.json" });
-        var action = configuration["postActions"]!.AsArray()[0]!.DeepClone();
-        action["args"]!["primaryOutputIndex"] = "1";
-        configuration["postActions"]!.AsArray().Add(action);
-        File.WriteAllText(path, configuration.ToJsonString());
-        Directory.CreateDirectory(Path.Combine(package, "project", "second"));
-        File.WriteAllText(Path.Combine(package, "project", "second", "host.json"), "{}");
+        var package = WriteTwoRootProjectPackage();
         await TemplateFixtures.InstallAsync(package, _hive);
         PhysicalFileSystem physical = new();
         var fileSystem = Substitute.For<IFileSystem>();
@@ -1573,6 +1655,39 @@ public sealed class TemplaterTests : IDisposable
         TemplateProjectConfigurationWriter writer = new(fileSystem ?? new PhysicalFileSystem());
         return new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive,
             projectSupport: new(CreateProjectPlanner(aliasKey), writer)));
+    }
+
+    private string WriteTwoRootProjectPackage()
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var path = Path.Combine(package, "project", ".template.config", "template.json");
+        var configuration = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        configuration["primaryOutputs"]!.AsArray().Add(new JsonObject { ["path"] = "second/host.json" });
+        var action = configuration["postActions"]!.AsArray()[0]!.DeepClone();
+        action["args"]!["primaryOutputIndex"] = "1";
+        configuration["postActions"]!.AsArray().Add(action);
+        File.WriteAllText(path, configuration.ToJsonString());
+        Directory.CreateDirectory(Path.Combine(package, "project", "second"));
+        File.WriteAllText(Path.Combine(package, "project", "second", "host.json"), "{}");
+        return package;
+    }
+
+    private sealed class CancelAfterConfigurationCommitFileSystem(CancellationTokenSource cancellation, int cancelOnCommit) : PhysicalFileSystem
+    {
+        private readonly CancellationTokenSource _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
+        private readonly List<string> _committedConfigurations = [];
+
+        public IReadOnlyList<string> CommittedConfigurations => _committedConfigurations.AsReadOnly();
+
+        public override void MoveFile(string sourcePath, string destinationPath, bool overwrite = false)
+        {
+            base.MoveFile(sourcePath, destinationPath, overwrite);
+            _committedConfigurations.Add(destinationPath);
+            if (_committedConfigurations.Count == cancelOnCommit)
+            {
+                _cancellation.Cancel();
+            }
+        }
     }
 
     private static TemplateProjectConfigurationPlanner CreateProjectPlanner(string aliasKey = "Python")

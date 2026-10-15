@@ -333,7 +333,6 @@ internal class TemplateEngineSession : IDisposable
             try
             {
                 await projectSupport.Writer.WriteAsync(plan, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
             }
             catch (IOException exception)
             {
