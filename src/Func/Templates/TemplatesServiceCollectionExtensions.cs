@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -46,6 +47,8 @@ internal static class TemplatesServiceCollectionExtensions
         services.AddSingleton<InitExecutionTargetInspector>();
         services.AddSingleton<TemplateProjectConfigurationPlanner>();
         services.AddSingleton<TemplateProjectConfigurationWriter>();
+        services.AddSingleton<Func<InstalledProjectStackCatalog>>(provider => provider.GetRequiredService<InstalledProjectStackCatalog>);
+        services.AddSingleton<Func<TemplateProjectSupport>>(provider => provider.GetRequiredService<TemplateProjectSupport>);
         services.AddSingleton<ITemplaterFactory, TemplaterFactory>();
         services.AddSingleton<ITemplateStoreLock, FileTemplateStoreLock>();
         services.AddSingleton<ITemplateStore, TemplateStore>();

@@ -791,6 +791,8 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         services.AddSingleton<IExtensionBundleResolver>(new ExtensionBundleResolver(new InstalledBundleScanner(bundles),
             NullBundleResolveTelemetry.Instance, NullLogger<ExtensionBundleResolver>.Instance));
         services.AddTemplatesOrchestrator();
+        services.AddSingleton<InstalledProjectStackCatalog>();
+        services.AddSingleton<TemplateProjectSupport>();
         services.AddSingleton<ITemplateStore>(_templates);
         return services.BuildServiceProvider();
     }

@@ -326,8 +326,7 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         using var json = JsonDocument.Parse(stdout.Output);
         json.RootElement.GetProperty("configuration").GetProperty("language").GetString().Should().Be("Language[bad]");
         stderr.Output.Should().Contain("Node[bad]").And.Contain("Language[bad]").And.Contain("Select the existing project's language:");
-        metadata.ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name == nameof(IProjectInitializer.GetInitOptions)
-            || call.GetMethodInfo().Name == nameof(IProjectInitializer.InitializeAsync));
+        harness.Provider.GetRequiredService<IEnumerable<IProjectInitializer>>().Single().ReceivedCalls().Should().BeEmpty();
         _factory.ReceivedCalls().Should().BeEmpty();
     }
 
@@ -345,7 +344,7 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         int exit = await harness.InvokeAsync([Target]);
 
         exit.Should().Be(1);
-        harness.Result!.Kind.Should().Be("ambiguousStack");
+        harness.Result!.Kind.Should().Be("duplicateStacks");
         harness.Result.Diagnostics.Single().Should().Contain("first").And.Contain("second");
         Snapshot().Should().BeEquivalentTo(before);
         _factory.ReceivedCalls().Should().BeEmpty();
@@ -435,7 +434,7 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         int exit = await harness.InvokeAsync([Target, "--language", "ambiguous"]);
 
         exit.Should().Be(1);
-        harness.Result!.Kind.Should().Be("ambiguousLanguage");
+        harness.Result!.Kind.Should().Be("duplicateStacks");
         File.Exists(Config).Should().BeFalse();
         _factory.ReceivedCalls().Should().BeEmpty();
     }
@@ -673,8 +672,8 @@ public sealed class InitExecutionAdoptionTests : IDisposable
 
         exit.Should().Be(1);
         using var json = JsonDocument.Parse(stdout.Output);
-        json.RootElement.GetProperty("kind").GetString().Should().Be("targetChanged");
-        json.RootElement.GetProperty("configuration").GetProperty("written").GetBoolean().Should().BeFalse();
+        json.RootElement.GetProperty("kind").GetString().Should().Be("duplicateStacks");
+        json.RootElement.TryGetProperty("configuration", out _).Should().BeFalse();
         File.ReadAllText(Config).Should().Be(original);
         await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
         _factory.ReceivedCalls().Should().BeEmpty();
@@ -745,8 +744,7 @@ public sealed class InitExecutionAdoptionTests : IDisposable
 
         exit.Should().Be(0);
         AssertCanonicalConfiguration(harness, "JavaScript");
-        metadata.ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name == nameof(IProjectInitializer.GetInitOptions)
-            || call.GetMethodInfo().Name == nameof(IProjectInitializer.InitializeAsync));
+        harness.Provider.GetRequiredService<IEnumerable<IProjectInitializer>>().Single().ReceivedCalls().Should().BeEmpty();
         _factory.ReceivedCalls().Should().BeEmpty();
     }
 
@@ -971,6 +969,34 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         _factory.ReceivedCalls().Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_ExistingProject_ResolvesSharedCatalogOnceWithoutSupportOrInitializerMetadata(bool repair)
+    {
+        WriteProject(typeScript: true);
+        if (repair)
+        {
+            WriteConfig("""{"stack":{"runtime":"node"},"profiles":["flex"],"unknown":"keep"}""");
+        }
+
+        var harness = CreateHarness(new TestInteractionService());
+
+        int exit = await harness.InvokeAsync([Target, "--language", "ts"]);
+
+        exit.Should().Be(0);
+        harness.CatalogRequests.Should().Be(1);
+        harness.SupportRequests.Should().Be(0);
+        harness.Provider.GetRequiredService<IEnumerable<IProjectInitializer>>().Single().ReceivedCalls().Should().BeEmpty();
+        AssertCanonicalConfiguration(harness, "TypeScript");
+        if (repair)
+        {
+            JsonNode.Parse(File.ReadAllText(Config))!["unknown"]!.GetValue<string>().Should().Be("keep");
+        }
+
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
     public void Dispose()
     {
         foreach (var scope in _scopes)
@@ -990,8 +1016,8 @@ public sealed class InitExecutionAdoptionTests : IDisposable
     }
 
     private Harness CreateHarness(IInteractionService interaction, IFileSystem? fileSystem = null,
-        IReadOnlyList<IProjectInitializer>? initializers = null, IFunctionsProjectResolver? resolver = null,
-        IReadOnlyList<IProjectInitializer>? additionalInitializers = null, IFunctionsProjectFactory? projectFactory = null)
+        IReadOnlyList<IProjectStack>? initializers = null, IFunctionsProjectResolver? resolver = null,
+        IReadOnlyList<IProjectStack>? additionalInitializers = null, IFunctionsProjectFactory? projectFactory = null)
     {
         ServiceCollection services = new();
         services.AddLogging();
@@ -1023,7 +1049,7 @@ public sealed class InitExecutionAdoptionTests : IDisposable
 
         if (initializers is not null)
         {
-            foreach (var registration in services.Where(descriptor => descriptor.ServiceType == typeof(IProjectInitializer)).ToArray())
+            foreach (var registration in services.Where(descriptor => descriptor.ServiceType == typeof(IProjectStack)).ToArray())
             {
                 services.Remove(registration);
             }
@@ -1040,14 +1066,34 @@ public sealed class InitExecutionAdoptionTests : IDisposable
             services.AddSingleton(resolver);
         }
 
+        foreach (var registration in services.Where(descriptor => descriptor.ServiceType == typeof(IProjectInitializer)).ToArray())
+        {
+            services.Remove(registration);
+        }
+
+        services.AddSingleton(Substitute.For<IProjectInitializer>());
+        services.AddSingleton<InstalledProjectStackCatalog>();
         services.AddTemplatesOrchestrator();
+        int catalogRequests = 0;
+        int supportRequests = 0;
+        services.AddSingleton<Func<InstalledProjectStackCatalog>>(provider => () =>
+        {
+            catalogRequests++;
+            return provider.GetRequiredService<InstalledProjectStackCatalog>();
+        });
+        services.AddSingleton<Func<TemplateProjectSupport>>(_ => () =>
+        {
+            supportRequests++;
+            throw new InvalidOperationException("Existing-project adoption and repair must not resolve project support.");
+        });
         services.AddSingleton(_factory);
         var provider = services.BuildServiceProvider();
         _providers.Add(provider);
         var scope = provider.CreateScope();
         _scopes.Add(scope);
         var runner = new RecordingRunner(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>());
-        return new(provider, new(runner, provider.GetRequiredService<InitExecutionRenderer>(), new([])), runner);
+        return new(provider, new(runner, provider.GetRequiredService<InitExecutionRenderer>(), new([])), runner,
+            () => catalogRequests, () => supportRequests);
     }
 
     private void WriteProject(bool typeScript = false, bool runtime = true, bool fingerprint = true)
@@ -1088,9 +1134,9 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         harness.Provider.GetRequiredService<IOptionsMonitor<StackOptions>>().Get(Target).Language.Should().Be(language);
     }
 
-    private static IProjectInitializer Metadata(string stack, IReadOnlyList<string> languages)
+    private static IProjectStack Metadata(string stack, IReadOnlyList<string> languages)
     {
-        var metadata = Substitute.For<IProjectInitializer>();
+        var metadata = Substitute.For<IProjectStack>();
         metadata.Stack.Returns(stack);
         metadata.DisplayName.Returns(stack);
         metadata.SupportedLanguages.Returns(languages);
@@ -1113,11 +1159,14 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         return fileSystem;
     }
 
-    private sealed class Harness(ServiceProvider provider, InitExecutionCommand command, RecordingRunner runner)
+    private sealed class Harness(ServiceProvider provider, InitExecutionCommand command, RecordingRunner runner,
+        Func<int> catalogRequests, Func<int> supportRequests)
     {
         public ServiceProvider Provider => provider;
         public InitExecutionResult? Result => runner.Result;
         public CancellationToken CommandToken => runner.CommandToken;
+        public int CatalogRequests => catalogRequests();
+        public int SupportRequests => supportRequests();
 
         public Task<int> InvokeAsync(string[] args, CancellationToken cancellationToken = default) =>
             command.ParseInvocation(args).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellationToken);

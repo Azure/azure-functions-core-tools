@@ -35,7 +35,10 @@ internal sealed class BundledNodeProcess
             }
         }
 
-        using IHost host = await CliHostFactory.CreateHostAsync(interaction, cancellationToken);
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
+        builder.Services.AddSingleton<TemplateProjectSupport>();
+        await builder.RegisterWorkloadsAsync(cancellationToken);
+        using IHost host = builder.Build();
         using IServiceScope scope = host.Services.CreateScope();
         IReadOnlyList<WorkloadEntry> installed = await host.Services.GetRequiredService<IWorkloadStore>().GetWorkloadsAsync(cancellationToken);
         TemplateConstraintEvaluationSnapshot availability = new([.. installed.Select(entry =>

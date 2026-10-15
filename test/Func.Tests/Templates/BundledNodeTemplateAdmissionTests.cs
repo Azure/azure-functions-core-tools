@@ -554,9 +554,9 @@ public sealed partial class BundledNodeTemplateTests
     {
         public TaskCompletionSource Waiting { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<TemplateEngineSession> OpenReadAsync(TemplateEngineContext context, CancellationToken cancellationToken,
-            TemplateConstraintEvaluationSnapshot? snapshot = null, TemplateProjectConfigurationPlanner? planner = null,
-            TemplateProjectConfigurationWriter? writer = null, Action<TemplateStoreWaitReason>? waiting = null)
-            => inner.OpenReadAsync(context, cancellationToken, snapshot, planner, writer, waiting);
+            TemplateConstraintEvaluationSnapshot? snapshot = null, TemplateProjectSupport? projectSupport = null,
+            Action<TemplateStoreWaitReason>? waiting = null)
+            => inner.OpenReadAsync(context, cancellationToken, snapshot, projectSupport, waiting);
 
         public Task<TemplateStoreWriteSession> OpenWriteAsync(TemplateEngineContext context, CancellationToken cancellationToken,
             Action<TemplateStoreWaitReason>? waiting = null)

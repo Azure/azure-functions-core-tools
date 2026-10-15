@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Common;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.Extensions.Logging;
-using NuGet.Versioning;
 
 using OrchestratorComponents = Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components;
 
@@ -46,15 +45,7 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context, TemplateCon
     private static IReadOnlyList<(Type, IIdentifiedComponent)> CreateComponents(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot? snapshot)
     {
         ArgumentNullException.ThrowIfNull(context);
-        NuGetVersion? bundleVersion = context.Bundle is null ? null : NuGetVersion.Parse(context.Bundle.Version);
-        if (snapshot is not null && (snapshot.BundleId is not null || snapshot.BundleVersion is not null)
-            && (!string.Equals(snapshot.BundleId, context.Bundle?.Id, StringComparison.OrdinalIgnoreCase) || !Equals(snapshot.BundleVersion, bundleVersion)))
-        {
-            throw new ArgumentException("Constraint bundle input must match the resolved engine context.", nameof(snapshot));
-        }
-
-        TemplateConstraintEvaluationSnapshot availability = new(snapshot?.Workloads ?? [], context.Bundle?.Id, bundleVersion);
-        return [..Components.AllComponents, ..OrchestratorComponents.AllComponents, ..FuncTemplateComponents.Create(availability)];
+        return [..Components.AllComponents, ..OrchestratorComponents.AllComponents, ..FuncTemplateComponents.Create(snapshot ?? new([]), context.Bundle)];
     }
 
     private static Dictionary<string, string> CreateDefaults(TemplateEngineContext context)

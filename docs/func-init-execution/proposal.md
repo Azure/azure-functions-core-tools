@@ -64,7 +64,7 @@ explicit failure, not an empty-config fallback. Nested projects are not adopted
 recursively. `--force` remains unsupported and never deletes content.
 
 Adoption/repair reads `local.settings.json`, the existing root-project resolver,
-and the initializer's read-only stack/language metadata. It never opens a
+and the shared installed `IProjectStack` catalog. It never opens a
 `Templater`, performs template/package discovery or acquisition, invokes an
 initializer, or executes a configuration post-action. Explicit invalid filters,
 conflicting runtime ownership, ambiguous aliases and unresolvable input fail
@@ -116,6 +116,17 @@ Plain and JSON output distinguish **planned** configurations/effects from
 `ConfiguredProjects`, the actually finalized subset. Configuration failure is
 nonzero, preserves generated content and completed roots, and stops subsequent
 finalization. Cancellation releases the flow and never reports success.
+The original preflight result is retained as typed `Preview`; `Invocation` is
+populated when a non-dry-run invocation request returns, even if native preflight
+refuses creation. `plannedChanges` and
+`plannedConfigurations` come from that preview, while `completedChanges` and
+configured roots come only from the actual invocation. Dry-run and post-preview
+target refusal never imply completed effects. This keeps preview output truthful
+when the runtime reports only confirmed effects after creation or partial
+finalization.
+Pre-create native refusals may still carry planned `Changes`; those are never
+rendered as completed. Completed effects are exposed only for successful native
+creation or partial configuration finalization, with the native result unchanged.
 Every result after successful plan computation retains that ordered planned
 metadata, including subsequent conflict or revalidation failures; a result
 before planning has no synthetic plan. Project configuration diagnostics remain
@@ -145,17 +156,45 @@ failures and cancellation before and after a relevant write. Multiple profiles
 without a default remain ambiguous to `ProfileResolver`; init neither picks one
 nor rewrites their selection.
 
-The temporary metadata source is the same `IProjectInitializer` projection already
-required by the project planner; no initializer behavior is invoked. The approved
-metadata-only `IProjectStack` migration is a separate owning change and must replace
-this adapter when composed. Package acquisition, production default templates for
+The synchronized consumer uses installed `IProjectStack` metadata through the
+same shared `InstalledProjectStackCatalog` used by its project planner. It does
+not read initializer metadata or invoke initializer behavior. Composition-root
+delegates defer that catalog and the existing paired `TemplateProjectSupport`
+until the workflow needs them. The catalog resolves once before support or an
+engine environment is requested, so conflicting definitions still return the
+structured `duplicateStacks` failure without creating files.
+Adoption and repair resolve that same catalog once but never request paired
+project-template support. Their deliberate configuration create/merge path
+continues to use the legacy atomic overwrite-capable writer, not the native
+fresh-project create-only writer. Shared catalog conflicts are rejected before
+adoption or repair; formerly local ambiguity diagnostics use `duplicateStacks`
+for the existing shared ownership conflict contract.
+
+Conflicts at the catalog's existing duplicate-ID and alias-ownership checks now
+throw the internal `ConflictingProjectStackMetadataException` subtype of
+`InvalidOperationException`, with the same messages and validation order. This
+is an intentional internal exception-contract refinement, not a new validation
+policy or unchanged exact exception behavior. Only that subtype maps to the
+workflow conflict result; malformed metadata and unrelated provider/constructor
+faults retain their normal propagation. No second catalog or competing predicate
+is introduced.
+
+The project flow uses the current asynchronous protected factory, retains the
+selected capability through preview/create, and finalizes through its paired
+planner/create-only writer. Existing CLI configuration is never overwritten by
+this native creation path; public legacy init/adopt/heal persistence remains
+separate. PROJECT constraints are workload-gated; `func-bundle` remains ITEM-only,
+and new-project bundle context stays unavailable.
+
+Package acquisition, production default templates for
 all six stacks, fresh/upgraded installability, and a Functions-owned browse URL
 remain switch gates. Missing-template diagnostics give explicit
 `func new install <package>` guidance without inventing a package ID or URL.
 
-The published lower runtime still has pending mounted-type/output-topology work.
-This stage neither repairs nor clears that dependency, and its controlled
-fixtures do not establish general type, path or platform safety. The additive
+The synchronized published runtime is consumed without changing its native
+guard/name/topology algorithms. This stage does not clear the remaining
+provider-held review gate, and its controlled fixtures do not establish general
+type, path, concurrent-store or platform safety. The additive
 declaration/result projection hunks in `Templater.GetCandidatesAsync`,
 `TemplateEngineSession.ValidateProjectConfiguration` / project result initializers,
 `TemplateCatalogEntry` and `TemplateInvocationResult` are explicit future
