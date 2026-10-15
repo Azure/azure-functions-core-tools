@@ -139,13 +139,7 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
         foreach (ITemplateInfo template in templates.Where(template => TemplateCatalogProjector.GetTemplateType(template) is not null))
         {
             ITemplatePackage? package = packages.FirstOrDefault(package => package.MountPointUri == template.MountPointUri);
-            TemplateCatalogEntry entry = TemplateCatalogProjector.Project(template, package);
-            entry = entry with
-            {
-                ShortNames = Array.AsReadOnly<string>([.. entry.ShortNames]),
-                Parameters = Array.AsReadOnly<TemplateParameterDefinition>(
-                    [.. entry.Parameters.Select(parameter => parameter with { Choices = Array.AsReadOnly<TemplateParameterChoice>([.. parameter.Choices]) })]),
-            };
+            TemplateCatalogEntry entry = Freeze(TemplateCatalogProjector.Project(template, package));
 
             try
             {
@@ -156,6 +150,7 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
                     continue;
                 }
 
+                entry = Freeze(TemplateCatalogProjector.Project(template, package, configuration));
                 if (!packageMetadata.TryGetValue(template.MountPointUri, out Task<IReadOnlyCollection<string>>? metadata))
                 {
                     metadata = _session.ReadPackageTypesAsync(package, cancellationToken);
@@ -199,6 +194,13 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
     }
 
     public void Dispose() => _session.Dispose();
+
+    private static TemplateCatalogEntry Freeze(TemplateCatalogEntry entry) => entry with
+    {
+        ShortNames = Array.AsReadOnly<string>([.. entry.ShortNames]),
+        Parameters = Array.AsReadOnly<TemplateParameterDefinition>(
+            [.. entry.Parameters.Select(parameter => parameter with { Choices = Array.AsReadOnly<TemplateParameterChoice>([.. parameter.Choices]) })]),
+    };
 
     private static bool IsEligible(Candidate candidate)
         => candidate.Entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible && candidate.Entry.MetadataDiagnostic is null && candidate.Configuration is not null;
