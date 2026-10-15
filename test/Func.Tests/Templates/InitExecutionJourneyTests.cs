@@ -514,6 +514,143 @@ public sealed class InitExecutionJourneyTests : IDisposable
     }
 
     [Theory]
+    [InlineData("runner")]
+    [InlineData("plain")]
+    [InlineData("json")]
+    public async Task Execute_FinalConfigurationCommitsBeforeCancellation_PreservesCompletedCreation(string boundary)
+    {
+        const string identity = "Func.Init.Committed";
+        WriteProject("committed", identity);
+        await InstallAsync();
+        using CancellationTokenSource producerCancellation = new();
+        CancelAfterConfigurationCommitFileSystem producerFileSystem = new(producerCancellation, cancelOnCommit: 1);
+        var producerHarness = CreateHarness(writerFileSystem: producerFileSystem);
+        string producerTarget = Path.Combine(_root, "producer");
+        using (var flow = await OpenProjectFlowAsync(producerHarness, producerTarget))
+        {
+            var selected = (await flow.ResolveGroupAsync(identity, TemplateType.Project)).Group![0];
+            var completed = await selected.InvokeAsync(
+                new(WorkingDirectory.FromExplicit(producerTarget), new Dictionary<string, string?>()), producerCancellation.Token);
+
+            producerCancellation.IsCancellationRequested.Should().BeTrue();
+            selected.Entry.Identity.Should().Be(identity);
+            completed.Status.Should().Be(TemplateInvocationStatus.Success);
+            completed.ConfiguredProjects.Should().Equal(producerTarget);
+            completed.Changes.Select(change => Path.GetFullPath(Path.Combine(producerTarget, change.Path))).Should().BeEquivalentTo(
+                Path.Combine(producerTarget, "host.json"), Path.Combine(producerTarget, "package.json"),
+                Path.Combine(producerTarget, "context.txt"), Path.Combine(producerTarget, ".func", "config.json"));
+            File.ReadAllText(Path.Combine(producerTarget, "host.json")).Should().Be("""{"version":"2.0"}""");
+            using var configuration = JsonDocument.Parse(File.ReadAllText(Path.Combine(producerTarget, ".func", "config.json")));
+            configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+            configuration.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be("JavaScript");
+        }
+
+        using CancellationTokenSource cancellation = new();
+        CancelAfterConfigurationCommitFileSystem fileSystem = new(cancellation, cancelOnCommit: 1);
+        var harness = CreateHarness(writerFileSystem: fileSystem);
+        int? exit = null;
+        var failure = await Record.ExceptionAsync(async () =>
+        {
+            if (boundary == "runner")
+            {
+                await harness.Runner.ExecuteAsync(new(WorkingDirectory.FromExplicit(Target), identity, null, null, null,
+                    false, true, false, false, [], new HashSet<string>(StringComparer.Ordinal)),
+                    new([new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true)]), cancellation.Token);
+            }
+            else
+            {
+                exit = await harness.InvokeAsync([Target, "--template", identity, "--output", boundary], cancellation.Token);
+            }
+        });
+
+        cancellation.IsCancellationRequested.Should().BeTrue();
+        fileSystem.CommittedConfigurations.Should().Equal(Path.Combine(Target, ".func", "config.json"));
+        File.ReadAllText(Path.Combine(Target, "host.json")).Should().Be("""{"version":"2.0"}""");
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
+        failure.Should().BeNull("the producer committed the final configuration before cancellation");
+        harness.Result!.Kind.Should().Be("created");
+        harness.Result.Succeeded.Should().BeTrue();
+        harness.Result.SelectedTemplate!.Identity.Should().Be(identity);
+        harness.Result.Preview!.ConfiguredProjects.Should().BeEmpty();
+        harness.Result.Invocation!.Status.Should().Be(TemplateInvocationStatus.Success);
+        harness.Result.Invocation.ConfiguredProjects.Should().Equal(Target);
+        harness.Result.Invocation.Changes.Should().Contain(change => change.Path.Replace('\\', '/') == ".func/config.json");
+        if (boundary != "runner")
+        {
+            exit.Should().Be(0);
+            if (boundary == "json")
+            {
+                AssertJson("created", planned: 1, completed: 1);
+            }
+            else
+            {
+                _interaction.AllOutput.Should().Contain("SUCCESS:").And.Contain("Completed effects").And.Contain("Configured project:");
+            }
+        }
+
+        await AssertDisposedAsync(harness.Factory);
+        await AssertDisposedAsync(producerHarness.Factory);
+    }
+
+    [Fact]
+    public async Task Command_ConfirmedPartialResultReturnsBeforeCancellation_PreservesFailureAndCompletedRoots()
+    {
+        WriteProject("multi", "Func.Init.Multi", roots: ["api", "worker", "later"]);
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        var fileSystem = WriterFileSystem();
+        string workerConfiguration = Path.Combine(Target, "worker", ".func", "config.json");
+        fileSystem.CreateAllTextAsync(workerConfiguration, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new IOException("controlled finalization failure")));
+        var harness = CreateHarness(writerFileSystem: fileSystem, afterRunnerReturn: result =>
+        {
+            result.Kind.Should().Be("partialInitialization");
+            result.Invocation!.Status.Should().Be(TemplateInvocationStatus.ConfigurationFailure);
+            result.Invocation.ConfiguredProjects.Should().Equal(Path.Combine(Target, "api"));
+            File.Exists(Path.Combine(Target, "api", ".func", "config.json")).Should().BeTrue();
+            cancellation.Cancel();
+        });
+        int? exit = null;
+
+        var failure = await Record.ExceptionAsync(async () =>
+            exit = await harness.InvokeAsync([Target, "--template", "Func.Init.Multi", "--output", "json"], cancellation.Token));
+
+        cancellation.IsCancellationRequested.Should().BeTrue();
+        harness.Result!.Succeeded.Should().BeFalse();
+        harness.Result.Invocation!.Changes.Should().Contain(change => change.Path.Replace('\\', '/') == "api/.func/config.json");
+        File.Exists(workerConfiguration).Should().BeFalse();
+        await fileSystem.DidNotReceive().CreateAllTextAsync(Path.Combine(Target, "later", ".func", "config.json"),
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
+        failure.Should().BeNull("the returned producer-confirmed partial result must not be replaced by late cancellation");
+        exit.Should().Be(1);
+        AssertJson("partialInitialization", planned: 3, completed: 1);
+        _interaction.AllOutput.Should().NotContain("SUCCESS:");
+        await AssertDisposedAsync(harness.Factory);
+    }
+
+    [Fact]
+    public async Task Command_CancellationAfterFirstConfigurationCommit_DoesNotStartRemainingPlanOrRenderSuccess()
+    {
+        WriteProject("multi", "Func.Init.Multi", roots: ["api", "worker"]);
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        CancelAfterConfigurationCommitFileSystem fileSystem = new(cancellation, cancelOnCommit: 1);
+        var harness = CreateHarness(writerFileSystem: fileSystem);
+
+        var failure = await Record.ExceptionAsync(() =>
+            harness.InvokeAsync([Target, "--template", "Func.Init.Multi", "--output", "json"], cancellation.Token));
+
+        fileSystem.CommittedConfigurations.Should().Equal(Path.Combine(Target, "api", ".func", "config.json"));
+        File.Exists(Path.Combine(Target, "api", ".func", "config.json")).Should().BeTrue();
+        File.ReadAllText(Path.Combine(Target, "worker", "host.json")).Should().Be("""{"version":"2.0"}""");
+        Directory.Exists(Path.Combine(Target, "worker", ".func")).Should().BeFalse();
+        failure.Should().BeAssignableTo<OperationCanceledException>();
+        harness.Result.Should().BeNull();
+        _interaction.AllOutput.Should().NotContain("JSON:").And.NotContain("SUCCESS:");
+        await AssertDisposedAsync(harness.Factory);
+    }
+
+    [Theory]
     [InlineData("Boolean")]
     [InlineData("choice")]
     [InlineData("string")]
@@ -940,7 +1077,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
     }
 
     private Harness CreateHarness(IInteractionService? interaction = null, IFileSystem? writerFileSystem = null,
-        IReadOnlyList<IProjectStack>? additionalStacks = null)
+        IReadOnlyList<IProjectStack>? additionalStacks = null, Action<InitExecutionResult>? afterRunnerReturn = null)
     {
         interaction ??= _interaction;
         ServiceCollection services = new();
@@ -992,7 +1129,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
         _providers.Add(provider);
         var scope = provider.CreateScope();
         _scopes.Add(scope);
-        var runner = new RecordingRunner(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>());
+        var runner = new RecordingRunner(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>(), afterRunnerReturn);
         InitExecutionCommand command = new(runner, provider.GetRequiredService<InitExecutionRenderer>(), new([
             new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true),
         ]));
@@ -1079,8 +1216,8 @@ public sealed class InitExecutionJourneyTests : IDisposable
 
     private Task InstallAsync() => TemplateFixtures.InstallAsync(Package, Path.Combine(Home, "templates"), CancellationToken.None);
 
-    private Task<Templater> OpenProjectFlowAsync(Harness harness) => harness.Factory.CreateProjectAsync(
-        new(WorkingDirectory.FromExplicit(Target), new(WorkingDirectory.FromExplicit(Target), stack: null)),
+    private Task<Templater> OpenProjectFlowAsync(Harness harness, string? target = null) => harness.Factory.CreateProjectAsync(
+        new(WorkingDirectory.FromExplicit(target ?? Target), new(WorkingDirectory.FromExplicit(target ?? Target), stack: null)),
         new([new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true)]),
         harness.Provider.GetRequiredService<TemplateProjectSupport>(), CancellationToken.None);
 
@@ -1133,6 +1270,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
     {
         public ServiceProvider Provider => provider;
         public InitExecutionResult? Result => runner.Result;
+        public IInitExecutionRunner Runner => runner;
         public RecordingFactory Factory => factory;
         public int SupportRequests => supportRequests();
         public int CatalogRequests => catalogRequests();
@@ -1141,7 +1279,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
             command.ParseInvocation(args).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellationToken);
     }
 
-    private sealed class RecordingRunner(IInitExecutionRunner inner) : IInitExecutionRunner
+    private sealed class RecordingRunner(IInitExecutionRunner inner, Action<InitExecutionResult>? afterReturn = null) : IInitExecutionRunner
     {
         public InitExecutionResult? Result { get; private set; }
 
@@ -1150,7 +1288,26 @@ public sealed class InitExecutionJourneyTests : IDisposable
         {
             Result = null;
             Result = await inner.ExecuteAsync(request, availability, cancellationToken);
+            afterReturn?.Invoke(Result);
             return Result;
+        }
+    }
+
+    private sealed class CancelAfterConfigurationCommitFileSystem(CancellationTokenSource cancellation, int cancelOnCommit) : PhysicalFileSystem
+    {
+        private readonly CancellationTokenSource _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
+        private readonly List<string> _committedConfigurations = [];
+
+        public IReadOnlyList<string> CommittedConfigurations => _committedConfigurations.AsReadOnly();
+
+        public override void MoveFile(string sourcePath, string destinationPath, bool overwrite = false)
+        {
+            base.MoveFile(sourcePath, destinationPath, overwrite);
+            _committedConfigurations.Add(destinationPath);
+            if (_committedConfigurations.Count == cancelOnCommit)
+            {
+                _cancellation.Cancel();
+            }
         }
     }
 
