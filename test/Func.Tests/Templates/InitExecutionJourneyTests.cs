@@ -71,10 +71,11 @@ public sealed class InitExecutionJourneyTests : IDisposable
         preview.Context.Project.Stack.Should().BeNull();
         preview.Context.Project.Language.Should().BeNull();
         preview.Context.Bundle.Should().BeNull();
-        preview.Invocation!.ProjectConfigurations.Should().ContainSingle().Which.Should()
+        preview.Preview!.ProjectConfigurations.Should().ContainSingle().Which.Should()
             .Be(new TemplateProjectConfigurationPlan(Path.Combine(Target, "host.json"), "node", "JavaScript"));
-        preview.Invocation.ConfiguredProjects.Should().BeEmpty();
-        preview.Invocation.Changes.Should().Contain(change => change.Path.Replace('\\', '/') == ".func/config.json");
+        preview.Preview.ConfiguredProjects.Should().BeEmpty();
+        preview.Preview.Changes.Should().Contain(change => change.Path.Replace('\\', '/') == ".func/config.json");
+        preview.Invocation.Should().BeNull();
         Directory.Exists(Target).Should().BeFalse();
         AssertJson("previewed", planned: 1, completed: 0);
 
@@ -140,18 +141,20 @@ public sealed class InitExecutionJourneyTests : IDisposable
     {
         WriteProject("valid", Low);
         await InstallAsync();
-        var other = Substitute.For<IProjectInitializer>();
+        var other = Substitute.For<IProjectStack>();
         other.Stack.Returns("other");
+        other.DisplayName.Returns("Other");
+        other.WorkerRuntimeAliases.Returns([]);
         other.SupportedLanguages.Returns(["JavaScript"]);
         other.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["JavaScript"] = ["js"] });
-        var harness = CreateHarness(additionalInitializers: [other]);
+        var harness = CreateHarness(additionalStacks: [other]);
 
         int exit = await harness.InvokeAsync([Target, "--language", "js", "--dry-run"]);
 
         exit.Should().Be(0);
-        harness.Result!.Invocation!.ProjectConfigurations.Single().Stack.Should().Be("node");
-        other.ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name == nameof(IProjectInitializer.InitializeAsync)
-            || call.GetMethodInfo().Name == nameof(IProjectInitializer.GetInitOptions));
+        harness.Result!.Preview!.ProjectConfigurations.Single().Stack.Should().Be("node");
+        typeof(IProjectStack).GetMethods().Should().NotContain(method => method.Name == nameof(IProjectInitializer.InitializeAsync)
+            || method.Name == nameof(IProjectInitializer.GetInitOptions));
         Directory.Exists(Target).Should().BeFalse();
     }
 
@@ -309,7 +312,8 @@ public sealed class InitExecutionJourneyTests : IDisposable
         var preview = harness.Result!;
 
         previewExit.Should().Be(0);
-        preview.Invocation!.ProjectConfigurations.Select(plan => plan.Root).Should().Equal(Path.Combine(Target, "api"), Path.Combine(Target, "worker"));
+        preview.Preview!.ProjectConfigurations.Select(plan => plan.Root).Should().Equal(Path.Combine(Target, "api"), Path.Combine(Target, "worker"));
+        preview.Invocation.Should().BeNull();
         Directory.Exists(Target).Should().BeFalse();
         AssertJson("previewed", planned: 2, completed: 0);
 
@@ -343,7 +347,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
         rejected.Should().Be(1);
         rejectedResult.Kind.Should().Be("noCompatibleTemplates");
         accepted.Should().Be(0);
-        harness.Result!.Invocation!.ProjectConfigurations.Select(plan => plan.Language).Should().Equal("JavaScript", "TypeScript");
+        harness.Result!.Preview!.ProjectConfigurations.Select(plan => plan.Language).Should().Equal("JavaScript", "TypeScript");
         Directory.Exists(Target).Should().BeFalse();
     }
 
@@ -456,7 +460,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
         await InstallAsync();
         string workerConfig = Path.Combine(Target, "worker", ".func", "config.json");
         var fileSystem = WriterFileSystem();
-        fileSystem.WriteAllTextAsync(workerConfig, Arg.Any<string>(), Arg.Any<CancellationToken>())
+        fileSystem.CreateAllTextAsync(workerConfig, Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new IOException("controlled finalization failure")));
         var harness = CreateHarness(writerFileSystem: fileSystem);
 
@@ -469,9 +473,16 @@ public sealed class InitExecutionJourneyTests : IDisposable
         File.Exists(Path.Combine(Target, "api", ".func", "config.json")).Should().BeTrue();
         File.Exists(workerConfig).Should().BeFalse();
         File.Exists(Path.Combine(Target, "later", "host.json")).Should().BeTrue();
-        await fileSystem.DidNotReceive().WriteAllTextAsync(Path.Combine(Target, "later", ".func", "config.json"),
+        await fileSystem.DidNotReceive().CreateAllTextAsync(Path.Combine(Target, "later", ".func", "config.json"),
             Arg.Any<string>(), Arg.Any<CancellationToken>());
         AssertJson("partialInitialization", planned: 3, completed: 1);
+        using var json = JsonDocument.Parse(_interaction.Lines.Last(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]);
+        var invocation = json.RootElement.GetProperty("invocation");
+        invocation.GetProperty("plannedChanges").EnumerateArray().Select(change => change.GetProperty("path").GetString()!.Replace('\\', '/'))
+            .Where(path => path.EndsWith("/.func/config.json", StringComparison.Ordinal))
+            .Should().BeEquivalentTo("api/.func/config.json", "worker/.func/config.json", "later/.func/config.json");
+        invocation.GetProperty("completedChanges").EnumerateArray().Select(change => change.GetProperty("path").GetString()!.Replace('\\', '/'))
+            .Where(path => path.EndsWith("/.func/config.json", StringComparison.Ordinal)).Should().Equal("api/.func/config.json");
         _interaction.AllOutput.Should().NotContain("SUCCESS:");
         await AssertDisposedAsync(harness.Factory);
     }
@@ -484,7 +495,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
         using CancellationTokenSource cancellation = new();
         var fileSystem = WriterFileSystem();
         string config = Path.Combine(Target, "api", ".func", "config.json");
-        fileSystem.WriteAllTextAsync(config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        fileSystem.CreateAllTextAsync(config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(_ =>
         {
             cancellation.Cancel();
             return Task.FromCanceled(cancellation.Token);
@@ -494,7 +505,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
         Func<Task> act = () => harness.InvokeAsync([Target, "--template", "Func.Init.Multi"], cancellation.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
-        await fileSystem.DidNotReceive().WriteAllTextAsync(Path.Combine(Target, "worker", ".func", "config.json"),
+        await fileSystem.DidNotReceive().CreateAllTextAsync(Path.Combine(Target, "worker", ".func", "config.json"),
             Arg.Any<string>(), Arg.Any<CancellationToken>());
         File.Exists(Path.Combine(Target, "worker", "host.json")).Should().BeTrue();
         harness.Result.Should().BeNull();
@@ -658,9 +669,10 @@ public sealed class InitExecutionJourneyTests : IDisposable
         harness.Result!.Kind.Should().Be("unsupportedTarget");
         File.ReadAllText(Path.Combine(Target, "appeared.txt")).Should().Be("keep");
         File.Exists(Path.Combine(Target, "host.json")).Should().BeFalse();
-        harness.Result.Invocation.Should().NotBeNull();
-        harness.Result.Invocation!.ProjectConfigurations.Should().ContainSingle();
-        harness.Result.Invocation.ConfiguredProjects.Should().BeEmpty();
+        harness.Result.Preview.Should().NotBeNull();
+        harness.Result.Preview!.ProjectConfigurations.Should().ContainSingle();
+        harness.Result.Preview.ConfiguredProjects.Should().BeEmpty();
+        harness.Result.Invocation.Should().BeNull();
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
 
@@ -672,6 +684,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
         json.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
         json.RootElement.GetProperty("invocation").GetProperty("plannedConfigurations").GetArrayLength().Should().Be(1);
         json.RootElement.GetProperty("invocation").GetProperty("configuredProjects").GetArrayLength().Should().Be(0);
+        json.RootElement.GetProperty("invocation").GetProperty("completedChanges").GetArrayLength().Should().Be(0);
         await AssertDisposedAsync(harness.Factory);
     }
 
@@ -686,6 +699,85 @@ public sealed class InitExecutionJourneyTests : IDisposable
         harness.Result!.Kind.Should().Be("noCompatibleTemplates");
         harness.Result.Diagnostics.Single().Should().Contain("func new install <package>");
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Command_ProjectBundleConstraint_StaysItemOnlyWithoutOpeningExistingProjectContext()
+    {
+        var configuration = WriteProject("bundle", Low, extraConstraint: """
+            "bundle":{"type":"func-bundle","args":{"id":"Microsoft.Azure.Functions.ExtensionBundle","version":"[4.0.0,5.0.0)"}}
+            """);
+        SaveConfiguration("bundle", configuration);
+        await InstallAsync();
+        var harness = CreateHarness();
+        var before = SnapshotHome();
+
+        int exit = await harness.InvokeAsync([Target, "--template", Low, "--dry-run", "--output", "json"]);
+
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("Unavailable");
+        harness.Result.Context!.Project!.Stack.Should().BeNull();
+        harness.Result.Context.Project.Language.Should().BeNull();
+        harness.Result.Context.Bundle.Should().BeNull();
+        harness.Result.Templates.Should().ContainSingle().Which.ConstraintEvaluation.Diagnostics
+            .Should().Contain(diagnostic => diagnostic.Message.Contains("func-bundle", StringComparison.Ordinal));
+        SnapshotHome().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+        await AssertDisposedAsync(harness.Factory);
+    }
+
+    [Fact]
+    public async Task Command_CurrentSupportPair_IsRetainedWithOneAvailabilityOnlyProtectedFlow()
+    {
+        WriteProject("valid", Low);
+        await InstallAsync();
+        var harness = CreateHarness();
+        var support = harness.Provider.GetRequiredService<TemplateProjectSupport>();
+
+        int exit = await harness.InvokeAsync([Target, "--template", Low, "--dry-run"]);
+
+        exit.Should().Be(0);
+        harness.Factory.ProjectSupports.Should().ContainSingle().Which.Should().BeSameAs(support);
+        harness.SupportRequests.Should().Be(1);
+        harness.CatalogRequests.Should().Be(1);
+        harness.Provider.GetRequiredService<Func<InstalledProjectStackCatalog>>()()
+            .Should().BeSameAs(harness.Provider.GetRequiredService<InstalledProjectStackCatalog>());
+        support.Planner.Should().BeSameAs(harness.Provider.GetRequiredService<TemplateProjectConfigurationPlanner>());
+        support.Writer.Should().BeSameAs(harness.Provider.GetRequiredService<TemplateProjectConfigurationWriter>());
+        harness.Factory.Contexts.Should().ContainSingle().Which.Should().BeSameAs(harness.Result!.Context);
+        harness.Factory.Availability.Should().ContainSingle().Which.Workloads.Should().ContainSingle()
+            .Which.Aliases.Should().Equal("node");
+        harness.Result.Context!.Bundle.Should().BeNull();
+        Directory.Exists(Target).Should().BeFalse();
+        await AssertDisposedAsync(harness.Factory);
+    }
+
+    [Fact]
+    public async Task Command_ConflictingInstalledMetadata_ReturnsStructuredFailureWithoutSupportStoreOrFiles()
+    {
+        WriteProject("valid", Low);
+        await InstallAsync();
+        var duplicate = Substitute.For<IProjectStack>();
+        duplicate.Stack.Returns("node");
+        duplicate.DisplayName.Returns("Conflicting Node");
+        duplicate.WorkerRuntimeAliases.Returns([]);
+        duplicate.SupportedLanguages.Returns(["JavaScript"]);
+        duplicate.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>());
+        var harness = CreateHarness(additionalStacks: [duplicate]);
+        var before = SnapshotHome();
+
+        int exit = await harness.InvokeAsync([Target, "--template", Low, "--output", "json"]);
+
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("duplicateStacks");
+        harness.Result.Succeeded.Should().BeFalse();
+        harness.SupportRequests.Should().Be(0);
+        harness.CatalogRequests.Should().Be(1);
+        harness.Factory.Contexts.Should().BeEmpty();
+        harness.Factory.ProjectSupports.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+        SnapshotHome().Should().BeEquivalentTo(before);
+        _interaction.AllOutput.Should().Contain("\"kind\":\"duplicateStacks\"").And.NotContain("SUCCESS:");
     }
 
     [Theory]
@@ -848,7 +940,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
     }
 
     private Harness CreateHarness(IInteractionService? interaction = null, IFileSystem? writerFileSystem = null,
-        IReadOnlyList<IProjectInitializer>? additionalInitializers = null)
+        IReadOnlyList<IProjectStack>? additionalStacks = null)
     {
         interaction ??= _interaction;
         ServiceCollection services = new();
@@ -866,12 +958,13 @@ public sealed class InitExecutionJourneyTests : IDisposable
         services.AddSingleton<IProfileSource, BuiltInProfileSource>();
         services.AddSingleton<IProfileCatalog, ProfileCatalog>();
         services.AddSingleton<IProfileResolver, ProfileResolver>();
-        foreach (IProjectInitializer initializer in additionalInitializers ?? [])
+        foreach (IProjectStack stack in additionalStacks ?? [])
         {
-            services.AddSingleton(initializer);
+            services.AddSingleton(stack);
         }
 
         new NodeWorkload().Configure(new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo("Controlled.Node")));
+        services.AddSingleton<InstalledProjectStackCatalog>();
         services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
         services.AddTemplatesOrchestrator();
         var factory = new RecordingFactory(new TemplaterFactory(new TemplateStore(
@@ -882,6 +975,19 @@ public sealed class InitExecutionJourneyTests : IDisposable
             services.AddSingleton(new TemplateProjectConfigurationWriter(writerFileSystem));
         }
 
+        services.AddSingleton<TemplateProjectSupport>();
+        int supportRequests = 0;
+        int catalogRequests = 0;
+        services.AddSingleton<Func<InstalledProjectStackCatalog>>(provider => () =>
+        {
+            catalogRequests++;
+            return provider.GetRequiredService<InstalledProjectStackCatalog>();
+        });
+        services.AddSingleton<Func<TemplateProjectSupport>>(provider => () =>
+        {
+            supportRequests++;
+            return provider.GetRequiredService<TemplateProjectSupport>();
+        });
         ServiceProvider provider = services.BuildServiceProvider();
         _providers.Add(provider);
         var scope = provider.CreateScope();
@@ -890,7 +996,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
         InitExecutionCommand command = new(runner, provider.GetRequiredService<InitExecutionRenderer>(), new([
             new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true),
         ]));
-        return new(provider, command, runner, factory);
+        return new(provider, command, runner, factory, () => supportRequests, () => catalogRequests);
     }
 
     private void WriteVariants()
@@ -976,8 +1082,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
     private Task<Templater> OpenProjectFlowAsync(Harness harness) => harness.Factory.CreateProjectAsync(
         new(WorkingDirectory.FromExplicit(Target), new(WorkingDirectory.FromExplicit(Target), stack: null)),
         new([new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true)]),
-        harness.Provider.GetRequiredService<TemplateProjectConfigurationPlanner>(),
-        harness.Provider.GetRequiredService<TemplateProjectConfigurationWriter>(), CancellationToken.None);
+        harness.Provider.GetRequiredService<TemplateProjectSupport>(), CancellationToken.None);
 
     private Dictionary<string, string> SnapshotHome() => Directory.GetFiles(Path.Combine(Home, "templates"), "*", SearchOption.AllDirectories)
         .ToDictionary(path => Path.GetRelativePath(Home, path), File.ReadAllText);
@@ -989,6 +1094,10 @@ public sealed class InitExecutionJourneyTests : IDisposable
         var invocation = json.RootElement.GetProperty("invocation");
         invocation.GetProperty("plannedConfigurations").GetArrayLength().Should().Be(planned);
         invocation.GetProperty("configuredProjects").GetArrayLength().Should().Be(completed);
+        if (kind == "previewed")
+        {
+            invocation.GetProperty("completedChanges").GetArrayLength().Should().Be(0);
+        }
     }
 
     private static IInteractionService Interactive()
@@ -1004,8 +1113,9 @@ public sealed class InitExecutionJourneyTests : IDisposable
     {
         var fileSystem = Substitute.For<IFileSystem>();
         fileSystem.FileExists(Arg.Any<string>()).Returns(call => File.Exists(call.Arg<string>()));
-        fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(call => new PhysicalFileSystem().WriteAllTextAsync(call.ArgAt<string>(0), call.ArgAt<string>(1), call.ArgAt<CancellationToken>(2)));
+        fileSystem.DirectoryExists(Arg.Any<string>()).Returns(call => Directory.Exists(call.Arg<string>()));
+        fileSystem.CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => new PhysicalFileSystem().CreateAllTextAsync(call.ArgAt<string>(0), call.ArgAt<string>(1), call.ArgAt<CancellationToken>(2)));
         return fileSystem;
     }
 
@@ -1018,11 +1128,14 @@ public sealed class InitExecutionJourneyTests : IDisposable
         }
     }
 
-    private sealed class Harness(ServiceProvider provider, InitExecutionCommand command, RecordingRunner runner, RecordingFactory factory)
+    private sealed class Harness(ServiceProvider provider, InitExecutionCommand command, RecordingRunner runner,
+        RecordingFactory factory, Func<int> supportRequests, Func<int> catalogRequests)
     {
         public ServiceProvider Provider => provider;
         public InitExecutionResult? Result => runner.Result;
         public RecordingFactory Factory => factory;
+        public int SupportRequests => supportRequests();
+        public int CatalogRequests => catalogRequests();
 
         public Task<int> InvokeAsync(string[] args, CancellationToken cancellationToken = default) =>
             command.ParseInvocation(args).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellationToken);
@@ -1045,6 +1158,8 @@ public sealed class InitExecutionJourneyTests : IDisposable
     {
         public List<TemplateEngineContext> Contexts { get; } = [];
         public List<Templater> Templaters { get; } = [];
+        public List<TemplateProjectSupport> ProjectSupports { get; } = [];
+        public List<TemplateConstraintEvaluationSnapshot> Availability { get; } = [];
 
         public Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
             => throw new InvalidOperationException("INIT must use the project-capable flow.");
@@ -1054,11 +1169,12 @@ public sealed class InitExecutionJourneyTests : IDisposable
             => throw new InvalidOperationException("INIT must use the project-capable flow.");
 
         public async Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
-            TemplateProjectConfigurationPlanner planner, TemplateProjectConfigurationWriter writer, CancellationToken cancellationToken,
-            Action<TemplateStoreWaitReason>? waiting = null)
+            TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
         {
             Contexts.Add(context);
-            var templater = await inner.CreateProjectAsync(context, snapshot, planner, writer, cancellationToken, waiting);
+            ProjectSupports.Add(projectSupport);
+            Availability.Add(snapshot);
+            var templater = await inner.CreateProjectAsync(context, snapshot, projectSupport, cancellationToken, waiting);
             Templaters.Add(templater);
             return templater;
         }

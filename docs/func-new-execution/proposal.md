@@ -64,6 +64,14 @@ files or a standalone package.json do not establish a separate Functions root.
 An unrecognized marked root is a repair error, not permission to borrow context
 from an outer project.
 
+The composed factory uses workload-only availability; the resolved bundle
+identity and version come solely from the immutable command context. The
+consumer remains an item-only `CreateAsync` caller. Its test factory follows
+the paired `TemplateProjectSupport` signature without enabling project creation.
+Installed initializer language metadata delegates to the existing workload
+stack metadata; this consumer does not introduce a second catalog or generation
+policy.
+
 One disposable native environment spans item listing/resolution, language and
 argument filtering before precedence, family/candidate selection, required-only
 completion, canonical reparse and exact-capability preview/create. The host name
@@ -98,8 +106,10 @@ or `func profile set`, not an unsupported `--profile` option.
 Public cutover still requires production native `FuncTemplate` inventory and
 package lifecycle/trust wiring; .NET/Node/Python restore/build/start/invocation
 baselines and replacement coverage; template-specific help integration; and a
-qualified startup availability handoff. The lower runtime's cached-versus-current
-mounted-type and nondeterministic filename/output-topology repair is owned by its
-foundation change. Until that repair is propagated and affected controls rerun,
-this consumer does not qualify those known-old runtime behaviors or claim a
-fully protected public replacement. No package IDs or feeds are guessed here.
+qualified startup availability handoff. The published parent runtime owns mounted
+validation and output-boundary behavior; ordinary composed consumer checks do
+not independently qualify its guard algorithms, concurrency or wider topology.
+Parent runtime results and earlier consumer results are not evidence for a new
+composed tree. This staged consumer is not a fully qualified public replacement.
+Project-template create-only configuration remains distinct from legacy
+init/adoption/repair persistence. No package IDs or feeds are guessed here.

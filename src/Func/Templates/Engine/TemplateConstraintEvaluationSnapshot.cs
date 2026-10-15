@@ -1,17 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using NuGet.Versioning;
-
 namespace Azure.Functions.Cli.Templates.Engine;
 
-internal sealed class TemplateConstraintEvaluationSnapshot(IReadOnlyCollection<TemplateConstraintWorkload> workloads, string? bundleId = null, NuGetVersion? bundleVersion = null)
+internal sealed class TemplateConstraintEvaluationSnapshot(IReadOnlyCollection<TemplateConstraintWorkload> workloads)
 {
     public IReadOnlyList<TemplateConstraintWorkload> Workloads { get; } = CaptureWorkloads(workloads);
-
-    public string? BundleId { get; } = bundleId;
-
-    public NuGetVersion? BundleVersion { get; } = bundleVersion;
 
     private static IReadOnlyList<TemplateConstraintWorkload> CaptureWorkloads(IReadOnlyCollection<TemplateConstraintWorkload> workloads)
     {

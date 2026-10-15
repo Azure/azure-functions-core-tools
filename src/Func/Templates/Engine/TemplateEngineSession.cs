@@ -30,31 +30,19 @@ internal class TemplateEngineSession : IDisposable
     private readonly TemplatePackageManager _packageManager;
     private readonly TemplateConstraintManager _constraintManager;
     private readonly TemplateCreator _creator;
-    private readonly TemplateProjectConfigurationPlanner? _projectPlanner;
-    private readonly TemplateProjectConfigurationWriter? _configurationWriter;
+    private readonly TemplateProjectSupport? _projectSupport;
     private readonly IDisposable? _ownership;
     private readonly TemplateStoreEngineDiagnostics? _diagnostics;
     private bool _disposed;
 
     public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null,
-        TemplateProjectConfigurationPlanner? projectPlanner = null, TemplateProjectConfigurationWriter? configurationWriter = null,
+        TemplateProjectSupport? projectSupport = null,
         IDisposable? ownership = null, TemplateStoreEngineDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
-        if (projectPlanner is not null)
-        {
-            ArgumentNullException.ThrowIfNull(configurationWriter);
-        }
-
-        if (configurationWriter is not null)
-        {
-            ArgumentNullException.ThrowIfNull(projectPlanner);
-        }
-
         Context = context;
-        _projectPlanner = projectPlanner;
-        _configurationWriter = configurationWriter;
+        _projectSupport = projectSupport;
         _ownership = ownership;
         _diagnostics = diagnostics;
         _settings = new(new FuncTemplateEngineHost(context, snapshot, diagnostics), settingsLocation: settingsLocation);
@@ -65,17 +53,17 @@ internal class TemplateEngineSession : IDisposable
 
     public TemplateEngineContext Context { get; }
 
-    public bool ProjectTemplatesEnabled => _projectPlanner is not null;
+    public bool ProjectTemplatesEnabled => _projectSupport is not null;
 
     public IReadOnlyList<TemplateProjectConfigurationDeclaration> ValidateProjectConfiguration(string configuration)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_projectPlanner is null)
+        if (_projectSupport is null)
         {
             throw new InvalidTemplateMetadataException("Mandatory project configuration is not enabled in this template flow.");
         }
 
-        return _projectPlanner.Read(configuration);
+        return _projectSupport.Planner.Read(configuration);
     }
 
     public IEngineEnvironmentSettings Settings
@@ -141,7 +129,7 @@ internal class TemplateEngineSession : IDisposable
         content.Position = 0;
         using var reader = new StreamReader(content);
         string configuration = await reader.ReadToEndAsync(cancellationToken);
-        return new(configuration, fingerprint);
+        return new(configuration, fingerprint, TemplateCatalogProjector.GetTemplateType(loaded), Array.AsReadOnly<ITemplateParameter>([.. loaded.ParameterDefinitions]));
     }
 
     public virtual async Task<IReadOnlyCollection<string>> ReadPackageTypesAsync(ITemplatePackage? package, CancellationToken cancellationToken)
@@ -229,36 +217,25 @@ internal class TemplateEngineSession : IDisposable
         ArgumentNullException.ThrowIfNull(request);
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
-        TemplateConfigurationSnapshot current;
-        try
+        TemplateInvocationResult? configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+        if (configurationFailure is not null)
         {
-            current = await ReadConfigurationAsync(template, cancellationToken);
-        }
-        catch (InvalidTemplateMetadataException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], exception.Message);
-        }
-        catch (IOException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable: {exception.Message}");
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
+            return configurationFailure;
         }
 
-        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
+        string? topologyFailure = TemplateOutputPathValidator.GetDiagnostic(configuration.Content, GetPopulatedParameters(template, configuration, request));
+        if (topologyFailure is not null)
         {
-            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed. Rerun selection.");
+            return new(TemplateInvocationStatus.InvalidTemplate, [], topologyFailure);
         }
 
-        using var document = JsonDocument.Parse(current.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
-        bool isProject = TemplateCatalogProjector.GetTemplateType(template) == TemplateType.Project;
-        if (isProject)
+        using var document = JsonDocument.Parse(configuration.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+        TemplateProjectSupport? projectSupport = configuration.Type == TemplateType.Project ? _projectSupport : null;
+        if (projectSupport is not null)
         {
             try
             {
-                ValidateProjectConfiguration(current.Content);
+                ValidateProjectConfiguration(configuration.Content);
             }
             catch (InvalidTemplateMetadataException exception)
             {
@@ -280,10 +257,11 @@ internal class TemplateEngineSession : IDisposable
             return new(MapCreationStatus(preview.Status, cancellationToken), [], preview.ErrorMessage ?? preview.Status.ToString());
         }
 
-        IReadOnlyList<TemplateFileChange> changes = Array.AsReadOnly<TemplateFileChange>(
+        IReadOnlyList<TemplateFileChange> templateChanges = Array.AsReadOnly<TemplateFileChange>(
             [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+        IReadOnlyList<TemplateFileChange> changes = templateChanges;
         IReadOnlyList<TemplateProjectConfigurationPlan> configurationPlans = [];
-        if (isProject)
+        if (projectSupport is not null)
         {
             try
             {
@@ -292,11 +270,10 @@ internal class TemplateEngineSession : IDisposable
                     return new(TemplateInvocationStatus.InvalidTemplate, [], "Project preview did not produce a configuration plan.");
                 }
 
-                configurationPlans = _projectPlanner!.CreatePlans(current.Content, preview.CreationEffects, output);
-                if (configurationPlans.Any(plan => _settings.Host.FileSystem.FileExists(plan.ConfigurationPath)
-                    || _settings.Host.FileSystem.DirectoryExists(plan.ConfigurationPath)))
+                configurationPlans = projectSupport.Planner.CreatePlans(configuration.Content, preview.CreationEffects, output);
+                if (configurationPlans.Any(projectSupport.Writer.ConfigurationExists))
                 {
-                    return new(TemplateInvocationStatus.FileConflict, changes, "Existing project configuration is user-owned. Use the existing initializer to adopt or repair it.")
+                    return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic)
                     {
                         ProjectConfigurations = configurationPlans,
                     };
@@ -338,35 +315,10 @@ internal class TemplateEngineSession : IDisposable
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        try
+        configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+        if (configurationFailure is not null)
         {
-            current = await ReadConfigurationAsync(template, cancellationToken);
-        }
-        catch (InvalidTemplateMetadataException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], exception.Message) { ProjectConfigurations = configurationPlans };
-        }
-        catch (IOException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}")
-            {
-                ProjectConfigurations = configurationPlans,
-            };
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}")
-            {
-                ProjectConfigurations = configurationPlans,
-            };
-        }
-
-        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
-        {
-            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed after preview. Rerun selection.")
-            {
-                ProjectConfigurations = configurationPlans,
-            };
+            return configurationFailure with { ProjectConfigurations = configurationPlans };
         }
 
         outputFailure = ValidateOutputPaths(output, changes);
@@ -379,12 +331,37 @@ internal class TemplateEngineSession : IDisposable
         cancellationToken.ThrowIfCancellationRequested();
         if (created.Status != CreationResultStatus.Success)
         {
-            return new(MapCreationStatus(created.Status, cancellationToken), changes, created.ErrorMessage ?? created.Status.ToString())
+            return new(MapCreationStatus(created.Status, cancellationToken), [], created.ErrorMessage ?? created.Status.ToString())
             {
                 ProjectConfigurations = configurationPlans,
             };
         }
 
+        if (created.CreationEffects is null)
+        {
+            return new(TemplateInvocationStatus.EngineFailure, [], "The template engine did not report creation effects.")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
+        }
+
+        IReadOnlyList<TemplateFileChange> written = Array.AsReadOnly<TemplateFileChange>(
+            [.. created.CreationEffects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+        if (!written.Select(change => change.Path).Order(StringComparer.Ordinal).SequenceEqual(templateChanges.Select(change => change.Path).Order(StringComparer.Ordinal), StringComparer.Ordinal)
+            || written.Any(change => _settings.Host.FileSystem.FileExists(Path.Combine(output, change.Path)) == string.Equals(change.Kind, "Delete", StringComparison.Ordinal)))
+        {
+            return new(TemplateInvocationStatus.EngineFailure, [], "Template creation did not produce the validated output paths.")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
+        }
+
+        if (projectSupport is null)
+        {
+            return new(TemplateInvocationStatus.Success, written);
+        }
+
+        List<TemplateFileChange> completedChanges = [.. written];
         List<string> configuredProjects = [];
         foreach (TemplateProjectConfigurationPlan plan in configurationPlans)
         {
@@ -392,7 +369,7 @@ internal class TemplateEngineSession : IDisposable
             outputFailure = ValidateOutputPaths(output, changes);
             if (outputFailure is not null)
             {
-                return new(TemplateInvocationStatus.ConfigurationFailure, changes, outputFailure)
+                return new(TemplateInvocationStatus.ConfigurationFailure, completedChanges.AsReadOnly(), outputFailure)
                 {
                     ProjectConfigurations = configurationPlans,
                     ConfiguredProjects = configuredProjects.AsReadOnly(),
@@ -401,26 +378,27 @@ internal class TemplateEngineSession : IDisposable
 
             try
             {
-                await _configurationWriter!.WriteAsync(plan, cancellationToken);
+                await projectSupport.Writer.WriteAsync(plan, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
             }
             catch (IOException exception)
             {
-                return ConfigurationFailure(exception, changes, configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
+                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
             }
             catch (UnauthorizedAccessException exception)
             {
-                return ConfigurationFailure(exception, changes, configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
+                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
             }
             catch (InvalidOperationException exception)
             {
-                return ConfigurationFailure(exception, changes, configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
+                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
             }
 
             configuredProjects.Add(plan.Root);
+            completedChanges.Add(new(Path.GetRelativePath(output, plan.ConfigurationPath), "Create"));
         }
 
-        return new(TemplateInvocationStatus.Success, changes)
+        return new(TemplateInvocationStatus.Success, completedChanges.AsReadOnly())
         {
             ProjectConfigurations = configurationPlans,
             ConfiguredProjects = configuredProjects.AsReadOnly(),
@@ -435,6 +413,91 @@ internal class TemplateEngineSession : IDisposable
         {
             ConfiguredProjects = configuredProjects.AsReadOnly(),
         };
+    }
+
+    private async Task<TemplateInvocationResult?> ValidateSelectedConfigurationAsync(ITemplateInfo template, TemplateConfigurationSnapshot configuration, CancellationToken cancellationToken)
+    {
+        TemplateConfigurationSnapshot current;
+        try
+        {
+            current = await ReadConfigurationAsync(template, cancellationToken);
+        }
+        catch (InvalidTemplateMetadataException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is invalid. Rerun selection: {exception.Message}");
+        }
+        catch (IOException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
+        }
+
+        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
+        {
+            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed. Rerun selection.");
+        }
+
+        bool qualified = current.Type == TemplateType.Item || (current.Type == TemplateType.Project && ProjectTemplatesEnabled);
+        return qualified && current.Type == configuration.Type
+            ? null
+            : new(TemplateInvocationStatus.InvalidTemplate, [], ProjectTemplatesEnabled
+                ? "Current mounted template type is not qualified for this invocation flow. Correct its type and rerun selection."
+                : "Current mounted template type is not a qualified item template. Correct its type and rerun selection.");
+    }
+
+    private Dictionary<string, object> GetPopulatedParameters(ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request)
+    {
+        if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
+        {
+            throw new InvalidOperationException($"Selected template '{template.Identity}' has no registered generator.");
+        }
+
+        string? name = !string.IsNullOrEmpty(request.Name) ? request.Name
+            : template.PreferDefaultName || string.IsNullOrEmpty(request.OutputDirectory.Info.Name) ? template.DefaultName
+            : request.OutputDirectory.Info.Name;
+        Dictionary<string, object> values = new(StringComparer.Ordinal);
+        foreach (ITemplateParameter parameter in configuration.Parameters)
+        {
+            if (parameter.Precedence.PrecedenceDefinition is PrecedenceDefinition.Disabled or PrecedenceDefinition.ConditionalyDisabled)
+            {
+                continue;
+            }
+
+            string? value = null;
+            if (!parameter.IsName)
+            {
+                _settings.Host.TryGetHostParamDefault(parameter.Name, out value);
+                if (value is null && !parameter.Precedence.CanBeRequired)
+                {
+                    value = parameter.DefaultValue;
+                }
+            }
+
+            object? converted = parameter.IsName ? name : null;
+            if (request.Parameters.TryGetValue(parameter.Name, out string? supplied))
+            {
+                value = supplied ?? parameter.DefaultIfOptionWithoutValue;
+            }
+
+            if (value is not null)
+            {
+                converted = generator.ConvertParameterValueToType(_settings, parameter, value, out bool error);
+                if (error)
+                {
+                    continue;
+                }
+            }
+
+            if (converted is not null)
+            {
+                values[parameter.Name] = converted;
+            }
+        }
+
+        return values;
     }
 
     private static TemplateInvocationStatus MapCreationStatus(CreationResultStatus status, CancellationToken cancellationToken)
@@ -466,7 +529,8 @@ internal class TemplateEngineSession : IDisposable
                 return "Template output escapes the requested output directory.";
             }
 
-            while (path is not null)
+            // The requested output directory is the boundary; linked parents do not redirect individual template paths.
+            while (path is not null && !string.Equals(Path.TrimEndingDirectorySeparator(path), Path.TrimEndingDirectorySeparator(output), StringComparison.Ordinal))
             {
                 try
                 {
