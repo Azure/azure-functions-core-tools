@@ -147,7 +147,11 @@ internal sealed class InitExecutionCommand : FuncCliCommand
             parseResult.GetValue(StackOption), parseResult.GetValue(LanguageOption), parseResult.GetValue(ForceOption),
             parseResult.GetValue(NonInteractiveOption), parseResult.GetValue(DryRunOption), json, Array.AsReadOnly(raw), CollectReservedAliases());
         InitExecutionResult result = await _runner.ExecuteAsync(request, _availability, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
+        if (!InitExecutionRunner.HasConfirmedCreationResult(result, request.DryRun))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
         return _renderer.Render(result, json);
     }
 

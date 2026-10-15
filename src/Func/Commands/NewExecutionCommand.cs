@@ -208,7 +208,11 @@ internal sealed class NewExecutionCommand : FuncCliCommand
             Array.AsReadOnly(raw),
             CollectReservedAliases());
         NewExecutionResult result = await _runner.ExecuteAsync(request, _availability, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
+        if (request.DryRun || !result.HasCompletedCreation)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
         return _renderer.Render(result, json);
     }
 

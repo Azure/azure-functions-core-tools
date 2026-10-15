@@ -109,4 +109,24 @@ public sealed class NewExecutionContractTests
         act.Should().Throw<ArgumentNullException>().WithParameterName("result");
         _interaction.ReceivedCalls().Should().BeEmpty();
     }
+
+    [Theory]
+    [InlineData("created", true, "Success", true)]
+    [InlineData("created", false, "Success", false)]
+    [InlineData("previewed", true, "Success", false)]
+    [InlineData("listed", true, "Success", false)]
+    [InlineData("invocationFailed", false, "FileConflict", false)]
+    [InlineData("created", true, "FileConflict", false)]
+    [InlineData("created", true, "Failed", false)]
+    [InlineData("created", true, null, false)]
+    public void CompletedCreation_RequiresSuccessfulCreatedPhaseNotEffects(
+        string kind, bool succeeded, string? status, bool completed)
+    {
+        NewExecutionResult result = new(kind, succeeded)
+        {
+            Invocation = status is not null ? new(Enum.Parse<TemplateInvocationStatus>(status), []) : null,
+        };
+
+        result.HasCompletedCreation.Should().Be(completed);
+    }
 }
