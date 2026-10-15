@@ -115,14 +115,15 @@ public sealed class TemplaterFactoryTests : IDisposable
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), Path.Combine(Home, "templates"));
         ITemplaterFactory factory = new TemplaterFactory(new(Home));
-        var initializer = Substitute.For<IProjectInitializer>();
+        var initializer = Substitute.For<IProjectStack>();
         initializer.Stack.Returns("python");
+        initializer.DisplayName.Returns("Python");
         initializer.SupportedLanguages.Returns(["Python"]);
         initializer.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["Python"] = ["py"] });
-        TemplateProjectConfigurationPlanner planner = new([initializer]);
+        TemplateProjectConfigurationPlanner planner = new(new([initializer]));
         TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
 
-        using Templater project = factory.CreateProject(Context("project"), new([]), planner, writer);
+        using Templater project = factory.CreateProject(Context("project"), new([]), new(planner, writer));
         using Templater ordinary = factory.Create(Context("ordinary"));
         var eligible = await project.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
         var gated = await ordinary.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
@@ -133,18 +134,76 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Theory]
+    [InlineData(true, "4.20", true)]
+    [InlineData(false, "4.20", false)]
+    [InlineData(true, "4.10", false)]
+    [InlineData(true, null, false)]
+    public async Task CreateProject_WorkloadsAndBundle_KeepProjectAndItemEligibilitySeparate(bool usable, string? bundleVersion, bool allowed)
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var path = Path.Combine(package, "project", ".template.config", "template.json");
+        var configuration = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
+        configuration["constraints"]!["stack"] = System.Text.Json.Nodes.JsonNode.Parse("""{"type":"func-workload","args":"python"}""");
+        File.WriteAllText(path, configuration.ToJsonString());
+        await TemplateFixtures.InstallAsync(package, Path.Combine(Home, "templates"));
+        var itemPackage = TemplateFixtures.WriteJourneyPackage(_root);
+        var itemPath = Path.Combine(itemPackage, "item", ".template.config", "template.json");
+        var itemConfiguration = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(itemPath))!;
+        itemConfiguration["constraints"]!["stack"]!["args"] = "python";
+        itemConfiguration["constraints"]!["bundle"] = System.Text.Json.Nodes.JsonNode.Parse("""{"type":"func-bundle","args":"[4.20,5.0)"}""");
+        File.WriteAllText(itemPath, itemConfiguration.ToJsonString());
+        await TemplateFixtures.InstallAsync(itemPackage, Path.Combine(Home, "templates"));
+        ITemplaterFactory factory = new TemplaterFactory(new(Home));
+        var stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns("python");
+        stack.DisplayName.Returns("Python");
+        stack.SupportedLanguages.Returns(["Python"]);
+        stack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["Python"] = ["py"] });
+        TemplateProjectConfigurationPlanner planner = new(new([stack]));
+        var context = new TemplateEngineContext(Context("composed").CommandDirectory,
+            bundle: bundleVersion is null ? null : new("bundle", bundleVersion));
+        using Templater templater = factory.CreateProject(context, new([new("python-package", NuGetVersion.Parse("1.0"), ["python"], usable)]),
+            new(planner, new(new PhysicalFileSystem())));
+
+        var result = await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
+        var item = await templater.ResolveGroupAsync("Func.Tests.Journey", TemplateType.Item, CancellationToken.None);
+
+        item.Status.Should().Be(allowed ? TemplateResolutionStatus.Success : TemplateResolutionStatus.Unavailable);
+        if (!allowed)
+        {
+            item.Group.Should().BeEmpty();
+            item.Diagnostics.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Restricted);
+        }
+
+        result.Status.Should().Be(usable ? TemplateResolutionStatus.Success : TemplateResolutionStatus.Unavailable);
+        if (usable)
+        {
+            var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "composed-project-output"));
+            var created = await result.Group![0].InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+            created.Status.Should().Be(TemplateInvocationStatus.Success);
+            created.ConfiguredProjects.Should().Equal(output.Info.FullName);
+            File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeTrue();
+        }
+        else
+        {
+            result.Group.Should().BeEmpty();
+            result.Diagnostics.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Restricted);
+        }
+    }
+
+    [Theory]
     [InlineData("context")]
     [InlineData("snapshot")]
-    [InlineData("planner")]
-    [InlineData("writer")]
+    [InlineData("projectSupport")]
     public void CreateProject_NullDependency_Throws(string argument)
     {
         ITemplaterFactory factory = new TemplaterFactory(new(Home));
-        TemplateProjectConfigurationPlanner planner = new([]);
+        TemplateProjectConfigurationPlanner planner = new(new([]));
         TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
 
         Action create = () => factory.CreateProject(argument == "context" ? null! : Context("project"),
-            argument == "snapshot" ? null! : new([]), argument == "planner" ? null! : planner, argument == "writer" ? null! : writer);
+            argument == "snapshot" ? null! : new([]), argument == "projectSupport" ? null! : new(planner, writer));
 
         create.Should().Throw<ArgumentNullException>().WithParameterName(argument);
     }

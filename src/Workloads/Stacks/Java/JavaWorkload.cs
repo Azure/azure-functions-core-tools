@@ -23,6 +23,8 @@ public sealed class JavaWorkload : Workload
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.AddSingleton<JavaProjectStack>();
+        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<JavaProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, JavaProjectInitializer>();
         builder.AddProjectFactory(new JavaProjectFactory());
     }

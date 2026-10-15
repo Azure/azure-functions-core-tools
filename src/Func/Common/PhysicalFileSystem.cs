@@ -6,7 +6,7 @@ using System.IO.Compression;
 namespace Azure.Functions.Cli.Common;
 
 /// <inheritdoc cref="IFileSystem" />
-internal sealed class PhysicalFileSystem : IFileSystem
+internal class PhysicalFileSystem : IFileSystem
 {
     // ── File operations ─────────────────────────────────────────────────────
 
@@ -24,17 +24,25 @@ internal sealed class PhysicalFileSystem : IFileSystem
         return await File.ReadAllTextAsync(path, cancellationToken);
     }
 
-    public async Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
+    public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
+        => WriteAllTextAsync(path, contents, overwrite: true, cancellationToken);
+
+    public Task CreateAllTextAsync(string path, string contents, CancellationToken cancellationToken)
+        => WriteAllTextAsync(path, contents, overwrite: false, cancellationToken);
+
+    private async Task WriteAllTextAsync(string path, string contents, bool overwrite, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(contents);
+        cancellationToken.ThrowIfCancellationRequested();
 
         EnsureParentDirectory(path);
         string tempPath = path + ".tmp." + Guid.NewGuid().ToString("N")[..8];
         try
         {
             await File.WriteAllTextAsync(tempPath, contents, cancellationToken);
-            File.Move(tempPath, path, overwrite: true);
+            cancellationToken.ThrowIfCancellationRequested();
+            MoveFile(tempPath, path, overwrite);
         }
         finally
         {
@@ -50,7 +58,7 @@ internal sealed class PhysicalFileSystem : IFileSystem
         await content.CopyToAsync(file, cancellationToken);
     }
 
-    public void MoveFile(string sourcePath, string destinationPath, bool overwrite = false) =>
+    public virtual void MoveFile(string sourcePath, string destinationPath, bool overwrite = false) =>
         File.Move(sourcePath, destinationPath, overwrite);
 
     public void CopyFile(string sourcePath, string destinationPath) =>
