@@ -293,10 +293,12 @@ public sealed class TemplateStoreTests : IDisposable
     public async Task FailedReadBootstrap_ReleasesSharedOwnership()
     {
         var store = Store();
-        var snapshot = new TemplateConstraintEvaluationSnapshot([], "bundle", NuGet.Versioning.NuGetVersion.Parse("4.20"));
-        Func<Task> action = () => store.OpenReadAsync(Context(), CancellationToken.None, snapshot);
+        var loggerFactory = Substitute.For<ILoggerFactory>();
+        loggerFactory.CreateLogger(Arg.Any<string>()).Returns(_ => throw new InvalidOperationException("Injected native bootstrap failure."));
+        var failingStore = new TemplateStore(new(_root), new PhysicalFileSystem(), new FileTemplateStoreLock(), loggerFactory);
+        Func<Task> action = () => failingStore.OpenReadAsync(Context(), CancellationToken.None);
 
-        await action.Should().ThrowAsync<ArgumentException>();
+        await action.Should().ThrowAsync<InvalidOperationException>().WithMessage("Injected native bootstrap failure.");
 
         using var writer = await store.OpenWriteAsync(Context(), CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
         writer.State.Should().Be(TemplateStoreTransactionState.Ready);
@@ -427,12 +429,12 @@ public sealed class TemplateStoreTests : IDisposable
         using var cancellation = new CancellationTokenSource();
         Action<TemplateStoreWaitReason> waiting = _ => { };
         using var engine = new TemplateEngineSession(context, Path.Combine(_root, "isolated"));
-        boundary.OpenReadAsync(context, cancellation.Token, snapshot, null, null, waiting).Returns(engine);
+        boundary.OpenReadAsync(context, cancellation.Token, snapshot, null, waiting).Returns(engine);
         var factory = new TemplaterFactory(boundary);
 
         using var flow = await factory.CreateAsync(context, snapshot, cancellation.Token, waiting);
 
-        await boundary.Received(1).OpenReadAsync(context, cancellation.Token, snapshot, null, null, waiting);
+        await boundary.Received(1).OpenReadAsync(context, cancellation.Token, snapshot, null, waiting);
     }
 
     [Fact]
