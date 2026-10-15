@@ -472,7 +472,7 @@ EOF
                 rollback_failed=true
             fi
         done
-        for publication_name in "${BACKED_UP_NAMES[@]}"; do
+        for publication_name in ${BACKED_UP_NAMES[@]+"${BACKED_UP_NAMES[@]}"}; do
             if ! cp -pR "${PUBLICATION_BACKUP_DIR}/${publication_name}" "$INSTALL_DIR/"; then
                 rollback_failed=true
             fi

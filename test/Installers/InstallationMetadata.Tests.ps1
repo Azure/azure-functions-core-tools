@@ -8,6 +8,30 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $expectedJson = '{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}' + "`n"
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) "func-installer-metadata-$([Guid]::NewGuid().ToString('N'))"
+$isWindowsHost = $IsWindows -or $env:OS -eq 'Windows_NT'
+$bashCommand = if ($isWindowsHost) {
+    $candidates = @(
+        (Join-Path $env:ProgramFiles 'Git/bin/bash.exe'),
+        (Get-Command bash -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1)
+    )
+    $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
+} else {
+    (Get-Command bash -ErrorAction Stop).Source
+}
+
+if ($null -eq $bashCommand) {
+    throw 'Bash is required to run the installer tests.'
+}
+
+function ConvertTo-BashPath {
+    param([Parameter(Mandatory)] [string] $Path)
+
+    if (-not $isWindowsHost) {
+        return $Path
+    }
+
+    return (& $bashCommand -c 'cygpath -u "$1"' -- $Path).Trim()
+}
 
 function Assert-True {
     param(
@@ -39,6 +63,8 @@ function Assert-Metadata {
         'Metadata contained fields outside the installation contract.'
     Assert-True (-not (Get-ChildItem -LiteralPath $InstallPath -Filter '.func.installation.json.tmp.*')) `
         'An atomic-write temporary file was left behind.'
+    Assert-True (-not (Get-ChildItem -LiteralPath $InstallPath -Filter '.func.installation.json.backup.*')) `
+        'An installation metadata backup file was left behind.'
 }
 
 function Invoke-PowerShellInstaller {
@@ -47,7 +73,8 @@ function Invoke-PowerShellInstaller {
         [Parameter(Mandatory)] [string] $InstallPath,
         [switch] $Force,
         [switch] $FailDownload,
-        [switch] $LockMetadata
+        [switch] $LockMetadata,
+        [switch] $LockWrapper
     )
 
     $runnerPath = Join-Path $testRoot 'invoke-install.ps1'
@@ -68,7 +95,7 @@ function Invoke-WebRequest {
     )
 
     if ($Method -eq 'Head') {
-        return [pscustomobject]@{ Headers = @{ 'Content-Type' = 'application/zip' } }
+        return [pscustomobject]@{ Headers = @{ 'Content-Type' = $env:FUNC_INSTALLER_TEST_CONTENT_TYPE } }
     }
 
     if ($env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD -eq 'true') {
@@ -89,10 +116,15 @@ if ($env:FUNC_INSTALLER_TEST_FORCE -eq 'true') {
 }
 
 $metadataLock = $null
+$wrapperLock = $null
 try {
     if ($env:FUNC_INSTALLER_TEST_LOCK_METADATA -eq 'true') {
         $metadataPath = Join-Path $env:FUNC_INSTALLER_TEST_ROOT 'func.installation.json'
         $metadataLock = [System.IO.File]::Open($metadataPath, 'Open', 'Read', 'Read')
+    }
+    if ($env:FUNC_INSTALLER_TEST_LOCK_WRAPPER -eq 'true') {
+        $wrapperPath = Join-Path $env:FUNC_INSTALLER_TEST_ROOT 'func5'
+        $wrapperLock = [System.IO.File]::Open($wrapperPath, 'Open', 'Read', 'Read')
     }
 
     & $env:FUNC_INSTALLER_SCRIPT @arguments
@@ -100,23 +132,30 @@ try {
     if ($metadataLock) {
         $metadataLock.Dispose()
     }
+    if ($wrapperLock) {
+        $wrapperLock.Dispose()
+    }
 }
 '@ | Set-Content -LiteralPath $runnerPath -Encoding utf8NoBOM
 
     $previousEnvironment = @{
         Archive = $env:FUNC_INSTALLER_TEST_ARCHIVE
+        ContentType = $env:FUNC_INSTALLER_TEST_CONTENT_TYPE
         Fail = $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD
         Force = $env:FUNC_INSTALLER_TEST_FORCE
         LockMetadata = $env:FUNC_INSTALLER_TEST_LOCK_METADATA
+        LockWrapper = $env:FUNC_INSTALLER_TEST_LOCK_WRAPPER
         Root = $env:FUNC_INSTALLER_TEST_ROOT
         Script = $env:FUNC_INSTALLER_SCRIPT
     }
 
     try {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $ArchivePath
+        $env:FUNC_INSTALLER_TEST_CONTENT_TYPE = if ($ArchivePath.EndsWith('.zip')) { 'application/zip' } else { 'application/gzip' }
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $FailDownload.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_FORCE = $Force.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_LOCK_METADATA = $LockMetadata.ToString().ToLowerInvariant()
+        $env:FUNC_INSTALLER_TEST_LOCK_WRAPPER = $LockWrapper.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_ROOT = $InstallPath
         $env:FUNC_INSTALLER_SCRIPT = Join-Path $repoRoot 'install.ps1'
         $output = & pwsh -NoLogo -NoProfile -File $runnerPath
@@ -125,9 +164,11 @@ try {
         return $exitCode
     } finally {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $previousEnvironment.Archive
+        $env:FUNC_INSTALLER_TEST_CONTENT_TYPE = $previousEnvironment.ContentType
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $previousEnvironment.Fail
         $env:FUNC_INSTALLER_TEST_FORCE = $previousEnvironment.Force
         $env:FUNC_INSTALLER_TEST_LOCK_METADATA = $previousEnvironment.LockMetadata
+        $env:FUNC_INSTALLER_TEST_LOCK_WRAPPER = $previousEnvironment.LockWrapper
         $env:FUNC_INSTALLER_TEST_ROOT = $previousEnvironment.Root
         $env:FUNC_INSTALLER_SCRIPT = $previousEnvironment.Script
     }
@@ -156,17 +197,17 @@ function Invoke-BashInstaller {
     }
 
     try {
-        $env:FUNC_INSTALLER_TEST_ARCHIVE = ($ArchivePath -replace '\\', '/')
+        $env:FUNC_INSTALLER_TEST_ARCHIVE = ConvertTo-BashPath $ArchivePath
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $FailDownload.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH = $FailMetadataPublish.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH = $FailWrapperPublish.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_OS = $OperatingSystem
-        $env:HOME = ($HomePath -replace '\\', '/')
+        $env:HOME = ConvertTo-BashPath $HomePath
 
         $arguments = @(
-            (($repoRoot -replace '\\', '/') + '/install.sh'),
+            (ConvertTo-BashPath (Join-Path $repoRoot 'install.sh')),
             '--install-path',
-            ($InstallPath -replace '\\', '/'),
+            (ConvertTo-BashPath $InstallPath),
             '--version',
             '5.0.0',
             '--skip-path'
@@ -175,8 +216,8 @@ function Invoke-BashInstaller {
             $arguments += '--force'
         }
 
-        $fakeBinUnixPath = (& bash -c "cygpath -u '$($FakeBinPath -replace '\\', '/')'").Trim()
-        $output = & bash -c 'PATH="$1:$PATH"; shift; exec bash "$@"' -- $fakeBinUnixPath @arguments
+        $fakeBinUnixPath = ConvertTo-BashPath $FakeBinPath
+        $output = & $bashCommand -c 'PATH="$1:$PATH"; shift; exec bash "$@"' -- $fakeBinUnixPath @arguments
         $exitCode = $LASTEXITCODE
         $output | ForEach-Object { Write-Host $_ }
         return $exitCode
@@ -193,80 +234,111 @@ function Invoke-BashInstaller {
 try {
     New-Item -ItemType Directory -Path $testRoot | Out-Null
 
-    $windowsPayload = Join-Path $testRoot 'windows-payload'
-    New-Item -ItemType Directory -Path $windowsPayload | Out-Null
-    Set-Content -LiteralPath (Join-Path $windowsPayload 'func.exe') -Value 'test executable' -Encoding ascii
-    $windowsArchive = Join-Path $testRoot 'func.zip'
-    Compress-Archive -Path (Join-Path $windowsPayload '*') -DestinationPath $windowsArchive
-    $invalidWindowsPayload = Join-Path $testRoot 'invalid-windows-payload'
-    New-Item -ItemType Directory -Path $invalidWindowsPayload | Out-Null
-    Set-Content -LiteralPath (Join-Path $invalidWindowsPayload 'README.txt') -Value 'missing executable' -Encoding ascii
-    $invalidWindowsArchive = Join-Path $testRoot 'invalid-func.zip'
-    Compress-Archive -Path (Join-Path $invalidWindowsPayload '*') -DestinationPath $invalidWindowsArchive
+    $powerShellExecutableName = if ($isWindowsHost) { 'func.exe' } else { 'func' }
+    $powerShellPayload = Join-Path $testRoot 'powershell-payload'
+    New-Item -ItemType Directory -Path $powerShellPayload | Out-Null
+    $powerShellExecutable = Join-Path $powerShellPayload $powerShellExecutableName
+    Set-Content -LiteralPath $powerShellExecutable -Value 'test executable' -Encoding ascii
+    if (-not $isWindowsHost) {
+        chmod +x $powerShellExecutable
+        Assert-True ($LASTEXITCODE -eq 0) 'Could not make the PowerShell test payload executable.'
+    }
 
-    $windowsInstall = Join-Path $testRoot 'custom windows install'
-    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $windowsArchive -InstallPath $windowsInstall) -eq 0) `
+    $powerShellArchive = Join-Path $testRoot $(if ($isWindowsHost) { 'func.zip' } else { 'func.tar.gz' })
+    if ($isWindowsHost) {
+        Compress-Archive -Path (Join-Path $powerShellPayload '*') -DestinationPath $powerShellArchive
+    } else {
+        & tar -czf $powerShellArchive -C $powerShellPayload .
+        Assert-True ($LASTEXITCODE -eq 0) 'Could not create the PowerShell test archive.'
+    }
+
+    $invalidPowerShellPayload = Join-Path $testRoot 'invalid-powershell-payload'
+    New-Item -ItemType Directory -Path $invalidPowerShellPayload | Out-Null
+    Set-Content -LiteralPath (Join-Path $invalidPowerShellPayload 'README.txt') -Value 'missing executable' -Encoding ascii
+    $invalidPowerShellArchive = Join-Path $testRoot $(if ($isWindowsHost) { 'invalid-func.zip' } else { 'invalid-func.tar.gz' })
+    if ($isWindowsHost) {
+        Compress-Archive -Path (Join-Path $invalidPowerShellPayload '*') -DestinationPath $invalidPowerShellArchive
+    } else {
+        & tar -czf $invalidPowerShellArchive -C $invalidPowerShellPayload .
+        Assert-True ($LASTEXITCODE -eq 0) 'Could not create the invalid PowerShell test archive.'
+    }
+
+    $powerShellInstall = Join-Path $testRoot 'custom powershell install'
+    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall) -eq 0) `
         'install.ps1 failed to install a valid payload.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $windowsInstall 'func.exe') -PathType Leaf) `
-        'install.ps1 did not install func.exe.'
-    Assert-Metadata -InstallPath $windowsInstall
+    Assert-True (Test-Path -LiteralPath (Join-Path $powerShellInstall $powerShellExecutableName) -PathType Leaf) `
+        "install.ps1 did not install $powerShellExecutableName."
+    Assert-Metadata -InstallPath $powerShellInstall
 
-    Set-Content -LiteralPath (Join-Path $windowsInstall 'func.installation.json') -Value '{}' -Encoding ascii
-    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $windowsArchive -InstallPath $windowsInstall -Force) -eq 0) `
+    Set-Content -LiteralPath (Join-Path $powerShellInstall 'func.installation.json') -Value '{}' -Encoding ascii
+    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force) -eq 0) `
         'install.ps1 failed during an upgrade.'
-    Assert-Metadata -InstallPath $windowsInstall
+    Assert-Metadata -InstallPath $powerShellInstall
 
-    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $windowsArchive -InstallPath $windowsInstall -Force -FailDownload) -ne 0) `
+    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force -FailDownload) -ne 0) `
         'install.ps1 unexpectedly succeeded during a failed upgrade.'
-    Assert-Metadata -InstallPath $windowsInstall
+    Assert-Metadata -InstallPath $powerShellInstall
 
-    Set-Content -LiteralPath (Join-Path $windowsInstall 'func.exe') -Value 'existing executable' -Encoding ascii
-    Set-Content -LiteralPath (Join-Path $windowsInstall 'func5') -Value 'existing bash wrapper' -Encoding ascii
-    Set-Content -LiteralPath (Join-Path $windowsInstall 'func5.cmd') -Value 'existing cmd wrapper' -Encoding ascii
-    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $invalidWindowsArchive -InstallPath $windowsInstall -Force) -ne 0) `
-        'install.ps1 accepted an upgrade archive without func.exe.'
-    Assert-Metadata -InstallPath $windowsInstall
-    Assert-True ((Get-Content -LiteralPath (Join-Path $windowsInstall 'func.exe') -Raw).Trim() -eq 'existing executable') `
+    Set-Content -LiteralPath (Join-Path $powerShellInstall $powerShellExecutableName) -Value 'existing executable' -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $powerShellInstall 'func5') -Value 'existing bash wrapper' -Encoding ascii
+    if ($isWindowsHost) {
+        Set-Content -LiteralPath (Join-Path $powerShellInstall 'func5.cmd') -Value 'existing cmd wrapper' -Encoding ascii
+    }
+    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $invalidPowerShellArchive -InstallPath $powerShellInstall -Force) -ne 0) `
+        "install.ps1 accepted an upgrade archive without $powerShellExecutableName."
+    Assert-Metadata -InstallPath $powerShellInstall
+    Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall $powerShellExecutableName) -Raw).Trim() -eq 'existing executable') `
         'install.ps1 modified the existing executable before rejecting an invalid upgrade payload.'
 
-    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $windowsArchive -InstallPath $windowsInstall -Force -LockMetadata) -ne 0) `
-        'install.ps1 replaced locked metadata instead of failing atomically.'
-    Assert-Metadata -InstallPath $windowsInstall
-    Assert-True ((Get-Content -LiteralPath (Join-Path $windowsInstall 'func.exe') -Raw).Trim() -eq 'existing executable') `
-        'install.ps1 did not restore the executable after late metadata failure.'
-    Assert-True ((Get-Content -LiteralPath (Join-Path $windowsInstall 'func5') -Raw).Trim() -eq 'existing bash wrapper') `
-        'install.ps1 did not restore the bash wrapper after late metadata failure.'
-    Assert-True ((Get-Content -LiteralPath (Join-Path $windowsInstall 'func5.cmd') -Raw).Trim() -eq 'existing cmd wrapper') `
-        'install.ps1 did not restore the cmd wrapper after late metadata failure.'
+    if ($isWindowsHost) {
+        Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force -LockMetadata) -ne 0) `
+            'install.ps1 replaced locked metadata instead of failing atomically.'
+        Assert-Metadata -InstallPath $powerShellInstall
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall $powerShellExecutableName) -Raw).Trim() -eq 'existing executable') `
+            'install.ps1 did not restore the executable after late metadata failure.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall 'func5') -Raw).Trim() -eq 'existing bash wrapper') `
+            'install.ps1 did not restore the bash wrapper after late metadata failure.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall 'func5.cmd') -Raw).Trim() -eq 'existing cmd wrapper') `
+            'install.ps1 did not restore the cmd wrapper after late metadata failure.'
 
-    $windowsFailedInstall = Join-Path $testRoot 'failed windows install'
-    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $windowsArchive -InstallPath $windowsFailedInstall -FailDownload) -ne 0) `
+        Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force `
+            -LockWrapper) -ne 0) 'install.ps1 unexpectedly reported successful rollback with a locked wrapper.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall $powerShellExecutableName) -Raw).Trim() -eq 'existing executable') `
+            'install.ps1 stopped rollback before restoring the executable after a wrapper failure.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall 'func5') -Raw).Trim() -eq 'existing bash wrapper') `
+            'install.ps1 stopped rollback before restoring the bash wrapper.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall 'func5.cmd') -Raw).Trim() -eq 'existing cmd wrapper') `
+            'install.ps1 stopped rollback before restoring the cmd wrapper.'
+    }
+
+    $powerShellFailedInstall = Join-Path $testRoot 'failed powershell install'
+    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellFailedInstall -FailDownload) -ne 0) `
         'install.ps1 unexpectedly succeeded after a download failure.'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $windowsFailedInstall 'func.installation.json'))) `
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $powerShellFailedInstall 'func.installation.json'))) `
         'install.ps1 wrote metadata before the payload installation succeeded.'
 
-    $windowsInvalidInstall = Join-Path $testRoot 'invalid windows install'
-    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $invalidWindowsArchive -InstallPath $windowsInvalidInstall) -ne 0) `
-        'install.ps1 accepted a fresh archive without func.exe.'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $windowsInvalidInstall 'func.installation.json'))) `
+    $powerShellInvalidInstall = Join-Path $testRoot 'invalid powershell install'
+    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $invalidPowerShellArchive -InstallPath $powerShellInvalidInstall) -ne 0) `
+        "install.ps1 accepted a fresh archive without $powerShellExecutableName."
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $powerShellInvalidInstall 'func.installation.json'))) `
         'install.ps1 wrote metadata for an invalid payload.'
 
-    $windowsDirectoryCollision = Join-Path $testRoot 'windows metadata directory'
-    New-Item -ItemType Directory -Path (Join-Path $windowsDirectoryCollision 'func.installation.json') -Force | Out-Null
-    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $windowsArchive -InstallPath $windowsDirectoryCollision) -ne 0) `
+    $powerShellDirectoryCollision = Join-Path $testRoot 'powershell metadata directory'
+    New-Item -ItemType Directory -Path (Join-Path $powerShellDirectoryCollision 'func.installation.json') -Force | Out-Null
+    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellDirectoryCollision) -ne 0) `
         'install.ps1 accepted a metadata directory collision.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $windowsDirectoryCollision 'func.installation.json') -PathType Container) `
+    Assert-True (Test-Path -LiteralPath (Join-Path $powerShellDirectoryCollision 'func.installation.json') -PathType Container) `
         'install.ps1 replaced the metadata directory.'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $windowsDirectoryCollision 'func.exe'))) `
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $powerShellDirectoryCollision $powerShellExecutableName))) `
         'install.ps1 published the payload before rejecting a metadata directory collision.'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $windowsDirectoryCollision 'func5.cmd'))) `
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $powerShellDirectoryCollision 'func5'))) `
         'install.ps1 published a wrapper before rejecting a metadata directory collision.'
 
     $bashPayload = Join-Path $testRoot 'bash-payload'
     New-Item -ItemType Directory -Path $bashPayload | Out-Null
     $bashExecutable = Join-Path $bashPayload 'func'
     Set-Content -LiteralPath $bashExecutable -Value "#!/usr/bin/env bash`necho test`n" -Encoding utf8NoBOM
-    & bash -c "chmod +x '$($bashExecutable -replace '\\', '/')'"
+    & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $bashExecutable)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the bash test payload executable.'
 
     $bashArchive = Join-Path $testRoot 'func.tar.gz'
@@ -308,7 +380,7 @@ if [[ "${FUNC_INSTALLER_TEST_FAIL_DOWNLOAD:-false}" == true ]]; then
 fi
 cp "$FUNC_INSTALLER_TEST_ARCHIVE" "$output"
 '@ | Set-Content -LiteralPath $fakeCurl -Encoding utf8NoBOM
-    & bash -c "chmod +x '$($fakeCurl -replace '\\', '/')'"
+    & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $fakeCurl)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake curl executable.'
 
     $fakeUname = Join-Path $fakeBin 'uname'
@@ -320,7 +392,7 @@ else
     printf 'x86_64\n'
 fi
 '@ | Set-Content -LiteralPath $fakeUname -Encoding utf8NoBOM
-    & bash -c "chmod +x '$($fakeUname -replace '\\', '/')'"
+    & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $fakeUname)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake uname executable.'
 
     $fakeMv = Join-Path $fakeBin 'mv'
@@ -334,7 +406,7 @@ if [[ "${FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH:-false}" == true &&
 fi
 exec /usr/bin/mv "$@"
 '@ | Set-Content -LiteralPath $fakeMv -Encoding utf8NoBOM
-    & bash -c "chmod +x '$($fakeMv -replace '\\', '/')'"
+    & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $fakeMv)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake mv executable.'
 
     $fakeCat = Join-Path $fakeBin 'cat'
@@ -346,7 +418,7 @@ if [[ "${FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH:-false}" == true && $# -eq 0 ]
 fi
 exec /usr/bin/cat "$@"
 '@ | Set-Content -LiteralPath $fakeCat -Encoding utf8NoBOM
-    & bash -c "chmod +x '$($fakeCat -replace '\\', '/')'"
+    & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $fakeCat)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake cat executable.'
 
     $bashHome = Join-Path $testRoot 'bash-home'
@@ -356,8 +428,8 @@ exec /usr/bin/cat "$@"
         'install.sh failed to install a valid payload.'
     Assert-True (Test-Path -LiteralPath (Join-Path $bashInstall 'func') -PathType Leaf) 'install.sh did not install func.'
     Assert-Metadata -InstallPath $bashInstall
-    $metadataPath = (Join-Path $bashInstall 'func.installation.json') -replace '\\', '/'
-    $metadataMode = (& bash -c 'stat -c "%a" "$1" 2>/dev/null || stat -f "%Lp" "$1"' -- $metadataPath).Trim()
+    $metadataPath = ConvertTo-BashPath (Join-Path $bashInstall 'func.installation.json')
+    $metadataMode = (& $bashCommand -c 'stat -c "%a" "$1" 2>/dev/null || stat -f "%Lp" "$1"' -- $metadataPath).Trim()
     Assert-True ($metadataMode -eq '644') "install.sh wrote metadata with mode $metadataMode instead of 644."
 
     $macInstall = Join-Path $testRoot 'custom-macos-install'

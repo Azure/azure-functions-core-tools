@@ -105,11 +105,8 @@ function Write-InstallationMetadata {
         $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
         [System.IO.File]::WriteAllText($tempPath, "$Script:InstallationMetadataJson`n", $utf8WithoutBom)
         if ($os -ne 'win') {
-            $metadataMode = [System.IO.UnixFileMode]::UserRead -bor
-                [System.IO.UnixFileMode]::UserWrite -bor
-                [System.IO.UnixFileMode]::GroupRead -bor
-                [System.IO.UnixFileMode]::OtherRead
-            [System.IO.File]::SetUnixFileMode($tempPath, $metadataMode)
+            chmod 0644 $tempPath
+            if ($LASTEXITCODE -ne 0) { throw "Failed to set installation metadata permissions (chmod exit $LASTEXITCODE)." }
         }
 
         if ([System.IO.File]::Exists($metadataPath)) {
@@ -414,10 +411,8 @@ try {
                 throw "The downloaded archive does not contain a regular func CLI executable."
             }
 
-            $executeBits = [System.IO.UnixFileMode]::UserExecute -bor
-                [System.IO.UnixFileMode]::GroupExecute -bor
-                [System.IO.UnixFileMode]::OtherExecute
-            if (([System.IO.File]::GetUnixFileMode($payloadFuncPath) -band $executeBits) -eq 0) {
+            & /usr/bin/test -x $payloadFuncPath
+            if ($LASTEXITCODE -ne 0) {
                 throw "The downloaded archive does not contain an executable func CLI."
             }
         }
@@ -482,22 +477,37 @@ try {
 
             Write-InstallationMetadata -InstallPath $InstallPath
         } catch {
+            $originalError = $_
+            $rollbackFailed = $false
             foreach ($name in $publicationNames) {
                 $destinationPath = Join-Path $InstallPath $name
                 if (Test-Path -LiteralPath $destinationPath) {
-                    Remove-Item -LiteralPath $destinationPath -Recurse -Force
+                    try {
+                        Remove-Item -LiteralPath $destinationPath -Recurse -Force
+                    } catch {
+                        $rollbackFailed = $true
+                    }
                 }
             }
             foreach ($name in $backedUpNames) {
                 $backupPath = Join-Path $publicationBackupPath $name
-                if ($os -eq 'win') {
-                    Copy-Item -LiteralPath $backupPath -Destination $InstallPath -Recurse -Force
-                } else {
-                    & /bin/cp -pR $backupPath $InstallPath
-                    if ($LASTEXITCODE -ne 0) { throw "Failed to restore $name after installation failed (cp exit $LASTEXITCODE)." }
+                try {
+                    if ($os -eq 'win') {
+                        Copy-Item -LiteralPath $backupPath -Destination $InstallPath -Recurse -Force
+                    } else {
+                        & /bin/cp -pR $backupPath $InstallPath
+                        if ($LASTEXITCODE -ne 0) { throw "Failed to restore $name (cp exit $LASTEXITCODE)." }
+                    }
+                } catch {
+                    $rollbackFailed = $true
                 }
             }
-            throw
+            if ($rollbackFailed) {
+                throw [System.InvalidOperationException]::new(
+                    "Installation failed and the previous installation could not be fully restored. Original error: $($originalError.Exception.Message)",
+                    $originalError.Exception)
+            }
+            throw $originalError
         }
     }
 } finally {
