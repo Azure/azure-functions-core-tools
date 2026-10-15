@@ -98,6 +98,7 @@ internal static class CliHostFactory
         builder.Services.AddSingleton<IFunctionsWorkerResolverFactory, DefaultFunctionsWorkerResolverFactory>();
         builder.Services.AddSingleton<IFunctionsWorkerInstaller, DefaultFunctionsWorkerInstaller>();
         builder.Services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
+        builder.Services.AddSingleton<InstalledProjectStackCatalog>();
         builder.Services.AddSingleton<IInstalledBundleWorkloads, InstalledBundleWorkloads>();
         builder.Services.AddSingleton<InstalledBundleScanner>();
         builder.Services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();
