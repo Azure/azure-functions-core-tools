@@ -73,6 +73,7 @@ function Invoke-PowerShellInstaller {
         [Parameter(Mandatory)] [string] $InstallPath,
         [switch] $Force,
         [switch] $FailDownload,
+        [switch] $FailWrapperChmod,
         [switch] $LockMetadata,
         [switch] $LockWrapper
     )
@@ -114,6 +115,11 @@ $arguments = @{
 if ($env:FUNC_INSTALLER_TEST_FORCE -eq 'true') {
     $arguments.Force = $true
 }
+if ($env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_CHMOD -eq 'true') {
+    function global:chmod {
+        $global:LASTEXITCODE = 75
+    }
+}
 
 $metadataLock = $null
 $wrapperLock = $null
@@ -142,6 +148,7 @@ try {
         Archive = $env:FUNC_INSTALLER_TEST_ARCHIVE
         ContentType = $env:FUNC_INSTALLER_TEST_CONTENT_TYPE
         Fail = $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD
+        FailWrapperChmod = $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_CHMOD
         Force = $env:FUNC_INSTALLER_TEST_FORCE
         LockMetadata = $env:FUNC_INSTALLER_TEST_LOCK_METADATA
         LockWrapper = $env:FUNC_INSTALLER_TEST_LOCK_WRAPPER
@@ -153,6 +160,7 @@ try {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $ArchivePath
         $env:FUNC_INSTALLER_TEST_CONTENT_TYPE = if ($ArchivePath.EndsWith('.zip')) { 'application/zip' } else { 'application/gzip' }
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $FailDownload.ToString().ToLowerInvariant()
+        $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_CHMOD = $FailWrapperChmod.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_FORCE = $Force.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_LOCK_METADATA = $LockMetadata.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_LOCK_WRAPPER = $LockWrapper.ToString().ToLowerInvariant()
@@ -166,6 +174,7 @@ try {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $previousEnvironment.Archive
         $env:FUNC_INSTALLER_TEST_CONTENT_TYPE = $previousEnvironment.ContentType
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $previousEnvironment.Fail
+        $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_CHMOD = $previousEnvironment.FailWrapperChmod
         $env:FUNC_INSTALLER_TEST_FORCE = $previousEnvironment.Force
         $env:FUNC_INSTALLER_TEST_LOCK_METADATA = $previousEnvironment.LockMetadata
         $env:FUNC_INSTALLER_TEST_LOCK_WRAPPER = $previousEnvironment.LockWrapper
@@ -309,6 +318,16 @@ try {
             'install.ps1 stopped rollback before restoring the bash wrapper.'
         Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall 'func5.cmd') -Raw).Trim() -eq 'existing cmd wrapper') `
             'install.ps1 stopped rollback before restoring the cmd wrapper.'
+    } else {
+        Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force `
+            -FailWrapperChmod) -ne 0) 'install.ps1 unexpectedly succeeded after wrapper chmod failed.'
+        Assert-Metadata -InstallPath $powerShellInstall
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall $powerShellExecutableName) -Raw).Trim() -eq 'existing executable') `
+            'install.ps1 did not restore the executable after wrapper chmod failed.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall 'func5') -Raw).Trim() -eq 'existing bash wrapper') `
+            'install.ps1 did not restore the wrapper after wrapper chmod failed.'
+        & /usr/bin/env test -x (Join-Path $powerShellInstall 'func5')
+        Assert-True ($LASTEXITCODE -eq 0) 'install.ps1 did not restore the wrapper mode after wrapper chmod failed.'
     }
 
     $powerShellFailedInstall = Join-Path $testRoot 'failed powershell install'

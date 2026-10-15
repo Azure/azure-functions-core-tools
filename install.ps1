@@ -473,6 +473,7 @@ try {
                 $body = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func`" `"`$@`"`n"
                 [System.IO.File]::WriteAllText($wrapperPath, $body)
                 chmod +x $wrapperPath
+                if ($LASTEXITCODE -ne 0) { throw "Failed to make $wrapperPath executable (chmod exit $LASTEXITCODE)." }
             }
 
             Write-InstallationMetadata -InstallPath $InstallPath
