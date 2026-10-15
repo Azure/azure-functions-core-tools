@@ -33,6 +33,8 @@ internal sealed record InitExecutionResult(string Kind, bool Succeeded)
 
     public TemplateCatalogEntry? SelectedTemplate { get; init; }
 
+    public TemplateInvocationResult? Preview { get; init; }
+
     public TemplateInvocationResult? Invocation { get; init; }
 
     public static InitExecutionResult Reject(string kind, params string[] diagnostics) => new(kind, false) { Diagnostics = diagnostics };

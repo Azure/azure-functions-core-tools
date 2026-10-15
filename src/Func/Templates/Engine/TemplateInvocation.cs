@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Microsoft.TemplateEngine.Abstractions;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -30,4 +31,4 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
     public IReadOnlyList<string> ConfiguredProjects { get; init; } = [];
 }
 
-internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint);
+internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters);

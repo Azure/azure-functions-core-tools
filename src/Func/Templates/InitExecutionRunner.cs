@@ -24,9 +24,8 @@ internal sealed class InitExecutionRunner(
     IInteractionService interaction,
     InitExecutionRenderer renderer,
     InitExecutionTargetInspector targets,
-    IEnumerable<IProjectInitializer> initializers,
-    TemplateProjectConfigurationPlanner planner,
-    TemplateProjectConfigurationWriter writer) : IInitExecutionRunner
+    Func<InstalledProjectStackCatalog> stackCatalog,
+    Func<TemplateProjectSupport> projectSupport) : IInitExecutionRunner
 {
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
@@ -34,9 +33,8 @@ internal sealed class InitExecutionRunner(
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly InitExecutionRenderer _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
     private readonly InitExecutionTargetInspector _targets = targets ?? throw new ArgumentNullException(nameof(targets));
-    private readonly IReadOnlyList<IProjectInitializer> _initializers = [.. initializers ?? throw new ArgumentNullException(nameof(initializers))];
-    private readonly TemplateProjectConfigurationPlanner _planner = planner ?? throw new ArgumentNullException(nameof(planner));
-    private readonly TemplateProjectConfigurationWriter _writer = writer ?? throw new ArgumentNullException(nameof(writer));
+    private readonly Func<InstalledProjectStackCatalog> _stackCatalog = stackCatalog ?? throw new ArgumentNullException(nameof(stackCatalog));
+    private readonly Func<TemplateProjectSupport> _projectSupport = projectSupport ?? throw new ArgumentNullException(nameof(projectSupport));
 
     public async Task<InitExecutionResult> ExecuteAsync(
         InitExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -69,43 +67,46 @@ internal sealed class InitExecutionRunner(
             return targetFailure;
         }
 
-        if (_initializers.Count == 0)
+        InstalledProjectStackCatalog catalog;
+        try
+        {
+            catalog = _stackCatalog();
+        }
+        catch (ConflictingProjectStackMetadataException exception)
+        {
+            return InitExecutionResult.Reject("duplicateStacks",
+                $"Installed stack metadata conflicts. {exception.Message} Inspect 'func workload list' and remove the conflict.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (catalog.Stacks.Count == 0)
         {
             return InitExecutionResult.Reject("noInstalledStacks", "Set up a stack with 'func setup --features <stack>' before initializing a project.");
         }
 
-        string[] duplicates = [.. _initializers.GroupBy(initializer => initializer.Stack, StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Count() > 1).Select(group => group.Key)];
-        if (duplicates.Length > 0)
-        {
-            return InitExecutionResult.Reject("duplicateStacks",
-                $"Multiple installed workloads claim these stacks: {string.Join(", ", duplicates)}. Inspect 'func workload list' and remove the conflict.");
-        }
-
-        IProjectInitializer[] stacks = request.ExplicitStack is null ? [.. _initializers] : [.. _initializers.Where(initializer =>
-            string.Equals(initializer.Stack, request.ExplicitStack, StringComparison.OrdinalIgnoreCase)
-            || initializer.WorkerRuntimeAliases.Contains(request.ExplicitStack, StringComparer.OrdinalIgnoreCase))];
-        if (request.ExplicitStack is not null && stacks.Length != 1)
+        IProjectStack? requestedStack = string.IsNullOrWhiteSpace(request.ExplicitStack) ? null : catalog.FindStack(request.ExplicitStack);
+        if (request.ExplicitStack is not null && requestedStack is null)
         {
             return InitExecutionResult.Reject("invalidStack",
-                $"Stack '{request.ExplicitStack}' must identify one installed stack. Supported stacks: {string.Join(", ", _initializers.Select(stack => stack.Stack))}.");
+                $"Stack '{request.ExplicitStack}' must identify one installed stack. Supported stacks: {string.Join(", ", catalog.Stacks.Select(stack => stack.Stack))}.");
         }
 
-        (string Stack, string Language)[] languages = [.. stacks.SelectMany(stack => stack.SupportedLanguages
-            .Where(language => request.ExplicitLanguage is null
-                || string.Equals(language, request.ExplicitLanguage, StringComparison.OrdinalIgnoreCase)
-                || (stack.SupportedLanguageAliases.TryGetValue(language, out IReadOnlyList<string>? aliases)
-                    && aliases.Contains(request.ExplicitLanguage, StringComparer.OrdinalIgnoreCase)))
-            .Select(language => (stack.Stack, language)))];
-        if (request.ExplicitLanguage is not null && languages.Length == 0)
+        string? requestedLanguage = string.IsNullOrWhiteSpace(request.ExplicitLanguage) ? null : catalog.GetCanonicalLanguage(request.ExplicitLanguage);
+        if (request.ExplicitLanguage is not null && (requestedLanguage is null
+            || (requestedStack is not null && !catalog.GetStacksForLanguage(request.ExplicitLanguage)
+                .Contains(requestedStack))))
         {
             return InitExecutionResult.Reject("invalidLanguage",
                 $"Language '{request.ExplicitLanguage}' does not match the installed stack selection. Supported languages: " +
-                $"{string.Join(", ", stacks.SelectMany(stack => stack.SupportedLanguages).Distinct(StringComparer.OrdinalIgnoreCase))}.");
+                $"{string.Join(", ", (requestedStack is null ? catalog.Stacks : [requestedStack])
+                    .SelectMany(stack => stack.SupportedLanguages).Distinct(StringComparer.OrdinalIgnoreCase))}.");
         }
 
         TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null));
-        using Templater templater = await _factory.CreateProjectAsync(context, availability, _planner, _writer, cancellationToken,
+        cancellationToken.ThrowIfCancellationRequested();
+        TemplateProjectSupport support = _projectSupport();
+        cancellationToken.ThrowIfCancellationRequested();
+        using Templater templater = await _factory.CreateProjectAsync(context, availability, support, cancellationToken,
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
         InitExecutionResult result = await ExecuteAsync(templater, request, Matches, cancellationToken);
@@ -113,10 +114,8 @@ internal sealed class InitExecutionRunner(
         return result with { Context = context };
 
         bool Matches(string stack, string language) =>
-            (request.ExplicitStack is null || string.Equals(stack, stacks[0].Stack, StringComparison.OrdinalIgnoreCase))
-            && (request.ExplicitLanguage is null || languages.Any(match =>
-                string.Equals(match.Stack, stack, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(match.Language, language, StringComparison.OrdinalIgnoreCase)));
+            (requestedStack is null || string.Equals(stack, requestedStack.Stack, StringComparison.OrdinalIgnoreCase))
+            && (requestedLanguage is null || string.Equals(language, requestedLanguage, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<InitExecutionResult> ExecuteAsync(Templater templater, InitExecutionRequest request,
@@ -269,7 +268,7 @@ internal sealed class InitExecutionRunner(
         cancellationToken.ThrowIfCancellationRequested();
         if (preview.Status != TemplateInvocationStatus.Success)
         {
-            return FromInvocation(preview, "invocationFailed");
+            return FromPreview("invocationFailed");
         }
 
         if (preview.ProjectConfigurations.Count == 0 || preview.ProjectConfigurations.Any(plan => !matches(plan.Stack, plan.Language)))
@@ -279,14 +278,14 @@ internal sealed class InitExecutionRunner(
             {
                 SelectedTemplate = selected.Entry,
                 ArgumentResults = [final],
-                Invocation = preview,
+                Preview = preview,
                 UnavailableTemplates = unavailable,
             };
         }
 
         if (request.DryRun)
         {
-            return FromInvocation(preview, "previewed");
+            return FromPreview("previewed");
         }
 
         InitExecutionResult? targetFailure = CheckTarget(request.WorkingDirectory);
@@ -297,7 +296,7 @@ internal sealed class InitExecutionRunner(
             {
                 SelectedTemplate = selected.Entry,
                 ArgumentResults = [final],
-                Invocation = preview,
+                Preview = preview,
                 UnavailableTemplates = unavailable,
             };
         }
@@ -312,7 +311,17 @@ internal sealed class InitExecutionRunner(
             SelectedTemplate = selected.Entry,
             ArgumentResults = [final],
             Invocation = invocation,
+            Preview = preview,
             Diagnostics = invocation.Diagnostic is null ? [] : [invocation.Diagnostic],
+            UnavailableTemplates = unavailable,
+        };
+
+        InitExecutionResult FromPreview(string kind) => new(kind, preview.Status == TemplateInvocationStatus.Success)
+        {
+            SelectedTemplate = selected.Entry,
+            ArgumentResults = [final],
+            Preview = preview,
+            Diagnostics = preview.Diagnostic is null ? [] : [preview.Diagnostic],
             UnavailableTemplates = unavailable,
         };
 

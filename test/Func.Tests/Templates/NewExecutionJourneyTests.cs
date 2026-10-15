@@ -344,6 +344,58 @@ public sealed class NewExecutionJourneyTests : IDisposable
         harness.Result.Context.Bundle.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_ComposedBundleRequirement_UsesResolvedContextWithWorkloadOnlyAvailability(bool declaredBundle)
+    {
+        WriteTemplate("bundle-context", """
+            {
+              "identity":"Func.Consumer.BundleContext","name":"Bundle context","shortName":"bundle-context",
+              "tags":{"type":"item","language":"JavaScript"},
+              "constraints":{"bundle":{"type":"func-bundle",
+                "args":{"id":"Microsoft.Azure.Functions.ExtensionBundle","version":"[4.0.0,5.0.0)"}}},
+              "symbols":{
+                "BundleId":{"type":"bind","binding":"host:func:bundle-id","replaces":"BUNDLE_ID"},
+                "BundleVersion":{"type":"bind","binding":"host:func:bundle-version","replaces":"BUNDLE_VERSION"}
+              }
+            }
+            """, "bundle.txt", "BUNDLE_ID|BUNDLE_VERSION");
+        await InstallAsync();
+        if (!declaredBundle)
+        {
+            File.WriteAllText(Path.Combine(Project, "host.json"), """{"version":"2.0"}""");
+        }
+
+        var harness = CreateHarness();
+        var before = Snapshot();
+
+        int previewExit = await harness.InvokeAsync(["Func.Consumer.BundleContext", "--path", Target, "--dry-run"]);
+        var preview = harness.Result!;
+
+        previewExit.Should().Be(declaredBundle ? 0 : 1);
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+        harness.Factory.Contexts.Should().ContainSingle().Which.Should().BeSameAs(preview.Context);
+        if (declaredBundle)
+        {
+            preview.Context!.Bundle.Should().Be(new TemplateEngineBundleContext(BundleHelpers.StableBundleId, "4.35.0"));
+            preview.Invocation!.Status.Should().Be(TemplateInvocationStatus.Success);
+
+            int createExit = await harness.InvokeAsync(["Func.Consumer.BundleContext", "--path", Target]);
+
+            createExit.Should().Be(0);
+            File.ReadAllText(Path.Combine(Target, "bundle.txt")).Should().Be($"{BundleHelpers.StableBundleId}|4.35.0");
+        }
+        else
+        {
+            preview.Kind.Should().Be("Unavailable");
+            preview.Context!.Bundle.Should().BeNull();
+            preview.Templates.Should().ContainSingle().Which.ConstraintEvaluation.Diagnostics
+                .Should().Contain(diagnostic => diagnostic.Type == "func-bundle");
+        }
+    }
+
     [Fact]
     public async Task Command_ConflictPreviewAndForce_KeepPreviewReadOnlyAndForceLimitedToWrites()
     {
@@ -1034,8 +1086,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         }
 
         public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
-            TemplateProjectConfigurationPlanner planner, TemplateProjectConfigurationWriter writer, CancellationToken cancellationToken,
-            Action<TemplateStoreWaitReason>? waiting = null)
+            TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
             => throw new InvalidOperationException("Item command must not create a project-template environment.");
     }
 }

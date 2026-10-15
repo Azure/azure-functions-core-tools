@@ -25,6 +25,8 @@ public sealed class DotNetWorkload : Workload
         builder.Services.AddSingleton<IDotnetPathResolver, DotnetPathResolver>();
         builder.Services.AddSingleton<IDotnetCliRunner, DotnetCliRunner>();
         builder.Services.AddSingleton<ITemplateHivePathProvider, TemplateHivePathProvider>();
+        builder.Services.AddSingleton<DotNetProjectStack>();
+        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<DotNetProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, DotNetProjectInitializer>();
         builder.Services.AddSingleton<IStartHostOptionContributor, DotNetStartOptionContributor>();
         builder.Services.AddSingleton<IQuickstartProvider, DotNetQuickstartProvider>();
