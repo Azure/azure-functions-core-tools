@@ -73,4 +73,27 @@ public class TemplateEngineContextTests
 
         act.Should().Throw<ArgumentException>().WithParameterName(parameterName);
     }
+
+    [Theory]
+    [InlineData("[4.*, 5.0.0)")]
+    [InlineData("[4.0,5.0)")]
+    [InlineData("not-a-version")]
+    public void BundleContext_InvalidResolvedVersion_ThrowsAtContextBoundary(string version)
+    {
+        Action act = () => _ = new TemplateEngineBundleContext("bundle", version);
+
+        act.Should().Throw<ArgumentException>().WithParameterName("version").WithMessage("*resolved bundle version*");
+    }
+
+    [Theory]
+    [InlineData("4.20")]
+    [InlineData("4.20.0")]
+    [InlineData("4.20.0-preview.1")]
+    public void BundleContext_ResolvedVersion_PreservesHostValue(string version)
+    {
+        TemplateEngineBundleContext context = new("bundle", version);
+
+        context.Version.Should().Be(version);
+        context.ResolvedVersion.ToString().Should().StartWith("4.20");
+    }
 }

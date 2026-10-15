@@ -8,7 +8,7 @@ using Microsoft.TemplateEngine.Abstractions.Constraints;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
-internal sealed class FuncTemplateConstraintFactory(string type, FuncTemplateConstraintEvaluator evaluator, TemplateConstraintEvaluationSnapshot snapshot) : ITemplateConstraintFactory
+internal sealed class FuncTemplateConstraintFactory(string type, FuncTemplateConstraintEvaluator evaluator, TemplateConstraintEvaluationSnapshot snapshot, TemplateEngineBundleContext? bundle = null) : ITemplateConstraintFactory
 {
     private readonly FuncTemplateConstraintEvaluator _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
     private readonly TemplateConstraintEvaluationSnapshot _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
@@ -23,10 +23,10 @@ internal sealed class FuncTemplateConstraintFactory(string type, FuncTemplateCon
     {
         ArgumentNullException.ThrowIfNull(environmentSettings);
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult<ITemplateConstraint>(new Constraint(Type, _evaluator, _snapshot));
+        return Task.FromResult<ITemplateConstraint>(new Constraint(Type, _evaluator, _snapshot, bundle));
     }
 
-    private sealed class Constraint(string type, FuncTemplateConstraintEvaluator evaluator, TemplateConstraintEvaluationSnapshot snapshot) : ITemplateConstraint
+    private sealed class Constraint(string type, FuncTemplateConstraintEvaluator evaluator, TemplateConstraintEvaluationSnapshot snapshot, TemplateEngineBundleContext? bundle) : ITemplateConstraint
     {
         public string Type => type;
 
@@ -57,7 +57,7 @@ internal sealed class FuncTemplateConstraintFactory(string type, FuncTemplateCon
                 }
 
                 TemplateConstraintDeclaration declaration = TemplateConstraintDeclarationReader.Read(Encoding.UTF8.GetString(stream.ToArray()))[0];
-                return evaluator.Evaluate(declaration, snapshot) == FuncTemplateConstraintOutcome.Eligible
+                return evaluator.Evaluate(declaration, snapshot, bundle) == FuncTemplateConstraintOutcome.Eligible
                     ? TemplateConstraintResult.CreateAllowed(this)
                     : TemplateConstraintResult.CreateRestricted(this, $"The supplied command context does not satisfy {Type}.", "Review the required workload or bundle and start a new template flow.");
             }

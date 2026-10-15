@@ -150,6 +150,12 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
             try
             {
                 TemplateConfigurationSnapshot configuration = await _session.ReadConfigurationAsync(template, cancellationToken);
+                if (configuration.Type is null || configuration.Type != entry.Type)
+                {
+                    candidates.Add(FailedCandidate(template, entry, "Current mounted template type is missing, unrecognized, or differs from its cached descriptor. Correct the type and refresh the installed template before rerunning selection."));
+                    continue;
+                }
+
                 if (!packageMetadata.TryGetValue(template.MountPointUri, out Task<IReadOnlyCollection<string>>? metadata))
                 {
                     metadata = _session.ReadPackageTypesAsync(package, cancellationToken);
