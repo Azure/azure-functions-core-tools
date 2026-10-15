@@ -30,6 +30,8 @@ Preview reports template and configuration effects without writing. Creation fin
 
 Configuration occupancy checks use the writer's injected `IFileSystem` for both files and directories. An occupied destination before creation returns `FileConflict` without generating a new project root. Configuration is committed with an atomic create-only rename, so a destination that appears after the checks is not replaced. That late collision returns `ConfigurationFailure`, preserving user bytes, generated output and any earlier completed configurations. Legacy initializer/repair writes retain their overwrite-capable behavior.
 
+After a configuration write commits, its root and file change are recorded before cancellation is observed again. Cancellation after the final configuration commit returns the completed result. If another plan remains, cancellation stops before that plan starts and preserves prior configuration writes and generated files; no full-success result or rollback is promised for the unfinished invocation. Cancellation before a configuration write commits still propagates normally.
+
 The project flow retains mounted-type checks and the native runtime's selected-configuration, topology and output-boundary validation. Creation results report native creation-call effects plus only completed configuration writes, not unwritten preview configuration paths.
 
 The fixture action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` remains proposed, not a stable public authoring contract. These tests qualify controlled runtime fixtures and configuration compatibility, not production template packages or a public command switch. Ordinary restores, reusable native evaluation, wider topology, live-hive leases and hostile concurrent filesystem mutation remain outside this qualified subset.
@@ -165,6 +167,12 @@ directory ancestor is required, returning `Failed` before creation rather than
 letting the native write fail later.
 Concurrent mutation of template sources or the output
 filesystem is not qualified, and no transactional rollback is promised.
+
+Cancellation is honored before creation and when the native engine reports
+cancellation. Once native creation returns success, the runtime validates and
+returns its completed effects rather than reporting a late cancellation as if
+the files had not been created. Cancellation after read-only preview still
+prevents creation.
 
 Resolved bundle versions are validated when constructing the command context;
 host.json version ranges are not resolved versions. Bundle constraint input comes

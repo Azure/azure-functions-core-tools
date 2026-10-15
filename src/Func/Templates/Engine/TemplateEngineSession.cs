@@ -328,15 +328,16 @@ internal class TemplateEngineSession : IDisposable
         }
 
         ITemplateCreationResult created = await InstantiateAsync(template, request, parameters, false, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
         if (created.Status != CreationResultStatus.Success)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return new(MapCreationStatus(created.Status, cancellationToken), [], created.ErrorMessage ?? created.Status.ToString())
             {
                 ProjectConfigurations = configurationPlans,
             };
         }
 
+        // Native success may already have committed files; preserve its effects even if cancellation arrives afterward.
         if (created.CreationEffects is null)
         {
             return new(TemplateInvocationStatus.EngineFailure, [], "The template engine did not report creation effects.")
@@ -379,7 +380,6 @@ internal class TemplateEngineSession : IDisposable
             try
             {
                 await projectSupport.Writer.WriteAsync(plan, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
             }
             catch (IOException exception)
             {
