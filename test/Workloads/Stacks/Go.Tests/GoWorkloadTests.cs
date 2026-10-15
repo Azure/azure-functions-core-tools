@@ -23,6 +23,17 @@ public class GoWorkloadTests
         initializer.Should().BeOfType<GoProjectInitializer>();
         initializer.Stack.Should().Be("go");
         initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("Go");
+
+        IProjectStack stack = provider.GetRequiredService<IProjectStack>();
+        stack.Should().BeOfType<GoProjectStack>();
+        stack.Should().BeSameAs(provider.GetRequiredService<GoProjectStack>());
+        stack.Should().NotBeAssignableTo<IProjectInitializer>();
+        stack.Stack.Should().Be(initializer.Stack);
+        stack.DisplayName.Should().Be("Go").And.Be(initializer.DisplayName);
+        stack.WorkerRuntimeAliases.Should().Equal("native").And.Equal(initializer.WorkerRuntimeAliases);
+        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
+        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
+        stack.SupportedLanguageAliases["Go"].Should().Equal("golang");
     }
 
     [Fact]

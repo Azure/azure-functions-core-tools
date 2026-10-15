@@ -17,7 +17,10 @@ internal interface ITemplaterFactory
     public Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
         CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null);
 
+    /// <summary>
+    /// Creates an internal project-enabled flow; production commands and DI do not activate this staged path yet.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">The context, availability snapshot or paired project support is null.</exception>
     public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
-        TemplateProjectConfigurationPlanner planner, TemplateProjectConfigurationWriter writer, CancellationToken cancellationToken,
-        Action<TemplateStoreWaitReason>? waiting = null);
+        TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null);
 }

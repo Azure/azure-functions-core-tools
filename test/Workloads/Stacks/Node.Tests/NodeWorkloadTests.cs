@@ -23,6 +23,18 @@ public class NodeWorkloadTests
         initializer.Should().BeOfType<NodeProjectInitializer>();
         initializer.Stack.Should().Be("node");
         initializer.SupportedLanguages.Should().Equal(["JavaScript", "TypeScript"]);
+
+        IProjectStack stack = provider.GetRequiredService<IProjectStack>();
+        stack.Should().BeOfType<NodeProjectStack>();
+        stack.Should().BeSameAs(provider.GetRequiredService<NodeProjectStack>());
+        stack.Should().NotBeAssignableTo<IProjectInitializer>();
+        stack.Stack.Should().Be(initializer.Stack);
+        stack.DisplayName.Should().Be("Node.js").And.Be(initializer.DisplayName);
+        stack.WorkerRuntimeAliases.Should().BeEmpty().And.Equal(initializer.WorkerRuntimeAliases);
+        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
+        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
+        stack.SupportedLanguageAliases["JavaScript"].Should().Equal("js");
+        stack.SupportedLanguageAliases["TypeScript"].Should().Equal("ts");
     }
 
     [Fact]

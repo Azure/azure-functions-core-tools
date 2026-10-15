@@ -23,13 +23,11 @@ internal sealed class TemplaterFactory(ITemplateStore store) : ITemplaterFactory
     }
 
     public async Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
-        TemplateProjectConfigurationPlanner planner, TemplateProjectConfigurationWriter writer, CancellationToken cancellationToken,
-        Action<TemplateStoreWaitReason>? waiting = null)
+        TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(snapshot);
-        ArgumentNullException.ThrowIfNull(planner);
-        ArgumentNullException.ThrowIfNull(writer);
-        return new(await _store.OpenReadAsync(context, cancellationToken, snapshot, planner, writer, waiting));
+        ArgumentNullException.ThrowIfNull(projectSupport);
+        return new(await _store.OpenReadAsync(context, cancellationToken, snapshot, projectSupport, waiting));
     }
 }

@@ -11,14 +11,14 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </summary>
 internal static class FuncTemplateComponents
 {
-    public static IReadOnlyList<(Type Type, IIdentifiedComponent Instance)> Create(TemplateConstraintEvaluationSnapshot snapshot)
+    public static IReadOnlyList<(Type Type, IIdentifiedComponent Instance)> Create(TemplateConstraintEvaluationSnapshot snapshot, TemplateEngineBundleContext? bundle = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         FuncTemplateConstraintEvaluator evaluator = new(new());
         return
         [
-            (typeof(ITemplateConstraintFactory), new FuncTemplateConstraintFactory("func-workload", evaluator, snapshot)),
-            (typeof(ITemplateConstraintFactory), new FuncTemplateConstraintFactory("func-bundle", evaluator, snapshot)),
+            (typeof(ITemplateConstraintFactory), new FuncTemplateConstraintFactory("func-workload", evaluator, snapshot, bundle)),
+            (typeof(ITemplateConstraintFactory), new FuncTemplateConstraintFactory("func-bundle", evaluator, snapshot, bundle)),
         ];
     }
 }
