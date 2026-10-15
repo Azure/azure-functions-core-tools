@@ -245,6 +245,7 @@ internal static class TemplateFixtures
       configuration["identity"] = "Func.Tests.RunnableNodeProject";
       configuration["shortName"] = "func-tests-runnable-node";
       configuration["tags"]!["language"] = "JavaScript";
+      configuration["constraints"]!["stack"] = JsonNode.Parse("""{"type":"func-workload","args":"node"}""");
       configuration["postActions"]![0]!["args"]!["stack"] = "node";
       configuration["postActions"]![0]!["args"]!["language"] = "js";
       File.WriteAllText(configurationPath, configuration.ToJsonString());
