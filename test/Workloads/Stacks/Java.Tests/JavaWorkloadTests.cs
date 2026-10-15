@@ -25,6 +25,17 @@ public class JavaWorkloadTests
         Assert.IsType<JavaProjectInitializer>(initializer);
         Assert.Equal("java", initializer.Stack);
         Assert.Equal("Java", Assert.Single(initializer.SupportedLanguages));
+
+        IProjectStack stack = provider.GetRequiredService<IProjectStack>();
+        stack.Should().BeOfType<JavaProjectStack>();
+        stack.Should().BeSameAs(provider.GetRequiredService<JavaProjectStack>());
+        stack.Should().NotBeAssignableTo<IProjectInitializer>();
+        stack.Stack.Should().Be(initializer.Stack);
+        stack.DisplayName.Should().Be("Java").And.Be(initializer.DisplayName);
+        stack.WorkerRuntimeAliases.Should().BeEmpty().And.Equal(initializer.WorkerRuntimeAliases);
+        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
+        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
+        stack.SupportedLanguageAliases["Java"].Should().BeEmpty();
     }
 
     [Fact]
