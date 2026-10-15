@@ -115,7 +115,14 @@ configuration writer; there is no secondary creation or initializer fallback.
 Plain and JSON output distinguish **planned** configurations/effects from
 `ConfiguredProjects`, the actually finalized subset. Configuration failure is
 nonzero, preserves generated content and completed roots, and stops subsequent
-finalization. Cancellation releases the flow and never reports success.
+finalization. Cancellation before creation or a configuration commit releases
+the flow without reporting success. Once the native producer returns confirmed
+creation success after the final configuration commit, late cancellation does
+not discard that completed result at the runner or command boundary. A returned
+configuration failure preserves its confirmed subset and nonzero exit even if
+cancellation arrives afterward. Preview, pre-create refusal, unsuccessful native
+returns and canceled tasks retain cancellation; existing adoption/healing policy
+is unchanged.
 The original preflight result is retained as typed `Preview`; `Invocation` is
 populated when a non-dry-run invocation request returns, even if native preflight
 refuses creation. `plannedChanges` and

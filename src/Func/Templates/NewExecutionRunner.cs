@@ -64,7 +64,11 @@ internal sealed class NewExecutionRunner(
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
         NewExecutionResult result = await ExecuteAsync(templater, request, canPrompt, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
+        if (request.DryRun || !result.HasCompletedCreation)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
         return result with { Context = context };
     }
 
@@ -212,15 +216,20 @@ internal sealed class NewExecutionRunner(
         cancellationToken.ThrowIfCancellationRequested();
         TemplateInvocationResult invocation = await selected.InvokeAsync(new(
             request.WorkingDirectory, final.ValuesByCanonicalName, request.Name, request.DryRun, request.Force), cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
         bool success = invocation.Status == TemplateInvocationStatus.Success;
-        return new(success ? request.DryRun ? "previewed" : "created" : "invocationFailed", success)
+        NewExecutionResult result = new(success ? request.DryRun ? "previewed" : "created" : "invocationFailed", success)
         {
             SelectedTemplate = selected.Entry,
             ArgumentResults = [final],
             Invocation = invocation,
             Diagnostics = invocation.Diagnostic is null ? [] : [invocation.Diagnostic],
         };
+        if (request.DryRun || !result.HasCompletedCreation)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return result;
 
         void AddCompatible(TemplateGroup group)
         {

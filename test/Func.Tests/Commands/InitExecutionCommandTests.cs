@@ -137,5 +137,96 @@ public sealed class InitExecutionCommandTests
         requests[1].RawTemplateTokens.Should().Equal("--value", "second");
     }
 
+    [Theory]
+    [InlineData("created", "Success", true)]
+    [InlineData("partialInitialization", "ConfigurationFailure", true)]
+    [InlineData("previewed", "Success", false)]
+    [InlineData("invocationFailed", "FileConflict", false)]
+    [InlineData("invocationFailed", "Failed", false)]
+    [InlineData("invocationFailed", "EngineFailure", false)]
+    [InlineData("created", "FileConflict", false)]
+    [InlineData("created", "ConfigurationFailure", false)]
+    [InlineData("partialInitialization", "Success", false)]
+    [InlineData("created", "2147483647", false)]
+    [InlineData("adopted", "Success", false)]
+    [InlineData("repaired", "Success", false)]
+    [InlineData("healed", "Success", false)]
+    public async Task Invoke_ResultReturnsAfterCancellation_OnlyFreshConfirmedCreationReachesRenderer(
+        string kind, string statusName, bool preserveResult)
+    {
+        using CancellationTokenSource cancellation = new();
+        var status = Enum.Parse<TemplateInvocationStatus>(statusName);
+        InitExecutionResult result = new(kind, kind == "created")
+        {
+            Invocation = new(status, []),
+        };
+        _runner.ExecuteAsync(Arg.Any<InitExecutionRequest>(), _availability, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return result;
+        });
+        int? exit = null;
+
+        var failure = await Record.ExceptionAsync(async () => exit = await CreateCommand().ParseInvocation(["--output", "json"])
+            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token));
+
+        if (preserveResult)
+        {
+            failure.Should().BeNull();
+            exit.Should().Be(result.Succeeded ? 0 : 1);
+            _interaction.AllOutput.Should().Contain("JSON:");
+        }
+        else
+        {
+            failure.Should().BeAssignableTo<OperationCanceledException>();
+            exit.Should().BeNull();
+            _interaction.AllOutput.Should().NotContain("JSON:").And.NotContain("SUCCESS:");
+        }
+    }
+
+    [Theory]
+    [InlineData("created", "Success")]
+    [InlineData("partialInitialization", "ConfigurationFailure")]
+    public async Task Invoke_DryRunResultReturnsAfterCancellation_DoesNotTreatCreationShapeAsCommitted(string kind, string statusName)
+    {
+        using CancellationTokenSource cancellation = new();
+        _runner.ExecuteAsync(Arg.Any<InitExecutionRequest>(), _availability, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return new InitExecutionResult(kind, kind == "created") { Invocation = new(Enum.Parse<TemplateInvocationStatus>(statusName), []) };
+        });
+
+        Func<Task> act = () => CreateCommand().ParseInvocation(["--dry-run", "--output", "json"])
+            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _interaction.AllOutput.Should().NotContain("JSON:").And.NotContain("SUCCESS:");
+    }
+
+    [Fact]
+    public async Task Invoke_RunnerTaskCanceled_DoesNotInventCompletedResult()
+    {
+        using CancellationTokenSource cancellation = new();
+        _runner.ExecuteAsync(Arg.Any<InitExecutionRequest>(), _availability, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return Task.FromCanceled<InitExecutionResult>(cancellation.Token);
+        });
+
+        Func<Task> act = () => CreateCommand().ParseInvocation(["--output", "json"])
+            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _interaction.AllOutput.Should().NotContain("JSON:").And.NotContain("SUCCESS:");
+    }
+
+    [Fact]
+    public void HasConfirmedCreationResult_NullResult_RejectsContractViolation()
+    {
+        Action act = () => InitExecutionRunner.HasConfirmedCreationResult(null!, dryRun: false);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("result");
+    }
+
     private InitExecutionCommand CreateCommand() => new(_runner, new(_interaction), _availability);
 }
