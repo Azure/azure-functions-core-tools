@@ -1,12 +1,17 @@
 <Project>
   <UsingTask TaskName="WriteBundledTemplatesJson" AssemblyFile="$(BaseOutputPath)../Workloads.Sdk/$(Configuration.ToLowerInvariant())/Azure.Functions.Cli.Workloads.Sdk.dll" TaskFactory="TaskHostFactory" />
-  <PropertyGroup>
+  <PropertyGroup Condition="'$(_BundledTemplatesArchiveToProduce)' == ''">
     <BundledTemplatesProject Condition="'$(BundledTemplatesProject)' == ''">$(MSBuildProjectDirectory)/NativeTemplates/Workloads.Node.Templates.csproj</BundledTemplatesProject>
     <BundledTemplatesPackageId Condition="'$(BundledTemplatesPackageId)' == ''">Azure.Functions.Templates.Node.Basic</BundledTemplatesPackageId>
     <BundledTemplatesPackagePath Condition="'$(BundledTemplatesPackagePath)' == ''">templates/node-basic.nupkg</BundledTemplatesPackagePath>
     <PackWorkloadDependsOn>$(PackWorkloadDependsOn);_PackBundledTemplates</PackWorkloadDependsOn>
   </PropertyGroup>
-  <Target Name="_PackBundledTemplates" DependsOnTargets="_SetWorkloadProperties" Condition="'$(WorkloadKind)' == 'workload'">
+  <!-- Keep cleanup in the native Pack context so cached Pack success cannot follow a caller-side deletion. -->
+  <Target Name="_PrepareBundledTemplatesArchive" Condition="'$(_BundledTemplatesArchiveToProduce)' != ''">
+    <Delete Files="$(_BundledTemplatesArchiveToProduce)" />
+  </Target>
+  <Target Name="_PackBundledTemplates" DependsOnTargets="_SetWorkloadProperties"
+    Condition="'$(WorkloadKind)' == 'workload' AND '$(_BundledTemplatesArchiveToProduce)' == ''">
     <PropertyGroup>
       <BundledTemplatesArchiveFileName Condition="'$(BundledTemplatesArchiveFileName)' == ''">$(BundledTemplatesPackageId).$(PackageVersion).nupkg</BundledTemplatesArchiveFileName>
       <_BundledTemplatesOutput>$(IntermediateOutputPath)bundled-templates/</_BundledTemplatesOutput>
@@ -14,9 +19,9 @@
       <_BundledTemplatesPackagePath>$(_WorkloadPackageContentRoot)$(BundledTemplatesPackagePath)</_BundledTemplatesPackagePath>
       <_BundledTemplatesManifest>$(IntermediateOutputPath)bundled-templates.json</_BundledTemplatesManifest>
     </PropertyGroup>
-    <Delete Files="$(_BundledTemplatesArchive);$(_BundledTemplatesManifest)" />
+    <Delete Files="$(_BundledTemplatesManifest)" />
     <MSBuild Projects="$(BundledTemplatesProject)"
-      Targets="Pack" Properties="Configuration=$(Configuration);PackageOutputPath=$([System.IO.Path]::GetFullPath('$(_BundledTemplatesOutput)'));PackageVersion=$(PackageVersion)" />
+      Targets="_PrepareBundledTemplatesArchive;Pack" Properties="Configuration=$(Configuration);PackageOutputPath=$([System.IO.Path]::GetFullPath('$(_BundledTemplatesOutput)'));PackageVersion=$(PackageVersion);_BundledTemplatesArchiveToProduce=$([System.IO.Path]::GetFullPath('$(_BundledTemplatesArchive)'))" />
     <Error Condition="!Exists('$(_BundledTemplatesArchive)')"
       Text="Bundled templates project '$(BundledTemplatesProject)' did not produce '$(BundledTemplatesArchiveFileName)'. Check BundledTemplatesPackageId and BundledTemplatesArchiveFileName." />
     <WriteBundledTemplatesJson Archive="$(_BundledTemplatesArchive)" ArchivePath="$(_BundledTemplatesPackagePath)"

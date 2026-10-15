@@ -166,9 +166,12 @@ The native project must pack a `FuncTemplate` archive. Its configuration and
 package version follow the physical workload build. The shared target selects
 the exact `$(BundledTemplatesPackageId).$(PackageVersion).nupkg` output; set
 `BundledTemplatesArchiveFileName` only if the native project's pack target
-produces a different filename. It removes the selected staged archive before
-packing and fails if that invocation does not recreate it, rather than picking
-a stale package or scanning a directory.
+produces a different filename. The native pack pipeline removes the selected
+staged archive before producing it and the caller fails if the expected output
+is missing, rather than picking a stale package or scanning a directory.
+When several outer packs use the same native project and build properties in
+one MSBuild invocation, the native pack and its cleanup are cached together.
+Later callers reuse those produced bytes without deleting them.
 
 `BundledTemplatesPackagePath` is relative to the physical `tools/any/` or
 `tools/<rid>/` content root. Only `WorkloadKind=workload` runs the target;

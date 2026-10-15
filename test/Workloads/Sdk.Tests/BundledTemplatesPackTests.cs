@@ -35,10 +35,12 @@ public sealed class BundledTemplatesPackTests
         AssertRepositoryMetadata(inner);
     }
 
-    [Fact]
-    public void Pack_NonNodeRid_EmbedsDeclaredBytesWithActualMetadataAndCompleteInventory()
+    [Theory]
+    [InlineData("fixture")]
+    [InlineData("fixture-repeat")]
+    public void Pack_NonNodeRid_EmbedsDeclaredBytesWithActualMetadataAndCompleteInventory(string directory)
     {
-        using ZipArchive outer = OpenPackage("fixture", $"{FixtureId}.win-x64.{Version}.nupkg");
+        using ZipArchive outer = OpenPackage(directory, $"{FixtureId}.win-x64.{Version}.nupkg");
 
         using ZipArchive inner = AssertBundledArchive(outer, "tools/win-x64/templates/controlled-native.nupkg", "Azure.Functions.Cli.Tests.NativeFixture");
 
@@ -58,6 +60,19 @@ public sealed class BundledTemplatesPackTests
         inner.GetEntry("LICENSE").Should().NotBeNull();
         AssertRepositoryMetadata(outer);
         AssertRepositoryMetadata(inner);
+    }
+
+    [Fact]
+    public void Pack_TwoOuterOutputsInOneBuild_ReusesSameProducedNativeBytesAndDeclaration()
+    {
+        const string path = "tools/win-x64/templates/controlled-native.nupkg";
+        using ZipArchive first = OpenPackage("fixture", $"{FixtureId}.win-x64.{Version}.nupkg");
+        using ZipArchive second = OpenPackage("fixture-repeat", $"{FixtureId}.win-x64.{Version}.nupkg");
+        using Stream firstStream = first.GetEntry(path)!.Open();
+        using Stream secondStream = second.GetEntry(path)!.Open();
+
+        SHA256.HashData(firstStream).Should().Equal(SHA256.HashData(secondStream));
+        Read(first, "bundled-templates.json").Should().Be(Read(second, "bundled-templates.json"));
     }
 
     [Fact]
