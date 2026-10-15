@@ -31,14 +31,13 @@ internal sealed class TemplaterFactory(CliConfigurationPathsOptions configuratio
         return new Templater(new TemplateEngineSession(context, settingsLocation, snapshot));
     }
 
-    public Templater CreateProject(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
-        TemplateProjectConfigurationPlanner planner, TemplateProjectConfigurationWriter writer)
+    public Templater CreateProject(
+        TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot, TemplateProjectSupport projectSupport)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(snapshot);
-        ArgumentNullException.ThrowIfNull(planner);
-        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentNullException.ThrowIfNull(projectSupport);
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new(new TemplateEngineSession(context, settingsLocation, snapshot, planner, writer));
+        return new(new TemplateEngineSession(context, settingsLocation, snapshot, projectSupport));
     }
 }

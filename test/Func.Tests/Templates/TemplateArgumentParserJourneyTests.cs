@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates;
@@ -174,6 +175,43 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     }
 
     [Theory]
+    [InlineData(null, false)]
+    [InlineData("4.35.0", true)]
+    [InlineData("5.0.0", false)]
+    public async Task Parse_ContextBundleEligibility_PrecedesArgumentCompatibility(string? bundleVersion, bool eligible)
+    {
+        await InstallAsync(requireBundle: true);
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "bundle-control"));
+        using var templater = CreateTemplater(output, bundleVersion: bundleVersion);
+        var before = SnapshotProject();
+
+        var resolution = await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None);
+
+        resolution.Status.Should().Be(eligible ? TemplateResolutionStatus.Success : TemplateResolutionStatus.Unavailable);
+        SnapshotProject().Should().BeEquivalentTo(before);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+        if (eligible)
+        {
+            var selected = resolution.Group.Should().ContainSingle().Subject;
+            var parsed = Parse(selected, ["--greeting", "bundle control", "-p:f", "true"]);
+            var preview = await selected.InvokeAsync(new(output, parsed.ValuesByCanonicalName, "Bundle", DryRun: true), CancellationToken.None);
+
+            parsed.IsComplete.Should().BeTrue();
+            preview.Status.Should().Be(TemplateInvocationStatus.Success);
+            Path.GetFullPath(Path.Combine(output.Info.FullName, preview.Changes.Should().ContainSingle().Which.Path))
+                .Should().Be(Path.Combine(output.Info.FullName, "Bundle.txt"));
+            SnapshotProject().Should().BeEquivalentTo(before);
+            Directory.Exists(output.Info.FullName).Should().BeFalse();
+        }
+        else
+        {
+            resolution.Group.Should().BeEmpty();
+            resolution.Diagnostics.Should().ContainSingle().Which.ConstraintEvaluation.Diagnostics
+                .Should().Contain(diagnostic => diagnostic.Type == "func-bundle");
+        }
+    }
+
+    [Theory]
     [InlineData("bool", "TRUE", true)]
     [InlineData("boolean", "false", true)]
     [InlineData("int", "9223372036854775807", true)]
@@ -217,13 +255,12 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         IReadOnlyDictionary<string, string?>? completed = null)
         => _parser.Parse(new(template.Entry.Identity, template.Parameters, _reserved, raw, completed));
 
-    private Templater CreateTemplater(WorkingDirectory output, bool usable = true)
+    private Templater CreateTemplater(WorkingDirectory output, bool usable = true, string? bundleVersion = "4.35.0")
     {
         TemplateEngineContext context = new(output,
             new(WorkingDirectory.FromExplicit(Path.Combine(_root, "project")), "node", "JavaScript"),
-            new("Microsoft.Azure.Functions.ExtensionBundle", "4.35.0"));
-        TemplateConstraintEvaluationSnapshot snapshot = new([new("node-package", NuGetVersion.Parse("1.0.0"), ["node"], usable)],
-            "Microsoft.Azure.Functions.ExtensionBundle", NuGetVersion.Parse("4.35.0"));
+            bundleVersion is null ? null : new("Microsoft.Azure.Functions.ExtensionBundle", bundleVersion));
+        TemplateConstraintEvaluationSnapshot snapshot = new([new("node-package", NuGetVersion.Parse("1.0.0"), ["node"], usable)]);
         return new TemplaterFactory(new CliConfigurationPathsOptions(Path.Combine(_root, "home"))).Create(context, snapshot);
     }
 
@@ -231,7 +268,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         => Directory.GetFiles(Path.Combine(_root, "project"), "*", SearchOption.AllDirectories)
             .ToDictionary(path => Path.GetRelativePath(Path.Combine(_root, "project"), path), File.ReadAllText);
 
-    private async Task InstallAsync(string scalarType = "string")
+    private async Task InstallAsync(string scalarType = "string", bool requireBundle = false)
     {
         string package = Path.Combine(_root, "package");
         string low = Path.Combine(package, "low", ".template.config");
@@ -258,6 +295,16 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
               }
             }
             """);
+        if (requireBundle)
+        {
+            string templatePath = Path.Combine(low, "template.json");
+            JsonNode configuration = JsonNode.Parse(File.ReadAllText(templatePath))!;
+            configuration["constraints"]!["bundle"] = JsonNode.Parse("""
+                {"type":"func-bundle","args":{"id":"Microsoft.Azure.Functions.ExtensionBundle","version":"[4.0.0,5.0.0)"}}
+                """);
+            File.WriteAllText(templatePath, configuration.ToJsonString());
+        }
+
         File.WriteAllText(Path.Combine(low, "func.host.json"), """
             {"symbolInfo":{"Greeting":{"longName":"greeting"},"AuthLevel":{"longName":"output","shortName":"n"},
               "Feature":{"longName":"force","shortName":"f"}}}
