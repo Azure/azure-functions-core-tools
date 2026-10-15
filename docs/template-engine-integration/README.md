@@ -117,6 +117,14 @@ type changed before selection remains unavailable, with a diagnostic to correct
 the type and refresh the installed template. Changes after selection still require
 selection to be rerun.
 
+Invocable parameter definitions and func host aliases come from the current
+mounted configuration, not the persisted engine descriptor. Native preview and
+creation receive an input dataset built from those same mounted definitions.
+Folder-template parameter edits between flows therefore take effect without
+refreshing the shared hive. The selected snapshot also captures and compares func
+host content separately, so alias edits after selection require rerunning selection
+without changing the raw template.json SHA used by source provenance.
+
 The pinned TemplateEngine reevaluates symbols for preview, creation effects, and
 actual creation; its creation effects are not a frozen output plan. This item flow
 therefore supports parameter-driven file renames, `name`/`sourceName` renames,
