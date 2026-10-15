@@ -5,6 +5,8 @@ using AwesomeAssertions;
 using Azure.Functions.Cli.Kubernetes;
 using Azure.Functions.Cli.Kubernetes.KEDA.Models;
 using Azure.Functions.Cli.Kubernetes.KEDA.V2.Models;
+using Azure.Functions.Cli.Kubernetes.Models.Kubernetes;
+using Newtonsoft.Json;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.HelperTests
@@ -58,6 +60,18 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             Kubernetes.Models.OutputSerializationOptions.Yaml);
 
             result.Should().Contain("\"1\"");
+        }
+
+        [Theory]
+        [InlineData(@"{""status"":{""loadBalancer"":{""ingress"":[{""ip"":""192.0.2.1""}]}}}", "192.0.2.1")]
+        [InlineData(@"{""status"":{""loadBalancer"":{""ingress"":[{""hostname"":""localhost""}]}}}", "localhost")]
+        [InlineData(@"{""status"":{""loadBalancer"":{""ingress"":[{""ip"":""192.0.2.1"",""hostname"":""example.test""}]}}}", "192.0.2.1")]
+        [InlineData(@"{""status"":{""loadBalancer"":{""ingress"":[]}}}", null)]
+        public void GetServiceAddressReturnsIpOrHostname(string json, string expected)
+        {
+            var service = JsonConvert.DeserializeObject<ServiceV1>(json);
+
+            KubernetesHelper.GetServiceAddress(service).Should().Be(expected);
         }
     }
 }
