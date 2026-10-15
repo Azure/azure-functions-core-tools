@@ -40,7 +40,7 @@ public sealed class InstallationMetadataReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_ReadsMetadataBesideExecutableWithFourKiBCap()
+    public async Task ReadAsync_ValidMetadata_ReadsBesideExecutable()
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
@@ -53,6 +53,23 @@ public sealed class InstallationMetadataReaderTests
         // Assert
         fileSystem.Received(1).ResolveFileLinkTarget(_processPath);
         fileSystem.Received(1).OpenReadIfExists(_metadataPath);
+    }
+
+    [Fact]
+    public async Task ReadAsync_ValidMetadataAtLimit_ReturnsMetadata()
+    {
+        // Arrange
+        (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
+        string json = ValidJson("standalone", "in-place");
+        string paddedJson = json.PadRight(InstallationMetadataReader.MaximumMetadataByteCount);
+        Encoding.UTF8.GetByteCount(paddedJson).Should().Be(InstallationMetadataReader.MaximumMetadataByteCount);
+        SetMetadata(fileSystem, paddedJson);
+
+        // Act
+        InstallationMetadata metadata = await reader.ReadAsync(CancellationToken.None);
+
+        // Assert
+        metadata.Should().Be(new InstallationMetadata("standalone", InstallationUpdatePolicy.InPlace));
     }
 
     [Fact]
@@ -102,7 +119,7 @@ public sealed class InstallationMetadataReaderTests
         // Assert
         InvalidInstallationMetadataException exception =
             (await act.Should().ThrowAsync<InvalidInstallationMetadataException>()).Which;
-        exception.InnerException.Should().BeOfType<System.Text.Json.JsonException>();
+        exception.InnerException.Should().BeAssignableTo<System.Text.Json.JsonException>();
     }
 
     [Theory]
@@ -136,6 +153,20 @@ public sealed class InstallationMetadataReaderTests
         SetMetadata(
             fileSystem,
             """{"schemaVersion":2,"installMethod":"standalone","updatePolicy":"in-place"}""");
+
+        // Act
+        Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<UnsupportedInstallationMetadataSchemaException>();
+    }
+
+    [Fact]
+    public async Task ReadAsync_UnsupportedSchemaWithUnknownProperty_ThrowsUnsupportedInstallationMetadataSchemaException()
+    {
+        // Arrange
+        (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
+        SetMetadata(fileSystem, """{"schemaVersion":2,"newField":1}""");
 
         // Act
         Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
@@ -212,6 +243,21 @@ public sealed class InstallationMetadataReaderTests
         // Assert
         await act.Should().ThrowAsync<IOException>().WithMessage("*link cycle*");
         fileSystem.DidNotReceiveWithAnyArgs().OpenReadIfExists(default!);
+    }
+
+    [Fact]
+    public async Task ReadAsync_MetadataAccessDenied_PropagatesUnauthorizedAccessException()
+    {
+        // Arrange
+        (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
+        fileSystem.OpenReadIfExists(_metadataPath)
+            .Returns<Stream?>(_ => throw new UnauthorizedAccessException("access denied"));
+
+        // Act
+        Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("*access denied*");
     }
 
     [Fact]

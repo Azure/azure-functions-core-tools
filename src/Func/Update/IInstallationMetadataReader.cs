@@ -34,6 +34,9 @@ internal interface IInstallationMetadataReader
     /// <exception cref="IOException">
     /// The executable's symbolic-link target cannot be resolved, or the metadata file cannot be read.
     /// </exception>
+    /// <exception cref="UnauthorizedAccessException">
+    /// The executable or installation metadata file cannot be accessed.
+    /// </exception>
     /// <exception cref="OperationCanceledException">
     /// The operation is cancelled.
     /// </exception>

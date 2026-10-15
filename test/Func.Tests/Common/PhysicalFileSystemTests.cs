@@ -66,6 +66,16 @@ public sealed class PhysicalFileSystemTests : IDisposable
     }
 
     [Fact]
+    public void ResolveFileLinkTarget_RelativePath_ThrowsArgumentException()
+    {
+        // Act
+        Action act = () => _fileSystem.ResolveFileLinkTarget("func");
+
+        // Assert
+        act.Should().Throw<ArgumentException>().WithParameterName("path");
+    }
+
+    [Fact]
     public void ResolveFileLinkTarget_FileIsNotLink_ReturnsOriginalFullPath()
     {
         // Arrange
@@ -80,39 +90,33 @@ public sealed class PhysicalFileSystemTests : IDisposable
     }
 
     [Fact]
-    public void ResolveFileLinkTarget_UnixExecutableSymlinkChain_ReturnsFinalTarget()
+    public void ResolveFileLinkTarget_ExecutableSymlinkChain_ReturnsFinalTarget()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         // Arrange
         string physicalDirectory = Path.Combine(_tempDirectory, "releases", "v1");
         Directory.CreateDirectory(physicalDirectory);
-        string physicalExecutable = Path.Combine(physicalDirectory, "func");
+        string executableName = OperatingSystem.IsWindows() ? "func.exe" : "func";
+        string physicalExecutable = Path.Combine(physicalDirectory, executableName);
         File.WriteAllText(physicalExecutable, string.Empty);
 
         string intermediateLink = Path.Combine(_tempDirectory, "intermediate");
-        File.CreateSymbolicLink(intermediateLink, Path.Combine("releases", "v1", "func"));
-        string executableLink = Path.Combine(_tempDirectory, "func");
+        File.CreateSymbolicLink(intermediateLink, Path.Combine("releases", "v1", executableName));
+        string executableLink = Path.Combine(_tempDirectory, executableName);
         File.CreateSymbolicLink(executableLink, "intermediate");
 
         // Act
         string resolved = _fileSystem.ResolveFileLinkTarget(executableLink);
 
         // Assert
-        resolved.Should().Be(physicalExecutable);
+        string.Equals(
+            resolved,
+            physicalExecutable,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal).Should().BeTrue();
     }
 
     [Fact]
-    public void ResolveFileLinkTarget_UnixExecutableSymlinkCycle_ThrowsIOException()
+    public void ResolveFileLinkTarget_ExecutableSymlinkCycle_ThrowsIOException()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         // Arrange
         string firstLink = Path.Combine(_tempDirectory, "first");
         string secondLink = Path.Combine(_tempDirectory, "second");
@@ -127,17 +131,27 @@ public sealed class PhysicalFileSystemTests : IDisposable
     }
 
     [Fact]
-    public async Task ResolveFileLinkTarget_UnixLinkedParent_PreservesAccessToSiblingMetadata()
+    public void ResolveFileLinkTarget_DanglingExecutableSymlink_ThrowsFileNotFoundException()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
+        // Arrange
+        string executableLink = Path.Combine(_tempDirectory, OperatingSystem.IsWindows() ? "func.exe" : "func");
+        File.CreateSymbolicLink(executableLink, Path.Combine(_tempDirectory, "missing"));
 
+        // Act
+        Action act = () => _fileSystem.ResolveFileLinkTarget(executableLink);
+
+        // Assert
+        act.Should().Throw<FileNotFoundException>();
+    }
+
+    [Fact]
+    public async Task ResolveFileLinkTarget_LinkInParentPath_PreservesAccessToSiblingMetadata()
+    {
         // Arrange
         string physicalDirectory = Path.Combine(_tempDirectory, "releases", "v1");
         Directory.CreateDirectory(physicalDirectory);
-        string physicalExecutable = Path.Combine(physicalDirectory, "func");
+        string executableName = OperatingSystem.IsWindows() ? "func.exe" : "func";
+        string physicalExecutable = Path.Combine(physicalDirectory, executableName);
         File.WriteAllText(physicalExecutable, string.Empty);
         string physicalMetadata = Path.Combine(physicalDirectory, InstallationMetadataReader.MetadataFileName);
         byte[] expected = [1, 2, 3];
@@ -145,7 +159,7 @@ public sealed class PhysicalFileSystemTests : IDisposable
 
         string currentLink = Path.Combine(_tempDirectory, "current");
         Directory.CreateSymbolicLink(currentLink, physicalDirectory);
-        string executablePath = Path.Combine(currentLink, "func");
+        string executablePath = Path.Combine(currentLink, executableName);
 
         // Act
         string resolved = _fileSystem.ResolveFileLinkTarget(executablePath);
