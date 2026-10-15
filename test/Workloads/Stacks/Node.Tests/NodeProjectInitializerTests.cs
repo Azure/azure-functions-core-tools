@@ -12,6 +12,13 @@ namespace Azure.Functions.Cli.Workloads.Node.Tests;
 
 public class NodeProjectInitializerTests : IDisposable
 {
+    [Fact]
+    public void Constructor_NullStack_Throws()
+    {
+        FluentActions.Invoking(() => new NodeProjectInitializer(null!))
+            .Should().ThrowExactly<ArgumentNullException>().WithParameterName("stack");
+    }
+
     private readonly DirectoryInfo _projectDir;
 
     public NodeProjectInitializerTests()
@@ -37,7 +44,7 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsNode()
     {
-        new NodeProjectInitializer().Stack.Should().Be("node");
+        new NodeProjectInitializer(new NodeProjectStack()).Stack.Should().Be("node");
     }
 
     [Theory]
@@ -52,7 +59,7 @@ public class NodeProjectInitializerTests : IDisposable
     [InlineData("unknown", "unknown")]
     public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
     {
-        new NodeProjectInitializer().NormalizeLanguage(input).Should().Be(expected);
+        new NodeProjectInitializer(new NodeProjectStack()).NormalizeLanguage(input).Should().Be(expected);
     }
 
     [Fact]
@@ -84,7 +91,7 @@ public class NodeProjectInitializerTests : IDisposable
     public void GetInitOptions_RegistersBundleAndNpmOptions()
     {
         RootCommand root = [];
-        IReadOnlyList<Option> options = new NodeProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
+        IReadOnlyList<Option> options = new NodeProjectInitializer(new NodeProjectStack()).GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         names.Should().Contain("--no-bundles");
@@ -242,7 +249,7 @@ public class NodeProjectInitializerTests : IDisposable
         string[]? args = null,
         Action<NodeProjectInitializer>? configure = null)
     {
-        NodeProjectInitializer initializer = new()
+        NodeProjectInitializer initializer = new(new NodeProjectStack())
         {
             // Stub by default so tests don't spawn real npm.
             RunNpmInstall = (_, _) => Task.FromResult((0, string.Empty)),

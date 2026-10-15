@@ -28,7 +28,7 @@ public class DotNetProjectInitializerTests : IDisposable
         }
     }
 
-    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli, _hivePathProvider);
+    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli, _hivePathProvider, new DotNetProjectStack());
 
     [Fact]
     public void Stack_IsDotNet()
@@ -84,13 +84,22 @@ public class DotNetProjectInitializerTests : IDisposable
     [Fact]
     public void Constructor_ThrowsOnNullRunner()
     {
-        FluentActions.Invoking(() => new DotNetProjectInitializer(null!, _hivePathProvider)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DotNetProjectInitializer(null!, _hivePathProvider, new DotNetProjectStack()))
+            .Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullHivePathProvider()
     {
-        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, null!)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, null!, new DotNetProjectStack()))
+            .Should().ThrowExactly<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Constructor_NullStack_Throws()
+    {
+        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, _hivePathProvider, null!))
+            .Should().ThrowExactly<ArgumentNullException>().WithParameterName("stack");
     }
 
     [Fact]
