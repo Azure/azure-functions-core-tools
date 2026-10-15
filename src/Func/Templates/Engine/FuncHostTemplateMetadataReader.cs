@@ -8,7 +8,7 @@ using Microsoft.TemplateEngine.Edge.Settings;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Reads the <c>func.host.json</c> content the template engine caches for each template.
+/// Parses <c>func.host.json</c> content captured from the engine cache or a mounted template.
 /// </summary>
 internal static class FuncHostTemplateMetadataReader
 {
@@ -31,10 +31,10 @@ internal static class FuncHostTemplateMetadataReader
     }
 
     /// <summary>
-    /// Parses cached func host metadata, returning <see cref="FuncHostTemplateMetadata.Empty"/> when the template has none.
+    /// Parses captured func host metadata, returning <see cref="FuncHostTemplateMetadata.Empty"/> when the template has none.
     /// </summary>
     /// <param name="hostConfigPlace">Location of the template's func host file, or <c>null</c> when it has none.</param>
-    /// <param name="hostData">Content the engine cached for that file.</param>
+    /// <param name="hostData">Captured content for that file.</param>
     /// <exception cref="InvalidTemplateMetadataException">The content is missing, isn't a JSON object, or has an invalid value.</exception>
     public static FuncHostTemplateMetadata Read(string? hostConfigPlace, string? hostData)
     {

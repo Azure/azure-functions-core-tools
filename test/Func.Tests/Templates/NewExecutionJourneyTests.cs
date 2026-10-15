@@ -1298,7 +1298,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         public ITemplateCreationResult? NativeResult { get; private set; }
 
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
-            IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+            InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             if (!dryRun && throwDuringCreate)
             {

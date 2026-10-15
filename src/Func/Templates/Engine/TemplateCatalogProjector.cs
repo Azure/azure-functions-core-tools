@@ -66,8 +66,9 @@ internal static class TemplateCatalogProjector
     /// <param name="package">
     /// Package that provides the template, or <c>null</c> when it isn't known. Only managed packages have details.
     /// </param>
+    /// <param name="configuration">Mounted schema and host content, when available.</param>
     /// <exception cref="ArgumentException"><paramref name="template"/> isn't an item or project template.</exception>
-    public static TemplateCatalogEntry Project(ITemplateInfo template, ITemplatePackage? package)
+    public static TemplateCatalogEntry Project(ITemplateInfo template, ITemplatePackage? package, TemplateConfigurationSnapshot? configuration = null)
     {
         TemplateType type = GetTemplateType(template)
             ?? throw new ArgumentException($"Template '{template.Identity}' isn't an item or project template.", nameof(template));
@@ -77,8 +78,10 @@ internal static class TemplateCatalogProjector
         string? metadataDiagnostic = null;
         try
         {
-            metadata = FuncHostTemplateMetadataReader.Read(template);
-            parameters = TemplateParameterProjector.Project(template.ParameterDefinitions, metadata);
+            metadata = configuration is null
+                ? FuncHostTemplateMetadataReader.Read(template)
+                : FuncHostTemplateMetadataReader.Read(configuration.HostConfigPlace, configuration.HostData);
+            parameters = TemplateParameterProjector.Project(configuration is null ? template.ParameterDefinitions : configuration.Parameters, metadata);
         }
         catch (InvalidTemplateMetadataException ex)
         {
