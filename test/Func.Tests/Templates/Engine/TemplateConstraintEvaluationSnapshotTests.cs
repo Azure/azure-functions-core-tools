@@ -68,27 +68,25 @@ public sealed class TemplateConstraintEvaluationSnapshotTests
     }
 
     [Fact]
-    public void Constructor_BundleContext_ProvidesCapturedEvaluationInput()
+    public void EvaluateAll_BundleContext_UsesResolvedInputSeparatelyFromWorkloads()
     {
         var declarations = TemplateConstraintDeclarationReader.Read("""{"constraints":{"bundle":{"type":"func-bundle","args":{"id":"bundle","version":"[4.20,5.0)"}}}}""");
         var version = NuGetVersion.Parse("4.20.0");
-        var snapshot = new TemplateConstraintEvaluationSnapshot([], "bundle", version);
+        var snapshot = new TemplateConstraintEvaluationSnapshot([]);
+        var bundle = new TemplateEngineBundleContext("bundle", version.ToNormalizedString());
 
-        var result = _evaluator.EvaluateAll(declarations, snapshot);
+        var result = _evaluator.EvaluateAll(declarations, snapshot, bundle);
 
         result.Should().Be(FuncTemplateConstraintOutcome.Eligible);
-        snapshot.BundleId.Should().Be("bundle");
-        snapshot.BundleVersion.Should().Be(version);
+        _evaluator.EvaluateAll(declarations, snapshot).Should().Be(FuncTemplateConstraintOutcome.Restricted);
     }
 
     [Fact]
-    public void Constructor_EmptyInput_DoesNotInventWorkloadsOrBundle()
+    public void Constructor_EmptyInput_DoesNotInventWorkloads()
     {
         var snapshot = new TemplateConstraintEvaluationSnapshot([]);
 
         snapshot.Workloads.Should().BeEmpty();
-        snapshot.BundleId.Should().BeNull();
-        snapshot.BundleVersion.Should().BeNull();
     }
 
     [Fact]

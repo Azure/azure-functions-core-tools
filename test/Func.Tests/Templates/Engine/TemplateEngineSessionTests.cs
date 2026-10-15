@@ -95,12 +95,18 @@ public sealed class TemplateEngineSessionTests : IDisposable
     }
 
     [Fact]
-    public void Constructor_ConflictingBundleSnapshot_Throws()
+    public async Task Constraints_SharedWorkloadSnapshot_DoesNotOverrideSessionBundle()
     {
-        var snapshot = new TemplateConstraintEvaluationSnapshot([], "bundle", NuGetVersion.Parse("4.20"));
-        Action action = () => new TemplateEngineSession(CommandContext("no-bundle"), Hive, snapshot);
+        var snapshot = new TemplateConstraintEvaluationSnapshot([]);
+        using TemplateEngineSession resolved = new(new(DirectoryUnderRoot("bundle"), bundle: new("bundle", "4.20")), Hive, snapshot);
+        using TemplateEngineSession missing = new(CommandContext("no-bundle"), Hive, snapshot);
+        var resolvedFactory = resolved.Settings.Components.OfType<ITemplateConstraintFactory>().Single(factory => factory.Type == "func-bundle");
+        var missingFactory = missing.Settings.Components.OfType<ITemplateConstraintFactory>().Single(factory => factory.Type == "func-bundle");
+        var resolvedConstraint = await resolvedFactory.CreateTemplateConstraintAsync(resolved.Settings, CancellationToken.None);
+        var missingConstraint = await missingFactory.CreateTemplateConstraintAsync(missing.Settings, CancellationToken.None);
 
-        action.Should().Throw<ArgumentException>().WithParameterName("snapshot");
+        resolvedConstraint.Evaluate("\"[4.20,5.0)\"").EvaluationStatus.Should().Be(TemplateConstraintResult.Status.Allowed);
+        missingConstraint.Evaluate("\"[4.20,5.0)\"").EvaluationStatus.Should().Be(TemplateConstraintResult.Status.Restricted);
     }
 
     [Fact]

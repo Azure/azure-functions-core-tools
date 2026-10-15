@@ -93,7 +93,7 @@ internal class TemplateEngineSession : IDisposable
         content.Position = 0;
         using var reader = new StreamReader(content);
         string configuration = await reader.ReadToEndAsync(cancellationToken);
-        return new(configuration, fingerprint);
+        return new(configuration, fingerprint, TemplateCatalogProjector.GetTemplateType(loaded), Array.AsReadOnly<ITemplateParameter>([.. loaded.ParameterDefinitions]));
     }
 
     public virtual async Task<IReadOnlyCollection<string>> ReadPackageTypesAsync(ITemplatePackage? package, CancellationToken cancellationToken)
@@ -181,30 +181,19 @@ internal class TemplateEngineSession : IDisposable
         ArgumentNullException.ThrowIfNull(request);
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
-        TemplateConfigurationSnapshot current;
-        try
+        TemplateInvocationResult? configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+        if (configurationFailure is not null)
         {
-            current = await ReadConfigurationAsync(template, cancellationToken);
-        }
-        catch (InvalidTemplateMetadataException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], exception.Message);
-        }
-        catch (IOException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable: {exception.Message}");
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
+            return configurationFailure;
         }
 
-        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
+        string? topologyFailure = TemplateOutputPathValidator.GetDiagnostic(configuration.Content, GetPopulatedParameters(template, configuration, request));
+        if (topologyFailure is not null)
         {
-            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed. Rerun selection.");
+            return new(TemplateInvocationStatus.InvalidTemplate, [], topologyFailure);
         }
 
-        using var document = JsonDocument.Parse(current.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+        using var document = JsonDocument.Parse(configuration.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
         if (document.RootElement.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
             && property.Value.ValueKind != JsonValueKind.Null && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
         {
@@ -240,26 +229,10 @@ internal class TemplateEngineSession : IDisposable
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        try
+        configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+        if (configurationFailure is not null)
         {
-            current = await ReadConfigurationAsync(template, cancellationToken);
-        }
-        catch (InvalidTemplateMetadataException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], exception.Message);
-        }
-        catch (IOException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}");
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable after preview. Rerun selection: {exception.Message}");
-        }
-
-        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
-        {
-            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed after preview. Rerun selection.");
+            return configurationFailure;
         }
 
         outputFailure = ValidateOutputPaths(output, changes);
@@ -270,9 +243,107 @@ internal class TemplateEngineSession : IDisposable
 
         ITemplateCreationResult created = await InstantiateAsync(template, request, parameters, false, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return created.Status == CreationResultStatus.Success
-            ? new(TemplateInvocationStatus.Success, changes)
-            : new(MapCreationStatus(created.Status, cancellationToken), changes, created.ErrorMessage ?? created.Status.ToString());
+        if (created.Status != CreationResultStatus.Success)
+        {
+            return new(MapCreationStatus(created.Status, cancellationToken), [], created.ErrorMessage ?? created.Status.ToString());
+        }
+
+        if (created.CreationEffects is null)
+        {
+            return new(TemplateInvocationStatus.EngineFailure, [], "The template engine did not report creation effects.");
+        }
+
+        IReadOnlyList<TemplateFileChange> written = Array.AsReadOnly<TemplateFileChange>(
+            [.. created.CreationEffects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+        if (!written.Select(change => change.Path).Order(StringComparer.Ordinal).SequenceEqual(changes.Select(change => change.Path).Order(StringComparer.Ordinal), StringComparer.Ordinal)
+            || written.Any(change => _settings.Host.FileSystem.FileExists(Path.Combine(output, change.Path)) == string.Equals(change.Kind, "Delete", StringComparison.Ordinal)))
+        {
+            return new(TemplateInvocationStatus.EngineFailure, [], "Template creation did not produce the validated output paths.");
+        }
+
+        return new(TemplateInvocationStatus.Success, written);
+    }
+
+    private async Task<TemplateInvocationResult?> ValidateSelectedConfigurationAsync(ITemplateInfo template, TemplateConfigurationSnapshot configuration, CancellationToken cancellationToken)
+    {
+        TemplateConfigurationSnapshot current;
+        try
+        {
+            current = await ReadConfigurationAsync(template, cancellationToken);
+        }
+        catch (InvalidTemplateMetadataException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is invalid. Rerun selection: {exception.Message}");
+        }
+        catch (IOException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
+        }
+
+        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
+        {
+            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed. Rerun selection.");
+        }
+
+        return current.Type == TemplateType.Item && current.Type == configuration.Type
+            ? null
+            : new(TemplateInvocationStatus.InvalidTemplate, [], "Current mounted template type is not a qualified item template. Correct its type and rerun selection.");
+    }
+
+    private Dictionary<string, object> GetPopulatedParameters(ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request)
+    {
+        if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
+        {
+            throw new InvalidOperationException($"Selected template '{template.Identity}' has no registered generator.");
+        }
+
+        string? name = !string.IsNullOrEmpty(request.Name) ? request.Name
+            : template.PreferDefaultName || string.IsNullOrEmpty(request.OutputDirectory.Info.Name) ? template.DefaultName
+            : request.OutputDirectory.Info.Name;
+        Dictionary<string, object> values = new(StringComparer.Ordinal);
+        foreach (ITemplateParameter parameter in configuration.Parameters)
+        {
+            if (parameter.Precedence.PrecedenceDefinition is PrecedenceDefinition.Disabled or PrecedenceDefinition.ConditionalyDisabled)
+            {
+                continue;
+            }
+
+            string? value = null;
+            if (!parameter.IsName)
+            {
+                _settings.Host.TryGetHostParamDefault(parameter.Name, out value);
+                if (value is null && !parameter.Precedence.CanBeRequired)
+                {
+                    value = parameter.DefaultValue;
+                }
+            }
+
+            object? converted = parameter.IsName ? name : null;
+            if (request.Parameters.TryGetValue(parameter.Name, out string? supplied))
+            {
+                value = supplied ?? parameter.DefaultIfOptionWithoutValue;
+            }
+
+            if (value is not null)
+            {
+                converted = generator.ConvertParameterValueToType(_settings, parameter, value, out bool error);
+                if (error)
+                {
+                    continue;
+                }
+            }
+
+            if (converted is not null)
+            {
+                values[parameter.Name] = converted;
+            }
+        }
+
+        return values;
     }
 
     private static TemplateInvocationStatus MapCreationStatus(CreationResultStatus status, CancellationToken cancellationToken)
@@ -303,7 +374,8 @@ internal class TemplateEngineSession : IDisposable
                 return "Template output escapes the requested output directory.";
             }
 
-            while (path is not null)
+            // The requested output directory is the boundary; linked parents do not redirect individual template paths.
+            while (path is not null && !string.Equals(Path.TrimEndingDirectorySeparator(path), Path.TrimEndingDirectorySeparator(output), StringComparison.Ordinal))
             {
                 try
                 {
