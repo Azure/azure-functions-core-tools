@@ -404,7 +404,7 @@ if [[ "${FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH:-false}" == true &&
       "$destination" == */func.installation.json ]]; then
     exit 73
 fi
-exec /usr/bin/mv "$@"
+exec /usr/bin/env PATH=/usr/bin:/bin mv "$@"
 '@ | Set-Content -LiteralPath $fakeMv -Encoding utf8NoBOM
     & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $fakeMv)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake mv executable.'
@@ -416,7 +416,7 @@ set -euo pipefail
 if [[ "${FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH:-false}" == true && $# -eq 0 ]]; then
     exit 74
 fi
-exec /usr/bin/cat "$@"
+exec /usr/bin/env PATH=/usr/bin:/bin cat "$@"
 '@ | Set-Content -LiteralPath $fakeCat -Encoding utf8NoBOM
     & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $fakeCat)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake cat executable.'
