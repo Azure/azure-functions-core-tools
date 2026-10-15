@@ -160,7 +160,11 @@ internal sealed class InitExecutionRunner(
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
         InitExecutionResult result = await ExecuteAsync(templater, request, Matches, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
+        if (!HasConfirmedCreationResult(result, request.DryRun))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
         return result with { Context = context };
 
         bool Matches(string stack, string language) =>
@@ -479,9 +483,14 @@ internal sealed class InitExecutionRunner(
         }
 
         TemplateInvocationResult created = await selected.InvokeAsync(invocationRequest with { DryRun = false }, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        return FromInvocation(created, created.Status == TemplateInvocationStatus.Success ? "created"
+        InitExecutionResult creation = FromInvocation(created, created.Status == TemplateInvocationStatus.Success ? "created"
             : created.Status == TemplateInvocationStatus.ConfigurationFailure ? "partialInitialization" : "invocationFailed");
+        if (!HasConfirmedCreationResult(creation, request.DryRun))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return creation;
 
         InitExecutionResult FromInvocation(TemplateInvocationResult invocation, string kind) => new(kind, invocation.Status == TemplateInvocationStatus.Success)
         {
@@ -514,6 +523,13 @@ internal sealed class InitExecutionRunner(
                 groups.Add(selectable);
             }
         }
+    }
+
+    internal static bool HasConfirmedCreationResult(InitExecutionResult result, bool dryRun)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return !dryRun && (result is { Kind: "created", Succeeded: true, Invocation.Status: TemplateInvocationStatus.Success }
+            or { Kind: "partialInitialization", Succeeded: false, Invocation.Status: TemplateInvocationStatus.ConfigurationFailure });
     }
 
     private const string PackageGuidance =
