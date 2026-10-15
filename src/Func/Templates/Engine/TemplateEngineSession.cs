@@ -7,6 +7,7 @@ using System.Xml;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.Mount;
+using Microsoft.TemplateEngine.Abstractions.Parameters;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
@@ -129,7 +130,22 @@ internal class TemplateEngineSession : IDisposable
         content.Position = 0;
         using var reader = new StreamReader(content);
         string configuration = await reader.ReadToEndAsync(cancellationToken);
-        return new(configuration, fingerprint, TemplateCatalogProjector.GetTemplateType(loaded), Array.AsReadOnly<ITemplateParameter>([.. loaded.ParameterDefinitions]));
+        IFile? hostFile = loaded.HostSpecificConfiguration is IFile { Exists: true } selectedHostFile
+            ? selectedHostFile
+            : configurationFile.Parent?.EnumerateFiles(FuncHostTemplateMetadataReader.FileName, SearchOption.TopDirectoryOnly).SingleOrDefault();
+        string? hostData = null;
+        if (hostFile is not null)
+        {
+            using Stream hostStream = hostFile.OpenRead();
+            using var hostReader = new StreamReader(hostStream);
+            hostData = await hostReader.ReadToEndAsync(cancellationToken);
+        }
+
+        return new(configuration, fingerprint, TemplateCatalogProjector.GetTemplateType(loaded), Array.AsReadOnly<ITemplateParameter>([.. loaded.ParameterDefinitions]))
+        {
+            HostConfigPlace = hostFile?.FullPath,
+            HostData = hostData,
+        };
     }
 
     public virtual async Task<IReadOnlyCollection<string>> ReadPackageTypesAsync(ITemplatePackage? package, CancellationToken cancellationToken)
@@ -250,7 +266,7 @@ internal class TemplateEngineSession : IDisposable
 
         Dictionary<string, string?> parameters = new(request.Parameters, StringComparer.Ordinal);
         string output = request.OutputDirectory.Info.FullName;
-        ITemplateCreationResult preview = await InstantiateAsync(template, request, parameters, true, cancellationToken);
+        ITemplateCreationResult preview = await InstantiateAsync(template, request, CreateInputData(configuration.Parameters, parameters), true, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (preview.Status != CreationResultStatus.Success)
         {
@@ -327,7 +343,7 @@ internal class TemplateEngineSession : IDisposable
             return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
         }
 
-        ITemplateCreationResult created = await InstantiateAsync(template, request, parameters, false, cancellationToken);
+        ITemplateCreationResult created = await InstantiateAsync(template, request, CreateInputData(configuration.Parameters, parameters), false, cancellationToken);
         if (created.Status != CreationResultStatus.Success)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -435,7 +451,9 @@ internal class TemplateEngineSession : IDisposable
             return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
         }
 
-        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal))
+        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal)
+            || !string.Equals(current.HostConfigPlace, configuration.HostConfigPlace, StringComparison.Ordinal)
+            || !string.Equals(current.HostData, configuration.HostData, StringComparison.Ordinal))
         {
             return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed. Rerun selection.");
         }
@@ -513,7 +531,20 @@ internal class TemplateEngineSession : IDisposable
             _ => TemplateInvocationStatus.EngineFailure,
         };
 
-    protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+    private static InputDataSet CreateInputData(IReadOnlyList<ITemplateParameter> definitions, IReadOnlyDictionary<string, string?> parameters)
+    {
+        List<InputParameterData> input = [];
+        foreach (ITemplateParameter definition in definitions)
+        {
+            bool supplied = parameters.TryGetValue(definition.Name, out string? value);
+            input.Add(new(definition, value, supplied ? DataSource.User : DataSource.NoSource,
+                supplied ? InputDataStateUtil.GetInputDataState(value) : InputDataState.Unset));
+        }
+
+        return new(new ParameterDefinitionSet(definitions), input);
+    }
+
+    protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         => _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName, parameters,
             forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
 

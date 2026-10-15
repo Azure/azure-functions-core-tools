@@ -31,4 +31,9 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
     public IReadOnlyList<string> ConfiguredProjects { get; init; } = [];
 }
 
-internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters);
+internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters)
+{
+    public string? HostConfigPlace { get; init; }
+
+    public string? HostData { get; init; }
+}
