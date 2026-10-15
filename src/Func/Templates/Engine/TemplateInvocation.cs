@@ -25,4 +25,9 @@ internal sealed record TemplateFileChange(string Path, string Kind);
 
 internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status, IReadOnlyList<TemplateFileChange> Changes, string? Diagnostic = null);
 
-internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters);
+internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters)
+{
+    public string? HostConfigPlace { get; init; }
+
+    public string? HostData { get; init; }
+}
