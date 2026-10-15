@@ -37,12 +37,13 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
                     parsed.DefinitionDiagnostics,
                     missingRequired = parsed.MissingRequiredParameters.Select(parameter => parameter.LongAlias),
                 }),
-                invocation = result.Invocation is { } invocation ? new
+                invocation = (result.Invocation ?? result.Preview) is { } invocation ? new
                 {
                     status = invocation.Status.ToString(),
-                    plannedChanges = invocation.Changes,
-                    plannedConfigurations = invocation.ProjectConfigurations,
-                    configuredProjects = invocation.ConfiguredProjects,
+                    plannedChanges = result.Preview?.Changes ?? [],
+                    completedChanges = GetCompletedChanges(result.Invocation),
+                    plannedConfigurations = result.Preview?.ProjectConfigurations ?? [],
+                    configuredProjects = result.Invocation?.ConfiguredProjects ?? [],
                     invocation.Diagnostic,
                 } : null,
             });
@@ -127,12 +128,25 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             }
         }
 
-        if (result.Invocation is { } invocation)
+        if (result.Preview is { } preview)
         {
             _interaction.WriteSectionHeader("Planned effects");
-            foreach (TemplateFileChange change in invocation.Changes)
+            foreach (TemplateFileChange change in preview.Changes)
             {
                 _interaction.WriteLine(line => line.Muted($"{change.Kind}: ").Code(change.Path));
+            }
+        }
+
+        if (result.Invocation is { } invocation)
+        {
+            IReadOnlyList<TemplateFileChange> completed = GetCompletedChanges(invocation);
+            if (completed.Count > 0)
+            {
+                _interaction.WriteSectionHeader("Completed effects");
+                foreach (TemplateFileChange change in completed)
+                {
+                    _interaction.WriteLine(line => line.Muted($"{change.Kind}: ").Code(change.Path));
+                }
             }
 
             foreach (string root in invocation.ConfiguredProjects)
@@ -140,6 +154,14 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
                 _interaction.WriteLine(line => line.Muted("Configured project: ").Code(root));
             }
         }
+    }
+
+    private static IReadOnlyList<TemplateFileChange> GetCompletedChanges(TemplateInvocationResult? invocation)
+    {
+        // Pre-create conflicts can carry preview changes without writing them.
+        return invocation is { Status: TemplateInvocationStatus.Success or TemplateInvocationStatus.ConfigurationFailure }
+            ? invocation.Changes
+            : [];
     }
 
     private void RenderTemplateDiagnostics(IReadOnlyList<TemplateCatalogEntry> entries)

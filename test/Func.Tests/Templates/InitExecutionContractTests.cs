@@ -1,14 +1,17 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Tests.Console;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -20,6 +23,7 @@ public sealed class InitExecutionContractTests
     private readonly ITemplateArgumentParser _arguments = new TemplateArgumentParser();
     private readonly IInteractionService _interaction = Substitute.For<IInteractionService>();
     private readonly InitExecutionTargetInspector _targets = Substitute.For<InitExecutionTargetInspector>(new PhysicalFileSystem());
+    private int _supportRequests;
 
     public InitExecutionContractTests()
     {
@@ -34,9 +38,8 @@ public sealed class InitExecutionContractTests
     [InlineData("interaction")]
     [InlineData("renderer")]
     [InlineData("targets")]
-    [InlineData("initializers")]
-    [InlineData("planner")]
-    [InlineData("writer")]
+    [InlineData("stackCatalog")]
+    [InlineData("projectSupport")]
     [InlineData("fileSystem")]
     [InlineData("localSettings")]
     [InlineData("projects")]
@@ -49,9 +52,8 @@ public sealed class InitExecutionContractTests
             dependency == "interaction" ? null! : _interaction,
             dependency == "renderer" ? null! : new(_interaction),
             dependency == "targets" ? null! : _targets,
-            dependency == "initializers" ? null! : [],
-            dependency == "planner" ? null! : new([]),
-            dependency == "writer" ? null! : new(new PhysicalFileSystem()),
+            dependency == "stackCatalog" ? null! : () => new([]),
+            dependency == "projectSupport" ? null! : () => new(new(new([])), new(new PhysicalFileSystem())),
             dependency == "fileSystem" ? null! : new PhysicalFileSystem(),
             dependency == "localSettings" ? null! : Substitute.For<ILocalSettingsProvider>(),
             dependency == "projects" ? null! : Substitute.For<IFunctionsProjectResolver>());
@@ -130,20 +132,107 @@ public sealed class InitExecutionContractTests
 
         result.Kind.Should().Be("noInstalledStacks");
         result.Diagnostics.Single().Should().Contain("func setup");
+        _supportRequests.Should().Be(0);
         _factory.ReceivedCalls().Should().BeEmpty();
     }
 
     [Fact]
     public async Task Execute_DuplicateStackOwnership_RefusesWithoutOpeningEngine()
     {
-        var first = Substitute.For<IProjectInitializer>();
-        first.Stack.Returns("node");
-        var second = Substitute.For<IProjectInitializer>();
-        second.Stack.Returns("NODE");
+        var first = Metadata("node");
+        var second = Metadata("NODE");
 
         var result = await CreateRunner([first, second]).ExecuteAsync(Request(), new([]), CancellationToken.None);
 
         result.Kind.Should().Be("duplicateStacks");
+        _supportRequests.Should().Be(0);
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Execute_ConflictingAliases_PreservesStructuredFailureBeforeSupportOrEnvironment(bool languageAlias)
+    {
+        var first = Metadata("node");
+        var second = Metadata("other");
+        if (languageAlias)
+        {
+            second.SupportedLanguages.Returns(["Python"]);
+            second.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["Python"] = ["js"] });
+        }
+        else
+        {
+            second.WorkerRuntimeAliases.Returns(["node"]);
+        }
+
+        var result = await CreateRunner([first, second]).ExecuteAsync(Request(), new([]), CancellationToken.None);
+
+        result.Kind.Should().Be("duplicateStacks");
+        result.Succeeded.Should().BeFalse();
+        result.Diagnostics.Single().Should().ContainEquivalentOf("conflict");
+        _supportRequests.Should().Be(0);
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Execute_UnexpectedCatalogProviderFault_IsNotMisclassifiedAsInstalledMetadata()
+    {
+        InitExecutionRunner runner = new(_factory, _arguments, new(_arguments, _interaction), _interaction, new(_interaction),
+            _targets, () => throw new InvalidOperationException("unexpected provider fault"),
+            () => throw new InvalidOperationException("support must not be requested"), new PhysicalFileSystem(),
+            Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>());
+
+        Func<Task> act = () => runner.ExecuteAsync(Request(), new([]), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("unexpected provider fault");
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Execute_UnexpectedSupportProviderFault_PropagatesInsteadOfReturningDuplicateStacks()
+    {
+        InstalledProjectStackCatalog catalog = new([Metadata("node")]);
+        InitExecutionRunner runner = new(_factory, _arguments, new(_arguments, _interaction), _interaction, new(_interaction),
+            _targets, () => catalog, () => throw new InvalidOperationException("unexpected support fault"), new PhysicalFileSystem(),
+            Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>());
+
+        Func<Task> act = () => runner.ExecuteAsync(Request(), new([]), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("unexpected support fault");
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Execute_MalformedCatalogDefinition_PropagatesWithoutMisreportingConflict()
+    {
+        var invalid = Metadata("node");
+        invalid.SupportedLanguages.Returns([]);
+
+        Func<Task> act = () => CreateRunner([invalid]).ExecuteAsync(Request(), new([]), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ArgumentException>();
+        _supportRequests.Should().Be(0);
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Execute_CatalogResolutionReturnsAfterCancellation_DoesNotRequestSupportOrEnvironment()
+    {
+        using CancellationTokenSource cancellation = new();
+        InstalledProjectStackCatalog catalog = new([Metadata("node")]);
+        InitExecutionRunner runner = new(_factory, _arguments, new(_arguments, _interaction), _interaction, new(_interaction),
+            _targets, () =>
+            {
+                cancellation.Cancel();
+                return catalog;
+            },
+            () => throw new InvalidOperationException("support must not be requested"), new PhysicalFileSystem(),
+            Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>());
+
+        Func<Task> act = () => runner.ExecuteAsync(Request(), new([]), cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
         _factory.ReceivedCalls().Should().BeEmpty();
     }
 
@@ -180,6 +269,10 @@ public sealed class InitExecutionContractTests
         TestInteractionService interaction = new();
         var result = InitExecutionResult.Reject("invocationFailed", "Native creation failed.") with
         {
+            Preview = new(TemplateInvocationStatus.Success, [new("host.json", "Create")])
+            {
+                ProjectConfigurations = [new(Path.Combine(Path.GetTempPath(), "consumer-project", "host.json"), "node", "JavaScript")],
+            },
             Invocation = new(TemplateInvocationStatus.Failed, [new("host.json", "Create")])
             {
                 ProjectConfigurations = [new(Path.Combine(Path.GetTempPath(), "consumer-project", "host.json"), "node", "JavaScript")],
@@ -205,6 +298,78 @@ public sealed class InitExecutionContractTests
         entries.Should().Throw<ArgumentNullException>().WithParameterName("entries");
         target.Should().Throw<ArgumentNullException>().WithParameterName("target");
         _interaction.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Render_PreCreateConflictWithPlannedChanges_DoesNotClaimCompletedEffects(bool jsonOutput)
+    {
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        TemplateFileChange host = new("host.json", "Create");
+        TemplateFileChange config = new(".func/config.json", "Create");
+        var result = InitExecutionResult.Reject("invocationFailed", "Existing user configuration was preserved.") with
+        {
+            Preview = new(TemplateInvocationStatus.Success, [host, config]),
+            Invocation = new(TemplateInvocationStatus.FileConflict, [host]),
+        };
+
+        int exit = new InitExecutionRenderer(new SpectreInteractionService(new DefaultTheme(), stdout, stderr)).Render(result, jsonOutput);
+
+        exit.Should().Be(1);
+        if (jsonOutput)
+        {
+            using var json = JsonDocument.Parse(stdout.Output);
+            json.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
+            var invocation = json.RootElement.GetProperty("invocation");
+            invocation.GetProperty("status").GetString().Should().Be("FileConflict");
+            invocation.GetProperty("plannedChanges").EnumerateArray().Select(change => change.GetProperty("path").GetString())
+                .Should().Equal("host.json", ".func/config.json");
+            invocation.GetProperty("completedChanges").GetArrayLength().Should().Be(0);
+            invocation.GetProperty("configuredProjects").GetArrayLength().Should().Be(0);
+        }
+        else
+        {
+            stdout.Output.Should().Contain("Planned effects").And.Contain("host.json").And.Contain(".func/config.json")
+                .And.NotContain("Completed effects").And.NotContain("Configured project:");
+        }
+    }
+
+    [Theory]
+    [InlineData("Success", 1)]
+    [InlineData("ConfigurationFailure", 1)]
+    [InlineData("Failed", 0)]
+    [InlineData("InvalidArguments", 0)]
+    [InlineData("MissingRequiredParameters", 0)]
+    [InlineData("FileConflict", 0)]
+    [InlineData("TemplateChanged", 0)]
+    [InlineData("TemplateUnavailable", 0)]
+    [InlineData("InvalidTemplate", 0)]
+    [InlineData("EngineFailure", 0)]
+    public void Render_PublishedOutcomeCategories_ClaimsOnlyConfirmedEffects(string statusName, int completedCount)
+    {
+        TemplateInvocationStatus status = Enum.Parse<TemplateInvocationStatus>(statusName);
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        TemplateFileChange effect = new("host.json", "Create");
+        InitExecutionResult result = new("control", status == TemplateInvocationStatus.Success)
+        {
+            Preview = new(TemplateInvocationStatus.Success, [effect]),
+            Invocation = new(status, [effect]),
+        };
+
+        int exit = new InitExecutionRenderer(new SpectreInteractionService(new DefaultTheme(), stdout, stderr)).Render(result, jsonOutput: true);
+
+        exit.Should().Be(status == TemplateInvocationStatus.Success ? 0 : 1);
+        using var json = JsonDocument.Parse(stdout.Output);
+        var invocation = json.RootElement.GetProperty("invocation");
+        invocation.GetProperty("plannedChanges").EnumerateArray().Single().GetProperty("path").GetString().Should().Be("host.json");
+        invocation.GetProperty("completedChanges").GetArrayLength().Should().Be(completedCount);
+        if (completedCount > 0)
+        {
+            invocation.GetProperty("completedChanges").EnumerateArray().Single().GetProperty("path").GetString().Should().Be("host.json");
+        }
     }
 
     [Fact]
@@ -251,10 +416,28 @@ public sealed class InitExecutionContractTests
         act.Should().Throw<ArgumentException>().WithParameterName("entry");
     }
 
-    private InitExecutionRunner CreateRunner(IReadOnlyList<IProjectInitializer> initializers) => new(
-        _factory, _arguments, new(_arguments, _interaction), _interaction, new(_interaction),
-        _targets, initializers, new(initializers), new(new PhysicalFileSystem()), new PhysicalFileSystem(),
-        Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>());
+    private InitExecutionRunner CreateRunner(IReadOnlyList<IProjectStack> stacks)
+    {
+        Lazy<InstalledProjectStackCatalog> catalog = new(() => new(stacks));
+        Lazy<TemplateProjectSupport> support = new(() => new(new(catalog.Value), new(new PhysicalFileSystem())));
+        return new(_factory, _arguments, new(_arguments, _interaction), _interaction, new(_interaction),
+            _targets, () => catalog.Value, () =>
+            {
+                _supportRequests++;
+                return support.Value;
+            }, new PhysicalFileSystem(), Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>());
+    }
+
+    private static IProjectStack Metadata(string stack)
+    {
+        var metadata = Substitute.For<IProjectStack>();
+        metadata.Stack.Returns(stack);
+        metadata.DisplayName.Returns(stack);
+        metadata.WorkerRuntimeAliases.Returns([]);
+        metadata.SupportedLanguages.Returns(["JavaScript"]);
+        metadata.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["JavaScript"] = ["js"] });
+        return metadata;
+    }
 
     private static InitExecutionRequest Request() => new(
         WorkingDirectory.FromCwd(), null, null, null, null, false, true, false, false, [], new HashSet<string>());

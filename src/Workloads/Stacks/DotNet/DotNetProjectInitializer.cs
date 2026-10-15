@@ -13,7 +13,8 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// Uses the <c>Microsoft.Azure.Functions.Worker.ProjectTemplates</c> NuGet
 /// template package to scaffold projects via <c>dotnet new func</c>.
 /// </summary>
-internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemplateHivePathProvider hivePathProvider) : IProjectInitializer
+internal sealed class DotNetProjectInitializer(
+    IDotnetCliRunner dotnetCli, ITemplateHivePathProvider hivePathProvider, DotNetProjectStack stack) : IProjectInitializer
 {
     internal const string TemplatesPackageName = "Microsoft.Azure.Functions.Worker.ProjectTemplates";
     internal const string TemplateShortName = "func";
@@ -26,20 +27,17 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
 
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
     private readonly ITemplateHivePathProvider _hivePathProvider = hivePathProvider ?? throw new ArgumentNullException(nameof(hivePathProvider));
+    private readonly DotNetProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
 
-    public string Stack => "dotnet";
+    public string Stack => _stack.Stack;
 
-    public string DisplayName => ".NET";
+    public string DisplayName => _stack.DisplayName;
 
-    public IReadOnlyList<string> WorkerRuntimeAliases { get; } = ["dotnet-isolated"];
+    public IReadOnlyList<string> WorkerRuntimeAliases => _stack.WorkerRuntimeAliases;
 
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>()
-    {
-        { "C#", ["csharp"] },
-        { "F#", ["fsharp"] }
-    };
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
 
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
+    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<string> FrameworkOption { get; private set; } = default!;
 
