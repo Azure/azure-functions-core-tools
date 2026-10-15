@@ -411,7 +411,7 @@ try {
                 throw "The downloaded archive does not contain a regular func CLI executable."
             }
 
-            & /usr/bin/test -x $payloadFuncPath
+            & /usr/bin/env test -x $payloadFuncPath
             if ($LASTEXITCODE -ne 0) {
                 throw "The downloaded archive does not contain an executable func CLI."
             }

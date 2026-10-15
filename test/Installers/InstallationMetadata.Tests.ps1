@@ -504,6 +504,7 @@ exec /usr/bin/cat "$@"
         'install.sh published a wrapper before rejecting a metadata directory collision.'
 
     Write-Host 'Installation metadata installer tests passed.'
+    exit 0
 } finally {
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force
