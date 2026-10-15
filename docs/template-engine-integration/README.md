@@ -36,6 +36,12 @@ ancestors may themselves be linked, as with macOS temporary directories.
 Concurrent mutation of template sources or the output
 filesystem is not qualified, and no transactional rollback is promised.
 
+Cancellation is honored before creation and when the native engine reports
+cancellation. Once native creation returns success, the runtime validates and
+returns its completed effects rather than reporting a late cancellation as if
+the files had not been created. Cancellation after read-only preview still
+prevents creation.
+
 Resolved bundle versions are validated when constructing the command context;
 host.json version ranges are not resolved versions. Bundle constraint input comes
 only from that context. The availability snapshot captures workloads, not another
