@@ -328,7 +328,7 @@ public sealed class TemplaterTests : IDisposable
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public async Task InvokeAsync_LinkedOutputChild_RejectsExternalWrites()
     {
         var package = TemplateFixtures.WriteBasicPackage(_root);
@@ -347,6 +347,7 @@ public sealed class TemplaterTests : IDisposable
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Linked"), CancellationToken.None);
 
         result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Diagnostic.Should().Contain("symbolic link or reparse point");
         File.Exists(Path.Combine(outside, "Linked.txt")).Should().BeFalse();
     }
 
@@ -365,6 +366,7 @@ public sealed class TemplaterTests : IDisposable
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Denied"), CancellationToken.None);
 
         result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Diagnostic.Should().Contain("Rerun selection");
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
 
@@ -387,7 +389,7 @@ public sealed class TemplaterTests : IDisposable
         }
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public async Task InvokeAsync_LinkIntroducedAfterPreview_RejectsExternalWrites()
     {
         var package = TemplateFixtures.WriteBasicPackage(_root);
@@ -402,12 +404,57 @@ public sealed class TemplaterTests : IDisposable
         var outside = Path.Combine(_root, "late-outside-output");
         Directory.CreateDirectory(output.Info.FullName);
         Directory.CreateDirectory(outside);
-        session.AfterPreview = () => Directory.CreateSymbolicLink(Path.Combine(output.Info.FullName, "link"), outside);
+        var preparedLink = Path.Combine(_root, "prepared-link");
+        Directory.CreateSymbolicLink(preparedLink, outside);
+        session.AfterPreview = () => Directory.Move(preparedLink, Path.Combine(output.Info.FullName, "link"));
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "LateLinked"), CancellationToken.None);
 
         result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Diagnostic.Should().Contain("symbolic link or reparse point");
+        Directory.Exists(preparedLink).Should().BeFalse();
         File.Exists(Path.Combine(outside, "LateLinked.txt")).Should().BeFalse();
+    }
+
+    [SymbolicLinkFact]
+    public async Task InvokeAsync_LinkedOutputAncestor_PreservesCreation()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var realParent = Path.Combine(_root, "real-parent");
+        var linkedParent = Path.Combine(_root, "linked-parent");
+        Directory.CreateDirectory(realParent);
+        Directory.CreateSymbolicLink(linkedParent, realParent);
+        var output = WorkingDirectory.FromExplicit(Path.Combine(linkedParent, "output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "LinkedParent"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Success);
+        File.ReadAllText(Path.Combine(realParent, "output", "LinkedParent.txt")).Should().Be("LinkedParent content");
+        var change = result.Changes.Should().ContainSingle().Subject;
+        Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path)).Should().Be(Path.Combine(output.Info.FullName, "LinkedParent.txt"));
+    }
+
+    [Fact]
+    public async Task ListAsync_MalformedMountedJson_PreservesHealthyCatalogEntries()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        await TemplateFixtures.InstallAsync(package, _hive);
+        await TemplateFixtures.GetInstalledTemplateAsync(_hive, TemplateFixtures.ItemTemplateIdentity);
+        File.WriteAllText(Path.Combine(package, "item", ".template.config", "template.json"), "{ invalid JSON");
+        using Templater templater = CreateTemplater();
+
+        var items = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+        var projects = await templater.ListAsync(TemplateType.Project, CancellationToken.None);
+        var resolution = await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None);
+
+        items.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Failed);
+        items[0].ConstraintEvaluation.Diagnostics.Should().ContainSingle().Which.Message.Should().Contain("could not be loaded");
+        projects.Should().ContainSingle().Which.Identity.Should().Be(TemplateFixtures.ProjectTemplateIdentity);
+        projects[0].ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.NotEvaluated);
+        resolution.Status.Should().Be(TemplateResolutionStatus.Unavailable);
+        resolution.Group.Should().BeEmpty();
     }
 
     [Fact]
@@ -720,7 +767,7 @@ public sealed class TemplaterTests : IDisposable
         {
             var result = await selected.InvokeAsync(request, CancellationToken.None);
             result.Status.Should().Be(TemplateInvocationStatus.EngineFailure);
-            result.Changes.Should().ContainSingle();
+            result.Changes.Should().BeEmpty();
         }
 
         Directory.Exists(output.Info.FullName).Should().BeFalse();
