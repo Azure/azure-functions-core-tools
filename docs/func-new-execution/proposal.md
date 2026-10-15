@@ -103,6 +103,14 @@ Required boolean prompting accepts the shared parser's case-insensitive scalar
 spellings. Multiple-profile guidance uses the existing `defaultProfile` setting
 or `func profile set`, not an unsupported `--profile` option.
 
+After native creation returns validated success, the consumer preserves that
+completed create result through both runner boundaries and command rendering,
+including a legitimate zero-output success. This is limited to the created
+phase of a non-dry-run invocation. Preview, pre-create decisions, conflicts,
+unsuccessful native returns and cancellation thrown during creation retain their
+existing cancellation behavior. File effects or a non-null invocation alone do
+not establish completion.
+
 Public cutover still requires production native `FuncTemplate` inventory and
 package lifecycle/trust wiring; .NET/Node/Python restore/build/start/invocation
 baselines and replacement coverage; template-specific help integration; and a
