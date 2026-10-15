@@ -1910,7 +1910,7 @@ public sealed class TemplaterTests : IDisposable
         public int CreationCalls { get; private set; }
 
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
-            IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+            InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             var native = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
             if (!dryRun)
@@ -1950,7 +1950,7 @@ public sealed class TemplaterTests : IDisposable
         bool failCreation = false, TemplateProjectSupport? projectSupport = null)
         : TemplateEngineSession(context, hive, projectSupport: projectSupport)
     {
-        protected override Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+        protected override Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             if (dryRun && failCreation)
             {
@@ -1965,7 +1965,7 @@ public sealed class TemplaterTests : IDisposable
 
     private sealed class CancelingEngineSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, bool cancelPreview, CreationResultStatus nativeStatus) : TemplateEngineSession(context, hive)
     {
-        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             if (dryRun == cancelPreview)
             {
@@ -1981,7 +1981,7 @@ public sealed class TemplaterTests : IDisposable
 
     private sealed class CancelingAfterNativeSuccessSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, bool cancelPreview = false) : TemplateEngineSession(context, hive)
     {
-        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             ITemplateCreationResult result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
             if (dryRun == cancelPreview && result.Status == CreationResultStatus.Success)
