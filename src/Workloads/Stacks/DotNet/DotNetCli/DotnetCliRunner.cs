@@ -4,7 +4,11 @@
 using System.Diagnostics;
 using System.Text;
 
+#if FUNC_HOST_DOTNET_TEMPLATES
+namespace Azure.Functions.Cli.Templates.DotNet.Shared;
+#else
 namespace Azure.Functions.Cli.Workloads.DotNet;
+#endif
 
 /// <summary>
 /// Executes <c>dotnet</c> CLI commands in a child process.

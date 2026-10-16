@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Templates.DotNet</PackageId>
+    <PackageType>FuncTemplate</PackageType>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <Description>Azure Functions CLI native isolated C# and F# project and item templates.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <SourceItemTemplatesVersion>4.0.5590</SourceItemTemplatesVersion>
+    <SourceProjectTemplatesVersion>4.0.5337</SourceProjectTemplatesVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ItemTemplates" Version="[$(SourceItemTemplatesVersion)]" />
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ProjectTemplates" Version="[$(SourceProjectTemplatesVersion)]" />
+    <Content Include="$(RepoRoot)LICENSE" Pack="true" PackagePath="/" />
+    <Content Include="upstream-sources.json" Pack="true" PackagePath="provenance/" />
+    <Content Include="upstream-configurations.json" Pack="true" PackagePath="provenance/" />
+  </ItemGroup>
+  <Target Name="StageUpstreamDotNetTemplates" BeforeTargets="_GetPackageFiles">
+    <PropertyGroup>
+      <_NativeDotNetStage>$(IntermediateOutputPath)native-dotnet/</_NativeDotNetStage>
+    </PropertyGroup>
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/stage-templates.ps1&quot; -PackageRoot &quot;$(NuGetPackageRoot).&quot; -OutputDirectory &quot;$(_NativeDotNetStage)&quot;" />
+    <ItemGroup>
+      <_DotNetNativeContent Include="$(_NativeDotNetStage)content/**" Exclude="$(_NativeDotNetStage)content/**/_gitignore" />
+      <_DotNetNativeProvenance Include="$(_NativeDotNetStage)provenance/**" />
+      <Content Include="@(_DotNetNativeContent)" Pack="true"
+        PackagePath="content/%(_DotNetNativeContent.RecursiveDir)%(_DotNetNativeContent.Filename)%(_DotNetNativeContent.Extension)" />
+      <Content Include="$(_NativeDotNetStage)content/ProjectTemplate-CSharp/_gitignore" Pack="true" PackagePath="content/ProjectTemplate-CSharp/" />
+      <Content Include="$(_NativeDotNetStage)content/ProjectTemplate-FSharp/_gitignore" Pack="true" PackagePath="content/ProjectTemplate-FSharp/" />
+      <Content Include="@(_DotNetNativeProvenance)" Pack="true"
+        PackagePath="provenance/%(_DotNetNativeProvenance.RecursiveDir)%(_DotNetNativeProvenance.Filename)%(_DotNetNativeProvenance.Extension)" />
+    </ItemGroup>
+  </Target>
+</Project>

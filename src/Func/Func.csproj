@@ -14,7 +14,7 @@
     <IsPackable>false</IsPackable>
     <IsPublishable>true</IsPublishable>
     <EnableDemoProject>true</EnableDemoProject>
-    <DefineConstants>$(DefineConstants);FUNC_PYTHON_TEMPLATE_HELPERS</DefineConstants>
+    <DefineConstants>$(DefineConstants);FUNC_HOST_DOTNET_TEMPLATES;FUNC_PYTHON_TEMPLATE_HELPERS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,6 +33,18 @@
 
   <ItemGroup>
     <Compile Include="../Workloads/Stacks/Node/NodeNpmInstaller.cs" Link="Templates/Node/NodeNpmInstaller.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/Templates/DotNetProjectFileSelection.cs" Link="Templates/DotNet/Shared/DotNetProjectFileSelection.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/Templates/DotNetTemplateFrameworks.cs" Link="Templates/DotNet/Shared/DotNetTemplateFrameworks.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/Templates/DotNetTemplateProjectPreparation.cs" Link="Templates/DotNet/Shared/DotNetTemplateProjectPreparation.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/Templates/DotNetTemplateDependencyExecutor.cs" Link="Templates/DotNet/Shared/DotNetTemplateDependencyExecutor.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/Templates/DotNetTemplatePackageReference.cs" Link="Templates/DotNet/Shared/DotNetTemplatePackageReference.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/Templates/FSharpCompileUpdater.cs" Link="Templates/DotNet/Shared/FSharpCompileUpdater.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/Templates/FSharpProjectFiles.cs" Link="Templates/DotNet/Shared/FSharpProjectFiles.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/DotNetCli/IDotnetCliRunner.cs" Link="Templates/DotNet/Shared/IDotnetCliRunner.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/DotNetCli/IDotnetPathResolver.cs" Link="Templates/DotNet/Shared/IDotnetPathResolver.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/DotNetCli/DotnetCliRunner.cs" Link="Templates/DotNet/Shared/DotnetCliRunner.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/DotNetCli/DotnetPathResolver.cs" Link="Templates/DotNet/Shared/DotnetPathResolver.cs" />
+    <Compile Include="../Workloads/Stacks/DotNet/DotNetCli/DotnetCliException.cs" Link="Templates/DotNet/Shared/DotnetCliException.cs" />
     <Compile Include="../Workloads/Stacks/Python/IPythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/IPythonTemplateAppendExecutor.cs" />
     <Compile Include="../Workloads/Stacks/Python/PythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/PythonTemplateAppendExecutor.cs" />
   </ItemGroup>
@@ -40,6 +52,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Profiles/BuiltInProfiles.json" LogicalName="Azure.Functions.Cli.Profiles.BuiltInProfiles.json" />
     <EmbeddedResource Include="Templates/Acquisition/BasicCompanions.json" LogicalName="Azure.Functions.Cli.Templates.Acquisition.BasicCompanions.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/upstream-configurations.json"
+      Link="Templates/DotNet/upstream-configurations.json" LogicalName="Azure.Functions.Cli.Templates.DotNet.upstream-configurations.json" />
   </ItemGroup>
 
   <ItemGroup>

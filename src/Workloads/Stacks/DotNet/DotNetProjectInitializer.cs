@@ -18,9 +18,9 @@ internal sealed class DotNetProjectInitializer(
 {
     internal const string TemplatesPackageName = "Microsoft.Azure.Functions.Worker.ProjectTemplates";
     internal const string TemplateShortName = "func";
-    internal const string DefaultFramework = "net10.0";
+    internal const string DefaultFramework = DotNetTemplateFrameworks.Default;
 
-    internal static readonly IReadOnlyList<string> SupportedFrameworks = ["net10.0"];
+    internal static readonly IReadOnlyList<string> SupportedFrameworks = DotNetTemplateFrameworks.Supported;
 
     internal static readonly TimeSpan HiveTtl = TimeSpan.FromDays(30);
     internal static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
