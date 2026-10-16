@@ -105,20 +105,13 @@ internal sealed class InstallationMetadataReader(
 
     private string GetMetadataPath()
     {
-        string processPath = _environment.ProcessPath;
-        if (string.IsNullOrWhiteSpace(processPath) || !Path.IsPathFullyQualified(processPath))
+        string baseDirectory = _environment.BaseDirectory;
+        if (string.IsNullOrWhiteSpace(baseDirectory) || !Path.IsPathFullyQualified(baseDirectory))
         {
-            throw new InvalidOperationException("The running CLI executable path is unavailable or is not fully qualified.");
+            throw new InvalidOperationException("The running CLI application base directory is unavailable or is not fully qualified.");
         }
 
-        string executableTargetPath = _fileSystem.ResolveFileLinkTarget(processPath);
-        string? installationDirectory = Path.GetDirectoryName(executableTargetPath);
-        if (string.IsNullOrEmpty(installationDirectory))
-        {
-            throw new InvalidOperationException("The running CLI installation directory could not be determined.");
-        }
-
-        return Path.Combine(installationDirectory, MetadataFileName);
+        return Path.Combine(baseDirectory, MetadataFileName);
     }
 
     private static void ValidateInstallMethod(string value, string metadataPath)

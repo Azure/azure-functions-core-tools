@@ -4,8 +4,7 @@
 namespace Azure.Functions.Cli.Update;
 
 /// <summary>
-/// Reads installer-authored metadata located beside the target of the running
-/// CLI executable.
+/// Reads installer-authored metadata from the running CLI application's base directory.
 /// </summary>
 internal interface IInstallationMetadataReader
 {
@@ -15,11 +14,10 @@ internal interface IInstallationMetadataReader
     /// contract from being interpreted with older update semantics.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The running executable path is unavailable or is not fully qualified.
+    /// The application base directory is unavailable or is not fully qualified.
     /// </exception>
     /// <exception cref="FileNotFoundException">
-    /// The executable or its symbolic-link target cannot be found, or the
-    /// installation metadata file does not exist beside it.
+    /// The installation metadata file does not exist in the application base directory.
     /// </exception>
     /// <exception cref="InstallationMetadataTooLargeException">
     /// The installation metadata file exceeds 4 KiB.
@@ -32,10 +30,10 @@ internal interface IInstallationMetadataReader
     /// contains an invalid installation method, or declares an unknown update policy.
     /// </exception>
     /// <exception cref="IOException">
-    /// The executable's symbolic-link target cannot be resolved, or the metadata file cannot be read.
+    /// The installation metadata file cannot be read.
     /// </exception>
     /// <exception cref="UnauthorizedAccessException">
-    /// The executable or installation metadata file cannot be accessed.
+    /// The installation metadata file cannot be accessed.
     /// </exception>
     /// <exception cref="OperationCanceledException">
     /// The operation is cancelled.

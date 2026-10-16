@@ -12,47 +12,6 @@ internal sealed class PhysicalFileSystem : IFileSystem
 
     public bool FileExists(string path) => File.Exists(path);
 
-    public string ResolveFileLinkTarget(string path)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-
-        if (!Path.IsPathFullyQualified(path))
-        {
-            throw new ArgumentException("Path must be fully qualified.", nameof(path));
-        }
-
-        string fullPath = Path.GetFullPath(path);
-        FileInfo file = new(fullPath);
-        FileSystemInfo? target;
-        try
-        {
-            target = file.ResolveLinkTarget(returnFinalTarget: true);
-        }
-        catch (DirectoryNotFoundException ex)
-        {
-            throw new FileNotFoundException($"Executable '{fullPath}' does not exist.", fullPath, ex);
-        }
-
-        if (target is null)
-        {
-            if (!file.Exists)
-            {
-                throw new FileNotFoundException($"Executable '{fullPath}' does not exist.", fullPath);
-            }
-
-            return fullPath;
-        }
-
-        if (!target.Exists)
-        {
-            throw new FileNotFoundException(
-                $"Executable link target '{target.FullName}' does not exist.",
-                target.FullName);
-        }
-
-        return Path.GetFullPath(target.FullName);
-    }
-
     public async Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

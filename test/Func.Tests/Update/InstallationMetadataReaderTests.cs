@@ -11,11 +11,10 @@ namespace Azure.Functions.Cli.Tests.Update;
 
 public sealed class InstallationMetadataReaderTests
 {
-    private static readonly string _processPath = Path.GetFullPath(Path.Combine("fake", "install", "func"));
-    private static readonly string _physicalProcessPath =
-        Path.GetFullPath(Path.Combine("physical", "install", "func"));
+    private static readonly string _baseDirectory =
+        Path.GetFullPath(Path.Combine("fake", "install")) + Path.DirectorySeparatorChar;
     private static readonly string _metadataPath =
-        Path.Combine(Path.GetDirectoryName(_physicalProcessPath)!, InstallationMetadataReader.MetadataFileName);
+        Path.Combine(_baseDirectory, InstallationMetadataReader.MetadataFileName);
     private static readonly byte[] _invalidUtf8 = [0xC3, 0x28];
 
     [Theory]
@@ -40,7 +39,7 @@ public sealed class InstallationMetadataReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_ValidMetadata_ReadsBesideExecutable()
+    public async Task ReadAsync_ValidMetadata_ReadsFromApplicationBaseDirectory()
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
@@ -51,8 +50,26 @@ public sealed class InstallationMetadataReaderTests
         await reader.ReadAsync(cancellationToken);
 
         // Assert
-        fileSystem.Received(1).ResolveFileLinkTarget(_processPath);
         fileSystem.Received(1).OpenReadIfExists(_metadataPath);
+    }
+
+    [Fact]
+    public async Task ReadAsync_DefaultEnvironmentOptions_ReadsFromAppContextBaseDirectory()
+    {
+        // Arrange
+        IFileSystem fileSystem = Substitute.For<IFileSystem>();
+        string metadataPath = Path.Combine(AppContext.BaseDirectory, InstallationMetadataReader.MetadataFileName);
+        fileSystem.OpenReadIfExists(metadataPath)
+            .Returns(_ => new MemoryStream(Encoding.UTF8.GetBytes(ValidJson("standalone", "in-place"))));
+        InstallationMetadataReader reader = new(
+            fileSystem,
+            Options.Create(new CliEnvironmentOptions()));
+
+        // Act
+        await reader.ReadAsync(CancellationToken.None);
+
+        // Assert
+        fileSystem.Received(1).OpenReadIfExists(metadataPath);
     }
 
     [Fact]
@@ -209,39 +226,21 @@ public sealed class InstallationMetadataReaderTests
 
     [Theory]
     [InlineData("")]
+    [InlineData(" ")]
     [InlineData("func")]
-    public async Task ReadAsync_UnresolvedExecutablePath_ThrowsInvalidOperationException(string processPath)
+    public async Task ReadAsync_InvalidApplicationBaseDirectory_ThrowsInvalidOperationException(string baseDirectory)
     {
         // Arrange
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
         InstallationMetadataReader reader = new(
             fileSystem,
-            Options.Create(new CliEnvironmentOptions { ProcessPath = processPath }));
+            Options.Create(new CliEnvironmentOptions { BaseDirectory = baseDirectory }));
 
         // Act
         Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>();
-        fileSystem.DidNotReceiveWithAnyArgs().OpenReadIfExists(default!);
-    }
-
-    [Fact]
-    public async Task ReadAsync_ExecutableLinkResolutionFails_PropagatesIOExceptionWithoutReadingMetadata()
-    {
-        // Arrange
-        IFileSystem fileSystem = Substitute.For<IFileSystem>();
-        fileSystem.ResolveFileLinkTarget(_processPath)
-            .Returns<string>(_ => throw new IOException("link cycle"));
-        InstallationMetadataReader reader = new(
-            fileSystem,
-            Options.Create(new CliEnvironmentOptions { ProcessPath = _processPath }));
-
-        // Act
-        Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
-
-        // Assert
-        await act.Should().ThrowAsync<IOException>().WithMessage("*link cycle*");
         fileSystem.DidNotReceiveWithAnyArgs().OpenReadIfExists(default!);
     }
 
@@ -261,7 +260,7 @@ public sealed class InstallationMetadataReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_PreCancelled_DoesNotResolveExecutablePath()
+    public async Task ReadAsync_PreCancelled_DoesNotReadMetadata()
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
@@ -273,7 +272,6 @@ public sealed class InstallationMetadataReaderTests
 
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();
-        fileSystem.DidNotReceiveWithAnyArgs().ResolveFileLinkTarget(default!);
         fileSystem.DidNotReceiveWithAnyArgs().OpenReadIfExists(default!);
     }
 
@@ -282,7 +280,7 @@ public sealed class InstallationMetadataReaderTests
     {
         Action act = () => _ = new InstallationMetadataReader(
             null!,
-            Options.Create(new CliEnvironmentOptions { ProcessPath = _processPath }));
+            Options.Create(new CliEnvironmentOptions { BaseDirectory = _baseDirectory }));
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
     }
@@ -304,11 +302,10 @@ public sealed class InstallationMetadataReaderTests
     private static (InstallationMetadataReader Reader, IFileSystem FileSystem) CreateReader()
     {
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
-        fileSystem.ResolveFileLinkTarget(_processPath).Returns(_physicalProcessPath);
         fileSystem.OpenReadIfExists(Arg.Any<string>()).Returns((Stream?)null);
         InstallationMetadataReader reader = new(
             fileSystem,
-            Options.Create(new CliEnvironmentOptions { ProcessPath = _processPath }));
+            Options.Create(new CliEnvironmentOptions { BaseDirectory = _baseDirectory }));
         return (reader, fileSystem);
     }
 

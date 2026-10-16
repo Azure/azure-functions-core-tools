@@ -17,19 +17,6 @@ internal interface IFileSystem
     public bool FileExists(string path);
 
     /// <summary>
-    /// Resolves a symbolic-link chain for a fully qualified file path and
-    /// returns the final target. Returns the original path when the file itself
-    /// is not a symbolic link.
-    /// </summary>
-    /// <exception cref="FileNotFoundException">
-    /// The file or link target does not exist.
-    /// </exception>
-    /// <exception cref="IOException">
-    /// A link cycle prevents resolution.
-    /// </exception>
-    public string ResolveFileLinkTarget(string path);
-
-    /// <summary>
     /// Reads a text file if it exists; returns <c>null</c> when the file is absent.
     /// </summary>
     public Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken);
