@@ -34,8 +34,6 @@ After a configuration write commits, its root and file change are recorded befor
 
 The project flow retains mounted-type checks and the native runtime's selected-configuration, topology and output-boundary validation. Creation results report native creation-call effects plus only completed configuration writes, not unwritten preview configuration paths.
 
-Native placeholder effects retain their directory expectation from the pre-create source mapping. Final checks require the expected file or directory kind and reject missing or linked outputs; an empty regular file is not a directory. Public changes describe operations, not filesystem entry kinds.
-
 The fixture action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` remains proposed, not a stable public authoring contract. These tests qualify controlled runtime fixtures and configuration compatibility, not production template packages or a public command switch. Ordinary restores, reusable native evaluation, wider topology, live-hive leases and hostile concurrent filesystem mutation remain outside this qualified subset.
 
 ## Staged project consumer projections
@@ -168,6 +166,10 @@ even with force. Content-only randomness remains supported.
 Preview and file-conflict results describe proposed changes. Successful creation
 uses native creation effects and checks that the reported paths exist (or were
 deleted), rather than returning the earlier preview as if it had been written.
+Native directory effects, including default or custom empty-directory placeholders,
+retain their expected kind from preflight. Completion requires that specific file
+or directory kind; a zero-byte regular file is still a file. Missing entries,
+wrong-kind substitutions and linked child paths do not satisfy the postcondition.
 Creation failures do not report preview paths as completed effects; partial output
 is still possible if the native engine fails after writing. Existing links below
 the requested output directory are rejected; the requested directory and its
