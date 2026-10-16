@@ -30,9 +30,9 @@ Preview reports template and configuration effects without writing. Creation fin
 
 Configuration occupancy checks use the writer's injected `IFileSystem` for both files and directories. An occupied destination before creation returns `FileConflict` without generating a new project root. Configuration is committed with an atomic create-only rename, so a destination that appears after the checks is not replaced. That late collision returns `ConfigurationFailure`, preserving user bytes, generated output and any earlier completed configurations. Legacy initializer/repair writes retain their overwrite-capable behavior.
 
-The project flow retains mounted-type checks and the native runtime's selected-configuration, topology and output-boundary validation. Creation results report native creation-call effects plus only completed configuration writes, not unwritten preview configuration paths.
+After a configuration write commits, its root and file change are recorded before cancellation is observed again. Cancellation after the final configuration commit returns the completed result. If another plan remains, cancellation stops before that plan starts and preserves prior configuration writes and generated files; no full-success result or rollback is promised for the unfinished invocation. Cancellation before a configuration write commits still propagates normally.
 
-Native placeholder effects retain their directory expectation from the pre-create source mapping. Final checks require the expected file or directory kind and reject missing or linked outputs; an empty regular file is not a directory. Public changes describe operations, not filesystem entry kinds.
+The project flow retains mounted-type checks and the native runtime's selected-configuration, topology and output-boundary validation. Creation results report native creation-call effects plus only completed configuration writes, not unwritten preview configuration paths.
 
 The fixture action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` remains proposed, not a stable public authoring contract. These tests qualify controlled runtime fixtures and configuration compatibility, not production template packages or a public command switch. Ordinary restores, reusable native evaluation, wider topology, live-hive leases and hostile concurrent filesystem mutation remain outside this qualified subset.
 
@@ -139,6 +139,14 @@ type changed before selection remains unavailable, with a diagnostic to correct
 the type and refresh the installed template. Changes after selection still require
 selection to be rerun.
 
+Invocable parameter definitions and func host aliases come from the current
+mounted configuration, not the persisted engine descriptor. Native preview and
+creation receive an input dataset built from those same mounted definitions.
+Folder-template parameter edits between flows therefore take effect without
+refreshing the shared hive. The selected snapshot also captures and compares func
+host content separately, so alias edits after selection require rerunning selection
+without changing the raw template.json SHA used by source provenance.
+
 The pinned TemplateEngine reevaluates symbols for preview, creation effects, and
 actual creation; its creation effects are not a frozen output plan. This item flow
 therefore supports parameter-driven file renames, `name`/`sourceName` renames,
@@ -158,6 +166,10 @@ even with force. Content-only randomness remains supported.
 Preview and file-conflict results describe proposed changes. Successful creation
 uses native creation effects and checks that the reported paths exist (or were
 deleted), rather than returning the earlier preview as if it had been written.
+Native directory effects, including default or custom empty-directory placeholders,
+retain their expected kind from preflight. Completion requires that specific file
+or directory kind; a zero-byte regular file is still a file. Missing entries,
+wrong-kind substitutions and linked child paths do not satisfy the postcondition.
 Creation failures do not report preview paths as completed effects; partial output
 is still possible if the native engine fails after writing. Existing links below
 the requested output directory are rejected; the requested directory and its
@@ -167,6 +179,12 @@ directory ancestor is required, returning `Failed` before creation rather than
 letting the native write fail later.
 Concurrent mutation of template sources or the output
 filesystem is not qualified, and no transactional rollback is promised.
+
+Cancellation is honored before creation and when the native engine reports
+cancellation. Once native creation returns success, the runtime validates and
+returns its completed effects rather than reporting a late cancellation as if
+the files had not been created. Cancellation after read-only preview still
+prevents creation.
 
 Resolved bundle versions are validated when constructing the command context;
 host.json version ranges are not resolved versions. Bundle constraint input comes

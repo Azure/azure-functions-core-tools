@@ -20,6 +20,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Parameters;
+using Microsoft.TemplateEngine.Edge.Template;
 using NSubstitute;
 using NuGet.Versioning;
 
@@ -848,6 +851,202 @@ public sealed class NewExecutionJourneyTests : IDisposable
         await disposed.Should().ThrowAsync<ObjectDisposedException>();
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Command_NativeCreationCommitsThenCancels_PreservesCompletedResultAndRendersOnce(bool noOutputs, bool json)
+    {
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        var native = new CancelAfterNativeReturnFactory(Path.Combine(Home, "templates"), cancellation);
+        var harness = CreateHarness(templateFactory: native);
+        string reference = noOutputs ? "Func.Consumer.Empty" : Low;
+        string[] values = noOutputs ? [] : ["--greeting", "completed"];
+        int? exit = null;
+
+        Exception? failure = await Record.ExceptionAsync(async () => exit = await harness.InvokeAsync(
+            [reference, "--path", Target, "--name", "Committed", .. values, "--output", json ? "json" : "plain"], cancellation.Token));
+
+        // Observe the real native commit before asserting anything about cancellation or host presentation.
+        if (!noOutputs)
+        {
+            File.ReadAllText(Path.Combine(Target, "Committed.txt"))
+                .Should().Be($"Committed|completed|anonymous|False|leave|{Target}|{Project}|JavaScript");
+        }
+
+        native.NativeResult.Should().NotBeNull();
+        native.NativeResult!.Status.Should().Be(CreationResultStatus.Success);
+        native.NativeResult.CreationEffects!.FileChanges.Should().HaveCount(noOutputs ? 0 : 1);
+        if (!noOutputs)
+        {
+            Path.GetFullPath(Path.Combine(Target, native.NativeResult.CreationEffects.FileChanges.Single().TargetRelativePath))
+                .Should().Be(Path.Combine(Target, "Committed.txt"));
+        }
+
+        cancellation.IsCancellationRequested.Should().BeTrue();
+        failure.Should().BeNull("native creation already returned validated successful effects");
+        exit.Should().Be(0);
+        harness.Result!.Kind.Should().Be("created");
+        harness.Result.Invocation!.Status.Should().Be(TemplateInvocationStatus.Success);
+        harness.Result.Invocation.Changes.Should().HaveCount(noOutputs ? 0 : 1);
+        if (json)
+        {
+            string record = _interaction.Lines.Should().ContainSingle(line => line.StartsWith("JSON: ", StringComparison.Ordinal)).Subject;
+            using var document = JsonDocument.Parse(record["JSON: ".Length..]);
+            document.RootElement.GetProperty("kind").GetString().Should().Be("created");
+            document.RootElement.GetProperty("succeeded").GetBoolean().Should().BeTrue();
+            document.RootElement.GetProperty("invocation").GetProperty("status").GetString().Should().Be("Success");
+            document.RootElement.GetProperty("invocation").GetProperty("changes").GetArrayLength().Should().Be(noOutputs ? 0 : 1);
+            document.RootElement.TryGetProperty("hasCompletedCreation", out _).Should().BeFalse();
+            if (!noOutputs)
+            {
+                JsonElement change = document.RootElement.GetProperty("invocation").GetProperty("changes")[0];
+                Path.GetFullPath(Path.Combine(Target, change.GetProperty("path").GetString()!)).Should().Be(Path.Combine(Target, "Committed.txt"));
+                change.GetProperty("kind").GetString().Should().Be("Create");
+            }
+
+            _interaction.Lines.Should().NotContain(line => line.StartsWith("SUCCESS:", StringComparison.Ordinal));
+        }
+        else
+        {
+            _interaction.Lines.Should().ContainSingle(line => line.StartsWith("SUCCESS:", StringComparison.Ordinal));
+            _interaction.Lines.Should().NotContain(line => line.StartsWith("JSON:", StringComparison.Ordinal));
+        }
+
+        Func<Task> disposed = () => harness.Factory.Templaters.Single().ListAsync(TemplateType.Item);
+        await disposed.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public async Task Command_CancelsAfterRunnerReturnsActualCreation_PreservesCompletedJsonAtCommandBoundary()
+    {
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        var harness = CreateHarness(afterResult: _ => cancellation.Cancel());
+        int? exit = null;
+
+        Exception? failure = await Record.ExceptionAsync(async () => exit = await harness.InvokeAsync(
+            [Low, "--path", Target, "--name", "RunnerCommitted", "--greeting", "runner", "--output", "json"], cancellation.Token));
+
+        File.ReadAllText(Path.Combine(Target, "RunnerCommitted.txt")).Should().StartWith("RunnerCommitted|runner|");
+        harness.Result!.Invocation!.Status.Should().Be(TemplateInvocationStatus.Success);
+        harness.Result.Invocation.Changes.Should().ContainSingle();
+        cancellation.IsCancellationRequested.Should().BeTrue();
+        failure.Should().BeNull("the real protected runner already returned creation success before cancellation");
+        exit.Should().Be(0);
+        _interaction.Lines.Should().ContainSingle(line => line.StartsWith("JSON: ", StringComparison.Ordinal));
+        AssertJsonKind("created");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_NativePreviewCompletesThenCancels_StillThrowsWithoutCreatingOutput(bool dryRun)
+    {
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        var native = new CancelAfterNativeReturnFactory(Path.Combine(Home, "templates"), cancellation, cancelPreview: true);
+        var harness = CreateHarness(templateFactory: native);
+        string[] preview = dryRun ? ["--dry-run"] : [];
+        var before = Snapshot();
+
+        Exception? failure = await Record.ExceptionAsync(() => harness.InvokeAsync(
+            [Low, "--path", Target, "--greeting", "preview", .. preview, "--output", "json"], cancellation.Token));
+
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+        native.NativeResult!.Status.Should().Be(CreationResultStatus.Success);
+        failure.Should().BeOfType<OperationCanceledException>();
+        harness.Result.Should().BeNull();
+        _interaction.Lines.Should().NotContain(line => line.StartsWith("JSON:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(CreationResultStatus.CreateFailed)]
+    [InlineData(CreationResultStatus.Cancelled)]
+    public async Task Command_NativeUnsuccessfulCreateAndCancellation_StillThrowsWithoutOutput(CreationResultStatus status)
+    {
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        var native = new CancelAfterNativeReturnFactory(Path.Combine(Home, "templates"), cancellation, unsuccessfulStatus: status);
+        var harness = CreateHarness(templateFactory: native);
+        var before = Snapshot();
+
+        Exception? failure = await Record.ExceptionAsync(() => harness.InvokeAsync(
+            [Low, "--path", Target, "--greeting", "failed", "--output", "json"], cancellation.Token));
+
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+        native.NativeResult!.Status.Should().Be(status);
+        failure.Should().BeOfType<OperationCanceledException>();
+        harness.Result.Should().BeNull();
+        _interaction.Lines.Should().NotContain(line => line.StartsWith("JSON:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Command_NativeCreationThrowsCancellation_DoesNotConvertItToSuccess()
+    {
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        var native = new CancelAfterNativeReturnFactory(Path.Combine(Home, "templates"), cancellation, throwDuringCreate: true);
+        var harness = CreateHarness(templateFactory: native);
+        var before = Snapshot();
+
+        Exception? failure = await Record.ExceptionAsync(() => harness.InvokeAsync(
+            [Low, "--path", Target, "--greeting", "cancelled", "--output", "json"], cancellation.Token));
+
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+        native.NativeResult.Should().BeNull();
+        failure.Should().BeOfType<OperationCanceledException>();
+        harness.Result.Should().BeNull();
+        _interaction.Lines.Should().NotContain(line => line.StartsWith("JSON:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("preview")]
+    [InlineData("conflict")]
+    [InlineData("unknown")]
+    [InlineData("required")]
+    [InlineData("list")]
+    public async Task Command_CancelsAfterUncommittedOutcome_StillThrowsWithoutRenderingSuccess(string mode)
+    {
+        await InstallAsync();
+        if (mode == "conflict")
+        {
+            Directory.CreateDirectory(Target);
+            File.WriteAllText(Path.Combine(Target, "Existing.txt"), "user content");
+        }
+
+        using CancellationTokenSource cancellation = new();
+        var harness = CreateHarness(afterResult: _ => cancellation.Cancel());
+        string[] args = mode switch
+        {
+            "preview" => [Low, "--path", Target, "--greeting", "preview", "--dry-run"],
+            "conflict" => [Low, "--path", Target, "--name", "Existing", "--greeting", "conflict"],
+            "unknown" => ["missing", "--path", Target],
+            "required" => [Low, "--path", Target],
+            "list" => ["--path", Target, "--list"],
+            _ => throw new InvalidOperationException("Unknown test mode."),
+        };
+        var before = Snapshot();
+
+        Exception? failure = await Record.ExceptionAsync(() => harness.InvokeAsync([.. args, "--output", "json"], cancellation.Token));
+
+        Snapshot().Should().BeEquivalentTo(before);
+        failure.Should().BeOfType<OperationCanceledException>();
+        harness.Result.Should().NotBeNull();
+        if (mode is "preview" or "conflict")
+        {
+            harness.Result!.Invocation!.Changes.Should().NotBeEmpty();
+        }
+
+        _interaction.Lines.Should().NotContain(line => line.StartsWith("JSON:", StringComparison.Ordinal)
+            || line.StartsWith("SUCCESS:", StringComparison.Ordinal));
+    }
+
     public void Dispose()
     {
         foreach (ServiceProvider provider in _providers)
@@ -861,7 +1060,8 @@ public sealed class NewExecutionJourneyTests : IDisposable
         }
     }
 
-    private Harness CreateHarness(IInteractionService? interaction = null, string? bundleVersion = "4.35.0")
+    private Harness CreateHarness(IInteractionService? interaction = null, string? bundleVersion = "4.35.0",
+        ITemplaterFactory? templateFactory = null, Action<NewExecutionResult>? afterResult = null)
     {
         interaction ??= _interaction;
         ServiceCollection services = new();
@@ -888,12 +1088,12 @@ public sealed class NewExecutionJourneyTests : IDisposable
         services.AddSingleton<IExtensionBundleResolver>(new ExtensionBundleResolver(
             new InstalledBundleScanner(installed), NullBundleResolveTelemetry.Instance, NullLogger<ExtensionBundleResolver>.Instance));
         services.AddTemplatesOrchestrator();
-        var factory = new RecordingFactory(new TemplaterFactory(new TemplateStore(
+        var factory = new RecordingFactory(templateFactory ?? new TemplaterFactory(new TemplateStore(
             new CliConfigurationPathsOptions(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance)));
         services.AddSingleton<ITemplaterFactory>(factory);
         ServiceProvider provider = services.BuildServiceProvider();
         _providers.Add(provider);
-        var runner = new RecordingRunner(provider.GetRequiredService<INewExecutionRunner>());
+        var runner = new RecordingRunner(provider.GetRequiredService<INewExecutionRunner>(), afterResult);
         NewExecutionCommand command = new(runner, provider.GetRequiredService<NewExecutionRenderer>(), new([
             new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true),
         ]));
@@ -1056,7 +1256,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
             }, cancellationToken);
     }
 
-    private sealed class RecordingRunner(INewExecutionRunner inner) : INewExecutionRunner
+    private sealed class RecordingRunner(INewExecutionRunner inner, Action<NewExecutionResult>? afterResult = null) : INewExecutionRunner
     {
         public NewExecutionResult? Result { get; private set; }
 
@@ -1064,7 +1264,67 @@ public sealed class NewExecutionJourneyTests : IDisposable
             NewExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
         {
             Result = await inner.ExecuteAsync(request, availability, cancellationToken);
+            afterResult?.Invoke(Result);
             return Result;
+        }
+    }
+
+    private sealed class CancelAfterNativeReturnFactory(string hive, CancellationTokenSource cancellation,
+        bool cancelPreview = false, CreationResultStatus? unsuccessfulStatus = null, bool throwDuringCreate = false) : ITemplaterFactory
+    {
+        private CancelAfterNativeReturnSession? _session;
+
+        public ITemplateCreationResult? NativeResult => _session?.NativeResult;
+
+        public Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken,
+            Action<TemplateStoreWaitReason>? waiting = null) => CreateAsync(context, new([]), cancellationToken, waiting);
+
+        public Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+            CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _session = new(context, hive, snapshot, cancellation, cancelPreview, unsuccessfulStatus, throwDuringCreate);
+            return Task.FromResult(new Templater(_session));
+        }
+
+        public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+            TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
+            => throw new InvalidOperationException("Item command must not create a project-template environment.");
+    }
+
+    private sealed class CancelAfterNativeReturnSession(TemplateEngineContext context, string hive,
+        TemplateConstraintEvaluationSnapshot snapshot, CancellationTokenSource cancellation, bool cancelPreview,
+        CreationResultStatus? unsuccessfulStatus, bool throwDuringCreate) : TemplateEngineSession(context, hive, snapshot)
+    {
+        public ITemplateCreationResult? NativeResult { get; private set; }
+
+        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
+            InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
+        {
+            if (!dryRun && throwDuringCreate)
+            {
+                await cancellation.CancelAsync();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            ITemplateCreationResult result;
+            if (!dryRun && unsuccessfulStatus is { } status)
+            {
+                result = Substitute.For<ITemplateCreationResult>();
+                result.Status.Returns(status);
+            }
+            else
+            {
+                result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+            }
+
+            if (dryRun == cancelPreview)
+            {
+                NativeResult = result;
+                await cancellation.CancelAsync();
+            }
+
+            return result;
         }
     }
 
