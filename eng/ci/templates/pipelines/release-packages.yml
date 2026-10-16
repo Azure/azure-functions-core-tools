@@ -9,9 +9,6 @@ parameters:
 - name: build_args
   type: string
   default: ""
-- name: postPackSteps
-  type: stepList
-  default: []
 
 resources:
   repositories:
@@ -59,7 +56,6 @@ extends:
           artifacts: ['pack']
           projects: ${{ parameters.projects }}
           build_args: -p:IsReleaseCI=true ${{ parameters.build_args }}
-          postPackSteps: ${{ parameters.postPackSteps }}
 
     - stage: Release
       dependsOn: Build

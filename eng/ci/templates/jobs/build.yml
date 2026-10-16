@@ -13,9 +13,6 @@ parameters:
 - name: build_args
   type: string
   default: ''
-- name: postPackSteps
-  type: stepList
-  default: []
 - name: npmPackageDirectory
   type: string
   default: ''
@@ -184,7 +181,3 @@ jobs:
           signType: nuget
           folderPath: $(pack_dir)
           pattern: '*.nupkg'
-
-    - ${{ if containsValue(parameters.artifacts, 'pack') }}:
-      - ${{ each step in parameters.postPackSteps }}:
-        - ${{ step }}

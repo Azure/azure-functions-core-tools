@@ -41,7 +41,7 @@ public class BuiltInProfileSourceTests
         {
             expectedRuntimes.Add("python");
             expectedWorkers.Add("python");
-            profile.Workers!["python"]!.Version.Should().Be("[4.46.1]");
+            profile.Workers!["python"]!.Version.Should().Be("[4.46.2]");
         }
 
         if (supportsGo)

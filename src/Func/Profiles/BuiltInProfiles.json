@@ -16,7 +16,7 @@
           "version": "[3.13.0]"
         },
         "python": {
-          "version": "[4.46.1]"
+          "version": "[4.46.2]"
         },
         "go": {
           "version": "[1.0.0]"
@@ -46,7 +46,7 @@
           "version": "[3.13.0]"
         },
         "python": {
-          "version": "[4.46.1]"
+          "version": "[4.46.2]"
         }
       },
       "supportedRuntimes": [
@@ -116,7 +116,7 @@
           "version": "[3.13.0]"
         },
         "python": {
-          "version": "[4.46.1]"
+          "version": "[4.46.2]"
         }
       },
       "supportedRuntimes": [

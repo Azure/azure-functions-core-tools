@@ -30,10 +30,7 @@
   <Target Name="IncludePythonWorkerContentInPack" DependsOnTargets="AssignTargetPaths;_SetWorkloadProperties">
     <ItemGroup>
       <TfmSpecificPackageFile Include="@(None)" TargetPath="%(RecursiveDir)%(Filename)%(Extension)" Pack="true" PackagePath="$(_WorkloadPackageContentRoot)"
-         Condition="'$(RuntimeIdentifier)' != 'win-arm64' AND $([System.String]::new('%(None.TargetPath)').StartsWith('workers/python/'))" />
-      <!-- Windows ARM64 is supported only for Python 3.15. -->
-      <TfmSpecificPackageFile Include="@(None)" TargetPath="%(RecursiveDir)%(Filename)%(Extension)" Pack="true" PackagePath="$(_WorkloadPackageContentRoot)"
-         Condition="'$(RuntimeIdentifier)' == 'win-arm64' AND ('%(None.TargetPath)' == 'workers/python/worker.config.json' OR $([System.String]::new('%(None.TargetPath)').StartsWith('workers/python/3.15/')))" />
+         Condition="$([System.String]::new('%(None.TargetPath)').StartsWith('workers/python/'))" />
     </ItemGroup>
   </Target>
 
