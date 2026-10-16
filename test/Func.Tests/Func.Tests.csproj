@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/DotNet/Workloads.DotNet.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Python/Workloads.Python.csproj" />
     <ProjectReference Include="../Fixtures/Templates.Tests.StoreProcess/Templates.Tests.StoreProcess.csproj"
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
@@ -75,6 +76,15 @@
   <Target Name="PackBundledNodeForTests" AfterTargets="Build">
     <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" Targets="Pack"
       Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-node-artifacts" />
+  </Target>
+
+  <Target Name="PackBundledDotNetForTests" AfterTargets="Build">
+    <ItemGroup>
+      <_PreviousBundledDotNetTestArchive Include="$(OutDir)bundled-dotnet-artifacts/Azure.Functions.Cli.Workloads.DotNet.*.nupkg" />
+    </ItemGroup>
+    <Delete Files="@(_PreviousBundledDotNetTestArchive)" />
+    <MSBuild Projects="$(SrcRoot)Workloads/Stacks/DotNet/Workloads.DotNet.csproj" Targets="Pack"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-dotnet-artifacts" />
   </Target>
 
   <Target Name="PackBundledPythonForTests" AfterTargets="Build">

@@ -26,10 +26,8 @@ internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFuncti
             return Task.FromResult(NotCreated("directory does not exist"));
         }
 
-        var projectFiles = workingDirectory
-            .EnumerateFiles("*.*proj", SearchOption.TopDirectoryOnly)
-            .Where(f => f.Extension is ".csproj" or ".fsproj")
-            .ToList();
+        IReadOnlyList<string> projectFiles = DotNetProjectFileSelection.Candidates(workingDirectory
+            .EnumerateFiles("*.*proj", SearchOption.TopDirectoryOnly).Select(file => file.FullName));
 
         if (projectFiles.Count > 1)
         {
@@ -38,7 +36,7 @@ internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFuncti
 
         if (projectFiles.Count == 1)
         {
-            string projectFile = projectFiles[0].FullName;
+            string projectFile = projectFiles[0];
             FunctionsProject project = new DotNetSourceProject(context.WorkingDirectory, projectFile, _dotnetCli);
             return Task.FromResult(Created(project, $"found {Path.GetFileName(projectFile)}"));
         }

@@ -1,7 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+#if FUNC_HOST_DOTNET_TEMPLATES
+namespace Azure.Functions.Cli.Templates.DotNet.Shared;
+#else
 namespace Azure.Functions.Cli.Workloads.DotNet;
+#endif
 
 /// <summary>
 /// Thrown when a <c>dotnet</c> CLI child process exits with a non-zero exit code.
