@@ -162,6 +162,14 @@ while explicit namespace is retained. Both distinctions use the authoritative
 canonical explicit-option provenance from the shared argument parser, not a
 second alias parser. Upstream template configurations remain unchanged.
 
+`DotNetDirectProviderTests` exercises this provider without the deferred common
+composer or host factory. Both project candidates share one real native session.
+Item preparation uses the physical source-project factory, imported MSBuild
+properties and the selected native capture; process controls replace only
+dependency execution. Separate integration cases execute real dependencies and
+compile C# and F# HTTP functions into `functions.metadata`. Refusal and partial
+completion controls retain user files and committed F# compile repairs.
+
 Selected item help uses the same source-pinned adapter to evaluate the trusted
 project's namespace default. Unqualified sources or unavailable projects show
 an explicitly unevaluated default and diagnostic instead of presenting the
