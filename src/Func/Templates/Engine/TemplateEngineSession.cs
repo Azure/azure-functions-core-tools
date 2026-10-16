@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Xml;
 using Microsoft.TemplateEngine.Abstractions;
@@ -12,6 +13,7 @@ using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 using Microsoft.TemplateEngine.Edge.Template;
+using Microsoft.TemplateEngine.Orchestrator.RunnableProjects.ConfigModel;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 
@@ -275,6 +277,13 @@ internal class TemplateEngineSession : IDisposable
 
         IReadOnlyList<TemplateFileChange> templateChanges = Array.AsReadOnly<TemplateFileChange>(
             [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+        using var configurationStream = new MemoryStream(Encoding.UTF8.GetBytes(configuration.Content));
+        string? placeholder = TemplateConfigModel.FromStream(configurationStream).PlaceholderFilename;
+        IReadOnlyList<string> placeholderFilenames = string.IsNullOrWhiteSpace(placeholder) ? ["-.-", "_._"] : [placeholder];
+        // Native placeholder source files represent directory effects, including when the directory is empty.
+        HashSet<string> directoryOutputs = new((preview.CreationEffects?.FileChanges ?? []).OfType<IFileChange2>()
+            .Where(change => placeholderFilenames.Contains(Path.GetFileName(change.SourceRelativePath), StringComparer.Ordinal))
+            .Select(change => change.TargetRelativePath), StringComparer.Ordinal);
         IReadOnlyList<TemplateFileChange> changes = templateChanges;
         IReadOnlyList<TemplateProjectConfigurationPlan> configurationPlans = [];
         if (projectSupport is not null)
@@ -347,7 +356,8 @@ internal class TemplateEngineSession : IDisposable
         IReadOnlyList<TemplateFileChange> written = Array.AsReadOnly<TemplateFileChange>(
             [.. created.CreationEffects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
         if (!written.Select(change => change.Path).Order(StringComparer.Ordinal).SequenceEqual(templateChanges.Select(change => change.Path).Order(StringComparer.Ordinal), StringComparer.Ordinal)
-            || written.Any(change => _settings.Host.FileSystem.FileExists(Path.Combine(output, change.Path)) == string.Equals(change.Kind, "Delete", StringComparison.Ordinal)))
+            || ValidateOutputPaths(output, templateChanges) is not null
+            || written.Any(change => !HasExpectedOutputKind(output, change, directoryOutputs)))
         {
             return new(TemplateInvocationStatus.EngineFailure, [], "Template creation did not produce the validated output paths.");
         }
@@ -518,6 +528,19 @@ internal class TemplateEngineSession : IDisposable
     protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         => _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName, parameters,
             forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
+
+    private bool HasExpectedOutputKind(string output, TemplateFileChange change, HashSet<string> directoryOutputs)
+    {
+        string path = Path.Combine(output, change.Path);
+        bool file = _settings.Host.FileSystem.FileExists(path);
+        bool directory = _settings.Host.FileSystem.DirectoryExists(path);
+        if (string.Equals(change.Kind, "Delete", StringComparison.Ordinal))
+        {
+            return !file && !directory;
+        }
+
+        return directoryOutputs.Contains(change.Path) ? directory && !file : file && !directory;
+    }
 
     private string? ValidateOutputPaths(string output, IReadOnlyList<TemplateFileChange> changes)
     {
