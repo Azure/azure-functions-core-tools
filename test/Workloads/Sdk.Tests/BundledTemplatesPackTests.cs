@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -73,6 +75,49 @@ public sealed class BundledTemplatesPackTests
 
         SHA256.HashData(firstStream).Should().Equal(SHA256.HashData(secondStream));
         Read(first, "bundled-templates.json").Should().Be(Read(second, "bundled-templates.json"));
+    }
+
+    [Theory]
+    [InlineData("fixture")]
+    [InlineData("fixture-repeat")]
+    public void Pack_RidImplementation_UsesRequestedConfigurationAndDeclaredRidProducer(string directory)
+    {
+        using ZipArchive outer = OpenPackage(directory, $"{FixtureId}.win-x64.{Version}.nupkg");
+        using Stream assembly = outer.GetEntry($"tools/win-x64/{FixtureId}.dll")!.Open();
+        using MemoryStream bytes = new();
+        assembly.CopyTo(bytes);
+        bytes.Position = 0;
+        using PEReader pe = new(bytes);
+        MetadataReader reader = pe.GetMetadataReader();
+        Dictionary<string, string?> metadata = [];
+
+        foreach (CustomAttributeHandle handle in reader.GetAssemblyDefinition().GetCustomAttributes())
+        {
+            CustomAttribute attribute = reader.GetCustomAttribute(handle);
+            if (attribute.Constructor.Kind != HandleKind.MemberReference)
+            {
+                continue;
+            }
+
+            MemberReference constructor = reader.GetMemberReference((MemberReferenceHandle)attribute.Constructor);
+            if (constructor.Parent.Kind != HandleKind.TypeReference)
+            {
+                continue;
+            }
+
+            TypeReference type = reader.GetTypeReference((TypeReferenceHandle)constructor.Parent);
+            if (reader.GetString(type.Namespace) != "System.Reflection" || reader.GetString(type.Name) != "AssemblyMetadataAttribute")
+            {
+                continue;
+            }
+
+            BlobReader value = reader.GetBlobReader(attribute.Value);
+            value.ReadUInt16().Should().Be(1);
+            metadata.Add(value.ReadSerializedString()!, value.ReadSerializedString());
+        }
+
+        metadata["FixtureConfiguration"].Should().BeEquivalentTo(TestHelpers.Configuration);
+        metadata["FixtureRuntimeIdentifier"].Should().Be("win-x64");
     }
 
     [Fact]

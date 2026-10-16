@@ -20,10 +20,11 @@
     <Delete Files="$(OutDir)bundled-templates-artifacts/node/Azure.Functions.Cli.Workloads.Node.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.win-x64.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture-repeat/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture-repeat/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.win-x64.7.8.9-pack-fixture.nupkg" />
     <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" Targets="Pack" BuildInParallel="false"
       Properties="Configuration=$(Configuration);NoBuild=true;PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/node" />
+    <!-- Solution references can build this unlisted fixture as Debug. Pack must build its requested configuration and RIDs. -->
     <MSBuild Projects="$(TestRoot)Fixtures/Workloads.Tests.BundledTemplates/Workloads.Tests.BundledTemplates.csproj" Targets="Pack" BuildInParallel="false"
-      Properties="Configuration=$(Configuration);NoBuild=true;PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture" />
+      Properties="Configuration=$(Configuration);PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture" />
     <MSBuild Projects="$(TestRoot)Fixtures/Workloads.Tests.BundledTemplates/Workloads.Tests.BundledTemplates.csproj" Targets="Pack" BuildInParallel="false"
-      Properties="Configuration=$(Configuration);NoBuild=true;PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture-repeat" />
+      Properties="Configuration=$(Configuration);PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture-repeat" />
   </Target>
 
 </Project>
