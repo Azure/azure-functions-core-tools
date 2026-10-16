@@ -1,0 +1,11 @@
+{
+  "isHidden": false,
+  "symbolInfo": {
+    "embedding-model-name": {
+      "longName": "embedding-model-name"
+    },
+    "httpTrigger-authLevel": {
+      "longName": "http-trigger-auth-level"
+    }
+  }
+}

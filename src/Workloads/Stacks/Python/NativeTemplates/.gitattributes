@@ -1,0 +1,4 @@
+# Retain the exact owned source payloads, including mixed upstream line endings.
+content/items/**/*.py -text
+snippets/**/*.py -text
+source/bundles/**/extensions.json -text

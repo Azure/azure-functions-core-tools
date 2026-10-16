@@ -7,18 +7,28 @@
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>python</WorkloadAlias>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <BundledTemplatesProject>$(MSBuildProjectDirectory)/NativeTemplates/Workloads.Python.Templates.csproj</BundledTemplatesProject>
+    <BundledTemplatesPackageId>Azure.Functions.Templates.Python</BundledTemplatesPackageId>
+    <BundledTemplatesPackagePath>templates/python.nupkg</BundledTemplatesPackagePath>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.Python.Tests" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <ProjectReference Include="NativeTemplates/Workloads.Python.Templates.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <Compile Remove="NativeTemplates/**" />
+    <EmbeddedResource Remove="NativeTemplates/**" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Templates/**" />
   </ItemGroup>
+
+  <Import Project="$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets" />
 
 </Project>

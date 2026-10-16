@@ -1,0 +1,11 @@
+{
+  "isHidden": false,
+  "symbolInfo": {
+    "mysqlTrigger-connection": {
+      "longName": "mysql-trigger-connection"
+    },
+    "mysqlTrigger-tableName": {
+      "longName": "mysql-trigger-table-name"
+    }
+  }
+}

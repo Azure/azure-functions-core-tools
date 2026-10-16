@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Gavin Aguiar",
+  "constraints": {
+    "bindings": {
+      "args": [
+        "Embeddings"
+      ],
+      "type": "func-bundle-bindings"
+    },
+    "bundle": {
+      "args": [
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
+          "version": "[4.0.0,)"
+        }
+      ],
+      "type": "func-bundle"
+    },
+    "host": {
+      "args": [
+        {
+          "hostname": "func"
+        }
+      ],
+      "type": "host"
+    },
+    "stack": {
+      "args": "python",
+      "type": "func-workload"
+    }
+  },
+  "defaultName": "generate_embeddings_http_request",
+  "description": "Template to create an Embeddings binding function",
+  "forms": {
+    "pythonCharacters": {
+      "identifier": "replace",
+      "pattern": "[^A-Za-z0-9_]",
+      "replacement": "_"
+    },
+    "pythonIdentifier": {
+      "identifier": "chain",
+      "steps": [
+        "pythonCharacters",
+        "pythonLeadingDigit"
+      ]
+    },
+    "pythonLeadingDigit": {
+      "identifier": "replace",
+      "pattern": "^(?=[0-9])",
+      "replacement": "_"
+    }
+  },
+  "groupIdentity": "Azure.Functions.Python.OpenAI-Embeddings.Append",
+  "identity": "Azure.Functions.Python.OpenAI-Embeddings.Append",
+  "name": "Open AI Embeddings Binding",
+  "preferNameDirectory": false,
+  "primaryOutputs": [
+    {
+      "path": "function_body.py"
+    }
+  ],
+  "shortName": [
+    "__python-append-OpenAI-Embeddings"
+  ],
+  "symbols": {
+    "embedding-model-name": {
+      "datatype": "string",
+      "defaultValue": "text-embedding-ada-002",
+      "description": "$embeddings_model_name_label",
+      "isRequired": true,
+      "replaces": "$(EMBEDDING_MODEL_NAME)",
+      "type": "parameter"
+    },
+    "FunctionIdentifier": {
+      "replaces": "__FUNCTION_NAME__",
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "pythonIdentifier"
+    },
+    "httpTrigger-authLevel": {
+      "choices": [
+        {
+          "choice": "FUNCTION"
+        },
+        {
+          "choice": "ANONYMOUS"
+        },
+        {
+          "choice": "ADMIN"
+        }
+      ],
+      "datatype": "choice",
+      "defaultValue": "FUNCTION",
+      "description": "Authorization level",
+      "isRequired": true,
+      "replaces": "$(AUTHLEVEL_INPUT)",
+      "type": "parameter"
+    }
+  },
+  "tags": {
+    "func-role": "python-append-helper",
+    "language": "Python",
+    "type": "item"
+  }
+}
