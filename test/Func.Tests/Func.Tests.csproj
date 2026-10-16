@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Update/Fixtures/version.json" LogicalName="Azure.Functions.Cli.Tests.Update.Fixtures.version.json" />
+    <EmbeddedResource Include="Templates/Acquisition/Fixtures/basic-companions.json" LogicalName="Azure.Functions.Cli.Tests.Templates.Acquisition.basic-companions.json" />
   </ItemGroup>
 
   <!-- Test fixtures: built and copied to output as content; loaded via reflection. -->

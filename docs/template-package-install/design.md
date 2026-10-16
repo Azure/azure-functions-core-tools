@@ -299,3 +299,144 @@ Qualification remains pinned to Microsoft.TemplateEngine **10.0.301** (upstream 
 This layer does **not** implement staging/trust/source/ownership policy, raw-content inventory or fingerprint production, `func new install/update/uninstall`, automatic installation, startup availability capture, parser policy, or public `new`/`init` cutovers. Future lifecycle orchestration must supply the real preflight-to-acquisition validation callback and remain inside this boundary. `ExecuteAsync` is a rollback-capable mutation foundation; it does not establish the separate uninstall-after-provider-success commit semantics described above. Factory integration is usable by the runtime facade but is not proof that every legacy template provider has migrated. Owner approval of these provisional contracts and platform qualification are landing gates.
 
 Public Linux build 309467 executed the initial `5fda1aaa` candidate's native/store/process tests: 41 store cases passed and two Windows-specific namespace/access cases were explicitly skipped, including all six cross-process cases passing. Their bodies have no Linux/backend early-return guard. This qualifies those operations on that worker's temporary filesystem, not all filesystems or a controlled Unix open-before-flock interleaving. The later synchronized-lifetime and parent-signaled-cancellation changes require their own exact-head qualification; the initial run is not reused as execution proof for those changes. macOS, controlled Unix inode interleavings and backend/cleanup permission failures remain separate gates.
+
+## Staged basic companion acquisition
+
+The internal, unregistered `Templates/Acquisition/BasicAcquisitionRunner` stages
+explicit setup/repair under the user-selected **CLI-bundled mapping with
+retained-stack reconstruction** option. It does not change public setup, init,
+new, quickstart, or profile behavior. Ahmed owns acquisition (#5649), Sarah owns
+first-party inventory/content (#5647), and Francisco owns publishing and the
+template lifecycle/store (#5629, #5631). The thin basic-only lifecycle adapter is
+provisional and requires those owners' review before landing or public activation.
+
+`BasicCompanions.json` is an embedded CLI-release resource, independent of
+overridable project/user/remote profiles. Its production inventory is deliberately
+empty and yields visible `Unavailable`/`MissingMapping` guidance, not successful
+acquisition. No example package, feed or version is shipped as production approval.
+The test assembly separately embeds a synthetic cohort and generates owned
+archives, computes their digests before invoking the reader, and supplies explicit
+fixture ownership evidence. That qualifies a hypothetical producer/consumer
+contract, not published runnable inventory.
+
+Schema version 1 requires a revision, explicit logical stack package IDs,
+nonoverlapping applicable stack-version ranges, approved effective feed URLs,
+and basic companion IDs/compatible ranges. Each exact approved artifact records
+package ID/version/source, SHA-256, content revision, explicit basic-only
+qualification, and a complete raw configuration path/identity/type inventory.
+The manifest revision also identifies its feed-policy snapshot. A compatible
+range does not authorize future unreviewed versions. The publisher must qualify
+the *whole artifact* as basic-only: item/project tags and a package prefix cannot
+establish that content policy. Exact-byte checks and the complete inventory enforce
+the reviewed evidence; they do not decide whether a reviewed sample is basic.
+Missing revisions, unsupported schemas, duplicate properties/records, overlapping
+stack mappings and invalid metadata fail explicitly.
+
+Before deployment, planning includes **every** covered persisted workload row,
+including unselected and side-by-side rows. A logical pointer's ID/version is used
+when present; otherwise only explicitly mapped literal IDs are recognized. Aliases
+are never acquisition authority. All retained shared requirements are intersected
+before writes, even if their companion never installed. An approved stack version
+without historical coverage blocks acquisition with a request for corrected
+release-bound data. Producers must retain historical mapping records and their
+requirements unchanged across CLI releases; this draft cannot compare artifacts
+from releases it has never received.
+
+The user selected **"Repair only the requested stack; retain all compatibility
+constraints (Recommended)"**. This is targeted repair, not machine-wide repair.
+All retained requirements still constrain shared ranges before any deployment,
+but only the requested stack's companions are acquisition targets. If retained A
+needs missing T and requested B needs independent U, B acquires U without
+installing/restoring T. `Completed` describes B's requested operation, not the
+completeness of every installed stack. Repeating B remains idempotent, while a
+later explicit A repair may restore T. The fixture journey keeps A's actual
+persisted row through those operations and checks native U-only visibility before
+explicit A repair. Existing shared-T intersection/conflict controls remain
+unchanged. This decision clarifies the result scope without broadening side effects
+or treating a reviewer-requested union as acquisition authorization.
+
+The runner resolves the existing `IPackageSourceProvider` once and passes its
+effective explicit/environment/default source to stack installation and companion
+selection. Each contributing mapping must approve it; disallowed overrides fail
+before stack deployment without alternate-feed fallback. A local installed stack's
+source path is not a companion feed. This repair path uses the ordinary approved
+HTTP(S) feed and does not define direct-local-stack acquisition policy.
+
+Installed companion reuse requires actual native managed-package identity/version,
+archive validation, and lifecycle-owned source/pin evidence keyed to that exact
+artifact. The default unavailable ownership implementation fails closed; installed
+versions do not imply ownership or consent. A compatible qualified older artifact
+can be reused. No incumbent is automatically replaced, upgraded, downgraded, or
+switched to another source; conflicts require a separate explicit owning-lifecycle
+action. No duplicate template registry or success-only association receipt is added.
+
+For a missing companion, the provisional adapter acquires only the selected exact
+archive, validates its bytes, NuGet ownership, complete raw configurations and
+constraints, and installs/scans it in a private preflight hive. It then composes
+`ITemplateStore.OpenWriteAsync` / `TemplateStoreWriteSession.ExecuteAsync` with
+native installation and **actual acquired-content validation**, followed by the
+store's cache/commit boundary. Validation compares the live archive and native
+discovered inventory again; a changed archive or incomplete engine discovery
+fails rather than committing provider success. There are no no-op validation
+callbacks, changes to store locking, or template invocation/post-actions.
+Acquiring through a staged local archive is not itself durable feed/pin provenance:
+the lifecycle owner must supply that input before production reuse is enabled.
+
+Typed outcomes distinguish completed, not applicable, unavailable, rejected,
+check-incomplete, partial failure, and cancellation, retaining completed identities
+and the actual cause/source diagnostics. Source argument handling is scoped to the
+source-provider call. Malformed nuspec XML/version data is classified as an invalid
+artifact at inspection, not a source conflict. Known stack feed HTTP/protocol
+failures and transport timeouts are classified around installation; caller
+cancellation stays distinct and unrelated argument errors escape. A successful
+stack row remains after companion failure, so a
+new process reconstructs its requirements before considering another stack. A
+removed stack contributes none; reinstalling its mapped version restores the
+requirement. Cancellation stops further operations and the protected store owns
+active template recovery. Earlier successful packages are not uninstalled.
+Check mode, native browsing and non-stack requests acquire nothing. Offline repair
+reuses verified installed state; the default payload source reports a missing
+payload rather than querying feeds. A separately injected verified local provider
+can supply exact offline bytes without changing approval.
+
+Public command integration, publisher-qualified production rows, historical upgrade
+coverage, real lifecycle source/pin provenance, concurrent workload-acquisition
+serialization, complete lifecycle replacement/update/uninstall, and cross-platform
+qualification remain separate gates. The runner observes workload state but does
+not add a cross-store transaction or serialize another process changing workloads
+after planning. Curated registration/proof/grammar remains #5640/#5653/#5651; no
+curated preinstallation, general scanner or second sample registry is introduced.
+This increment is not M5 or production acquisition completion.
+
+### Unresolved shared workload mutation protocol
+
+The single-writer fixture journey does not qualify concurrent workload state.
+`BasicAcquisitionRunner` reads an installed snapshot before planning;
+`WorkloadDeploymentService.InstallAsync` can later replace the physical directory
+and call `SaveWorkloadAsync` or move logical ownership. `WorkloadStore` reads,
+modifies and atomically renames the registry without a lease spanning that
+read-modify-write. Two writers can therefore publish stale aggregate state or add
+a disjoint retained requirement after acquisition has planned. Atomic file
+replacement prevents partial serialization, not lost updates or stale planning.
+The new composition inherits and exposes that risk. The template-hive lease does
+not protect workload directories or the workload registry.
+
+Before production activation or landing as a concurrent-safe acquisition feature,
+the workload/lifecycle owners must agree a cohesive protocol covering every local
+and catalog install, update, uninstall, explicit/logical ownership attach/remove/
+move, and direct registry save/remove/replace, including setup and this runner.
+No acquisition-private lock can establish safety while other mutators ignore it.
+Francisco's lifecycle/store review is required, coordinated with workload owners.
+The next protocol proposal must answer:
+
+1. Which authoritative workload lease or snapshot revision spans validation and
+   deployment, and how do every mutator and retained-row reader participate?
+2. What is the global order between workload ownership and template read/write
+   admission? Can slow payload acquisition happen before admission with a
+   mandatory recheck, without deadlock or accepting a changed requirement?
+3. What completed-state and recovery evidence survives cancellation/process death
+   after stack persistence or during companion commit, and which owner repairs it
+   without silently removing a working stack or publishing a stale registry?
+
+These are unresolved landing/activation questions, not a locking implementation
+or a claim that `Completed` guarantees concurrent machine-wide consistency.
