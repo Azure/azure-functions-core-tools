@@ -135,6 +135,45 @@ public sealed class BundledTemplatesPackTests
         pointer.Entries.Should().NotContain(entry => entry.FullName.StartsWith("tools/", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("fixture-interleaved", "7.8.9-pack-fixture")]
+    [InlineData("fixture-interleaved-other", "8.9.10-pack-interleaving")]
+    public void Pack_TwoVersionsInterleaved_KeepDeclarationsBoundToTheirActualArchive(string directory, string version)
+    {
+        const string path = "tools/win-x64/templates/controlled-native.nupkg";
+        using ZipArchive outer = OpenPackage(directory, $"{FixtureId}.win-x64.{version}.nupkg");
+        using var declaration = JsonDocument.Parse(outer.GetEntry("bundled-templates.json")!.Open());
+        JsonElement asset = declaration.RootElement.GetProperty("assets").EnumerateArray().Should().ContainSingle().Which;
+        using Stream embedded = outer.GetEntry(path)!.Open();
+        using MemoryStream bytes = new();
+        embedded.CopyTo(bytes);
+        bytes.Position = 0;
+        using ZipArchive inner = new(bytes, ZipArchiveMode.Read);
+        XElement outerMetadata = Metadata(outer);
+        XElement innerMetadata = Metadata(inner);
+
+        declaration.RootElement.GetProperty("schemaVersion").GetInt32().Should().Be(1);
+        outerMetadata.Element(outerMetadata.Name.Namespace + "id")!.Value.Should().Be(FixtureId + ".win-x64");
+        outerMetadata.Element(outerMetadata.Name.Namespace + "version")!.Value.Should().Be(version);
+        innerMetadata.Element(innerMetadata.Name.Namespace + "id")!.Value.Should().Be("Azure.Functions.Cli.Tests.NativeFixture");
+        innerMetadata.Element(innerMetadata.Name.Namespace + "version")!.Value.Should().Be(version);
+        asset.GetProperty("path").GetString().Should().Be(path);
+        asset.GetProperty("packageId").GetString().Should().Be("Azure.Functions.Cli.Tests.NativeFixture");
+        asset.GetProperty("version").GetString().Should().Be(version);
+        asset.GetProperty("sha256").GetString().Should().Be(Convert.ToHexStringLower(SHA256.HashData(bytes.ToArray())));
+        PackageTypes(outer).Should().Equal("FuncCliWorkloadRidPackage");
+        PackageTypes(inner).Should().Equal("FuncTemplate");
+        TemplateInventory(inner).Should().Equal(
+            ("content/item/.template.config/template.json", "Azure.Functions.Cli.Tests.Controlled.Item", "item"),
+            ("content/project/.template.config/template.json", "Azure.Functions.Cli.Tests.Controlled.Project", "project"));
+        asset.GetProperty("templates").EnumerateArray().Select(template => (
+            template.GetProperty("path").GetString()!,
+            template.GetProperty("identity").GetString()!,
+            template.GetProperty("type").GetString()!)).Should().Equal(TemplateInventory(inner));
+        AssertRepositoryMetadata(outer);
+        AssertRepositoryMetadata(inner);
+    }
+
     private static ZipArchive OpenPackage(string directory, string fileName)
     {
         return ZipFile.OpenRead(Path.Combine(AppContext.BaseDirectory, "bundled-templates-artifacts", directory, fileName));

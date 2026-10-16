@@ -25,6 +25,9 @@
       Properties="Configuration=$(Configuration);PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture" />
     <MSBuild Projects="$(TestRoot)Fixtures/Workloads.Tests.BundledTemplates/Workloads.Tests.BundledTemplates.csproj" Targets="Pack" BuildInParallel="false"
       Properties="Configuration=$(Configuration);PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture-repeat" />
+    <Delete Files="$(OutDir)bundled-templates-artifacts/fixture-interleaved/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture-interleaved/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.win-x64.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture-interleaved-other/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.win-x64.8.9.10-pack-interleaving.nupkg" />
+    <MSBuild Projects="$(TestRoot)Fixtures/Workloads.Tests.BundledTemplates/Workloads.Tests.BundledTemplates.csproj" Targets="Pack" BuildInParallel="false"
+      Properties="Configuration=$(Configuration);PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture-interleaved;InterleavedPackageVersion=8.9.10-pack-interleaving;InterleavedPackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture-interleaved-other" />
   </Target>
 
 </Project>
