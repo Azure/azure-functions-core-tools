@@ -14,10 +14,10 @@
     Condition="'$(WorkloadKind)' == 'workload' AND '$(_BundledTemplatesArchiveToProduce)' == ''">
     <PropertyGroup>
       <BundledTemplatesArchiveFileName Condition="'$(BundledTemplatesArchiveFileName)' == ''">$(BundledTemplatesPackageId).$(PackageVersion).nupkg</BundledTemplatesArchiveFileName>
-      <_BundledTemplatesOutput>$(IntermediateOutputPath)bundled-templates/</_BundledTemplatesOutput>
+      <_BundledTemplatesOutput>$(IntermediateOutputPath)bundled-templates/$(PackageVersion)/</_BundledTemplatesOutput>
       <_BundledTemplatesArchive>$(_BundledTemplatesOutput)$(BundledTemplatesArchiveFileName)</_BundledTemplatesArchive>
       <_BundledTemplatesPackagePath>$(_WorkloadPackageContentRoot)$(BundledTemplatesPackagePath)</_BundledTemplatesPackagePath>
-      <_BundledTemplatesManifest>$(IntermediateOutputPath)bundled-templates.json</_BundledTemplatesManifest>
+      <_BundledTemplatesManifest>$(_BundledTemplatesOutput)bundled-templates.json</_BundledTemplatesManifest>
     </PropertyGroup>
     <Delete Files="$(_BundledTemplatesManifest)" />
     <MSBuild Projects="$(BundledTemplatesProject)"
