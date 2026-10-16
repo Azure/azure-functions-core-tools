@@ -73,9 +73,9 @@ internal static class TemplateConstraintDeclarationReader
             throw Invalid($"{source} declares a func type in a package shared with another template host.");
         }
 
-        if (project && type == "func-bundle")
+        if (project && type is "func-bundle" or "func-bundle-bindings")
         {
-            throw Invalid($"{source} declares func-bundle in a project template.");
+            throw Invalid($"{source} declares {type} in a project template.");
         }
 
         IReadOnlyList<TemplateConstraintAlternative> alternatives = type switch
@@ -84,7 +84,20 @@ internal static class TemplateConstraintDeclarationReader
             "func-bundle" => ReadAlternatives(arguments, workload: false, source),
             _ => [],
         };
-        return new(label, type, arguments?.Clone(), alternatives);
+        return new(label, type, arguments?.Clone(), alternatives)
+        {
+            RequiredBindings = type == "func-bundle-bindings" ? ReadRequiredBindings(arguments, source) : null,
+        };
+    }
+
+    private static IReadOnlyList<string> ReadRequiredBindings(JsonElement? arguments, string source)
+    {
+        if (arguments is not { ValueKind: JsonValueKind.Array } array)
+        {
+            throw Invalid($"{source} requires an array of binding names.");
+        }
+
+        return Array.AsReadOnly<string>([.. array.EnumerateArray().Select(item => RequireString(item, $"{source} binding name"))]);
     }
 
     private static IReadOnlyList<TemplateConstraintAlternative> ReadAlternatives(JsonElement? arguments, bool workload, string source)

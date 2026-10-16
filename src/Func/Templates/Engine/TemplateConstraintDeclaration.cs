@@ -9,7 +9,10 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <summary>
 /// Retains a validated declaration without interpreting unknown constraint types.
 /// </summary>
-internal sealed record TemplateConstraintDeclaration(string Label, string Type, JsonElement? Arguments, IReadOnlyList<TemplateConstraintAlternative> Alternatives);
+internal sealed record TemplateConstraintDeclaration(string Label, string Type, JsonElement? Arguments, IReadOnlyList<TemplateConstraintAlternative> Alternatives)
+{
+    public IReadOnlyList<string>? RequiredBindings { get; init; }
+}
 
 /// <summary>
 /// Describes one workload or bundle requirement in a func constraint.

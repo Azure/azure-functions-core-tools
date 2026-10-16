@@ -2,6 +2,15 @@
 
 Define the context-bound Microsoft.TemplateEngine integration layer for listing, resolving, and invoking installed templates.
 
+After native project creation and mandatory CLI configuration commit, cancellation
+anywhere in owned stack-preparation completion, including selected-source
+revalidation before `CompleteAsync`, warns on stderr that outputs were retained
+and then rethrows the original cancellation. It does not run the next preparation
+step, roll back files, or turn optional-preparation cancellation into success,
+even when preparation was configured to skip. Pre-create cancellation and
+completed native creation without optional preparation retain their existing
+semantics.
+
 ## Shared Parser Draft Qualification
 
 `ITemplateArgumentParser.Parse` accepts a candidate identity, its projected parameter definitions, the calling command's complete reserved alias set and the unchanged template token sequence. It creates an ephemeral parser; it does not attach options to public commands. The result preserves effective aliases for help and prompting, canonical values, invalid-input diagnostics, authoring diagnostics and unresolved required parameters. Input diagnostics carry zero-based indices into the original tokens, or no indices for completion values. Schema-local alias mapping retains token provenance and requires every original token to occupy a declared option/value role, including tokens the framework would otherwise ignore. Response-file expansion and parser actions are not enabled. Missing visible required values remain argument-compatible, but `IsComplete` is false until resolved. Native preview remains authoritative for engine features not represented in the projected schema.

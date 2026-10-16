@@ -25,7 +25,9 @@ internal sealed class NewExecutionContextResolver(
     IOptionsMonitor<StackOptions> stackOptions,
     IEnumerable<IProjectInitializer> initializers,
     IHostJsonBundleSectionReader hostReader,
-    IExtensionBundleResolver bundles) : INewExecutionContextResolver
+    IExtensionBundleResolver bundles,
+    TemplateEngineBundleContextReader? bundleContextReader = null,
+    bool enableBundleBindingConstraints = false) : INewExecutionContextResolver
 {
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly IFunctionsProjectResolver _projects = projects ?? throw new ArgumentNullException(nameof(projects));
@@ -34,8 +36,22 @@ internal sealed class NewExecutionContextResolver(
     private readonly IReadOnlyList<IProjectInitializer> _initializers = [.. initializers ?? throw new ArgumentNullException(nameof(initializers))];
     private readonly IHostJsonBundleSectionReader _hostReader = hostReader ?? throw new ArgumentNullException(nameof(hostReader));
     private readonly IExtensionBundleResolver _bundles = bundles ?? throw new ArgumentNullException(nameof(bundles));
+    private readonly TemplateEngineBundleContextReader? _bundleContextReader = enableBundleBindingConstraints
+        ? bundleContextReader ?? throw new ArgumentNullException(nameof(bundleContextReader))
+        : bundleContextReader;
 
-    public async Task<NewExecutionContextResult> ResolveAsync(NewExecutionRequest request, bool canPrompt, CancellationToken cancellationToken)
+    public Task<NewExecutionContextResult> ResolveAsync(NewExecutionRequest request, bool canPrompt, CancellationToken cancellationToken)
+        => ResolveCoreAsync(request, canPrompt, null, cancellationToken);
+
+    internal Task<NewExecutionContextResult> ResolveNativeAsync(NewExecutionRequest request, bool canPrompt,
+        InstalledProjectStackCatalog stackCatalog, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(stackCatalog);
+        return ResolveCoreAsync(request, canPrompt, stackCatalog, cancellationToken);
+    }
+
+    private async Task<NewExecutionContextResult> ResolveCoreAsync(NewExecutionRequest request, bool canPrompt,
+        InstalledProjectStackCatalog? stackCatalog, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.WorkingDirectory);
@@ -83,14 +99,34 @@ internal sealed class NewExecutionContextResolver(
 
         WorkingDirectory root = project.WorkingDirectory;
         string stack = project.StackName;
-        IProjectInitializer[] matches = [.. _initializers.Where(initializer => string.Equals(initializer.Stack, stack, StringComparison.OrdinalIgnoreCase))];
-        if (matches.Length != 1)
+        IReadOnlyList<string> supportedLanguages;
+        IReadOnlyDictionary<string, IReadOnlyList<string>> languageAliases;
+        if (stackCatalog is not null)
         {
-            return Fail("languageMetadataUnavailable",
-                $"Cannot resolve language metadata for stack '{stack}'. Run 'func setup' to repair the installed stack workload.");
+            IProjectStack? installedStack = stackCatalog.FindStack(stack);
+            if (installedStack is null)
+            {
+                return Fail("languageMetadataUnavailable",
+                    $"Cannot resolve language metadata for stack '{stack}'. Run 'func setup' to repair the installed stack workload.");
+            }
+
+            stack = installedStack.Stack;
+            supportedLanguages = installedStack.SupportedLanguages;
+            languageAliases = installedStack.SupportedLanguageAliases;
+        }
+        else
+        {
+            IProjectInitializer[] matches = [.. _initializers.Where(initializer => string.Equals(initializer.Stack, stack, StringComparison.OrdinalIgnoreCase))];
+            if (matches.Length != 1)
+            {
+                return Fail("languageMetadataUnavailable",
+                    $"Cannot resolve language metadata for stack '{stack}'. Run 'func setup' to repair the installed stack workload.");
+            }
+
+            supportedLanguages = matches[0].SupportedLanguages;
+            languageAliases = matches[0].SupportedLanguageAliases;
         }
 
-        IProjectInitializer initializer = matches[0];
         StackOptions options;
         try
         {
@@ -111,15 +147,15 @@ internal sealed class NewExecutionContextResolver(
 
         string? requestedLanguage = request.ExplicitLanguage ?? options.Language ?? project.Language;
         string[] languages = requestedLanguage is null
-            ? [.. initializer.SupportedLanguages.Count == 1 ? initializer.SupportedLanguages : []]
-            : [.. initializer.SupportedLanguages.Where(language => string.Equals(language, requestedLanguage, StringComparison.OrdinalIgnoreCase)
-                || (initializer.SupportedLanguageAliases.TryGetValue(language, out IReadOnlyList<string>? aliases)
+            ? [.. supportedLanguages.Count == 1 ? supportedLanguages : []]
+            : [.. supportedLanguages.Where(language => string.Equals(language, requestedLanguage, StringComparison.OrdinalIgnoreCase)
+                || (languageAliases.TryGetValue(language, out IReadOnlyList<string>? aliases)
                     && aliases.Contains(requestedLanguage, StringComparer.OrdinalIgnoreCase)))];
         if (languages.Length != 1)
         {
             return Fail("invalidLanguage", requestedLanguage is null
-                ? $"Cannot determine the project language. Supply --language <{string.Join("|", initializer.SupportedLanguages)}> or run 'func init' to repair the project."
-                : $"Language '{requestedLanguage}' is not supported by stack '{stack}'. Use --language with one of: {string.Join(", ", initializer.SupportedLanguages)}.");
+                ? $"Cannot determine the project language. Supply --language <{string.Join("|", supportedLanguages)}> or run 'func init' to repair the project."
+                : $"Language '{requestedLanguage}' is not supported by stack '{stack}'. Use --language with one of: {string.Join(", ", supportedLanguages)}.");
         }
 
         ProfileResolution profile;
@@ -169,11 +205,13 @@ internal sealed class NewExecutionContextResolver(
                 return Fail("bundleUnavailable", diagnostic);
             }
 
-            bundle = new(resolved.BundleId, resolved.Version);
+            bundle = enableBundleBindingConstraints
+                ? await _bundleContextReader!.ReadAsync(resolved, cancellationToken)
+                : new(resolved.BundleId, resolved.Version, resolved.Path);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return new(new(request.WorkingDirectory, new(root, stack, languages[0]), bundle), null);
+        return new(new(request.WorkingDirectory, new(root, stack, languages[0]), bundle, enableBundleBindingConstraints, request.OutputIntent), null);
     }
 
     private static NewExecutionContextResult Fail(string kind, string diagnostic) => new(null, NewExecutionResult.Reject(kind, diagnostic));
