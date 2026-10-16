@@ -16,11 +16,14 @@ func workload install node
 ## Status
 
 Preview. The existing initializer scaffolds v4 JavaScript/TypeScript projects.
-The stack artifact also carries [native basic project and HTTP item
+The stack artifact also carries [native basic project and Node item
 templates](NativeTemplates/README.md), registered locally during normal stack
 installation. Their staged command journey is not a public `init`/`new` switch;
 creation-time npm actions and destructive bundled lifecycle operations remain
-explicit limitations.
+explicit limitations. The full owned JavaScript/TypeScript item catalog is
+packaged, including hidden known-ID entries. Extension-dependent items remain
+unavailable until binding-aware bundle eligibility is qualified; packaging is
+not a claim of per-channel workflow availability.
 
 ## Links
 

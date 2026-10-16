@@ -52,6 +52,119 @@ aliases. Project parameters are `--no-bundles true` and
 Run `new` at the project's `src/functions` directory so the existing `main`
 glob picks up the generated item.
 
+## Complete owned item catalog
+
+`Convert-NodeItemTemplates.ps1` projects the owned Node
+`Templates/Node/content/v2` source at pack time into native item configurations
+and source files under `content/items/` in the same inner archive. It reads
+the existing jobs, prompts, resources and `_bindings.json`; there is no second
+maintained item catalog, template feed, or separate release. Changes to the
+job/action shape or missing binding/prompt metadata fail the pack.
+The existing basic projects and HTTP payloads/options are unchanged. HTTP
+metadata additionally declares its legacy IDs and display-name alias.
+
+The b2a2f295 source contains 33 items: 18 JavaScript and 15 TypeScript. All are
+carried, not claimed as 33 visible choices in every channel. Six preserve the
+legacy hidden policy: TypeScript Blob/Event Grid Blob and both languages'
+Durable entity/orchestrator templates. Hidden entries remain addressable by
+their exact legacy IDs. New native items retain those IDs, display-name aliases,
+default function names and canonical installed-stack languages. No TypeScript
+Dapr variants or other absent entries are synthesized. Existing HTTP identities
+remain `Azure.Functions.Node.Http.JavaScript|TypeScript`, with legacy IDs as
+source-declared aliases.
+
+Non-name parameters retain the original prompt IDs, kebab-case option aliases,
+required/default values, choices and resource descriptions. Only tokens actually
+present in the owned source are replaced. In particular, most existing
+connection/path/schedule prompts are no-ops in these payloads, and MCP
+resource/tool registration names are fixed literals. This migration does not
+silently repair those inherited semantics, add package dependencies, or run
+shell actions. The command-owned `--name` replaces the original function-name
+input where the payload uses it.
+The native parameter projection reserves `name` for the command; it does not
+carry the legacy function-name regex. The baseline staged facade also supplies
+the output-directory name as the native fallback when `--name` is omitted.
+Neither policy is changed globally. The unused command bridge can explicitly
+compose `NodeItemCompatibility` to obtain the original item's effective name
+and regex validation from its selected packaged source, with explicit input
+winning over the authored default.
+
+Extension-dependent items declare the existing `func-bundle` identity/version
+requirements plus a **provisional** `func-bundle-bindings` requirement containing
+the exact source binding list. Bundle channel names alone are not evidence that
+a binding exists. The default runtime does not register this additional
+constraint, so these items deliberately fail closed unless a private harness explicitly enables
+binding evaluation and reads the actual selected bundle's local
+`bin/extensions.json`. Capabilities belong to the immutable resolved command
+bundle, not the workload snapshot. HTTP and timer have no extension binding
+dependency. This is not a stable authoring ABI, default activation, or a claim
+that a published channel has the same bindings as a private fixture.
+
+`BundledNodeCatalogTests.cs` compares the physical package against the owned
+source, reopens all native descriptors and prompt metadata, and renders every
+raw item with the actual native backend into private existing-project fixtures.
+The backend authoring check is deliberately separate from facade eligibility;
+it does not bypass the production facade or claim an unavailable item is
+workflow-qualified. Separate facade checks cover timer preview/create, conflict
+refusal/source preservation and binding-dependent unavailability.
+
+## Selected-source compatibility in the unused bridge
+
+The inner archive additionally contains the byte-exact original
+`templates.json`, `_bindings.json`, `userPrompts.json` and `Resources.json`
+under `provenance/node/v2/`. A Node-local pack-generated
+`provenance/node/compatibility.json` binds each original ID to its native
+identity, package ID/version, configuration, host metadata and payload hashes.
+These are internal qualification records, not a second catalog, release,
+user-supplied metadata policy or stable authoring ABI.
+
+The unregistered, CLI-internal `NodeItemCompatibility` provider reads those
+records only through the exact selected `ResolvedTemplate`'s mounted-package
+reader. It verifies the selected configuration fingerprint and actual bytes,
+reuses the original V2 prompt projection, and delegates validation/name origin
+to the shared compatibility helper. It never locates another archive by
+package ID/version, trusts hash syntax without reading bytes, changes core
+name fallback, or invokes the legacy V2 file-writing backend.
+
+
+`NodeTemplateWorkflowProvider` adapts the same CLI-owned item compatibility and
+project preparation to the shared invocation-scoped workflow contracts. Its
+project ownership check selects only the existing native Node package and
+canonical JavaScript/TypeScript project identities; the adapters still verify
+the actual selected archive bytes. Composition must supply the CLI-compiled
+`NodeNpmInstaller`, not the physical workload's same-named assembly type.
+The provider does not register itself, alter command routing, or add a second
+template catalog.
+
+
+## Template-owned item layout
+
+The native `template.json` owns two mutually exclusive `sources` mappings.
+`InvocationOutputIntent` binds to the internal generic host parameter
+`host:func:item-output-intent`: `legacy` selects the original write directory,
+and any absent intent selects the literal `./` mapping. The command context
+supplies the validated `literal` or `legacy` value before opening the template
+session; it is not a user parameter, public option or environment setting.
+The converter derives the static legacy target from the owned raw write action
+at pack time. The CLI does not calculate a Node output directory or evaluate
+the source conditions; the native engine does both from the authored config.
+
+`NodeItemSourceQualifier` retains the original single-job/action/body
+association and native configuration/payload checks without selecting a
+target. `NodeTemplateWorkflowProvider` supplies a directory-free generic
+source snapshot in both modes: exact selected identity/configuration hash,
+manifest, config, host, native body and all four original source-file pins,
+plus the expected native regular-file source. Shared engine guards revalidate
+these pins before preview and creation and reject extra/wrong-kind outputs.
+The runtime Node directory planner and typed placement override are removed.
+`LiteralOutput` remains the default for staged/direct-native callers.
+
+The legacy-relative base is always the original command directory, including
+omitted root, explicit root and explicit nested directories. No folder suffix
+deduplication or re-anchoring to the discovered project root occurs. Thus a
+public-style nested base retains the old nested `src/functions/<name>.js|ts`
+formula, while an explicitly literal nested output remains literal.
+
 ## Staged creation, not a public command switch
 
 Project templates use the **draft** configuration action
@@ -65,11 +178,28 @@ templates with CLI-owned configuration finalization. They remain unregistered;
 the public `func init` / `func new` continue their existing paths. This package
 does not claim M3/M4 production completion or qualify other runtimes.
 
-Ordinary creation post-actions remain unsupported by the staged project path.
-Therefore these packages **do not yet preserve the initializer's default
-creation-time `npm install` or its `--skip-npm-install` switch**. Do not mistake
-the absence of an npm post-action for full init parity. The staged journey
-explicitly calls the existing installed Node project's
+Ordinary template-authored creation post-actions remain unsupported by the
+staged project path. A private bridge harness can explicitly supply
+`NodeProjectPreparation`, which plans the fixed `NodeNpmInstall` operation and
+honors the canonical `SkipNpmInstall` parameter (`--skip-npm-install`).
+Preview never starts npm; completion uses the existing owned npm helper only
+after native project files and mandatory CLI configuration exist. Nonzero
+results retain those files, preserve stderr, and report `partialPreparation`.
+Cancellation emits a retained-output warning, then propagates without claiming
+completion or rollback.
+No preparation provider is registered by default, and no arbitrary command
+string is accepted from a template.
+
+The Node initializer's npm process logic is extracted once into internal
+`NodeNpmInstaller.cs`, compiled by the Node workload and source-linked by the
+CLI. The legacy delegate, best-effort result behavior, process arguments and
+cancellation/error semantics remain unchanged; there is no runtime reference
+between the CLI and physical stack assemblies. Controlled helper substitutes
+prove native init ordering/skip/failure behavior, not an actual dependency
+restore. A separate offline real-npm proof on a private dependency-free package
+does not qualify installation of a generated project's published dependencies.
+
+The staged journey also explicitly calls the existing installed Node project's
 `PrepareForHostRunAsync`: restore missing `node_modules`, then compile TS via
 `npm run build`. Public `func run` also invokes this preparation hook.
 
@@ -143,9 +273,8 @@ are explicitly refused before destructive effects; an ownership/removal policy
 is future work. Undeclared legacy workloads retain their prior behavior.
 
 Release coordination must ship the supporting CLI before these stack artifacts.
-This base uses the existing initializer metadata adapter. The separately
-published `IProjectStack` migration must be integrated later without duplicating
-it here; independent template feeds/releases are not prerequisites.
+This base retains the initializer and factory alongside the canonical installed
+`IProjectStack` metadata; independent template feeds/releases are not prerequisites.
 
 ## Exercising the staged journey
 

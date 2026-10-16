@@ -1,4 +1,5 @@
 { "symbolInfo": {
   "NoBundles": { "longName": "no-bundles" },
+  "SkipNpmInstall": { "longName": "skip-npm-install" },
   "BundlesChannel": { "longName": "bundles-channel", "shortName": "c" }
 } }
