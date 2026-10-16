@@ -24,3 +24,6 @@ PythonWorker NuGet doesn't ship preview/experimental SKUs.
 Worker assets are pulled at pack time from the restored
 `Microsoft.Azure.Functions.PythonWorker` NuGet package (its `tools/` payload)
 and packed under `tools/any/` in the resulting workload NuGet.
+
+The `win-arm64` implementation package contains only the Python 3.15 payload.
+Other RID packages retain every Python version supplied by the upstream worker.
