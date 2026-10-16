@@ -1,0 +1,11 @@
+{
+  "isHidden": true,
+  "symbolInfo": {
+    "blobTrigger-connection": {
+      "longName": "blob-trigger-connection"
+    },
+    "blobTrigger-path": {
+      "longName": "blob-trigger-path"
+    }
+  }
+}

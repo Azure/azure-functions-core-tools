@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Susanta Biswas (susantabiswas)",
+  "constraints": {
+    "bindings": {
+      "args": [
+        "MySqlTrigger"
+      ],
+      "type": "func-bundle-bindings"
+    },
+    "bundle": {
+      "args": [
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
+          "version": "[4.0.0,)"
+        }
+      ],
+      "type": "func-bundle"
+    },
+    "host": {
+      "args": [
+        {
+          "hostname": "func"
+        }
+      ],
+      "type": "host"
+    },
+    "stack": {
+      "args": "python",
+      "type": "func-workload"
+    }
+  },
+  "defaultName": "mysqlTrigger_func",
+  "description": "A function will be invoked when there are changes detected on a MySQL table on which the trigger is configured.",
+  "forms": {
+    "pythonCharacters": {
+      "identifier": "replace",
+      "pattern": "[^A-Za-z0-9_]",
+      "replacement": "_"
+    },
+    "pythonIdentifier": {
+      "identifier": "chain",
+      "steps": [
+        "pythonCharacters",
+        "pythonLeadingDigit"
+      ]
+    },
+    "pythonLeadingDigit": {
+      "identifier": "replace",
+      "pattern": "^(?=[0-9])",
+      "replacement": "_"
+    }
+  },
+  "groupIdentity": "Azure.Functions.Python.MySqlTrigger",
+  "identity": "Azure.Functions.Python.MySqlTrigger",
+  "name": "MySQL trigger",
+  "preferNameDirectory": false,
+  "shortName": [
+    "MySqlTrigger-Python"
+  ],
+  "symbols": {
+    "FunctionIdentifier": {
+      "replaces": "__FUNCTION_NAME__",
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "pythonIdentifier"
+    },
+    "mysqlTrigger-connection": {
+      "datatype": "string",
+      "defaultValue": "MySqlConnectionString",
+      "description": "MySql Connection string setting",
+      "isRequired": true,
+      "replaces": "$(CONNECTION_STRING_INPUT)",
+      "type": "parameter"
+    },
+    "mysqlTrigger-tableName": {
+      "datatype": "string",
+      "defaultValue": "mysqlTable_name",
+      "description": "Table Name",
+      "isRequired": true,
+      "replaces": "$(TABLE_NAME_INPUT)",
+      "type": "parameter"
+    }
+  },
+  "tags": {
+    "language": "Python",
+    "type": "item"
+  }
+}

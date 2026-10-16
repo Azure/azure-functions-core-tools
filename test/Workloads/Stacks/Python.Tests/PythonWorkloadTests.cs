@@ -34,6 +34,8 @@ public class PythonWorkloadTests
         stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
         stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
         stack.SupportedLanguageAliases["Python"].Should().Equal("py");
+        provider.GetRequiredService<PythonTemplateApplicationPlanner>().Should().NotBeNull();
+        provider.GetRequiredService<IPythonTemplateAppendExecutor>().Should().BeOfType<PythonTemplateAppendExecutor>();
     }
 
     [Fact]

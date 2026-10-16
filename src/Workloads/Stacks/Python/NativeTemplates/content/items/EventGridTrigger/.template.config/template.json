@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Prashant Thummar",
+  "constraints": {
+    "bindings": {
+      "args": [
+        "eventgridtrigger"
+      ],
+      "type": "func-bundle-bindings"
+    },
+    "bundle": {
+      "args": [
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
+          "version": "[4.0.0,)"
+        }
+      ],
+      "type": "func-bundle"
+    },
+    "host": {
+      "args": [
+        {
+          "hostname": "func"
+        }
+      ],
+      "type": "host"
+    },
+    "stack": {
+      "args": "python",
+      "type": "func-workload"
+    }
+  },
+  "defaultName": "EventGridTrigger",
+  "description": "A function that will be run whenever an event grid receives a new event",
+  "forms": {
+    "pythonCharacters": {
+      "identifier": "replace",
+      "pattern": "[^A-Za-z0-9_]",
+      "replacement": "_"
+    },
+    "pythonIdentifier": {
+      "identifier": "chain",
+      "steps": [
+        "pythonCharacters",
+        "pythonLeadingDigit"
+      ]
+    },
+    "pythonLeadingDigit": {
+      "identifier": "replace",
+      "pattern": "^(?=[0-9])",
+      "replacement": "_"
+    }
+  },
+  "groupIdentity": "Azure.Functions.Python.EventGridTrigger",
+  "identity": "Azure.Functions.Python.EventGridTrigger",
+  "name": "EventGrid trigger",
+  "preferNameDirectory": false,
+  "shortName": [
+    "EventGridTrigger-Python"
+  ],
+  "symbols": {
+    "FunctionIdentifier": {
+      "replaces": "__FUNCTION_NAME__",
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "pythonIdentifier"
+    }
+  },
+  "tags": {
+    "language": "Python",
+    "type": "item"
+  }
+}

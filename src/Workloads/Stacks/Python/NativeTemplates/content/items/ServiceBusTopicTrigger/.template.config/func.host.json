@@ -1,0 +1,14 @@
+{
+  "isHidden": false,
+  "symbolInfo": {
+    "serviceBusTrigger-connection": {
+      "longName": "service-bus-trigger-connection"
+    },
+    "serviceBusTrigger-subscriptionName": {
+      "longName": "service-bus-trigger-subscription-name"
+    },
+    "serviceBusTrigger-topicName": {
+      "longName": "service-bus-trigger-topic-name"
+    }
+  }
+}

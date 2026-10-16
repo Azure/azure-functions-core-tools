@@ -26,6 +26,8 @@ public sealed class PythonWorkload : Workload
         builder.Services.AddSingleton<PythonProjectStack>();
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<PythonProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, PythonProjectInitializer>();
+        builder.Services.AddSingleton<PythonTemplateApplicationPlanner>();
+        builder.Services.AddSingleton<IPythonTemplateAppendExecutor, PythonTemplateAppendExecutor>();
         builder.Services.AddSingleton<IQuickstartProvider, PythonQuickstartProvider>();
         builder.AddProjectFactory(new PythonProjectFactory());
     }

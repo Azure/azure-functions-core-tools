@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Gavin Aguiar",
+  "constraints": {
+    "bindings": {
+      "args": [
+        "TextCompletion"
+      ],
+      "type": "func-bundle-bindings"
+    },
+    "bundle": {
+      "args": [
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
+          "version": "[4.0.0,)"
+        }
+      ],
+      "type": "func-bundle"
+    },
+    "host": {
+      "args": [
+        {
+          "hostname": "func"
+        }
+      ],
+      "type": "host"
+    },
+    "stack": {
+      "args": "python",
+      "type": "func-workload"
+    }
+  },
+  "defaultName": "text_completion_function",
+  "description": "Template for TextCompletion binding function",
+  "forms": {
+    "pythonCharacters": {
+      "identifier": "replace",
+      "pattern": "[^A-Za-z0-9_]",
+      "replacement": "_"
+    },
+    "pythonIdentifier": {
+      "identifier": "chain",
+      "steps": [
+        "pythonCharacters",
+        "pythonLeadingDigit"
+      ]
+    },
+    "pythonLeadingDigit": {
+      "identifier": "replace",
+      "pattern": "^(?=[0-9])",
+      "replacement": "_"
+    }
+  },
+  "groupIdentity": "Azure.Functions.Python.OpenAI-TextCompletion.Append",
+  "identity": "Azure.Functions.Python.OpenAI-TextCompletion.Append",
+  "name": "OpenAI TextCompletion Binding",
+  "preferNameDirectory": false,
+  "primaryOutputs": [
+    {
+      "path": "function_body.py"
+    }
+  ],
+  "shortName": [
+    "__python-append-OpenAI-TextCompletion"
+  ],
+  "symbols": {
+    "chat-model-name": {
+      "datatype": "string",
+      "defaultValue": "gpt-3.5-turbo",
+      "description": "Chat model name",
+      "isRequired": true,
+      "replaces": "$(CHAT_MODEL_NAME)",
+      "type": "parameter"
+    },
+    "FunctionIdentifier": {
+      "replaces": "__FUNCTION_NAME__",
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "pythonIdentifier"
+    },
+    "httpTrigger-authLevel": {
+      "choices": [
+        {
+          "choice": "FUNCTION"
+        },
+        {
+          "choice": "ANONYMOUS"
+        },
+        {
+          "choice": "ADMIN"
+        }
+      ],
+      "datatype": "choice",
+      "defaultValue": "FUNCTION",
+      "description": "Authorization level",
+      "isRequired": true,
+      "replaces": "$(AUTHLEVEL_INPUT)",
+      "type": "parameter"
+    }
+  },
+  "tags": {
+    "func-role": "python-append-helper",
+    "language": "Python",
+    "type": "item"
+  }
+}

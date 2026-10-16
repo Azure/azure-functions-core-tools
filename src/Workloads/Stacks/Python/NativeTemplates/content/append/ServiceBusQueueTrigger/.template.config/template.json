@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Gavin Aguiar",
+  "constraints": {
+    "bindings": {
+      "args": [
+        "servicebustrigger"
+      ],
+      "type": "func-bundle-bindings"
+    },
+    "bundle": {
+      "args": [
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
+          "version": "[4.0.0,)"
+        }
+      ],
+      "type": "func-bundle"
+    },
+    "host": {
+      "args": [
+        {
+          "hostname": "func"
+        }
+      ],
+      "type": "host"
+    },
+    "stack": {
+      "args": "python",
+      "type": "func-workload"
+    }
+  },
+  "defaultName": "servicebus_queue_trigger",
+  "description": "A function that will be run whenever a message is added to a specified Service Bus queue",
+  "forms": {
+    "pythonCharacters": {
+      "identifier": "replace",
+      "pattern": "[^A-Za-z0-9_]",
+      "replacement": "_"
+    },
+    "pythonIdentifier": {
+      "identifier": "chain",
+      "steps": [
+        "pythonCharacters",
+        "pythonLeadingDigit"
+      ]
+    },
+    "pythonLeadingDigit": {
+      "identifier": "replace",
+      "pattern": "^(?=[0-9])",
+      "replacement": "_"
+    }
+  },
+  "groupIdentity": "Azure.Functions.Python.ServiceBusQueueTrigger.Append",
+  "identity": "Azure.Functions.Python.ServiceBusQueueTrigger.Append",
+  "name": "ServiceBus Queue trigger",
+  "preferNameDirectory": false,
+  "primaryOutputs": [
+    {
+      "path": "function_body.py"
+    }
+  ],
+  "shortName": [
+    "__python-append-ServiceBusQueueTrigger"
+  ],
+  "symbols": {
+    "FunctionIdentifier": {
+      "replaces": "__FUNCTION_NAME__",
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "pythonIdentifier"
+    },
+    "serviceBusTrigger-connection": {
+      "datatype": "string",
+      "defaultValue": "ServiceBusConnectionString",
+      "description": "Service Bus connection",
+      "isRequired": true,
+      "replaces": "$(CONNECTION_STRING_INPUT)",
+      "type": "parameter"
+    },
+    "serviceBusTrigger-queueName": {
+      "datatype": "string",
+      "defaultValue": "servicebusqueuename",
+      "description": "Queue name",
+      "isRequired": true,
+      "replaces": "$(SERVICEBUS_NAME_INPUT)",
+      "type": "parameter"
+    }
+  },
+  "tags": {
+    "func-role": "python-append-helper",
+    "language": "Python",
+    "type": "item"
+  }
+}

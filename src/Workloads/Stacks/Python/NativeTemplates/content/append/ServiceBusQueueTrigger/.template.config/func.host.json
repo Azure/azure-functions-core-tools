@@ -1,0 +1,11 @@
+{
+  "isHidden": true,
+  "symbolInfo": {
+    "serviceBusTrigger-connection": {
+      "longName": "service-bus-trigger-connection"
+    },
+    "serviceBusTrigger-queueName": {
+      "longName": "service-bus-trigger-queue-name"
+    }
+  }
+}

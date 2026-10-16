@@ -1,0 +1,11 @@
+{
+  "isHidden": false,
+  "symbolInfo": {
+    "queueTrigger-connection": {
+      "longName": "queue-trigger-connection"
+    },
+    "queueTrigger-queueName": {
+      "longName": "queue-trigger-queue-name"
+    }
+  }
+}
