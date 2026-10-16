@@ -52,7 +52,10 @@ internal sealed class NativeTemplateCommandAdapter(
                 ProjectPreparation = _projectPreparation,
             };
             InitExecutionResult result = await _init.ExecuteAsync(request, _availability, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
+            if (!InitExecutionRunner.HasConfirmedCreationResult(result, request.DryRun))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
             return _initRenderer.Render(result with
             {
                 ArgumentResults = Array.AsReadOnly<TemplateCandidateParseResult>([.. result.ArgumentResults.Select(input.RestoreProvenance)]),
@@ -92,7 +95,10 @@ internal sealed class NativeTemplateCommandAdapter(
                 SelectedItemEffects = _selectedItemEffects,
             };
             NewExecutionResult result = await _items.ExecuteAsync(request, _availability, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
+            if (request.DryRun || !result.HasCompletedCreation)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
             return _itemRenderer.Render(result with
             {
                 ArgumentResults = Array.AsReadOnly<TemplateCandidateParseResult>([.. result.ArgumentResults.Select(input.RestoreProvenance)]),

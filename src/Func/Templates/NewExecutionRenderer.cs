@@ -159,15 +159,21 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
             status = invocation.Status.ToString(),
             invocation.Changes,
             invocation.Diagnostic,
-            effects = new
-            {
-                effects.Kind,
-                effects.Succeeded,
-                planned = effects.Plan.Effects.Select(ProjectEffect),
-                completed = effects.CompletedEffects.Select(ProjectEffect),
-                failed = effects.FailedEffects.Select(ProjectEffect),
-                effects.Diagnostics,
-            },
+            effects = ProjectEffects(effects),
+        };
+    }
+
+    internal static object ProjectEffects(NativeTemplateEffectResult effects)
+    {
+        ArgumentNullException.ThrowIfNull(effects);
+        return new
+        {
+            effects.Kind,
+            effects.Succeeded,
+            planned = effects.Plan.Effects.Select(ProjectEffect),
+            completed = effects.CompletedEffects.Select(ProjectEffect),
+            failed = effects.FailedEffects.Select(ProjectEffect),
+            effects.Diagnostics,
         };
     }
 

@@ -172,6 +172,46 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
                 _interaction.WriteLine(line => line.Muted("Configured project: ").Code(root));
             }
         }
+
+        if ((result.Preview?.Effects ?? result.Invocation?.Effects) is { } plannedEffects)
+        {
+            RenderDependencyEffects("Planned dependency effects", plannedEffects.Plan.Effects);
+        }
+
+        if (result.Invocation?.Effects is { } actualEffects)
+        {
+            RenderDependencyEffects("Completed dependency effects", actualEffects.CompletedEffects);
+            RenderDependencyEffects("Failed dependency effects", actualEffects.FailedEffects);
+        }
+
+        foreach (string diagnostic in (result.Invocation?.Effects ?? result.Preview?.Effects)?.Diagnostics ?? [])
+        {
+            _interaction.WriteWarning(diagnostic);
+        }
+    }
+
+    private void RenderDependencyEffects(string title, IReadOnlyList<TemplateEffect> effects)
+    {
+        if (effects.Count == 0)
+        {
+            return;
+        }
+
+        _interaction.WriteSectionHeader(title);
+        foreach (TemplateEffect effect in effects)
+        {
+            string operation = effect is TemplatePackageReferenceEffect package
+                ? $"{effect.GetType().Name} {package.PackageId} {package.Version}"
+                : effect.GetType().Name;
+            _interaction.WriteLine(line => line.Muted($"{operation}: ").Code(effect.TargetPath));
+            if (effect is TemplateFSharpCompileEffect compile)
+            {
+                foreach (TemplateGeneratedFSharpFile file in compile.GeneratedFiles)
+                {
+                    _interaction.WriteLine(line => line.Muted("Include before Program.fs: ").Code(file.Path));
+                }
+            }
+        }
     }
 
     private static IReadOnlyList<TemplateFileChange> GetCompletedChanges(TemplateInvocationResult? invocation)
@@ -189,34 +229,35 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             return null;
         }
 
-        if (result.Preparation is not { } preparation)
+        Dictionary<string, object> projected = new()
         {
-            return new
-            {
-                status = invocation.Status.ToString(),
-                plannedChanges = result.Preview?.Changes ?? [],
-                completedChanges = GetCompletedChanges(result.Invocation),
-                plannedConfigurations = result.Preview?.ProjectConfigurations ?? [],
-                configuredProjects = result.Invocation?.ConfiguredProjects ?? [],
-                invocation.Diagnostic,
-            };
+            ["status"] = invocation.Status.ToString(),
+            ["plannedChanges"] = result.Preview?.Changes ?? [],
+            ["completedChanges"] = GetCompletedChanges(result.Invocation),
+            ["plannedConfigurations"] = result.Preview?.ProjectConfigurations ?? [],
+            ["configuredProjects"] = result.Invocation?.ConfiguredProjects ?? [],
+        };
+        if (invocation.Diagnostic is { } diagnostic)
+        {
+            projected["diagnostic"] = diagnostic;
         }
 
-        return new
+        if ((result.Invocation?.Effects ?? result.Preview?.Effects) is { } effects)
         {
-            status = invocation.Status.ToString(),
-            plannedChanges = result.Preview?.Changes ?? [],
-            completedChanges = GetCompletedChanges(result.Invocation),
-            plannedConfigurations = result.Preview?.ProjectConfigurations ?? [],
-            configuredProjects = result.Invocation?.ConfiguredProjects ?? [],
-            invocation.Diagnostic,
-            preparation = new
+            projected["effects"] = NewExecutionRenderer.ProjectEffects(effects);
+        }
+
+        if (result.Preparation is { } preparation)
+        {
+            projected["preparation"] = new
             {
                 planned = preparation.Preview.Operations.Select(step => new { operation = step.Operation.ToString(), step.Skipped }),
                 preparation.Preview.Diagnostics,
                 completion = preparation.Completion,
-            },
-        };
+            };
+        }
+
+        return projected;
     }
 
     private void RenderTemplateDiagnostics(IReadOnlyList<TemplateCatalogEntry> entries)
