@@ -5,6 +5,7 @@ using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Parameters;
 using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
@@ -157,7 +158,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
         public Action? AfterCreation { get; init; }
 
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
-            IReadOnlyDictionary<string, string?> parameters, bool dryRun, CancellationToken cancellationToken)
+            InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             var native = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
             if (dryRun)
