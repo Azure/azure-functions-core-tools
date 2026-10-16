@@ -79,28 +79,28 @@ foreach ($template in $templates) {
     $symbols = [ordered]@{}
     $symbolInfo = [ordered]@{}
     $defaultName = $null
-    foreach ($input in $job.inputs) {
-        if (-not $promptById.ContainsKey($input.paramId)) { throw "Missing prompt '$($input.paramId)' for '$id'." }
-        if ($input.assignTo -eq '$(FUNCTION_NAME_INPUT)') {
-            $defaultName = $input.defaultValue
+    foreach ($templateInput in $job.inputs) {
+        if (-not $promptById.ContainsKey($templateInput.paramId)) { throw "Missing prompt '$($templateInput.paramId)' for '$id'." }
+        if ($templateInput.assignTo -eq '$(FUNCTION_NAME_INPUT)') {
+            $defaultName = $templateInput.defaultValue
             continue
         }
-        $prompt = $promptById[$input.paramId]
+        $prompt = $promptById[$templateInput.paramId]
         $symbol = [ordered]@{
             type = 'parameter'
             datatype = $(if ($prompt['enum']) { 'choice' } else { 'string' })
             description = Resolve-Resource ([string] $prompt.label)
-            isRequired = [bool] ($input['required'] -or $prompt['required'])
+            isRequired = [bool] ($templateInput['required'] -or $prompt['required'])
         }
-        if ($input.Contains('defaultValue')) { $symbol.defaultValue = [string] $input.defaultValue }
+        if ($templateInput.Contains('defaultValue')) { $symbol.defaultValue = [string] $templateInput.defaultValue }
         elseif ($prompt.Contains('defaultValue')) { $symbol.defaultValue = [string] $prompt.defaultValue }
         if ($prompt['enum']) {
             $symbol.choices = @($prompt.enum | ForEach-Object { @{ choice = $_.value; displayName = $_.display } })
         }
         # Do not invent substitutions for prompts absent from the owned payload.
-        if ($content.Contains([string] $input.assignTo)) { $symbol.replaces = $input.assignTo }
-        $symbols.Add($input.paramId, $symbol)
-        $symbolInfo.Add($input.paramId, @{ longName = ConvertTo-OptionName $input.paramId })
+        if ($content.Contains([string] $templateInput.assignTo)) { $symbol.replaces = $templateInput.assignTo }
+        $symbols.Add($templateInput.paramId, $symbol)
+        $symbolInfo.Add($templateInput.paramId, @{ longName = ConvertTo-OptionName $templateInput.paramId })
     }
     if ([string]::IsNullOrWhiteSpace($defaultName)) { throw "Missing default function name for '$id'." }
     $content = $content.Replace('$(FUNCTION_NAME_INPUT)', 'funcNodeItem')
