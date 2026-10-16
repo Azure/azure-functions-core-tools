@@ -57,7 +57,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         preview.Context!.CommandDirectory.Info.FullName.Should().Be(Target);
         preview.Context.Project!.RootDirectory.Info.FullName.Should().Be(Project);
         preview.Context.Project.Language.Should().Be("JavaScript");
-        preview.Context.Bundle.Should().Be(new TemplateEngineBundleContext(BundleHelpers.StableBundleId, "4.35.0"));
+        preview.Context.Bundle.Should().Be(new TemplateEngineBundleContext(BundleHelpers.StableBundleId, "4.35.0", Path.Combine(_root, "bundle", "tools", "any")));
         preview.Invocation!.Changes.Should().ContainSingle(change => change.Path.EndsWith("Generated.txt", StringComparison.Ordinal));
         preview.Invocation.ProjectConfigurations.Should().BeEmpty();
         preview.Invocation.ConfiguredProjects.Should().BeEmpty();
@@ -382,7 +382,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         harness.Factory.Contexts.Should().ContainSingle().Which.Should().BeSameAs(preview.Context);
         if (declaredBundle)
         {
-            preview.Context!.Bundle.Should().Be(new TemplateEngineBundleContext(BundleHelpers.StableBundleId, "4.35.0"));
+            preview.Context!.Bundle.Should().Be(new TemplateEngineBundleContext(BundleHelpers.StableBundleId, "4.35.0", Path.Combine(_root, "bundle", "tools", "any")));
             preview.Invocation!.Status.Should().Be(TemplateInvocationStatus.Success);
 
             int createExit = await harness.InvokeAsync(["Func.Consumer.BundleContext", "--path", Target]);

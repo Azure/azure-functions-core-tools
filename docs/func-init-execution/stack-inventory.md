@@ -80,3 +80,132 @@ Template acquisition (#5649), first-party template publishing, runtime
 integration, and the `func init` switch are separate work. The switch must wait
 for usable template packages and its regression coverage; none is required
 to register and inspect this metadata.
+
+## Local command/workflow parity bridge
+
+`NativeTemplateCommandAdapter` is an **unregistered parity harness**, not the
+public route. It composes fresh existing `InitCommand` / `NewCommand`
+definitions with the native execution runners. Both retain their current
+optional `[path]`; the public `new` positional is not interpreted as a template.
+Preview and init's template selection/noninteractive/JSON settings are internal
+harness inputs, not new CLI flags. No initializer or legacy provider is invoked
+after native generation.
+
+`NativeTemplateCommandInput` retains original argv separately from the native
+scalar input. It does not reconstruct tokens from `NewInvocation.UserOptionValues`.
+Only an existing workload Boolean option's implicit value is made explicit;
+aliases, inline spelling, duplicate occurrences and diagnostic source indices
+are retained. Workload options remain owned by `InitOptionRegistry`; unsupported
+preparation options fail native validation instead of being consumed and ignored.
+`NativeTemplateHelpProjector` uses the strict parser's effective aliases without
+attaching options to a singleton command.
+
+The optional item compatibility hook resolves the name only after a native
+candidate is selected. An explicit name wins over an original-catalog default,
+then the native authored `defaultName`; missing defaults prompt or refuse rather
+than inventing an output-directory name. The hook retains explicit/default/prompt
+origin and applies source-qualified legacy regex rules without sanitizing input.
+Its selected-entry contract and owned-source reader must be explicitly supplied;
+the source bytes are hashed and compared before validation. The controlled hook
+bounds regex evaluation to one second and reports timeouts as validation failures;
+this operational timing difference must be qualified before public activation.
+Native direct
+invocations without this hook and project name behavior are unchanged.
+
+### Remaining composition gates
+
+| Boundary | Required behavior before any public switch |
+| --- | --- |
+| Python items | Preserve the original job's create-target selection independently from append target selection. The optional selected-item hook renders an exact source-bound hidden helper through the same native session into owned temporary output before planning append; never force-overwrite the app. Real Python asset/owned-executor composition remains a separate gate. The raw catalog's blueprint branches are not automatically CLI-selected. |
+| .NET items | Use actual MSBuild-evaluated framework/namespace and native-evaluated, ordered package-reference/restore actions against an exact project. Source generation alone is not `dotnet new` parity; package addition itself can restore. Preserve inherited secondary-restore failures rather than claiming every original action succeeds. |
+| .NET projects | Preserve `net10.0` and exact upstream inputs. Current project topology/source-name guards still block unqualified upstream layouts; the bridge does not relax them. |
+| Node initialization | Preserve default `npm install` and `--skip-npm-install`. Host preparation is not a substitute: `SkipBuild` still permits dependency installation. |
+| Go initialization | Preserve default `go mod tidy` and its skip option. The old initializer ignores exit/stderr; the staged workflow must report nonzero/partial results explicitly before activation. |
+| Java initialization | Generate the existing Maven project; do not add a Maven invocation to init. |
+| PowerShell initialization | Validate runtime `7.4`/`7.6` before writes. Managed dependencies default off; when enabled, prepare create-only `requirements.psd1` from owned source. Failed optional Az-major lookup retains the commented placeholder with an explicit diagnostic. |
+| Item eligibility | Actual bundle ID/version/capabilities and project/profile targeting remain authoritative. Binding capability composition and exact original name/prompt contracts must be qualified for each source. |
+| Force/configuration | Keep current refusal, adoption, repair and user-owned source/config preservation controls. Destructive init force remains unqualified by the staged runner. |
+
+`NativeTemplateEffectPlanner` consumes native **evaluated** actions, not raw
+conditions. Its internal plans cover append, the conditional PowerShell
+create-only file, exact package references/restores and an explicit editor no-op.
+Unknown actions reject the entire plan even when `continueOnError` is set.
+`NativeTemplateEffectWorkflow` requires an explicitly injected capability that
+preflights every source hash, target snapshot, path and occupancy before mutation
+and rechecks each effect at execution. Preview/refusal never execute effects;
+partial failures retain completed/failed effects and diagnostics. Continuing an
+action does not turn its failure into success. No production capability is
+registered, default native-session denial remains intact, and no arbitrary shell,
+transactional rollback or universal concurrency guarantee is introduced.
+
+`TemplateInvocationRequest.EffectSupport` is an explicit internal opt-in for
+generic ITEM invocations and bounded, explicitly source-qualified .NET project
+layouts. Native preview supplies evaluated actions; all effects are planned and
+preflighted before native generation, confirmation is required, and effects run
+only after generated files pass the existing path/kind checks. Effect failure
+retains native file changes and structured partial diagnostics. Default item
+post-action denial and project topology/action qualification remain unchanged.
+
+The optional append hook binds original/helper configuration fingerprints,
+package identity/version, owned mapping/create/helper source hashes, and one
+expected helper output. It uses the same canonical arguments, effective name,
+context and native invocation path, rejects extra outputs, and invokes no
+effect hooks while expanding the helper. An authored `func-role` tag is a
+deny-only signal: ordinary item runners reject internal roles even without an
+append capability. It never authorizes expansion. Exact source-bound role
+mapping is still required, while ordinary legacy hidden items remain supported
+by explicit identity.
+
+`InitExecutionRequest.ProjectPreparation` is a separate optional owned
+capability. It receives the selected resolved source, canonical parameters,
+target and actual native preview; it plans only fixed Node npm, Go tidy or
+PowerShell managed-dependency operations for the matching single project stack.
+Preview does not complete preparation. Completion runs only after native files
+and mandatory configuration succeed, and a nonzero owned-helper outcome reports
+`partialPreparation` with the created project retained. Skip decisions remain
+explicit. This does not register a new command/action ABI, authorize arbitrary
+template executables, or add Java Maven execution. Concrete stack helper
+composition is separately qualified; the old Go ignored-exit behavior remains
+an intentional activation decision rather than a claimed compatibility fix.
+
+`TemplateInvocationRequest.MsBuildBindings` forwards an explicitly supplied,
+already-evaluated immutable snapshot through the native `IBindSymbolSource`
+component API. It must match the exact selected item, current mounted
+configuration fingerprint and controlled project/effect boundary before native
+preview. Controlled item effects with `msbuild:` bindings refuse a missing
+snapshot rather than use the template's framework default. A session that has
+accepted a snapshot refuses absent or replacement snapshots on later
+invocations. This adds no default component registration, project discovery,
+SDK evaluation or framework inference; the owned .NET preparation helper remains
+responsible for evaluating and validating the supplied project properties.
+
+Cancellation of owned preparation still propagates the original
+`OperationCanceledException` and token. After verified native/configuration
+success, that phase emits an existing stderr warning that created outputs were
+preserved and preparation may be incomplete; it does not return success, invent
+a completed-effects result or claim rollback. Pre-create and default no-prep
+cancellation are unchanged.
+
+### Bounded F# workflow repair
+
+The internal, explicit `NativeTemplateInvocationEffects.FSharpRepair` contract
+carries a selected-source/configuration fingerprint, exact `.fsproj` and
+expected project digest, evaluated root-file compile sequence ending in
+`Program.fs`, and hashed native-generated `.fs` files. The qualified planner
+matches those files against actual native `Create` effects and evaluated primary
+outputs, then places a required compile-update effect before package/restore
+actions. Unknown actions, mismatched source/project/file sets, overwrites and
+unqualified sequences refuse the whole plan. Preview reports the compile plan
+without applying it; update failure prevents later dependency operations and
+does not erase generated outputs.
+
+The owned .NET updater validates the actual MSBuild sequence, project/source
+digests and supported XML/file shape and performs the surgical project edit.
+The shared seam neither edits project files nor infers a project by scanning.
+The pinned F# restore action has no arguments; only the explicit selected
+`.fsproj` is restored by the controlled path. Restore actions with `files`,
+`targetFiles` or other arguments remain unhandled, not broadly reinterpreted.
+This opt-in repair is an approved intentional correction to the characterized
+upstream omission, not a claim that the old workflow compiled the generated
+function. Public commands, default registrations and no-capability denial stay
+unchanged.

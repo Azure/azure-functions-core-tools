@@ -20,6 +20,7 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
                 result.Kind,
                 result.Succeeded,
                 executionDirectory = result.Context?.CommandDirectory.Info.FullName,
+                outputDirectory = result.Context?.CommandDirectory.Info.FullName,
                 projectRoot = result.Context?.Project?.RootDirectory.Info.FullName,
                 stack = result.Context?.Project?.Stack,
                 language = result.Context?.Project?.Language,
@@ -43,12 +44,7 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
                     parsed.DefinitionDiagnostics,
                     missingRequired = parsed.MissingRequiredParameters.Select(parameter => parameter.LongAlias),
                 }),
-                invocation = result.Invocation is { } invocation ? new
-                {
-                    status = invocation.Status.ToString(),
-                    invocation.Changes,
-                    invocation.Diagnostic,
-                } : null,
+                invocation = result.Invocation is { } invocation ? ProjectInvocation(invocation) : null,
             });
         }
         else
@@ -128,7 +124,78 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
             {
                 _interaction.WriteHint("Re-run with --force to permit conflicting file changes.");
             }
+
+            if (invocation.Effects is { } effects)
+            {
+                foreach (TemplateEffect effect in effects.Plan.Effects)
+                {
+                    _interaction.WriteLine(line => line.Muted($"{effect.GetType().Name}: ").Code(effect.TargetPath));
+                    if (effect is TemplateFSharpCompileEffect compile)
+                    {
+                        foreach (TemplateGeneratedFSharpFile file in compile.GeneratedFiles)
+                        {
+                            _interaction.WriteLine(line => line.Muted("Include before Program.fs: ").Code(file.Path));
+                        }
+                    }
+                }
+
+                foreach (string diagnostic in effects.Diagnostics)
+                {
+                    _interaction.WriteWarning(diagnostic);
+                }
+            }
         }
+    }
+
+    private static object ProjectInvocation(TemplateInvocationResult invocation)
+    {
+        if (invocation.Effects is not { } effects)
+        {
+            return new { status = invocation.Status.ToString(), invocation.Changes, invocation.Diagnostic };
+        }
+
+        return new
+        {
+            status = invocation.Status.ToString(),
+            invocation.Changes,
+            invocation.Diagnostic,
+            effects = new
+            {
+                effects.Kind,
+                effects.Succeeded,
+                planned = effects.Plan.Effects.Select(ProjectEffect),
+                completed = effects.CompletedEffects.Select(ProjectEffect),
+                failed = effects.FailedEffects.Select(ProjectEffect),
+                effects.Diagnostics,
+            },
+        };
+    }
+
+    private static object ProjectEffect(TemplateEffect effect)
+    {
+        if (effect is TemplateFSharpCompileEffect compile)
+        {
+            return new
+            {
+                kind = effect.GetType().Name,
+                effect.TargetPath,
+                effect.Source,
+                compile.ExpectedProjectSha256,
+                compile.EvaluatedCompileOrder,
+                compile.GeneratedFiles,
+                effect.ContinueOnError,
+            };
+        }
+
+        return new
+        {
+            kind = effect.GetType().Name,
+            effect.TargetPath,
+            effect.Source,
+            packageId = (effect as TemplatePackageReferenceEffect)?.PackageId,
+            packageVersion = (effect as TemplatePackageReferenceEffect)?.Version,
+            effect.ContinueOnError,
+        };
     }
 
     private static object ProjectTemplate(TemplateCatalogEntry entry) => new

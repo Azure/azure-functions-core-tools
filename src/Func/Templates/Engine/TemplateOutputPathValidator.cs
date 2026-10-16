@@ -12,20 +12,54 @@ using Microsoft.TemplateEngine.Orchestrator.RunnableProjects.ValueForms;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Qualifies parameter-only output topology before the native engine reevaluates symbols during creation.
+/// Qualifies stable output dependencies before the native engine evaluates source mappings.
 /// </summary>
 internal static class TemplateOutputPathValidator
 {
     private const string DefaultGuidFormats = "ndbpxNDPBX";
 
-    public static string? GetDiagnostic(string configuration, IReadOnlyDictionary<string, object>? populatedParameters = null)
+    public static string? GetDiagnostic(string configuration, IReadOnlyDictionary<string, object>? populatedParameters = null,
+        TemplateEngineContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(configuration));
         var model = TemplateConfigModel.FromStream(stream);
         BaseSymbol[] symbols = [.. model.Symbols];
+        HashSet<string> frozenBindings = new(StringComparer.Ordinal);
+        if (context is not null)
+        {
+            using var document = JsonDocument.Parse(configuration, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            if (!document.RootElement.EnumerateObject().Any(property => property.Name.Equals("additionalConfigFiles", StringComparison.OrdinalIgnoreCase))
+                && document.RootElement.TryGetProperty("symbols", out JsonElement declarations) && declarations.ValueKind == JsonValueKind.Object)
+            {
+                foreach (JsonProperty symbol in declarations.EnumerateObject())
+                {
+                    if (declarations.EnumerateObject().Count(candidate => candidate.Name == symbol.Name) == 1
+                        && symbol.Value.ValueKind == JsonValueKind.Object
+                        && symbol.Value.TryGetProperty("type", out JsonElement type) && type.ValueKind == JsonValueKind.String && type.GetString() == "bind"
+                        && symbol.Value.TryGetProperty("binding", out JsonElement binding) && binding.ValueKind == JsonValueKind.String
+                        && binding.GetString() == "host:" + FuncTemplateEngineHostParameters.ItemOutputIntent)
+                    {
+                        frozenBindings.Add(symbol.Name);
+                    }
+                }
+
+            }
+        }
         HashSet<string> parameters = new(symbols.OfType<ParameterSymbol>().Select(symbol => symbol.Name), StringComparer.Ordinal);
-        HashSet<string> unstable = new(symbols.Where(symbol => symbol is not ParameterSymbol).Select(symbol => symbol.Name), StringComparer.Ordinal);
+        HashSet<string> unstable = new(symbols.Where(symbol => symbol is not ParameterSymbol && !frozenBindings.Contains(symbol.Name))
+            .Select(symbol => symbol.Name), StringComparer.Ordinal);
+        foreach (BaseValueSymbol symbol in symbols.OfType<BaseValueSymbol>())
+        {
+            foreach (string form in symbol.Forms.GlobalForms)
+            {
+                string alias = $"{symbol.Name}{{-VALUE-FORMS-}}{form}";
+                if (frozenBindings.Contains(alias))
+                {
+                    unstable.Add(alias);
+                }
+            }
+        }
 
         List<(string Name, string Formats)> guidProducers = [];
         foreach (GeneratedSymbol symbol in symbols.OfType<GeneratedSymbol>().Where(symbol => symbol.Generator == "guid"))
@@ -122,12 +156,17 @@ internal static class TemplateOutputPathValidator
             variables[variable] = false;
         }
 
+        foreach (string binding in frozenBindings.Except(unstable))
+        {
+            variables[binding] = context!.ItemOutputIntentValue;
+        }
+
         foreach (ExtendedFileSource source in model.Sources)
         {
             if (!HasStableCondition(source.Condition, variables, unstable)
                 || source.Modifiers.Any(modifier => !HasStableCondition(modifier.Condition, variables, unstable)))
             {
-                return "Template output paths use a source or modifier condition with non-parameter symbols or an unsupported expression. Use parameter-only conditions until a frozen native output plan is supported.";
+                return "Template output paths use a source or modifier condition with non-parameter symbols or an unsupported expression. Use parameters or the immutable host item-output intent.";
             }
         }
 

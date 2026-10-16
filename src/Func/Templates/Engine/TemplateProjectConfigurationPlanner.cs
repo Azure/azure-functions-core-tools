@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Azure.Functions.Cli.Projects;
 using Microsoft.TemplateEngine.Abstractions;
@@ -68,6 +70,102 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         ArgumentNullException.ThrowIfNull(effects);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
         IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = Read(configuration);
+        return CreatePlans(effects, outputDirectory, declarations, nativeDotNetLayout: false);
+    }
+
+    /// <summary>
+    /// Qualifies only the selected upstream .NET project's static ignore rename and single renamed project output.
+    /// This layout contract does not approve native dependency actions.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">The qualification is null.</exception>
+    /// <exception cref="ArgumentException">Configuration is blank.</exception>
+    /// <exception cref="InvalidTemplateMetadataException">The selected bytes or layout are not qualified.</exception>
+    public IReadOnlyList<TemplateProjectConfigurationDeclaration> ReadDotNetLayout(
+        string configuration, DotNetProjectLayoutQualification qualification)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(configuration);
+        ArgumentNullException.ThrowIfNull(qualification);
+        Require(string.Equals(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(configuration))),
+            qualification.ConfigurationFingerprint, StringComparison.OrdinalIgnoreCase),
+            "The selected .NET project configuration does not match its qualified source fingerprint.");
+        try
+        {
+            using var document = JsonDocument.Parse(configuration,
+                new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            JsonElement root = document.RootElement;
+            Require(root.ValueKind == JsonValueKind.Object, "Project template configuration must be an object.");
+            RejectDuplicates(root);
+            Require(root.TryGetProperty("identity", out JsonElement identity)
+                && ReadString(identity, "identity") == qualification.TemplateIdentity,
+                "The selected .NET project identity does not match its layout qualification.");
+            ValidateTopology(root, allowDotNetIgnoreRename: true);
+            ValidateSymbols(root);
+            Require(root.TryGetProperty("symbols", out JsonElement symbols) && symbols.ValueKind == JsonValueKind.Object
+                && symbols.TryGetProperty("Framework", out JsonElement framework) && framework.ValueKind == JsonValueKind.Object
+                && framework.TryGetProperty("type", out JsonElement frameworkType) && frameworkType.ValueKind == JsonValueKind.String
+                && DecodeString(frameworkType) == "parameter"
+                && framework.TryGetProperty("datatype", out JsonElement dataType) && dataType.ValueKind == JsonValueKind.String
+                && DecodeString(dataType) == "choice"
+                && framework.TryGetProperty("replaces", out JsonElement replacement) && replacement.ValueKind == JsonValueKind.String
+                && DecodeString(replacement) == "TargetFrameworkValue"
+                && framework.TryGetProperty("choices", out JsonElement choices) && choices.ValueKind == JsonValueKind.Array
+                && choices.EnumerateArray().Any(choice => choice.ValueKind == JsonValueKind.Object
+                    && choice.TryGetProperty("choice", out JsonElement value) && value.ValueKind == JsonValueKind.String
+                    && DecodeString(value) == "net10.0"),
+                "The qualified .NET layout requires the observed native Framework parameter with net10.0 support.");
+            Require(root.TryGetProperty("tags", out JsonElement tags) && tags.ValueKind == JsonValueKind.Object
+                && tags.TryGetProperty("type", out JsonElement type) && ReadString(type, "type") == "project"
+                && tags.TryGetProperty("language", out JsonElement language) && language.ValueKind == JsonValueKind.String,
+                "The qualified .NET layout requires a native project type and language.");
+            string declaredLanguage = ReadString(tags.GetProperty("language"), "language");
+            Require(declaredLanguage is "C#" or "F#", "The qualified .NET layout supports only C# and F#.");
+            (string stack, string canonicalLanguage) = ResolveStackLanguage("dotnet", declaredLanguage);
+            Require(root.TryGetProperty("sourceName", out JsonElement sourceName)
+                && ReadString(sourceName, "sourceName") == "Company.FunctionApp",
+                "Only the observed upstream .NET project sourceName is qualified.");
+            string sourceOutput = "Company.FunctionApp" + (canonicalLanguage == "F#" ? ".fsproj" : ".csproj");
+            Require(root.TryGetProperty("primaryOutputs", out JsonElement outputs) && outputs.ValueKind == JsonValueKind.Array
+                && outputs.GetArrayLength() == 1, "The qualified .NET layout requires exactly one native project primary output.");
+            JsonElement output = outputs[0];
+            Require(output.ValueKind == JsonValueKind.Object && output.EnumerateObject().Count() == 1
+                && output.TryGetProperty("path", out JsonElement path) && ReadString(path, "path") == sourceOutput,
+                "Only the observed unconditional .NET project primary-output path is qualified.");
+            return [new(0, sourceOutput, stack, canonicalLanguage)];
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidTemplateMetadataException($"Project configuration metadata is invalid: {exception.Message}", exception);
+        }
+    }
+
+    /// <summary>
+    /// Binds the qualified project source to the actual native preview output and mandatory CLI configuration root.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Effects, parameters or qualification is null.</exception>
+    /// <exception cref="ArgumentException">Configuration or output directory is blank.</exception>
+    /// <exception cref="InvalidTemplateMetadataException">The invocation, native mapping or output root is unqualified.</exception>
+    public IReadOnlyList<TemplateProjectConfigurationPlan> CreateDotNetPlans(
+        string configuration, ICreationEffects effects, string outputDirectory, DotNetProjectLayoutQualification qualification,
+        IReadOnlyDictionary<string, string?> parameters)
+    {
+        ArgumentNullException.ThrowIfNull(effects);
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        ArgumentNullException.ThrowIfNull(parameters);
+        if (!Path.IsPathFullyQualified(outputDirectory))
+        {
+            throw new ArgumentException("The qualified .NET layout requires an absolute invocation root.", nameof(outputDirectory));
+        }
+
+        IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = ReadDotNetLayout(configuration, qualification);
+        Require(parameters.TryGetValue("Framework", out string? framework) && framework == "net10.0",
+            "Qualified .NET project creation requires an explicit Framework value of net10.0.");
+        return CreatePlans(effects, outputDirectory, declarations, nativeDotNetLayout: true);
+    }
+
+    private IReadOnlyList<TemplateProjectConfigurationPlan> CreatePlans(ICreationEffects effects, string outputDirectory,
+        IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations, bool nativeDotNetLayout)
+    {
+        outputDirectory = Path.GetFullPath(outputDirectory);
         string[] primaryOutputs =
             [.. effects.CreationResult.PrimaryOutputs.Select(output => Path.GetFullPath(Path.Combine(outputDirectory, output.Path)))];
         string[] changedOutputs =
@@ -83,10 +181,29 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         string[] roots = [.. generatedOutputs.Where(path => _pathComparer.Equals(Path.GetFileName(path), "host.json"))
             .Select(path => Path.GetDirectoryName(path)!).Distinct(_pathComparer)];
         Require(roots.Length > 0, "Project creation must produce an active host.json root.");
+        if (nativeDotNetLayout)
+        {
+            Require(effects.CreationResult.PrimaryOutputs.All(output => !Path.IsPathRooted(output.Path)
+                && !output.Path.Split('/', '\\').Any(segment => segment == ".."))
+                && primaryOutputs.Length == 1 && _pathComparer.Equals(Path.GetDirectoryName(primaryOutputs[0]), outputDirectory)
+                && Path.GetExtension(primaryOutputs[0]) == Path.GetExtension(declarations[0].Path)
+                && generatedOutputs.Contains(primaryOutputs[0], _pathComparer),
+                "The qualified .NET primary output must resolve to one generated project file directly inside the invocation root.");
+            Require(changedOutputs.All(path => IsWithin(outputDirectory, path))
+                && roots.Length == 1 && _pathComparer.Equals(roots[0], outputDirectory),
+                "The qualified .NET layout must remain inside one invocation root with one generated host.json.");
+            Require(generatedOutputs.Count(path => Path.GetExtension(path) is ".csproj" or ".fsproj") == 1,
+                "The qualified .NET layout must generate exactly one project file.");
+            Require(HasNativeMapping(effects, declarations[0].Path, primaryOutputs[0], outputDirectory)
+                && HasNativeMapping(effects, "_gitignore", Path.Combine(outputDirectory, ".gitignore"), outputDirectory),
+                "The native preview must map the selected project source and static ignore rename to their generated outputs.");
+        }
+
         List<TemplateProjectConfigurationPlan> plans = [];
         foreach (TemplateProjectConfigurationDeclaration declaration in declarations)
         {
-            string path = Path.GetFullPath(Path.Combine(outputDirectory, declaration.Path));
+            string path = nativeDotNetLayout ? primaryOutputs[declaration.PrimaryOutputIndex]
+                : Path.GetFullPath(Path.Combine(outputDirectory, declaration.Path));
             Require(primaryOutputs.Count(output => _pathComparer.Equals(output, path)) == 1
                 && generatedOutputs.Contains(path, _pathComparer), "Configuration references must bind to one resolved, generated primary output.");
             plans.Add(new(path, declaration.Stack, declaration.Language));
@@ -99,13 +216,38 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         return plans.AsReadOnly();
     }
 
-    private static void ValidateTopology(JsonElement root)
+    private static bool HasNativeMapping(ICreationEffects effects, string source, string target, string outputDirectory)
+        => effects.FileChanges.OfType<IFileChange2>().Count(change =>
+            (change.SourceRelativePath == source || change.SourceRelativePath == "./" + source)
+            && Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)) == target
+            && change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite) == 1;
+
+    private static void ValidateTopology(JsonElement root, bool allowDotNetIgnoreRename = false)
     {
         foreach (string property in new[] { "sources", "specialCustomOperations", "globalCustomOperations", "baselines", "additionalConfigFiles" })
         {
+            if (property == "sources" && allowDotNetIgnoreRename)
+            {
+                Require(root.TryGetProperty("sources", out JsonElement sources) && sources.ValueKind == JsonValueKind.Array
+                    && sources.GetArrayLength() == 1 && HasOnlyProperty(sources[0], "modifiers", out JsonElement modifiers)
+                    && modifiers.ValueKind == JsonValueKind.Array && modifiers.GetArrayLength() == 1
+                    && HasOnlyProperty(modifiers[0], "rename", out JsonElement rename)
+                    && HasOnlyProperty(rename, "_gitignore", out JsonElement destination)
+                    && destination.ValueKind == JsonValueKind.String && DecodeString(destination) == ".gitignore",
+                    "Only the observed static _gitignore to .gitignore source rename is qualified for .NET projects.");
+                continue;
+            }
+
             Require(!root.EnumerateObject().Any(candidate => string.Equals(candidate.Name, property, StringComparison.OrdinalIgnoreCase)),
                 $"Project topology property '{property}' is not qualified for this creation path.");
         }
+    }
+
+    private static bool HasOnlyProperty(JsonElement element, string propertyName, out JsonElement value)
+    {
+        value = default;
+        return element.ValueKind == JsonValueKind.Object && element.EnumerateObject().Count() == 1
+            && element.TryGetProperty(propertyName, out value);
     }
 
     private static void ValidateSymbols(JsonElement root)

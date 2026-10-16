@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 
@@ -31,6 +32,36 @@ internal static class TemplateCatalogProjector
             string type when type.Equals(ProjectType, StringComparison.OrdinalIgnoreCase) => TemplateType.Project,
             _ => null,
         };
+    }
+
+    internal static string? ReadInternalRole(string configuration)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(configuration);
+        try
+        {
+            using var document = JsonDocument.Parse(configuration,
+                new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            JsonProperty[] roles = [.. document.RootElement.EnumerateObject()
+                .Where(property => property.Name.Equals("tags", StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.Object)
+                .SelectMany(property => property.Value.EnumerateObject())
+                .Where(property => property.Name.Equals("func-role", StringComparison.OrdinalIgnoreCase))];
+            if (roles.Length == 0)
+            {
+                return null;
+            }
+
+            if (roles.Length != 1 || roles[0].Name != "func-role" || roles[0].Value.ValueKind != JsonValueKind.String
+                || roles[0].Value.GetString() is not { } role || string.IsNullOrWhiteSpace(role) || role.Trim() != role)
+            {
+                throw new InvalidTemplateMetadataException("An internal template role must be one nonempty, trimmed func-role string.");
+            }
+
+            return role;
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidTemplateMetadataException("Internal template role metadata is invalid.", exception);
+        }
     }
 
     /// <summary>
@@ -103,7 +134,11 @@ internal static class TemplateCatalogProjector
             package is IManagedTemplatePackage managed ? new(managed.Identifier, NullIfEmpty(managed.Version)) : null,
             metadata.IsHidden,
             parameters,
-            metadataDiagnostic);
+            metadataDiagnostic)
+        {
+            DefaultName = NullIfEmpty(template.DefaultName),
+            DeclaredInternalRole = GetTag(template, "func-role"),
+        };
     }
 
     private static string? GetTag(ITemplateInfo template, string name)

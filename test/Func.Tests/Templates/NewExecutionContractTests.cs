@@ -100,6 +100,23 @@ public sealed class NewExecutionContractTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_UnknownOutputIntent_RefusesBeforeContextOrFactory()
+    {
+        NewExecutionRunner runner = new(_contexts, _factory, _arguments, _interaction, new(_arguments, _interaction));
+        NewExecutionRequest request = new(WorkingDirectory.FromCwd(), null, null, null, false, true, false, false, false, [], new HashSet<string>())
+        {
+            OutputIntent = (NativeItemOutputIntent)123,
+        };
+
+        NewExecutionResult result = await runner.ExecuteAsync(request, new([]), CancellationToken.None);
+
+        result.Kind.Should().Be("invalidOutputIntent");
+        result.Succeeded.Should().BeFalse();
+        _contexts.ReceivedCalls().Should().BeEmpty();
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
     public void Render_NullResult_RejectsBeforeOutput()
     {
         NewExecutionRenderer renderer = new(_interaction);

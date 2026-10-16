@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.ObjectModel;
 using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
@@ -30,7 +31,8 @@ internal sealed class InitExecutionRunner(
     Func<TemplateProjectSupport> projectSupport,
     IFileSystem fileSystem,
     ILocalSettingsProvider localSettings,
-    IFunctionsProjectResolver projects) : IInitExecutionRunner
+    IFunctionsProjectResolver projects,
+    NativeTemplateWorkflowRegistry? workflows = null) : IInitExecutionRunner
 {
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
@@ -43,6 +45,7 @@ internal sealed class InitExecutionRunner(
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly ILocalSettingsProvider _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
     private readonly IFunctionsProjectResolver _projects = projects ?? throw new ArgumentNullException(nameof(projects));
+    private readonly NativeTemplateWorkflowRegistry? _workflows = workflows;
 
     public async Task<InitExecutionResult> ExecuteAsync(
         InitExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -155,6 +158,10 @@ internal sealed class InitExecutionRunner(
         TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null));
         cancellationToken.ThrowIfCancellationRequested();
         TemplateProjectSupport support = _projectSupport();
+        if (_workflows is not null)
+        {
+            support = support with { QualifyLayoutAsync = _workflows.QualifyLayoutAsync };
+        }
         cancellationToken.ThrowIfCancellationRequested();
         using Templater templater = await _factory.CreateProjectAsync(context, availability, support, cancellationToken,
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
@@ -444,7 +451,48 @@ internal sealed class InitExecutionRunner(
             };
         }
 
-        TemplateInvocationRequest invocationRequest = new(request.WorkingDirectory, final.ValuesByCanonicalName, request.Name, DryRun: true);
+        NativeProjectPreparationContext? preparationContext = null;
+        NativeProjectPreparationOutcome? preparation = null;
+        TemplateInvocationRequest invocationRequest = new(request.WorkingDirectory, final.ValuesByCanonicalName,
+            request.Name ?? (_workflows is null ? null : request.WorkingDirectory.Info.Name), DryRun: true);
+        INativeProjectWorkflowProvider? provider;
+        try
+        {
+            provider = _workflows?.FindProject(selected.Entry);
+        }
+        catch (InvalidTemplateMetadataException exception)
+        {
+            return InitExecutionResult.Reject("workflowUnavailable", exception.Message) with
+            {
+                SelectedTemplate = selected.Entry,
+                ArgumentResults = [final],
+            };
+        }
+        INativeProjectPreparation? projectPreparation = provider?.Preparation ?? (_workflows is null ? request.ProjectPreparation : null);
+        if (provider is not null)
+        {
+            NativeTemplateInvocationPreparation prepared = await provider.PrepareAsync(
+                new(templater, selected, final, request, invocationRequest), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            string? diagnostic = prepared.Request is null ? null : NativeTemplateWorkflowRegistry.InvocationDiagnostic(invocationRequest, prepared.Request, final);
+            if (prepared.Request is null || prepared.Diagnostics.Count > 0 || diagnostic is not null)
+            {
+                return InitExecutionResult.Reject("workflowPreparationFailed",
+                    [.. prepared.Diagnostics, .. diagnostic is null ? [] : new[] { diagnostic }]) with
+                {
+                    SelectedTemplate = selected.Entry,
+                    ArgumentResults = [final],
+                };
+            }
+
+            invocationRequest = prepared.Request;
+            final = final with
+            {
+                ValuesByCanonicalName = new ReadOnlyDictionary<string, string?>(
+                    new Dictionary<string, string?>(invocationRequest.Parameters, StringComparer.Ordinal)),
+            };
+        }
+
         TemplateInvocationResult preview = await selected.InvokeAsync(invocationRequest, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (preview.Status != TemplateInvocationStatus.Success)
@@ -462,6 +510,32 @@ internal sealed class InitExecutionRunner(
                 Preview = preview,
                 UnavailableTemplates = unavailable,
             };
+        }
+
+        if (projectPreparation is { } preparationSupport)
+        {
+            preparationContext = new(selected, request.WorkingDirectory, invocationRequest.Parameters, preview);
+            NativeProjectPreparationPreview planned = await preparationSupport.PreviewAsync(preparationContext, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            preparation = new(planned);
+            if (!planned.Succeeded || preview.ProjectConfigurations.Count != 1
+                || planned.Operations.Any(step => step.Operation switch
+                {
+                    NativeProjectPreparationOperation.NodeNpmInstall => !string.Equals(preview.ProjectConfigurations[0].Stack, "node", StringComparison.OrdinalIgnoreCase),
+                    NativeProjectPreparationOperation.GoModTidy => !string.Equals(preview.ProjectConfigurations[0].Stack, "go", StringComparison.OrdinalIgnoreCase),
+                    NativeProjectPreparationOperation.PowerShellManagedDependencies => !string.Equals(preview.ProjectConfigurations[0].Stack, "powershell", StringComparison.OrdinalIgnoreCase),
+                    _ => true,
+                }))
+            {
+                return InitExecutionResult.Reject("preparationUnavailable",
+                    ["Stack preparation is unsupported or does not match the selected project source.", .. planned.Diagnostics]) with
+                {
+                    SelectedTemplate = selected.Entry,
+                    ArgumentResults = [final],
+                    Preview = preview,
+                    Preparation = preparation,
+                };
+            }
         }
 
         if (request.DryRun)
@@ -483,6 +557,43 @@ internal sealed class InitExecutionRunner(
         }
 
         TemplateInvocationResult created = await selected.InvokeAsync(invocationRequest with { DryRun = false }, cancellationToken);
+        if (created.Status == TemplateInvocationStatus.Success && projectPreparation is { } completionSupport
+            && preparation is not null && preparationContext is not null)
+        {
+            NativeProjectPreparationResult completed;
+            try
+            {
+                TemplateInvocationResult? sourceChanged = await selected.ValidateConfigurationAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (sourceChanged is null)
+                {
+                    completed = await completionSupport.CompleteAsync(preparationContext, preparation.Preview, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                else
+                {
+                    completed = new(false, [sourceChanged.Diagnostic ?? "The selected project source changed before stack preparation."]);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _interaction.WriteWarning("Native project files and CLI configuration were created before stack preparation was canceled. "
+                    + "No rollback was attempted; preparation may be incomplete.");
+                throw;
+            }
+
+            preparation = preparation with { Completion = completed };
+            if (!completed.Succeeded)
+            {
+                return FromInvocation(created, "partialPreparation") with
+                {
+                    Succeeded = false,
+                    Diagnostics = ["Native project files and CLI configuration were created, but stack preparation did not complete.",
+                        .. completed.Diagnostics],
+                };
+            }
+        }
+
         InitExecutionResult creation = FromInvocation(created, created.Status == TemplateInvocationStatus.Success ? "created"
             : created.Status == TemplateInvocationStatus.ConfigurationFailure ? "partialInitialization" : "invocationFailed");
         if (!HasConfirmedCreationResult(creation, request.DryRun))
@@ -500,6 +611,7 @@ internal sealed class InitExecutionRunner(
             Preview = preview,
             Diagnostics = invocation.Diagnostic is null ? [] : [invocation.Diagnostic],
             UnavailableTemplates = unavailable,
+            Preparation = preparation,
         };
 
         InitExecutionResult FromPreview(string kind) => new(kind, preview.Status == TemplateInvocationStatus.Success)
@@ -509,6 +621,7 @@ internal sealed class InitExecutionRunner(
             Preview = preview,
             Diagnostics = preview.Diagnostic is null ? [] : [preview.Diagnostic],
             UnavailableTemplates = unavailable,
+            Preparation = preparation,
         };
 
         bool CanMatch(TemplateCatalogEntry entry) => entry.ProjectConfigurations is not { } declarations

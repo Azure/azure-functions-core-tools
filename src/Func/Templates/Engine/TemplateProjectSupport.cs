@@ -12,4 +12,8 @@ internal sealed record TemplateProjectSupport(
     public TemplateProjectConfigurationPlanner Planner { get; } = Planner ?? throw new ArgumentNullException(nameof(Planner));
 
     public TemplateProjectConfigurationWriter Writer { get; } = Writer ?? throw new ArgumentNullException(nameof(Writer));
+
+    public DotNetProjectLayoutQualification? DotNetLayout { get; init; }
+
+    public Func<NativeProjectTemplateSource, CancellationToken, Task<DotNetProjectLayoutQualification?>>? QualifyLayoutAsync { get; init; }
 }

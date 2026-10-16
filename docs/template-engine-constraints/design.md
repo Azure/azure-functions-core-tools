@@ -39,7 +39,7 @@ Templates declare func requirements in the standard `constraints` section:
 }
 ```
 
-Every entry must be satisfied. When `args` is an array, its items are alternatives and one satisfying item is enough, as with the engine's built-in constraints. Func types use the `func-` prefix so they can't collide with engine or .NET SDK types, and they require `args`.
+Every entry must be satisfied. For `func-workload` and `func-bundle`, when `args` is an array, its items are alternatives and one satisfying item is enough, as with the engine's built-in constraints. Func types use the `func-` prefix so they can't collide with engine or .NET SDK types, and they require `args`.
 
 The engine matches type names case-sensitively and discards entry labels. It also skips an entry that isn't an object or has no `type`, and a repeated label replaces the earlier entry. Both silently drop a requirement, so authoring validation rejects them.
 
@@ -83,6 +83,16 @@ A name must start with an ASCII letter or digit, contain only ASCII letters, dig
 ```
 
 A string argument is a version range for any bundle identity, and identities compare case-insensitively. When the command resolved no bundle, as in `func init` or a project without extension bundles, the constraint is restricted and can't be satisfied. For projects that use extension bundles, `func new` stops before template listing if a declared bundle cannot be resolved. Projects without extension bundles, including .NET projects, remain supported with absent bundle context. Project templates express bundle needs through `func-workload`, and packaging rejects `func-bundle` in project templates.
+
+### Provisional bundle binding capability seam
+
+The internal, opt-in `func-bundle-bindings` constraint accepts a flat array of exact source-declared binding names, such as `["blobTrigger", "eventGridTrigger"]`. Unlike the alternatives above, **every** name must be present, compared with `OrdinalIgnoreCase`. An explicit `[]` declares no extension dependency and needs no bundle, matching the old Node `_bindings.json` HTTP/timer entries. Omitted or malformed arguments fail validation. Unknown names are not a registry error: they cannot match unless the selected bundle actually declares them. Project templates and packages shared with another host cannot declare this constraint.
+
+`TemplateEngineBundleContextReader(IFileSystem).ReadAsync(resolution, cancellationToken)` reads only `bin/extensions.json` beneath the actual `ExtensionBundleResolution.Resolved.Path`. It captures `extensions[].bindings` in an immutable set bound to that resolution's ID, parsed version and absolute normalized path. Extensions without a `bindings` member contribute no names; a missing file, malformed structure, invalid name, or unreadable metadata retains an explicit failure diagnostic, with no partially usable set. Unexpected provider faults and cancellation propagate. No capability is inferred from workload availability, another bundle, a channel default or a CDN request.
+
+The normal command resolver retains the selected path, but does not read capabilities or enable this constraint. A staged caller must supply the reader-produced bundle context and explicitly construct `TemplateEngineContext(..., enableBundleBindingConstraints: true)`, or explicitly construct `NewExecutionContextResolver` with that flag and an injected reader. Without that opt-in the factory is unregistered, so these declarations remain `NotEvaluated`. With it, absent bundles and missing required names are `Restricted`; missing, unreadable or differently source-bound capability snapshots are `Failed`. Existing `func-bundle` ID/version requirements remain separate and conjunctive, and `TemplateConstraintEvaluationSnapshot` remains workload-only.
+
+This is an intentional semantic change, **not exact legacy parity**. The old pack-time Node filter used the latest listed 4.x bundle for each channel and permanently removed unsupported entries. The staged runtime gate evaluates the actual locally selected bundle per command and keeps unavailable templates diagnosable. It also rejects malformed metadata instead of interpreting it as an empty set. Public activation and complete catalog/workflow parity require separate composition decisions.
 
 ### Versions use NuGet ranges
 

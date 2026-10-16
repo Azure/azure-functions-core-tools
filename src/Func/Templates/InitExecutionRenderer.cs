@@ -37,15 +37,7 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
                     parsed.DefinitionDiagnostics,
                     missingRequired = parsed.MissingRequiredParameters.Select(parameter => parameter.LongAlias),
                 }),
-                invocation = (result.Invocation ?? result.Preview) is { } invocation ? new
-                {
-                    status = invocation.Status.ToString(),
-                    plannedChanges = result.Preview?.Changes ?? [],
-                    completedChanges = GetCompletedChanges(result.Invocation),
-                    plannedConfigurations = result.Preview?.ProjectConfigurations ?? [],
-                    configuredProjects = result.Invocation?.ConfiguredProjects ?? [],
-                    invocation.Diagnostic,
-                } : null,
+                invocation = ProjectInvocation(result),
             });
         }
         else
@@ -95,6 +87,32 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
         else if (result.Kind == "partialInitialization")
         {
             _interaction.WriteError("Project files were generated, but mandatory CLI configuration is incomplete. Generated files and completed configurations were preserved.");
+        }
+        else if (result.Kind == "partialPreparation")
+        {
+            _interaction.WriteError("Project files and CLI configuration were created, but stack preparation did not complete. Existing effects were preserved.");
+        }
+
+        if (result.Preparation is { } preparation)
+        {
+            foreach (NativeProjectPreparationStep operation in preparation.Preview.Operations)
+            {
+                _interaction.WriteHint($"{operation.Operation}: {(operation.Skipped ? "Skipped"
+                    : preparation.Completion is null ? "Planned" : preparation.Completion.Succeeded ? "Completed" : "Not completed")}.");
+            }
+
+            foreach (string diagnostic in preparation.Preview.Diagnostics)
+            {
+                _interaction.WriteHint(diagnostic);
+            }
+
+            if (preparation.Completion is { Succeeded: true } completed)
+            {
+                foreach (string diagnostic in completed.Diagnostics)
+                {
+                    _interaction.WriteHint(diagnostic);
+                }
+            }
         }
 
         foreach (string diagnostic in result.Diagnostics)
@@ -159,9 +177,46 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
     private static IReadOnlyList<TemplateFileChange> GetCompletedChanges(TemplateInvocationResult? invocation)
     {
         // Pre-create conflicts can carry preview changes without writing them.
-        return invocation is { Status: TemplateInvocationStatus.Success or TemplateInvocationStatus.ConfigurationFailure }
+        return invocation is { Status: TemplateInvocationStatus.Success or TemplateInvocationStatus.ConfigurationFailure or TemplateInvocationStatus.EffectFailure }
             ? invocation.Changes
             : [];
+    }
+
+    private static object? ProjectInvocation(InitExecutionResult result)
+    {
+        if ((result.Invocation ?? result.Preview) is not { } invocation)
+        {
+            return null;
+        }
+
+        if (result.Preparation is not { } preparation)
+        {
+            return new
+            {
+                status = invocation.Status.ToString(),
+                plannedChanges = result.Preview?.Changes ?? [],
+                completedChanges = GetCompletedChanges(result.Invocation),
+                plannedConfigurations = result.Preview?.ProjectConfigurations ?? [],
+                configuredProjects = result.Invocation?.ConfiguredProjects ?? [],
+                invocation.Diagnostic,
+            };
+        }
+
+        return new
+        {
+            status = invocation.Status.ToString(),
+            plannedChanges = result.Preview?.Changes ?? [],
+            completedChanges = GetCompletedChanges(result.Invocation),
+            plannedConfigurations = result.Preview?.ProjectConfigurations ?? [],
+            configuredProjects = result.Invocation?.ConfiguredProjects ?? [],
+            invocation.Diagnostic,
+            preparation = new
+            {
+                planned = preparation.Preview.Operations.Select(step => new { operation = step.Operation.ToString(), step.Skipped }),
+                preparation.Preview.Diagnostics,
+                completion = preparation.Completion,
+            },
+        };
     }
 
     private void RenderTemplateDiagnostics(IReadOnlyList<TemplateCatalogEntry> entries)

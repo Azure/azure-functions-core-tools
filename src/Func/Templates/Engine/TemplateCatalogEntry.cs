@@ -35,6 +35,10 @@ internal sealed record TemplateCatalogEntry(
     IReadOnlyList<TemplateParameterDefinition> Parameters,
     string? MetadataDiagnostic)
 {
+    public string? DefaultName { get; init; }
+
+    public string? DeclaredInternalRole { get; init; }
+
     public TemplateConstraintEvaluation ConstraintEvaluation { get; init; } = TemplateConstraintEvaluation.NotEvaluated;
 
     public IReadOnlyList<TemplateProjectConfigurationDeclaration>? ProjectConfigurations { get; init; }

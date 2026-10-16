@@ -45,13 +45,17 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context, TemplateCon
     private static IReadOnlyList<(Type, IIdentifiedComponent)> CreateComponents(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot? snapshot)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return [..Components.AllComponents, ..OrchestratorComponents.AllComponents, ..FuncTemplateComponents.Create(snapshot ?? new([]), context.Bundle)];
+        return [..Components.AllComponents, ..OrchestratorComponents.AllComponents,
+            ..FuncTemplateComponents.Create(snapshot ?? new([]), context.Bundle, context.EnableBundleBindingConstraints)];
     }
 
     private static Dictionary<string, string> CreateDefaults(TemplateEngineContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        Dictionary<string, string> defaults = new(StringComparer.Ordinal);
+        Dictionary<string, string> defaults = new(StringComparer.Ordinal)
+        {
+            [FuncTemplateEngineHostParameters.ItemOutputIntent] = context.ItemOutputIntentValue,
+        };
 
         if (context.Project is { } project)
         {

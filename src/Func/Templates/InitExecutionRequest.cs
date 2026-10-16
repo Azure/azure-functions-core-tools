@@ -18,7 +18,10 @@ internal sealed record InitExecutionRequest(
     bool DryRun,
     bool JsonOutput,
     IReadOnlyList<string> RawTemplateTokens,
-    IReadOnlySet<string> ReservedAliases);
+    IReadOnlySet<string> ReservedAliases)
+{
+    public INativeProjectPreparation? ProjectPreparation { get; init; }
+}
 
 internal sealed record InitExecutionResult(string Kind, bool Succeeded)
 {
@@ -39,6 +42,8 @@ internal sealed record InitExecutionResult(string Kind, bool Succeeded)
     public TemplateInvocationResult? Invocation { get; init; }
 
     public InitExistingProjectConfiguration? Configuration { get; init; }
+
+    public NativeProjectPreparationOutcome? Preparation { get; init; }
 
     public static InitExecutionResult Reject(string kind, params string[] diagnostics) => new(kind, false) { Diagnostics = diagnostics };
 }
