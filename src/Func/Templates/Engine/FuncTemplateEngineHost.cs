@@ -12,8 +12,8 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <summary>
 /// Template engine host that exposes one command's <see cref="TemplateEngineContext"/> as host parameters.
 /// </summary>
-internal class FuncTemplateEngineHost(TemplateEngineContext context)
-    : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), _builtIns)
+internal class FuncTemplateEngineHost(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot? snapshot = null)
+    : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), CreateComponents(context, snapshot))
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
@@ -24,13 +24,6 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
     internal const string Identifier = "func";
 
     private const string WorkingDirectoryParameter = "WorkingDirectory";
-
-    private static readonly IReadOnlyList<(Type, IIdentifiedComponent)> _builtIns =
-    [
-        ..Components.AllComponents,
-        ..OrchestratorComponents.AllComponents,
-        ..FuncTemplateComponents.AllComponents,
-    ];
 
     private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));
 
@@ -46,8 +39,15 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
         return base.TryGetHostParamDefault(paramName, out value);
     }
 
+    private static IReadOnlyList<(Type, IIdentifiedComponent)> CreateComponents(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot? snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return [..Components.AllComponents, ..OrchestratorComponents.AllComponents, ..FuncTemplateComponents.Create(snapshot ?? new([]), context.Bundle)];
+    }
+
     private static Dictionary<string, string> CreateDefaults(TemplateEngineContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
         Dictionary<string, string> defaults = new(StringComparer.Ordinal);
 
         if (context.Project is { } project)

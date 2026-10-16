@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.IO.Compression;
+using System.Xml.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
@@ -92,6 +94,25 @@ internal static class TemplateFixtures
         return packageDirectory;
     }
 
+    public static string WriteConstraintPackage(string parentDirectory, string constraints)
+    {
+      string packageDirectory = Path.Combine(parentDirectory, "constraint-templates");
+      WriteTemplate(
+        Path.Combine(packageDirectory, "item"),
+        $$"""
+        {
+          "identity": "Func.Tests.ConstrainedItem",
+          "name": "Func Tests Constrained Item",
+          "shortName": "func-tests-constrained-item",
+          "tags": { "type": "item" },
+          "sourceName": "ItemFunction",
+          "constraints": {{constraints}}
+        }
+        """,
+        ("ItemFunction.txt", "ItemFunction content"));
+      return packageDirectory;
+    }
+
     /// <summary>
     /// Writes a folder package whose templates exercise func host metadata, and returns its path.
     /// </summary>
@@ -170,6 +191,72 @@ internal static class TemplateFixtures
             ("func.host.json", """{ "isHidden": true }"""));
 
         return packageDirectory;
+    }
+
+    public static string WriteJourneyPackage(string parentDirectory)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "journey-templates");
+        WriteTemplate(
+            Path.Combine(packageDirectory, "item"),
+            """
+            {
+              "identity": "Func.Tests.Journey",
+              "name": "Func Tests Journey",
+              "shortName": "func-tests-journey",
+              "tags": { "type": "item", "language": "CSharp" },
+              "sourceName": "ItemFunction",
+              "constraints": { "stack": { "type": "func-workload", "args": "node" } },
+              "symbols": {
+                "Greeting": { "type": "parameter", "datatype": "string", "defaultValue": "hello", "replaces": "GREETING" }
+              }
+            }
+            """,
+            ("ItemFunction.txt", "ItemFunction GREETING"));
+        return packageDirectory;
+    }
+
+    public static string WriteSharedJourneyPackage(string parentDirectory, bool shared = true, string? packageTypeVersion = null, bool multiple = false)
+    {
+        string folder = WriteJourneyPackage(parentDirectory);
+        if (multiple)
+        {
+            WriteTemplate(
+                Path.Combine(folder, "second-item"),
+                """{"identity":"Func.Tests.SecondItem","name":"Second item","shortName":"func-tests-second-item","tags":{"type":"item"},"sourceName":"SecondFunction"}""",
+                ("SecondFunction.txt", "SecondFunction content"));
+        }
+
+        string nuspec = """
+            <?xml version="1.0"?>
+            <package>
+              <metadata>
+                <id>Func.Tests.Shared</id>
+                <version>1.0.0</version>
+                <authors>func-tests</authors>
+                <description>Shared host fixture.</description>
+                <packageTypes>
+                  <packageType name="Template" />
+                  <packageType name="FuncTemplate" />
+                </packageTypes>
+              </metadata>
+            </package>
+            """;
+        var metadata = XDocument.Parse(nuspec);
+        XElement types = metadata.Root!.Element("metadata")!.Element("packageTypes")!;
+        if (!shared)
+        {
+            types.Elements("packageType").Single(type => type.Attribute("name")!.Value == "Template").Remove();
+        }
+
+        if (packageTypeVersion is not null)
+        {
+            types.Elements("packageType").First().SetAttributeValue("version", packageTypeVersion);
+        }
+
+        File.WriteAllText(Path.Combine(folder, "Func.Tests.Shared.nuspec"), metadata.ToString());
+        string package = Path.Combine(parentDirectory, "Func.Tests.Shared.1.0.0.nupkg");
+        ZipFile.CreateFromDirectory(folder, package);
+        return package;
     }
 
     /// <summary>
