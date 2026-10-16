@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <IsPackable>true</IsPackable>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <PackAsWorkload>true</PackAsWorkload>
+    <WorkloadKind>workload</WorkloadKind>
+    <WorkloadAlias>bundled-fixture</WorkloadAlias>
+    <WorkloadEntryPointType Condition="'$(RuntimeIdentifier)' != ''">Azure.Functions.Cli.Workloads.Tests.Fixtures.Default.StubWorkload</WorkloadEntryPointType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BundledTemplatesProject>$(MSBuildProjectDirectory)/NativeTemplates/Workloads.Tests.BundledTemplates.Native.csproj</BundledTemplatesProject>
+    <BundledTemplatesPackageId>Azure.Functions.Cli.Tests.NativeFixture</BundledTemplatesPackageId>
+    <BundledTemplatesArchiveFileName>controlled-native.nupkg</BundledTemplatesArchiveFileName>
+    <BundledTemplatesPackagePath>templates/controlled-native.nupkg</BundledTemplatesPackagePath>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="FixtureConfiguration" Value="$(Configuration)" />
+    <AssemblyMetadata Include="FixtureRuntimeIdentifier" Value="$(RuntimeIdentifier)" />
+    <Compile Include="../Workloads.Tests.Fixtures.Default/StubWorkload.cs" Link="StubWorkload.cs" />
+    <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <ProjectReference Include="NativeTemplates/Workloads.Tests.BundledTemplates.Native.csproj" ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+  <Import Project="$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets" />
+  <Import Project="InterleavedPack.targets" />
+</Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Cli.Tests.NativeFixture</PackageId>
+    <PackageType>FuncTemplate</PackageType>
+    <Description>Controlled first-party native archive for workload packaging tests.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="content/**" Pack="true" PackagePath="content/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Content Include="$(RepoRoot)LICENSE" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <Target Name="RenameControlledNativeArchive" AfterTargets="Pack">
+    <Move SourceFiles="$(PackageOutputPath)/$(PackageId).$(PackageVersion).nupkg"
+      DestinationFiles="$(PackageOutputPath)/controlled-native.nupkg" />
+  </Target>
+</Project>
