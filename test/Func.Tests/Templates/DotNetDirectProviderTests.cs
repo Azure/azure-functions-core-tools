@@ -24,7 +24,7 @@ using PhysicalRunner = Azure.Functions.Cli.Workloads.DotNet.IDotnetCliRunner;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
-public sealed partial class DotNetDirectProviderTests(ITestOutputHelper output) : IDisposable
+public sealed partial class DotNetDirectProviderTests(ITestOutputHelper testOutput) : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("func-direct-dotnet-").FullName;
     private readonly CancellationTokenSource _deadline = new(TimeSpan.FromMinutes(5));
@@ -76,7 +76,7 @@ public sealed partial class DotNetDirectProviderTests(ITestOutputHelper output) 
             var capture = await selected.CaptureNativePreparationAsync(request, new PhysicalFileSystem(), true, _deadline.Token);
             capture.Failure.Should().BeNull();
             capture.Snapshot!.Source.Sha256.Should().Be(Hash(configBytes.Span));
-            output.WriteLine($"Selected {selected.Entry.Identity}; configuration SHA256 {Hash(configBytes.Span)}; explicit Framework {explicitFramework}");
+            testOutput.WriteLine($"Selected {selected.Entry.Identity}; configuration SHA256 {Hash(configBytes.Span)}; explicit Framework {explicitFramework}");
             var nativeProject = capture.Snapshot.Effects.CreationResult.PrimaryOutputs.Single().Path;
             nativeProject.Should().Be(language == "C#" ? "Native.App.csproj" : "Native.App.fsproj");
             request.EffectSupport!.ExactProjectPath.Should().Be(Path.Combine(output.Info.FullName, nativeProject));
@@ -332,9 +332,9 @@ public sealed partial class DotNetDirectProviderTests(ITestOutputHelper output) 
             "bin", "Debug", "net10.0", "functions.metadata")));
         var function = metadata.RootElement.EnumerateArray().Single(item => item.GetProperty("name").GetString() == "ActualHttp");
         function.GetProperty("bindings").EnumerateArray().Should().Contain(item => item.GetProperty("type").GetString() == "httpTrigger");
-        output.WriteLine($"Actual {language} project {Path.GetFileName(fixture.Project)} SHA256 {Hash(File.ReadAllBytes(fixture.Project!))}");
-        output.WriteLine($"Selected source {selected.ConfigurationSourceIdentity}; SHA256 {selected.ConfigurationSha256}");
-        output.WriteLine($"Compiled HTTP metadata: {function.GetRawText()}");
+        testOutput.WriteLine($"Actual {language} project {Path.GetFileName(fixture.Project)} SHA256 {Hash(File.ReadAllBytes(fixture.Project!))}");
+        testOutput.WriteLine($"Selected source {selected.ConfigurationSourceIdentity}; SHA256 {selected.ConfigurationSha256}");
+        testOutput.WriteLine($"Compiled HTTP metadata: {function.GetRawText()}");
         if (language == "F#")
         {
             StringBuilder output = new();
