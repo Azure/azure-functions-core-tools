@@ -310,7 +310,7 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
         helper.ConfigurationSha256!, Source(HelperIdentity, "helper/function_body.py"), "function_body.py");
 
     private TemplateEffectSource Source(string identity, string path) =>
-        new(identity, path, Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(Package, path.Replace('/', '\\'))))));
+        new(identity, path, Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(Package, path.Replace('/', Path.DirectorySeparatorChar))))));
 
     private async Task<Templater> OpenAsync(bool hiddenUser = false, bool extraHelperOutput = false, bool archive = false)
     {
