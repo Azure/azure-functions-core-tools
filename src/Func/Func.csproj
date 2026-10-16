@@ -31,6 +31,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../Workloads/Stacks/Node/NodeNpmInstaller.cs" Link="Templates/Node/NodeNpmInstaller.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Profiles/BuiltInProfiles.json" LogicalName="Azure.Functions.Cli.Profiles.BuiltInProfiles.json" />
     <EmbeddedResource Include="Templates/Acquisition/BasicCompanions.json" LogicalName="Azure.Functions.Cli.Templates.Acquisition.BasicCompanions.json" />
   </ItemGroup>

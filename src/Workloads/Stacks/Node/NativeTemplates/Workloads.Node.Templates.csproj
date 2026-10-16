@@ -5,7 +5,7 @@
     <PackageId>Azure.Functions.Templates.Node.Basic</PackageId>
     <PackageType>FuncTemplate</PackageType>
     <NoDefaultExcludes>true</NoDefaultExcludes>
-    <Description>Azure Functions CLI basic Node.js v4 project and HTTP item templates.</Description>
+    <Description>Azure Functions CLI Node.js v4 project and JavaScript/TypeScript item templates.</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
@@ -27,6 +27,28 @@
     <ItemGroup>
       <Content Include="$(IntermediateOutputPath)native/.funcignore;$(IntermediateOutputPath)native/.gitignore"
         Pack="true" PackagePath="content/project-js/;content/project-ts/" />
+    </ItemGroup>
+  </Target>
+  <Target Name="StageNativeNodeItems" BeforeTargets="_GetPackageFiles">
+    <PropertyGroup>
+      <_NodeItemSource>$(MSBuildProjectDirectory)/../../../Templates/Node/content/v2/</_NodeItemSource>
+      <_NodeItemOutput>$(IntermediateOutputPath)native-items/</_NodeItemOutput>
+      <_NodeProvenanceOutput>$(IntermediateOutputPath)native-provenance/</_NodeProvenanceOutput>
+    </PropertyGroup>
+    <RemoveDir Directories="$(_NodeItemOutput)" />
+    <RemoveDir Directories="$(_NodeProvenanceOutput)" />
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/Convert-NodeItemTemplates.ps1&quot; -SourceDirectory &quot;$(_NodeItemSource)&quot; -OutputDirectory &quot;$(_NodeItemOutput)&quot; -ProvenanceDirectory &quot;$(_NodeProvenanceOutput)&quot; -PackageId &quot;$(PackageId)&quot; -PackageVersion &quot;$(PackageVersion)&quot;" />
+    <ItemGroup>
+      <_NodeItem Include="$(_NodeItemOutput)**/*">
+        <Pack>true</Pack>
+        <PackagePath>content/items/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      </_NodeItem>
+      <Content Include="@(_NodeItem)" />
+      <_NodeProvenance Include="$(_NodeProvenanceOutput)**/*">
+        <Pack>true</Pack>
+        <PackagePath>provenance/node/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      </_NodeProvenance>
+      <Content Include="@(_NodeProvenance)" />
     </ItemGroup>
   </Target>
 </Project>
