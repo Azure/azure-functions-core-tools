@@ -101,7 +101,7 @@ internal sealed class PythonTemplateSourceReader
         Require(rawTemplates.Length == 25 && rawTemplates.All(item => item is not null && !string.IsNullOrWhiteSpace(item.Id))
             && rawTemplates.Select(item => item.Id).Distinct(StringComparer.Ordinal).Count() == 25, "Python original identities are missing or duplicated.");
         Require(rawPrompts.All(item => item is not null && !string.IsNullOrWhiteSpace(item.Id))
-            && rawPrompts.Select(item => item.Id).Distinct(StringComparer.Ordinal).Count() == rawPrompts.Length, "Python prompt identities are missing or duplicated.");
+            && rawPrompts.Select(item => item.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() == rawPrompts.Length, "Python prompt identities are missing or duplicated.");
         Require(rawPrompts.All(item => (item.Enum is null || item.Enum.All(choice => choice is not null && !string.IsNullOrWhiteSpace(choice.Value)))
             && (item.Validators is null || item.Validators.All(validator => validator is not null))),
             "Python prompt choices or validators contain invalid entries.");
@@ -172,7 +172,7 @@ internal sealed class PythonTemplateSourceReader
         Require(entry.IsHidden == (internalHelper || _hiddenIds.Contains(raw.Id, StringComparer.Ordinal)), "Python original/helper hidden metadata changed.");
         ValidateChannelsAndBindings(sources, raw.Id, native.RootElement);
 
-        Dictionary<string, UserPromptDoc> prompts = rawPrompts.ToDictionary(item => item.Id!, StringComparer.Ordinal);
+        Dictionary<string, UserPromptDoc> prompts = rawPrompts.ToDictionary(item => item.Id!, StringComparer.OrdinalIgnoreCase);
         using JsonDocument resourcesDocument = Parse(sources["source/resources.json"]);
         Dictionary<string, string> resources = JsonSerializer.Deserialize<Dictionary<string, string>>(resourcesDocument.RootElement)
             ?? throw Invalid("Python resources must be an object.");

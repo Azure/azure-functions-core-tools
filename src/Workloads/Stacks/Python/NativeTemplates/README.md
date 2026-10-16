@@ -190,6 +190,9 @@ mounted reader for package/version, original and helper configuration hashes,
 source hashes, internal roles, defaults, required values, choices and original
 regex validation. Unknown, malformed, duplicated or changed mappings refuse;
 the package ID alone is not authorization.
+Original prompt documents are matched case-insensitively, preserving the
+legacy labels and validators while retaining raw canonical argument IDs.
+Prompt IDs that collide under that lookup are refused before projection.
 
 `PythonProjectWorkflowProvider` qualifies only the packaged basic project.
 It has no preparation action: initialization does not run pip, create a venv,
