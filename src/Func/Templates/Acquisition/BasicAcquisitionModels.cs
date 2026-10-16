@@ -47,6 +47,8 @@ internal enum BasicAcquisitionFailure
     PayloadUnavailable,
     InvalidArtifact,
     InstallFailed,
+    PlanChanged,
+    RecoveryRequired,
 }
 
 internal sealed record BasicAcquisitionStep(string PackageId, string Version, bool Reused);

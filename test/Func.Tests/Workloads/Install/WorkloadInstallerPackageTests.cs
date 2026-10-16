@@ -50,8 +50,7 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         File.Exists(Path.Combine(installDir, "tools", "any", "Test.dll")).Should().BeTrue();
         File.Exists(nupkg).Should().BeTrue("Source .nupkg must be left in place.");
 
-        await _store.Received(1).SaveWorkloadAsync(
-            Arg.Is<WorkloadEntry>(entry =>
+        await _store.Received(1).SaveWorkloadAsync(Arg.Any<IWorkloadOperation>(), Arg.Is<WorkloadEntry>(entry =>
                 entry.PackageId == "test.workload"
                 && entry.PackageVersion == "1.0.0"
                 && entry.EntryPoint!.AssemblyPath == "Test.dll"
@@ -110,7 +109,7 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         await act.Should().ThrowExactlyAsync<InvalidWorkloadException>()
             .WithMessage("*missing workload.json*");
         Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")).Should().BeFalse();
-        await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -124,7 +123,7 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         await act.Should().ThrowExactlyAsync<InvalidWorkloadException>()
             .WithMessage("*FuncCliWorkload*");
         Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")).Should().BeFalse();
-        await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -157,8 +156,7 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         result.Entry.DisplayName.Should().Be("test.workload");
         result.Entry.Description.Should().Be("For tests.");
 
-        await _store.Received(1).SaveWorkloadAsync(
-            Arg.Is<WorkloadEntry>(entry =>
+        await _store.Received(1).SaveWorkloadAsync(Arg.Any<IWorkloadOperation>(), Arg.Is<WorkloadEntry>(entry =>
                 entry.Kind == WorkloadKind.Content
                 && entry.EntryPoint == null
                 && entry.DisplayName == "test.workload"
@@ -194,8 +192,7 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
         result.Entry.DisplayName.Should().Be("Functions Host");
         result.Entry.Description.Should().Be("Azure Functions host workload.");
 
-        await _store.Received(1).SaveWorkloadAsync(
-            Arg.Is<WorkloadEntry>(entry =>
+        await _store.Received(1).SaveWorkloadAsync(Arg.Any<IWorkloadOperation>(), Arg.Is<WorkloadEntry>(entry =>
                 entry.DisplayName == "Functions Host"
                 && entry.Description == "Azure Functions host workload."),
             Arg.Any<CancellationToken>());

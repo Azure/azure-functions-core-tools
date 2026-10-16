@@ -71,7 +71,7 @@ public sealed class WorkloadRidPackageSelectorTests
                 Kind = WorkloadKind.RidPointer,
                 Packages = packages,
             },
-            WorkloadPackageRole.Pointer);
+            WorkloadPackageRole.Pointer, "shape-only-pointer");
 
     private static InspectedWorkloadPackage Implementation(string packageId, string runtimeIdentifier)
         => new(
@@ -85,5 +85,5 @@ public sealed class WorkloadRidPackageSelectorTests
                 Kind = WorkloadKind.Content,
                 RuntimeIdentifier = runtimeIdentifier,
             },
-            WorkloadPackageRole.RuntimeIdentifierImplementation);
+            WorkloadPackageRole.RuntimeIdentifierImplementation, "shape-only-implementation");
 }

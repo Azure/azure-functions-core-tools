@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
@@ -37,25 +38,21 @@ public abstract class WorkloadInstallerTestBase : IDisposable
             });
         _runtimeIdentifierProvider.Current.Returns("win-x64");
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _store.AddOwnershipAsync(
-                Arg.Any<WorkloadEntry>(),
+        _store.AddOwnershipAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<WorkloadEntry>(),
                 Arg.Any<WorkloadOwnershipKind>(),
                 Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<WorkloadEntry>());
-        _store.MoveExplicitOwnershipAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<WorkloadEntry>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => new WorkloadOwnershipMoveResult(call.Arg<WorkloadEntry>(), PreviousEntryRemoved: true));
-        _store.MoveLogicalOwnershipAsync(
-                Arg.Any<string>(),
+        _store.MoveExplicitOwnershipAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<WorkloadEntry>(),
                 Arg.Any<CancellationToken>())
             .Returns(call => new WorkloadOwnershipMoveResult(call.Arg<WorkloadEntry>(), PreviousEntryRemoved: true));
-        _store.RemoveOwnershipAsync(
+        _store.MoveLogicalOwnershipAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<string>(),
                 Arg.Any<string>(),
+                Arg.Any<WorkloadEntry>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => new WorkloadOwnershipMoveResult(call.Arg<WorkloadEntry>(), PreviousEntryRemoved: true));
+        _store.RemoveOwnershipAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<WorkloadOwnershipKind>(),
                 Arg.Any<CancellationToken>())
@@ -94,8 +91,9 @@ public abstract class WorkloadInstallerTestBase : IDisposable
         WorkloadPackageInspector inspector = new(reader, selector);
         WorkloadPackageSource packageSource =
             new(_catalog, inspector, Options.Create(new WorkloadCatalogOptions { IncludePrerelease = includePrerelease }));
-        WorkloadDeploymentService deploymentService = new(_paths, _store, reader);
-        return new WorkloadInstaller(packageSource, inspector, selector, deploymentService);
+        WorkloadDeploymentService deploymentService = new(_paths, _store, reader, new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem());
+        return new WorkloadInstaller(packageSource, inspector, selector, deploymentService,
+            new FileWorkloadOperationCoordinator(_paths), _store, new PhysicalFileSystem());
     }
 
     private protected string BuildNupkg(string? tags = null, bool includeFuncCliWorkloadType = true, string version = "1.0.0",

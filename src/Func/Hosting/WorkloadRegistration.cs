@@ -80,7 +80,7 @@ internal static class WorkloadRegistration
         IInteractionService interaction,
         CancellationToken cancellationToken)
     {
-        var store = new WorkloadStore(paths);
+        var store = new WorkloadStore(paths, new FileWorkloadOperationCoordinator(paths));
         var runtimeIdentifierProvider = new WorkloadRuntimeIdentifierProvider();
         var loader = new WorkloadLoader(paths, runtimeIdentifierProvider);
 

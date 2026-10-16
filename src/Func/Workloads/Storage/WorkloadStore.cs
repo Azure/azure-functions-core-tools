@@ -10,10 +10,11 @@ namespace Azure.Functions.Cli.Workloads.Storage;
 /// Filesystem-backed <see cref="IWorkloadStore"/>. Persists the registry as
 /// JSON at <see cref="IWorkloadPaths.WorkloadRegistryPath"/>.
 /// </summary>
-internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
+internal class WorkloadStore(IWorkloadPaths paths, IWorkloadOperationCoordinator coordinator) : IWorkloadStore
 {
     private readonly IWorkloadPaths _paths = paths
         ?? throw new ArgumentNullException(nameof(paths));
+    private readonly IWorkloadOperationCoordinator _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
 
     public async Task<IReadOnlyList<WorkloadEntry>> GetWorkloadsAsync(CancellationToken cancellationToken = default)
     {
@@ -21,8 +22,49 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         return [.. registry.Workloads];
     }
 
-    public async Task SaveWorkloadAsync(WorkloadEntry entry, CancellationToken cancellationToken = default)
+    public Task SaveWorkloadAsync(WorkloadEntry entry, CancellationToken cancellationToken = default)
+        => RunWriterAsync(async operation =>
+        {
+            await SaveWorkloadAsync(operation, entry, cancellationToken);
+            return true;
+        }, cancellationToken);
+
+    public Task<bool> RemoveWorkloadAsync(string packageId, string version, CancellationToken cancellationToken = default)
+        => RunWriterAsync(operation => RemoveWorkloadAsync(operation, packageId, version, cancellationToken), cancellationToken);
+
+    public Task ReplaceWorkloadAsync(string oldPackageId, string oldVersion, WorkloadEntry newEntry, CancellationToken cancellationToken = default)
+        => RunWriterAsync(async operation =>
+        {
+            await ReplaceWorkloadAsync(operation, oldPackageId, oldVersion, newEntry, cancellationToken);
+            return true;
+        }, cancellationToken);
+
+    public Task<WorkloadEntry> AddOwnershipAsync(WorkloadEntry entry, WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default)
+        => RunWriterAsync(operation => AddOwnershipAsync(operation, entry, ownership, cancellationToken), cancellationToken);
+
+    public Task<WorkloadOwnershipRemovalResult> RemoveOwnershipAsync(string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default)
+        => RunWriterAsync(operation => RemoveOwnershipAsync(operation, packageId, version, ownership, cancellationToken), cancellationToken);
+
+    public Task<WorkloadOwnershipMoveResult> MoveLogicalOwnershipAsync(string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken = default)
+        => RunWriterAsync(operation => MoveLogicalOwnershipAsync(operation, oldPackageId, oldVersion, newEntry, cancellationToken), cancellationToken);
+
+    public Task<WorkloadOwnershipMoveResult> MoveExplicitOwnershipAsync(string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken = default)
+        => RunWriterAsync(operation => MoveExplicitOwnershipAsync(operation, oldPackageId, oldVersion, newEntry, cancellationToken), cancellationToken);
+
+    private async Task<T> RunWriterAsync<T>(Func<IWorkloadOperation, Task<T>> write, CancellationToken cancellationToken)
     {
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        T result = await write(operation);
+        operation.CompleteMutation();
+        return result;
+    }
+
+    public async Task SaveWorkloadAsync(IWorkloadOperation operation, WorkloadEntry entry, CancellationToken cancellationToken)
+    {
+        ValidateOperation(operation);
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentException.ThrowIfNullOrWhiteSpace(entry.PackageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(entry.PackageVersion);
@@ -39,11 +81,12 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
             registry.Workloads.Add(entry);
         }
 
-        await WriteRegistryAsync(registry, cancellationToken);
+        await WriteRegistryAsync(operation, registry, cancellationToken);
     }
 
-    public async Task<bool> RemoveWorkloadAsync(string packageId, string version, CancellationToken cancellationToken = default)
+    public async Task<bool> RemoveWorkloadAsync(IWorkloadOperation operation, string packageId, string version, CancellationToken cancellationToken)
     {
+        ValidateOperation(operation);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
 
@@ -56,13 +99,14 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         }
 
         registry.Workloads.RemoveAt(index);
-        await WriteRegistryAsync(registry, cancellationToken);
+        await WriteRegistryAsync(operation, registry, cancellationToken);
         return true;
     }
 
-    public async Task ReplaceWorkloadAsync(string oldPackageId, string oldVersion, WorkloadEntry newEntry,
-        CancellationToken cancellationToken = default)
+    public async Task ReplaceWorkloadAsync(IWorkloadOperation operation, string oldPackageId, string oldVersion, WorkloadEntry newEntry,
+        CancellationToken cancellationToken)
     {
+        ValidateOperation(operation);
         ArgumentException.ThrowIfNullOrWhiteSpace(oldPackageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(oldVersion);
         ArgumentNullException.ThrowIfNull(newEntry);
@@ -87,24 +131,26 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
             registry.Workloads.Add(newEntry);
         }
 
-        await WriteRegistryAsync(registry, cancellationToken);
+        await WriteRegistryAsync(operation, registry, cancellationToken);
     }
 
-    public async Task<WorkloadEntry> AddOwnershipAsync(WorkloadEntry entry, WorkloadOwnershipKind ownership,
-        CancellationToken cancellationToken = default)
+    public async Task<WorkloadEntry> AddOwnershipAsync(IWorkloadOperation operation, WorkloadEntry entry, WorkloadOwnershipKind ownership,
+        CancellationToken cancellationToken)
     {
+        ValidateOperation(operation);
         ValidateEntry(entry);
         ValidateOwnership(entry, ownership);
 
         WorkloadRegistry registry = await ReadRegistryAsync(cancellationToken);
         WorkloadEntry merged = AddOwnershipCore(registry, entry, ownership);
-        await WriteRegistryAsync(registry, cancellationToken);
+        await WriteRegistryAsync(operation, registry, cancellationToken);
         return merged;
     }
 
-    public async Task<WorkloadOwnershipRemovalResult> RemoveOwnershipAsync(string packageId, string version,
-        WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default)
+    public async Task<WorkloadOwnershipRemovalResult> RemoveOwnershipAsync(IWorkloadOperation operation, string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
     {
+        ValidateOperation(operation);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
 
@@ -115,21 +161,22 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
             return result;
         }
 
-        await WriteRegistryAsync(registry, cancellationToken);
+        await WriteRegistryAsync(operation, registry, cancellationToken);
         return result;
     }
 
-    public async Task<WorkloadOwnershipMoveResult> MoveLogicalOwnershipAsync(string oldPackageId, string oldVersion,
-        WorkloadEntry newEntry, CancellationToken cancellationToken = default)
-        => await MoveOwnershipAsync(oldPackageId, oldVersion, newEntry, WorkloadOwnershipKind.Logical, cancellationToken);
+    public async Task<WorkloadOwnershipMoveResult> MoveLogicalOwnershipAsync(IWorkloadOperation operation, string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken)
+        => await MoveOwnershipAsync(operation, oldPackageId, oldVersion, newEntry, WorkloadOwnershipKind.Logical, cancellationToken);
 
-    public async Task<WorkloadOwnershipMoveResult> MoveExplicitOwnershipAsync(string oldPackageId, string oldVersion,
-        WorkloadEntry newEntry, CancellationToken cancellationToken = default)
-        => await MoveOwnershipAsync(oldPackageId, oldVersion, newEntry, WorkloadOwnershipKind.Explicit, cancellationToken);
+    public async Task<WorkloadOwnershipMoveResult> MoveExplicitOwnershipAsync(IWorkloadOperation operation, string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken)
+        => await MoveOwnershipAsync(operation, oldPackageId, oldVersion, newEntry, WorkloadOwnershipKind.Explicit, cancellationToken);
 
-    private async Task<WorkloadOwnershipMoveResult> MoveOwnershipAsync(string oldPackageId, string oldVersion,
+    private async Task<WorkloadOwnershipMoveResult> MoveOwnershipAsync(IWorkloadOperation operation, string oldPackageId, string oldVersion,
         WorkloadEntry newEntry, WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
     {
+        ValidateOperation(operation);
         ArgumentException.ThrowIfNullOrWhiteSpace(oldPackageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(oldVersion);
         ValidateEntry(newEntry);
@@ -144,7 +191,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         }
 
         WorkloadEntry merged = AddOwnershipCore(registry, newEntry, ownership);
-        await WriteRegistryAsync(registry, cancellationToken);
+        await WriteRegistryAsync(operation, registry, cancellationToken);
         return new WorkloadOwnershipMoveResult(merged, removal.EntryRemoved);
     }
 
@@ -244,14 +291,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
     {
         bool attachExplicit = ownership == WorkloadOwnershipKind.Explicit && current.IsImplicitlyInstalled;
         bool attachLogical = current.LogicalPackage is null && incoming.LogicalPackage is not null;
-        if (ownership == WorkloadOwnershipKind.Logical
-            && current.LogicalPackage is not null
-            && !SameLogicalOwner(current.LogicalPackage, incoming.LogicalPackage!))
-        {
-            throw new InvalidOperationException(
-                $"Physical workload '{current.PackageId}' version '{current.PackageVersion}' is already owned by logical package " +
-                $"'{current.LogicalPackage.PackageId}' version '{current.LogicalPackage.PackageVersion}'.");
-        }
+        WorkloadOwnershipRules.ValidateDestination(current, incoming.LogicalPackage, ownership);
 
         // Payload metadata comes from the incoming entry: the caller may have just replaced the payload
         // on disk, and a legacy row would otherwise keep stale values such as a missing runtime identifier.
@@ -261,10 +301,6 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
             current.LogicalPackage ?? incoming.LogicalPackage,
             current.InstallRefCount + (attachExplicit ? 1 : 0) + (attachLogical ? 1 : 0));
     }
-
-    private static bool SameLogicalOwner(LogicalPackage left, LogicalPackage right)
-        => string.Equals(left.PackageId, right.PackageId, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(left.PackageVersion, right.PackageVersion, StringComparison.Ordinal);
 
     private static WorkloadEntry CopyWithOwnership(
         WorkloadEntry entry, bool isImplicitlyInstalled, LogicalPackage? logicalPackage, int installRefCount)
@@ -294,7 +330,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
 
         try
         {
-            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
+            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, bufferSize: 4096, useAsync: true);
 
             WorkloadRegistry registry = await JsonSerializer.DeserializeAsync(
                 stream,
@@ -330,7 +366,13 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         }
     }
 
-    private async Task WriteRegistryAsync(WorkloadRegistry registry, CancellationToken cancellationToken)
+    private void ValidateOperation(IWorkloadOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        operation.Validate(_paths);
+    }
+
+    private async Task WriteRegistryAsync(IWorkloadOperation operation, WorkloadRegistry registry, CancellationToken cancellationToken)
     {
         string path = _paths.WorkloadRegistryPath;
         string directory = Path.GetDirectoryName(path)!;
@@ -356,7 +398,15 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
                 await SerializeAsync(stream, registry, cancellationToken);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+            operation.BeginMutation();
             File.Move(tempPath, path, overwrite: true);
+            WorkloadRegistry persisted = await ReadRegistryAsync(CancellationToken.None);
+            if (JsonSerializer.Serialize(persisted, WorkloadJsonContext.Default.WorkloadRegistry)
+                != JsonSerializer.Serialize(registry, WorkloadJsonContext.Default.WorkloadRegistry))
+            {
+                throw new IOException("The workload registry did not persist the expected state.");
+            }
         }
         catch
         {

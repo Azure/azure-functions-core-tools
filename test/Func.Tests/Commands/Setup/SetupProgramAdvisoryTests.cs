@@ -44,7 +44,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             DateTime cacheTimestamp = File.GetLastWriteTimeUtc(paths.VersionCachePath);
 
             // If-needed host setup uses inventory without loading an assembly or consulting a feed.
-            WorkloadStore store = new(workloads);
+            WorkloadStore store = new(workloads, new FileWorkloadOperationCoordinator(workloads));
             await store.SaveWorkloadAsync(new WorkloadEntry
             {
                 PackageId = SetupDependency.Host(null).PackageId,

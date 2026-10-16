@@ -15,11 +15,43 @@ public class WorkloadPruneCommandTests
     private readonly TestInteractionService _interaction = new();
     private readonly IWorkloadInstaller _installer = Substitute.For<IWorkloadInstaller>();
     private readonly IWorkloadStore _store = Substitute.For<IWorkloadStore>();
+    private readonly IWorkloadOperationCoordinator _coordinator = Substitute.For<IWorkloadOperationCoordinator>();
+    private readonly IWorkloadOperation _operation = Substitute.For<IWorkloadOperation>();
+
+    public WorkloadPruneCommandTests()
+    {
+        _coordinator.AcquireAsync(Arg.Any<CancellationToken>()).Returns(_operation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Prune_KnownAdmissionFailure_PreservesCauseAndReadsNoSelection(bool recovery)
+    {
+        Exception expected = recovery ? new WorkloadRecoveryRequiredException("owned-test.intent") : new WorkloadLockNotSupportedException();
+        _coordinator.AcquireAsync(Arg.Any<CancellationToken>()).Returns<Task<IWorkloadOperation>>(_ => throw expected);
+        var command = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
+
+        Func<Task> invoke = () => InvokeAsync(command);
+
+        var exception = (await invoke.Should().ThrowAsync<GracefulException>()).Which;
+        exception.IsUserError.Should().BeTrue();
+        exception.InnerException.Should().BeSameAs(expected);
+        await _store.DidNotReceive().GetWorkloadsAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void Prune_NullCoordinator_RejectsProgrammerError()
+    {
+        Action create = () => new WorkloadPruneCommand(_interaction, _installer, _store, null!);
+
+        create.Should().Throw<ArgumentNullException>();
+    }
 
     [Fact]
     public void Prune_HasExpectedArgsAndOptions()
     {
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
         cmd.Arguments.Should().ContainSingle(a => a.Name == "id");
         cmd.Options.Should().Contain(o => o.Name == "--exact");
     }
@@ -29,13 +61,13 @@ public class WorkloadPruneCommandTests
     {
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<WorkloadEntry>());
 
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
         int exit = await InvokeAsync(cmd);
 
         exit.Should().Be(0);
         _interaction.Lines.Should().Contain(l => l.StartsWith("HINT:") && l.Contains("No workloads installed"));
-        await _installer.DidNotReceive().UninstallAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().UninstallAsync(_operation,
+            Arg.Any<string>(), Arg.Any<string>(), WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -47,13 +79,13 @@ public class WorkloadPruneCommandTests
             new WorkloadEntry { PackageId = "Pkg.B", PackageVersion = "2.0.0" },
         });
 
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
         int exit = await InvokeAsync(cmd);
 
         exit.Should().Be(0);
         _interaction.Lines.Should().Contain(l => l.StartsWith("HINT:") && l.Contains("Nothing to prune"));
-        await _installer.DidNotReceive().UninstallAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().UninstallAsync(_operation,
+            Arg.Any<string>(), Arg.Any<string>(), WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -65,16 +97,16 @@ public class WorkloadPruneCommandTests
             new WorkloadEntry { PackageId = "Pkg.A", PackageVersion = "2.0.0" },
             new WorkloadEntry { PackageId = "Pkg.A", PackageVersion = "1.5.0" },
         });
-        _installer.UninstallAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _installer.UninstallAsync(_operation, Arg.Any<string>(), Arg.Any<string>(), WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
             .Returns(true);
 
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
         int exit = await InvokeAsync(cmd);
 
         exit.Should().Be(0);
-        await _installer.Received(1).UninstallAsync("Pkg.A", "1.5.0", Arg.Any<CancellationToken>());
-        await _installer.Received(1).UninstallAsync("Pkg.A", "1.0.0", Arg.Any<CancellationToken>());
-        await _installer.DidNotReceive().UninstallAsync("Pkg.A", "2.0.0", Arg.Any<CancellationToken>());
+        await _installer.Received(1).UninstallAsync(_operation, "Pkg.A", "1.5.0", WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
+        await _installer.Received(1).UninstallAsync(_operation, "Pkg.A", "1.0.0", WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().UninstallAsync(_operation, "Pkg.A", "2.0.0", WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -87,15 +119,15 @@ public class WorkloadPruneCommandTests
             new WorkloadEntry { PackageId = "Pkg.B", PackageVersion = "1.0.0" },
             new WorkloadEntry { PackageId = "Pkg.B", PackageVersion = "2.0.0" },
         });
-        _installer.UninstallAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _installer.UninstallAsync(_operation, Arg.Any<string>(), Arg.Any<string>(), WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
             .Returns(true);
 
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
         int exit = await InvokeAsync(cmd, "Pkg.A");
 
         exit.Should().Be(0);
-        await _installer.Received(1).UninstallAsync("Pkg.A", "1.0.0", Arg.Any<CancellationToken>());
-        await _installer.DidNotReceive().UninstallAsync("Pkg.B", Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _installer.Received(1).UninstallAsync(_operation, "Pkg.A", "1.0.0", WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().UninstallAsync(_operation, "Pkg.B", Arg.Any<string>(), WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -106,14 +138,14 @@ public class WorkloadPruneCommandTests
             new WorkloadEntry { PackageId = "Pkg.A", PackageVersion = "1.0.0", Aliases = ["a"] },
             new WorkloadEntry { PackageId = "Pkg.A", PackageVersion = "2.0.0", Aliases = ["a"] },
         });
-        _installer.UninstallAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _installer.UninstallAsync(_operation, Arg.Any<string>(), Arg.Any<string>(), WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
             .Returns(true);
 
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
         int exit = await InvokeAsync(cmd, "a");
 
         exit.Should().Be(0);
-        await _installer.Received(1).UninstallAsync("Pkg.A", "1.0.0", Arg.Any<CancellationToken>());
+        await _installer.Received(1).UninstallAsync(_operation, "Pkg.A", "1.0.0", WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -124,7 +156,7 @@ public class WorkloadPruneCommandTests
             new WorkloadEntry { PackageId = "Pkg.A", PackageVersion = "1.0.0", Aliases = ["shared"] },
             new WorkloadEntry { PackageId = "Pkg.B", PackageVersion = "1.0.0", Aliases = ["shared"] },
         ]);
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
 
         GracefulException ex = (await FluentActions.Awaiting(
             () => InvokeAsync(cmd, "shared")).Should().ThrowExactlyAsync<GracefulException>()).Which;
@@ -132,8 +164,8 @@ public class WorkloadPruneCommandTests
         ex.Message.Should().Contain("matches multiple installed workloads");
         ex.Message.Should().Contain("Pkg.A");
         ex.Message.Should().Contain("Pkg.B");
-        await _installer.DidNotReceive().UninstallAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().UninstallAsync(_operation,
+            Arg.Any<string>(), Arg.Any<string>(), WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -166,7 +198,7 @@ public class WorkloadPruneCommandTests
                 },
             },
         ]);
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
 
         GracefulException ex = (await FluentActions.Awaiting(
             () => InvokeAsync(cmd, "shared")).Should().ThrowExactlyAsync<GracefulException>()).Which;
@@ -174,7 +206,7 @@ public class WorkloadPruneCommandTests
         ex.Message.Should().Contain("matches multiple installed workloads");
         ex.Message.Should().Contain("Pkg.A");
         ex.Message.Should().Contain("Pkg.B");
-        await _installer.DidNotReceive().UninstallAsync(
+        await _installer.DidNotReceive().UninstallAsync(_operation,
             Arg.Any<string>(),
             Arg.Any<string>(),
             WorkloadOwnershipKind.Logical,
@@ -190,13 +222,13 @@ public class WorkloadPruneCommandTests
             new WorkloadEntry { PackageId = "Pkg.A", PackageVersion = "2.0.0", Aliases = ["a"] },
         });
 
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
         int exit = await InvokeAsync(cmd, "a", "--exact");
 
         exit.Should().Be(0);
         _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:") && l.Contains("'a' is not installed"));
-        await _installer.DidNotReceive().UninstallAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _installer.DidNotReceive().UninstallAsync(_operation,
+            Arg.Any<string>(), Arg.Any<string>(), WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -207,23 +239,23 @@ public class WorkloadPruneCommandTests
             LogicalEntry("Pkg.Pointer.win-x64", "1.0.0"),
             LogicalEntry("Pkg.Pointer.win-x64", "2.0.0"),
         ]);
-        _installer.UninstallAsync(
+        _installer.UninstallAsync(_operation,
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 WorkloadOwnershipKind.Logical,
                 Arg.Any<CancellationToken>())
             .Returns(true);
 
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
         int exit = await InvokeAsync(cmd, "pointer");
 
         exit.Should().Be(0);
-        await _installer.Received(1).UninstallAsync(
+        await _installer.Received(1).UninstallAsync(_operation,
             "Pkg.Pointer",
             "1.0.0",
             WorkloadOwnershipKind.Logical,
             Arg.Any<CancellationToken>());
-        await _installer.DidNotReceive().UninstallAsync(
+        await _installer.DidNotReceive().UninstallAsync(_operation,
             "Pkg.Pointer",
             "2.0.0",
             WorkloadOwnershipKind.Logical,
@@ -246,7 +278,7 @@ public class WorkloadPruneCommandTests
     [Fact]
     public async Task Prune_WhitespaceArg_FailsValidation()
     {
-        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store);
+        var cmd = new WorkloadPruneCommand(_interaction, _installer, _store, _coordinator);
         int exit = await InvokeAsync(cmd, "   ");
 
         exit.Should().NotBe(0);

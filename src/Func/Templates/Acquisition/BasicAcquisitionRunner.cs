@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Templates.Acquisition;
 /// </summary>
 internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, BasicAcquisitionPlanner planner,
     IPackageSourceProvider sourceProvider, IWorkloadStore workloads, IWorkloadPaths workloadPaths,
-    IWorkloadInstaller workloadInstaller, IBasicTemplateLifecycle templates, IFileSystem fileSystem)
+    IWorkloadInstaller workloadInstaller, IBasicTemplateLifecycle templates, IFileSystem fileSystem, IWorkloadOperationCoordinator coordinator)
 {
     private readonly IBasicCompanionCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
     private readonly BasicAcquisitionPlanner _planner = planner ?? throw new ArgumentNullException(nameof(planner));
@@ -26,6 +26,7 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
     private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller ?? throw new ArgumentNullException(nameof(workloadInstaller));
     private readonly IBasicTemplateLifecycle _templates = templates ?? throw new ArgumentNullException(nameof(templates));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly IWorkloadOperationCoordinator _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
 
     public async Task<BasicAcquisitionResult> RunAsync(BasicAcquisitionRequest request, CancellationToken cancellationToken)
     {
@@ -36,7 +37,9 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
         List<BasicAcquisitionStep> completed = [];
         string? revision = null;
         string? source = null;
-        bool acquisitionStarted = false;
+        List<PreparedBasicTemplate> preparedTemplates = [];
+        PreparedWorkloadInstall? preparedStack = null;
+        bool workloadRecoveryRequired = false;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -84,42 +87,95 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
 
                 try
                 {
-                    acquisitionStarted = true;
-                    await _workloadInstaller.InstallFromCatalogAsync(request.StackPackageId, request.StackVersion, source,
-                        request.IncludePrerelease, exact: true, force: false, cancellationToken: cancellationToken);
+                    preparedStack = await _workloadInstaller.PrepareFromCatalogAsync(request.StackPackageId, request.StackVersion, source,
+                        request.IncludePrerelease, exact: true, force: false, progress: null, cancellationToken);
                 }
-                catch (Exception exception) when (exception is WorkloadPackageNotFoundException or InvalidWorkloadException or IOException or InvalidOperationException
-                    or HttpRequestException or NuGet.Protocol.Core.Types.FatalProtocolException
+                catch (Exception exception) when (exception is WorkloadPackageNotFoundException or InvalidWorkloadException or IOException
+                    || (exception is InvalidOperationException && exception is not WorkloadPlanChangedException
+                        && exception is not WorkloadRecoveryRequiredException)
+                    || exception is HttpRequestException or NuGet.Protocol.Core.Types.FatalProtocolException
                     || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
                 {
                     throw new BasicAcquisitionException(BasicAcquisitionFailure.InstallFailed,
                         $"Stack '{request.StackPackageId}' {request.StackVersion} installation from '{source}' failed: {exception.Message}", exception);
                 }
+            }
 
-                // A returned result is not proof of persistence. Partial repair relies on the owning store's actual retained row.
-                stack = FindStack(await _workloads.GetWorkloadsAsync(cancellationToken), request);
-                if (stack is null || !_fileSystem.DirectoryExists(_workloadPaths.GetInstallDirectory(stack.PackageId, stack.PackageVersion)))
+            foreach (BasicTemplateSelection selection in selected)
+            {
+                preparedTemplates.Add(await _templates.PrepareAsync(selection, context, request.Offline, cancellationToken));
+            }
+
+            // All preview reads are disposed and all network/private preflight is finished before writer admission.
+            using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+            operation.Validate(_workloadPaths);
+            installed = await _workloads.GetWorkloadsAsync(cancellationToken);
+            BasicAcquisitionPlan currentPlan = _planner.Plan(manifest, request, installed, source)
+                ?? throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged, "The prepared mapping no longer applies. Re-run explicit repair.");
+            foreach (BasicTemplateSelection selection in selected)
+            {
+                BasicCompanionPlan companion = currentPlan.Companions.Single(c =>
+                    string.Equals(c.PackageId, selection.Artifact.PackageId, StringComparison.OrdinalIgnoreCase));
+                if (!companion.Candidates.Contains(selection.Artifact))
                 {
-                    throw new BasicAcquisitionException(BasicAcquisitionFailure.InstallFailed, "The workload installer did not persist the requested stack.");
+                    throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
+                        "Retained requirements now require different qualified bytes. Re-run explicit repair; no replacement was downloaded under the lease.");
+                }
+
+                BasicTemplateSelection actual = await _templates.SelectAsync(companion, context, cancellationToken);
+                if (actual.Artifact != selection.Artifact || (selection.Installed && !actual.Installed))
+                {
+                    throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
+                        "Companion content or ownership changed after preparation. Re-run explicit repair.");
                 }
             }
 
+            foreach (PreparedBasicTemplate prepared in preparedTemplates)
+            {
+                await _templates.RevalidatePreparedAsync(prepared, context, cancellationToken);
+            }
+
+            stack = FindStack(installed, request);
+            if (preparedStack is not null)
+            {
+                try
+                {
+                    await _workloadInstaller.CommitPreparedAsync(operation, preparedStack, progress: null, cancellationToken);
+                }
+                catch (Exception exception) when (exception is InvalidWorkloadException or IOException
+                    || (exception is InvalidOperationException && exception is not WorkloadPlanChangedException
+                        && exception is not WorkloadRecoveryRequiredException))
+                {
+                    throw new BasicAcquisitionException(operation.IsDirty ? BasicAcquisitionFailure.RecoveryRequired : BasicAcquisitionFailure.InstallFailed,
+                        $"Stack installation failed; inspect workload recovery diagnostics before retry: {exception.Message}", exception);
+                }
+                finally
+                {
+                    workloadRecoveryRequired = operation.IsDirty;
+                }
+                stack = FindStack(await _workloads.GetWorkloadsAsync(cancellationToken), request);
+            }
+
+            if (stack is null || !_fileSystem.DirectoryExists(_workloadPaths.GetInstallDirectory(stack.PackageId, stack.PackageVersion)))
+            {
+                throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged, "The requested stack changed or was not persisted. Re-run explicit repair.");
+            }
+
             completed.Add(new(request.StackPackageId, request.StackVersion.ToNormalizedString(), stackInstalled));
-            acquisitionStarted = true;
-            foreach (BasicTemplateSelection selection in selected)
+            foreach (PreparedBasicTemplate prepared in preparedTemplates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 bool reused;
                 try
                 {
-                    reused = await _templates.EnsureAsync(selection.Artifact, context, request.Offline, cancellationToken);
+                    reused = await _templates.CommitAsync(prepared, context, cancellationToken);
                 }
                 catch (IOException exception)
                 {
                     throw new BasicAcquisitionException(BasicAcquisitionFailure.InstallFailed,
                         $"Companion/store operation failed; inspect its recovery diagnostics before retry: {exception.Message}", exception);
                 }
-                completed.Add(new(selection.Artifact.PackageId, selection.Artifact.Version.ToNormalizedString(), reused));
+                completed.Add(new(prepared.Artifact.PackageId, prepared.Artifact.Version.ToNormalizedString(), reused));
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -127,18 +183,45 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
         }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
-            await IncludeRetainedStackAsync(request, completed);
+            if (!workloadRecoveryRequired)
+            {
+                await IncludeRetainedStackAsync(request, completed);
+            }
             return new(BasicAcquisitionStatus.Canceled, revision, source, completed.AsReadOnly(),
-                Message: "Acquisition canceled. Completed packages remain; retry explicit repair. Active template mutation uses its owning store's recovery.",
+                Failure: workloadRecoveryRequired ? BasicAcquisitionFailure.RecoveryRequired : null,
+                Message: workloadRecoveryRequired
+                    ? "Acquisition canceled during workload mutation. Reconcile the workload dirty intent before retry; no unverified stack completion is reported."
+                    : "Acquisition canceled. Completed packages remain; retry explicit repair. Active template mutation uses its owning store's recovery.",
                 Cause: exception);
         }
         catch (BasicAcquisitionException exception)
         {
-            await IncludeRetainedStackAsync(request, completed);
+            if (!workloadRecoveryRequired)
+            {
+                await IncludeRetainedStackAsync(request, completed);
+            }
             BasicAcquisitionStatus status = exception.Failure == BasicAcquisitionFailure.MissingMapping
                 ? BasicAcquisitionStatus.Unavailable
-                : acquisitionStarted && completed.Count > 0 ? BasicAcquisitionStatus.PartialFailure : BasicAcquisitionStatus.Rejected;
+                : completed.Count > 0 ? BasicAcquisitionStatus.PartialFailure : BasicAcquisitionStatus.Rejected;
             return new(status, revision, source, completed.AsReadOnly(), exception.Failure, exception.Message, exception.InnerException ?? exception);
+        }
+        catch (WorkloadRecoveryRequiredException exception)
+        {
+            return new(BasicAcquisitionStatus.Rejected, revision, source, completed.AsReadOnly(),
+                BasicAcquisitionFailure.RecoveryRequired, exception.Message, exception);
+        }
+        catch (WorkloadPlanChangedException exception)
+        {
+            return new(BasicAcquisitionStatus.Rejected, revision, source, completed.AsReadOnly(),
+                BasicAcquisitionFailure.PlanChanged, exception.Message, exception);
+        }
+        finally
+        {
+            preparedStack?.Dispose();
+            foreach (PreparedBasicTemplate prepared in preparedTemplates)
+            {
+                prepared.Dispose();
+            }
         }
     }
 

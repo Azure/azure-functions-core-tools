@@ -30,6 +30,7 @@ internal static class WorkloadStorageRegistration
 
         services.AddSingleton<WorkloadPathsOptions>(_ => new WorkloadPathsOptions());
         services.AddSingleton<IWorkloadPaths>(sp => sp.GetRequiredService<WorkloadPathsOptions>());
+        services.AddSingleton<IWorkloadOperationCoordinator, FileWorkloadOperationCoordinator>();
         services.AddSingleton<IWorkloadStore, WorkloadStore>();
         services.AddSingleton<IWorkloadLoader, WorkloadLoader>();
         services.AddSingleton<IWorkloadMetadataReader, WorkloadMetadataReader>();

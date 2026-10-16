@@ -16,9 +16,19 @@ internal interface IBasicTemplateLifecycle
 {
     public Task<BasicTemplateSelection> SelectAsync(BasicCompanionPlan plan, TemplateEngineContext context, CancellationToken cancellationToken);
     public Task<bool> EnsureAsync(BasicTemplateArtifact artifact, TemplateEngineContext context, bool offline, CancellationToken cancellationToken);
+    public Task<PreparedBasicTemplate> PrepareAsync(BasicTemplateSelection selection, TemplateEngineContext context, bool offline, CancellationToken cancellationToken);
+    public Task<bool> CommitAsync(PreparedBasicTemplate prepared, TemplateEngineContext context, CancellationToken cancellationToken);
+    public Task RevalidatePreparedAsync(PreparedBasicTemplate prepared, TemplateEngineContext context, CancellationToken cancellationToken);
 }
 
 internal sealed record BasicTemplateSelection(BasicTemplateArtifact Artifact, bool Installed);
+
+internal sealed class PreparedBasicTemplate(BasicTemplateArtifact artifact, TempDirectory? staging, string? archive) : IDisposable
+{
+    public BasicTemplateArtifact Artifact { get; } = artifact;
+    public string? Archive { get; } = archive;
+    public void Dispose() => staging?.Dispose();
+}
 
 /// <summary>
 /// Provisional basic-only lifecycle adapter. Installs qualified archives but never replaces an incumbent or infers user ownership.
@@ -50,27 +60,83 @@ internal sealed class BasicTemplateLifecycle(ITemplateStore store, IBasicPackage
     {
         ArgumentNullException.ThrowIfNull(artifact);
         ArgumentNullException.ThrowIfNull(context);
+        BasicTemplateSelection selection = await SelectAsync(new(artifact.PackageId, new VersionRange(artifact.Version, true, artifact.Version, true), [artifact]),
+            context, cancellationToken);
+        using PreparedBasicTemplate prepared = await PrepareAsync(selection, context, offline, cancellationToken);
+        return await CommitAsync(prepared, context, cancellationToken);
+    }
+
+    public async Task<PreparedBasicTemplate> PrepareAsync(BasicTemplateSelection selection, TemplateEngineContext context,
+        bool offline, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(selection);
+        ArgumentNullException.ThrowIfNull(context);
+        BasicTemplateArtifact artifact = selection.Artifact;
         using (TemplateEngineSession reader = await _store.OpenReadAsync(context, cancellationToken))
         {
             if (await FindReusableAsync(reader, artifact.PackageId, [artifact], cancellationToken) is not null)
             {
-                return true;
+                return new(artifact, null, null);
             }
         }
 
-        using TempDirectory staging = _fileSystem.CreateTempDirectory();
+        TempDirectory staging = _fileSystem.CreateTempDirectory();
         string archive = Path.Combine(staging.Path, $"{artifact.PackageId}.{artifact.Version.ToNormalizedString()}.nupkg");
-        await using (Stream payload = await OpenPayloadAsync(artifact, offline, cancellationToken))
+        try
         {
-            await _fileSystem.SaveStreamToFileAsync(archive, payload, cancellationToken);
+            await using (Stream payload = await OpenPayloadAsync(artifact, offline, cancellationToken))
+            {
+                await _fileSystem.SaveStreamToFileAsync(archive, payload, cancellationToken);
+            }
+
+            await _inspector.ValidateAsync(archive, artifact, cancellationToken);
+            // Preflight scans a private hive. Neither provider success nor an archive digest alone proves engine discovery.
+            using (TemplateEngineSession preflight = new(context, Path.Combine(staging.Path, "hive")))
+            {
+                await InstallAsync(preflight, archive, cancellationToken);
+                await ValidateInstalledAsync(preflight, artifact, cancellationToken);
+            }
+
+            return new(artifact, staging, archive);
+        }
+        catch
+        {
+            staging.Dispose();
+            throw;
+        }
+    }
+
+    public async Task RevalidatePreparedAsync(PreparedBasicTemplate prepared, TemplateEngineContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        ArgumentNullException.ThrowIfNull(context);
+        BasicTemplateArtifact artifact = prepared.Artifact;
+        if (prepared.Archive is null)
+        {
+            using TemplateEngineSession reader = await _store.OpenReadAsync(context, cancellationToken);
+            if (await FindReusableAsync(reader, artifact.PackageId, [artifact], cancellationToken) is null)
+            {
+                throw Conflict(artifact.PackageId, "Installed content changed after preparation. Re-run explicit repair.");
+            }
+
+            return;
         }
 
-        await _inspector.ValidateAsync(archive, artifact, cancellationToken);
-        // Preflight scans a private hive. Neither provider success nor an archive digest alone proves engine discovery.
-        using (TemplateEngineSession preflight = new(context, Path.Combine(staging.Path, "hive")))
+        if (!_fileSystem.FileExists(prepared.Archive)
+            || !string.Equals(await _fileSystem.ComputeSha256Async(prepared.Archive, cancellationToken), artifact.Sha256, StringComparison.OrdinalIgnoreCase))
         {
-            await InstallAsync(preflight, archive, cancellationToken);
-            await ValidateInstalledAsync(preflight, artifact, cancellationToken);
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
+                $"Prepared companion '{artifact.PackageId}' content changed. Re-run explicit repair.");
+        }
+    }
+
+    public async Task<bool> CommitAsync(PreparedBasicTemplate prepared, TemplateEngineContext context, CancellationToken cancellationToken)
+    {
+        await RevalidatePreparedAsync(prepared, context, cancellationToken);
+        BasicTemplateArtifact artifact = prepared.Artifact;
+        if (prepared.Archive is null)
+        {
+            return true;
         }
 
         using TemplateStoreWriteSession transaction = await _store.OpenWriteAsync(context, cancellationToken);
@@ -80,7 +146,7 @@ internal sealed class BasicTemplateLifecycle(ITemplateStore store, IBasicPackage
             reused = await FindReusableAsync(session, artifact.PackageId, [artifact], token) is not null;
             if (!reused)
             {
-                await InstallAsync(session, archive, token);
+                await InstallAsync(session, prepared.Archive, token);
             }
         }, (session, token) => ValidateInstalledAsync(session, artifact, token), cancellationToken);
         return reused;

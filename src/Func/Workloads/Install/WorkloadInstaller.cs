@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Catalog;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Versioning;
@@ -9,7 +10,8 @@ using NuGet.Versioning;
 namespace Azure.Functions.Cli.Workloads.Install;
 
 internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IWorkloadPackageInspector packageInspector,
-    WorkloadRidPackageSelector ridPackageSelector, IWorkloadDeploymentService deploymentService) : IWorkloadInstaller
+    WorkloadRidPackageSelector ridPackageSelector, IWorkloadDeploymentService deploymentService,
+    IWorkloadOperationCoordinator coordinator, IWorkloadStore store, IFileSystem fileSystem) : IWorkloadInstaller
 {
     private readonly IWorkloadPackageSource _packageSource =
         packageSource ?? throw new ArgumentNullException(nameof(packageSource));
@@ -19,37 +21,64 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         ridPackageSelector ?? throw new ArgumentNullException(nameof(ridPackageSelector));
     private readonly IWorkloadDeploymentService _deploymentService =
         deploymentService ?? throw new ArgumentNullException(nameof(deploymentService));
+    private readonly IWorkloadOperationCoordinator _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
+    private readonly IWorkloadStore _store = store ?? throw new ArgumentNullException(nameof(store));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(string nupkgPath, bool force = false,
         IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nupkgPath);
 
-        if (!File.Exists(nupkgPath))
+        if (!_fileSystem.FileExists(nupkgPath))
         {
             throw new FileNotFoundException($"Package file '{nupkgPath}' does not exist.", nupkgPath);
         }
 
         string fullPath = Path.GetFullPath(nupkgPath);
-        InspectedWorkloadPackage package = await _packageInspector.InspectAsync(fullPath, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        using TempDirectory archives = _fileSystem.CreateTempDirectory();
+        string privatePath = Path.Combine(archives.Path, "package.nupkg");
+        _fileSystem.CopyFile(fullPath, privatePath);
+        cancellationToken.ThrowIfCancellationRequested();
+        InspectedWorkloadPackage package = await _packageInspector.InspectAsync(privatePath, cancellationToken);
+        PreparedWorkloadInstall prepared;
 
         if (package.Role != WorkloadPackageRole.Pointer)
         {
-            return await _deploymentService.InstallAsync(
-                package, fullPath, WorkloadOwnershipKind.Explicit, logicalPackage: null, force, progress, cancellationToken);
+            prepared = await PreparePhysicalAsync(package, fullPath, null, null, null, force, progress, cancellationToken);
+        }
+        else
+        {
+            WorkloadPointerSelection selection = _ridPackageSelector.SelectImplementation(package);
+            LogicalPackage logicalPackage = CreateLogicalPackage(package, fullPath);
+            string implementationPath = _packageSource.FindLocalImplementation(fullPath, selection.PackageId, package.Identity.Version, selection.RuntimeIdentifier);
+            string privateImplementation = Path.Combine(archives.Path, "implementation.nupkg");
+            _fileSystem.CopyFile(implementationPath, privateImplementation);
+            cancellationToken.ThrowIfCancellationRequested();
+            InspectedWorkloadPackage implementation = await _packageInspector.InspectAsync(privateImplementation, cancellationToken);
+            _ridPackageSelector.ValidateImplementation(package, selection, implementation);
+            prepared = await PreparePhysicalAsync(implementation, implementationPath, package,
+                package.Sha256, logicalPackage, force, progress, cancellationToken);
         }
 
-        WorkloadPointerSelection selection = _ridPackageSelector.SelectImplementation(package);
-        LogicalPackage logicalPackage = CreateLogicalPackage(package, fullPath);
-        string implementationPath = _packageSource.FindLocalImplementation(fullPath, selection.PackageId, package.Identity.Version, selection.RuntimeIdentifier);
-        InspectedWorkloadPackage implementation = await _packageInspector.InspectAsync(implementationPath, cancellationToken);
-        _ridPackageSelector.ValidateImplementation(package, selection, implementation);
-
-        return await _deploymentService.InstallAsync(implementation, implementationPath, WorkloadOwnershipKind.Logical, logicalPackage, force, progress, cancellationToken);
+        using (prepared)
+        using (IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken))
+        {
+            return await CommitPreparedAsync(operation, prepared, progress, cancellationToken);
+        }
     }
 
     public async Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
         bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        using PreparedWorkloadInstall prepared = await PrepareFromCatalogAsync(packageId, version, source, includePrerelease, exact, force, progress, cancellationToken);
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        return await CommitPreparedAsync(operation, prepared, progress, cancellationToken);
+    }
+
+    public async Task<PreparedWorkloadInstall> PrepareFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
+        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         progress?.Report(new WorkloadInstallProgress(
@@ -58,11 +87,12 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         ResolvedPackage resolved = await _packageSource.ResolveAsync(packageId, version, source, includePrerelease, exact, cancellationToken);
         WorkloadInstallResult? reused = force
             ? null
-            : await _deploymentService.TryReuseExplicitAsync(resolved.PackageId, resolved.Version.ToNormalizedString(), cancellationToken);
+            : await _deploymentService.GetAdvisoryExplicitReuseAsync(resolved.PackageId, resolved.Version.ToNormalizedString(), cancellationToken);
 
         if (reused is not null)
         {
-            return reused;
+            return await PrepareReuseAsync(reused.Entry.PackageId, reused.Entry.PackageVersion, resolved.Source.Source,
+                null, null, null, null, cancellationToken, reused.Entry);
         }
 
         using TemporaryWorkloadPackageFile packageDownload = await _packageSource.DownloadAsync(resolved, progress, cancellationToken);
@@ -71,20 +101,20 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         if (package.Role != WorkloadPackageRole.Pointer)
         {
-            return await _deploymentService.InstallAsync(
-                package, resolved.Source.Source, WorkloadOwnershipKind.Explicit, logicalPackage: null, force, progress, cancellationToken);
+            return await PreparePhysicalAsync(package, resolved.Source.Source, null, null, null, force, progress, cancellationToken);
         }
 
         WorkloadPointerSelection selection = _ridPackageSelector.SelectImplementation(package);
         LogicalPackage logicalPackage = CreateLogicalPackage(package, resolved.Source.Source);
-        WorkloadInstallResult? existingImplementation = force
+        string pointerHash = package.Sha256;
+        WorkloadEntry? existingImplementation = force
             ? null
-            : await _deploymentService.TryReuseImplementationAsync(
-                selection.PackageId, package.Identity.Version, selection.RuntimeIdentifier, logicalPackage, cancellationToken);
+            : await _deploymentService.GetReusableImplementationAsync(selection.PackageId, package.Identity.Version, selection.RuntimeIdentifier, cancellationToken);
 
         if (existingImplementation is not null)
         {
-            return existingImplementation;
+            return await PrepareReuseAsync(selection.PackageId, package.Identity.Version, resolved.Source.Source,
+                package, pointerHash, selection.RuntimeIdentifier, logicalPackage, cancellationToken, existingImplementation);
         }
 
         ResolvedPackage implementationResolved = await _packageSource.ResolveImplementationAsync(package, selection, resolved.Source.Source, cancellationToken);
@@ -95,7 +125,77 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         _ridPackageSelector.ValidateImplementation(package, selection, implementation);
 
-        return await _deploymentService.InstallAsync(implementation, implementationResolved.Source.Source, WorkloadOwnershipKind.Logical, logicalPackage, force, progress, cancellationToken);
+        return await PreparePhysicalAsync(implementation, implementationResolved.Source.Source, package, pointerHash, logicalPackage, force, progress, cancellationToken);
+    }
+
+    public async Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
+        bool? includePrerelease, bool exact, bool force, WorkloadInstallExpectation expectation,
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(expectation);
+        ArgumentNullException.ThrowIfNull(expectation.Installed);
+        using PreparedWorkloadInstall prepared = await PrepareFromCatalogAsync(packageId, version, source, includePrerelease, exact, force, progress, cancellationToken);
+        if (!force && prepared.CaptureState(expectation.Installed) != prepared.ExpectedState)
+        {
+            throw new WorkloadPlanChangedException();
+        }
+
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        return await CommitPreparedAsync(operation, prepared, progress, cancellationToken);
+    }
+
+    public async Task<WorkloadInstallResult> CommitPreparedAsync(IWorkloadOperation operation, PreparedWorkloadInstall prepared,
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(prepared);
+        if (prepared.CaptureState(await _store.GetWorkloadsAsync(cancellationToken)) != prepared.ExpectedState)
+        {
+            throw new WorkloadPlanChangedException();
+        }
+
+        WorkloadInstallResult result;
+        if (prepared.Deployment is not null)
+        {
+            result = await _deploymentService.InstallPreparedAsync(operation, prepared.Deployment, progress, cancellationToken);
+        }
+        else
+        {
+            PreparedWorkloadReuse reuse = prepared.Reuse
+                ?? throw new ArgumentException("A prepared reuse plan must carry destination verification evidence.", nameof(prepared));
+            await _deploymentService.ValidateReuseAsync(operation, reuse, cancellationToken);
+            result = (prepared.LogicalPackage is null
+                ? await _deploymentService.TryReuseExplicitAsync(operation, prepared.PackageId, prepared.Version, cancellationToken)
+                : await _deploymentService.TryReuseImplementationAsync(operation, prepared.PackageId, prepared.Version,
+                    prepared.RuntimeIdentifier!, prepared.LogicalPackage, cancellationToken))
+                ?? throw new WorkloadPlanChangedException();
+            operation.CompleteMutation();
+        }
+
+        return result;
+    }
+
+    private async Task<PreparedWorkloadInstall> PreparePhysicalAsync(InspectedWorkloadPackage package, string source,
+        InspectedWorkloadPackage? pointer, string? pointerHash, LogicalPackage? logicalPackage, bool force,
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
+    {
+        PreparedWorkloadInstall plan = await PrepareReuseAsync(package.Identity.PackageId, package.Identity.Version, source,
+            pointer, pointerHash, package.Metadata.RuntimeIdentifier, logicalPackage, cancellationToken);
+        PreparedWorkloadDeployment deployment = await _deploymentService.PrepareAsync(package, source,
+            logicalPackage is null ? WorkloadOwnershipKind.Explicit : WorkloadOwnershipKind.Logical, logicalPackage, force, progress, cancellationToken);
+        return new(plan.PackageId, plan.Version, source, pointer, pointerHash, plan.RuntimeIdentifier, logicalPackage, deployment, plan.ExpectedState);
+    }
+
+    private async Task<PreparedWorkloadInstall> PrepareReuseAsync(string packageId, string version, string source,
+        InspectedWorkloadPackage? pointer, string? pointerHash, string? runtimeIdentifier, LogicalPackage? logicalPackage,
+        CancellationToken cancellationToken, WorkloadEntry? reusableEntry = null)
+    {
+        PreparedWorkloadInstall plan = new(packageId, version, source, pointer, pointerHash, runtimeIdentifier, logicalPackage, null, string.Empty);
+        string expected = plan.CaptureState(await _store.GetWorkloadsAsync(cancellationToken));
+        return new(packageId, version, source, pointer, pointerHash, runtimeIdentifier, logicalPackage, null, expected)
+        {
+            Reuse = reusableEntry is null ? null : await _deploymentService.PrepareReuseAsync(reusableEntry, cancellationToken),
+        };
     }
 
     public async Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
@@ -127,27 +227,42 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         return await _deploymentService.UninstallAsync(packageId, version, ownership, cancellationToken);
     }
 
+    public async Task<bool> UninstallAsync(IWorkloadOperation operation, string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        return await _deploymentService.UninstallAsync(operation, packageId, version, ownership, cancellationToken);
+    }
+
     private async Task<WorkloadUpdateResult> UpdateExplicitAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
         bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
     {
-        WorkloadEntry currentEntry = await _deploymentService.GetUpdateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, cancellationToken);
+        WorkloadEntry currentEntry = await _deploymentService.GetAdvisoryUpdateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, cancellationToken);
         var currentVersion = NuGetVersion.Parse(currentEntry.PackageVersion);
         ResolvedPackage? resolved = await _packageSource.ResolveLatestVersionAsync(currentEntry.PackageId, includePrerelease, currentVersion, allowMajor, source, cancellationToken);
 
         if (resolved is null)
         {
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, currentEntry, cancellationToken);
             return new WorkloadUpdateResult(currentEntry, currentEntry.PackageVersion, true, true);
         }
 
         if (resolved.Version <= currentVersion)
         {
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, currentEntry, cancellationToken);
             return new WorkloadUpdateResult(currentEntry, currentEntry.PackageVersion, true);
         }
 
         using TemporaryWorkloadPackageFile download = await _packageSource.DownloadAsync(resolved, progress, cancellationToken);
         InspectedWorkloadPackage package = await _packageInspector.InspectAsync(download.Path, cancellationToken);
         ValidateResolvedIdentity(resolved, package.Identity);
-        WorkloadEntry newEntry = await _deploymentService.UpdateAsync(currentEntry, package, resolved.Source.Source, WorkloadOwnershipKind.Explicit, logicalPackage: null, progress, cancellationToken);
+        using PreparedWorkloadDeployment prepared = await _deploymentService.PrepareAsync(package, resolved.Source.Source,
+            WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true, progress, cancellationToken);
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        await RevalidateTargetAsync(operation, packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, currentEntry, cancellationToken);
+        WorkloadEntry newEntry = await _deploymentService.UpdatePreparedAsync(operation, currentEntry, prepared, cancellationToken);
 
         return new WorkloadUpdateResult(newEntry, currentEntry.PackageVersion, false);
     }
@@ -155,7 +270,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     private async Task<WorkloadUpdateResult> UpdateLogicalAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
         bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
     {
-        WorkloadEntry currentEntry = await _deploymentService.GetUpdateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, cancellationToken);
+        WorkloadEntry currentEntry = await _deploymentService.GetAdvisoryUpdateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, cancellationToken);
         LogicalPackage currentLogical = currentEntry.LogicalPackage!;
 
         if (source is null && _packageSource.IsLocal(currentLogical.Source))
@@ -172,11 +287,13 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         if (pointerResolved is null)
         {
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
             return new WorkloadUpdateResult(currentEntry, currentLogical.PackageVersion, true, true);
         }
 
         if (pointerResolved.Version < currentVersion)
         {
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
             return new WorkloadUpdateResult(currentEntry, currentLogical.PackageVersion, true);
         }
 
@@ -197,16 +314,25 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         if (pointerResolved.Version == currentVersion && !ridPivot)
         {
+            await RevalidateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
             return new WorkloadUpdateResult(currentEntry, currentLogical.PackageVersion, true);
         }
 
         LogicalPackage newLogical = CreateLogicalPackage(pointer, pointerResolved.Source.Source);
-        WorkloadInstallResult? reusable = await _deploymentService.TryReuseImplementationForUpdateAsync(
-            currentEntry, selection.PackageId, pointer.Identity.Version, selection.RuntimeIdentifier, newLogical, cancellationToken);
+        WorkloadEntry? reusable = await _deploymentService.GetReusableImplementationAsync(
+            selection.PackageId, pointer.Identity.Version, selection.RuntimeIdentifier, cancellationToken);
 
         if (reusable is not null)
         {
-            return new WorkloadUpdateResult(reusable.Entry, currentLogical.PackageVersion, false);
+            PreparedWorkloadReuse preparedReuse = await _deploymentService.PrepareReuseAsync(reusable, cancellationToken);
+            using IWorkloadOperation reuseOperation = await _coordinator.AcquireAsync(cancellationToken);
+            await RevalidateTargetAsync(reuseOperation, packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
+            await _deploymentService.ValidateReuseAsync(reuseOperation, preparedReuse, cancellationToken);
+            WorkloadInstallResult result = await _deploymentService.TryReuseImplementationForUpdateAsync(reuseOperation, currentEntry,
+                selection.PackageId, pointer.Identity.Version, selection.RuntimeIdentifier, newLogical, cancellationToken)
+                ?? throw new WorkloadPlanChangedException();
+            reuseOperation.CompleteMutation();
+            return new WorkloadUpdateResult(result.Entry, currentLogical.PackageVersion, false);
         }
 
         ResolvedPackage implementationResolved = await _packageSource.ResolveImplementationAsync(pointer, selection, pointerResolved.Source.Source, cancellationToken);
@@ -214,9 +340,30 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         InspectedWorkloadPackage implementation = await _packageInspector.InspectAsync(implementationDownload.Path, cancellationToken);
         ValidateResolvedIdentity(implementationResolved, implementation.Identity);
         _ridPackageSelector.ValidateImplementation(pointer, selection, implementation);
-        WorkloadEntry newEntry = await _deploymentService.UpdateAsync(currentEntry, implementation, implementationResolved.Source.Source, WorkloadOwnershipKind.Logical, newLogical, progress, cancellationToken);
+        using PreparedWorkloadDeployment prepared = await _deploymentService.PrepareAsync(implementation, implementationResolved.Source.Source,
+            WorkloadOwnershipKind.Logical, newLogical, force: true, progress, cancellationToken);
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        await RevalidateTargetAsync(operation, packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
+        WorkloadEntry newEntry = await _deploymentService.UpdatePreparedAsync(operation, currentEntry, prepared, cancellationToken);
 
         return new WorkloadUpdateResult(newEntry, currentLogical.PackageVersion, false);
+    }
+
+    private async Task RevalidateTargetAsync(string packageId, NuGetVersion? targetInstalledVersion, WorkloadOwnershipKind ownership,
+        WorkloadEntry expected, CancellationToken cancellationToken)
+    {
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        await RevalidateTargetAsync(operation, packageId, targetInstalledVersion, ownership, expected, cancellationToken);
+    }
+
+    private async Task RevalidateTargetAsync(IWorkloadOperation operation, string packageId, NuGetVersion? targetInstalledVersion,
+        WorkloadOwnershipKind ownership, WorkloadEntry expected, CancellationToken cancellationToken)
+    {
+        WorkloadEntry actual = await _deploymentService.GetUpdateTargetAsync(operation, packageId, targetInstalledVersion, ownership, cancellationToken);
+        if (!WorkloadStateSnapshot.Same(actual, expected))
+        {
+            throw new WorkloadPlanChangedException();
+        }
     }
 
     private static LogicalPackage CreateLogicalPackage(InspectedWorkloadPackage pointer, string source)

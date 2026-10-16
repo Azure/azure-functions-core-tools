@@ -31,7 +31,7 @@ public sealed class BasicAcquisitionJourneyTests
         {
             new("Fixture.StackA", "1.0.0", false), new("Fixture.Basic", "1.0.0", false),
         });
-        var persisted = await new WorkloadStore(fixture.Paths).GetWorkloadsAsync();
+        var persisted = await new WorkloadStore(fixture.Paths, new FileWorkloadOperationCoordinator(fixture.Paths)).GetWorkloadsAsync();
         persisted.Should().ContainSingle().Which.LogicalPackage!.PackageId.Should().Be("fixture.stacka");
         persisted[0].PackageId.Should().Be("fixture.stacka.test-rid");
         File.ReadAllText(Path.Combine(fixture.Paths.GetInstallDirectory(persisted[0].PackageId, persisted[0].PackageVersion),
@@ -50,6 +50,7 @@ public sealed class BasicAcquisitionJourneyTests
     public async Task RunAsync_RetainedStackAfterCompanionFailureOrCancellation_ReopenedBRejectsDisjointRangeBeforeMutation(bool cancel)
     {
         using var fixture = new BasicAcquisitionFixture();
+        await fixture.SeedStackAsync("Fixture.StackA", "1.0.0");
         using var cancellation = new CancellationTokenSource();
         fixture.Payload.Missing = !cancel;
         fixture.Payload.Opening = _ =>
@@ -74,7 +75,7 @@ public sealed class BasicAcquisitionJourneyTests
         fixture.Downloads.Should().HaveCount(downloads);
         fixture.Payload.Opened.Should().BeEmpty();
         fixture.HiveHashes().Should().BeEquivalentTo(bytes);
-        (await new WorkloadStore(fixture.Paths).GetWorkloadsAsync()).Should().ContainSingle()
+        (await new WorkloadStore(fixture.Paths, new FileWorkloadOperationCoordinator(fixture.Paths)).GetWorkloadsAsync()).Should().ContainSingle()
             .Which.LogicalPackage!.PackageId.Should().Be("fixture.stacka");
     }
 
@@ -82,6 +83,7 @@ public sealed class BasicAcquisitionJourneyTests
     public async Task RunAsync_FailureThenRepair_ReusesRetainedStackWithoutSuccessReceipt()
     {
         using var fixture = new BasicAcquisitionFixture();
+        await fixture.SeedStackAsync("Fixture.StackA", "1.0.0");
         fixture.Payload.Missing = true;
         var failed = await fixture.Runner().RunAsync(fixture.Request(), CancellationToken.None);
         fixture.Payload.Missing = false;
@@ -269,12 +271,12 @@ public sealed class BasicAcquisitionJourneyTests
 
         var result = await fixture.Runner().RunAsync(fixture.Request(), CancellationToken.None);
 
-        result.Status.Should().Be(BasicAcquisitionStatus.PartialFailure);
+        result.Status.Should().Be(BasicAcquisitionStatus.Rejected, "private qualification precedes the first live workload effect");
         result.Failure.Should().Be(BasicAcquisitionFailure.InvalidArtifact);
         result.Message.Should().Contain(approveBytes ? "inventory" : "digest");
         (await fixture.ReadTemplatesAsync()).Should().BeEmpty();
         fixture.HiveHashes().Should().BeEmpty();
-        (await fixture.Store.GetWorkloadsAsync()).Should().ContainSingle();
+        (await fixture.Store.GetWorkloadsAsync()).Should().BeEmpty();
     }
 
     [Fact]
@@ -468,9 +470,9 @@ public sealed class BasicAcquisitionJourneyTests
 
         var result = await fixture.Runner().RunAsync(fixture.Request(), CancellationToken.None);
 
-        result.Status.Should().Be(BasicAcquisitionStatus.PartialFailure);
+        result.Status.Should().Be(BasicAcquisitionStatus.Rejected, "unqualified content fails during private preparation");
         result.Failure.Should().BeOneOf(BasicAcquisitionFailure.InvalidArtifact, BasicAcquisitionFailure.InstallFailed);
-        result.Completed.Should().ContainSingle().Which.PackageId.Should().Be("Fixture.StackA");
+        result.Completed.Should().BeEmpty();
         (await fixture.ReadTemplatesAsync()).Should().BeEmpty();
         fixture.HiveHashes().Should().BeEmpty();
         if (change is "malformed-version" or "malformed-xml")
@@ -479,9 +481,9 @@ public sealed class BasicAcquisitionJourneyTests
             result.Cause.Should().BeOfType(change == "malformed-version" ? typeof(ArgumentException) : typeof(System.Xml.XmlException));
             var downloads = fixture.Downloads.Count;
             var reopened = await fixture.Runner().RunAsync(fixture.Request("Fixture.StackB"), CancellationToken.None);
-            reopened.Failure.Should().Be(BasicAcquisitionFailure.RangeConflict);
-            fixture.Downloads.Should().HaveCount(downloads);
-            fixture.Payload.Opened.Should().Equal("1.0.0");
+            reopened.Status.Should().Be(BasicAcquisitionStatus.Completed, "failed private preparation retained no incompatible stack requirement");
+            fixture.Downloads.Should().HaveCount(downloads + 2);
+            fixture.Payload.Opened.Should().Equal("1.0.0", "2.0.0");
         }
     }
 
@@ -559,6 +561,7 @@ public sealed class BasicAcquisitionJourneyTests
     public async Task RunAsync_CompanionTransportAfterStackPersistence_RetainsProgressAndBlocksReopenedB(bool timeout)
     {
         using var fixture = new BasicAcquisitionFixture();
+        await fixture.SeedStackAsync("Fixture.StackA", "1.0.0");
         Exception failure = timeout ? new TaskCanceledException("Fixture companion timeout.") : new HttpRequestException("Fixture companion feed failed.");
         fixture.Payload.Opening = _ => throw failure;
 
@@ -582,9 +585,10 @@ public sealed class BasicAcquisitionJourneyTests
     public async Task RunAsync_TargetedBWithIndependentU_DoesNotRestoreRetainedAOnlyT_ExplicitARepairDoes()
     {
         using var fixture = new BasicAcquisitionFixture();
+        await fixture.SeedStackAsync("Fixture.StackA", "1.0.0");
         fixture.Payload.Missing = true;
         var partialA = await fixture.Runner().RunAsync(fixture.Request(), CancellationToken.None);
-        var retainedA = (await new WorkloadStore(fixture.Paths).GetWorkloadsAsync()).Single();
+        var retainedA = (await new WorkloadStore(fixture.Paths, new FileWorkloadOperationCoordinator(fixture.Paths)).GetWorkloadsAsync()).Single();
         fixture.UseIndependentBCompanion();
         fixture.Payload.Missing = false;
 
@@ -610,7 +614,7 @@ public sealed class BasicAcquisitionJourneyTests
         });
         fixture.Payload.Requested.Should().Equal("Fixture.Unrelated/1.0.0", "Fixture.Basic/1.0.0");
         fixture.Downloads.Should().HaveCount(afterBDownloads, "repeat B and explicit A repair reuse their persisted stack rows");
-        var finalRows = await new WorkloadStore(fixture.Paths).GetWorkloadsAsync();
+        var finalRows = await new WorkloadStore(fixture.Paths, new FileWorkloadOperationCoordinator(fixture.Paths)).GetWorkloadsAsync();
         finalRows.Should().HaveCount(2);
         finalRows.Single(row => row.LogicalPackage!.PackageId == "fixture.stacka").Should().BeEquivalentTo(retainedA);
         (await fixture.ReadTemplatesAsync()).Select(template => template.Identity).Should().BeEquivalentTo(

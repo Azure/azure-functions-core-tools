@@ -93,6 +93,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         bool? includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
         bool force = parseResult.GetValue(ForceOption);
+        IReadOnlyList<WorkloadEntry> advisoryInstalled = [];
 
         if (EffectivePrerelease(includePrerelease))
         {
@@ -101,12 +102,13 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
 
         if (!force && !LooksLikeLocalPackagePath(workload))
         {
+            advisoryInstalled = await _store.GetWorkloadsAsync(cancellationToken);
             // Spec §4.1: when any version of <package> is already installed,
             // prompt the user to use `update` instead. --force skips the
             // prompt entirely. Non-interactive contexts treat the prompt as
             // a decline and exit non-zero with the same hint. Local .nupkg
             // installs bypass the check since the resolver path differs.
-            int? earlyExit = await HandleAlreadyInstalledAsync(workload, exact, source, includePrerelease, cancellationToken);
+            int? earlyExit = await HandleAlreadyInstalledAsync(workload, exact, source, includePrerelease, advisoryInstalled, cancellationToken);
             if (earlyExit is { } code)
             {
                 return code;
@@ -132,6 +134,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                             includePrerelease,
                             exact,
                             force,
+                            new WorkloadInstallExpectation(advisoryInstalled),
                             progress,
                             ct);
                 },
@@ -191,9 +194,9 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         bool exact,
         string? source,
         bool? includePrerelease,
+        IReadOnlyList<WorkloadEntry> installed,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         if (installed.Count == 0)
         {
             return null;
