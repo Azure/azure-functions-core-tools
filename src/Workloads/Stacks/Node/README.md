@@ -15,8 +15,12 @@ func workload install node
 
 ## Status
 
-Preview. The project initializer is currently a stub; full scaffolding lands
-in a follow-up release.
+Preview. The existing initializer scaffolds v4 JavaScript/TypeScript projects.
+The stack artifact also carries [native basic project and HTTP item
+templates](NativeTemplates/README.md), registered locally during normal stack
+installation. Their staged command journey is not a public `init`/`new` switch;
+creation-time npm actions and destructive bundled lifecycle operations remain
+explicit limitations.
 
 ## Links
 

@@ -19,13 +19,20 @@ internal sealed class Program
     private static async Task Main(string[] args)
     {
         string mode = args[0];
+        if (mode == "bundled-node")
+        {
+            Environment.ExitCode = await new BundledNodeProcess().RunAsync(args, CancellationToken.None);
+            return;
+        }
         WorkloadPathsOptions paths = new(args[1]);
         SignalingCoordinator coordinator = new(new FileWorkloadOperationCoordinator(paths));
         PhysicalFileSystem fileSystem = new();
         WorkloadMetadataReader metadata = new();
         WorkloadStore store = mode is "save" or "move" or "directory-crash" or "uninstall-held"
             ? new PausingStore(paths, coordinator) : new WorkloadStore(paths, coordinator);
-        WorkloadDeploymentService deployment = new(paths, store, metadata, coordinator, fileSystem);
+        TemplateStore bundledStore = new(new(paths.Home), fileSystem, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        WorkloadDeploymentService deployment = new(paths, store, metadata, coordinator, fileSystem,
+            new BundledTemplateInstaller(bundledStore, new BasicArtifactInspector(fileSystem), fileSystem, new(paths.Home)));
         using CancellationTokenSource cancellation = new();
         CancellationToken token = cancellation.Token;
         try

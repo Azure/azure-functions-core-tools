@@ -152,6 +152,11 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             }
             return 0;
         }
+        catch (BundledTemplateRegistrationCanceledException ex)
+        {
+            _interaction.WriteWarning(ex.Message);
+            throw;
+        }
         catch (WorkloadPackageNotFoundException ex)
         {
             throw new GracefulException(ex.Message, isUserError: true);
@@ -162,7 +167,11 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         }
         catch (InvalidWorkloadException ex)
         {
-            throw new GracefulException(ex.Message, isUserError: true);
+            throw new GracefulException(ex.Message, ex, isUserError: true);
+        }
+        catch (BundledTemplateRegistrationException ex)
+        {
+            throw new GracefulException(ex.Message, ex, isUserError: true);
         }
         catch (FileNotFoundException ex)
         {
@@ -235,7 +244,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             match = explicitMatches.FirstOrDefault();
         }
 
-        if (match is null)
+        if (match is null || _installer.HasBundledTemplates(match))
         {
             return null;
         }

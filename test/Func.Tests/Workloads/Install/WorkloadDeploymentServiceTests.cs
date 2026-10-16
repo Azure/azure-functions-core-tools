@@ -25,7 +25,8 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     {
         _paths = new WorkloadPathsOptions(Path.Combine(_root, ".azure-functions"));
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        _deploymentService = new WorkloadDeploymentService(_paths, _store, _metadataReader, new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem());
+        _deploymentService = new WorkloadDeploymentService(_paths, _store, _metadataReader, new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem(),
+            Substitute.For<IBundledTemplateInstaller>());
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);

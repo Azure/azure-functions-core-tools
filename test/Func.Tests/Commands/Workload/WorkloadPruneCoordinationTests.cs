@@ -150,7 +150,7 @@ public sealed class WorkloadPruneCoordinationTests
         WorkloadRidPackageSelector selector = new(runtime);
         WorkloadPackageInspector inspector = new(metadata, selector);
         return new(new WorkloadPackageSource(fixture.WorkloadCatalog, inspector, Options.Create(new WorkloadCatalogOptions())),
-            inspector, selector, new WorkloadDeploymentService(fixture.Paths, store, metadata, coordinator, fileSystem),
+            inspector, selector, new WorkloadDeploymentService(fixture.Paths, store, metadata, coordinator, fileSystem, Substitute.For<IBundledTemplateInstaller>()),
             coordinator, store, fileSystem);
     }
 

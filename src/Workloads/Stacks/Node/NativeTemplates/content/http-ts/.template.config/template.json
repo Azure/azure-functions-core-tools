@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": ".NET Foundation",
+  "identity": "Azure.Functions.Node.Http.TypeScript",
+  "groupIdentity": "Azure.Functions.Node.Http",
+  "name": "HTTP trigger",
+  "shortName": "http",
+  "tags": { "type": "item", "language": "TypeScript" },
+  "sourceName": "httpTrigger",
+  "defaultName": "httpTrigger",
+  "preferNameDirectory": false,
+  "symbols": {
+    "AuthLevel": { "type": "parameter", "datatype": "choice", "defaultValue": "anonymous", "replaces": "__AUTH_LEVEL__", "description": "HTTP authorization level.",
+      "choices": [{ "choice": "anonymous" }, { "choice": "function" }, { "choice": "admin" }] }
+  },
+  "constraints": {
+    "host": { "type": "host", "args": [{ "hostname": "func" }] },
+    "stack": { "type": "func-workload", "args": "node" }
+  }
+}

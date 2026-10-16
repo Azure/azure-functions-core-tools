@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Hosting;
@@ -20,6 +21,8 @@ internal static class WorkloadInstallRegistration
         services.AddSingleton<WorkloadRidPackageSelector>();
         services.AddSingleton<IWorkloadPackageInspector, WorkloadPackageInspector>();
         services.AddSingleton<IWorkloadPackageSource, WorkloadPackageSource>();
+        services.AddSingleton<IBasicArtifactInspector, BasicArtifactInspector>();
+        services.AddSingleton<IBundledTemplateInstaller, BundledTemplateInstaller>();
         services.AddSingleton<IWorkloadDeploymentService, WorkloadDeploymentService>();
         services.AddSingleton<IWorkloadInstaller, WorkloadInstaller>();
 

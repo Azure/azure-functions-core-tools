@@ -7,6 +7,7 @@
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>node</WorkloadAlias>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,10 +16,15 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <ProjectReference Include="NativeTemplates/Workloads.Node.Templates.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <Compile Remove="NativeTemplates/**" />
+    <EmbeddedResource Remove="NativeTemplates/**" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Templates/**" />
   </ItemGroup>
+
+  <Import Project="$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets" />
 
 </Project>

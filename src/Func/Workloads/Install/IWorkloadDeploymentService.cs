@@ -8,8 +8,17 @@ namespace Azure.Functions.Cli.Workloads.Install;
 
 internal interface IWorkloadDeploymentService
 {
+    public bool HasBundledTemplates(WorkloadEntry entry);
     public Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken);
-    public Task ValidateReuseAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared, CancellationToken cancellationToken);
+    /// <summary>
+    /// Revalidates the leased registry and payload, optionally checking native registration without registering packages.
+    /// </summary>
+    public Task ValidateReuseAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared, CancellationToken cancellationToken, bool checkOnly = false);
+    /// <summary>
+    /// Revalidates reuse and admits workload ownership before registering bundles under continuous native protection.
+    /// </summary>
+    public Task<WorkloadInstallResult> CommitPreparedReuseAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared,
+        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken);
     public Task<WorkloadEntry> GetAdvisoryUpdateTargetAsync(string packageId, NuGetVersion? targetInstalledVersion,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken);
     public Task<WorkloadInstallResult?> GetAdvisoryExplicitReuseAsync(string packageId, string version, CancellationToken cancellationToken);
