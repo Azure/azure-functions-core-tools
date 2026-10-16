@@ -172,6 +172,9 @@ is missing, rather than picking a stale package or scanning a directory.
 When several outer packs use the same native project and build properties in
 one MSBuild invocation, the native pack and its cleanup are cached together.
 Later callers reuse those produced bytes without deleting them.
+The intermediate native archive and declaration share a stable directory per
+`PackageVersion`, so interleaved packs of different versions cannot overwrite
+each other's staged bytes or declaration before the outer package consumes them.
 
 `BundledTemplatesPackagePath` is relative to the physical `tools/any/` or
 `tools/<rid>/` content root. Only `WorkloadKind=workload` runs the target;

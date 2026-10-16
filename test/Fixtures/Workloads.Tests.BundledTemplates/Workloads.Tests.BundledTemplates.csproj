@@ -22,4 +22,5 @@
     <ProjectReference Include="NativeTemplates/Workloads.Tests.BundledTemplates.Native.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
   <Import Project="$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets" />
+  <Import Project="InterleavedPack.targets" />
 </Project>
