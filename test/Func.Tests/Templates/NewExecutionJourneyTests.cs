@@ -58,6 +58,10 @@ public sealed class NewExecutionJourneyTests : IDisposable
         preview.Context.Project.Language.Should().Be("JavaScript");
         preview.Context.Bundle.Should().Be(new TemplateEngineBundleContext(BundleHelpers.StableBundleId, "4.35.0"));
         preview.Invocation!.Changes.Should().ContainSingle(change => change.Path.EndsWith("Generated.txt", StringComparison.Ordinal));
+        preview.Invocation.ProjectConfigurations.Should().BeEmpty();
+        preview.Invocation.ConfiguredProjects.Should().BeEmpty();
+        preview.SelectedTemplate.ProjectConfigurations.Should().BeNull();
+        preview.SelectedTemplate.ProjectConfigurationDiagnostic.Should().BeNull();
         Snapshot().Should().BeEquivalentTo(before);
         Directory.Exists(Target).Should().BeFalse();
         var parsed = preview.ArgumentResults.Should().ContainSingle().Subject;
@@ -80,6 +84,28 @@ public sealed class NewExecutionJourneyTests : IDisposable
         }
 
         AssertJsonKind("created");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_RealJsonAdapter_PreservesOneStructuredPreviewOrFailure(bool invalidArguments)
+    {
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+        var before = Snapshot();
+        string[] tail = invalidArguments ? ["--unknown", "invalid"] : ["--greeting", "hello"];
+
+        int exit = await harness.InvokeAsync([Low, "--path", Target, "--dry-run", "--output", "json", .. tail]);
+
+        exit.Should().Be(invalidArguments ? 1 : 0);
+        using var json = JsonDocument.Parse(stdout.Output);
+        json.RootElement.GetProperty("kind").GetString().Should().Be(invalidArguments ? "invalidArguments" : "previewed");
+        stderr.Reads.Should().Be(0);
+        Directory.Exists(Target).Should().BeFalse();
+        Snapshot().Should().BeEquivalentTo(before);
     }
 
     [Fact]

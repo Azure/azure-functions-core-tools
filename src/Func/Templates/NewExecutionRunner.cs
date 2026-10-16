@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates.Engine;
-using Spectre.Console;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -20,12 +19,14 @@ internal sealed class NewExecutionRunner(
     INewExecutionContextResolver contexts,
     ITemplaterFactory factory,
     ITemplateArgumentParser arguments,
-    IInteractionService interaction) : INewExecutionRunner
+    IInteractionService interaction,
+    TemplateExecutionInteraction prompts) : INewExecutionRunner
 {
     private readonly INewExecutionContextResolver _contexts = contexts ?? throw new ArgumentNullException(nameof(contexts));
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+    private readonly TemplateExecutionInteraction _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
 
     public async Task<NewExecutionResult> ExecuteAsync(
         NewExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -163,7 +164,7 @@ internal sealed class NewExecutionRunner(
                 };
             }
 
-            selectedGroup = await PickAsync("Select an item-template family:", groups, group => GroupIdentity(group[0].Entry), cancellationToken);
+            selectedGroup = await _prompts.PickAsync("Select an item-template family:", groups, group => GroupIdentity(group[0].Entry), cancellationToken);
         }
         else
         {
@@ -183,7 +184,7 @@ internal sealed class NewExecutionRunner(
                 };
             }
 
-            selected = await PickAsync("Select an item-template candidate:", narrowed, template => template.Entry.Identity, cancellationToken);
+            selected = await _prompts.PickAsync("Select an item-template candidate:", narrowed, template => template.Entry.Identity, cancellationToken);
         }
         else
         {
@@ -201,33 +202,8 @@ internal sealed class NewExecutionRunner(
             };
         }
 
-        Dictionary<string, string?> completed = new(StringComparer.Ordinal);
-        foreach (TemplateArgumentParameter parameter in initial.MissingRequiredParameters)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            TemplateParameterDefinition definition = parameter.Definition;
-            string label = $"{parameter.LongAlias} ({definition.DataType})";
-            string value;
-            if (definition.Choices.Count > 0)
-            {
-                value = await PromptForLiteralSelectionAsync(label, definition.Choices.Select(choice => choice.Value), cancellationToken);
-            }
-            else if (definition.DataType.Equals("bool", StringComparison.OrdinalIgnoreCase)
-                || definition.DataType.Equals("boolean", StringComparison.OrdinalIgnoreCase))
-            {
-                value = await PromptForLiteralSelectionAsync(label, ["true", "false"], cancellationToken);
-            }
-            else
-            {
-                value = await _interaction.PromptForInputAsync(Markup.Escape(label), cancellationToken: cancellationToken);
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            completed.Add(definition.CanonicalName, value);
-        }
-
-        TemplateCandidateParseResult final = _arguments.Parse(new(
-            selected.Entry.Identity, selected.Parameters, request.ReservedAliases, request.RawTemplateTokens, completed), cancellationToken);
+        TemplateCandidateParseResult final = await _prompts.CompleteAsync(
+            selected, initial, request.ReservedAliases, request.RawTemplateTokens, cancellationToken);
         if (!final.IsComplete)
         {
             return NewExecutionResult.Reject("invalidCompletion", "Required template values are still invalid or unresolved.") with
@@ -269,26 +245,6 @@ internal sealed class NewExecutionRunner(
                 groups.Add(compatible);
             }
         }
-    }
-
-    private async Task<T> PickAsync<T>(string title, IReadOnlyList<T> choices, Func<T, string> label, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var byLabel = choices.ToDictionary(label, StringComparer.Ordinal);
-        string selected = await PromptForLiteralSelectionAsync(title, byLabel.Keys, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        return byLabel.TryGetValue(selected, out T? value)
-            ? value
-            : throw new InvalidOperationException("The interaction service returned a choice that was not offered.");
-    }
-
-    private async Task<string> PromptForLiteralSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var rawByLabel = choices.ToDictionary(Markup.Escape, StringComparer.Ordinal);
-        string selected = await _interaction.PromptForSelectionAsync(Markup.Escape(title), rawByLabel.Keys, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        return rawByLabel.TryGetValue(selected, out string? raw) ? raw : selected;
     }
 
     private static string GroupIdentity(TemplateCatalogEntry entry) => entry.GroupIdentity ?? entry.Identity;

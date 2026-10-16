@@ -6,6 +6,7 @@ namespace Azure.Functions.Cli.Projects;
 /// <summary>
 /// Describes stack capabilities contributed by installed workloads without selecting an initializer.
 /// </summary>
+/// <exception cref="ConflictingProjectStackMetadataException">Installed stack IDs or alias ownership conflict.</exception>
 internal sealed class InstalledProjectStackCatalog(IEnumerable<IProjectStack> stacks)
 {
     public IReadOnlyList<IProjectStack> Stacks { get; } = ValidateStacks(stacks);
@@ -75,7 +76,7 @@ internal sealed class InstalledProjectStackCatalog(IEnumerable<IProjectStack> st
             ArgumentNullException.ThrowIfNull(stack.SupportedLanguageAliases, nameof(stacks));
             if (!stackIds.Add(stack.Stack))
             {
-                throw new InvalidOperationException($"Multiple installed workloads claim the '{stack.Stack}' stack.");
+                throw new ConflictingProjectStackMetadataException($"Multiple installed workloads claim the '{stack.Stack}' stack.");
             }
 
             RegisterName(stackNames, stack.Stack, stack.Stack, "stack");
@@ -126,7 +127,7 @@ internal sealed class InstalledProjectStackCatalog(IEnumerable<IProjectStack> st
         ValidateName(name);
         if (names.TryGetValue(name, out string? owner) && !string.Equals(owner, canonical, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"The {kind} name or alias '{name}' belongs to both '{owner}' and '{canonical}'.");
+            throw new ConflictingProjectStackMetadataException($"The {kind} name or alias '{name}' belongs to both '{owner}' and '{canonical}'.");
         }
 
         names.TryAdd(name, canonical);

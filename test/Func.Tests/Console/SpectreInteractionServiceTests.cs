@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
+using System.Text.Json;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Spectre.Console;
@@ -10,6 +11,36 @@ namespace Azure.Functions.Cli.Tests.Console;
 
 public class SpectreInteractionServiceTests
 {
+    [Fact]
+    public void WriteJson_UsesRawInjectedStdoutWithoutMarkupOrWrapping()
+    {
+        using var stdout = new BufferedConsole(interactive: false, ansi: false, noColor: true);
+        using var stderr = new BufferedConsole(interactive: false, ansi: false, noColor: true);
+        stdout.Profile.Width = 20;
+        var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+        string literal = "[red]" + new string('x', 200) + "[/]\n\"quoted\"\\ending";
+
+        service.WriteJson(new { Literal = literal });
+
+        using var json = JsonDocument.Parse(stdout.Output);
+        json.RootElement.GetProperty("literal").GetString().Should().Be(literal);
+        stderr.Output.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WriteJson_NullValue_RejectsBeforeWritingToEitherStream()
+    {
+        using var stdout = new BufferedConsole(interactive: false, ansi: false);
+        using var stderr = new BufferedConsole(interactive: false, ansi: false);
+        var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+
+        Action act = () => service.WriteJson(null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("value");
+        stdout.Output.Should().BeEmpty();
+        stderr.Output.Should().BeEmpty();
+    }
+
     [Fact]
     public void WriteRawLine_LongText_WritesVerbatimToInjectedStdout()
     {

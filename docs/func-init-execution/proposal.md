@@ -34,3 +34,120 @@ None.
 - Follows `func-init-quickstarts` for template-first selection, whole-template filters, and multi-project topology.
 - Requires project template packages for every supported installed stack and language.
 - Does not define a new authorization policy for ordinary post-actions; mandatory project configuration actions cannot be skipped or marked continue-on-error.
+
+## Staged installed-project consumer
+
+`InitExecutionCommand` is an unregistered, invocation-scoped harness for the
+installed-project subset. It does not replace public `InitCommand`, alter its
+adoption/healing or workload scaffolding, add a feature flag, or remove providers.
+Its proposed grammar is:
+
+```text
+init [path] --template <identity-or-short-name> [--stack <stack>] [--language <language>]
+     [--name <name>] [--non-interactive] [--dry-run] [--output plain|json] [template options]
+```
+
+Put an explicit target before template options. The optional positional value is
+always a target, never a template reference. Omitted templates are selected
+automatically only when one applicable family remains, or through a family picker
+before variant parsing. The shared strict parser, literal prompts and required
+completion are also used by staged NEW; argument compatibility precedes variant
+precedence, and host name remains outside canonical template parameters.
+
+The target must be absent or empty. Existing content, adoption, repair and
+`--force` cleanup are explicitly unqualified by this harness and rejected without
+deletion. Public init retains those behaviors. The directory becomes both command
+directory and prospective project root before opening one protected project flow;
+stack, language, bundle and existing-project profile defaults remain unavailable.
+
+Project catalog entries carry the existing planner's unconditional declarations
+from that flow's configuration snapshot. Whole-template filters use their
+installed canonical stack/language metadata before selection. Restricted entries
+and their diagnostics remain visible alongside the interactive picker, but are
+never offered as selectable choices. After required completion, native preview
+supplies the actual configuration plans for the authoritative whole-template
+assertion. Preview and creation invoke the exact selected capability in the same
+protected flow. Creation alone finalizes through the existing runtime and atomic
+configuration writer; there is no secondary creation or initializer fallback.
+
+Plain and JSON output distinguish **planned** configurations/effects from
+`ConfiguredProjects`, the actually finalized subset. Configuration failure is
+nonzero, preserves generated content and completed roots, and stops subsequent
+finalization. Cancellation before creation or a configuration commit releases
+the flow without reporting success. Once the native producer returns confirmed
+creation success after the final configuration commit, late cancellation does
+not discard that completed result at the runner or command boundary. A returned
+configuration failure preserves its confirmed subset and nonzero exit even if
+cancellation arrives afterward. Preview, pre-create refusal, unsuccessful native
+returns and canceled tasks retain cancellation; existing adoption/healing policy
+is unchanged.
+The original preflight result is retained as typed `Preview`; `Invocation` is
+populated when a non-dry-run invocation request returns, even if native preflight
+refuses creation. `plannedChanges` and
+`plannedConfigurations` come from that preview, while `completedChanges` and
+configured roots come only from the actual invocation. Dry-run and post-preview
+target refusal never imply completed effects. This keeps preview output truthful
+when the runtime reports only confirmed effects after creation or partial
+finalization.
+Pre-create native refusals may still carry planned `Changes`; those are never
+rendered as completed. Completed effects are exposed only for successful native
+creation or partial configuration finalization, with the native result unchanged.
+Every result after successful plan computation retains that ordered planned
+metadata, including subsequent conflict or revalidation failures; a result
+before planning has no synthetic plan. Project configuration diagnostics remain
+separate from func host metadata diagnostics and block capability creation.
+
+In JSON mode, unavailable discovery entries and their diagnostics travel as
+`unavailableTemplates` data rather than a pre-rendered table. Prompts stay on
+stderr and complete stdout is one JSON result, or empty when cancellation
+prevents a result. The shared Spectre adapter writes unchanged serialized JSON
+through its existing raw stdout writer, honoring both injected and default
+stdout without markup rendering.
+
+The installed-fixture tests compose actual Node workload metadata, native project
+creation, canonical configuration, project resolution, and `ProfileResolver`.
+They exercise a literal two-root layout as well as homogeneous variants and
+mixed-language unconditional roots. This is not qualification of conditional
+topology, renaming, remapped sources, supplemental configuration or ordinary
+post-actions: the existing planner rejects those. The fixture configuration
+action GUID and its input schema remain provisional, not a public authoring ABI.
+
+The synchronized consumer uses installed `IProjectStack` metadata through the
+same shared `InstalledProjectStackCatalog` used by its project planner. It does
+not read initializer metadata or invoke initializer behavior. Composition-root
+delegates defer that catalog and the existing paired `TemplateProjectSupport`
+until the workflow needs them. The catalog resolves once before support or an
+engine environment is requested, so conflicting definitions still return the
+structured `duplicateStacks` failure without creating files.
+
+Conflicts at the catalog's existing duplicate-ID and alias-ownership checks now
+throw the internal `ConflictingProjectStackMetadataException` subtype of
+`InvalidOperationException`, with the same messages and validation order. This
+is an intentional internal exception-contract refinement, not a new validation
+policy or unchanged exact exception behavior. Only that subtype maps to the
+workflow conflict result; malformed metadata and unrelated provider/constructor
+faults retain their normal propagation. No second catalog or competing predicate
+is introduced.
+
+The project flow uses the current asynchronous protected factory, retains the
+selected capability through preview/create, and finalizes through its paired
+planner/create-only writer. Existing CLI configuration is never overwritten by
+this native creation path; public legacy init/adopt/heal persistence remains
+separate. PROJECT constraints are workload-gated; `func-bundle` remains ITEM-only,
+and new-project bundle context stays unavailable.
+
+Package acquisition, production default templates for
+all six stacks, fresh/upgraded installability, and a Functions-owned browse URL
+remain switch gates. Missing-template diagnostics give explicit
+`func new install <package>` guidance without inventing a package ID or URL.
+
+The synchronized published runtime is consumed without changing its native
+guard/name/topology algorithms. This stage does not clear the remaining
+provider-held review gate, and its controlled fixtures do not establish general
+type, path, concurrent-store or platform safety. The additive
+declaration/result projection hunks in `Templater.GetCandidatesAsync`,
+`TemplateEngineSession.ValidateProjectConfiguration` / project result initializers,
+`TemplateCatalogEntry` and `TemplateInvocationResult` are explicit future
+composition conflict surfaces; snapshot shape, mounted-type authorization,
+read-snapshot validation, effect/path guards and native invocation order are
+unchanged. No completed public INIT switch or milestone is claimed.

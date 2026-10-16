@@ -26,6 +26,8 @@ internal sealed record TemplateFileChange(string Path, string Kind);
 
 internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status, IReadOnlyList<TemplateFileChange> Changes, string? Diagnostic = null)
 {
+    public IReadOnlyList<TemplateProjectConfigurationPlan> ProjectConfigurations { get; init; } = [];
+
     public IReadOnlyList<string> ConfiguredProjects { get; init; } = [];
 }
 

@@ -58,7 +58,7 @@ internal class TemplateEngineSession : IDisposable
 
     public bool ProjectTemplatesEnabled => _projectSupport is not null;
 
-    public void ValidateProjectConfiguration(string configuration)
+    public IReadOnlyList<TemplateProjectConfigurationDeclaration> ValidateProjectConfiguration(string configuration)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_projectSupport is null)
@@ -66,7 +66,7 @@ internal class TemplateEngineSession : IDisposable
             throw new InvalidTemplateMetadataException("Mandatory project configuration is not enabled in this template flow.");
         }
 
-        _projectSupport.Planner.Read(configuration);
+        return _projectSupport.Planner.Read(configuration);
     }
 
     public IEngineEnvironmentSettings Settings
@@ -298,7 +298,10 @@ internal class TemplateEngineSession : IDisposable
                 configurationPlans = projectSupport.Planner.CreatePlans(configuration.Content, preview.CreationEffects, output);
                 if (configurationPlans.Any(projectSupport.Writer.ConfigurationExists))
                 {
-                    return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic);
+                    return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic)
+                    {
+                        ProjectConfigurations = configurationPlans,
+                    };
                 }
 
                 changes = Array.AsReadOnly<TemplateFileChange>([.. changes,
@@ -306,51 +309,66 @@ internal class TemplateEngineSession : IDisposable
             }
             catch (InvalidTemplateMetadataException exception)
             {
-                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message)
+                {
+                    ProjectConfigurations = configurationPlans,
+                };
             }
         }
 
         bool requiresForce = !request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal));
         if (!request.DryRun && requiresForce)
         {
-            return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.");
+            return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
 
         string? outputFailure = ValidateOutputPaths(output, changes);
         if (outputFailure is not null)
         {
-            return new(TemplateInvocationStatus.Failed, [], outputFailure);
+            return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
         }
 
         if (request.DryRun)
         {
-            return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null);
+            return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null)
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
         if (configurationFailure is not null)
         {
-            return configurationFailure;
+            return configurationFailure with { ProjectConfigurations = configurationPlans };
         }
 
         outputFailure = ValidateOutputPaths(output, changes);
         if (outputFailure is not null)
         {
-            return new(TemplateInvocationStatus.Failed, [], outputFailure);
+            return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
         }
 
         ITemplateCreationResult created = await InstantiateAsync(template, request, CreateInputData(configuration.Parameters, parameters), false, cancellationToken);
         if (created.Status != CreationResultStatus.Success)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return new(MapCreationStatus(created.Status, cancellationToken), [], created.ErrorMessage ?? created.Status.ToString());
+            return new(MapCreationStatus(created.Status, cancellationToken), [], created.ErrorMessage ?? created.Status.ToString())
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
 
         // Native success may already have committed files; preserve its effects even if cancellation arrives afterward.
         if (created.CreationEffects is null)
         {
-            return new(TemplateInvocationStatus.EngineFailure, [], "The template engine did not report creation effects.");
+            return new(TemplateInvocationStatus.EngineFailure, [], "The template engine did not report creation effects.")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
 
         IReadOnlyList<TemplateFileChange> written = Array.AsReadOnly<TemplateFileChange>(
@@ -359,7 +377,10 @@ internal class TemplateEngineSession : IDisposable
             || ValidateOutputPaths(output, templateChanges) is not null
             || written.Any(change => !HasExpectedOutputKind(output, change, directoryOutputs)))
         {
-            return new(TemplateInvocationStatus.EngineFailure, [], "Template creation did not produce the validated output paths.");
+            return new(TemplateInvocationStatus.EngineFailure, [], "Template creation did not produce the validated output paths.")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
 
         if (projectSupport is null)
@@ -375,7 +396,11 @@ internal class TemplateEngineSession : IDisposable
             outputFailure = ValidateOutputPaths(output, changes);
             if (outputFailure is not null)
             {
-                return new(TemplateInvocationStatus.ConfigurationFailure, completedChanges.AsReadOnly(), outputFailure) { ConfiguredProjects = configuredProjects.AsReadOnly() };
+                return new(TemplateInvocationStatus.ConfigurationFailure, completedChanges.AsReadOnly(), outputFailure)
+                {
+                    ProjectConfigurations = configurationPlans,
+                    ConfiguredProjects = configuredProjects.AsReadOnly(),
+                };
             }
 
             try
@@ -384,22 +409,26 @@ internal class TemplateEngineSession : IDisposable
             }
             catch (IOException exception)
             {
-                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken);
+                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
             }
             catch (UnauthorizedAccessException exception)
             {
-                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken);
+                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
             }
             catch (InvalidOperationException exception)
             {
-                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken);
+                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
             }
 
             configuredProjects.Add(plan.Root);
             completedChanges.Add(new(Path.GetRelativePath(output, plan.ConfigurationPath), "Create"));
         }
 
-        return new(TemplateInvocationStatus.Success, completedChanges.AsReadOnly()) { ConfiguredProjects = configuredProjects.AsReadOnly() };
+        return new(TemplateInvocationStatus.Success, completedChanges.AsReadOnly())
+        {
+            ProjectConfigurations = configurationPlans,
+            ConfiguredProjects = configuredProjects.AsReadOnly(),
+        };
     }
 
     private static TemplateInvocationResult ConfigurationFailure(Exception exception, IReadOnlyList<TemplateFileChange> changes,
