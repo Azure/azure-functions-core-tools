@@ -35,7 +35,7 @@ Several TemplateEngine components capture environment settings at construction. 
 command context resolution
           |
           v
-ITemplaterFactory.Create(context)
+await ITemplaterFactory.CreateAsync(context, cancellationToken)
           |
           v
       Templater
@@ -337,3 +337,5 @@ Specific exceptions remain appropriate for programmer contract violations, cance
 5. Remove public exposure of raw engine objects after all command callers migrate.
 
 Rollback consists of reverting command callers to the previous facade while the new models remain unused; the shared settings hive and installed package registry format do not change.
+
+The draft protected-store implementation makes factory admission asynchronous and cancellation-aware. Its shared lease spans private native settings/cache initialization, catalog access, selection, and invocation, and is released only after native disposal. Live package mounts remain protected even though the engine's cache writes occur in an opaque private settings copy. See `../template-package-install/design.md`, “Draft protected-store foundation,” for provisional APIs, recovery mechanics, qualification evidence, intentional cache-warming differences, and command/lifecycle integration exclusions. These mechanics do not change workload availability or authorize acquisition inside a browsing flow.

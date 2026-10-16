@@ -366,6 +366,7 @@ public sealed class ProfileCommandTests : IDisposable
         public TempDirectory CreateTempDirectory() => throw new NotImplementedException();
         public TempDirectory CreateTempDirectory(string parentDirectory) => throw new NotImplementedException();
         public void CopyDirectory(string sourcePath, string destinationPath) => throw new NotImplementedException();
+        public Task CopyDirectoryAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken) => throw new NotImplementedException();
         public void DeleteDirectory(string path) => throw new NotImplementedException();
         public IReadOnlyList<string> GetFiles(string directoryPath) => throw new NotImplementedException();
         public void ExtractZip(string zipPath, string destinationDirectory) => throw new NotImplementedException();

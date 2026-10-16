@@ -98,6 +98,11 @@ internal interface IFileSystem
     public void CopyDirectory(string sourcePath, string destinationPath);
 
     /// <summary>
+    /// Copies a directory tree, honoring cancellation while streaming each file.
+    /// </summary>
+    public Task CopyDirectoryAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Deletes a directory and all its contents.
     /// </summary>
     public void DeleteDirectory(string path);

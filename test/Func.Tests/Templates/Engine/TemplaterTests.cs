@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.Extensions.Logging.Abstractions;
 using Azure.Functions.Cli.Tests.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.TemplateEngine.Abstractions;
@@ -248,9 +249,10 @@ public sealed class TemplaterTests : IDisposable
         var output = WorkingDirectory.FromExplicit(Path.Combine(parentDirectory, "generated"));
         TemplateProjectConfigurationPlanner planner = new(new([stack]));
         TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
-        ITemplaterFactory factory = new TemplaterFactory(new(home));
+        ITemplaterFactory factory = new TemplaterFactory(new TemplateStore(new(home), new PhysicalFileSystem(),
+            new FileTemplateStoreLock(), NullLoggerFactory.Instance));
         var snapshot = new TemplateConstraintEvaluationSnapshot([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]);
-        using Templater templater = factory.CreateProject(new(output), snapshot, new(planner, writer));
+        using Templater templater = await factory.CreateProjectAsync(new(output), snapshot, new(planner, writer), cancellationToken);
         var resolution = await templater.ResolveGroupAsync("Func.Tests.RunnableNodeProject", TemplateType.Project, cancellationToken);
         var selected = resolution.Group!.Single();
         var request = new TemplateInvocationRequest(output, new Dictionary<string, string?> { ["Greeting"] = "Hello" }, "GeneratedApp", DryRun: true);

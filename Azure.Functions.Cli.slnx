@@ -36,6 +36,7 @@
     <Project Path="src/Workloads/Workers/Python/Workloads.Workers.Python.csproj" />
   </Folder>
   <Folder Name="/test/">
+    <Project Path="test/Fixtures/Templates.Tests.StoreProcess/Templates.Tests.StoreProcess.csproj" />
     <Project Path="test/Fixtures/Workloads.Tests.Fixtures.Default/Workloads.Tests.Fixtures.Default.csproj" />
     <Project Path="test/Fixtures/Workloads.Tests.Fixtures.Sdk/Workloads.Tests.Fixtures.Sdk.csproj" />
     <Project Path="test/Fixtures/Workloads.Tests.Fixtures.WithCommand/Workloads.Tests.Fixtures.WithCommand.csproj" />

@@ -38,6 +38,8 @@ internal static class TemplatesServiceCollectionExtensions
         services.AddSingleton<INewCommandRunner, NewCommandRunner>();
         services.AddSingleton<ITemplateArgumentParser, TemplateArgumentParser>();
         services.AddSingleton<ITemplaterFactory, TemplaterFactory>();
+        services.AddSingleton<ITemplateStoreLock, FileTemplateStoreLock>();
+        services.AddSingleton<ITemplateStore, TemplateStore>();
 
         return services;
     }
