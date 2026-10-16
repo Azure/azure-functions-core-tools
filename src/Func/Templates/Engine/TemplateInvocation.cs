@@ -19,11 +19,15 @@ internal enum TemplateInvocationStatus
     TemplateUnavailable,
     InvalidTemplate,
     EngineFailure,
+    ConfigurationFailure,
 }
 
 internal sealed record TemplateFileChange(string Path, string Kind);
 
-internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status, IReadOnlyList<TemplateFileChange> Changes, string? Diagnostic = null);
+internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status, IReadOnlyList<TemplateFileChange> Changes, string? Diagnostic = null)
+{
+    public IReadOnlyList<string> ConfiguredProjects { get; init; } = [];
+}
 
 internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters)
 {

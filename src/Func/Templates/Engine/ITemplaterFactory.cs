@@ -14,4 +14,11 @@ internal interface ITemplaterFactory
     public Templater Create(TemplateEngineContext context);
 
     public Templater Create(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot);
+
+    /// <summary>
+    /// Creates an internal project-enabled flow; production commands and DI do not activate this staged path yet.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">The context, availability snapshot or paired project support is null.</exception>
+    public Templater CreateProject(
+        TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot, TemplateProjectSupport projectSupport);
 }
