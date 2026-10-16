@@ -144,6 +144,10 @@ even with force. Content-only randomness remains supported.
 Preview and file-conflict results describe proposed changes. Successful creation
 uses native creation effects and checks that the reported paths exist (or were
 deleted), rather than returning the earlier preview as if it had been written.
+Native directory effects, including default or custom empty-directory placeholders,
+retain their expected kind from preflight. Completion requires that specific file
+or directory kind; a zero-byte regular file is still a file. Missing entries,
+wrong-kind substitutions and linked child paths do not satisfy the postcondition.
 Creation failures do not report preview paths as completed effects; partial output
 is still possible if the native engine fails after writing. Existing links below
 the requested output directory are rejected; the requested directory and its
