@@ -1,11 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using Azure.Functions.Cli.Commands.Setup;
-using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Workloads;
@@ -17,7 +15,7 @@ namespace Azure.Functions.Cli.Tests.Commands.Setup;
 public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
 {
     private const string CachedVersion = "9999.0.0";
-    private const string UnusedSource = "http://127.0.0.1:1/v3/index.json";
+    private const string UnusedSource = CliProcessTestRunner.UnusedSource;
 
     [Theory]
     [Trait("Category", "Integration")]
@@ -35,6 +33,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
         WorkloadPathsOptions workloads = new(Path.Combine(directory, "workload-home"));
         string project = Path.Combine(directory, "project");
         using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(60));
+        CliProcessTestRunner runner = new(output);
 
         try
         {
@@ -68,9 +67,8 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             }
 
             // The rejected .net spelling fails inside setup, before any profile or package lookup.
-            CliResult result = await RunCliAsync(directory, paths.Home, workloads.Home, project, args, cancellation.Token);
+            CliProcessTestRunner.CliResult result = await runner.RunAsync(directory, paths.Home, workloads.Home, project, args, cancellation.Token);
 
-            output.WriteLine("stdout: {0}{1}stderr: {2}", result.StandardOutput, Environment.NewLine, result.StandardError);
             result.ExitCode.Should().Be(fail ? 1 : 0, "stdout: {0}{1}stderr: {2}",
                 result.StandardOutput, Environment.NewLine, result.StandardError);
             if (json || check)
@@ -126,7 +124,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
                 // Check must preserve existing state as well as avoid creating it.
                 const string sentinel = "existing first-run completion";
                 await File.WriteAllTextAsync(marker, sentinel, cancellation.Token);
-                CliResult repeated = await RunCliAsync(directory, paths.Home, workloads.Home, project, args, cancellation.Token);
+                CliProcessTestRunner.CliResult repeated = await runner.RunAsync(directory, paths.Home, workloads.Home, project, args, cancellation.Token);
 
                 repeated.ExitCode.Should().Be(result.ExitCode);
                 repeated.StandardOutput.Should().NotContain(CachedVersion);
@@ -166,6 +164,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
         WorkloadPathsOptions workloads = new(Path.Combine(directory, "workload-home"));
         string project = Path.Combine(directory, "project");
         using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(60));
+        CliProcessTestRunner runner = new(output);
 
         try
         {
@@ -173,9 +172,8 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             Directory.CreateDirectory(project);
             await File.WriteAllTextAsync(paths.VersionCachePath, CachedVersion, cancellation.Token);
 
-            CliResult result = await RunCliAsync(directory, paths.Home, workloads.Home, project, args, cancellation.Token);
+            CliProcessTestRunner.CliResult result = await runner.RunAsync(directory, paths.Home, workloads.Home, project, args, cancellation.Token);
 
-            output.WriteLine("stdout: {0}{1}stderr: {2}", result.StandardOutput, Environment.NewLine, result.StandardError);
             result.ExitCode.Should().Be(expectedExit);
             result.StandardError.Should().NotContain("unexpected error");
             if (expectedExit == 0) result.StandardError.Should().BeEmpty();
@@ -202,100 +200,6 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
         }
     }
 
-    private static async Task<CliResult> RunCliAsync(
-        string directory, string home, string workloadsHome, string project, IReadOnlyList<string> args, CancellationToken cancellationToken)
-    {
-        string testAssembly = typeof(SetupProgramAdvisoryTests).Assembly.Location;
-        ProcessStartInfo startInfo = new()
-        {
-            FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
-            WorkingDirectory = project,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            RedirectStandardInput = true,
-            CreateNoWindow = true,
-        };
-        startInfo.ArgumentList.Add("exec");
-        startInfo.ArgumentList.Add("--runtimeconfig");
-        startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".runtimeconfig.json"));
-        startInfo.ArgumentList.Add("--depsfile");
-        startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".deps.json"));
-        startInfo.ArgumentList.Add(typeof(SetupCommand).Assembly.Location);
-        foreach (string arg in args)
-        {
-            startInfo.ArgumentList.Add(arg);
-        }
-
-        // Preserve only host/runtime discovery. Do not inherit CLI options, credentials, hooks, or user caches.
-        startInfo.Environment.Clear();
-        string[] inheritedKeys =
-        [
-            "PATH", "SystemRoot", "WINDIR", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432",
-            "DOTNET_ROOT", "DOTNET_ROOT_X64", "DOTNET_ROOT_X86", "DOTNET_ROOT_ARM64", "DOTNET_ROOT(x86)",
-            "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH",
-        ];
-        foreach (string key in inheritedKeys)
-        {
-            if (Environment.GetEnvironmentVariable(key) is { } value)
-            {
-                startInfo.Environment[key] = value;
-            }
-        }
-
-        string[] isolatedKeys =
-        [
-            "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "DOTNET_CLI_HOME",
-            "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "NUGET_PACKAGES",
-            "NUGET_HTTP_CACHE_PATH", "NUGET_PLUGINS_CACHE_PATH", "TEMP", "TMP", "TMPDIR",
-        ];
-        foreach (string key in isolatedKeys)
-        {
-            string isolatedPath = Path.Combine(directory, key.ToLowerInvariant());
-            Directory.CreateDirectory(isolatedPath);
-            startInfo.Environment[key] = isolatedPath;
-        }
-
-        startInfo.Environment[Abstractions.Common.Constants.FuncHomeEnvironmentVariable] = home;
-        startInfo.Environment[Constants.WorkloadsHomeEnvironmentVariable] = workloadsHome;
-        startInfo.Environment[Constants.WorkloadsSourceEnvironmentVariable] = UnusedSource;
-        startInfo.Environment[Constants.ProfilesCdnBaseUrlEnvironmentVariable] = "http://127.0.0.1:1/";
-        startInfo.Environment[Constants.TelemetryOptOutEnvVar] = "1";
-        startInfo.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
-        startInfo.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1";
-        startInfo.Environment["NO_COLOR"] = "1";
-
-        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start the CLI test process.");
-        process.StandardInput.Close();
-        Task<string> stdout = process.StandardOutput.ReadToEndAsync();
-        Task<string> stderr = process.StandardError.ReadToEndAsync();
-        try
-        {
-            await process.WaitForExitAsync(cancellationToken);
-            await Task.WhenAll(stdout, stderr).WaitAsync(cancellationToken);
-            return new CliResult(process.ExitCode, await stdout, await stderr);
-        }
-        finally
-        {
-            using CancellationTokenSource cleanup = new(TimeSpan.FromSeconds(10));
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (InvalidOperationException) when (process.HasExited)
-                {
-                    // The owned process exited between the check and kill.
-                }
-
-                await process.WaitForExitAsync(cleanup.Token);
-            }
-
-            await Task.WhenAll(stdout, stderr).WaitAsync(cleanup.Token);
-        }
-    }
-
     private static JsonElement[] ReadPhysicalEvents(string stdout)
     {
         List<JsonElement> events = [];
@@ -312,6 +216,4 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
         events.Should().NotBeEmpty();
         return [.. events];
     }
-
-    private sealed record CliResult(int ExitCode, string StandardOutput, string StandardError);
 }
