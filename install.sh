@@ -15,6 +15,8 @@ readonly HEAD_REQUEST_TIMEOUT_SEC=60
 readonly DEFAULT_INSTALL_DIR="$HOME/.azure-functions"
 readonly DOWNLOAD_BASE_URL="https://cdn.functions.azure.com"
 readonly VERSION_MANIFEST_URL="${DOWNLOAD_BASE_URL}/public/cli/v5/version.json"
+readonly INSTALLATION_METADATA_FILE="func.installation.json"
+readonly INSTALLATION_METADATA_JSON='{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}'
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
@@ -53,6 +55,27 @@ say_error() {
 say_verbose() {
     if [[ "$VERBOSE" == true ]]; then
         echo -e "${YELLOW}$1${RESET}" >&2
+    fi
+}
+
+write_installation_metadata() {
+    local metadata_path="${INSTALL_DIR}/${INSTALLATION_METADATA_FILE}"
+    local temp_path
+
+    if [[ -d "$metadata_path" ]]; then
+        say_error "Cannot write installation metadata because ${metadata_path} is a directory."
+        return 1
+    fi
+
+    temp_path=$(mktemp "${INSTALL_DIR}/.${INSTALLATION_METADATA_FILE}.tmp.XXXXXX")
+    if ! printf '%s\n' "$INSTALLATION_METADATA_JSON" > "$temp_path" || ! chmod 0644 "$temp_path"; then
+        rm -f "$temp_path"
+        return 1
+    fi
+
+    if ! mv -f "$temp_path" "$metadata_path"; then
+        rm -f "$temp_path"
+        return 1
     fi
 }
 
@@ -389,19 +412,82 @@ else
     validate_content_type "$DOWNLOAD_URL" || exit 1
     say_info "Downloading ${ASSET_NAME}..."
     secure_curl "$DOWNLOAD_URL" "${TEMP_DIR}/${ASSET_NAME}"
-    mkdir -p "$INSTALL_DIR"
-    tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$INSTALL_DIR"
+    PAYLOAD_DIR="${TEMP_DIR}/payload"
+    mkdir -p "$PAYLOAD_DIR"
+    tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$PAYLOAD_DIR"
 
-    if [[ "$OS" == "osx" ]]; then
-        xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
+    if [[ -L "${PAYLOAD_DIR}/func" || ! -f "${PAYLOAD_DIR}/func" || ! -x "${PAYLOAD_DIR}/func" ]]; then
+        say_error "The downloaded archive does not contain an executable func CLI."
+        exit 1
+    fi
+    if [[ -e "${PAYLOAD_DIR}/${INSTALLATION_METADATA_FILE}" || -L "${PAYLOAD_DIR}/${INSTALLATION_METADATA_FILE}" ]]; then
+        say_error "The downloaded archive must not contain installation metadata."
+        exit 1
     fi
 
-    # Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
-    cat > "${INSTALL_DIR}/func5" <<'EOF'
+    mkdir -p "$INSTALL_DIR"
+    PUBLICATION_BACKUP_DIR="${TEMP_DIR}/publication-backup"
+    mkdir "$PUBLICATION_BACKUP_DIR"
+    PUBLICATION_NAMES=("func5")
+    while IFS= read -r -d '' payload_entry; do
+        payload_name="${payload_entry#"${PAYLOAD_DIR}/"}"
+        if [[ "$payload_name" != "func5" ]]; then
+            PUBLICATION_NAMES+=("$payload_name")
+        fi
+    done < <(find "$PAYLOAD_DIR" -mindepth 1 -maxdepth 1 -print0)
+
+    BACKED_UP_NAMES=()
+    for publication_name in "${PUBLICATION_NAMES[@]}"; do
+        destination_path="${INSTALL_DIR}/${publication_name}"
+        if [[ -e "$destination_path" || -L "$destination_path" ]]; then
+            cp -pR "$destination_path" "$PUBLICATION_BACKUP_DIR/"
+            BACKED_UP_NAMES+=("$publication_name")
+        fi
+    done
+
+    publish_installation() {
+        cp -pR "${PAYLOAD_DIR}/." "$INSTALL_DIR/" || return 1
+
+        if [[ "$OS" == "osx" ]]; then
+            xattr -d com.apple.quarantine "${INSTALL_DIR}/func" 2>/dev/null || true
+        fi
+
+        # Drop a func5 wrapper so v5 can be invoked side-by-side with a v4 `func` on PATH.
+        if ! cat > "${INSTALL_DIR}/func5" <<'EOF'
 #!/usr/bin/env bash
 exec "$(dirname "$0")/func" "$@"
 EOF
-    chmod +x "${INSTALL_DIR}/func5"
+        then
+            return 1
+        fi
+        chmod +x "${INSTALL_DIR}/func5" || return 1
+        write_installation_metadata || return 1
+    }
+
+    rollback_installation() {
+        local publication_name
+        local rollback_failed=false
+        for publication_name in "${PUBLICATION_NAMES[@]}"; do
+            if ! rm -rf -- "${INSTALL_DIR:?}/${publication_name}"; then
+                rollback_failed=true
+            fi
+        done
+        for publication_name in ${BACKED_UP_NAMES[@]+"${BACKED_UP_NAMES[@]}"}; do
+            if ! cp -pR "${PUBLICATION_BACKUP_DIR}/${publication_name}" "$INSTALL_DIR/"; then
+                rollback_failed=true
+            fi
+        done
+        [[ "$rollback_failed" == false ]]
+    }
+
+    if ! publish_installation; then
+        if ! rollback_installation; then
+            say_error "Installation failed and the previous installation could not be fully restored."
+            exit 1
+        fi
+        say_error "Installation failed; the previous installation was restored."
+        exit 1
+    fi
 fi
 
 # --- PATH / shell profile ---
@@ -553,4 +639,3 @@ if [[ "$SKIP_PATH" != true && -n "$UPDATED_PROFILE" ]]; then
     say_info "To use the func CLI in new terminal sessions, restart your terminal or run:"
     say_info "  source ${UPDATED_PROFILE}"
 fi
-

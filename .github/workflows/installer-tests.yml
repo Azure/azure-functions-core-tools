@@ -1,0 +1,37 @@
+name: Installer tests
+
+on:
+  pull_request:
+    paths:
+      - install.ps1
+      - install.sh
+      - test/Installers/**
+      - .github/workflows/installer-tests.yml
+  push:
+    branches:
+      - vnext
+    paths:
+      - install.ps1
+      - install.sh
+      - test/Installers/**
+      - .github/workflows/installer-tests.yml
+
+permissions:
+  contents: read
+
+jobs:
+  installation-metadata:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate installer metadata publication
+        shell: pwsh
+        run: ./test/Installers/InstallationMetadata.Tests.ps1
