@@ -29,6 +29,15 @@ internal sealed class NativeTemplatePackageScope(IReadOnlyList<NativeTemplatePac
     private readonly IReadOnlyList<NativeTemplatePackagePin> _owned = Freeze(owned, nameof(owned));
     private readonly IReadOnlyList<NativeTemplatePackagePin> _active = Freeze(active, nameof(active));
 
+    public NativeTemplatePackageScope ForPhysicalOwner(string packageId, string version)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        return new(_owned, Array.AsReadOnly<NativeTemplatePackagePin>([.. _active.Where(pin =>
+            pin.Origin is { } origin && string.Equals(origin.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
+                && origin.Version == version)]), ownership);
+    }
+
     public bool Includes(TemplatePackageInfo? package) => package is null
         || !_owned.Any(pin => Matches(pin, package))
         || _active.Any(pin => Matches(pin, package));

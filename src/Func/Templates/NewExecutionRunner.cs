@@ -73,6 +73,10 @@ internal sealed class NewExecutionRunner(
         {
             return NewExecutionResult.Reject("stackUpdateRequired", diagnostic) with { Context = context };
         }
+        if (_stackCompatibility is not null)
+        {
+            availability = _stackCompatibility.ForStack(availability, context.Project!.Stack!);
+        }
         using Templater templater = await _factory.CreateAsync(context, availability, cancellationToken,
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();

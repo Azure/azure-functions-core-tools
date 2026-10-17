@@ -216,6 +216,10 @@ internal sealed class InitExecutionRunner(
             }
         }
 
+        if (requestedStack is not null && _stackCompatibility is not null)
+        {
+            availability = _stackCompatibility.ForStack(availability, requestedStack.Stack);
+        }
         TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null));
         cancellationToken.ThrowIfCancellationRequested();
         TemplateProjectSupport support = _projectSupport();

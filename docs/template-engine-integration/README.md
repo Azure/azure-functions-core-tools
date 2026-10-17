@@ -10,6 +10,14 @@ there is no opt-in flag, environment switch, or automatic legacy-template fallba
 The old command implementations remain available only to internal compatibility controls.
 Unrelated commands retain the common command graph, start-argument normalization,
 first-run handling, telemetry, version notices, and cancellation wiring.
+Command ownership comes from that real graph, including aliases and nested
+commands, not token presence in a miniature tree. Valid CWD configuration is
+loaded before workload registration and DI command construction. An expected
+project-configuration load error is deferred only until the actual command is
+known: unrelated commands rethrow the original error before startup/invocation,
+while template commands inspect their explicit target through named providers.
+Supported non-template response files retain System.CommandLine handling;
+template argv retains its existing strict, unexpanded provenance.
 
 Fresh `init` preserves unrelated files, `.git`, and existing scaffold files when
 `--force` is absent. Native generation supplies missing files; preserved files are
@@ -25,6 +33,11 @@ while unavailable input permits the explicit force request. The selected native
 template, arguments, output plan, and stack preparation are qualified before
 confirmation and cleanup. Cleanup preserves `.git` and checks cancellation before
 deleting. Cancellation or failure before cleanup preserves project bytes.
+The explicit pre-cleanup preview uses a read-only future-directory view, so
+regular `.func`, `src`, or other generated-directory ancestors that cleanup will
+remove do not block qualification. Safety checks still inspect the real
+filesystem for links, reparse points, preserved paths and output boundaries.
+The future view never applies to actual creation or ordinary previews.
 Cleanup and native creation are not a project-wide transaction: a later native or
 preparation failure can leave cleared or partially created output, reported as a
 failure rather than successful initialization.
@@ -67,7 +80,10 @@ inactive directory; the committed registry and native owner select the new versi
 The native global template cache deduplicates template identities. Runtime
 discovery therefore uses a read-only provider view before that cache, scoped to
 the exact declared package versions, acquisition origins and archive hashes of
-the captured successfully configured workload cohort. It does not select a
+the physical workload that contributed the selected `IProjectStack`, including
+that owner's declared asset closure. Other successful runtimes remain usable
+facts for workload constraints, but do not grant template-source authority.
+It does not select a
 globally newest native version. Proven inactive owned versions are excluded;
 unknown ownership, conflicting records, and malformed active registrations fail
 explicitly rather than disappearing. Exact native scanner discovery validates

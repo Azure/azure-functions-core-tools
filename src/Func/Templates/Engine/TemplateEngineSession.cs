@@ -12,6 +12,7 @@ using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.Mount;
 using Microsoft.TemplateEngine.Abstractions.Parameters;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
+using Microsoft.TemplateEngine.Abstractions.PhysicalFileSystem;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 using Microsoft.TemplateEngine.Edge.Template;
@@ -337,7 +338,8 @@ internal class TemplateEngineSession : IDisposable
         }
 
         TemplateFileChange[] changes = [.. effects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))];
-        diagnostic = ValidateOutputPaths(request.OutputDirectory.Info.FullName, changes);
+        bool cleanupPreview = IsCleanupPreview(template, request);
+        diagnostic = ValidateOutputPaths(request.OutputDirectory.Info.FullName, changes, cleanupPreview);
         if (diagnostic is not null)
         {
             return Failed(diagnostic);
@@ -346,8 +348,6 @@ internal class TemplateEngineSession : IDisposable
         Dictionary<string, ReadOnlyMemory<byte>> expanded = new(StringComparer.Ordinal);
         if (expandFiles)
         {
-            bool cleanupPreview = request.PreviewAfterDirectoryCleanup && request.DryRun && request.Force
-                && configuration.Type == TemplateType.Project && _projectSupport is not null;
             if (string.IsNullOrWhiteSpace(request.Name) || effects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create
                 && !(cleanupPreview && change.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite)))
             {
@@ -747,7 +747,7 @@ internal class TemplateEngineSession : IDisposable
             };
         }
 
-        string? outputFailure = ValidateOutputPaths(output, changes);
+        string? outputFailure = ValidateOutputPaths(output, changes, request.PreviewAfterDirectoryCleanup);
         if (outputFailure is not null)
         {
             return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
@@ -1104,9 +1104,28 @@ internal class TemplateEngineSession : IDisposable
         return new(new ParameterDefinitionSet(definitions), input);
     }
 
-    protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
-        => _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName, parameters,
-            forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
+    protected virtual async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
+        InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
+    {
+        IPhysicalFileSystem? previous = _host.InvocationFileSystem;
+        if (dryRun && IsCleanupPreview(template, request))
+        {
+            _host.InvocationFileSystem = new PlannedCleanupTemplateFileSystem(_host.FileSystem, request.OutputDirectory.Info.FullName);
+        }
+        try
+        {
+            return await _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName,
+                parameters, forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
+        }
+        finally
+        {
+            _host.InvocationFileSystem = previous;
+        }
+    }
+
+    private bool IsCleanupPreview(ITemplateInfo template, TemplateInvocationRequest request) =>
+        request.PreviewAfterDirectoryCleanup && request.DryRun && request.Force && ProjectTemplatesEnabled
+        && TemplateCatalogProjector.GetTemplateType(template) == TemplateType.Project;
 
     private bool HasExpectedOutputKind(string output, TemplateFileChange change, HashSet<string> directoryOutputs)
     {
@@ -1167,9 +1186,10 @@ internal class TemplateEngineSession : IDisposable
             && files.Select(file => file.TargetRelativePath).Distinct(StringComparer.Ordinal).Count() == files.Length;
     }
 
-    private string? ValidateOutputPaths(string output, IReadOnlyList<TemplateFileChange> changes)
+    private string? ValidateOutputPaths(string output, IReadOnlyList<TemplateFileChange> changes, bool cleanupPreview = false)
     {
         string boundary = output;
+        PlannedCleanupTemplateFileSystem? planned = cleanupPreview ? new(_host.FileSystem, output) : null;
         foreach (TemplateFileChange change in changes)
         {
             string? path = Path.GetFullPath(Path.Combine(output, change.Path));
@@ -1179,19 +1199,24 @@ internal class TemplateEngineSession : IDisposable
             {
                 return "Template output escapes the requested output directory.";
             }
+            if (planned?.IsPreservedPath(path) == true)
+            {
+                return "A force preview cannot write preserved .git content.";
+            }
 
             // The requested output directory is the boundary; linked parents do not redirect individual template paths.
             while (path is not null && !string.Equals(Path.TrimEndingDirectorySeparator(path), Path.TrimEndingDirectorySeparator(boundary), StringComparison.Ordinal))
             {
                 try
                 {
-                    FileAttributes attributes = _settings.Host.FileSystem.GetFileAttributes(path);
+                    FileAttributes attributes = _host.FileSystem.GetFileAttributes(path);
                     if ((attributes & FileAttributes.ReparsePoint) != 0)
                     {
                         return "Template output uses a symbolic link or reparse point. Choose an unlinked output directory.";
                     }
 
-                    if (!string.Equals(path, target, StringComparison.Ordinal) && (attributes & FileAttributes.Directory) == 0)
+                    if (!string.Equals(path, target, StringComparison.Ordinal) && (attributes & FileAttributes.Directory) == 0
+                        && planned?.IsScheduledForDeletion(path) != true)
                     {
                         return "A template output directory ancestor is an existing file. Choose an output directory without file collisions.";
                     }

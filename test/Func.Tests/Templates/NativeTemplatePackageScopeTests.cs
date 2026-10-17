@@ -2,11 +2,36 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Workloads.Install;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed class NativeTemplatePackageScopeTests
 {
+    [Fact]
+    public void SelectedPhysicalOwner_RestrictsAssetsWithoutMutatingTheOriginalScope()
+    {
+        NativeTemplatePackagePin first = new("Owned", "1.0.0", new string('a', 64))
+        {
+            Origin = new BundledTemplateOrigin("Stack.A", "1.0.0", new string('c', 64), "source-a"),
+        };
+        NativeTemplatePackagePin second = new("Owned", "2.0.0", new string('b', 64))
+        {
+            Origin = new BundledTemplateOrigin("Unrelated.B", "2.0.0", new string('d', 64), "source-b"),
+        };
+        NativeTemplatePackageScope original = new([first, second], [first, second]);
+
+        NativeTemplatePackageScope selected = original.ForPhysicalOwner("stack.a", "1.0.0");
+
+        selected.ExpectedHash(new("Owned", "1.0.0")).Sha256.Should().Be(first.Sha256);
+        selected.ExpectedHash(new("Owned", "2.0.0")).Diagnostic.Should().Contain("not an active owned asset");
+        original.ExpectedHash(new("Owned", "2.0.0")).Sha256.Should().Be(second.Sha256);
+        Action missingOwner = () => original.ForPhysicalOwner(null!, "1.0.0");
+        Action missingVersion = () => original.ForPhysicalOwner("Stack.A", null!);
+        missingOwner.Should().Throw<ArgumentException>();
+        missingVersion.Should().Throw<ArgumentException>();
+    }
+
     [Fact]
     public void Scope_V1V2V1_SelectsCapturedAssetsRatherThanHighestVersionAndPreservesUnownedPackages()
     {

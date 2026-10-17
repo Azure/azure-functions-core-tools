@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Runtime.ExceptionServices;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -15,7 +16,7 @@ internal interface INativeTemplateWorkflowHostFactory
 {
     public Task<NativeTemplateWorkflowHost> CreateAsync(IInteractionService interaction, WorkloadPathsOptions paths, CliConfigurationPathsOptions configurationPaths,
         Action<IServiceCollection> configureProviders, bool enableBundleBindingConstraints, CancellationToken cancellationToken,
-        bool includeProjectConfiguration = true);
+        bool includeProjectConfiguration = true, bool deferProjectConfigurationErrors = false);
 }
 
 /// <summary>
@@ -25,14 +26,16 @@ internal sealed class NativeTemplateWorkflowHostFactory : INativeTemplateWorkflo
 {
     public async Task<NativeTemplateWorkflowHost> CreateAsync(IInteractionService interaction, WorkloadPathsOptions paths, CliConfigurationPathsOptions configurationPaths,
         Action<IServiceCollection> configureProviders, bool enableBundleBindingConstraints, CancellationToken cancellationToken,
-        bool includeProjectConfiguration = true)
+        bool includeProjectConfiguration = true, bool deferProjectConfigurationErrors = false)
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(paths);
         ArgumentNullException.ThrowIfNull(configurationPaths);
         ArgumentNullException.ThrowIfNull(configureProviders);
         cancellationToken.ThrowIfCancellationRequested();
-        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction, includeProjectConfiguration);
+        ExceptionDispatchInfo? projectConfigurationFailure = null;
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction, includeProjectConfiguration,
+            deferProjectConfigurationErrors ? exception => projectConfigurationFailure = ExceptionDispatchInfo.Capture(exception) : null);
         builder.Services.AddSingleton(paths);
         builder.Services.AddSingleton<IWorkloadPaths>(paths);
         builder.Services.AddSingleton(configurationPaths);
@@ -44,15 +47,19 @@ internal sealed class NativeTemplateWorkflowHostFactory : INativeTemplateWorkflo
         cancellationToken.ThrowIfCancellationRequested();
         builder.Services.AddNativeTemplateWorkflowComposition(capture, enableBundleBindingConstraints);
         configureProviders(builder.Services);
-        return new(builder.Build());
+        return new(builder.Build(), projectConfigurationFailure);
     }
 }
 
-internal sealed class NativeTemplateWorkflowHost(IHost host) : IDisposable
+internal sealed class NativeTemplateWorkflowHost(IHost host, ExceptionDispatchInfo? projectConfigurationFailure = null) : IDisposable
 {
     private readonly IHost _host = host ?? throw new ArgumentNullException(nameof(host));
 
     internal Task StartAsync(CancellationToken cancellationToken) => _host.StartAsync(cancellationToken);
+
+    internal bool HasProjectConfigurationFailure => projectConfigurationFailure is not null;
+
+    internal void ThrowIfProjectConfigurationFailed() => projectConfigurationFailure?.Throw();
 
     public NativeTemplateWorkflowInvocation CreateInvocation()
     {

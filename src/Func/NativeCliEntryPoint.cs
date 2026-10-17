@@ -43,27 +43,29 @@ internal sealed class NativeCliEntryPoint
         FuncAliasNudge? aliasNudge = null;
         try
         {
-            bool templateInvocation = IsTemplateInvocation(original);
             using NativeTemplateWorkflowHost host = await new NativeTemplateWorkflowHostFactory().CreateAsync(
                 interaction, workloads, configuration, services =>
                 {
                     services.AddFirstPartyNativeWorkflows();
                     configure?.Invoke(services);
                 }, enableBundleBindingConstraints: true, cancellationToken,
-                includeProjectConfiguration: !templateInvocation);
-            await host.StartAsync(cancellationToken);
+                deferProjectConfigurationErrors: true);
+            if (!host.HasProjectConfigurationFailure)
+            {
+                await host.StartAsync(cancellationToken);
+            }
             using NativeTemplateWorkflowInvocation invocation = host.CreateCommandScope();
             var binding = new NativeEntryCommandBinding(invocation.Services, original);
             root = Parser.CreateCommand(invocation.Services, binding);
-            ParserConfiguration parserConfiguration = new()
+            parsed = ParseArguments(root, original);
+            if (!IsTemplateInvocation(parsed))
             {
-                EnablePosixBundling = false,
-            };
-            if (templateInvocation)
-            {
-                parserConfiguration.ResponseFileTokenReplacer = null;
+                host.ThrowIfProjectConfigurationFailed();
             }
-            parsed = root.Parse(LegacyStartArgumentNormalizer.Normalize(original), parserConfiguration);
+            if (host.HasProjectConfigurationFailure)
+            {
+                await host.StartAsync(cancellationToken);
+            }
             commandName = CommandNameResolver.ResolveCommandName(parsed, root);
             activity?.SetCommandName(commandName);
             bool json = parsed.CommandResult.Command is NewCommand item && NativeEntryCommandBinding.IsJsonOutput(item, parsed);
@@ -138,17 +140,26 @@ internal sealed class NativeCliEntryPoint
         }
     }
 
-    private static bool IsTemplateInvocation(string[] arguments)
+    internal static ParseResult ParseArguments(FuncRootCommand root, string[] arguments)
     {
-        Command init = new("init") { TreatUnmatchedTokensAsErrors = false };
-        Command item = new("new") { TreatUnmatchedTokensAsErrors = false };
-        FuncRootCommand root = new() { Subcommands = { init, item } };
-        ParseResult parsed = root.Parse(arguments, new ParserConfiguration
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(arguments);
+        string[] normalized = LegacyStartArgumentNormalizer.Normalize(arguments);
+        ParseResult parsed = root.Parse(normalized, new ParserConfiguration
         {
             EnablePosixBundling = false,
             ResponseFileTokenReplacer = null,
         });
-        // Template commands inspect their explicit target, not an unrelated or malformed cwd configuration.
-        return ReferenceEquals(parsed.CommandResult.Command, init) || ReferenceEquals(parsed.CommandResult.Command, item);
+        return IsTemplateInvocation(parsed) ? parsed : root.Parse(normalized, new ParserConfiguration { EnablePosixBundling = false });
+    }
+
+    internal static bool IsTemplateInvocation(ParseResult parsed)
+    {
+        ArgumentNullException.ThrowIfNull(parsed);
+        if (parsed.CommandResult.Command is InitCommand or NewCommand) return true;
+        if (parsed.CommandResult.Command is not HelpCommand help) return false;
+        string? requested = parsed.GetResult(help.CommandArgument)?.GetValueOrDefault<string?>();
+        return parsed.RootCommandResult.Command.Subcommands.FirstOrDefault(command =>
+            string.Equals(command.Name, requested, StringComparison.OrdinalIgnoreCase)) is InitCommand or NewCommand;
     }
 }

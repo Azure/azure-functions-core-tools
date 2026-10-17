@@ -25,6 +25,7 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
     private readonly ITemplaterFactory _templates = services.GetRequiredService<ITemplaterFactory>();
     private readonly ITemplateArgumentParser _parser = services.GetRequiredService<ITemplateArgumentParser>();
     private readonly Lazy<NativeTemplateWorkflowRegistry> _workflows = new(services.GetRequiredService<NativeTemplateWorkflowRegistry>);
+    private readonly Lazy<NativeTemplateStackCompatibility> _stackCompatibility = new(services.GetRequiredService<NativeTemplateStackCompatibility>);
 
     internal static bool IsJsonOutput(NewCommand command, ParseResult parsed)
     {
@@ -138,6 +139,7 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
             }
 
             TemplateConstraintEvaluationSnapshot availability = await binding._availability.CaptureAsync(cancellationToken);
+            availability = binding._stackCompatibility.Value.ForStack(availability, context.Context!.Project!.Stack!);
             using Templater templater = await binding._templates.CreateAsync(context.Context!, availability, cancellationToken);
             TemplateResolutionResult resolved;
             try

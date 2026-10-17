@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" PrivateAssets="all" ExcludeAssets="runtime" />
   </ItemGroup>
 
 </Project>
