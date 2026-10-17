@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
+using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Invocation;
 using Azure.Functions.Cli.Workloads.Loading;
@@ -48,15 +49,28 @@ internal static class WorkloadRegistration
     /// <param name="paths">Pre-resolved workload paths, including the workload home. Construct with the default ctor to use the env-var-aware resolver, or with an explicit home in tests.</param>
     /// <param name="interaction">Used to surface per-workload load and Configure failures as warnings.</param>
     /// <param name="cancellationToken">Cancellation propagated to manifest reads.</param>
-    public static async Task RegisterWorkloadsAsync(
+    public static Task RegisterWorkloadsAsync(
         IServiceCollection services,
         WorkloadPathsOptions paths,
         IInteractionService interaction,
         CancellationToken cancellationToken = default)
+        => RegisterAsync(services, paths, interaction, null, cancellationToken);
+
+    internal static Task RegisterWorkloadsAsync(IServiceCollection services, WorkloadPathsOptions paths, IInteractionService interaction,
+        NativeTemplateWorkloadCapture capture, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        cancellationToken.ThrowIfCancellationRequested();
+        return RegisterAsync(services, paths, interaction, capture, cancellationToken);
+    }
+
+    private static async Task RegisterAsync(IServiceCollection services, WorkloadPathsOptions paths, IInteractionService interaction,
+        NativeTemplateWorkloadCapture? capture, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(paths);
         ArgumentNullException.ThrowIfNull(interaction);
+        capture?.Begin();
 
         // The activity name doubles as the metric scope: WorkloadBootMetricListener
         // translates the stop event into cli.workload.boot_duration with the
@@ -64,7 +78,7 @@ internal static class WorkloadRegistration
         using Activity? activity = CliTelemetry.Trace.StartWorkloadBootActivity();
         try
         {
-            int loadedCount = await RegisterCoreAsync(services, paths, interaction, cancellationToken);
+            int loadedCount = await RegisterCoreAsync(services, paths, interaction, capture, cancellationToken);
             activity?.SetTag(TelemetryConventions.CliWorkloadCount, loadedCount);
         }
         catch (Exception ex)
@@ -78,6 +92,7 @@ internal static class WorkloadRegistration
         IServiceCollection services,
         WorkloadPathsOptions paths,
         IInteractionService interaction,
+        NativeTemplateWorkloadCapture? capture,
         CancellationToken cancellationToken)
     {
         var store = new WorkloadStore(paths, new FileWorkloadOperationCoordinator(paths));
@@ -93,19 +108,33 @@ internal static class WorkloadRegistration
         IReadOnlyList<ContentWorkloadInfo> contentWorkloads = CreateContentWorkloads(compatibleEntries, paths);
 
         var runtimeWorkloads = new List<RuntimeWorkloadInfo>(liveEntries.Count);
+        Dictionary<RuntimeWorkloadInfo, WorkloadEntry>? selectedEntries = capture is null ? null : new(ReferenceEqualityComparer.Instance);
         foreach (WorkloadEntry entry in liveEntries)
         {
+            RuntimeWorkloadInfo? loadedWorkload = null;
+            string? failure = null;
             try
             {
                 // Load per-entry so one failure becomes a warning instead of
                 // aborting discovery for the rest.
                 IReadOnlyList<RuntimeWorkloadInfo> loaded = loader.Load([entry]);
-                runtimeWorkloads.Add(loaded[0]);
+                loadedWorkload = loaded[0];
             }
             catch (Exception ex)
             {
                 interaction.WriteWarning(
                     $"Workload '{entry.PackageId}@{entry.PackageVersion}' could not be loaded: {ex.Message}");
+                failure = ex.Message;
+            }
+
+            if (loadedWorkload is not null)
+            {
+                runtimeWorkloads.Add(loadedWorkload);
+                selectedEntries?.Add(loadedWorkload, entry);
+            }
+            else
+            {
+                capture?.Record(entry, null, failure);
             }
         }
 
@@ -128,6 +157,8 @@ internal static class WorkloadRegistration
             // Per-workload builder so RegisterCommand can tag the resulting
             // ExternalCommand with its owning workload.
             var builder = new DefaultFunctionsCliBuilder(services, workload);
+            capture?.ObserveStackDescriptors(services, configured: false);
+            string? failure = null;
             try
             {
                 workload.Instance.Configure(builder);
@@ -140,7 +171,17 @@ internal static class WorkloadRegistration
                 // remain in the collection. Tracked in #4948.
                 interaction.WriteWarning(
                     $"Workload '{workload.PackageId}@{workload.PackageVersion}' failed to initialize: {ex.Message}");
+                failure = ex.Message;
             }
+
+            capture?.Record(selectedEntries![workload], workload, failure);
+            capture?.ObserveStackDescriptors(services, configured: failure is null);
+        }
+
+        if (capture is not null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            capture.Complete(services);
         }
 
         return runtimeWorkloads.Count;

@@ -36,6 +36,7 @@ public sealed partial class BundledPythonTemplateTests : IDisposable
     private readonly JsonDocument _channels;
     private readonly JsonDocument _applications;
     private readonly HashSet<string> _helperIdentities;
+    private bool _loadedBootWorkload;
 
     public BundledPythonTemplateTests()
     {
@@ -467,6 +468,13 @@ public sealed partial class BundledPythonTemplateTests : IDisposable
     {
         _channels.Dispose();
         _applications.Dispose();
-        Directory.Delete(_root, recursive: true);
+        try
+        {
+            Directory.Delete(_root, recursive: true);
+        }
+        catch (UnauthorizedAccessException) when (_loadedBootWorkload)
+        {
+            // Windows can retain this test's loaded workload DLL until the process exits, even after its load context unloads.
+        }
     }
 }
