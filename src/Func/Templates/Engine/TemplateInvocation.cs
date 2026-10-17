@@ -13,6 +13,10 @@ internal sealed record TemplateInvocationRequest(WorkingDirectory OutputDirector
     public NativeMsBuildBindingSnapshot? MsBuildBindings { get; init; }
 
     public NativeTemplateSourceSnapshot? SourceSnapshot { get; init; }
+
+    public bool PreserveExistingFiles { get; init; }
+
+    public bool PreviewAfterDirectoryCleanup { get; init; }
 }
 
 internal sealed record NativeTemplateInvocationEffects(

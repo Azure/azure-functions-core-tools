@@ -125,7 +125,7 @@ internal sealed class GoProjectInitializer(GoProjectStack stack) : IProjectIniti
         IEnumerable<char> chars = raw.Trim().ToLowerInvariant().Replace(' ', '-')
             .Where(c => char.IsLetterOrDigit(c) || c is '-' or '_');
         string sanitized = new([.. chars]);
-        return string.IsNullOrEmpty(sanitized) ? DefaultModuleName : sanitized;
+        return string.IsNullOrEmpty(sanitized) || sanitized is "go" or "toolchain" ? DefaultModuleName : sanitized;
     }
 
     private static void EnsureExtensionBundle(JsonObject host, BundleChannel channel)

@@ -90,6 +90,16 @@ public class GoProjectInitializerTests : IDisposable
         goMod.Should().MatchRegex(@"^module \S+");
     }
 
+    [Theory]
+    [InlineData("go")]
+    [InlineData("toolchain")]
+    public async Task InitializeAsync_ReservedModuleName_UsesValidFallback(string name)
+    {
+        await RunAsync(projectName: name, force: false);
+
+        File.ReadAllText(Path.Combine(_projectDir.FullName, "go.mod")).Should().StartWith("module app");
+    }
+
     [Fact]
     public async Task InitializeAsync_AppendsExtensionBundle_IntoExistingHostJson()
     {

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Templates;
@@ -100,6 +101,10 @@ internal static class WorkloadRegistration
         var loader = new WorkloadLoader(paths, runtimeIdentifierProvider);
 
         IReadOnlyList<WorkloadEntry> allEntries = await store.GetWorkloadsAsync(cancellationToken);
+        if (capture is not null)
+        {
+            await capture.CaptureTemplatePackagesAsync(allEntries, paths, new PhysicalFileSystem(), cancellationToken);
+        }
         IReadOnlyList<WorkloadEntry> compatibleEntries = SelectRuntimeCompatibleEntries(
             allEntries,
             runtimeIdentifierProvider.Current,
@@ -175,7 +180,7 @@ internal static class WorkloadRegistration
             }
 
             capture?.Record(selectedEntries![workload], workload, failure);
-            capture?.ObserveStackDescriptors(services, configured: failure is null);
+            capture?.ObserveStackDescriptors(services, configured: failure is null, workload);
         }
 
         if (capture is not null)

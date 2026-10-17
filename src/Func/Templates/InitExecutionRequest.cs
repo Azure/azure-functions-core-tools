@@ -21,6 +21,16 @@ internal sealed record InitExecutionRequest(
     IReadOnlySet<string> ReservedAliases)
 {
     public INativeProjectPreparation? ProjectPreparation { get; init; }
+
+    public InitExecutionTargetPolicy TargetPolicy { get; init; }
+
+    public IReadOnlyList<string>? ExistingProjectTokens { get; init; }
+}
+
+internal enum InitExecutionTargetPolicy
+{
+    EmptyOrAdoptable,
+    PublicCompatible,
 }
 
 internal sealed record InitExecutionResult(string Kind, bool Succeeded)
@@ -48,7 +58,7 @@ internal sealed record InitExecutionResult(string Kind, bool Succeeded)
     public static InitExecutionResult Reject(string kind, params string[] diagnostics) => new(kind, false) { Diagnostics = diagnostics };
 }
 
-internal sealed record InitExistingProjectConfiguration(string Root, string Stack, string Language, bool Repair, bool Written = false)
+internal sealed record InitExistingProjectConfiguration(string Root, string Stack, string? Language, bool Repair, bool Written = false)
 {
     public string Path => CliConfigurationPathsOptions.GetProjectConfigPath(new(Root));
 }

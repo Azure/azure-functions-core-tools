@@ -19,6 +19,33 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
     private const string CachedVersion = "9999.0.0";
     private const string UnusedSource = "http://127.0.0.1:1/v3/index.json";
 
+    [Fact]
+    public async Task Program_GracefulWorkloadFailure_PreservesTheOrdinaryCachedVersionAdvisory()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-workload-advisory-{Guid.NewGuid():N}");
+        CliConfigurationPathsOptions paths = new(Path.Combine(directory, "home"));
+        WorkloadPathsOptions workloads = new(Path.Combine(directory, "workload-home"));
+        string project = Path.Combine(directory, "project");
+        using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(60));
+        try
+        {
+            Directory.CreateDirectory(paths.Home);
+            Directory.CreateDirectory(project);
+            await File.WriteAllTextAsync(paths.VersionCachePath, CachedVersion, cancellation.Token);
+
+            CliResult result = await RunCliAsync(directory, paths.Home, workloads.Home, project,
+                ["workload", "install", Path.Combine(directory, "missing.nupkg")], cancellation.Token);
+
+            result.ExitCode.Should().Be(1);
+            result.StandardError.Should().Contain("does not exist").And.NotContain("unexpected error");
+            result.StandardOutput.Should().Contain(CachedVersion).And.Contain("A newer version");
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Theory]
     [Trait("Category", "Integration")]
     [InlineData(false, false, false)]
@@ -203,12 +230,13 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
     }
 
     internal static async Task<CliResult> RunCliAsync(
-        string directory, string home, string workloadsHome, string project, IReadOnlyList<string> args, CancellationToken cancellationToken)
+        string directory, string home, string workloadsHome, string project, IReadOnlyList<string> args, CancellationToken cancellationToken,
+        string? executablePath = null)
     {
         string testAssembly = typeof(SetupProgramAdvisoryTests).Assembly.Location;
         ProcessStartInfo startInfo = new()
         {
-            FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
+            FileName = executablePath ?? Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
             WorkingDirectory = project,
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -216,12 +244,15 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             RedirectStandardInput = true,
             CreateNoWindow = true,
         };
-        startInfo.ArgumentList.Add("exec");
-        startInfo.ArgumentList.Add("--runtimeconfig");
-        startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".runtimeconfig.json"));
-        startInfo.ArgumentList.Add("--depsfile");
-        startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".deps.json"));
-        startInfo.ArgumentList.Add(typeof(SetupCommand).Assembly.Location);
+        if (executablePath is null)
+        {
+            startInfo.ArgumentList.Add("exec");
+            startInfo.ArgumentList.Add("--runtimeconfig");
+            startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".runtimeconfig.json"));
+            startInfo.ArgumentList.Add("--depsfile");
+            startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".deps.json"));
+            startInfo.ArgumentList.Add(typeof(SetupCommand).Assembly.Location);
+        }
         foreach (string arg in args)
         {
             startInfo.ArgumentList.Add(arg);
@@ -263,6 +294,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
         startInfo.Environment[Constants.TelemetryOptOutEnvVar] = "1";
         startInfo.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
         startInfo.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1";
+        startInfo.Environment["DOTNET_BUNDLE_EXTRACT_BASE_DIR"] = Path.Combine(directory, "bundle-extract");
         startInfo.Environment["NO_COLOR"] = "1";
 
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start the CLI test process.");

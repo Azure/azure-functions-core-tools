@@ -17,9 +17,9 @@ namespace Azure.Functions.Cli.Workloads.Go;
 /// </summary>
 internal sealed class GoFunctionsProject : FunctionsProject
 {
-    // Hardcoded to match the Go worker's worker.config.json `defaultExecutablePath = bin/app`.
-    // Don't derive from go.mod: the worker spawns this exact name regardless of module.
+    // The worker launches this fixed output regardless of the module name.
     internal const string DefaultExecutableName = "app";
+    internal const string WorkerExecutablePathEnvironmentVariable = "languageWorkers__native__defaultExecutablePath";
     internal const int MinimumGoMajorVersion = 1;
     internal const int MinimumGoMinorVersion = 24;
 
@@ -67,14 +67,12 @@ internal sealed class GoFunctionsProject : FunctionsProject
         string executableName = OperatingSystem.IsWindows() ? DefaultExecutableName + ".exe" : DefaultExecutableName;
         string binDirectory = Path.Combine(root, ExecutableRelativeFolder);
         string outputPath = Path.Combine(binDirectory, executableName);
+        // Process launch requires native separators on Windows; keep the shared worker asset portable.
+        context.EnvironmentVariables[WorkerExecutablePathEnvironmentVariable] = Path.Combine(ExecutableRelativeFolder, executableName);
 
         if (context.SkipBuild)
         {
-            // Go projects compile to bin/app; with --no-build the user is
-            // asserting that binary already exists. Trust them and skip the
-            // build. Leave StartupDirectory at the project root so host.json
-            // is found there and the worker's `defaultExecutablePath = bin/app`
-            // resolves to <project>/bin/app.
+            // The caller asserts that the binary already exists; retain the same launch path without building.
             return;
         }
 
@@ -126,10 +124,7 @@ internal sealed class GoFunctionsProject : FunctionsProject
                 isUserError: true);
         }
 
-        // StartupDirectory stays at the project root: host.json lives there, and the Go
-        // worker's `defaultExecutablePath = bin/app` is resolved relative to the script
-        // root, so AzureWebJobsScriptRoot pointing at the project root yields the
-        // correct <project>/bin/app launch path.
+        // StartupDirectory stays at the project root for host.json and the relative worker launch path.
     }
 
     private static async Task<(int Major, int Minor)?> DefaultReadGoVersionAsync(CancellationToken cancellationToken)

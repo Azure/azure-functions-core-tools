@@ -201,7 +201,8 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
             }
 
             DotNetTemplateEffectCapability capability = Capability(selected, request.OutputDirectory, project,
-                Convert.ToHexString(SHA256.HashData(projectContent[0].Value.Span)), createsProject: true);
+                Convert.ToHexString(SHA256.HashData(projectContent[0].Value.Span)), createsProject: true,
+                reinitializesProject: request.PreviewAfterDirectoryCleanup);
             request = request with { EffectSupport = new(request.OutputDirectory, project, capability, Confirmed: true) };
             NativeTemplateEffectPlanningResult planned = new NativeTemplateEffectPlanner().PlanDependencies(
                 request.OutputDirectory, snapshot.Source, snapshot.Effects.CreationResult, project);
@@ -214,8 +215,8 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
     }
 
     private DotNetTemplateEffectCapability Capability(ResolvedTemplate selected, WorkingDirectory root,
-        string project, string digest, bool createsProject)
-        => new(selected, root, project, digest, createsProject, _files, _paths, _preparation, _dependencies, _updater);
+        string project, string digest, bool createsProject, bool reinitializesProject = false)
+        => new(selected, root, project, digest, createsProject, _files, _paths, _preparation, _dependencies, _updater, reinitializesProject);
 
     private static async Task<NativeTemplateInvocationPreparation> BindAsync(TemplateInvocationRequest request,
         DotNetTemplateEffectCapability capability, NativeTemplateEffectPlanningResult planned, CancellationToken cancellationToken)

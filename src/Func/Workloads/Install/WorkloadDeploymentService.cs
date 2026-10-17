@@ -137,9 +137,11 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             {
                 throw new InvalidWorkloadException("Bundled workload provenance is malformed. Preserve the installation and request explicit repair.", exception);
             }
+            // Logical provenance records acquisition, including after that selected owner moves away.
             if (origin.PackageId != entry.PackageId || origin.Version != entry.PackageVersion || origin.Source != entry.Source
-                || origin.LogicalPackageId != entry.LogicalPackage?.PackageId || origin.LogicalVersion != entry.LogicalPackage?.PackageVersion
-                || origin.LogicalSource != entry.LogicalPackage?.Source)
+                || (entry.LogicalPackage is not null
+                    && (origin.LogicalPackageId != entry.LogicalPackage.PackageId || origin.LogicalVersion != entry.LogicalPackage.PackageVersion
+                        || origin.LogicalSource != entry.LogicalPackage.Source)))
             {
                 throw new WorkloadPlanChangedException();
             }
@@ -222,7 +224,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
     public async Task<PreparedWorkloadDeployment> PrepareAsync(InspectedWorkloadPackage package, string source,
         WorkloadOwnershipKind ownership, LogicalPackage? logicalPackage, bool force,
-        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken, WorkloadEntry? updateFrom = null)
     {
         ArgumentNullException.ThrowIfNull(package);
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
@@ -241,6 +243,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             package.Identity.PackageId, logicalPackage?.PackageId);
         TempDirectory staging = _fileSystem.CreateTempDirectory();
         PreparedBundledTemplates? bundled = null;
+        PreparedWorkloadReuse? previous = null;
+        PreparedWorkloadReuse? destination = null;
         try
         {
             progress?.Report(new(WorkloadInstallPhase.Extracting, $"Extracting workload '{package.Identity.PackageId}' {package.Identity.Version}"));
@@ -264,9 +268,42 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                     throw new InvalidWorkloadException("Bundled templates must be declared by a physical stack workload.");
                 }
 
+                if (updateFrom is not null)
+                {
+                    previous = await PrepareReuseAsync(updateFrom, cancellationToken);
+                }
                 BundledTemplateOrigin origin = new(package.Identity.PackageId, package.Identity.Version, package.Sha256, source,
                     logicalPackage?.PackageId, logicalPackage?.PackageVersion, logicalPackage?.Source);
-                bundled = await _bundledTemplates.PrepareAsync(staging.Path, origin, cancellationToken)
+                if (previous is not null)
+                {
+                    WorkloadEntry? existing = (await _store.GetWorkloadsAsync(cancellationToken)).SingleOrDefault(entry =>
+                        string.Equals(entry.PackageId, package.Identity.PackageId, StringComparison.OrdinalIgnoreCase)
+                        && entry.PackageVersion == package.Identity.Version);
+                    if (existing is not null && HasBundledTemplates(existing))
+                    {
+                        WorkloadOwnershipRules.ValidateDestination(existing, logicalPackage, ownership);
+                        destination = await PrepareReuseAsync(existing, cancellationToken);
+                        BundledTemplateOrigin installedOrigin = destination.BundledTemplates!.Origin;
+                        LogicalPackage? retainedLogical = existing.LogicalPackage ?? logicalPackage;
+                        if (installedOrigin.PackageId != origin.PackageId || installedOrigin.Version != origin.Version
+                            || installedOrigin.Sha256 != origin.Sha256 || installedOrigin.Source != origin.Source
+                            || (retainedLogical is not null
+                                && (installedOrigin.LogicalPackageId != retainedLogical.PackageId
+                                    || installedOrigin.LogicalVersion != retainedLogical.PackageVersion
+                                    || installedOrigin.LogicalSource != retainedLogical.Source))
+                            || (ownership == WorkloadOwnershipKind.Logical
+                                && (installedOrigin.LogicalPackageId != origin.LogicalPackageId
+                                    || installedOrigin.LogicalVersion != origin.LogicalVersion
+                                    || installedOrigin.LogicalSource != origin.LogicalSource)))
+                        {
+                            throw new InvalidWorkloadException("The installed update destination has a different validated origin. " +
+                                "No source, ownership, or payload replacement was performed.");
+                        }
+                        origin = installedOrigin;
+                    }
+                }
+                bundled = await _bundledTemplates.PrepareAsync(staging.Path, origin, cancellationToken, previous?.BundledTemplates,
+                    previous?.Entry.InstallRefCount > 1)
                     ?? throw new InvalidWorkloadException("The declared bundled-template manifest changed during preparation.");
                 await _fileSystem.WriteAllTextAsync(Path.Combine(staging.Path, BundledTemplateInstaller.OriginName),
                     JsonSerializer.Serialize(origin, BundledTemplateJsonContext.Default.BundledTemplateOrigin), cancellationToken);
@@ -278,11 +315,18 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                 hashes.Add(Path.GetRelativePath(staging.Path, path), await _fileSystem.ComputeSha256Async(path, cancellationToken));
             }
 
-            return new(staging, package, source, ownership, logicalPackage, force, hashes, expectedState) { BundledTemplates = bundled };
+            return new(staging, package, source, ownership, logicalPackage, force, hashes, expectedState)
+            {
+                BundledTemplates = bundled,
+                UpdateFrom = previous,
+                Destination = destination,
+            };
         }
         catch
         {
             bundled?.Dispose();
+            previous?.Dispose();
+            destination?.Dispose();
             staging.Dispose();
             throw;
         }
@@ -428,7 +472,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         WorkloadOwnershipKind ownership, LogicalPackage? logicalPackage, IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        using PreparedWorkloadDeployment prepared = await PrepareAsync(package, source, ownership, logicalPackage, force: true, progress, cancellationToken);
+        using PreparedWorkloadDeployment prepared = await PrepareAsync(package, source, ownership, logicalPackage, force: true, progress,
+            cancellationToken, currentEntry);
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
         return await UpdatePreparedAsync(operation, currentEntry, prepared, cancellationToken);
     }
@@ -438,11 +483,70 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
     {
         ArgumentNullException.ThrowIfNull(prepared);
         await ValidateCurrentEntryAsync(operation, currentEntry, cancellationToken);
-        RejectBundledMutation(currentEntry, true);
-        if (prepared.BundledTemplates is not null)
+        if (prepared.BundledTemplates is null)
         {
-            throw new InvalidWorkloadException("Updating to a bundled stack is not supported in this fresh-install phase. Preserve the existing installation.");
+            RejectBundledMutation(currentEntry, true);
+            return (await UpdatePreparedCoreAsync(operation, currentEntry, prepared, cancellationToken)).Entry;
         }
+
+        PreparedWorkloadReuse previous = prepared.UpdateFrom
+            ?? throw new InvalidWorkloadException("An explicit update must prepare the incumbent payload before replacing bundled templates. Nothing was changed.");
+        if (!WorkloadStateSnapshot.Same(previous.Entry, currentEntry)
+            || prepared.BundledTemplates.Replacing != previous.BundledTemplates
+            || prepared.BundledTemplates.RetainPrevious != (currentEntry.InstallRefCount > 1))
+        {
+            throw new WorkloadPlanChangedException();
+        }
+        await ValidateReuseAsync(operation, previous, cancellationToken);
+        string finalPath = _paths.GetInstallDirectory(prepared.Package.Identity.PackageId, prepared.Package.Identity.Version);
+        if (prepared.Destination is not null)
+        {
+            await ValidateReuseAsync(operation, prepared.Destination, cancellationToken);
+        }
+        else if (_fileSystem.DirectoryExists(finalPath))
+        {
+            throw new InvalidWorkloadException("The update destination already exists. No existing workload payload or template ownership was replaced.");
+        }
+        string registry = await _fileSystem.ReadAllTextIfExistsAsync(_paths.WorkloadRegistryPath, cancellationToken)
+            ?? throw new WorkloadPlanChangedException();
+
+        bool previousEntryRemoved = false;
+        WorkloadInstallResult result = await _bundledTemplates.CommitAsync(prepared.BundledTemplates, async token =>
+        {
+            WorkloadOwnershipMoveResult moved = await UpdatePreparedCoreAsync(operation, currentEntry, prepared, token, deferCompletion: true);
+            previousEntryRemoved = moved.PreviousEntryRemoved;
+            return new(moved.Entry, false);
+        }, cancellationToken, async token =>
+        {
+            if (!operation.IsDirty)
+            {
+                return;
+            }
+
+            await _fileSystem.WriteAllTextAsync(_paths.WorkloadRegistryPath, registry, token);
+            if (prepared.Destination is null && _fileSystem.DirectoryExists(finalPath))
+            {
+                _fileSystem.DeleteDirectory(finalPath);
+            }
+            operation.CompleteMutation();
+        });
+
+        if (previousEntryRemoved)
+        {
+            string oldPath = _paths.GetInstallDirectory(currentEntry.PackageId, currentEntry.PackageVersion);
+            if (!string.Equals(oldPath, finalPath, StringComparison.Ordinal))
+            {
+                TryDeleteDirectory(oldPath);
+            }
+        }
+        operation.CompleteMutation();
+        return result.Entry;
+    }
+
+    private async Task<WorkloadOwnershipMoveResult> UpdatePreparedCoreAsync(IWorkloadOperation operation, WorkloadEntry currentEntry,
+        PreparedWorkloadDeployment prepared, CancellationToken cancellationToken, bool deferCompletion = false)
+    {
+        await ValidateCurrentEntryAsync(operation, currentEntry, cancellationToken);
         await ValidatePreparedAsync(prepared, cancellationToken);
         InspectedWorkloadPackage package = prepared.Package;
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
@@ -455,27 +559,29 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             string.Equals(entry.PackageId, package.Identity.PackageId, StringComparison.OrdinalIgnoreCase)
             && entry.PackageVersion == package.Identity.Version);
         WorkloadOwnershipRules.ValidateDestination(destination, prepared.LogicalPackage, prepared.Ownership);
-        RejectBundledMutation(destination, true);
-        if (installed.Any(entry => string.Equals(entry.PackageId, package.Identity.PackageId, StringComparison.OrdinalIgnoreCase)
-            && entry.PackageVersion != package.Identity.Version && HasBundledTemplates(entry)))
-        {
-            throw new InvalidWorkloadException("Updating beside a bundled sibling version is not supported. Nothing was changed.");
-        }
+        RejectBundledMutation(destination, prepared.Destination is null);
         string finalPath = _paths.GetInstallDirectory(package.Identity.PackageId, package.Identity.Version);
         string stagingPath = prepared.StagingPath;
         try
         {
             WorkloadEntry incoming = CreateEntry(package, prepared.Source, prepared.Ownership, prepared.LogicalPackage, prepared.BundledTemplates is not null);
+            if (prepared.Destination is not null)
+            {
+                await ValidatePayloadAsync(prepared, finalPath, cancellationToken);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             operation.BeginMutation();
-            DeleteInstallDirectory(finalPath);
-            Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
-            MoveDirectory(stagingPath, finalPath);
+            if (prepared.Destination is null)
+            {
+                DeleteInstallDirectory(finalPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
+                MoveDirectory(stagingPath, finalPath);
+            }
             WorkloadOwnershipMoveResult moved = prepared.Ownership == WorkloadOwnershipKind.Logical
                 ? await _store.MoveLogicalOwnershipAsync(operation, currentEntry.PackageId, currentEntry.PackageVersion, incoming, cancellationToken)
                 : await _store.MoveExplicitOwnershipAsync(operation, currentEntry.PackageId, currentEntry.PackageVersion, incoming, cancellationToken);
 
-            if (moved.PreviousEntryRemoved)
+            if (moved.PreviousEntryRemoved && !deferCompletion)
             {
                 string oldPath = _paths.GetInstallDirectory(currentEntry.PackageId, currentEntry.PackageVersion);
                 if (!string.Equals(oldPath, finalPath, StringComparison.Ordinal))
@@ -485,8 +591,11 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             }
 
             await ValidatePayloadAsync(prepared, finalPath, CancellationToken.None);
-            operation.CompleteMutation();
-            return moved.Entry;
+            if (!deferCompletion)
+            {
+                operation.CompleteMutation();
+            }
+            return moved;
         }
         catch
         {
@@ -576,7 +685,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             return null;
         }
 
-        if (installed.Any(entry => string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
+        if (currentLogicalOwner is null && installed.Any(entry => string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
             && entry.PackageVersion != version && HasBundledTemplates(entry)))
         {
             throw new InvalidWorkloadException("Cached ownership reuse beside a bundled sibling version is not supported. Nothing was changed.");

@@ -4,6 +4,8 @@
 using Azure.Functions.Cli.Common;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
+using Microsoft.TemplateEngine.Abstractions.PhysicalFileSystem;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.Extensions.Logging;
 
 using OrchestratorComponents = Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components;
@@ -16,7 +18,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 internal class FuncTemplateEngineHost(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot? snapshot = null,
     ILoggerFactory? loggerFactory = null)
     : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), CreateComponents(context, snapshot),
-        loggerFactory: loggerFactory)
+        loggerFactory: loggerFactory), ITemplateEngineHost
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
@@ -29,6 +31,46 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context, TemplateCon
     private const string WorkingDirectoryParameter = "WorkingDirectory";
 
     private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));
+    private readonly NativeTemplatePackageScope? _packageScope = snapshot?.PackageScope;
+    private readonly List<NativeCohortPackageProviderFactory> _cohortFactories = [];
+    private IReadOnlyList<(Type InterfaceType, IIdentifiedComponent Instance)>? _scopedComponents;
+
+    internal IPhysicalFileSystem? InvocationFileSystem { get; set; }
+
+    IPhysicalFileSystem ITemplateEngineHost.FileSystem => InvocationFileSystem ?? FileSystem;
+
+    public override IReadOnlyList<(Type InterfaceType, IIdentifiedComponent Instance)> BuiltInComponents
+    {
+        get
+        {
+            if (_packageScope is null) return base.BuiltInComponents;
+            if (_scopedComponents is not null) return _scopedComponents;
+            List<(Type InterfaceType, IIdentifiedComponent Instance)> components = [];
+            foreach ((Type type, IIdentifiedComponent instance) in base.BuiltInComponents)
+            {
+                if (instance is ITemplatePackageProviderFactory factory)
+                {
+                    NativeCohortPackageProviderFactory scoped = new(factory, _packageScope);
+                    _cohortFactories.Add(scoped);
+                    components.Add((type, scoped));
+                }
+                else
+                {
+                    components.Add((type, instance));
+                }
+            }
+            _scopedComponents = components.AsReadOnly();
+            return _scopedComponents;
+        }
+    }
+
+    internal void ThrowIfCohortFailed()
+    {
+        if (_cohortFactories.Select(factory => factory.Failure).FirstOrDefault(failure => failure is not null) is { } failure)
+        {
+            throw new NativeTemplateCohortException(failure);
+        }
+    }
 
     public override bool TryGetHostParamDefault(string paramName, out string? value)
     {

@@ -7,6 +7,8 @@ internal sealed class TemplateConstraintEvaluationSnapshot(IReadOnlyCollection<T
 {
     public IReadOnlyList<TemplateConstraintWorkload> Workloads { get; } = CaptureWorkloads(workloads);
 
+    public NativeTemplatePackageScope? PackageScope { get; init; }
+
     private static IReadOnlyList<TemplateConstraintWorkload> CaptureWorkloads(IReadOnlyCollection<TemplateConstraintWorkload> workloads)
     {
         ArgumentNullException.ThrowIfNull(workloads);

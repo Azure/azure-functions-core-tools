@@ -22,7 +22,14 @@ internal sealed class NativeTemplateWorkflowComposer(INativeTemplateAvailability
         ArgumentNullException.ThrowIfNull(request);
         TemplateConstraintEvaluationSnapshot availability = await _availability.CaptureAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return await _items.ExecuteAsync(request, availability, cancellationToken);
+        try
+        {
+            return await _items.ExecuteAsync(request, availability, cancellationToken);
+        }
+        catch (NativeTemplateCohortException exception)
+        {
+            return NewExecutionResult.Reject("nativeCohortUnavailable", exception.Message);
+        }
     }
 
     public async Task<InitExecutionResult> ExecuteProjectAsync(InitExecutionRequest request, CancellationToken cancellationToken)
@@ -30,7 +37,14 @@ internal sealed class NativeTemplateWorkflowComposer(INativeTemplateAvailability
         ArgumentNullException.ThrowIfNull(request);
         TemplateConstraintEvaluationSnapshot availability = await _availability.CaptureAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return await _projects.ExecuteAsync(request, availability, cancellationToken);
+        try
+        {
+            return await _projects.ExecuteAsync(request, availability, cancellationToken);
+        }
+        catch (NativeTemplateCohortException exception)
+        {
+            return InitExecutionResult.Reject("nativeCohortUnavailable", exception.Message);
+        }
     }
 
     public async Task<NativeTemplateCommandAdapter> CreateCommandAdapterAsync(CancellationToken cancellationToken)

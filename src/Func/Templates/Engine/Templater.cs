@@ -135,13 +135,22 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
             return _candidates;
         }
 
-        IReadOnlyList<ITemplateInfo> templates = await packageManager.GetTemplatesAsync(cancellationToken);
         IReadOnlyList<ITemplatePackage> packages = await packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
         _session.CheckStoreDiagnostics();
+        IReadOnlyList<ITemplateInfo> templates = await packageManager.GetTemplatesAsync(cancellationToken);
+        _session.CheckStoreDiagnostics();
+        Dictionary<string, NativeTemplatePackageDisposition> packageScopes = new(StringComparer.Ordinal);
+        foreach (ITemplatePackage package in packages)
+        {
+            packageScopes[package.MountPointUri] = await _session.ClassifyPackageScopeAsync(package, cancellationToken);
+        }
+        templates = Array.AsReadOnly<ITemplateInfo>([.. templates.Where(template =>
+            !packageScopes.TryGetValue(template.MountPointUri, out NativeTemplatePackageDisposition? scope) || scope.Include)]);
         _malformedTypes = Array.AsReadOnly<MalformedTypeDescriptor>([.. templates.Where(template => TemplateCatalogProjector.GetTemplateType(template) is null)
             .Select(template => new MalformedTypeDescriptor(template.Identity, Array.AsReadOnly<string>([.. template.ShortNameList])))]);
         List<Candidate> candidates = [];
         Dictionary<string, Task<IReadOnlyCollection<string>>> packageMetadata = new(StringComparer.Ordinal);
+        Dictionary<string, Task<string?>> packagePins = new(StringComparer.Ordinal);
         foreach (ITemplateInfo template in templates.Where(template => TemplateCatalogProjector.GetTemplateType(template) is not null))
         {
             ITemplatePackage? package = packages.FirstOrDefault(package => package.MountPointUri == template.MountPointUri);
@@ -149,6 +158,22 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
 
             try
             {
+                if (packageScopes.TryGetValue(template.MountPointUri, out NativeTemplatePackageDisposition? scope)
+                    && scope.Diagnostic is { } ownershipDiagnostic)
+                {
+                    candidates.Add(FailedCandidate(template, entry, ownershipDiagnostic));
+                    continue;
+                }
+                if (!packagePins.TryGetValue(template.MountPointUri, out Task<string?>? pin))
+                {
+                    pin = _session.ValidatePackageScopeAsync(package, cancellationToken);
+                    packagePins.Add(template.MountPointUri, pin);
+                }
+                if (await pin is { } packageDiagnostic)
+                {
+                    candidates.Add(FailedCandidate(template, entry, packageDiagnostic));
+                    continue;
+                }
                 TemplateConfigurationSnapshot configuration = await _session.ReadConfigurationAsync(template, cancellationToken);
                 entry = Freeze(TemplateCatalogProjector.Project(template, package, configuration));
                 entry = entry with

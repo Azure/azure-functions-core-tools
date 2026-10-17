@@ -3,6 +3,8 @@
 
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Install;
+using Azure.Functions.Cli.Workloads.Discovery;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Templates;
@@ -10,7 +12,8 @@ namespace Azure.Functions.Cli.Templates;
 /// <summary>
 /// Projects an explicitly captured runtime boot without inferring activation from installed inventory rows.
 /// </summary>
-internal sealed class NativeTemplateAvailability(IWorkloadProvider workloads, NativeTemplateWorkloadCapture capture) : INativeTemplateAvailability
+internal sealed class NativeTemplateAvailability(IWorkloadProvider workloads, NativeTemplateWorkloadCapture capture,
+    IBundledTemplateInstaller? ownership = null) : INativeTemplateAvailability
 {
     private readonly IWorkloadProvider _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
     private readonly NativeTemplateWorkloadCapture _capture = capture ?? throw new ArgumentNullException(nameof(capture));
@@ -40,7 +43,45 @@ internal sealed class NativeTemplateAvailability(IWorkloadProvider workloads, Na
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(new TemplateConstraintEvaluationSnapshot(snapshot));
+        return Task.FromResult(new TemplateConstraintEvaluationSnapshot(snapshot)
+        {
+            PackageScope = _capture.GetPackageScope(ownership is null ? null : ReadOwnershipAsync),
+        });
+    }
+
+    private async Task<NativeTemplateOwnership> ReadOwnershipAsync(NativeTemplatePackagePin? expected, TemplatePackageInfo package,
+        CancellationToken cancellationToken)
+    {
+        if (package.Version is null)
+        {
+            return new(false, "The native package registration has no exact version.");
+        }
+        BundledTemplateOwner? owner;
+        try
+        {
+            IBundledTemplateInstaller reader = ownership
+                ?? throw new InvalidOperationException("Native ownership probing requires the composed receipt reader.");
+            owner = await reader.ReadOwnerAsync(package.Identifier, package.Version, cancellationToken);
+        }
+        catch (Exception exception) when (exception is InvalidWorkloadException or IOException or UnauthorizedAccessException)
+        {
+            return new(false, $"Cannot validate native ownership for '{package.Identifier}@{package.Version}': {exception.Message}");
+        }
+        if (owner is null)
+        {
+            return new(false);
+        }
+        if (expected is null)
+        {
+            return new(true, Sha256: owner.Sha256);
+        }
+        return new(owner.Origin == (expected.Origin
+                ?? throw new InvalidOperationException("An active captured asset has no physical workload origin."))
+            && string.Equals(owner.PackageId, expected.Identifier, StringComparison.OrdinalIgnoreCase)
+            && NuGetVersion.TryParse(owner.Version, out NuGetVersion? registered)
+            && NuGetVersion.TryParse(expected.Version, out NuGetVersion? captured)
+            && registered == captured
+            && string.Equals(owner.Sha256, expected.Sha256, StringComparison.OrdinalIgnoreCase));
     }
 
     private static TemplateConstraintWorkload Requirement(string id, string version, IReadOnlyList<string> aliases, bool usable)
