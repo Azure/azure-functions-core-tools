@@ -11,6 +11,9 @@
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/DotNet/Workloads.DotNet.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Python/Workloads.Python.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Go/Workloads.Go.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Java/Workloads.Java.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/PowerShell/Workloads.PowerShell.csproj" />
     <ProjectReference Include="../Fixtures/Templates.Tests.StoreProcess/Templates.Tests.StoreProcess.csproj"
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../Fixtures/Workloads.Tests.OperationProcess/Workloads.Tests.OperationProcess.csproj"
@@ -90,6 +93,14 @@
   <Target Name="PackBundledPythonForTests" AfterTargets="Build">
     <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Python/Workloads.Python.csproj" Targets="Pack"
       Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-python-artifacts" />
+  </Target>
+
+  <Target Name="PackRemainingProjectsForTests" AfterTargets="Build">
+    <ItemGroup>
+      <_RemainingProjectStack Include="$(SrcRoot)Workloads/Stacks/Go/Workloads.Go.csproj;$(SrcRoot)Workloads/Stacks/Java/Workloads.Java.csproj;$(SrcRoot)Workloads/Stacks/PowerShell/Workloads.PowerShell.csproj" />
+    </ItemGroup>
+    <MSBuild Projects="@(_RemainingProjectStack)" Targets="Pack" BuildInParallel="true"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-project-artifacts" />
   </Target>
 
 </Project>

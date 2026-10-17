@@ -1,0 +1,16 @@
+{
+  "version": "2.0"
+  //#if (!NoBundles)
+  ,
+  "extensionBundle": {
+    "id": "__BUNDLE_ID__",
+    "version": "[4.*, 5.0.0)"
+  }
+  //#endif
+  //#if (ManagedDependencies)
+  ,
+  "managedDependency": {
+    "enabled": true
+  }
+  //#endif
+}

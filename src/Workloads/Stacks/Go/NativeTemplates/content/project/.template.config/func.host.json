@@ -1,0 +1,5 @@
+{ "symbolInfo": {
+  "SkipGoModTidy": { "longName": "skip-go-mod-tidy" },
+  "NoBundles": { "longName": "no-bundles" },
+  "BundlesChannel": { "longName": "bundles-channel", "shortName": "c" }
+} }

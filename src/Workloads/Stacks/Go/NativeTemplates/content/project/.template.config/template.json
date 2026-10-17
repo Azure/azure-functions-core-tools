@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": ".NET Foundation",
+  "identity": "Azure.Functions.Go.Basic",
+  "groupIdentity": "Azure.Functions.Go.Basic",
+  "name": "Azure Functions Go worker SDK project",
+  "shortName": "basic",
+  "tags": { "type": "project", "language": "Go" },
+  "preferNameDirectory": false,
+  "symbols": {
+    "ModuleName": { "type": "derived", "valueSource": "name", "valueTransform": "moduleName", "replaces": "{ModuleName}" },
+    "SkipGoModTidy": { "type": "parameter", "datatype": "Boolean", "defaultValue": "false", "description": "Skip running 'go mod tidy' after Go project creation." },
+    "NoBundles": { "type": "parameter", "datatype": "Boolean", "defaultValue": "false", "description": "Create host.json without an extension bundle." },
+    "BundlesChannel": { "type": "parameter", "datatype": "choice", "defaultValue": "Stable", "description": "Extension bundle channel.",
+      "choices": [{ "choice": "Stable" }, { "choice": "Preview" }, { "choice": "Experimental" }] },
+    "BundleId": { "type": "generated", "generator": "switch", "replaces": "__BUNDLE_ID__",
+      "parameters": { "evaluator": "C++", "cases": [
+        { "condition": "(BundlesChannel == \"Stable\")", "value": "Microsoft.Azure.Functions.ExtensionBundle" },
+        { "condition": "(BundlesChannel == \"Preview\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Preview" },
+        { "condition": "(BundlesChannel == \"Experimental\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Experimental" }
+      ] } }
+  },
+  "forms": {
+    "nameTrim": { "identifier": "replace", "pattern": "^\\s+|\\s+$", "replacement": "" },
+    "nameSpaces": { "identifier": "replace", "pattern": " ", "replacement": "-" },
+    "nameCharacters": { "identifier": "replace", "pattern": "[^\\p{L}\\p{Nd}_-]", "replacement": "" },
+    "nameFallback": { "identifier": "replace", "pattern": "^$", "replacement": "app" },
+    "moduleName": { "identifier": "chain", "steps": ["nameTrim", "lowerCase", "nameSpaces", "nameCharacters", "nameFallback"] }
+  },
+  "constraints": {
+    "host": { "type": "host", "args": [{ "hostname": "func" }] },
+    "stack": { "type": "func-workload", "args": "go" }
+  },
+  "primaryOutputs": [{ "path": "host.json" }],
+  "postActions": [{
+    "actionId": "00e33184-ffc7-43ef-bec0-b1684df8ad56",
+    "description": "Write Azure Functions CLI project configuration (draft authoring contract).",
+    "continueOnError": false,
+    "args": { "primaryOutputIndex": "0", "stack": "go", "language": "Go" }
+  }]
+}

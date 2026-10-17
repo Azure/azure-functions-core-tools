@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Templates.Go.Basic</PackageId>
+    <PackageType>FuncTemplate</PackageType>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <Description>Azure Functions CLI basic Go worker SDK project template.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="content/**" Pack="true" PackagePath="content/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Content Include="$(RepoRoot)LICENSE" Pack="true" PackagePath="/" />
+    <Content Include="README.md" Pack="true" PackagePath="/" />
+    <Content Include="../Templates/go.mod;../Templates/main.go;../Templates/local.settings.json"
+      Pack="true" PackagePath="content/project/" />
+  </ItemGroup>
+  <Target Name="StageNativeIgnoreFiles" BeforeTargets="_GetPackageFiles">
+    <Copy SourceFiles="../Templates/funcignore;../Templates/gitignore"
+      DestinationFiles="$(IntermediateOutputPath)native/.funcignore;$(IntermediateOutputPath)native/.gitignore" />
+    <ItemGroup>
+      <Content Include="$(IntermediateOutputPath)native/.funcignore;$(IntermediateOutputPath)native/.gitignore"
+        Pack="true" PackagePath="content/project/" />
+    </ItemGroup>
+  </Target>
+  <Target Name="WriteGoProjectProvenance" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <_GoProjectSource Include="content/project/.template.config/template.json" PackageSourcePath="content/project/.template.config/template.json" />
+      <_GoProjectSource Include="content/project/.template.config/func.host.json" PackageSourcePath="content/project/.template.config/func.host.json" />
+      <_GoProjectSource Include="content/project/host.json" PackageSourcePath="content/project/host.json" />
+      <_GoProjectSource Include="../Templates/go.mod" PackageSourcePath="content/project/go.mod" />
+      <_GoProjectSource Include="../Templates/main.go" PackageSourcePath="content/project/main.go" />
+      <_GoProjectSource Include="../Templates/local.settings.json" PackageSourcePath="content/project/local.settings.json" />
+      <_GoProjectSource Include="../Templates/funcignore" PackageSourcePath="content/project/.funcignore" />
+      <_GoProjectSource Include="../Templates/gitignore" PackageSourcePath="content/project/.gitignore" />
+    </ItemGroup>
+    <GetFileHash Files="@(_GoProjectSource)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_HashedGoProjectSource" />
+    </GetFileHash>
+    <PropertyGroup>
+      <_GoProjectSourceJson>@(_HashedGoProjectSource->'{ &quot;path&quot;: &quot;%(PackageSourcePath)&quot;, &quot;sha256&quot;: &quot;%(FileHash)&quot; }', ',')</_GoProjectSourceJson>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)go-project-provenance.json" Overwrite="true" Encoding="UTF-8"
+      Lines="{ &quot;schemaVersion&quot;: 1, &quot;packageId&quot;: &quot;$(PackageId)&quot;, &quot;packageVersion&quot;: &quot;$(PackageVersion)&quot;, &quot;identity&quot;: &quot;Azure.Functions.Go.Basic&quot;, &quot;stack&quot;: &quot;go&quot;, &quot;language&quot;: &quot;Go&quot;, &quot;sources&quot;: [$(_GoProjectSourceJson)] }" />
+    <ItemGroup>
+      <Content Include="$(IntermediateOutputPath)go-project-provenance.json" Pack="true" PackagePath="provenance/go/project.json" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,6 @@
+{ "symbolInfo": {
+  "RuntimeVersion": { "longName": "runtime-version" },
+  "ManagedDependencies": { "longName": "managed-dependencies" },
+  "NoBundles": { "longName": "no-bundles" },
+  "BundlesChannel": { "longName": "bundles-channel", "shortName": "c" }
+} }
