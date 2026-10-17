@@ -16,6 +16,7 @@ using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.DotNet;
 using Azure.Functions.Cli.Templates.V2;
+using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workers;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Extensions.Configuration;
@@ -92,6 +93,8 @@ internal static class CliHostFactory
         }
 
         builder.Services.AddSingleton<IProcessEnvironment, ProcessEnvironment>();
+        builder.Services.AddSingleton<IFileSystem, PhysicalFileSystem>();
+        builder.Services.AddSingleton<IInstallationMetadataReader, InstallationMetadataReader>();
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();
         builder.Services.AddSingleton<IFunctionsWorkerContentResolver, DefaultFunctionsWorkerContentResolver>();

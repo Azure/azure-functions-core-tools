@@ -8,6 +8,13 @@ namespace Azure.Functions.Cli.Tests.Common;
 public sealed class PhysicalFileSystemTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "func-create-only-" + Guid.NewGuid().ToString("N"));
+    private readonly string _tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+    private readonly PhysicalFileSystem _fileSystem = new();
+
+    public PhysicalFileSystemTests()
+    {
+        Directory.CreateDirectory(_tempDirectory);
+    }
 
     public void Dispose()
     {
@@ -15,6 +22,8 @@ public sealed class PhysicalFileSystemTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
+
+        Directory.Delete(_tempDirectory, recursive: true);
     }
 
     [Fact]
@@ -121,6 +130,37 @@ public sealed class PhysicalFileSystemTests : IDisposable
 
         await create.Should().ThrowAsync<ArgumentNullException>().WithParameterName("contents");
         Directory.Exists(_root).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task OpenReadIfExists_ExistingFile_ReturnsReadableStream()
+    {
+        // Arrange
+        string path = Path.Combine(_tempDirectory, "metadata.json");
+        byte[] expected = [1, 2, 3];
+        await File.WriteAllBytesAsync(path, expected, CancellationToken.None);
+
+        // Act
+        await using Stream? stream = _fileSystem.OpenReadIfExists(path);
+
+        // Assert
+        stream.Should().NotBeNull();
+        using MemoryStream actual = new();
+        await stream!.CopyToAsync(actual, CancellationToken.None);
+        actual.ToArray().Should().Equal(expected);
+    }
+
+    [Fact]
+    public void OpenReadIfExists_MissingFile_ReturnsNull()
+    {
+        // Arrange
+        string path = Path.Combine(_tempDirectory, "missing.json");
+
+        // Act
+        Stream? stream = _fileSystem.OpenReadIfExists(path);
+
+        // Assert
+        stream.Should().BeNull();
     }
 }
 
