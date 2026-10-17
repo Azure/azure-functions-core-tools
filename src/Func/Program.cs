@@ -52,6 +52,13 @@ Console.CancelKeyPress += (_, e) =>
     }
 };
 
+// Native entry is staged internally; changing this default requires a separate rollout decision.
+NativeEntryExecutionPolicy executionPolicy = NativeEntryExecutionPolicy.Legacy;
+if (executionPolicy == NativeEntryExecutionPolicy.StagedFirstParty)
+{
+    return await new NativeCliEntryPoint().ExecuteAsync(args, interaction, new(), new(), cts.Token);
+}
+
 // Leave advisories disabled until the parsed command establishes its output contract.
 Task<string?> versionCheckTask = Task.FromResult<string?>(null);
 bool allowAdvisories = false;

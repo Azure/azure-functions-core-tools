@@ -266,9 +266,7 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
 
             provenance.Add((sourceIndex, TokenType.Argument));
             // Unknown option-like tokens otherwise become string values. Literal dash-prefixed values use inline syntax.
-            if (token.StartsWith('-') && !long.TryParse(token, out _)
-                && !double.TryParse(token, NumberStyles.Float, CultureInfo.CurrentCulture, out _)
-                && !double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            if (IsOptionLikeToken(token))
             {
                 AddInvalid($"Unrecognized template option '{token}'. Use an effective template alias, or inline syntax for a dash-prefixed literal value.", [sourceIndex]);
             }
@@ -363,6 +361,11 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
 
         bool IsReserved(string alias) => reserved.Contains(alias) || reserved.Contains(alias.TrimStart('-'));
     }
+
+    internal static bool IsOptionLikeToken(string token)
+        => token.StartsWith('-') && !long.TryParse(token, out _)
+            && !double.TryParse(token, NumberStyles.Float, CultureInfo.CurrentCulture, out _)
+            && !double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
 
     private static bool IsValidAliasName(string? name)
         => !string.IsNullOrEmpty(name) && !name.StartsWith('-')

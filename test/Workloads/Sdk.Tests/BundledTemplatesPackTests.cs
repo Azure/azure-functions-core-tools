@@ -38,6 +38,27 @@ public sealed class BundledTemplatesPackTests
     }
 
     [Theory]
+    [InlineData("node")]
+    [InlineData("node-native-interleaved")]
+    public void Pack_NodeGenerationInterleaved_ProvenanceMatchesItsDeclaredArchive(string directory)
+    {
+        using ZipArchive outer = OpenPackage(directory, $"Azure.Functions.Cli.Workloads.Node.{Version}.nupkg");
+        using ZipArchive inner = AssertBundledArchive(outer, "tools/any/templates/node-basic.nupkg", "Azure.Functions.Templates.Node.Basic");
+        using var provenance = JsonDocument.Parse(inner.GetEntry("provenance/node/compatibility.json")!.Open());
+        XElement metadata = Metadata(inner);
+
+        provenance.RootElement.GetProperty("packageId").GetString().Should()
+            .Be(metadata.Element(metadata.Name.Namespace + "id")!.Value);
+        provenance.RootElement.GetProperty("packageVersion").GetString().Should()
+            .Be(metadata.Element(metadata.Name.Namespace + "version")!.Value);
+        foreach (JsonElement descriptor in provenance.RootElement.GetProperty("sources").EnumerateArray())
+        {
+            using Stream source = inner.GetEntry(descriptor.GetProperty("path").GetString()!)!.Open();
+            Convert.FromHexString(descriptor.GetProperty("sha256").GetString()!).Should().Equal(SHA256.HashData(source));
+        }
+    }
+
+    [Theory]
     [InlineData("fixture")]
     [InlineData("fixture-repeat")]
     public void Pack_NonNodeRid_EmbedsDeclaredBytesWithActualMetadataAndCompleteInventory(string directory)

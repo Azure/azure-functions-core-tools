@@ -1,0 +1,7 @@
+<Project>
+  <Target Name="InterleaveNodeNativeGeneration" AfterTargets="StageNativeNodeItems"
+    Condition="'$(MSBuildProjectName)' == 'Workloads.Node.Templates' AND '$(NodeInterleavedPackageVersion)' != ''">
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="StageNativeNodeItems"
+      Properties="PackageVersion=$(NodeInterleavedPackageVersion);NodeInterleavedPackageVersion=" />
+  </Target>
+</Project>

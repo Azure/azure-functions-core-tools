@@ -202,7 +202,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
         }
     }
 
-    private static async Task<CliResult> RunCliAsync(
+    internal static async Task<CliResult> RunCliAsync(
         string directory, string home, string workloadsHome, string project, IReadOnlyList<string> args, CancellationToken cancellationToken)
     {
         string testAssembly = typeof(SetupProgramAdvisoryTests).Assembly.Location;
@@ -313,5 +313,5 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
         return [.. events];
     }
 
-    private sealed record CliResult(int ExitCode, string StandardOutput, string StandardError);
+    internal sealed record CliResult(int ExitCode, string StandardOutput, string StandardError);
 }
