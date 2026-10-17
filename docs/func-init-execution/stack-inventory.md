@@ -260,3 +260,67 @@ force behavior and rollout policy are unchanged. Native HTTP output placement
 still follows the requested execution directory; a nested factory journey is
 not proof that switching the public project-root `new` route preserves every
 legacy output path.
+
+### Internally staged full entry
+
+`NativeEntryExecutionPolicy` defaults to `Legacy` in `Program`. No command flag
+or environment variable selects native routing. The separately testable
+`NativeCliEntryPoint` stages the full CLI graph with one captured host, one
+invocation scope and one authoritative parse. `Parser` accepts an optional
+binding that supplies fresh `InitCommand` / `NewCommand` definitions before
+parenting; the normal registered definitions and legacy hydration remain the
+default path. Public syntax stays `init [path]` and `new [path] --template ...`,
+not the staged execution commands' positional-template or `--path` grammar.
+
+The staged binder retains original argv, accounts for actual root command
+identifier tokens and global options, and preserves scalar alias/value
+provenance. Template options may precede the path. Effective aliases with
+`--param:` or `-p:` prefixes are not mistaken for inline values. Native help
+resolves the explicitly supplied project path asynchronously and projects the
+selected installed schema without attaching mutable options or running
+preparation. A source-owned help projection may refine only descriptions and
+defaults. Selected .NET help uses qualified project evaluation for the namespace;
+unavailable context reports an unevaluated default rather than `Company.Function`.
+Generic help does not evaluate an SDK project. JSON and noninteractive host
+options suppress first-run prompts and stdout advisories; warnings remain on stderr. Default non-template routes
+and legacy `host start` normalization stay in the full graph.
+
+This first staged cohort accepts only fresh empty initialization targets from
+complete preinstalled bundled stacks. Destructive force, nonempty targets,
+adoption and repair are explicitly refused before mutation; they are not
+silently routed to a second scaffolder after native failure. Their default
+legacy route is unchanged. Staged creation does not invoke first-run setup to
+acquire missing stacks; ordinary non-creation first-run behavior remains in the
+full command graph.
+
+Public-style staged item requests carry `LegacyWorkflowRelative` output intent;
+direct native requests default to `LiteralOutput`. The immutable context exposes
+only this generic intent through the private `host:func:item-output-intent`
+binding before the template session opens. Templates own conditional native
+source mappings and target directories. The CLI does not derive a Node parent,
+extension or output filename, and the invocation output directory remains the
+original command base.
+
+The topology guard permits only parameter dependencies and the proven immutable
+intent binding in source conditions; native evaluation selects the sources.
+Other bound/generated topology, alias overwrites and project topology restrictions
+remain unchanged. A selected-source snapshot copies package/configuration,
+provenance and body fingerprints and the exact native regular-file source set.
+The engine rechecks the mounted sources before preview and creation, rejects
+extra sources and placeholder directories, and retains conflict, kind,
+containment and reparse-point checks. Base-relative native targets naturally
+include every nested prefix in the existing ancestry walk.
+
+Both root and explicit nested public paths preserve the old
+`command directory + template-authored relative parent` formula, without root
+reanchoring or folder deduplication. Literal invocations remain literal.
+The staged JSON `executionDirectory` and `outputDirectory` fields both identify
+the native command base; this intentionally replaces the earlier staged
+`outputDirectory` derived-parent value. `invocation.Changes` contains the actual
+native paths relative to that base. No field names or public flags change.
+
+Actual full-entry tests, rather than only factory calls, cover this staged path
+and authoritative committed result propagation. They do not authorize a
+default routing flip, historical-install migration, broader force/adoption
+policy or all-stack runtime/backend claims. Activation remains a separate
+decision after the candidate is qualified.

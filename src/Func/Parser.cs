@@ -33,7 +33,7 @@ internal static class Parser
     /// Creates and configures the root CLI command, resolving all
     /// <see cref="FuncCliCommand"/> services from <paramref name="services"/>.
     /// </summary>
-    public static FuncRootCommand CreateCommand(IServiceProvider services)
+    public static FuncRootCommand CreateCommand(IServiceProvider services, NativeEntryCommandBinding? nativeEntry = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -48,6 +48,11 @@ internal static class Parser
         rootCommand.Subcommands.Add(helpCommand);
 
         var allCommands = services.GetServices<FuncCliCommand>().ToList();
+        if (nativeEntry is not null)
+        {
+            allCommands.RemoveAll(command => command is InitCommand or NewCommand);
+            allCommands.AddRange(nativeEntry.CreateCommands());
+        }
 
         // Defensive: every FuncCliCommand resolved from DI must be either a
         // built-in or an ExternalCommand (workload-contributed). Anything
@@ -116,16 +121,21 @@ internal static class Parser
             rootCommand.Subcommands.Add(command);
         }
 
-        ReplaceHelpAction(rootCommand, helpCommand);
+        ReplaceHelpAction(rootCommand, helpCommand, nativeEntry);
         ConfigureRootAction(rootCommand, helpCommand, versionCommand);
 
         return rootCommand;
     }
 
-    private static void ReplaceHelpAction(FuncRootCommand rootCommand, HelpCommand helpCommand)
+    private static void ReplaceHelpAction(FuncRootCommand rootCommand, HelpCommand helpCommand, NativeEntryCommandBinding? nativeEntry)
     {
         var templateAwareHelp = new TemplateAwareHelpAction(helpCommand);
         var spectreHelp = new SpectreHelpAction(helpCommand, templateAwareHelp);
+        if (nativeEntry is not null)
+        {
+            rootCommand.Options.OfType<HelpOption>().Single().Action = nativeEntry.CreateHelpAction(helpCommand, spectreHelp);
+            return;
+        }
 
         SetHelpAction(rootCommand, spectreHelp);
 
@@ -159,4 +169,3 @@ internal static class Parser
         });
     }
 }
-
