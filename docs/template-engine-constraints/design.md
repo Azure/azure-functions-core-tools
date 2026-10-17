@@ -73,6 +73,18 @@ The snapshot contains only workloads that passed the CLI's applicable compatibil
 
 A name must start with an ASCII letter or digit, contain only ASCII letters, digits, `.`, `-`, and `_`, and not end in `.nupkg`. Any other name makes the constraint fail, so template text can't change a generated command. Evaluation never contacts a feed, so workload constraints behave the same offline.
 
+### Explicit native boot availability
+
+The opt-in native invocation producer uses `NativeTemplateWorkloadCapture`, passed to the internal `WorkloadRegistration.RegisterWorkloadsAsync` overload **before** workloads register. It records the actual RID-compatible, highest-per-physical-package runtime selections at the existing load/configure boundary. Successful configuration and load/configuration failures are distinct receipts. Existing provider inventory, partial service registrations, warnings and default boot composition are unchanged. A receipt is not proof that an SDK, backend, worker executable or external tool works.
+
+`NativeTemplateAvailability(IWorkloadProvider, NativeTemplateWorkloadCapture)` implements `INativeTemplateAvailability.CaptureAsync`. It requires completed capture from that same host's runtime instances and copies physical and logical IDs into separate workload rows with their own versions and aliases. It does not map the logical ID onto the physical version, infer IDs from suffixes, rescan the registry, or choose a different runtime version. Failed receipts remain unusable even if they registered partial stack services. Missing, incomplete or cross-host capture explicitly refuses availability rather than treating provider presence as successful configuration.
+
+The explicit composition root also constructs its single `InstalledProjectStackCatalog` from `capture.SelectConfiguredStacks(resolvedStacks, services)`. The capture records the identity and configuration outcome of each contributed unkeyed `IProjectStack` descriptor. Failed or unattributed contributions are not offered, including for templates without a workload constraint. Selection requires the same captured service collection, unchanged final descriptor identities/order and matching resolved enumeration. Post-boot stack replacement or ambiguous enumeration refuses selection. Default services remain untouched; filtering is only at this explicit native catalog boundary.
+
+This initial native producer is deliberately **runtime-only**. Content-only workload rows have no captured activation authority and cannot satisfy a requirement through this producer. Content constraints remain unavailable, a coverage limitation rather than evidence that the content is absent or unusable. Bundle binding capabilities still come exclusively from the independently resolved bundle context, not these rows.
+
+`NativeTemplateContextResolver` reuses the existing project/profile/bundle resolution path with `InstalledProjectStackCatalog` as the single native stack/language metadata authority. It retains containing project root versus nested command target, profile defaults and range selection, and canonical language aliases without consulting legacy initializers. It reads the selected bundle's local metadata once only when the explicit binding policy is enabled; that flag defaults to false. It is not registered by default and does not resolve bundles for project-template creation.
+
 ### `func-bundle` requires the project's extension bundle
 
 `func-bundle` reads `func:bundle-id` and `func:bundle-version` from the command context:

@@ -126,6 +126,17 @@ to the shared compatibility helper. It never locates another archive by
 package ID/version, trusts hash syntax without reading bytes, changes core
 name fallback, or invokes the legacy V2 file-writing backend.
 
+`BundledNodeBridgeTests.cs` composes that provider with the real unused
+`NativeTemplateCommandAdapter`, installed Node stack, protected native store,
+and selected-bundle metadata reader. Private literal extension metadata tests
+all-required, case-insensitive binding checks and fresh source capture across
+stable/preview/experimental identities; they do not equate the old pack-time
+latest-channel filter with the selected runtime bundle. The bridge tests
+exercise all owned items' omitted/explicit names, display/ID aliases, hidden
+explicit IDs, original regex rejection, unchanged no-op prompt semantics and
+existing-source preservation. Missing or altered mapped provenance, native
+payloads, package versions and configuration hashes refuse before generation.
+Public command routing and default service registration remain unchanged.
 
 `NodeTemplateWorkflowProvider` adapts the same CLI-owned item compatibility and
 project preparation to the shared invocation-scoped workflow contracts. Its
@@ -136,6 +147,29 @@ the actual selected archive bytes. Composition must supply the CLI-compiled
 The provider does not register itself, alter command routing, or add a second
 template catalog.
 
+`BundledNodeWorkflowCompositionTests.cs` explicitly composes the production
+workflow registry, composer, native runners, captured workload availability and
+canonical context resolver against the installed Node archive. Requests leave
+their compatibility, effects and preparation fields unset: the registry selects
+the Node provider from the installed stack catalog. The same scoped provider
+supplies both interfaces, and a separate scope receives a new instance.
+The factory-created command adapter retains the existing flag surface.
+These checks substitute only npm execution and private bundle inventory;
+they do not replace provider selection with test-only capability delegates.
+The earlier real-npm and HTTP qualification remains evidence for its pinned
+`2438be76` source, not a new runtime claim for this composition increment.
+
+The explicit `NativeTemplateWorkflowHostFactory.CreateAsync` boot path is also
+qualified directly, including its captured successful-workload stack filter.
+`BundledNodeExplicitBootBoundaryTests.cs` records the unchanged literal-output
+contract: an item requested at the project root writes `httpTrigger.js|ts`
+at that root, unlike the owned legacy `WriteToFile` action's
+`src/functions/$(FUNCTION_NAME_INPUT).js|ts` target. That root output is outside
+the project's JavaScript `src/functions/*.js` or TypeScript
+`dist/src/functions/*.js` main glob. An explicitly nested `src/functions`
+invocation works with the original default name. The tests preserve both
+requested paths; they do not redirect the root request, change template bytes,
+or establish public project-root `func new` placement parity by themselves.
 
 ## Template-owned item layout
 
@@ -164,6 +198,15 @@ omitted root, explicit root and explicit nested directories. No folder suffix
 deduplication or re-anchoring to the discovered project root occurs. Thus a
 public-style nested base retains the old nested `src/functions/<name>.js|ts`
 formula, while an explicitly literal nested output remains literal.
+`BundledNodeRelativePlacementTests.cs` exercises actual native writes and
+preview agreement, unchanged entry globs, file/reparse-point prefix refusal,
+user-file conflicts, cancellation and changed mounted raw-source refusal.
+These typed-intent checks do not activate the public command route.
+The internal staged JSON `outputDirectory` now means the native invocation
+base (the original command directory), not a CLI-derived target parent.
+Nested `invocation.changes` paths identify the actual authored destinations.
+This is an intentional internal result-semantics change; property names are
+unchanged.
 
 ## Staged creation, not a public command switch
 

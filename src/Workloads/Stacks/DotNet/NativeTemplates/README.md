@@ -162,6 +162,22 @@ while explicit namespace is retained. Both distinctions use the authoritative
 canonical explicit-option provenance from the shared argument parser, not a
 second alias parser. Upstream template configurations remain unchanged.
 
+Actual `InitExecutionRunner` and `NewExecutionRunner` tests use this production
+provider/composer without private test capabilities for both languages. They
+exercise native generation, default/explicit options, trusted metadata,
+source/layout/path/refusal and partial/cancellation behavior. Separate tests run
+real dependency commands and build both generated HTTP functions into
+`functions.metadata`. This composition is not called from default boot or the
+public command routes; no rollout, parser or public SDK boundary is changed.
+
+A separate explicit host-factory test installs the actual physical .NET
+workload into private homes, uses boot-captured availability and the filtered
+installed stack catalog, then calls `CreateInvocation().Composer` for C# and
+F# initialization and item creation with request capabilities unset. It runs
+the real dependencies and builds each generated HTTP function into metadata.
+This exercises the normal workload load-context boundary; the CLI adapter
+does not resolve or cast the physical workload's internal helper services.
+
 `DotNetDirectProviderTests` exercises this provider without the deferred common
 composer or host factory. Both project candidates share one real native session.
 Item preparation uses the physical source-project factory, imported MSBuild

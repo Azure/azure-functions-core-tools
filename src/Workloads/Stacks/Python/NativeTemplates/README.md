@@ -193,11 +193,15 @@ the package ID alone is not authorization.
 Original prompt documents are matched case-insensitively, preserving the
 legacy labels and validators while retaining raw canonical argument IDs.
 Prompt IDs that collide under that lookup are refused before projection.
+The actual `NewExecutionRunner`
+tests use this provider through the common workflow composer with request
+capability fields unset, rather than supplying test-only mapping callbacks.
 
 `PythonProjectWorkflowProvider` qualifies only the packaged basic project.
 It has no preparation action: initialization does not run pip, create a venv,
 or call a second legacy initializer. Generic paired CLI configuration remains
-mandatory.
+mandatory. The production `InitExecutionRunner` tests exercise both the
+normal and no-bundle variants and reject changed owned requirements.
 
 The CLI source-links the existing append interface and executor, using a
 host-only namespace conditional to avoid exposing identically named internal
