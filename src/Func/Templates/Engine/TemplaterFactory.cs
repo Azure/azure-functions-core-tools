@@ -22,4 +22,12 @@ internal sealed class TemplaterFactory(CliConfigurationPathsOptions configuratio
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
         return new Templater(new TemplateEngineSession(context, settingsLocation));
     }
+
+    public Templater Create(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
+        return new Templater(new TemplateEngineSession(context, settingsLocation, snapshot));
+    }
 }

@@ -18,16 +18,16 @@ internal sealed class FuncTemplateConstraintEvaluator(TemplateConstraintRequirem
 {
     private readonly TemplateConstraintRequirementMatcher _matcher = matcher ?? throw new ArgumentNullException(nameof(matcher));
 
-    public FuncTemplateConstraintOutcome EvaluateAll(IReadOnlyCollection<TemplateConstraintDeclaration> declarations, TemplateConstraintEvaluationSnapshot snapshot)
+    public FuncTemplateConstraintOutcome EvaluateAll(IReadOnlyCollection<TemplateConstraintDeclaration> declarations, TemplateConstraintEvaluationSnapshot snapshot, TemplateEngineBundleContext? bundle = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        return EvaluateAll(declarations, snapshot.Workloads, snapshot.BundleId, snapshot.BundleVersion);
+        return EvaluateAll(declarations, snapshot.Workloads, bundle?.Id, bundle?.ResolvedVersion);
     }
 
-    public FuncTemplateConstraintOutcome Evaluate(TemplateConstraintDeclaration declaration, TemplateConstraintEvaluationSnapshot snapshot)
+    public FuncTemplateConstraintOutcome Evaluate(TemplateConstraintDeclaration declaration, TemplateConstraintEvaluationSnapshot snapshot, TemplateEngineBundleContext? bundle = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        return Evaluate(declaration, snapshot.Workloads, snapshot.BundleId, snapshot.BundleVersion);
+        return Evaluate(declaration, snapshot.Workloads, bundle?.Id, bundle?.ResolvedVersion);
     }
 
     public FuncTemplateConstraintOutcome EvaluateAll(IReadOnlyCollection<TemplateConstraintDeclaration> declarations, IReadOnlyCollection<TemplateConstraintWorkload> workloads, string? bundleId = null, NuGetVersion? bundleVersion = null)
