@@ -126,7 +126,7 @@ internal static class CliHostFactory
                 builder.Configuration.AddConfiguration(configurationProvider.GetProjectConfiguration(workingDirectory));
             }
             catch (Exception exception) when (onProjectConfigurationFailure is not null
-                && exception is IOException or UnauthorizedAccessException)
+                && exception is InvalidDataException or IOException or UnauthorizedAccessException)
             {
                 onProjectConfigurationFailure(exception);
             }

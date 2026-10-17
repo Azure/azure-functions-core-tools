@@ -2,19 +2,21 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Commands.Setup;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using Azure.Functions.Cli.Configuration;
-using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Console;
+using Microsoft.Extensions.Hosting;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -265,6 +267,30 @@ public sealed partial class BundledNodeTemplateTests
             .Should().Contain("Failed to load configuration");
     }
 
+    [Theory]
+    [InlineData("new")]
+    [InlineData("init")]
+    public async Task Program_UnrelatedResponseWithTemplateNamedPath_PreservesOriginalCwdConfigurationFailure(string path)
+    {
+        string project = Path.Combine(_root, "bad-response-cwd");
+        Directory.CreateDirectory(Path.Combine(project, ".func"));
+        File.WriteAllText(Path.Combine(project, ".func", "config.json"), "{malformed project configuration");
+        Exception original = Record.Exception(() => new CliConfigurationProvider(new LocalSettingsProvider(), new CliConfigurationPathsOptions(Home))
+            .GetProjectConfiguration(new(project)))!;
+        original.Should().BeOfType<InvalidDataException>();
+        string response = Path.Combine(_root, "bad-cwd.rsp");
+        File.WriteAllText(response, $"start {path} --help");
+        using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(1));
+
+        var result = await SetupProgramAdvisoryTests.RunCliAsync(Path.Combine(_root, "bad-response-process"), Home, _paths.Home, project,
+            ["@" + response], timeout.Token, ReviewPublishedCli);
+
+        result.ExitCode.Should().Be(1, result.StandardOutput + result.StandardError);
+        string.Concat(result.StandardError.Where(character => !char.IsWhiteSpace(character))).Should()
+            .Contain(string.Concat(original.Message.Where(character => !char.IsWhiteSpace(character))));
+        Directory.GetFiles(project, "*", SearchOption.AllDirectories).Should().ContainSingle();
+    }
+
     [Fact]
     public async Task Program_ValidAmbientCwdProject_CannotOverrideDifferentExplicitNativeTarget()
     {
@@ -290,6 +316,78 @@ public sealed partial class BundledNodeTemplateTests
         item.StandardError.Should().BeEmpty();
         File.ReadAllText(Path.Combine(target, "src", "functions", "ExplicitTarget.js")).Should().Contain("app.http('ExplicitTarget'");
         Directory.GetFiles(cwd, "*", SearchOption.AllDirectories).Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("missing", false, 0)]
+    [InlineData("valid", false, 0)]
+    [InlineData("malformed", false, 1)]
+    [InlineData("unreadable", false, 1)]
+    [InlineData("missing", true, 0)]
+    [InlineData("valid", true, 0)]
+    [InlineData("malformed", true, 0)]
+    [InlineData("unreadable", true, 0)]
+    public async Task Program_ProjectConfigurationLoadBoundary_SeparatesActualCommandOwnership(string state, bool template, int expected)
+    {
+        await _installer.InstallFromPackageAsync(BuiltArchive);
+        string cwd = Path.Combine(_root, "configuration-load-cwd");
+        Directory.CreateDirectory(Path.Combine(cwd, ".func"));
+        string path = Path.Combine(cwd, ".func", "config.json");
+        if (state != "missing") File.WriteAllText(path, state == "malformed" ? "{malformed project configuration" : "{}");
+        using FileStream? unreadable = state == "unreadable" ? new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None) : null;
+        Exception? original = state is "malformed" or "unreadable"
+            ? Record.Exception(() => new CliConfigurationProvider(new LocalSettingsProvider(), new CliConfigurationPathsOptions(Home)).GetProjectConfiguration(new(cwd)))
+            : null;
+        if (state is "malformed" or "unreadable") original.Should().NotBeNull("the controlled project input must actually fail to load");
+        string target = Path.Combine(_root, "configuration-load-target");
+        string[] arguments = template
+            ? ["init", target, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"]
+            : ["--version"];
+        using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(1));
+
+        var result = await SetupProgramAdvisoryTests.RunCliAsync(Path.Combine(_root, "load-boundary-process"), Home, _paths.Home, cwd,
+            arguments, timeout.Token, ReviewPublishedCli);
+
+        result.ExitCode.Should().Be(expected, result.StandardOutput + result.StandardError);
+        if (!template && original is not null)
+        {
+            string rendered = string.Concat(result.StandardError.Where(character => !char.IsWhiteSpace(character)));
+            string message = string.Concat(original.Message.Where(character => !char.IsWhiteSpace(character)));
+            rendered.Should().Contain(message, "the non-template boundary must preserve the original loader message");
+        }
+        File.Exists(Path.Combine(target, "package.json")).Should().Be(template && expected == 0);
+    }
+
+    [Fact]
+    public async Task Program_InvalidUserGlobalConfiguration_IsNeverDeferredForTemplateCommands()
+    {
+        await _installer.InstallFromPackageAsync(BuiltArchive);
+        Directory.CreateDirectory(Home);
+        File.WriteAllText(Path.Combine(Home, CliConfigurationNames.ConfigFileName), "{invalid user-global configuration");
+        string cwd = Directory.CreateDirectory(Path.Combine(_root, "global-config-cwd")).FullName;
+        string target = Path.Combine(_root, "global-config-target");
+        using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(1));
+
+        var result = await SetupProgramAdvisoryTests.RunCliAsync(Path.Combine(_root, "global-config-process"), Home, _paths.Home, cwd,
+            ["init", target, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"], timeout.Token, ReviewPublishedCli);
+
+        result.ExitCode.Should().Be(1);
+        Directory.Exists(target).Should().BeFalse();
+        result.StandardError.Should().Contain("Failed to load configuration");
+    }
+
+    [Fact]
+    public void DeferredProjectConfigurationFailure_RethrowsTheSameExceptionAndCause()
+    {
+        IOException cause = new("controlled unreadable project");
+        InvalidDataException original = new("controlled project configuration load", cause);
+        var host = new NativeTemplateWorkflowHost(Substitute.For<IHost>(), ExceptionDispatchInfo.Capture(original));
+        Action fail = host.ThrowIfProjectConfigurationFailed;
+
+        var thrown = fail.Should().Throw<InvalidDataException>().Which;
+
+        thrown.Should().BeSameAs(original);
+        thrown.InnerException.Should().BeSameAs(cause);
     }
 
     private string UnrelatedRuntimeArchive(string version, string marker, string rid, string workloadType = "StubWorkload")
