@@ -8,7 +8,7 @@
 ## 2. Planned Focused Specifications
 
 - [x] 2.1 Create and strictly validate the `template-engine-constraints` change covering func-specific bundle, stack, and related compatibility constraints.
-- [ ] 2.2 Create and strictly validate the `template-engine-post-actions` change covering supported actions, execution policy, dry-run behavior, cancellation, and diagnostics.
+- [x] 2.2 Create and strictly validate the `template-engine-post-actions` change covering supported actions, execution policy, dry-run behavior, cancellation, and diagnostics.
 - [ ] 2.3 Create and strictly validate the `template-engine-bind-sources` change covering MSBuild, npm, and other project-ecosystem value sources.
 - [ ] 2.4 Create and strictly validate the `func-new-search` change covering NuGet feed scanning, `FuncTemplate` discovery manifests, CDN publication, and CLI search.
 - [x] 2.5 Create and strictly validate the `azure-samples-template-pipeline` change covering repository conventions, validation, package generation, and seamless release automation.
