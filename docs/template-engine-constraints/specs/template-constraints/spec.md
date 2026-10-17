@@ -102,11 +102,16 @@ Func constraint types SHALL use the `func-` prefix. A template package that othe
 - **THEN** the shared-package rule permits that declaration
 
 ### Requirement: Workload requirements
-The `func-workload` constraint SHALL name a workload by alias or package ID with an optional version range. Names SHALL start with an ASCII letter or digit, SHALL contain only ASCII letters, digits, `.`, `-`, and `_`, SHALL NOT end in `.nupkg`, and SHALL compare case-insensitively with the aliases, package IDs, and published package IDs of the workloads the CLI loaded when the command started. The loaded workloads SHALL be the highest installed version of each runtime workload that loaded and every installed version of each content workload except packages built for another platform. The constraint SHALL be satisfied when a matching loaded workload has a version in the range. When a matching workload is installed but didn't load, the constraint SHALL be restricted without a next step. Evaluation SHALL NOT access the network or depend on project context.
+The `func-workload` constraint SHALL name a workload by alias or package ID with an optional version range. Names SHALL start with an ASCII letter or digit, SHALL contain only ASCII letters, digits, `.`, `-`, and `_`, SHALL NOT end in `.nupkg`, and SHALL compare case-insensitively with the aliases, package IDs, and published package IDs in the command's immutable availability snapshot. Runtime entries SHALL use the selected highest installed runtime version only when loading and initialization both succeeded. A runtime that loaded but failed initialization SHALL NOT satisfy a requirement, and evaluation SHALL NOT activate an older installed version as a fallback. Content entries SHALL include admitted installed versions except packages built for another platform, without treating inventory admission as proof of payload health. A matching usable entry SHALL satisfy the constraint when its version is in the range. An installed runtime that failed loading or initialization SHALL be restricted without an automatic next step and retain its CLI-owned diagnostic. Evaluation SHALL NOT access the network, load workload code, or depend on project context.
 
 #### Scenario: Required workload is loaded
-- **WHEN** a template requires `node` and a loaded `node` workload has a version in the declared range
+- **WHEN** a template requires `node` and the selected `node` runtime loaded and initialized successfully with a version in the declared range
 - **THEN** the constraint is satisfied
+
+#### Scenario: Runtime loads but initialization fails
+- **WHEN** a matching selected runtime assembly loaded but initialization failed even though its version is in range and no matching usable entry or satisfied alternative exists
+- **THEN** it cannot satisfy the constraint and the template is restricted without an automatic install or update step
+- **AND** the CLI-owned initialization diagnostic is retained
 
 #### Scenario: Required workload is missing
 - **WHEN** no installed workload matches the required name
@@ -114,25 +119,25 @@ The `func-workload` constraint SHALL name a workload by alias or package ID with
 - **AND** the next step installs it, through `func setup` when the workload belongs to a setup feature
 
 #### Scenario: Required workload is installed but not loaded
-- **WHEN** a matching workload is installed but didn't load
+- **WHEN** a matching runtime is installed but failed loading and no matching usable entry or satisfied alternative exists
 - **THEN** the template is restricted without a next step
 
-#### Scenario: Loaded workload is older than required
-- **WHEN** every matching loaded version is below a range that has no upper bound
+#### Scenario: Usable workload is older than required
+- **WHEN** at least one usable entry matches and every matching usable version is below a range that has no upper bound
 - **THEN** the template is restricted as outdated
 - **AND** the next step updates the workload
 
 #### Scenario: Outdated workload's range has an upper bound
-- **WHEN** every matching loaded version is below a range that has an upper bound
+- **WHEN** at least one usable entry matches and every matching usable version is below a range that has an upper bound
 - **THEN** the template is restricted as outdated without a next step
 
-#### Scenario: Loaded workload is newer than allowed
-- **WHEN** every matching loaded version is outside the range and at least one is above it
+#### Scenario: Usable workload is newer than allowed
+- **WHEN** at least one usable entry matches, every matching usable version is outside the range, and at least one is above it
 - **THEN** the template is restricted as incompatible without a next step
 
 #### Scenario: Older in-range version is installed beside a newer runtime workload
-- **WHEN** a runtime workload has an in-range version installed and a newer out-of-range version is loaded
-- **THEN** the constraint evaluates only the loaded version and is restricted as incompatible
+- **WHEN** a runtime workload has an older in-range version installed and its newer selected version loaded and initialized successfully outside the range
+- **THEN** the constraint evaluates only that selected usable version and is restricted as incompatible
 
 #### Scenario: Workload name isn't valid
 - **WHEN** a workload name contains a space, starts with `-`, or ends in `.nupkg`
@@ -141,14 +146,14 @@ The `func-workload` constraint SHALL name a workload by alias or package ID with
 
 #### Scenario: Platform-specific workload is named by its published package ID
 - **WHEN** a template names a platform-specific workload by the package ID it was published under
-- **THEN** the constraint matches the platform package that loaded
+- **THEN** the constraint matches the admitted usable platform entry rather than a diagnostic-only installed entry
 
 #### Scenario: No project exists yet
 - **WHEN** a workload constraint is evaluated before a project context exists
 - **THEN** it gives the same result it gives inside a project
 
 ### Requirement: Compatibility and eligibility boundaries
-The workload subsystem SHALL own applicable CLI/workload contract, packaging, and activation checks. The template subsystem SHALL own template package classification and supported format and feature checks. The workload snapshot used by `func-workload` SHALL exclude workloads rejected by applicable compatibility or activation checks. Template constraints SHALL NOT replace or bypass those checks, select replacement package versions, or acquire packages.
+The workload subsystem SHALL own applicable CLI/workload contract, packaging, and activation checks. The template subsystem SHALL own template package classification and supported format and feature checks. The combined immutable availability input SHALL retain installed-only rejection, load-failure, and initialization-failure diagnostics. Its usable-workload projection SHALL exclude those entries, and only that projection SHALL participate in `func-workload` satisfaction. Template constraints SHALL NOT replace or bypass those checks, select replacement package versions, or acquire packages.
 
 #### Scenario: Installed workload was rejected before activation
 - **WHEN** a matching workload is installed but rejected by compatibility checks and no matching usable workload is present

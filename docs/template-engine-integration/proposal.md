@@ -5,7 +5,7 @@ The CLI needs one reliable boundary around Microsoft.TemplateEngine so every tem
 ## What Changes
 
 - Make `Templater` the context-bound entry point for Microsoft.TemplateEngine bootstrapping, installed-template listing, and template-group resolution.
-- Create one `Templater` per command invocation from an immutable snapshot of the command directory, resolved Functions project, stack, language, and extension bundle.
+- Create one `Templater` per uninterrupted command-scoped runtime flow from an immutable context snapshot. Acquisition ends that flow, and later execution starts fresh context, catalog, eligibility, and selection without transferring a disposed capability.
 - Publish stable host parameters for project, stack, language, bundle ID, and bundle version so constraints and opt-in template bind symbols consume the same context.
 - Return the installed templates of the requested type from listing, with eligibility and constraint diagnostics.
 - Resolve exact template identities and short names into context-evaluated template groups, applying constraints before any template can be selected.
@@ -21,7 +21,7 @@ The CLI needs one reliable boundary around Microsoft.TemplateEngine so every tem
 
 ### Modified Capabilities
 
-None.
+- `template-constraints`: Require successful runtime loading and initialization in the shared availability snapshot, retaining load/initialization failure diagnostics rather than satisfying requirements from installed-only entries.
 
 ## Impact
 
