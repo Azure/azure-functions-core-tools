@@ -14,8 +14,24 @@ func workload install go
 
 ## Status
 
-Preview. The project initializer is currently a stub; full scaffolding lands
-in a follow-up release.
+Preview. The public initializer scaffolds the Go worker SDK project and runs
+`go mod tidy` unless `--skip-go-mod-tidy` is supplied.
+
+The workload also bundles a native `basic` project archive from the same owned
+sources. It retains bundle options and module naming, but remains staged:
+the shared native workflow must provide Go preparation before public activation.
+No separate template feed or Go item catalog is introduced.
+
+Controlled native-project fixtures supply the owned Go preparation helper
+through the shared init-runner preview/complete callback. They cover tidy
+skips, preserved exit/stderr results, cancellation and retained native files
+on preparation failure. The callback is explicitly injected by tests only;
+public `func init` remains on the existing initializer.
+
+An opt-in CLI-owned workflow provider now supplies that preparation using
+narrowly source-linked helper code and the archive's exact project provenance.
+It does not consume a physical workload's preparation services. Public command
+routing and the existing Windows worker launch contract are unchanged.
 
 ## Links
 

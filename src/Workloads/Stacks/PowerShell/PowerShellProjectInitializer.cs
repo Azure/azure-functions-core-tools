@@ -4,8 +4,6 @@
 using System.CommandLine;
 using System.Reflection;
 using System.Text.Json.Nodes;
-
-using System.Xml;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
 
@@ -18,9 +16,6 @@ namespace Azure.Functions.Cli.Workloads.PowerShell;
 /// </summary>
 internal sealed class PowerShellProjectInitializer(PowerShellProjectStack stack) : IProjectInitializer
 {
-    private const string AzModuleName = "Az";
-    private const string PowerShellGalleryFindPackagesByIdUri = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id=";
-    private const int GalleryTimeoutSeconds = 10;
     private const string MajorVersionPlaceholder = "MAJOR_VERSION";
     private const string RuntimeVersionPlaceholder = "{RuntimeVersion}";
     private const string DefaultRuntimeVersion = "7.4";
@@ -184,55 +179,6 @@ internal sealed class PowerShellProjectInitializer(PowerShellProjectStack stack)
         };
     }
 
-    private static async Task<string?> DefaultGetLatestAzModuleMajorVersion(CancellationToken cancellationToken)
-    {
-        try
-        {
-            Uri address = new($"{PowerShellGalleryFindPackagesByIdUri}'{AzModuleName}'");
-
-            using HttpClient client = new();
-            client.DefaultRequestHeaders.Add("User-Agent", "AzureFunctionsCli");
-            client.Timeout = TimeSpan.FromSeconds(GalleryTimeoutSeconds);
-
-            using HttpResponseMessage response = await client.GetAsync(address, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-
-            using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-
-            XmlDocument doc = new();
-            using (var reader = XmlReader.Create(stream))
-            {
-                doc.Load(reader);
-            }
-
-            XmlNamespaceManager nsmgr = new(doc.NameTable);
-            nsmgr.AddNamespace("ps", "http://www.w3.org/2005/Atom");
-            nsmgr.AddNamespace("d", "http://schemas.microsoft.com/ado/2007/08/dataservices");
-            nsmgr.AddNamespace("m", "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata");
-
-            XmlNode? root = doc.DocumentElement;
-            XmlNodeList? props = root?.SelectNodes("//m:properties[d:IsPrerelease = \"false\"]/d:Version", nsmgr);
-            var latestVersion = new Version("0.0");
-
-            if (props is { Count: > 0 })
-            {
-                foreach (XmlNode prop in props)
-                {
-                    if (Version.TryParse(prop.FirstChild?.Value, out Version? currentVersion) && currentVersion > latestVersion)
-                    {
-                        latestVersion = currentVersion;
-                    }
-                }
-            }
-
-            string major = latestVersion.Major.ToString();
-            return major == "0" ? null : major;
-        }
-        catch (Exception)
-        {
-            // Best-effort lookup; failures (network issues, invalid JSON, etc.) are non-fatal
-            // because the Az module version is only used to pre-populate requirements.psd1.
-            return null;
-        }
-    }
+    internal static Task<string?> DefaultGetLatestAzModuleMajorVersion(CancellationToken cancellationToken)
+        => new PowerShellProjectPreparation().GetLatestAzModuleMajorVersionAsync(cancellationToken);
 }

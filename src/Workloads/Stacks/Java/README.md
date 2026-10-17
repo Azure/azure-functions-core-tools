@@ -25,6 +25,12 @@ acquired automatically the first time you run `func start`.
 
 Preview.
 
+The workload bundles a native `basic` project archive containing the existing
+Maven scaffold and sample HTTP function. It retains artifact naming and bundle
+options, with CLI configuration supplied by the shared project planner/writer.
+The public initializer remains unchanged; init does not invoke Maven. No
+separate template feed or Java item catalog is introduced.
+
 ## Links
 
 - [Azure Functions CLI](https://github.com/Azure/azure-functions-core-tools)
