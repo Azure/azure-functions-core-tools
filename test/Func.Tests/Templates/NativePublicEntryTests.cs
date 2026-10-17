@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Globalization;
 using System.Text.Json;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Workloads;
@@ -10,11 +11,99 @@ using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Commands.Setup;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed partial class BundledNodeTemplateTests
 {
+    [Theory]
+    [InlineData("en-US", "-1", "before")]
+    [InlineData("en-US", "-1", "inline")]
+    [InlineData("en-US", "-1", "pathFirst")]
+    [InlineData("fr-FR", "-1,25", "before")]
+    [InlineData("fr-FR", "-1,25", "inline")]
+    [InlineData("fr-FR", "-1,25", "pathFirst")]
+    [InlineData("fr-FR", "-1.25", "before")]
+    [InlineData("en-US", "-1e-3", "before")]
+    public async Task StagedEntry_SignedNumericScalar_CreatesAtExplicitPathWithOriginalValue(string culture, string value, string layout)
+    {
+        CultureInfo previous = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+            string project = await CreateReviewProjectAsync();
+            string[] scalar = layout == "inline" ? ["--timer-trigger-schedule=" + value] : ["--timer-trigger-schedule", value];
+            string[] tail = layout == "pathFirst" ? [project, .. scalar] : [.. scalar, project];
+            string[] arguments = ["new", .. tail, "-t", "TimerTrigger-JavaScript", "--name", "SignedScalar",
+                "--non-interactive", "--output=json"];
+            string[] original = [.. arguments];
+            TestInteractionService output = new();
+            int checks = 0;
+
+            int exit = await new NativeCliEntryPoint().ExecuteAsync(arguments, output, _paths, new(Home), CancellationToken.None,
+                TrackEntryContexts, _ =>
+                {
+                    checks++;
+                    return Task.FromResult<string?>("9999.0.0");
+                });
+
+            exit.Should().Be(0, output.AllOutput);
+            File.ReadAllText(Path.Combine(project, "src", "functions", "SignedScalar.js")).Should().Contain("app.timer('SignedScalar'");
+            using var json = JsonDocument.Parse(output.Lines.Single(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]);
+            json.RootElement.GetProperty("kind").GetString().Should().Be("created");
+            json.RootElement.GetProperty("executionDirectory").GetString().Should().Be(project);
+            json.RootElement.GetProperty("outputDirectory").GetString().Should().Be(project);
+            json.RootElement.GetProperty("argumentResults")[0].GetProperty("valuesByCanonicalName")
+                .GetProperty("timerTrigger-schedule").GetString().Should().Be(value);
+            json.RootElement.GetProperty("invocation").GetProperty("changes")[0].GetProperty("path").GetString()
+                .Should().Be("src/functions/SignedScalar.js");
+            checks.Should().Be(0);
+            output.AllOutput.Should().NotContain("INPUT:").And.NotContain("SELECT:").And.NotContain("9999.0.0");
+            _source.ReceivedCalls().Should().BeEmpty();
+            arguments.Should().Equal(original);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
+    }
+
+    [Theory]
+    [InlineData("separateLiteral", false)]
+    [InlineData("inlineLiteral", true)]
+    [InlineData("unknown", false)]
+    [InlineData("missingValue", false)]
+    public async Task StagedEntry_ScalarBoundaryControls_DoNotBroadenOptionOrHostPolicy(string scenario, bool succeeds)
+    {
+        string project = await CreateReviewProjectAsync();
+        string[] scalar = scenario switch
+        {
+            "separateLiteral" => ["--timer-trigger-schedule", "--not-a-number"],
+            "inlineLiteral" => ["--timer-trigger-schedule=--not-a-number"],
+            "unknown" => ["--unknown", "-1"],
+            _ => ["--timer-trigger-schedule"],
+        };
+        TestInteractionService output = new();
+
+        int exit = await new NativeCliEntryPoint().ExecuteAsync(
+            ["new", project, .. scalar, "-t", "TimerTrigger-JavaScript", "--name", "ScalarControl", "--non-interactive", "--output=json"],
+            output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
+
+        exit.Should().Be(succeeds ? 0 : 1, output.AllOutput);
+        using var json = JsonDocument.Parse(output.Lines.Single(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]);
+        json.RootElement.GetProperty("succeeded").GetBoolean().Should().Be(succeeds);
+        json.RootElement.GetProperty("executionDirectory").GetString().Should().Be(project);
+        File.Exists(Path.Combine(project, "src", "functions", "ScalarControl.js")).Should().Be(succeeds);
+        if (!succeeds)
+        {
+            Directory.GetFiles(Path.Combine(project, "src", "functions")).Should().BeEmpty();
+            json.RootElement.GetProperty("kind").GetString().Should().Be("invalidArguments");
+        }
+        output.AllOutput.Should().NotContain("INPUT:").And.NotContain("SELECT:");
+        _source.ReceivedCalls().Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData("JavaScript", "js", ".js")]
     [InlineData("TypeScript", "ts", ".ts")]

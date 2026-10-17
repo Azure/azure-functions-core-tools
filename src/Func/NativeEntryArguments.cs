@@ -5,6 +5,7 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Templates;
 
 namespace Azure.Functions.Cli;
 
@@ -91,7 +92,7 @@ internal sealed class NativeEntryArguments(IReadOnlyList<string> arguments)
                 string alias = separator < 0 ? value : value[..separator];
                 Option? option = options.SingleOrDefault(option => option.Name == alias || option.Aliases.Contains(alias));
                 if (separator < 0 && index + 1 < tail.Length
-                    && (option is null ? !tail[index + 1].StartsWith('-')
+                    && (option is null ? !TemplateArgumentParser.IsOptionLikeToken(tail[index + 1])
                         : option.Arity.MinimumNumberOfValues > 0 || (option is Option<bool> && bool.TryParse(tail[index + 1], out _))))
                 {
                     index++;

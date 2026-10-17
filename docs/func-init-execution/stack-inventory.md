@@ -274,7 +274,9 @@ not the staged execution commands' positional-template or `--path` grammar.
 
 The staged binder retains original argv, accounts for actual root command
 identifier tokens and global options, and preserves scalar alias/value
-provenance. Template options may precede the path. Effective aliases with
+provenance. Template options may precede the path. Separated signed numeric
+scalars use the native parser's current/invariant-culture recognition without
+consuming the following positional path. Effective aliases with
 `--param:` or `-p:` prefixes are not mistaken for inline values. Native help
 resolves the explicitly supplied project path asynchronously and projects the
 selected installed schema without attaching mutable options or running
