@@ -23,11 +23,15 @@ internal sealed class PreparedWorkloadDeployment(TempDirectory staging, Inspecte
     public IReadOnlyDictionary<string, string> Hashes { get; } = hashes;
     public string ExpectedState { get; } = expectedState;
     public PreparedBundledTemplates? BundledTemplates { get; init; }
+    public PreparedWorkloadReuse? UpdateFrom { get; init; }
+    public PreparedWorkloadReuse? Destination { get; init; }
     public string CaptureState(IReadOnlyList<WorkloadEntry> installed)
         => WorkloadStateSnapshot.CaptureAffected(installed, Package.Identity.PackageId, LogicalPackage?.PackageId);
     public void Dispose()
     {
         BundledTemplates?.Dispose();
+        UpdateFrom?.Dispose();
+        Destination?.Dispose();
         staging.Dispose();
     }
 }

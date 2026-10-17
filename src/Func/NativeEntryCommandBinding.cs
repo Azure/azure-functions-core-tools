@@ -6,29 +6,25 @@ using System.CommandLine.Help;
 using System.CommandLine.Invocation;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Console;
-using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli;
 
-internal sealed class NativeEntryCommandBinding(IServiceProvider services, NativeTemplateWorkflowComposer composer,
-    IReadOnlyList<string> originalArguments)
+internal sealed class NativeEntryCommandBinding(IServiceProvider services, IReadOnlyList<string> originalArguments)
 {
     private readonly IServiceProvider _services = services ?? throw new ArgumentNullException(nameof(services));
-    private readonly NativeTemplateWorkflowComposer _composer = composer ?? throw new ArgumentNullException(nameof(composer));
+    private readonly Lazy<NativeTemplateWorkflowComposer> _composer = new(services.GetRequiredService<NativeTemplateWorkflowComposer>);
     private readonly NativeEntryArguments _arguments = new(originalArguments);
     private readonly IInteractionService _interaction = services.GetRequiredService<IInteractionService>();
     private readonly InitExecutionRenderer _projects = services.GetRequiredService<InitExecutionRenderer>();
     private readonly NewExecutionRenderer _items = services.GetRequiredService<NewExecutionRenderer>();
-    private readonly InitExecutionTargetInspector _targets = services.GetRequiredService<InitExecutionTargetInspector>();
-    private readonly InstalledProjectStackCatalog _catalog = services.GetRequiredService<InstalledProjectStackCatalog>();
-    private readonly INewExecutionContextResolver _contexts = services.GetRequiredService<INewExecutionContextResolver>();
+    private readonly Lazy<INewExecutionContextResolver> _contexts = new(services.GetRequiredService<INewExecutionContextResolver>);
     private readonly INativeTemplateAvailability _availability = services.GetRequiredService<INativeTemplateAvailability>();
     private readonly ITemplaterFactory _templates = services.GetRequiredService<ITemplaterFactory>();
     private readonly ITemplateArgumentParser _parser = services.GetRequiredService<ITemplateArgumentParser>();
-    private readonly NativeTemplateWorkflowRegistry _workflows = services.GetRequiredService<NativeTemplateWorkflowRegistry>();
+    private readonly Lazy<NativeTemplateWorkflowRegistry> _workflows = new(services.GetRequiredService<NativeTemplateWorkflowRegistry>);
 
     internal static bool IsJsonOutput(NewCommand command, ParseResult parsed)
     {
@@ -76,7 +72,7 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, Nativ
         var request = new NewExecutionRequest(raw.Directory, parsed.GetValue(command.TemplateOption), parsed.GetValue(command.NameOption),
             null, parsed.GetValue(command.ForceOption), IsNonInteractive(command, parsed), false, parsed.GetValue(command.ListOption),
             json, input.NativeTokens, input.ReservedAliases) { OutputIntent = NativeItemOutputIntent.LegacyWorkflowRelative };
-        NewExecutionResult result = await _composer.ExecuteItemAsync(request, cancellationToken);
+        NewExecutionResult result = await _composer.Value.ExecuteItemAsync(request, cancellationToken);
         return _items.Render(result with
         {
             ArgumentResults = Array.AsReadOnly<TemplateCandidateParseResult>([.. result.ArgumentResults.Select(input.RestoreProvenance)]),
@@ -96,58 +92,15 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, Nativ
         }
         var input = NativeTemplateCommandInput.CaptureEntry(command, parsed, raw.Tokens,
             new HashSet<Option> { command.StackOption, command.NameOption, command.LanguageOption, command.ForceOption }, raw.PathIndex);
-        if (parsed.GetValue(command.ForceOption))
+        var request = new InitExecutionRequest(raw.Directory, null, parsed.GetValue(command.NameOption),
+            parsed.GetValue(command.StackOption), parsed.GetValue(command.LanguageOption), parsed.GetValue(command.ForceOption),
+            !_interaction.IsInteractive, false, false, input.NativeTokens, input.ReservedAliases)
         {
-            return _projects.Render(InitExecutionResult.Reject("stagedForceUnsupported",
-                "This staged entry supports fresh project creation only. No files were deleted; default public routing remains legacy."), false);
-        }
-
-        if (_targets.GetDiagnostic(raw.Directory) is not null)
-        {
-            return _projects.Render(InitExecutionResult.Reject("stagedTargetUnsupported",
-                "This staged entry requires a new empty directory. Adoption, repair and reinitialization remain on the default legacy route."), false);
-        }
-
-        InstalledProjectStackCatalog catalog = _catalog;
-        IProjectStack? stack = parsed.GetValue(command.StackOption) is { } requested ? catalog.FindStack(requested) : null;
-        if (parsed.GetValue(command.StackOption) is not null && stack is null)
-        {
-            return _projects.Render(InitExecutionResult.Reject("invalidStack", "Supply one installed --stack."), false);
-        }
-
-        if (stack is null && catalog.Stacks.Count == 1)
-        {
-            stack = catalog.Stacks[0];
-        }
-        else if (stack is null && catalog.Stacks.Count > 1 && _interaction.IsInteractive)
-        {
-            string picked = await _interaction.PromptForSelectionAsync("Select a stack:", catalog.Stacks.Select(candidate => candidate.DisplayName), cancellationToken);
-            stack = catalog.Stacks.Single(candidate => candidate.DisplayName == picked);
-        }
-
-        if (stack is null)
-        {
-            return _projects.Render(InitExecutionResult.Reject("stackRequired", "Install a complete bundled stack and supply --stack when multiple stacks are installed."), false);
-        }
-
-        string? language = parsed.GetValue(command.LanguageOption);
-        if (language is null && stack.SupportedLanguages.Count == 1)
-        {
-            language = stack.SupportedLanguages[0];
-        }
-        else if (language is null && _interaction.IsInteractive)
-        {
-            language = await _interaction.PromptForSelectionAsync("Select a language:", stack.SupportedLanguages, cancellationToken);
-        }
-
-        if (language is null)
-        {
-            return _projects.Render(InitExecutionResult.Reject("languageRequired", "Supply --language for the selected multi-language stack."), false);
-        }
-
-        var request = new InitExecutionRequest(raw.Directory, null, parsed.GetValue(command.NameOption), stack.Stack, language,
-            false, !_interaction.IsInteractive, false, false, input.NativeTokens, input.ReservedAliases);
-        InitExecutionResult result = await _composer.ExecuteProjectAsync(request, cancellationToken);
+            TargetPolicy = InitExecutionTargetPolicy.PublicCompatible,
+            ExistingProjectTokens = NativeTemplateCommandInput.CaptureEntry(command, parsed, raw.Tokens,
+                command.Options.ToHashSet(), raw.PathIndex).NativeTokens,
+        };
+        InitExecutionResult result = await _composer.Value.ExecuteProjectAsync(request, cancellationToken);
         return _projects.Render(result with
         {
             ArgumentResults = Array.AsReadOnly<TemplateCandidateParseResult>([.. result.ArgumentResults.Select(input.RestoreProvenance)]),
@@ -177,7 +130,7 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, Nativ
 
             (IReadOnlyList<string> Tokens, int? PathIndex, Common.WorkingDirectory Directory) raw = binding._arguments.Read(parseResult, item);
             var request = new NewExecutionRequest(raw.Directory, reference, null, null, false, true, false, false, false, [], new HashSet<string>());
-            NewExecutionContextResult context = await binding._contexts.ResolveAsync(request, false, cancellationToken);
+            NewExecutionContextResult context = await binding._contexts.Value.ResolveAsync(request, false, cancellationToken);
             if (context.Failure is { } failure)
             {
                 foreach (string diagnostic in failure.Diagnostics) binding._interaction.WriteError(diagnostic);
@@ -186,7 +139,16 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, Nativ
 
             TemplateConstraintEvaluationSnapshot availability = await binding._availability.CaptureAsync(cancellationToken);
             using Templater templater = await binding._templates.CreateAsync(context.Context!, availability, cancellationToken);
-            TemplateResolutionResult resolved = await templater.ResolveGroupAsync(reference, TemplateType.Item, cancellationToken);
+            TemplateResolutionResult resolved;
+            try
+            {
+                resolved = await templater.ResolveGroupAsync(reference, TemplateType.Item, cancellationToken);
+            }
+            catch (NativeTemplateCohortException exception)
+            {
+                binding._interaction.WriteError(exception.Message);
+                return 1;
+            }
             if (resolved.Status != TemplateResolutionStatus.Success)
             {
                 binding._interaction.WriteError($"The requested item is unavailable: {resolved.Status}.");
@@ -205,7 +167,7 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, Nativ
                 item.Options.ToHashSet(), raw.PathIndex);
             foreach (ResolvedTemplate selected in visible)
             {
-                INativeItemWorkflowProvider? provider = binding._workflows.FindItem(context.Context!.Project!.Stack!);
+                INativeItemWorkflowProvider? provider = binding._workflows.Value.FindItem(context.Context!.Project!.Stack!);
                 NativeItemHelpProjection overlay = provider is null ? new(selected.Parameters, [])
                     : await provider.DescribeHelpAsync(new(selected, context.Context), cancellationToken);
                 if (overlay.Parameters.Count != selected.Parameters.Count || selected.Parameters.Any(parameter =>

@@ -32,7 +32,8 @@ internal sealed class InitExecutionRunner(
     IFileSystem fileSystem,
     ILocalSettingsProvider localSettings,
     IFunctionsProjectResolver projects,
-    NativeTemplateWorkflowRegistry? workflows = null) : IInitExecutionRunner
+    NativeTemplateWorkflowRegistry? workflows = null,
+    NativeTemplateStackCompatibility? stackCompatibility = null) : IInitExecutionRunner
 {
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
@@ -46,6 +47,7 @@ internal sealed class InitExecutionRunner(
     private readonly ILocalSettingsProvider _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
     private readonly IFunctionsProjectResolver _projects = projects ?? throw new ArgumentNullException(nameof(projects));
     private readonly NativeTemplateWorkflowRegistry? _workflows = workflows;
+    private readonly NativeTemplateStackCompatibility? _stackCompatibility = stackCompatibility;
 
     public async Task<InitExecutionResult> ExecuteAsync(
         InitExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -66,7 +68,8 @@ internal sealed class InitExecutionRunner(
             return InitExecutionResult.Reject("invalidName", "Supply a nonempty --name.");
         }
 
-        if (request.Force)
+        bool publicCompatibility = request.TargetPolicy == InitExecutionTargetPolicy.PublicCompatible;
+        if (request.Force && !publicCompatibility)
         {
             return InitExecutionResult.Reject("forceNotQualified",
                 "Force cleanup is not qualified by this staged INIT consumer. Nothing was deleted; use a new empty target.");
@@ -75,7 +78,17 @@ internal sealed class InitExecutionRunner(
         InitExecutionTarget target;
         try
         {
-            target = await _targets.InspectAsync(request.WorkingDirectory, cancellationToken);
+            if (publicCompatibility && _targets.GetPathDiagnostic(request.WorkingDirectory) is { } pathDiagnostic)
+            {
+                return InitExecutionResult.Reject("invalidTarget", pathDiagnostic);
+            }
+
+            target = publicCompatibility && request.Force ? new(InitExecutionTargetState.Empty)
+                : await _targets.InspectAsync(request.WorkingDirectory, cancellationToken);
+            if (publicCompatibility && target.State == InitExecutionTargetState.Unsupported)
+            {
+                target = new(InitExecutionTargetState.Empty);
+            }
         }
         catch (JsonException exception)
         {
@@ -111,7 +124,7 @@ internal sealed class InitExecutionRunner(
         if (target.State == InitExecutionTargetState.Configured && !repair)
         {
             return InitExecutionResult.Reject("alreadyInitialized",
-                "This directory already contains Functions CLI configuration. Nothing was changed; use a new target for project-template creation.");
+                "This directory already contains Functions CLI configuration. Nothing was changed; pass --force to re-initialize.");
         }
 
         bool existing = target.State == InitExecutionTargetState.Adoptable || repair;
@@ -121,7 +134,8 @@ internal sealed class InitExecutionRunner(
                 "--template cannot be used during adoption or repair. Reinitialization requires --force, which is not qualified by this staged consumer; nothing was changed.");
         }
 
-        if (existing && (request.RawTemplateTokens.Count > 0 || request.Name is not null))
+        if (existing && (publicCompatibility ? request.ExistingProjectTokens?.Count > 0
+            : request.RawTemplateTokens.Count > 0 || request.Name is not null))
         {
             return InitExecutionResult.Reject("invalidExistingProjectArguments",
                 "Adoption and repair only update CLI configuration. Remove --name and template-specific arguments; no template is loaded.");
@@ -155,6 +169,53 @@ internal sealed class InitExecutionRunner(
             return await ConfigureExistingAsync(request, target, repair, catalog, requestedStack, requestedLanguage, cancellationToken);
         }
 
+        if (publicCompatibility)
+        {
+            bool canPrompt = !request.NonInteractive && _interaction.IsInteractive;
+            if (requestedStack is null)
+            {
+                if (catalog.Stacks.Count == 1)
+                {
+                    requestedStack = catalog.Stacks[0];
+                }
+                else if (canPrompt)
+                {
+                    requestedStack = await _prompts.PickAsync("Select a stack:", catalog.Stacks, stack => stack.DisplayName, cancellationToken);
+                }
+                else
+                {
+                    return InitExecutionResult.Reject("stackRequired", "Multiple stacks are installed. Supply --stack <stack>.");
+                }
+
+            }
+
+            if (_stackCompatibility?.GetDiagnostic(requestedStack.Stack) is { } diagnostic)
+            {
+                return InitExecutionResult.Reject("stackUpdateRequired", diagnostic);
+            }
+
+            if (requestedLanguage is not null && !requestedStack.SupportedLanguages.Contains(requestedLanguage, StringComparer.OrdinalIgnoreCase))
+            {
+                return InitExecutionResult.Reject("invalidLanguage", $"Supply a --language supported by stack '{requestedStack.Stack}'.");
+            }
+
+            if (requestedLanguage is null)
+            {
+                if (requestedStack.SupportedLanguages.Count == 1)
+                {
+                    requestedLanguage = requestedStack.SupportedLanguages[0];
+                }
+                else if (canPrompt)
+                {
+                    requestedLanguage = await _prompts.PickAsync("Select a language:", requestedStack.SupportedLanguages, value => value, cancellationToken);
+                }
+                else
+                {
+                    return InitExecutionResult.Reject("languageRequired", $"Supply --language <{string.Join("|", requestedStack.SupportedLanguages)}>.");
+                }
+            }
+        }
+
         TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null));
         cancellationToken.ThrowIfCancellationRequested();
         TemplateProjectSupport support = _projectSupport();
@@ -172,7 +233,13 @@ internal sealed class InitExecutionRunner(
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        return result with { Context = context };
+        return result with
+        {
+            Context = context,
+            Diagnostics = publicCompatibility && requestedStack is not null && _stackCompatibility is not null
+                && result.Kind is "noCompatibleTemplates" or "workflowUnavailable" or "workflowPreparationFailed" or "preparationUnavailable"
+                ? [.. result.Diagnostics, _stackCompatibility.RecoveryHint(requestedStack.Stack)] : result.Diagnostics,
+        };
 
         bool Matches(string stack, string language) =>
             (requestedStack is null || string.Equals(stack, requestedStack.Stack, StringComparison.OrdinalIgnoreCase))
@@ -214,10 +281,13 @@ internal sealed class InitExecutionRunner(
 
         string? language = requestedLanguage;
         cancellationToken.ThrowIfCancellationRequested();
-        ProjectResolutionResult resolution;
+        ProjectResolutionResult? resolution = null;
         try
         {
-            resolution = await _projects.ResolveProjectAsync(new(request.WorkingDirectory), cancellationToken);
+            if (request.TargetPolicy != InitExecutionTargetPolicy.PublicCompatible || requestedLanguage is null)
+            {
+                resolution = await _projects.ResolveProjectAsync(new(request.WorkingDirectory), cancellationToken);
+            }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -228,7 +298,8 @@ internal sealed class InitExecutionRunner(
         cancellationToken.ThrowIfCancellationRequested();
         if (resolution is ProjectResolutionResult.Resolved resolved)
         {
-            if (!string.Equals(resolved.Project.StackName, selected.Stack, StringComparison.OrdinalIgnoreCase))
+            if (request.TargetPolicy != InitExecutionTargetPolicy.PublicCompatible
+                && !string.Equals(resolved.Project.StackName, selected.Stack, StringComparison.OrdinalIgnoreCase))
             {
                 return InitExecutionResult.Reject("projectStackConflict",
                     $"Existing files identify stack '{resolved.Project.StackName}', not '{selected.Stack}'. Supply matching project metadata; nothing was changed.");
@@ -236,7 +307,8 @@ internal sealed class InitExecutionRunner(
 
             language ??= resolved.Project.Language;
         }
-        else if (resolution is ProjectResolutionResult.NotResolved { Failure: not null } failed)
+        else if (request.TargetPolicy != InitExecutionTargetPolicy.PublicCompatible
+            && resolution is ProjectResolutionResult.NotResolved { Failure: not null } failed)
         {
             return InitExecutionResult.Reject("invalidProjectMetadata", failed.Message);
         }
@@ -250,13 +322,14 @@ internal sealed class InitExecutionRunner(
         }
 
         IReadOnlyList<string> supported = selected.SupportedLanguages;
-        if (canonicalLanguage is null && supported.Count > 1 && !canPrompt)
+        bool unknownAdoptedLanguage = !repair && request.TargetPolicy == InitExecutionTargetPolicy.PublicCompatible && canonicalLanguage is null;
+        if (!unknownAdoptedLanguage && canonicalLanguage is null && supported.Count > 1 && !canPrompt)
         {
             return InitExecutionResult.Reject("missingProjectLanguage",
                 $"Couldn't resolve the existing project's language. Supply --language <{string.Join("|", supported)}>; no configuration was written.");
         }
 
-        language = canonicalLanguage ?? (supported.Count == 1 ? supported[0]
+        language = unknownAdoptedLanguage ? null : canonicalLanguage ?? (supported.Count == 1 ? supported[0]
             : await _prompts.PickAsync("Select the existing project's language:", supported, value => value, cancellationToken));
         cancellationToken.ThrowIfCancellationRequested();
         InitExistingProjectConfiguration configuration = new(request.WorkingDirectory.Info.FullName, selected.Stack, language, repair);
@@ -279,7 +352,8 @@ internal sealed class InitExecutionRunner(
                         with { Configuration = configuration };
                 }
 
-                json = ProjectConfigurationJson.MergeLanguage(current.ConfigurationJson!, language, selected.Stack);
+                json = ProjectConfigurationJson.MergeLanguage(current.ConfigurationJson!, language!,
+                    request.TargetPolicy == InitExecutionTargetPolicy.PublicCompatible ? null : selected.Stack);
             }
             else
             {
@@ -289,11 +363,19 @@ internal sealed class InitExecutionRunner(
                         with { Configuration = configuration };
                 }
 
-                json = ProjectConfigurationJson.Create(selected.Stack, language);
+                json = ProjectConfigurationJson.Create(selected.Stack,
+                    request.TargetPolicy == InitExecutionTargetPolicy.PublicCompatible && supported.Count == 1 ? null : language);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await _fileSystem.WriteAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            if (repair || request.TargetPolicy != InitExecutionTargetPolicy.PublicCompatible)
+            {
+                await _fileSystem.WriteAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            }
+            else
+            {
+                await _fileSystem.CreateAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -454,7 +536,11 @@ internal sealed class InitExecutionRunner(
         NativeProjectPreparationContext? preparationContext = null;
         NativeProjectPreparationOutcome? preparation = null;
         TemplateInvocationRequest invocationRequest = new(request.WorkingDirectory, final.ValuesByCanonicalName,
-            request.Name ?? (_workflows is null ? null : request.WorkingDirectory.Info.Name), DryRun: true);
+            request.Name ?? (_workflows is null ? null : request.WorkingDirectory.Info.Name), DryRun: true, Force: request.Force)
+        {
+            PreserveExistingFiles = request.TargetPolicy == InitExecutionTargetPolicy.PublicCompatible && !request.Force,
+            PreviewAfterDirectoryCleanup = request.TargetPolicy == InitExecutionTargetPolicy.PublicCompatible && request.Force,
+        };
         INativeProjectWorkflowProvider? provider;
         try
         {
@@ -543,7 +629,8 @@ internal sealed class InitExecutionRunner(
             return FromPreview("previewed");
         }
 
-        InitExecutionResult? targetFailure = CheckTarget(request.WorkingDirectory);
+        InitExecutionResult? targetFailure = request.TargetPolicy == InitExecutionTargetPolicy.PublicCompatible
+            ? await PreparePublicTargetAsync(request, selected, cancellationToken) : CheckTarget(request.WorkingDirectory);
         cancellationToken.ThrowIfCancellationRequested();
         if (targetFailure is not null)
         {
@@ -556,7 +643,12 @@ internal sealed class InitExecutionRunner(
             };
         }
 
-        TemplateInvocationResult created = await selected.InvokeAsync(invocationRequest with { DryRun = false }, cancellationToken);
+        TemplateInvocationResult created = await selected.InvokeAsync(invocationRequest with
+        {
+            DryRun = false,
+            Force = false,
+            PreviewAfterDirectoryCleanup = false,
+        }, cancellationToken);
         if (created.Status == TemplateInvocationStatus.Success && projectPreparation is { } completionSupport
             && preparation is not null && preparationContext is not null)
         {
@@ -647,6 +739,51 @@ internal sealed class InitExecutionRunner(
 
     private const string PackageGuidance =
         "Use the template author's package instructions and install explicitly with 'func new install <package>'; no package is installed automatically.";
+
+    private async Task<InitExecutionResult?> PreparePublicTargetAsync(InitExecutionRequest request, ResolvedTemplate selected,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_targets.GetPathDiagnostic(request.WorkingDirectory) is { } diagnostic)
+            {
+                return InitExecutionResult.Reject("invalidTarget", diagnostic);
+            }
+
+            if (!request.Force)
+            {
+                InitExecutionTarget current = await _targets.InspectAsync(request.WorkingDirectory, cancellationToken);
+                return current.State is InitExecutionTargetState.Adoptable or InitExecutionTargetState.Configured
+                    ? InitExecutionResult.Reject("targetChanged", "A Functions project appeared during initialization. Run 'func init' again to adopt or repair it; nothing was changed.")
+                    : null;
+            }
+
+            if (_targets.HasNonGitContent(request.WorkingDirectory))
+            {
+                _interaction.WriteWarning($"--force will delete all files in '{request.WorkingDirectory.Info.FullName}' (except .git) before initializing.");
+                if (!await _interaction.ConfirmAsync("Continue?", defaultValue: false, whenInputUnavailable: true, cancellationToken))
+                {
+                    return InitExecutionResult.Reject("declined", "Init cancelled. The directory was not modified.");
+                }
+            }
+
+            TemplateInvocationResult? changed = await selected.ValidateConfigurationAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (changed is not null)
+            {
+                return InitExecutionResult.Reject("templateChanged", changed.Diagnostic ?? "The selected native source changed; nothing was deleted.");
+            }
+
+            _targets.ClearExceptGit(request.WorkingDirectory);
+            cancellationToken.ThrowIfCancellationRequested();
+            return null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return InitExecutionResult.Reject("invalidTarget",
+                $"Cannot prepare the project directory. Check its contents and access before retrying. {exception.Message}");
+        }
+    }
 
     private InitExecutionResult? CheckTarget(WorkingDirectory target)
     {

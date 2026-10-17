@@ -59,6 +59,14 @@ internal class InitExecutionTargetInspector(IFileSystem fileSystem)
 
     public virtual string? GetDiagnostic(WorkingDirectory target)
     {
+        string? pathDiagnostic = GetPathDiagnostic(target);
+        return pathDiagnostic ?? (_fileSystem.DirectoryExists(target.Info.FullName) && _fileSystem.GetFileSystemEntries(target.Info.FullName).Count > 0
+            ? "The target is not empty and is not an adoptable root Functions project. Supply a root with host.json or use a new empty target; nothing was deleted."
+            : null);
+    }
+
+    public virtual string? GetPathDiagnostic(WorkingDirectory target)
+    {
         ArgumentNullException.ThrowIfNull(target);
         for (DirectoryInfo? directory = target.Info; directory is not null; directory = directory.Parent)
         {
@@ -68,9 +76,18 @@ internal class InitExecutionTargetInspector(IFileSystem fileSystem)
             }
         }
 
-        return _fileSystem.DirectoryExists(target.Info.FullName) && _fileSystem.GetFileSystemEntries(target.Info.FullName).Count > 0
-            ? "The target is not empty and is not an adoptable root Functions project. Supply a root with host.json or use a new empty target; nothing was deleted."
-            : null;
+        return null;
+    }
+
+    public virtual bool HasNonGitContent(WorkingDirectory target) =>
+        _fileSystem.DirectoryExists(target.Info.FullName) && DirectoryGuard.HasNonGitContent(target.Info);
+
+    public virtual void ClearExceptGit(WorkingDirectory target)
+    {
+        if (_fileSystem.DirectoryExists(target.Info.FullName))
+        {
+            DirectoryGuard.ClearExceptGit(target.Info);
+        }
     }
 
     private static string? ReadString(JsonElement stack, string key)

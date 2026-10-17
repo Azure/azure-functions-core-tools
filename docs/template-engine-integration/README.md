@@ -2,11 +2,90 @@
 
 Define the context-bound Microsoft.TemplateEngine integration layer for listing, resolving, and invoking installed templates.
 
-## Staged full-entry prompt and completion policy
+## Public native entry
 
-The internal `NativeCliEntryPoint` remains opt-in through composition; `Program`
-still defaults to legacy routing, with no new public flag or environment switch.
-For staged `new`, the parsed host `--output=json` implies noninteractive execution
+`Program` runs `NativeCliEntryPoint` by default. Ordinary `func init` and `func new`
+use installed Microsoft.TemplateEngine templates and CLI-owned stack workflows;
+there is no opt-in flag, environment switch, or automatic legacy-template fallback.
+The old command implementations remain available only to internal compatibility controls.
+Unrelated commands retain the common command graph, start-argument normalization,
+first-run handling, telemetry, version notices, and cancellation wiring.
+
+Fresh `init` preserves unrelated files, `.git`, and existing scaffold files when
+`--force` is absent. Native generation supplies missing files; preserved files are
+reported as `Preserve` effects. Required CLI configuration is still create-only.
+A repeated initialized target is refused unless its multi-language configuration
+needs language repair. Adoption only writes configuration; repair fills the
+missing language without changing runtime aliases, profiles, or unknown keys.
+An adopted project whose language cannot be detected retains an unset language;
+repair requires an explicit or detected valid language.
+
+`init --force` retains the established warning and confirmation: Enter declines,
+while unavailable input permits the explicit force request. The selected native
+template, arguments, output plan, and stack preparation are qualified before
+confirmation and cleanup. Cleanup preserves `.git` and checks cancellation before
+deleting. Cancellation or failure before cleanup preserves project bytes.
+Cleanup and native creation are not a project-wide transaction: a later native or
+preparation failure can leave cleared or partially created output, reported as a
+failure rather than successful initialization.
+
+Template-generating commands require the selected, successfully configured
+workload to declare native template capability. This is a capability check, not
+a comparison against the newest feed version. An unbundled installation receives
+an actionable `func workload update <package>` instruction before project writes
+or force cleanup; generation never silently updates, downloads, or falls back.
+Metadata-only adoption and healing do not require a native template catalog.
+Older initializer-only workloads can supply captured configuration metadata
+without granting permission to invoke their legacy scaffolder.
+Missing retained native registration can be repaired explicitly using
+`func setup --features <stack> --install-policy if-needed`.
+
+Explicit `func workload update <package> --source <v3-feed-url>` supports
+same-home unbundled-to-bundled migration and subsequent bundled updates. Use
+`--prerelease` when needed and `--major` to authorize crossing a major version.
+`update --version` selects the installed version to replace; it does not pin the
+incoming version. Existing projects, unrelated workloads, and user-installed
+templates are not migrated or overwritten. Native package or identity collisions,
+changed incumbent provenance/payload, occupied destinations, and conflicting native
+version requirements of retained owners fail without replacing user content.
+Updates move only the selected explicit or logical owner, preserving other
+owners and legacy sibling versions. An already installed destination is reused
+only with exact source, origin, and payload agreement.
+Native registrations and ownership receipts are version-qualified, so owners can
+retain different versions of the same inner package and template identities.
+Compatible older unqualified receipts remain readable without writes; only an
+explicit update migrates them under the protected writer/recovery protocol.
+Conflicting origins for the same native ID/version remain an explicit conflict,
+not a reason to reject every shared/sibling state.
+Native registration and workload admission remain protected through rollback;
+in-process failure or cancellation restores both stores before releasing the
+native lease. This is not a power-loss or cross-store crash-atomicity guarantee.
+Unrelated global bundled uninstall and force-install policies are unchanged.
+On Windows a loaded old workload assembly can prevent best-effort deletion of its
+inactive directory; the committed registry and native owner select the new version.
+
+The native global template cache deduplicates template identities. Runtime
+discovery therefore uses a read-only provider view before that cache, scoped to
+the exact declared package versions, acquisition origins and archive hashes of
+the captured successfully configured workload cohort. It does not select a
+globally newest native version. Proven inactive owned versions are excluded;
+unknown ownership, conflicting records, and malformed active registrations fail
+explicitly rather than disappearing. Exact native scanner discovery validates
+retained installed inventories independently of the global deduplicating cache.
+Each invocation keeps the existing protected/private cache boundary, allowing
+retained v1, current v2, and retained v1 flows to interleave without cache leakage.
+
+Node, Python, and .NET retain their supported public item catalogs and placement;
+C#/F# dependency and compile-order work remains source-qualified. Go, Java, and
+PowerShell supply project workflows, not a new first-party item catalog.
+Go names reserved by the toolchain (`go` and `toolchain`) use the existing `app`
+module fallback, including when derived from the target directory name.
+Go host preparation supplies a platform-native relative worker executable path,
+including for `start --no-build`, without changing the shared worker asset.
+
+## Prompt and completion policy
+
+For public `new`, the parsed host `--output=json` implies noninteractive execution
 before project/profile resolution, template selection, or required-value completion.
 Template values that happen to contain output-option text do not set host policy.
 JSON and explicit `--non-interactive` also prevent version checks and alias nudges
@@ -31,15 +110,15 @@ semantics.
 
 Callers apply argument compatibility before precedence. After prompting, they parse again with the **original** tokens and canonical completion values; completions cannot overwrite explicit input or erase its errors. Required defaults are validated and passed explicitly because the native engine ignores them. The native `name` symbol remains excluded from parameter projection; host `--name` is passed separately as `TemplateInvocationRequest.Name`.
 
-This draft proposes scalar options with one explicit value, including booleans; repeated options are rejected, and choice values must match a declared choice case-insensitively, without native abbreviations or multivalue expansion. Unknown dash-prefixed tokens fail even when the underlying parser would consume them as string values; literal dash-prefixed values use inline syntax (`--greeting=-literal`), while negative numbers remain valid separated values. The template token tail has no positional arguments or standalone `--` terminator. Missing or unknown datatypes fail closed rather than becoming strings. Supported native scalar spellings are `string`/`text`, `bool`/`boolean`, `int`/`integer` (signed 64-bit), `float` (current or invariant culture) and `hex` (`0x` prefix), plus declared `choice` values. These input policies need owner review before a public switch; unprojected conditional requirements, option-without-value defaults and multivalue semantics are not claimed qualified.
+Native scalar options take one explicit value, including booleans; the public entry retains workload-owned implicit Boolean switches. Repeated options are rejected, and choice values must match a declared choice case-insensitively, without native abbreviations or multivalue expansion. Unknown dash-prefixed tokens fail even when the underlying parser would consume them as string values; literal dash-prefixed values use inline syntax (`--greeting=-literal`), while negative numbers remain valid separated values. The template token tail has no positional arguments or standalone `--` terminator; the public entry accounts for its positional project path separately. Missing or unknown datatypes fail closed rather than becoming strings. Supported native scalar spellings are `string`/`text`, `bool`/`boolean`, `int`/`integer` (signed 64-bit), `float` (current or invariant culture) and `hex` (`0x` prefix), plus declared `choice` values. Unprojected conditional requirements, option-without-value defaults and multivalue semantics are not claimed qualified.
 
-`TemplateArgumentParserJourneyTests` installs a real folder fixture into a private test hive, parses raw arguments for each native item candidate, selects an argument-compatible lower-precedence variant, and previews and creates that same capability. It checks required-default injection, post-prompt validation, host name handling, nested output versus project root, no output writes on preview or rejection, and unchanged type, constraint and lifetime guards. This is a shared parser/runtime boundary increment, not public `func new`/`func init` cutover, live-store locking, production package qualification or a completed milestone. Existing public grammar, hydration and provider dispatch remain unchanged.
+`TemplateArgumentParserJourneyTests` installs a real folder fixture into a private test hive, parses raw arguments for each native item candidate, selects an argument-compatible lower-precedence variant, and previews and creates that same capability. It checks required-default injection, post-prompt validation, host name handling, nested output versus project root, no output writes on preview or rejection, and unchanged type, constraint and lifetime guards. These lower-level checks are complemented by actual `Program` subprocess controls in `NativeProgramStackTests` and the public initialization/compatibility tests; they are not themselves host invocation or every-platform qualification.
 
 ## Project Runtime Qualification
 
 The explicit internal `CreateProjectAsync` flow adds mandatory CLI-owned configuration to installed project-template creation. Existing `CreateAsync` calls remain item-only. The project flow requires supplied availability, installed `IProjectStack` metadata from the existing stack catalog, and paired `TemplateProjectSupport` planner/writer support.
 
-This is staged internal support: production commands do not call `CreateProjectAsync`, and the planner and writer are not registered in production DI. Existing public `init` and `new` routes remain unchanged.
+The public native entry composes this support through the same protected project runner and scoped planner/writer used by the internal harness.
 
 Language-alias metadata keys are matched case-insensitively, consistent with the installed catalog, while configuration retains the selected stack's canonical language spelling.
 
@@ -49,7 +128,7 @@ A configuration anchor can be another generated primary-output file when its res
 
 Host roots and configuration anchors must correspond to preview create, change or overwrite effects. A declared but ungenerated `host.json`, or a deletion effect, cannot establish a Functions project root.
 
-Preview reports template and configuration effects without writing. Creation finalizes configuration in declaration order through the existing atomic writer. A finalization failure preserves generated files and completed configuration writes, reports completed roots and fails the invocation. Existing user configuration is refused even with file-conflict force; adoption and repair remain owned by the existing initializer.
+Preview reports template and configuration effects without writing. Creation finalizes configuration in declaration order through the existing atomic writer. A finalization failure preserves generated files and completed configuration writes, reports completed roots and fails the invocation. Actual invocation refuses existing user configuration even with file-conflict force. A force preview can inspect an occupied target without writing; only the public runner's confirmed cleanup removes the old configuration before actual native invocation. Adoption and repair bypass template discovery.
 
 Configuration occupancy checks use the writer's injected `IFileSystem` for both files and directories. An occupied destination before creation returns `FileConflict` without generating a new project root. Configuration is committed with an atomic create-only rename, so a destination that appears after the checks is not replaced. That late collision returns `ConfigurationFailure`, preserving user bytes, generated output and any earlier completed configurations. Legacy initializer/repair writes retain their overwrite-capable behavior.
 
@@ -85,9 +164,7 @@ ordered plans; failures before planning do not invent plans.
 
 The public `func init` adoption and language-repair paths remain independent of template discovery and invocation. Their configuration writes now use the existing atomic filesystem writer and must finish before init reports success. A write failure is a non-zero, actionable error rather than a warning followed by successful adoption or repair. Repair preserves unrelated configuration keys and refuses missing, malformed or non-object configuration instead of synthesizing replacement metadata. Cancellation is passed through configuration reads and writes and stops subsequent success output or initializer dispatch.
 
-The same mandatory writer is used by the current workload-backed creation path before initializer dispatch. This does not change scaffolding order, language omission for single-language stacks, or introduce rollback; a later initializer failure can still leave configuration behind. File-level atomic writes do not provide concurrent-edit isolation or a transaction covering the entire project.
-
-This is preparatory failure qualification, not the public template-first switch. Stack metadata migration, shared strict parsing, stable configuration-action authoring, template acquisition and all-six-stack package qualification remain separate gates.
+Public native creation finalizes configuration after native generation and before owned stack preparation. Fresh native projects persist canonical stack and language values; adoption retains the established omission for single-language stacks. The obsolete initializer control still writes configuration before legacy scaffolding. File-level atomic writes do not provide concurrent-edit isolation or a transaction covering the entire project.
 
 ## Runnable Node Smoke
 
@@ -146,9 +223,9 @@ Stop only the smoke host and emulator with Ctrl+C, then close the dedicated term
 
 ## Protected-store draft qualification
 
-Factory admission is asynchronous and accepts the command's cancellation token. The factory acquires shared ownership of the live `<CLI home>/templates` store before native initialization and attaches it to the disposable runtime flow. Private settings/cache copies isolate native bootstrap and catalog writes; live absolute package mounts remain protected through selection and invocation. The composed project/parser fixture journeys use this boundary; legacy public command providers remain unchanged.
+Factory admission is asynchronous and accepts the command's cancellation token. The factory acquires shared ownership of the live `<CLI home>/templates` store before native initialization and attaches it to the disposable runtime flow. Private settings/cache copies isolate native bootstrap and catalog writes; live absolute package mounts remain protected through selection and invocation. Both public native workflows and the composed project/parser fixture journeys use this boundary.
 
-The protected project factory forwards the current paired `TemplateProjectSupport` unchanged. Its planner uses the existing installed `IProjectStack` catalog; its writer remains create-only, distinct from legacy init/adoption/repair writes. Workload availability snapshots contain only workloads, while resolved bundle identity/version remain in the immutable engine context. Composed controls cover those inputs, read-only preview, refusal to replace occupied user configuration even with force, and lease retention through invocation and disposal.
+The protected project factory forwards the current paired `TemplateProjectSupport` unchanged. Its planner uses the existing installed `IProjectStack` catalog; its writer remains create-only, distinct from language-repair writes. Workload availability snapshots contain only workloads, while resolved bundle identity/version remain in the immutable engine context. Composed controls cover those inputs, read-only preview, refusal to replace occupied user configuration during actual invocation even with force, and lease retention through invocation and disposal.
 
 The exclusive store foundation snapshots opaque hive files, validates through caller-supplied mutation/content callbacks, checks native cache rebuilding, and restores failed or interrupted mutations before another runtime flow can open. Old engine capabilities are invalidated rather than transferred across recovery. Separate owned Windows processes qualify reader overlap, queued-writer admission, cancellation, stale-marker inspection and process-termination recovery. Windows-only mandatory namespace/access controls explicitly skip elsewhere.
 

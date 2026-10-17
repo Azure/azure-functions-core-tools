@@ -48,7 +48,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
     public Option<string?> SourceOption { get; } = new("--source")
     {
-        Description = "Catalog source URL or local directory to resolve from. Default: the configured catalog.",
+        Description = "NuGet V3 service index URL to resolve from. Default: the configured catalog.",
     };
 
     public Option<bool?> IncludePrereleaseOption { get; } = new("--prerelease")

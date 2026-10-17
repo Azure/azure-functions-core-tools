@@ -35,6 +35,9 @@ internal class TemplateEngineSession : IDisposable
     private readonly TemplatePackageManager _packageManager;
     private readonly TemplateConstraintManager _constraintManager;
     private readonly TemplateCreator _creator;
+    private readonly FuncTemplateEngineHost _host;
+    private readonly NativeTemplatePackageScope? _packageScope;
+    private readonly Dictionary<string, string> _packagePins = new(StringComparer.Ordinal);
     private readonly TemplateProjectSupport? _projectSupport;
     private readonly IDisposable? _ownership;
     private readonly TemplateStoreEngineDiagnostics? _diagnostics;
@@ -49,10 +52,12 @@ internal class TemplateEngineSession : IDisposable
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
         Context = context;
+        _packageScope = snapshot?.PackageScope;
         _projectSupport = projectSupport;
         _ownership = ownership;
         _diagnostics = diagnostics;
-        _settings = new(new FuncTemplateEngineHost(context, snapshot, diagnostics), settingsLocation: settingsLocation);
+        _host = new(context, snapshot, diagnostics);
+        _settings = new(_host, settingsLocation: settingsLocation);
         _packageManager = new(_settings);
         _constraintManager = new(_settings);
         _creator = new(_settings);
@@ -61,6 +66,60 @@ internal class TemplateEngineSession : IDisposable
     public TemplateEngineContext Context { get; }
 
     public bool ProjectTemplatesEnabled => _projectSupport is not null;
+
+    internal async Task<NativeTemplatePackageDisposition> ClassifyPackageScopeAsync(ITemplatePackage? package, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        NativeTemplatePackageDisposition result = _packageScope is null ? new(true)
+            : await _packageScope.ClassifyAsync(PackageInfo(package), cancellationToken);
+        if (!result.Include && result.OwnedSha256 is { } hash && package is not null)
+        {
+            try
+            {
+                if (await ValidatePackageHashAsync(package.MountPointUri, hash, cancellationToken) is { } diagnostic)
+                {
+                    return new(true, "The claimed inactive native registration is not proven owned. " + diagnostic);
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return new(true, $"The claimed inactive native registration cannot be validated: {exception.Message}");
+            }
+        }
+        return result;
+    }
+
+    internal async Task<string?> ValidatePackageScopeAsync(ITemplatePackage? package, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_packageScope is null || package is null || PackageInfo(package) is not { } info)
+        {
+            return null;
+        }
+        (string? hash, string? diagnostic) = await _packageScope.VerifyAsync(info, cancellationToken);
+        if (diagnostic is not null || hash is null)
+        {
+            return diagnostic;
+        }
+        string? failure = await ValidatePackageHashAsync(package.MountPointUri, hash, cancellationToken);
+        if (failure is null)
+        {
+            _packagePins[package.MountPointUri] = hash;
+        }
+        return failure;
+    }
+
+    private Task<string?> ValidatePackageHashAsync(string archive, string expected, CancellationToken cancellationToken)
+    {
+        NativeTemplatePackageScope scope = _packageScope
+            ?? throw new InvalidOperationException("Native archive verification requires a captured package scope.");
+        return scope.ValidateArchiveAsync(_settings.Host.FileSystem, archive, expected, cancellationToken);
+    }
+
+    private static TemplatePackageInfo? PackageInfo(ITemplatePackage? package) =>
+        package is IManagedTemplatePackage managed ? new(managed.Identifier, managed.Version) : null;
 
     public IReadOnlyList<TemplateProjectConfigurationDeclaration> ValidateProjectConfiguration(string configuration)
     {
@@ -140,7 +199,11 @@ internal class TemplateEngineSession : IDisposable
         }
     }
 
-    internal void CheckStoreDiagnostics() => _diagnostics?.ThrowIfCacheFailed();
+    internal void CheckStoreDiagnostics()
+    {
+        _host.ThrowIfCohortFailed();
+        _diagnostics?.ThrowIfCacheFailed();
+    }
 
     public virtual async Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
     {
@@ -283,14 +346,25 @@ internal class TemplateEngineSession : IDisposable
         Dictionary<string, ReadOnlyMemory<byte>> expanded = new(StringComparer.Ordinal);
         if (expandFiles)
         {
-            if (string.IsNullOrWhiteSpace(request.Name) || effects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create))
+            bool cleanupPreview = request.PreviewAfterDirectoryCleanup && request.DryRun && request.Force
+                && configuration.Type == TemplateType.Project && _projectSupport is not null;
+            if (string.IsNullOrWhiteSpace(request.Name) || effects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create
+                && !(cleanupPreview && change.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite)))
             {
                 return Failed("Private native expansion requires an explicit effective name and create-only native outputs.");
             }
 
             using Common.TempDirectory temporary = fileSystem.CreateTempDirectory();
             var output = Common.WorkingDirectory.FromExplicit(temporary.Path);
-            TemplateInvocationRequest expansionRequest = request with { OutputDirectory = output, EffectSupport = null, MsBuildBindings = null };
+            TemplateInvocationRequest expansionRequest = request with
+            {
+                OutputDirectory = output,
+                EffectSupport = null,
+                MsBuildBindings = null,
+                Force = false,
+                PreserveExistingFiles = false,
+                PreviewAfterDirectoryCleanup = false,
+            };
             diagnostic = ValidateOutputPaths(output.Info.FullName, changes);
             if (diagnostic is not null)
             {
@@ -508,6 +582,15 @@ internal class TemplateEngineSession : IDisposable
 
         using var document = JsonDocument.Parse(configuration.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
         TemplateProjectSupport? projectSupport = configuration.Type == TemplateType.Project ? ProjectSupport(configuration.Content) : null;
+        if (request.PreserveExistingFiles && projectSupport is null)
+        {
+            return new(TemplateInvocationStatus.InvalidArguments, [], "Existing-file preservation is only supported for project initialization.");
+        }
+        if (request.PreviewAfterDirectoryCleanup && (!request.DryRun || !request.Force || projectSupport is null))
+        {
+            return new(TemplateInvocationStatus.InvalidArguments, [],
+                "Directory-cleanup intent is only supported for a forced project preview, never actual invocation.");
+        }
         bool qualifiedDotNetProject = projectSupport?.DotNetLayout is not null;
         if (projectSupport is not null)
         {
@@ -543,6 +626,14 @@ internal class TemplateEngineSession : IDisposable
 
         IReadOnlyList<TemplateFileChange> templateChanges = Array.AsReadOnly<TemplateFileChange>(
             [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+        HashSet<string> preserved = new(Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        if (request.PreserveExistingFiles)
+        {
+            preserved.UnionWith(templateChanges.Select(change => Path.GetFullPath(Path.Combine(output, change.Path)))
+                .Where(_settings.Host.FileSystem.FileExists));
+            templateChanges = Array.AsReadOnly<TemplateFileChange>([.. templateChanges.Select(change =>
+                preserved.Contains(Path.GetFullPath(Path.Combine(output, change.Path))) ? change with { Kind = "Preserve" } : change)]);
+        }
         using var configurationStream = new MemoryStream(Encoding.UTF8.GetBytes(configuration.Content));
         string? placeholder = TemplateConfigModel.FromStream(configurationStream).PlaceholderFilename;
         IReadOnlyList<string> placeholderFilenames = string.IsNullOrWhiteSpace(placeholder) ? ["-.-", "_._"] : [placeholder];
@@ -571,7 +662,7 @@ internal class TemplateEngineSession : IDisposable
                 configurationPlans = projectSupport.DotNetLayout is { } layout
                     ? projectSupport.Planner.CreateDotNetPlans(configuration.Content, preview.CreationEffects, output, layout, parameters)
                     : projectSupport.Planner.CreatePlans(configuration.Content, preview.CreationEffects, output);
-                if (configurationPlans.Any(projectSupport.Writer.ConfigurationExists))
+                if (!request.PreviewAfterDirectoryCleanup && configurationPlans.Any(projectSupport.Writer.ConfigurationExists))
                 {
                     return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic)
                     {
@@ -645,7 +736,8 @@ internal class TemplateEngineSession : IDisposable
             }
         }
 
-        bool requiresForce = !request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal));
+        bool requiresForce = !request.Force && changes.Any(change => change.Kind != "Create"
+            && !(request.PreserveExistingFiles && change.Kind == "Preserve"));
         if (!request.DryRun && requiresForce)
         {
             return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.")
@@ -689,7 +781,21 @@ internal class TemplateEngineSession : IDisposable
             return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
         }
 
-        ITemplateCreationResult created = await InstantiateAsync(template, request, CreateInputData(configuration.Parameters, parameters), false, cancellationToken);
+        ITemplateCreationResult created;
+        try
+        {
+            if (request.PreserveExistingFiles)
+            {
+                _host.InvocationFileSystem = new PreservingTemplateFileSystem(_host.FileSystem, output, preserved);
+            }
+
+            created = await InstantiateAsync(template, request with { Force = request.Force || request.PreserveExistingFiles },
+                CreateInputData(configuration.Parameters, parameters), false, cancellationToken);
+        }
+        finally
+        {
+            _host.InvocationFileSystem = null;
+        }
         if (created.Status != CreationResultStatus.Success)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -709,7 +815,8 @@ internal class TemplateEngineSession : IDisposable
         }
 
         IReadOnlyList<TemplateFileChange> written = Array.AsReadOnly<TemplateFileChange>(
-            [.. created.CreationEffects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+            [.. created.CreationEffects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath,
+                preserved.Contains(Path.GetFullPath(Path.Combine(output, change.TargetRelativePath))) ? "Preserve" : change.ChangeKind.ToString()))]);
         if (!written.Select(change => change.Path).Order(StringComparer.Ordinal).SequenceEqual(templateChanges.Select(change => change.Path).Order(StringComparer.Ordinal), StringComparer.Ordinal)
             || ValidateOutputPaths(output, templateChanges) is not null
             || (request.SourceSnapshot is { } writtenSources && !MatchesOutputSources(writtenSources, created.CreationEffects.FileChanges))
@@ -879,9 +986,16 @@ internal class TemplateEngineSession : IDisposable
 
     internal async Task<TemplateInvocationResult?> ValidateSelectedConfigurationAsync(ITemplateInfo template, TemplateConfigurationSnapshot configuration, CancellationToken cancellationToken)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
         TemplateConfigurationSnapshot current;
         try
         {
+            if (_packagePins.TryGetValue(template.MountPointUri, out string? expected)
+                && await ValidatePackageHashAsync(template.MountPointUri, expected, cancellationToken) is { } packageFailure)
+            {
+                return new(TemplateInvocationStatus.TemplateChanged, [], packageFailure);
+            }
             current = await ReadConfigurationAsync(template, cancellationToken);
         }
         catch (InvalidTemplateMetadataException exception)

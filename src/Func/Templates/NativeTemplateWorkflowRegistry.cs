@@ -93,6 +93,8 @@ internal sealed class NativeTemplateWorkflowRegistry(
 
         return original.OutputDirectory != prepared.OutputDirectory || original.Name != prepared.Name
             || original.DryRun != prepared.DryRun || original.Force != prepared.Force
+            || original.PreserveExistingFiles != prepared.PreserveExistingFiles
+            || original.PreviewAfterDirectoryCleanup != prepared.PreviewAfterDirectoryCleanup
             ? "A native workflow provider changed the command's target, effective name, preview or force policy."
             : null;
     }

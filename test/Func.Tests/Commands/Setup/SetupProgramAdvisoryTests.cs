@@ -19,6 +19,33 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
     private const string CachedVersion = "9999.0.0";
     private const string UnusedSource = "http://127.0.0.1:1/v3/index.json";
 
+    [Fact]
+    public async Task Program_GracefulWorkloadFailure_PreservesTheOrdinaryCachedVersionAdvisory()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-workload-advisory-{Guid.NewGuid():N}");
+        CliConfigurationPathsOptions paths = new(Path.Combine(directory, "home"));
+        WorkloadPathsOptions workloads = new(Path.Combine(directory, "workload-home"));
+        string project = Path.Combine(directory, "project");
+        using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(60));
+        try
+        {
+            Directory.CreateDirectory(paths.Home);
+            Directory.CreateDirectory(project);
+            await File.WriteAllTextAsync(paths.VersionCachePath, CachedVersion, cancellation.Token);
+
+            CliResult result = await RunCliAsync(directory, paths.Home, workloads.Home, project,
+                ["workload", "install", Path.Combine(directory, "missing.nupkg")], cancellation.Token);
+
+            result.ExitCode.Should().Be(1);
+            result.StandardError.Should().Contain("does not exist").And.NotContain("unexpected error");
+            result.StandardOutput.Should().Contain(CachedVersion).And.Contain("A newer version");
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Theory]
     [Trait("Category", "Integration")]
     [InlineData(false, false, false)]

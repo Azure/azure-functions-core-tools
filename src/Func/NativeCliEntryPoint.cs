@@ -19,7 +19,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Azure.Functions.Cli;
 
 /// <summary>
-/// Runs the explicitly selected staged full CLI entry; Program keeps the legacy policy until a separate rollout.
+/// Runs public CLI commands with native project and item template workflows.
 /// </summary>
 internal sealed class NativeCliEntryPoint
 {
@@ -36,31 +36,43 @@ internal sealed class NativeCliEntryPoint
         var stopwatch = Stopwatch.StartNew();
         string commandName = "unknown";
         int exit = 1;
+        FuncRootCommand? root = null;
+        ParseResult? parsed = null;
+        bool advisories = false;
+        Task<string?> notice = Task.FromResult<string?>(null);
+        FuncAliasNudge? aliasNudge = null;
         try
         {
+            bool templateInvocation = IsTemplateInvocation(original);
             using NativeTemplateWorkflowHost host = await new NativeTemplateWorkflowHostFactory().CreateAsync(
                 interaction, workloads, configuration, services =>
                 {
                     services.AddFirstPartyNativeWorkflows();
                     configure?.Invoke(services);
-                }, enableBundleBindingConstraints: true, cancellationToken);
+                }, enableBundleBindingConstraints: true, cancellationToken,
+                includeProjectConfiguration: !templateInvocation);
             await host.StartAsync(cancellationToken);
-            using NativeTemplateWorkflowInvocation invocation = host.CreateInvocation();
-            var binding = new NativeEntryCommandBinding(invocation.Services, invocation.Composer, original);
-            FuncRootCommand root = Parser.CreateCommand(invocation.Services, binding);
-            ParseResult parsed = root.Parse(LegacyStartArgumentNormalizer.Normalize(original), new ParserConfiguration
+            using NativeTemplateWorkflowInvocation invocation = host.CreateCommandScope();
+            var binding = new NativeEntryCommandBinding(invocation.Services, original);
+            root = Parser.CreateCommand(invocation.Services, binding);
+            ParserConfiguration parserConfiguration = new()
             {
                 EnablePosixBundling = false,
-                ResponseFileTokenReplacer = null,
-            });
+            };
+            if (templateInvocation)
+            {
+                parserConfiguration.ResponseFileTokenReplacer = null;
+            }
+            parsed = root.Parse(LegacyStartArgumentNormalizer.Normalize(original), parserConfiguration);
             commandName = CommandNameResolver.ResolveCommandName(parsed, root);
             activity?.SetCommandName(commandName);
             bool json = parsed.CommandResult.Command is NewCommand item && NativeEntryCommandBinding.IsJsonOutput(item, parsed);
             bool nonInteractive = parsed.CommandResult.Command is NewCommand command
                 && NativeEntryCommandBinding.IsNonInteractive(command, parsed);
-            bool advisories = !nonInteractive && !SetupCommand.ShouldSuppressAdvisories(parsed);
-            Task<string?> notice = advisories
+            advisories = !nonInteractive && !SetupCommand.ShouldSuppressAdvisories(parsed);
+            notice = advisories
                 ? (versionCheck ?? VersionChecker.CheckForUpdateAsync)(cancellationToken) : Task.FromResult<string?>(null);
+            aliasNudge = advisories ? invocation.Services.GetRequiredService<FuncAliasNudge>() : null;
             if (json && parsed.Errors.Count > 0)
             {
                 interaction.WriteJson(new { kind = "invalidArguments", succeeded = false, diagnostics = parsed.Errors.Select(error => error.Message) });
@@ -68,22 +80,10 @@ internal sealed class NativeCliEntryPoint
             }
 
             IFirstRunCoordinator firstRun = invocation.Services.GetRequiredService<IFirstRunCoordinator>();
-            bool stagedCreation = parsed.CommandResult.Command is InitCommand or NewCommand;
-            int? firstRunResult = json || nonInteractive || stagedCreation ? null
+            bool creation = parsed.CommandResult.Command is InitCommand or NewCommand;
+            int? firstRunResult = json || nonInteractive || creation ? null
                 : await firstRun.EnsureFirstRunPromptedAsync(commandName, parsed, cancellationToken);
             exit = firstRunResult ?? await parsed.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellationToken);
-            if (advisories && !cancellationToken.IsCancellationRequested)
-            {
-                Task finished = await Task.WhenAny(notice, Task.Delay(1000, cancellationToken));
-                if (ReferenceEquals(finished, notice) && await notice is { } latest)
-                {
-                    interaction.WriteBlankLine();
-                    interaction.WriteLine(line => line.Warning($"A newer version of Azure Functions CLI is available ({latest})."));
-                }
-
-                invocation.Services.GetRequiredService<FuncAliasNudge>().TryPrint(exit, commandName);
-            }
-
             return exit;
         }
         catch (OperationCanceledException)
@@ -93,12 +93,18 @@ internal sealed class NativeCliEntryPoint
         }
         catch (GracefulException exception)
         {
+            exit = 1;
             activity?.Fail(exception);
             interaction.WriteError(exception.Message);
+            if (exception.VerboseMessage is not null && root is not null && parsed?.GetValue(root.VerboseOption) is true)
+            {
+                interaction.WriteHint(exception.VerboseMessage);
+            }
             return exit;
         }
         catch (Exception exception)
         {
+            exit = 1;
             activity?.Fail(exception);
             interaction.WriteError($"An unexpected error occurred: {exception.Message}");
             return exit;
@@ -107,6 +113,42 @@ internal sealed class NativeCliEntryPoint
         {
             stopwatch.Stop();
             CliTelemetry.Metric.RecordCommand(commandName, exit, stopwatch.ElapsedMilliseconds);
+            if (advisories && exit != 130 && !cancellationToken.IsCancellationRequested)
+            {
+                await PrintVersionNoticeAsync(interaction, notice, cancellationToken);
+                aliasNudge?.TryPrint(exit, commandName);
+            }
         }
+    }
+
+    private static async Task PrintVersionNoticeAsync(IInteractionService interaction, Task<string?> notice, CancellationToken cancellationToken)
+    {
+        try
+        {
+            Task finished = await Task.WhenAny(notice, Task.Delay(1000, cancellationToken));
+            if (ReferenceEquals(finished, notice) && await notice is { } latest)
+            {
+                interaction.WriteBlankLine();
+                interaction.WriteLine(line => line.Warning($"A newer version of Azure Functions CLI is available ({latest})."));
+            }
+        }
+        catch (Exception)
+        {
+            // Version advisories are best-effort and must not change a completed command's exit code.
+        }
+    }
+
+    private static bool IsTemplateInvocation(string[] arguments)
+    {
+        Command init = new("init") { TreatUnmatchedTokensAsErrors = false };
+        Command item = new("new") { TreatUnmatchedTokensAsErrors = false };
+        FuncRootCommand root = new() { Subcommands = { init, item } };
+        ParseResult parsed = root.Parse(arguments, new ParserConfiguration
+        {
+            EnablePosixBundling = false,
+            ResponseFileTokenReplacer = null,
+        });
+        // Template commands inspect their explicit target, not an unrelated or malformed cwd configuration.
+        return ReferenceEquals(parsed.CommandResult.Command, init) || ReferenceEquals(parsed.CommandResult.Command, item);
     }
 }

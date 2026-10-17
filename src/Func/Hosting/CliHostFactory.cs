@@ -53,7 +53,7 @@ internal static class CliHostFactory
     /// before workloads register; production code should use
     /// <see cref="CreateHostAsync"/>.
     /// </summary>
-    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction)
+    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction, bool includeProjectConfiguration = true)
     {
         ArgumentNullException.ThrowIfNull(interaction);
 
@@ -117,7 +117,8 @@ internal static class CliHostFactory
 
         builder.Services.AddSingleton<StartDashboardEventStreamFactory>();
 
-        builder.Configuration.AddConfiguration(configurationProvider.GetEffectiveConfiguration(workingDirectory));
+        builder.Configuration.AddConfiguration(includeProjectConfiguration
+            ? configurationProvider.GetEffectiveConfiguration(workingDirectory) : configurationProvider.GetUserConfiguration());
         builder.Services.AddSingleton<IConfigureOptions<StackOptions>, StackOptionsSetup>();
         builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();
 

@@ -14,23 +14,25 @@ namespace Azure.Functions.Cli.Templates;
 internal interface INativeTemplateWorkflowHostFactory
 {
     public Task<NativeTemplateWorkflowHost> CreateAsync(IInteractionService interaction, WorkloadPathsOptions paths, CliConfigurationPathsOptions configurationPaths,
-        Action<IServiceCollection> configureProviders, bool enableBundleBindingConstraints, CancellationToken cancellationToken);
+        Action<IServiceCollection> configureProviders, bool enableBundleBindingConstraints, CancellationToken cancellationToken,
+        bool includeProjectConfiguration = true);
 }
 
 /// <summary>
-/// Builds only an explicitly requested native workflow host, capturing workload outcomes before provider construction.
+/// Builds the CLI host, capturing workload outcomes before native provider construction.
 /// </summary>
 internal sealed class NativeTemplateWorkflowHostFactory : INativeTemplateWorkflowHostFactory
 {
     public async Task<NativeTemplateWorkflowHost> CreateAsync(IInteractionService interaction, WorkloadPathsOptions paths, CliConfigurationPathsOptions configurationPaths,
-        Action<IServiceCollection> configureProviders, bool enableBundleBindingConstraints, CancellationToken cancellationToken)
+        Action<IServiceCollection> configureProviders, bool enableBundleBindingConstraints, CancellationToken cancellationToken,
+        bool includeProjectConfiguration = true)
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(paths);
         ArgumentNullException.ThrowIfNull(configurationPaths);
         ArgumentNullException.ThrowIfNull(configureProviders);
         cancellationToken.ThrowIfCancellationRequested();
-        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction, includeProjectConfiguration);
         builder.Services.AddSingleton(paths);
         builder.Services.AddSingleton<IWorkloadPaths>(paths);
         builder.Services.AddSingleton(configurationPaths);
@@ -54,17 +56,20 @@ internal sealed class NativeTemplateWorkflowHost(IHost host) : IDisposable
 
     public NativeTemplateWorkflowInvocation CreateInvocation()
     {
-        IServiceScope scope = _host.Services.CreateScope();
+        NativeTemplateWorkflowInvocation invocation = CreateCommandScope();
         try
         {
-            return new(scope, scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>());
+            _ = invocation.Composer;
+            return invocation;
         }
         catch
         {
-            scope.Dispose();
+            invocation.Dispose();
             throw;
         }
     }
+
+    internal NativeTemplateWorkflowInvocation CreateCommandScope() => new(_host.Services.CreateScope());
 
     public void Dispose()
     {
@@ -77,11 +82,11 @@ internal sealed class NativeTemplateWorkflowHost(IHost host) : IDisposable
     }
 }
 
-internal sealed class NativeTemplateWorkflowInvocation(IServiceScope scope, NativeTemplateWorkflowComposer composer) : IDisposable
+internal sealed class NativeTemplateWorkflowInvocation(IServiceScope scope) : IDisposable
 {
     private readonly IServiceScope _scope = scope ?? throw new ArgumentNullException(nameof(scope));
 
-    public NativeTemplateWorkflowComposer Composer { get; } = composer ?? throw new ArgumentNullException(nameof(composer));
+    public NativeTemplateWorkflowComposer Composer => _scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>();
 
     internal IServiceProvider Services => _scope.ServiceProvider;
 

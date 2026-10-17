@@ -101,14 +101,16 @@ public sealed partial class BundledPythonTemplateTests
         packageSource.ReceivedCalls().Should().BeEmpty("boot/creation uses only actually installed local packages");
     }
 
-    private string BuildMetadataOnlyPythonBundle()
+    private string BuildMetadataOnlyPythonBundle() => BuildMetadataOnlyPythonBundle(_root, _archive);
+
+    internal static string BuildMetadataOnlyPythonBundle(string fixtureRoot, string nativeArchive)
     {
-        var root = Directory.CreateDirectory(Path.Combine(_root, "bundle-metadata-fixture")).FullName;
+        var root = Directory.CreateDirectory(Path.Combine(fixtureRoot, "bundle-metadata-fixture")).FullName;
         var manifest = Path.Combine(root, "workload.json");
         File.WriteAllText(manifest,
             "{\"$schema\":\"https://aka.ms/func-workloads/package/v1/schema.json\",\"kind\":\"content\",\"displayName\":\"Pinned binding metadata fixture\"}");
         var extensions = Path.Combine(root, "extensions.json");
-        using (PackageArchiveReader inner = new(_archive))
+        using (PackageArchiveReader inner = new(nativeArchive))
         using (var input = inner.GetStream("source/bundles/stable/extensions.json"))
         using (var output = File.Create(extensions))
         {

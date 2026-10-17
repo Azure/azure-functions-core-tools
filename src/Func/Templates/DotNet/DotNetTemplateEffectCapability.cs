@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Templates.DotNet;
 internal sealed class DotNetTemplateEffectCapability(
     ResolvedTemplate selected, WorkingDirectory root, string projectPath, string expectedProjectSha256, bool createsProject,
     IFileSystem files, FSharpProjectFiles paths, DotNetTemplateProjectPreparation preparation,
-    DotNetTemplateDependencyExecutor dependencies, FSharpCompileUpdater updater) : INativeTemplateEffectCapability
+    DotNetTemplateDependencyExecutor dependencies, FSharpCompileUpdater updater, bool reinitializesProject = false) : INativeTemplateEffectCapability
 {
     private readonly ResolvedTemplate _selected = selected ?? throw new ArgumentNullException(nameof(selected));
     private readonly WorkingDirectory _root = root ?? throw new ArgumentNullException(nameof(root));
@@ -53,7 +53,7 @@ internal sealed class DotNetTemplateEffectCapability(
         {
             bool exists = _files.FileExists(_project);
             _paths.ValidatePath(_project, _root.Info.FullName, mustExist: !createsProject || exists);
-            if (exists)
+            if (exists && !(createsProject && reinitializesProject))
             {
                 await ValidateProjectAsync(cancellationToken);
             }
