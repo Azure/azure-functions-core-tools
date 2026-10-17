@@ -162,6 +162,44 @@ public sealed class PhysicalFileSystemTests : IDisposable
         // Assert
         stream.Should().BeNull();
     }
+
+    [Fact]
+    public void OpenReadIfExists_MissingDirectory_ReturnsNull()
+    {
+        var stream = _fileSystem.OpenReadIfExists(Path.Combine(_tempDirectory, "missing", "metadata.json"));
+
+        stream.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void OpenReadIfExists_InvalidPath_Throws(string? path)
+    {
+        Action open = () => _fileSystem.OpenReadIfExists(path!);
+
+        open.Should().Throw<ArgumentException>().WithParameterName("path");
+    }
+
+    [Fact]
+    public void OpenReadIfExists_ExclusiveFile_PropagatesIOException()
+    {
+        string path = Path.Combine(_tempDirectory, "exclusive.json");
+        using FileStream exclusive = new(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+
+        Action open = () => _fileSystem.OpenReadIfExists(path);
+
+        open.Should().Throw<IOException>();
+    }
+
+    [Fact]
+    public void OpenReadIfExists_Directory_PropagatesAccessFailure()
+    {
+        Action open = () => _fileSystem.OpenReadIfExists(_tempDirectory);
+
+        open.Should().Throw<UnauthorizedAccessException>();
+    }
 }
 
 internal sealed class CommitBoundaryFileSystem(Action<string> beforeCommit) : PhysicalFileSystem

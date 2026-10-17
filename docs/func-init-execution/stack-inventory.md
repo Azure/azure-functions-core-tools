@@ -222,6 +222,16 @@ only successfully attributed stack service descriptors for the single
 made usable by their presence in DI. An incomplete, cross-host or altered boot
 receipt refuses composition rather than reconstructing availability afterward.
 
+The host also retains the default singleton filesystem and installation metadata
+reader. Explicit filesystem overrides still win over profile defaults; neither
+registration grants stack authority. Constructing the host, reader or native
+invocation does not read installation metadata. An explicit metadata read uses
+`CliEnvironmentOptions.BaseDirectory` (the application's installation directory,
+defaulting to `AppContext.BaseDirectory`), not either workload or CLI/template
+home. Missing metadata and invalid metadata retain their reader errors without
+blocking unrelated native generation. Optional stream reads coexist with the
+create-only, cancellation-aware native filesystem operations.
+
 CLI-owned `INativeItemWorkflowProvider` and `INativeProjectWorkflowProvider`
 implementations are explicitly supplied. Native runners select them from the
 resolved installed stack and exact selected source, not from test-provided
@@ -250,4 +260,3 @@ force behavior and rollout policy are unchanged. Native HTTP output placement
 still follows the requested execution directory; a nested factory journey is
 not proof that switching the public project-root `new` route preserves every
 legacy output path.
-
