@@ -14,3 +14,8 @@ The opt-in CLI-owned Java project provider validates the versioned
 `provenance/java/project.json` source inventory and supplies no preparation
 operation. Mandatory project configuration still uses the shared planner and
 writer; no Maven invocation is added to initialization.
+
+Direct tests use the mounted archive and concrete provider to check exact
+source admission, unchanged invocation, native creation and canonical CLI
+configuration. Changed provenance or source is refused. These tests do not
+run Maven or qualify a Java build, host or deployment.

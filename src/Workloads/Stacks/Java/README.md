@@ -31,6 +31,11 @@ options, with CLI configuration supplied by the shared project planner/writer.
 The public initializer remains unchanged; init does not invoke Maven. No
 separate template feed or Java item catalog is introduced.
 
+`ProjectOnlyDirectProviderTests` checks the concrete Java provider against
+mounted native sources. It preserves the same invocation and has no
+preparation operation or second initializer. Native scaffold/configuration
+coverage is separate from Maven, host and deployment qualification.
+
 ## Links
 
 - [Azure Functions CLI](https://github.com/Azure/azure-functions-core-tools)

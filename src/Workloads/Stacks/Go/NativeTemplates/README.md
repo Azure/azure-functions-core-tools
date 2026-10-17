@@ -15,3 +15,9 @@ packaged source hashes and package version. The opt-in CLI-owned Go workflow
 provider validates that inventory, native identity and configuration before
 using a host-compiled copy of the shared preparation helper. It is not resolved
 from a physical workload's DI container.
+
+Direct provider tests mount the packed archive and exercise the production
+preparation after native creation and canonical CLI configuration. They cover
+omitted versus explicit skip, source and preview drift, tool diagnostics and
+cancellation with committed files retained. Controlled tool results are not
+proof that a real Go module cache can resolve the worker SDK.

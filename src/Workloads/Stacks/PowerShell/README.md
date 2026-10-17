@@ -40,6 +40,11 @@ freezes the resolved optional Az content and diagnostic; completion applies
 that exact create-only plan after source and project configuration rechecks.
 No physical-workload DI service transfer or public command switch is required.
 
+`ProjectOnlyDirectPowerShellTests` exercises the concrete provider and actual
+create-only materializer, rather than the earlier test-owned effect bridge.
+It uses deterministic optional version lookup results. No live gallery,
+module acquisition, host execution or deployment is qualified by those tests.
+
 ## Links
 
 - [Azure Functions CLI](https://github.com/Azure/azure-functions-core-tools)

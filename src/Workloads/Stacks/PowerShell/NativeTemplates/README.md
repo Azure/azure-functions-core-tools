@@ -23,3 +23,9 @@ without loading its preparation services from another DI container. Preview
 resolves the optional Az version once and freezes the exact requirements
 content and diagnostics. Completion rechecks source, target and canonical
 configuration, then atomically creates that same file without replacement.
+
+Direct tests exercise this production provider and materializer on mounted
+archives, including both runtimes, no helper lookup/read when disabled,
+source/parameter/preview drift, occupied destinations, atomic write failure
+and cancellation. Managed-true cases substitute only the optional version
+lookup; they do not qualify PSGallery or acquire Az modules.

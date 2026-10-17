@@ -3,6 +3,7 @@
 
 using System.Security.Cryptography;
 using System.Text.Json;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;

@@ -33,6 +33,11 @@ narrowly source-linked helper code and the archive's exact project provenance.
 It does not consume a physical workload's preparation services. Public command
 routing and the existing Windows worker launch contract are unchanged.
 
+`ProjectOnlyDirectProviderTests` exercises that concrete provider without
+the deferred common composer. Real default preparation additionally requires
+an available Go tool and worker SDK modules. An offline cache miss is a
+qualification blocker, not a reason to skip tidy or change generated source.
+
 ## Links
 
 - [Azure Functions CLI](https://github.com/Azure/azure-functions-core-tools)
