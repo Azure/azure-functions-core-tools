@@ -123,6 +123,12 @@ validated retained outer asset when its exact registration, source origin and
 receipt still agree. Check-only remains read-only and fails while that archive
 is missing. Changed bytes, unknown ownership or conflicting receipts remain
 errors; repair does not replace them.
+Check-only readiness (`func setup --check`) requires a clean native store during
+both bundled-asset preparation and later registration validation. A pending valid
+or corrupt native recovery journal is reported as requiring explicit recovery;
+the check does not restore the hive, remove the journal or migrate receipts.
+Explicit install/update and setup repair retain their normal protected recovery
+behavior.
 On Windows a loaded old workload assembly can prevent best-effort deletion of its
 inactive directory; the committed registry and native owner select the new version.
 

@@ -24,6 +24,9 @@ internal interface IWorkloadInstaller
     /// <exception cref="Discovery.InvalidWorkloadException">Declared assets or native ownership are invalid, or check-only finds missing templates.</exception>
     /// <exception cref="BundledTemplateRegistrationException">The retained stack's template registration failed after protected recovery.</exception>
     /// <exception cref="BundledTemplateRegistrationCanceledException">Cancellation retained the stack after native recovery settled.</exception>
+    /// <exception cref="Azure.Functions.Cli.Templates.Engine.TemplateStoreRecoveryRequiredException">
+    /// Check-only readiness cannot inspect native state until an explicit mutation recovers its pending journal.
+    /// </exception>
     public Task<WorkloadInstallResult> EnsureInstalledAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool checkOnly = false);
     public Task<PreparedWorkloadInstall> PrepareFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
         bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken);

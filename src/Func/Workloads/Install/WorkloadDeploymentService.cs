@@ -112,7 +112,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         CancellationToken cancellationToken)
         => FindReusableImplementation(await _store.GetWorkloadsAsync(cancellationToken), packageId, version, runtimeIdentifier);
 
-    public async Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken)
+    public async Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool requireCleanStore = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
         string directory = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
@@ -164,7 +164,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                 throw new WorkloadPlanChangedException();
             }
 
-            templates = await _bundledTemplates.PrepareAsync(directory, origin, cancellationToken)
+            templates = await _bundledTemplates.PrepareAsync(directory, origin, cancellationToken, requireCleanStore: requireCleanStore)
                 ?? throw new InvalidWorkloadException("The declared bundled-template manifest changed during preparation.");
         }
 

@@ -30,7 +30,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     public async Task<WorkloadInstallResult> EnsureInstalledAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool checkOnly = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        using PreparedWorkloadReuse prepared = await _deploymentService.PrepareReuseAsync(entry, cancellationToken);
+        using PreparedWorkloadReuse prepared = await _deploymentService.PrepareReuseAsync(entry, cancellationToken, requireCleanStore: checkOnly);
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
         if (checkOnly)
         {

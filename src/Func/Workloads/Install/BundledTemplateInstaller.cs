@@ -21,7 +21,7 @@ namespace Azure.Functions.Cli.Workloads.Install;
 internal interface IBundledTemplateInstaller
 {
     public Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin, CancellationToken cancellationToken,
-        PreparedBundledTemplates? replacing = null, bool retainPrevious = false);
+        PreparedBundledTemplates? replacing = null, bool retainPrevious = false, bool requireCleanStore = false);
     /// <summary>
     /// Reads exact version ownership, including legacy receipts, without migrating or writing native state.
     /// </summary>
@@ -60,12 +60,13 @@ internal sealed record BundledTemplatesManifest(int SchemaVersion, IReadOnlyList
 
 internal sealed class PreparedBundledTemplates(TempDirectory staging, BundledTemplateOrigin origin,
     IReadOnlyList<(string Archive, BasicTemplateArtifact Artifact)> assets, PreparedBundledTemplates? replacing = null,
-    bool retainPrevious = false) : IDisposable
+    bool retainPrevious = false, bool requireCleanStore = false) : IDisposable
 {
     public BundledTemplateOrigin Origin { get; } = origin;
     public IReadOnlyList<(string Archive, BasicTemplateArtifact Artifact)> Assets { get; } = assets;
     public PreparedBundledTemplates? Replacing { get; } = replacing;
     public bool RetainPrevious { get; } = retainPrevious;
+    public bool RequireCleanStore { get; } = requireCleanStore;
     public void Dispose() => staging.Dispose();
 }
 
@@ -89,7 +90,7 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
     private readonly CliConfigurationPathsOptions _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
     public async Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin, CancellationToken cancellationToken,
-        PreparedBundledTemplates? replacing = null, bool retainPrevious = false)
+        PreparedBundledTemplates? replacing = null, bool retainPrevious = false, bool requireCleanStore = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentNullException.ThrowIfNull(origin);
@@ -128,7 +129,7 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
                 assets.Add((archive, artifact));
             }
 
-            TemplateEngineContext context = Context(staging.Path);
+            TemplateEngineContext context = Context(staging.Path, requireCleanStore);
             try
             {
                 using TemplateEngineSession preflight = new(context, Path.Combine(staging.Path, "hive"));
@@ -153,7 +154,7 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
                 }
             }
 
-            return new(staging, origin, assets.AsReadOnly(), replacing, retainPrevious);
+            return new(staging, origin, assets.AsReadOnly(), replacing, retainPrevious, requireCleanStore);
         }
         catch
         {
@@ -301,7 +302,7 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
     public async Task ValidateInstalledAsync(PreparedBundledTemplates prepared, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prepared);
-        using TemplateEngineSession session = await _store.OpenReadAsync(Context(_paths.Home), cancellationToken);
+        using TemplateEngineSession session = await _store.OpenReadAsync(Context(_paths.Home, prepared.RequireCleanStore), cancellationToken);
         foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
         {
             if (!await CheckIncumbentAsync(session, prepared.Origin, artifact, cancellationToken))
@@ -817,7 +818,8 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
     private static bool SameVersion(string? left, string? right)
         => NuGetVersion.TryParse(left, out NuGetVersion? first) && NuGetVersion.TryParse(right, out NuGetVersion? second) && first == second;
 
-    private static TemplateEngineContext Context(string directory) => new(WorkingDirectory.FromExplicit(directory));
+    private static TemplateEngineContext Context(string directory, bool requireCleanStore = false)
+        => new(WorkingDirectory.FromExplicit(directory)) { RequireCleanStore = requireCleanStore };
 
     private static bool IsRelativeAsset(string? path)
         => path is not null && path.StartsWith("tools/", StringComparison.Ordinal) && path.EndsWith(".nupkg", StringComparison.Ordinal)
