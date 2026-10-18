@@ -349,9 +349,10 @@ internal class TemplateEngineSession : IDisposable
         if (expandFiles)
         {
             if (string.IsNullOrWhiteSpace(request.Name) || effects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create
-                && !(cleanupPreview && change.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite)))
+                && !(cleanupPreview && change.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite)
+                && !IsForcedItemReplacement(change)))
             {
-                return Failed("Private native expansion requires an explicit effective name and create-only native outputs.");
+                return Failed("Private native expansion requires an explicit effective name and create-only outputs or explicitly forced regular item files.");
             }
 
             using Common.TempDirectory temporary = fileSystem.CreateTempDirectory();
@@ -457,6 +458,15 @@ internal class TemplateEngineSession : IDisposable
 
         static NativeTemplatePreparationResult Failed(string message) =>
             new(null, new(TemplateInvocationStatus.InvalidTemplate, [], message));
+
+        bool IsForcedItemReplacement(IFileChange change)
+        {
+            string path = Path.GetFullPath(Path.Combine(request.OutputDirectory.Info.FullName, change.TargetRelativePath));
+            return request.Force && configuration.Type == TemplateType.Item
+                && change.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite
+                && change is IFileChange2 source && !sourcePlaceholders.Contains(Path.GetFileName(source.SourceRelativePath), StringComparer.Ordinal)
+                && _host.FileSystem.FileExists(path) && !_host.FileSystem.DirectoryExists(path);
+        }
     }
 
     public virtual async Task<IReadOnlyCollection<string>> ReadPackageTypesAsync(ITemplatePackage? package, CancellationToken cancellationToken)

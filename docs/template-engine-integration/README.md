@@ -169,6 +169,15 @@ management boot path.
 Node, Python, and .NET retain their supported public item catalogs and placement;
 C#/F# dependency and compile-order work remains source-qualified. Go, Java, and
 PowerShell supply project workflows, not a new first-party item catalog.
+
+When item preparation needs rendered source bytes, explicit `new --force` may
+plan replacement of an existing regular target file. The engine retains that
+real-target change plan but renders the corresponding create-only files in a
+fresh private directory, without changing the project during preparation or
+preview. This does not authorize deletion, linked paths, directory replacement,
+or initialization-style cleanup. Exact output/source checks and pre-invocation
+source, path, and dependency guards still apply.
+
 Go names reserved by the toolchain (`go` and `toolchain`) use the existing `app`
 module fallback, including when derived from the target directory name.
 Go host preparation supplies a platform-native relative worker executable path,
