@@ -516,14 +516,10 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     [Fact]
     public async Task LogicalReuse_CannotAttachNewOwnerToBundledDestination()
     {
-        var bundled = await _installer.InstallFromPackageAsync(BuiltArchive);
+        var bundled = await _installer.InstallFromPackageAsync(MigrationRidArchive("1.0.0", bundled: true));
         var coordinator = new FileWorkloadOperationCoordinator(_paths);
-        var metadata = Substitute.For<IWorkloadMetadataReader>();
-        metadata.Read(Arg.Any<string>()).Returns(new WorkloadMetadata { Schema = WorkloadManifestSchema.PackageManifestV1Schema,
-            RuntimeIdentifier = "win-x64", EntryPoint = bundled.Entry.EntryPoint });
-        var ridEntry = new WorkloadEntry { PackageId = bundled.Entry.PackageId, PackageVersion = bundled.Entry.PackageVersion, EntryPoint = bundled.Entry.EntryPoint,
-            Source = bundled.Entry.Source, RuntimeIdentifier = "win-x64", BundledTemplatesDeclared = true };
-        await _workloads.SaveWorkloadAsync(ridEntry);
+        var metadata = new WorkloadMetadataReader();
+        var ridEntry = bundled.Entry;
         var deployment = new WorkloadDeploymentService(_paths, _workloads, metadata, coordinator, _files,
             new BundledTemplateInstaller(_templates, _inspector, _files, new(Home)));
         string before = File.ReadAllText(_paths.WorkloadRegistryPath);
@@ -537,18 +533,14 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     [Fact]
     public async Task LogicalInstallRefusal_DoesNotRepairNativeStateDuringReuseValidation()
     {
+        string archive = MigrationRidArchive("1.0.0", bundled: true);
         _inspector.FailLive = true;
-        Func<Task> first = () => _installer.InstallFromPackageAsync(BuiltArchive);
+        Func<Task> first = () => _installer.InstallFromPackageAsync(archive);
         await first.Should().ThrowAsync<BundledTemplateRegistrationException>();
         _inspector.FailLive = false;
-        var bundled = (await _workloads.GetWorkloadsAsync()).Single();
-        var ridEntry = new WorkloadEntry { PackageId = bundled.PackageId, PackageVersion = bundled.PackageVersion, EntryPoint = bundled.EntryPoint,
-            Source = bundled.Source, RuntimeIdentifier = "win-x64", BundledTemplatesDeclared = true };
-        await _workloads.SaveWorkloadAsync(ridEntry);
+        var ridEntry = (await _workloads.GetWorkloadsAsync()).Single();
         var coordinator = new FileWorkloadOperationCoordinator(_paths);
-        var metadata = Substitute.For<IWorkloadMetadataReader>();
-        metadata.Read(Arg.Any<string>()).Returns(new WorkloadMetadata { Schema = WorkloadManifestSchema.PackageManifestV1Schema,
-            RuntimeIdentifier = "win-x64", EntryPoint = ridEntry.EntryPoint });
+        var metadata = new WorkloadMetadataReader();
         var deployment = new WorkloadDeploymentService(_paths, _workloads, metadata, coordinator, _files,
             new BundledTemplateInstaller(_templates, _inspector, _files, new(Home)));
         var runtime = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
@@ -691,22 +683,17 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     [Fact]
     public async Task CachedLogicalUpdate_MovesOnlyTheLegacyOwnerAndPreservesBundledSiblingRegistration()
     {
-        var bundled = await _installer.InstallFromPackageAsync(BuiltArchive);
-        var oldLogical = new LogicalPackage { PackageId = "Historical.Pointer", PackageVersion = "0.1.0", Source = bundled.Entry.Source };
-        var legacy = new WorkloadEntry { PackageId = bundled.Entry.PackageId, PackageVersion = "0.1.0",
-            RuntimeIdentifier = "win-x64", EntryPoint = bundled.Entry.EntryPoint, IsImplicitlyInstalled = true, LogicalPackage = oldLogical, Source = bundled.Entry.Source };
-        var cached = new WorkloadEntry { PackageId = bundled.Entry.PackageId, PackageVersion = "2.0.0",
-            RuntimeIdentifier = "win-x64", EntryPoint = bundled.Entry.EntryPoint, Source = bundled.Entry.Source };
+        var bundled = await _installer.InstallFromPackageAsync(MigrationRidArchive("1.0.0", bundled: true));
+        var previous = await _installer.InstallFromPackageAsync(MigrationRidArchive("0.1.0", bundled: false));
+        var oldLogical = new LogicalPackage { PackageId = "Historical.Pointer", PackageVersion = "0.1.0", Source = previous.Entry.Source };
+        var legacy = new WorkloadEntry { PackageId = previous.Entry.PackageId, PackageVersion = previous.Entry.PackageVersion,
+            Kind = previous.Entry.Kind, RuntimeIdentifier = previous.Entry.RuntimeIdentifier, EntryPoint = previous.Entry.EntryPoint,
+            IsImplicitlyInstalled = true, LogicalPackage = oldLogical, Source = previous.Entry.Source };
         await _workloads.SaveWorkloadAsync(legacy);
-        await _workloads.SaveWorkloadAsync(cached);
+        var cached = (await _installer.InstallFromPackageAsync(MigrationRidArchive("2.0.0", bundled: false))).Entry;
         string cachedDirectory = _paths.GetInstallDirectory(cached.PackageId, cached.PackageVersion);
-        _files.CopyDirectory(_paths.GetInstallDirectory(bundled.Entry.PackageId, bundled.Entry.PackageVersion), cachedDirectory);
-        File.Delete(Path.Combine(cachedDirectory, "bundled-templates.json"));
-        File.Delete(Path.Combine(cachedDirectory, ".bundled-template-origin.json"));
         var coordinator = new FileWorkloadOperationCoordinator(_paths);
-        var metadata = Substitute.For<IWorkloadMetadataReader>();
-        metadata.Read(Arg.Any<string>()).Returns(new WorkloadMetadata { Schema = WorkloadManifestSchema.PackageManifestV1Schema,
-            RuntimeIdentifier = "win-x64", EntryPoint = cached.EntryPoint });
+        var metadata = new WorkloadMetadataReader();
         var deployment = new WorkloadDeploymentService(_paths, _workloads, metadata, coordinator, _files,
             new BundledTemplateInstaller(_templates, _inspector, _files, new(Home)));
         using var prepared = await deployment.PrepareReuseAsync(cached, CancellationToken.None);

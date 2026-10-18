@@ -219,7 +219,7 @@ internal sealed class BasicAcquisitionFixture : IDisposable
             WriteEntry(zip, $"{physical}.nuspec", Nuspec(physical, version, WorkloadPackageTypes.RuntimeIdentifierPackage, "kind:content rid:test-rid"));
             WriteEntry(zip, "workload.json",
                 $$"""{"$schema":"{{WorkloadManifestSchema.PackageManifestV1Schema}}","kind":"content","runtimeIdentifier":"test-rid"}""");
-            WriteEntry(zip, "tools/any/fixture.txt", "Installation fixture, not an activated stack implementation.");
+            WriteEntry(zip, "tools/test-rid/fixture.txt", "Installation fixture, not an activated stack implementation.");
         }
 
         _archives[Key(id, version)] = pointer;
