@@ -24,7 +24,10 @@ internal sealed record SetupProfileScope(ResolvedProfile? Profile)
     public string Name => Profile?.Name ?? "unconstrained";
 }
 
-internal sealed record SetupDependencyPlan(IReadOnlyList<SetupDependency> Dependencies, IReadOnlyList<SetupDependencyResult> Failures);
+internal sealed record SetupDependencyPlan(IReadOnlyList<SetupDependency> Dependencies,
+    IReadOnlyList<SetupDependencyResult> Failures, bool HasIncompatibleBundleRanges = false);
+
+internal sealed record SetupStackSelection(string PackageId, string Version);
 
 internal sealed record SetupDependency(
     SetupDependencyKind Kind,
@@ -35,7 +38,8 @@ internal sealed record SetupDependency(
     string? RangeText,
     string? ResolvedPackageId,
     bool Optional = false,
-    BundleChannel? Channel = null)
+    BundleChannel? Channel = null,
+    SetupStackSelection? StackSelection = null)
 {
     private const string WorkerPackagePrefix = "Azure.Functions.Cli.Workloads.Workers.";
     private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
@@ -204,4 +208,4 @@ internal enum SetupBundlePolicy
     DefaultStable,
 }
 
-internal sealed class SetupConfigurationException(string message) : Exception(message);
+internal sealed class SetupConfigurationException(string message, Exception? innerException = null) : Exception(message, innerException);

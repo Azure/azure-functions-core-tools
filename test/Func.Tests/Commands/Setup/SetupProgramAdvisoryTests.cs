@@ -70,7 +70,14 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             await File.WriteAllTextAsync(paths.VersionCachePath, CachedVersion, cancellation.Token);
             DateTime cacheTimestamp = File.GetLastWriteTimeUtc(paths.VersionCachePath);
 
-            // If-needed host setup uses inventory without loading an assembly or consulting a feed.
+            string hostDirectory = workloads.GetInstallDirectory(HostWorkloadPackage.PackageId, "1.0.0");
+            Directory.CreateDirectory(WorkloadPackageLayout.GetContentRoot(hostDirectory, null));
+            await File.WriteAllTextAsync(Path.Combine(hostDirectory, "workload.json"),
+                JsonSerializer.Serialize(new Dictionary<string, string>
+                {
+                    ["$schema"] = WorkloadManifestSchema.CurrentPackageManifestSchema,
+                    ["kind"] = "content",
+                }), cancellation.Token);
             WorkloadStore store = new(workloads, new FileWorkloadOperationCoordinator(workloads));
             await store.SaveWorkloadAsync(new WorkloadEntry
             {

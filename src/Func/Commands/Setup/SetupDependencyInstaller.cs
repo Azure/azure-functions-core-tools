@@ -3,8 +3,11 @@
 
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Workload;
+using Azure.Functions.Cli.Commands.Start.Host;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
@@ -30,12 +33,16 @@ internal sealed class SetupDependencyInstaller(
     IInteractionService interaction,
     IWorkloadStore workloadStore,
     IWorkloadCatalog workloadCatalog,
-    IWorkloadInstaller workloadInstaller) : ISetupDependencyInstaller
+    IWorkloadInstaller workloadInstaller,
+    IWorkloadPaths workloadPaths,
+    IFileSystem fileSystem) : ISetupDependencyInstaller
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IWorkloadStore _workloadStore = workloadStore ?? throw new ArgumentNullException(nameof(workloadStore));
     private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
     private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller ?? throw new ArgumentNullException(nameof(workloadInstaller));
+    private readonly IWorkloadPaths _workloadPaths = workloadPaths ?? throw new ArgumentNullException(nameof(workloadPaths));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public async Task<SetupDependencyResult> EnsureDependencyAsync(
         SetupCommandOptions options,
@@ -46,15 +53,37 @@ internal sealed class SetupDependencyInstaller(
         ArgumentNullException.ThrowIfNull(dependency);
 
         IReadOnlyList<WorkloadEntry> installed = await _workloadStore.GetWorkloadsAsync(cancellationToken);
+        if (dependency.Kind == SetupDependencyKind.Templates && dependency.StackSelection is { } selection)
+        {
+            var stack = SetupDependency.Stack(dependency.Name);
+            WorkloadEntry? selected = installed.SingleOrDefault(entry =>
+                string.Equals(entry.PackageId, selection.PackageId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(entry.PackageVersion, selection.Version, StringComparison.Ordinal));
+            if (selected is null)
+            {
+                return SetupDependencyResult.Failed(dependency, "The selected stack changed during setup. Run setup again before checking its templates.");
+            }
+
+            if (selected.BundledTemplatesDeclared || _workloadInstaller.HasBundledTemplates(selected))
+            {
+                string? failure = await EnsureRetainedDependencyAsync(selected, options.Check, options.Source, stack.PackageId, cancellationToken);
+                return failure is null
+                    ? SetupDependencyResult.Satisfied(dependency, selected.PackageId, selected.PackageVersion,
+                        $"{dependency.DisplayName} are bundled with the installed {dependency.Name} stack.")
+                    : SetupDependencyResult.Failed(dependency, failure);
+            }
+        }
+
         IReadOnlyList<InstalledCandidate> compatibleInstalled = GetInstalledCandidates(installed, dependency, options.IncludePrerelease)
-            .Where(candidate => dependency.VersionRange is null || dependency.VersionRange.Satisfies(candidate.Version))
+            .Where(candidate => dependency.VersionRange is null
+                || WorkloadVersionRanges.SatisfiesRange(dependency.VersionRange, candidate.Version, options.IncludePrerelease))
             .OrderByDescending(static candidate => candidate.Version)
             .ToArray();
 
         if (options.InstallPolicy == SetupInstallPolicy.IfNeeded && compatibleInstalled.Count > 0)
         {
             InstalledCandidate selected = compatibleInstalled[0];
-            string? failure = await EnsureBundledAsync(selected.Entry, options.Check, options.Source, dependency.PackageId, cancellationToken);
+            string? failure = await EnsureRetainedDependencyAsync(selected.Entry, options.Check, options.Source, dependency.PackageId, cancellationToken);
             if (failure is not null)
             {
                 return SetupDependencyResult.Failed(dependency, failure);
@@ -73,7 +102,7 @@ internal sealed class SetupDependencyInstaller(
             if (compatibleInstalled.Count > 0)
             {
                 InstalledCandidate selected = compatibleInstalled[0];
-                string? failure = await EnsureBundledAsync(selected.Entry, options.Check, options.Source, dependency.PackageId, cancellationToken);
+                string? failure = await EnsureRetainedDependencyAsync(selected.Entry, options.Check, options.Source, dependency.PackageId, cancellationToken);
                 if (failure is not null)
                 {
                     return SetupDependencyResult.Failed(dependency, failure);
@@ -86,7 +115,7 @@ internal sealed class SetupDependencyInstaller(
                     $"{dependency.DisplayName} is satisfied by installed version {selected.Version.ToNormalizedString()} because catalog resolution failed: {resolution.FailureMessage}");
             }
 
-            if (resolution.PackageMissing && dependency.Optional)
+            if (resolution.PackageMissing && dependency.Optional && dependency.VersionRange is null)
             {
                 return SetupDependencyResult.Skipped(
                     dependency,
@@ -109,7 +138,7 @@ internal sealed class SetupDependencyInstaller(
         string targetVersion = package.Version.ToNormalizedString();
         if (exactInstalled is not null)
         {
-            string? failure = await EnsureBundledAsync(exactInstalled, options.Check, package.Source.Source, package.PackageId, cancellationToken);
+            string? failure = await EnsureRetainedDependencyAsync(exactInstalled, options.Check, package.Source.Source, package.PackageId, cancellationToken);
             if (failure is not null)
             {
                 return SetupDependencyResult.Failed(dependency, failure);
@@ -117,7 +146,7 @@ internal sealed class SetupDependencyInstaller(
 
             return SetupDependencyResult.Satisfied(
                 dependency,
-                package.PackageId,
+                exactInstalled.PackageId,
                 targetVersion,
                 $"{dependency.DisplayName} {targetVersion} is already installed.") with { Warning = channelWarning };
         }
@@ -155,6 +184,12 @@ internal sealed class SetupDependencyInstaller(
                     cancellationToken);
 
             string installedVersion = installResult.Entry.PackageVersion;
+            string? payloadFailure = ValidateHostPayload(installResult.Entry);
+            if (payloadFailure is not null)
+            {
+                return SetupDependencyResult.Failed(dependency, payloadFailure);
+            }
+
             return installResult.AlreadyInstalled
                 ? SetupDependencyResult.Satisfied(
                     dependency,
@@ -336,19 +371,37 @@ internal sealed class SetupDependencyInstaller(
         return candidates;
     }
 
-    private async Task<string?> EnsureBundledAsync(WorkloadEntry entry, bool checkOnly, string? requestedSource,
-        string requestedPackageId, CancellationToken cancellationToken)
+    private string? ValidateHostPayload(WorkloadEntry entry)
     {
-        if (!entry.BundledTemplatesDeclared)
+        if (!entry.PackageId.StartsWith(HostWorkloadPackage.PackageIdPrefix, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
+        string directory = _workloadPaths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        string contentRoot = WorkloadPackageLayout.GetContentRoot(directory, entry.RuntimeIdentifier);
+        string executable = HostProcessStartInfoFactory.ResolveExecutablePath(contentRoot);
+        return _fileSystem.FileExists(executable)
+            ? null
+            : $"Host workload executable was not found at '{executable}'. "
+                + $"Reinstall the original host workload package from '{entry.Source}' to repair the installation.";
+    }
+
+    private async Task<string?> EnsureRetainedDependencyAsync(WorkloadEntry entry, bool checkOnly, string? requestedSource,
+        string requestedPackageId, CancellationToken cancellationToken)
+    {
+        string? payloadFailure = ValidateHostPayload(entry);
+        if (payloadFailure is not null)
+        {
+            return payloadFailure;
+        }
+
         string actualSource = entry.LogicalPackage is { } logical
             && string.Equals(requestedPackageId, logical.PackageId, StringComparison.OrdinalIgnoreCase) ? logical.Source : entry.Source;
-        if (requestedSource is not null && !string.Equals(requestedSource, actualSource, StringComparison.Ordinal))
+        bool bundled = entry.BundledTemplatesDeclared || _workloadInstaller.HasBundledTemplates(entry);
+        if (bundled && requestedSource is not null && !string.Equals(requestedSource, actualSource, StringComparison.Ordinal))
         {
-            return "The requested source conflicts with the installed bundled stack's validated origin. Use its original source to repair it.";
+            return $"The requested source conflicts with the installed bundled stack's validated origin. Use its original source '{actualSource}' to repair it.";
         }
 
         try

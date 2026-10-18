@@ -39,6 +39,7 @@ internal sealed class SetupDependencyPlanBuilder(
 
         List<SetupDependency> dependencies = [];
         List<SetupDependencyResult> failures = [];
+        bool incompatibleBundleRanges = false;
 
         HostJsonBundleSection? hostJsonBundle = await _hostJsonBundleSectionReader.ReadAsync(workingDirectory, cancellationToken);
         BundleChannel bundleChannel = ResolveBundleChannel(hostJsonBundle);
@@ -85,6 +86,7 @@ internal sealed class SetupDependencyPlanBuilder(
             SetupDependency? bundleDependency = CreateBundleDependency(hostJsonBundle, bundleChannel, profileScope);
             if (bundleDependency is null)
             {
+                incompatibleBundleRanges = true;
                 var dependency = SetupDependency.Bundle(BundleHelpers.StableBundleId, versionRange: null, rangeText: null, BundleChannel.Stable);
                 failures.Add(SetupDependencyResult.Failed(
                     dependency,
@@ -96,7 +98,7 @@ internal sealed class SetupDependencyPlanBuilder(
             }
         }
 
-        return new SetupDependencyPlan(dependencies, failures);
+        return new SetupDependencyPlan(dependencies, failures, incompatibleBundleRanges);
     }
 
     private static BundleChannel ResolveBundleChannel(HostJsonBundleSection? hostJsonBundle)

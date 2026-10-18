@@ -131,8 +131,8 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
 
         SetupCommandOptions options = new(
             workingDirectory.Info,
-            SplitList(parseResult.GetValue(FeaturesOption)),
-            SplitList(parseResult.GetValue(ProfileOption)).Concat(SplitList(parseResult.GetValue(ProfilesOption))).ToArray(),
+            SplitList(parseResult.GetValue(FeaturesOption), "--features"),
+            SplitList(parseResult.GetValue(ProfileOption), "--profile").Concat(SplitList(parseResult.GetValue(ProfilesOption), "--profiles")).ToArray(),
             NullIfWhiteSpace(parseResult.GetValue(SourceOption)),
             ResolveInstallPolicy(parseResult.GetValue(InstallPolicyOption)),
             parseResult.GetValue(PrereleaseOption) ?? _catalogOptions.IncludePrerelease,
@@ -177,13 +177,13 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         };
     }
 
-    private static IReadOnlyList<string> SplitList(string[]? values)
-        => values is null ? [] : SplitList(values.AsEnumerable());
+    private static IReadOnlyList<string> SplitList(string[]? values, string optionName)
+        => values is null || values.Length == 0 ? [] : SplitList(values.AsEnumerable(), optionName);
 
-    private static IReadOnlyList<string> SplitList(string? value)
-        => string.IsNullOrWhiteSpace(value) ? [] : SplitList([value]);
+    private static IReadOnlyList<string> SplitList(string? value, string optionName)
+        => value is null ? [] : SplitList([value], optionName);
 
-    private static IReadOnlyList<string> SplitList(IEnumerable<string> values)
+    private static IReadOnlyList<string> SplitList(IEnumerable<string> values, string optionName)
     {
         List<string> result = [];
         foreach (string value in values)
@@ -197,7 +197,9 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
             }
         }
 
-        return result;
+        return result.Count > 0
+            ? result
+            : throw new GracefulException($"{optionName} requires at least one non-empty value.", isUserError: true);
     }
 
     private static string? NullIfWhiteSpace(string? value)

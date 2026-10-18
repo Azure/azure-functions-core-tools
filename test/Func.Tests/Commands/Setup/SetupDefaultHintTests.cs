@@ -210,7 +210,8 @@ public sealed class SetupDefaultHintTests
                     return SetupDependencyResult.Satisfied(dependency, dependency.PackageId, "1.0.0", "Already installed.");
                 });
             FirstRun.MarkCompleteAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
-            SetupFeatureResolver features = new(Interaction, Store, configuration ?? Configuration);
+            SetupFeatureResolver features = new(Interaction, Store, configuration ?? Configuration,
+                Substitute.For<Azure.Functions.Cli.Workloads.Catalog.IWorkloadCatalog>(), []);
             Runner = new SetupRunner(Interaction, features, Profiles, new SetupDependencyPlanBuilder(BundleReader), Installer, FirstRun);
         }
     }

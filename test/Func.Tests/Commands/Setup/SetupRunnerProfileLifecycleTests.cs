@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Setup;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
@@ -21,6 +22,27 @@ public sealed class SetupRunnerProfileLifecycleTests
 {
     private const string StackId = "Azure.Functions.Cli.Workloads.DotNet";
     private const string TemplatesId = "Azure.Functions.Cli.Workloads.Templates.DotNet";
+
+    [Fact]
+    public async Task RunAsync_LaterDisjointBundleRanges_PreservesEarlierProfileWithoutMutatingFailingProfile()
+    {
+        using Fixture fixture = new();
+        int reads = 0;
+        fixture.BundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ++reads == 1 ? null : new HostJsonBundleSection(BundleHelpers.StableBundleId, "[6.0.0,7.0.0)"));
+
+        SetupRunResult result = await fixture.Runner().RunAsync(fixture.Options(), CancellationToken.None);
+
+        result.ExitCode.Should().Be(1);
+        fixture.StartedProfiles.Should().Equal("p1", "p2");
+        fixture.CompletedProfiles.Should().Equal("p1:0", "p2:1");
+        fixture.ResultsFor("p2").Should().Equal("extension-bundle:failed");
+        fixture.InstallAttempts.Should().Equal(
+            $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0", $"{TemplatesId}@1.0.0",
+            $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0");
+        (await fixture.InstalledAsync()).Should().Equal(fixture.InstallAttempts);
+        fixture.FirstRun.ReceivedCalls().Should().BeEmpty();
+    }
 
     [Fact]
     public async Task RunAsync_SecondProfilePlanningFailure_InstallsValidDependenciesBeforeStopping()
@@ -65,7 +87,9 @@ public sealed class SetupRunnerProfileLifecycleTests
         fixture.Interaction.Events.Should().ContainSingle(item => item.GetProperty("type").GetString() == "setup.failed")
             .Which.GetProperty("failure_count").GetInt32().Should().Be(3);
         fixture.Interaction.EventTypes.Should().NotContain("setup.completed");
-        fixture.PackageInstaller.ReceivedCalls().Should().BeEmpty();
+        fixture.PackageInstaller.ReceivedCalls().Should().OnlyContain(call =>
+            call.GetMethodInfo().Name == nameof(IWorkloadInstaller.HasBundledTemplates)
+            || (call.GetMethodInfo().Name == nameof(IWorkloadInstaller.EnsureInstalledAsync) && (bool)call.GetArguments()[2]!));
         (await File.ReadAllBytesAsync(fixture.Paths.WorkloadRegistryPath)).Should().Equal(before);
         fixture.FirstRun.ReceivedCalls().Should().BeEmpty();
     }
@@ -123,7 +147,9 @@ public sealed class SetupRunnerProfileLifecycleTests
         fixture.FirstRun.ReceivedCalls().Should().BeEmpty();
         if (check)
         {
-            fixture.PackageInstaller.ReceivedCalls().Should().BeEmpty();
+            fixture.PackageInstaller.ReceivedCalls().Should().OnlyContain(call =>
+                call.GetMethodInfo().Name == nameof(IWorkloadInstaller.HasBundledTemplates)
+                || (call.GetMethodInfo().Name == nameof(IWorkloadInstaller.EnsureInstalledAsync) && (bool)call.GetArguments()[2]!));
             (await fixture.InstalledAsync()).Should().Equal(before);
         }
         else
@@ -165,7 +191,9 @@ public sealed class SetupRunnerProfileLifecycleTests
         (await fixture.InstalledAsync()).Should().BeEquivalentTo(expected);
         if (check)
         {
-            fixture.PackageInstaller.ReceivedCalls().Should().BeEmpty();
+            fixture.PackageInstaller.ReceivedCalls().Should().OnlyContain(call =>
+                call.GetMethodInfo().Name == nameof(IWorkloadInstaller.HasBundledTemplates)
+                || (call.GetMethodInfo().Name == nameof(IWorkloadInstaller.EnsureInstalledAsync) && (bool)call.GetArguments()[2]!));
             (await File.ReadAllBytesAsync(fixture.Paths.WorkloadRegistryPath)).Should().Equal(before!);
             fixture.FirstRun.ReceivedCalls().Should().BeEmpty();
             fixture.MarkerEvents.Should().BeEmpty();
@@ -306,9 +334,9 @@ public sealed class SetupRunnerProfileLifecycleTests
         }
 
         public SetupRunner Runner(ISetupProfileScopeResolver? profiles = null)
-            => new(Interaction, new SetupFeatureResolver(Interaction, Store, Substitute.For<ICliConfigurationProvider>()),
+            => new(Interaction, new SetupFeatureResolver(Interaction, Store, Substitute.For<ICliConfigurationProvider>(), Catalog, []),
                 profiles ?? Profiles, new SetupDependencyPlanBuilder(BundleReader),
-                new SetupDependencyInstaller(Interaction, Store, Catalog, PackageInstaller), FirstRun);
+                new SetupDependencyInstaller(Interaction, Store, Catalog, PackageInstaller, Paths, Substitute.For<IFileSystem>()), FirstRun);
 
         public SetupCommandOptions Options(bool check = false, IReadOnlyList<string>? features = null)
             => new(new DirectoryInfo(Paths.Home), features ?? ["dotnet", "runtime"], ["p1", "p2", "p3"], null,

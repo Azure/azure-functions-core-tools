@@ -60,6 +60,8 @@ internal sealed class SetupRunner(
 
             IReadOnlyList<SetupProfileScope> profileScopes = await _profileScopeResolver.ResolveProfileScopesAsync(options, renderer, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
+            await _featureResolver.ValidateFeaturesAsync(options, featurePlan, profileScopes, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
             renderer.SetupStarted(options, featurePlan, profileScopes);
 
@@ -153,16 +155,37 @@ internal sealed class SetupRunner(
         SetupDependencyPlan plan = await _dependencyPlanBuilder.BuildDependencyPlanAsync(options.WorkingDirectory, featurePlan, profileScope, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         int failures = 0;
+        Dictionary<string, SetupStackSelection> selectedStacks = new(StringComparer.OrdinalIgnoreCase);
+        if (plan.HasIncompatibleBundleRanges && !options.Check)
+        {
+            foreach (SetupDependencyResult failure in plan.Failures)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                renderer.DependencyResult(profileScope, failure.Dependency, failure);
+            }
 
-        foreach (SetupDependency dependency in plan.Dependencies)
+            cancellationToken.ThrowIfCancellationRequested();
+            return new ProfileSetupOutcome(plan.Failures.Count);
+        }
+
+        foreach (SetupDependency plannedDependency in plan.Dependencies)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            SetupDependency dependency = plannedDependency.Kind == SetupDependencyKind.Templates
+                && selectedStacks.TryGetValue(plannedDependency.Name, out SetupStackSelection? selectedStack)
+                    ? plannedDependency with { StackSelection = selectedStack }
+                    : plannedDependency;
             renderer.DependencyDetected(profileScope, dependency);
             cancellationToken.ThrowIfCancellationRequested();
             SetupDependencyResult result = await _dependencyInstaller.EnsureDependencyAsync(options, dependency, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             renderer.DependencyResult(profileScope, dependency, result);
             cancellationToken.ThrowIfCancellationRequested();
+            if (dependency.Kind == SetupDependencyKind.Stack && result.Status != SetupDependencyStatus.Failed
+                && result.PackageId is { } packageId && result.Version is { } version)
+            {
+                selectedStacks[dependency.Name] = new(packageId, version);
+            }
 
             if (result.Status == SetupDependencyStatus.Failed)
             {

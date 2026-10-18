@@ -611,7 +611,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         catalog.ResolveLatestVersionAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<NuGetVersion?>(), true,
                 requestedSource, Arg.Any<CancellationToken>())
             .Returns(new ResolvedPackage(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), new(requestedSource)));
-        var setup = new SetupDependencyInstaller(_interaction, _workloads, catalog, _installer);
+        var setup = new SetupDependencyInstaller(_interaction, _workloads, catalog, _installer, _paths, _files);
         var options = new SetupCommandOptions(new(_root), ["node"], [], requestedSource, (SetupInstallPolicy)policyValue, true, true, true, false, SetupOutputMode.Json);
         string before = File.ReadAllText(_paths.WorkloadRegistryPath);
 

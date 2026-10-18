@@ -100,6 +100,41 @@ public sealed class SetupCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task SetupCommand_OmittedLists_UsesDefaults()
+    {
+        ISetupRunner runner = Substitute.For<ISetupRunner>();
+        runner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>()).Returns(new SetupRunResult(0));
+        IServiceProvider services = TestParser.BuildServiceProviderWith(_interaction, collection => collection.AddSingleton(runner));
+        ParseResult result = Parser.CreateCommand(services).Parse(["setup", _tempDir]);
+
+        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        exitCode.Should().Be(0);
+        await runner.Received(1).RunAsync(
+            Arg.Is<SetupCommandOptions>(options => options.Features.Count == 0 && options.ProfileNames.Count == 0),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("--features", ",")]
+    [InlineData("--features", " ")]
+    [InlineData("--profile", ",")]
+    [InlineData("--profiles", " , ")]
+    public async Task SetupCommand_ExplicitEmptyList_FailsBeforeRunning(string option, string value)
+    {
+        ISetupRunner runner = Substitute.For<ISetupRunner>();
+        IServiceProvider services = TestParser.BuildServiceProviderWith(_interaction, collection => collection.AddSingleton(runner));
+        ParseResult result = Parser.CreateCommand(services).Parse(["setup", _tempDir, option, value]);
+
+        GracefulException error = (await FluentActions.Awaiting(
+            () => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        error.Message.Should().Contain(option).And.Contain("non-empty");
+        runner.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SetupCommand_InvalidInstallPolicy_ThrowsGracefulException()
     {
         var root = TestParser.CreateRoot(_interaction);

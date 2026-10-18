@@ -53,6 +53,25 @@ without granting permission to invoke their legacy scaffolder.
 Missing retained native registration can be repaired explicitly using
 `func setup --features <stack> --install-policy if-needed`.
 
+Setup reports templates bundled with the selected installed stack as satisfied
+only after validating their retained native registration. It does not acquire an
+independent `Templates.*` companion when the stack already owns that capability.
+`--check` verifies without repairing; explicit setup can restore missing owned
+registration, but conflicting source origins or damaged retained payloads remain
+errors. Reuse the original source when repairing a bundled stack. Host readiness
+also requires the installed host executable, not just a registry row.
+
+Unknown setup features are validated before dependency installation. Built-in
+runtimes, registered stack IDs and worker aliases, selected-profile runtime
+descriptors, and published worker workloads remain supported; an unrecognized
+name cannot succeed by skipping its worker and installing only host and bundle.
+Omitted feature/profile lists retain their defaults; explicitly empty lists fail.
+Explicit profile worker ranges must be satisfiable even when an unconstrained
+worker would be optional. A known empty intersection between host.json and profile
+bundle ranges fails before that profile installs dependencies; completed earlier
+profiles are preserved.
+Setup JSON output remains NDJSON events, not a single result document.
+
 Explicit `func workload update <package> --source <v3-feed-url>` supports
 same-home unbundled-to-bundled migration and subsequent bundled updates. Use
 `--prerelease` when needed and `--major` to authorize crossing a major version.

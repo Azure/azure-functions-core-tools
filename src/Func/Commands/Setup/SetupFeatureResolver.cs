@@ -3,7 +3,10 @@
 
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Storage;
+using NuGet.Protocol.Core.Types;
 
 namespace Azure.Functions.Cli.Commands.Setup;
 
@@ -19,16 +22,67 @@ internal interface ISetupFeatureResolver
     /// a clean no-op rather than a failure.
     /// </returns>
     public Task<SetupFeaturePlan?> ResolveFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken);
+
+    public Task ValidateFeaturesAsync(SetupCommandOptions options, SetupFeaturePlan featurePlan,
+        IReadOnlyList<SetupProfileScope> profileScopes, CancellationToken cancellationToken);
 }
 
 internal sealed class SetupFeatureResolver(
     IInteractionService interaction,
     IWorkloadStore workloadStore,
-    ICliConfigurationProvider configurationProvider) : ISetupFeatureResolver
+    ICliConfigurationProvider configurationProvider,
+    IWorkloadCatalog workloadCatalog,
+    IEnumerable<IProjectStack> stacks) : ISetupFeatureResolver
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IWorkloadStore _workloadStore = workloadStore ?? throw new ArgumentNullException(nameof(workloadStore));
     private readonly ICliConfigurationProvider _configurationProvider = configurationProvider ?? throw new ArgumentNullException(nameof(configurationProvider));
+    private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
+    private readonly IReadOnlyList<IProjectStack> _stacks = stacks?.ToArray() ?? throw new ArgumentNullException(nameof(stacks));
+
+    public async Task ValidateFeaturesAsync(SetupCommandOptions options, SetupFeaturePlan featurePlan,
+        IReadOnlyList<SetupProfileScope> profileScopes, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(featurePlan);
+        ArgumentNullException.ThrowIfNull(profileScopes);
+
+        foreach (SetupRuntimeFeature runtime in featurePlan.RuntimeFeatures)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (SetupDependency.SupportsStack(runtime.Name)
+                || runtime.Name is "java" or "powershell" or "custom"
+                || _stacks.Any(stack => string.Equals(stack.Stack, runtime.Name, StringComparison.OrdinalIgnoreCase)
+                    || stack.WorkerRuntimeAliases.Contains(runtime.Name, StringComparer.OrdinalIgnoreCase))
+                || profileScopes.Any(scope => scope.Profile is { } profile
+                    && (profile.SupportedRuntimes?.Contains(runtime.ProfileRuntime, StringComparer.OrdinalIgnoreCase) == true
+                        || profile.WorkerVersionRanges.ContainsKey(runtime.ProfileRuntime))))
+            {
+                continue;
+            }
+
+            ResolvedPackage? worker;
+            try
+            {
+                worker = await _workloadCatalog.ResolveLatestVersionAsync(SetupDependency.Worker(runtime.Name, null).PackageId,
+                    options.IncludePrerelease, currentVersion: null, allowMajor: true, options.Source, cancellationToken);
+            }
+            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException
+                or IOException or HttpRequestException or FatalProtocolException)
+            {
+                throw new SetupConfigurationException(
+                    $"Cannot validate setup feature '{runtime.Name}' against the configured workload catalog: {exception.Message}",
+                    exception);
+            }
+
+            if (worker is null)
+            {
+                throw new SetupConfigurationException(
+                    $"Unknown setup feature '{runtime.Name}'. Use host, runtime, node, python, go or dotnet, "
+                    + "or a runtime declared by a registered stack, selected profile or published worker workload.");
+            }
+        }
+    }
 
     public async Task<SetupFeaturePlan?> ResolveFeaturesAsync(SetupCommandOptions options, CancellationToken cancellationToken)
     {

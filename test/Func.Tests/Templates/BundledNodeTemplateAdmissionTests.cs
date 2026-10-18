@@ -94,7 +94,7 @@ public sealed partial class BundledNodeTemplateTests
             "tools", "any", "templates", "node-basic.nupkg");
         if (parentMissing) Directory.Delete(Path.GetDirectoryName(asset)!, true);
         else File.Delete(asset);
-        var setup = new SetupDependencyInstaller(_interaction, _workloads, Substitute.For<IWorkloadCatalog>(), _installer);
+        var setup = new SetupDependencyInstaller(_interaction, _workloads, Substitute.For<IWorkloadCatalog>(), _installer, _paths, _files);
         var options = new SetupCommandOptions(new(_root), ["node"], [], null, SetupInstallPolicy.IfNeeded, true, true, true, true, SetupOutputMode.Json);
         string before = File.ReadAllText(_paths.WorkloadRegistryPath);
 
@@ -131,7 +131,7 @@ public sealed partial class BundledNodeTemplateTests
         plans.BuildDependencyPlanAsync(Arg.Any<DirectoryInfo>(), Arg.Any<SetupFeaturePlan>(), Arg.Any<SetupProfileScope>(),
             Arg.Any<CancellationToken>()).Returns(new SetupDependencyPlan([SetupDependency.Stack("node")], []));
         var runner = new SetupRunner(interaction, features, scopes, plans,
-            new SetupDependencyInstaller(interaction, _workloads, Substitute.For<IWorkloadCatalog>(), _installer));
+            new SetupDependencyInstaller(interaction, _workloads, Substitute.For<IWorkloadCatalog>(), _installer, _paths, _files));
         var options = new SetupCommandOptions(new(_root), ["node"], [], null, SetupInstallPolicy.IfNeeded, true, true, true, true, SetupOutputMode.Json);
 
         var result = await runner.RunAsync(options, CancellationToken.None);
