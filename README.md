@@ -137,6 +137,8 @@ dotnet build
 
 ### Test
 
+Node.js 22.x must be on `PATH` for tests that evaluate generated JavaScript. CI installs it before running unit tests.
+
 ```bash
 dotnet test
 ```
