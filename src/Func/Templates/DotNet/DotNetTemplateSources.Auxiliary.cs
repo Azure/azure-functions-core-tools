@@ -26,6 +26,11 @@ internal sealed partial class DotNetTemplateSources
         }
         JsonElement pin = candidates[0];
         string path = pin.GetProperty("path").GetString()!;
+        string configurationPath = path[..path.LastIndexOf('/')] + "/.template.config/template.json";
+        if (selected.ConfigurationSourceIdentity?.EndsWith("::/" + configurationPath, StringComparison.Ordinal) != true)
+        {
+            throw new InvalidDataException("The selected .NET auxiliary configuration is not mounted at its qualified source path.");
+        }
         ReadOnlyMemory<byte> bytes = await selected.ReadPackageFileAsync(path, cancellationToken);
         string hash = Convert.ToHexString(SHA256.HashData(bytes.Span));
         if (Same(hash, pin.GetProperty("sha256").GetString())

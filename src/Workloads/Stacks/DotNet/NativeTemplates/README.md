@@ -68,15 +68,16 @@ Neither correction adds a project dependency or edits an existing function.
 The six exact C# sources in `auxiliary-identities.json` also qualify their
 configuration and original source hashes before adaptation. The entity-class
 sample's `Counter` type and the entity-function sample's fixed `Counter` function
-ID now use the requested main function name. Orchestration activities use
-`<FunctionName>SayHello`, including all activity calls and logger references;
-the existing `<FunctionName>_HttpStart` entry point is retained.
+ID now use the requested main function name. Orchestration activities use the
+ID `<FunctionName>-SayHello`, including all activity calls and logger references;
+the HTTP starter uses `<FunctionName>-HttpStart`. The C# activity method remains
+`<FunctionName>SayHello`.
 
 SignalR's main function ID and logger use the requested name rather than the
 fixed `negotiate`. Its connection model is nested as `<FunctionName>ConnectionInfo`.
 Dapr's auxiliary methods live directly in the new main class, with method names
 `<FunctionName>TopicTrigger` and `<FunctionName>Invoke`, and function IDs and
-loggers `<FunctionName>_TopicTrigger` and `<FunctionName>_Invoke`. They are not
+loggers `<FunctionName>-TopicTrigger` and `<FunctionName>-Invoke`. They are not
 nested function classes, which the pinned worker SDK does not index.
 The invocation helper's HTTP route is
 `<FunctionName>/invoke/{appId}/{methodName}`; its sample curl and Dapr CLI
@@ -100,15 +101,17 @@ the service helper route, rather than deriving an identifier from the filename
 or applying a second argv normalizer. Actual generated function IDs must start
 with an ASCII letter, contain only ASCII letters, digits, `_` or `-`, and fit
 within the host's 128-character limit; `host` is reserved. Orchestrations leave
-room for `_HttpStart` (main name at most 118 characters), publishers for
-`_TopicTrigger` (115), and service invocations for `_Invoke` (121). Native space
+room for `-HttpStart` (main name at most 118 characters), publishers for
+`-TopicTrigger` (115), and service invocations for `-Invoke` (121). Native space
 and hyphen normalization is retained; Unicode-only, leading-digit and
 leading-underscore IDs are refused rather than producing host-invalid metadata.
 Raw older sources retain their existing behavior without a latest-version gate.
 Conflicting source proofs or changed canonical sources refuse before writes.
-This is not project-wide semantic analysis of pre-existing function IDs:
-choosing another function's derived helper ID as a new main name can still
-collide, and existing projects are not automatically cleaned up.
+The helper-ID hyphen separates these helpers from native C# primary IDs,
+whose `sourceName` normalization converts hyphens to underscores. Thus an
+ordinary `Foo_Invoke` primary does not collide with the helper `Foo-Invoke`.
+This is not project-wide semantic analysis of arbitrary authored function IDs,
+and existing projects are not automatically cleaned up.
 
 ## Deliberately staged
 

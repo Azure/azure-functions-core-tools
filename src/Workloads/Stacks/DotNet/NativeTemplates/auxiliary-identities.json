@@ -29,10 +29,13 @@
     "sha256": "D9E4AEE6A649B753A71ECC19B11FA8E811D44C399EC0FD9760A2346DA21001C2",
     "configurationSha256": "B2F78551DE0FB8BA21505FFA38D24C5B3EBE33FB8ECCAA59406AEDE88FD27FA1",
     "authoredSources": [
-      { "configurationSha256": "B2F78551DE0FB8BA21505FFA38D24C5B3EBE33FB8ECCAA59406AEDE88FD27FA1", "sha256": "99F0C5FDC0AA3D824B7CA754CE51012139CDC0DBF19060295BF736135F06884B" }
+      { "configurationSha256": "B2F78551DE0FB8BA21505FFA38D24C5B3EBE33FB8ECCAA59406AEDE88FD27FA1", "sha256": "71A870F105E22D7B0647152D617C166CA54679EA917CE005406F3B2E6724E501" }
     ],
     "replacements": [
-      { "from": "SayHello", "to": "DurableFunctionsOrchestrationCSharpSayHello", "count": 6 }
+      { "from": "nameof(SayHello)", "to": "\"DurableFunctionsOrchestrationCSharp-SayHello\"", "count": 4 },
+      { "from": "public static string SayHello(", "to": "public static string DurableFunctionsOrchestrationCSharpSayHello(", "count": 1 },
+      { "from": "\"SayHello\"", "to": "\"DurableFunctionsOrchestrationCSharp-SayHello\"", "count": 1 },
+      { "from": "DurableFunctionsOrchestrationCSharp_HttpStart", "to": "DurableFunctionsOrchestrationCSharp-HttpStart", "count": 2 }
     ]
   },
   {
@@ -55,11 +58,11 @@
     "sha256": "1CEA7C1504459BB50CED8890D67DC960040A8F532E7965258A7A90AAFA6D19F3",
     "configurationSha256": "2C669376FE1EC865A772C2773645A4B68BB5ABED45FACFF682435BC2F98194C8",
     "authoredSources": [
-      { "configurationSha256": "2C669376FE1EC865A772C2773645A4B68BB5ABED45FACFF682435BC2F98194C8", "sha256": "52C53D5032D3B2E6B73E573547687897F830DDCAD57F785325AD385484FA5A4E" }
+      { "configurationSha256": "2C669376FE1EC865A772C2773645A4B68BB5ABED45FACFF682435BC2F98194C8", "sha256": "DDE391A0F5FCF5E2769C37C30BBABEDD234E20B1D78EC260FFC730CB20BF28D6" }
     ],
     "replacements": [
       { "from": "\"DaprPublishOutputCSharp\"", "to": "\"DaprPublishOutputBindingCSharp\"", "count": 1 },
-      { "from": "\"DaprTopicTriggerFuncApp\"", "to": "\"DaprPublishOutputBindingCSharp_TopicTrigger\"", "count": 2 },
+      { "from": "\"DaprTopicTriggerFuncApp\"", "to": "\"DaprPublishOutputBindingCSharp-TopicTrigger\"", "count": 2 },
       { "from": "    // Below Azure function will receive message published on topic A, and it will log the message\n", "to": "", "count": 1 },
       { "from": "    }\n\n    public static class DaprTopicTriggerFuncApp\n    {\n", "to": "\n", "count": 1 },
       { "from": "public static void Run(", "to": "public static void DaprPublishOutputBindingCSharpTopicTrigger(", "count": 1 }
@@ -71,12 +74,12 @@
     "sha256": "45E3BFA8F5121F351B4360A1B08AA228B55283DAE6A96B6A55E47643B34556BE",
     "configurationSha256": "9E33F913529139E9C2E22EA14596897D3E31766D5ED8B594E90752B2ABE87E18",
     "authoredSources": [
-      { "configurationSha256": "9E33F913529139E9C2E22EA14596897D3E31766D5ED8B594E90752B2ABE87E18", "sha256": "42CB2A59F20539846153FDC9B174930B55191AA8FBA33FBF22F85895E957C7E6" }
+      { "configurationSha256": "9E33F913529139E9C2E22EA14596897D3E31766D5ED8B594E90752B2ABE87E18", "sha256": "4BEEAA89E119509872B7CBDAC013433FA7D9DD4B286BD2B79909A3D451B04476" }
     ],
     "replacements": [
       { "from": "    }\n\n    public static class InvokeOutputBinding\n    {\n", "to": "\n", "count": 1 },
       { "from": "public static async Task<InvokeMethodParameters> Run(", "to": "public static async Task<InvokeMethodParameters> DaprServiceInvocationTriggerCSharpInvoke(", "count": 1 },
-      { "from": "\"InvokeOutputBinding\"", "to": "\"DaprServiceInvocationTriggerCSharp_Invoke\"", "count": 2 },
+      { "from": "\"InvokeOutputBinding\"", "to": "\"DaprServiceInvocationTriggerCSharp-Invoke\"", "count": 2 },
       { "from": "Route = \"invoke/{appId}/{methodName}\"", "to": "Route = \"DaprServiceInvocationTriggerCSharp/invoke/{appId}/{methodName}\"", "count": 1 },
       { "from": "--method {yourFunctionName}", "to": "--method DaprServiceInvocationTriggerCSharp", "count": 1 },
       { "from": "/api/invoke/functionapp/{yourFunctionName}", "to": "/api/DaprServiceInvocationTriggerCSharp/invoke/functionapp/DaprServiceInvocationTriggerCSharp", "count": 1 }

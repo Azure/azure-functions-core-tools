@@ -174,9 +174,9 @@ public sealed class NativeDotNetTemplateTests : IDisposable
                     break;
                 case "DurableFunctionsOrchestration.1.x":
                     source.Should().ContainAll($"[Function(nameof({name}))]", $"public static string {name}SayHello(",
-                        $"[Function(nameof({name}SayHello))]", $"GetLogger(\"{name}SayHello\")",
-                        $"[Function(\"{name}_HttpStart\")]", $"nameof({name}));");
-                    source.Split($"CallActivityAsync<string>(nameof({name}SayHello)").Should().HaveCount(4);
+                        $"[Function(\"{name}-SayHello\")]", $"GetLogger(\"{name}-SayHello\")",
+                        $"[Function(\"{name}-HttpStart\")]", $"nameof({name}));");
+                    source.Split($"CallActivityAsync<string>(\"{name}-SayHello\"").Should().HaveCount(4);
                     break;
                 case "SignalR.3.x":
                     source.Should().ContainAll($"[Function(\"{name}\")]", $"CreateLogger(\"{name}\")",
@@ -186,14 +186,14 @@ public sealed class NativeDotNetTemplateTests : IDisposable
                     break;
                 case "DaprPublishOutputBinding":
                     source.Should().ContainAll($"[Function(\"{name}\")]", $"GetLogger(\"{name}\")",
-                        $"public static void {name}TopicTrigger(", $"[Function(\"{name}_TopicTrigger\")]",
-                        $"GetLogger(\"{name}_TopicTrigger\")", "[DaprPublishOutput(PubSubName = \"pubsub\", Topic = \"A\")]",
+                        $"public static void {name}TopicTrigger(", $"[Function(\"{name}-TopicTrigger\")]",
+                        $"GetLogger(\"{name}-TopicTrigger\")", "[DaprPublishOutput(PubSubName = \"pubsub\", Topic = \"A\")]",
                         "[DaprTopicTrigger(\"pubsub\", Topic = \"A\")]");
                     source.Should().NotContain("DaprTopicTriggerFuncApp");
                     break;
                 case "DaprServiceInvocationTrigger":
                     source.Should().ContainAll($"[Function(\"{name}\")]", $"public static async Task<InvokeMethodParameters> {name}Invoke(",
-                        $"[Function(\"{name}_Invoke\")]", $"GetLogger(\"{name}_Invoke\")",
+                        $"[Function(\"{name}-Invoke\")]", $"GetLogger(\"{name}-Invoke\")",
                         $"Route = \"{name}/invoke/{{appId}}/{{methodName}}\"",
                         "AppId = \"{appId}\", MethodName = \"{methodName}\"",
                         $"--method {name}", $"/api/{name}/invoke/functionapp/{name}");
@@ -499,10 +499,10 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         [
             ("DurableFunctionsEntityClass.1.x", "EntityClass", [""]),
             ("DurableFunctionsEntityFunction.1.x", "EntityFunction", [""]),
-            ("DurableFunctionsOrchestration.1.x", "Orchestrate", ["", "SayHello", "_HttpStart"]),
+            ("DurableFunctionsOrchestration.1.x", "Orchestrate", ["", "-SayHello", "-HttpStart"]),
             ("SignalR.3.x", "Negotiate", [""]),
-            ("DaprPublishOutputBinding", "Publish", ["", "_TopicTrigger"]),
-            ("DaprServiceInvocationTrigger", "Service", ["", "_Invoke"]),
+            ("DaprPublishOutputBinding", "Publish", ["", "-TopicTrigger"]),
+            ("DaprServiceInvocationTrigger", "Service", ["", "-Invoke"]),
         ];
         foreach ((string variant, string prefix, string[] suffixes) in cases)
         {
@@ -517,9 +517,24 @@ public sealed class NativeDotNetTemplateTests : IDisposable
                 expectedNames.AddRange(suffixes.Select(suffix => name + suffix));
                 if (prefix == "Service")
                 {
-                    expectedRoutes.Add(name + "_Invoke", name + "/invoke/{appId}/{methodName}");
+                    expectedRoutes.Add(name + "-Invoke", name + "/invoke/{appId}/{methodName}");
                 }
             }
+        }
+        ITemplateInfo http = templates.Single(item => item.Identity == "Azure.Function.CSharp.Isolated.HttpTrigger.3.x");
+        foreach ((string requested, string actual) in new[]
+        {
+            ("ServiceFirst_Invoke", "ServiceFirst_Invoke"),
+            ("OrchestrateFirst_HttpStart", "OrchestrateFirst_HttpStart"),
+            ("PublishFirst_TopicTrigger", "PublishFirst_TopicTrigger"),
+            ("Hyphen-Primary", "Hyphen_Primary"),
+        })
+        {
+            ITemplateCreationResult created = await creator.InstantiateAsync(http, requested, requested, output,
+                new Dictionary<string, string?> { ["namespace"] = "Sample" }, cancellationToken: timeout.Token);
+            created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+            actions.AddRange(created.CreationEffects!.CreationResult.PostActions);
+            expectedNames.Add(actual);
         }
         string customPath = Path.Combine(output, "Custom.cs");
         const string userSource = "namespace Sample; public class Counter { } public class MyConnectionInfo { } "

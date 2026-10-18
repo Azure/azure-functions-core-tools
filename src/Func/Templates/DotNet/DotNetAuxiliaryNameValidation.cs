@@ -52,10 +52,10 @@ internal static class DotNetAuxiliaryNameValidation
         {
             "DurableFunctionsEntityClass.1.x" or "DurableFunctionsEntityFunction.1.x" => [$"[Function(nameof({type}))]"],
             "DurableFunctionsOrchestration.1.x" =>
-                [$"[Function(nameof({type}))]", $"[Function(nameof({type}SayHello))]", $"[Function(\"{type}_HttpStart\")]"],
+                [$"[Function(nameof({type}))]", $"[Function(\"{type}-SayHello\")]", $"[Function(\"{type}-HttpStart\")]"],
             "SignalR.3.x" => [$"[Function(\"{type}\")]"],
-            "DaprPublishOutputBinding" => [$"[Function(\"{type}\")]", $"[Function(\"{type}_TopicTrigger\")]"],
-            "DaprServiceInvocationTrigger" => [$"[Function(\"{type}\")]", $"[Function(\"{type}_Invoke\")]"],
+            "DaprPublishOutputBinding" => [$"[Function(\"{type}\")]", $"[Function(\"{type}-TopicTrigger\")]"],
+            "DaprServiceInvocationTrigger" => [$"[Function(\"{type}\")]", $"[Function(\"{type}-Invoke\")]"],
             _ => throw new ArgumentException("Supply a qualified auxiliary item identity.", nameof(identity)),
         };
         if (!attributes.SequenceEqual(expected, StringComparer.Ordinal)
@@ -66,9 +66,9 @@ internal static class DotNetAuxiliaryNameValidation
         }
         string[] names = variant switch
         {
-            "DurableFunctionsOrchestration.1.x" => [type, type + "SayHello", type + "_HttpStart"],
-            "DaprPublishOutputBinding" => [type, type + "_TopicTrigger"],
-            "DaprServiceInvocationTrigger" => [type, type + "_Invoke"],
+            "DurableFunctionsOrchestration.1.x" => [type, type + "-SayHello", type + "-HttpStart"],
+            "DaprPublishOutputBinding" => [type, type + "-TopicTrigger"],
+            "DaprServiceInvocationTrigger" => [type, type + "-Invoke"],
             _ => [type],
         };
         foreach (string name in names)

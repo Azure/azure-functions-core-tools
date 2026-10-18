@@ -91,6 +91,10 @@ public sealed partial class DotNetDirectProviderTests
             selected.ConfigurationSha256, selected.ValidateConfigurationAsync, selected.ConfigurationSourceIdentity);
         var action = () => sources.QualifyAuxiliaryAsync(changed, _deadline.Token);
         await action.Should().ThrowAsync<InvalidDataException>().WithMessage("*source changed or is unsupported*");
+        ResolvedTemplate decoy = new(selected.Entry, selected.InvokeAsync, selected.ReadPackageFileAsync,
+            selected.ConfigurationSha256, selected.ValidateConfigurationAsync, "archive::/decoy/.template.config/template.json");
+        var decoyAction = () => sources.QualifyAuxiliaryAsync(decoy, _deadline.Token);
+        await decoyAction.Should().ThrowAsync<InvalidDataException>().WithMessage("*qualified source path*");
     }
 
     [Theory]
