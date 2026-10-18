@@ -91,7 +91,8 @@ public sealed class WorkloadPruneCoordinationTests
         row.PackageId.Should().Be("fixture.stacka.test-rid");
         row.PackageVersion.Should().Be(change == "current" ? "1.0.0" : "2.0.0");
         row.LogicalPackage?.PackageId.Should().Be(logical ? "fixture.stacka" : null);
-        File.ReadAllText(Path.Combine(fixture.Paths.GetInstallDirectory(row.PackageId, row.PackageVersion), "tools", "any", "fixture.txt"))
+        File.ReadAllText(Path.Combine(WorkloadPackageLayout.GetContentRoot(
+            fixture.Paths.GetInstallDirectory(row.PackageId, row.PackageVersion), row.RuntimeIdentifier), "fixture.txt"))
             .Should().Be("Installation fixture, not an activated stack implementation.");
         interaction.Lines.Count(line => line.Contains("Pruned workload", StringComparison.Ordinal)).Should().Be(change == "obsolete" ? 1 : 0);
         fixture.Downloads.Should().HaveCount(downloads);
