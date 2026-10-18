@@ -185,15 +185,14 @@ including for `start --no-build`, without changing the shared worker asset.
 
 ## Prompt and completion policy
 
-For public `new`, the parsed host `--output=json` implies noninteractive execution
-before project/profile resolution, template selection, or required-value completion.
+For public `init` and `new`, the parsed host `--output=json` implies noninteractive
+execution before project/profile resolution, template selection, required-value
+completion or force confirmation.
 Template values that happen to contain output-option text do not set host policy.
 JSON and explicit `--non-interactive` also prevent version checks and alias nudges
 from starting or emitting advisory output. Plain interactive creation and other
 commands retain their existing advisory behavior. Bare parent commands dispatch
 both synchronous and asynchronous help actions through the common command base.
-The public `init` grammar has no host JSON output option; this does not add one or
-change the separate internal INIT harness's prompt policy.
 
 After native project creation and mandatory CLI configuration commit, cancellation
 anywhere in owned stack-preparation completion, including selected-source
