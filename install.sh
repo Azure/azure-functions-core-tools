@@ -62,6 +62,10 @@ write_installation_metadata() {
     local metadata_path="${INSTALL_DIR}/${INSTALLATION_METADATA_FILE}"
     local temp_path
 
+    if [[ -L "$metadata_path" ]]; then
+        say_error "Cannot write installation metadata because ${metadata_path} is a symbolic link."
+        return 1
+    fi
     if [[ -d "$metadata_path" ]]; then
         say_error "Cannot write installation metadata because ${metadata_path} is a directory."
         return 1
@@ -399,11 +403,17 @@ fi
 # --- Download and extract ---
 
 TEMP_DIR=$(mktemp -d)
-if [[ "$KEEP_ARCHIVE" != true ]]; then
-    trap 'rm -rf "$TEMP_DIR"' EXIT
-else
+REMOVE_TEMP_DIR_ON_EXIT=true
+if [[ "$KEEP_ARCHIVE" == true ]]; then
+    REMOVE_TEMP_DIR_ON_EXIT=false
     say_info "Keeping temp dir: $TEMP_DIR"
 fi
+cleanup_temp_dir() {
+    if [[ "$REMOVE_TEMP_DIR_ON_EXIT" == true ]]; then
+        rm -rf "$TEMP_DIR"
+    fi
+}
+trap cleanup_temp_dir EXIT
 
 if [[ "$DRY_RUN" == true ]]; then
     say_info "[DRY RUN] Would download ${DOWNLOAD_URL} to ${TEMP_DIR}/${ASSET_NAME}"
@@ -436,9 +446,22 @@ else
         fi
     done < <(find "$PAYLOAD_DIR" -mindepth 1 -maxdepth 1 -print0)
 
+    while IFS= read -r -d '' payload_entry; do
+        payload_name="${payload_entry#"${PAYLOAD_DIR}/"}"
+        destination_path="${INSTALL_DIR}/${payload_name}"
+        if [[ -L "$destination_path" ]]; then
+            say_error "Cannot install because ${destination_path} is a symbolic link."
+            exit 1
+        fi
+    done < <(find "$PAYLOAD_DIR" -mindepth 1 -print0)
+
     BACKED_UP_NAMES=()
     for publication_name in "${PUBLICATION_NAMES[@]}"; do
         destination_path="${INSTALL_DIR}/${publication_name}"
+        if [[ -L "$destination_path" ]]; then
+            say_error "Cannot install because ${destination_path} is a symbolic link."
+            exit 1
+        fi
         if [[ -e "$destination_path" || -L "$destination_path" ]]; then
             cp -pR "$destination_path" "$PUBLICATION_BACKUP_DIR/"
             BACKED_UP_NAMES+=("$publication_name")
@@ -482,7 +505,8 @@ EOF
 
     if ! publish_installation; then
         if ! rollback_installation; then
-            say_error "Installation failed and the previous installation could not be fully restored."
+            REMOVE_TEMP_DIR_ON_EXIT=false
+            say_error "Installation failed and the previous installation could not be fully restored. Recovery files are available at ${PUBLICATION_BACKUP_DIR}."
             exit 1
         fi
         say_error "Installation failed; the previous installation was restored."

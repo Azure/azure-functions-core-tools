@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $expectedJson = '{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}' + "`n"
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) "func-installer-metadata-$([Guid]::NewGuid().ToString('N'))"
+$installerTempRoot = Join-Path $testRoot 'installer-temp'
 $isWindowsHost = $IsWindows -or $env:OS -eq 'Windows_NT'
 $bashCommand = if ($isWindowsHost) {
     $candidates = @(
@@ -68,10 +69,23 @@ function Assert-Metadata {
     Assert-True ($metadata.updatePolicy -eq 'in-place') 'updatePolicy was not in-place.'
     Assert-True (($metadata.PSObject.Properties.Name | Sort-Object) -join ',' -eq 'installMethod,schemaVersion,updatePolicy') `
         'Metadata contained fields outside the installation contract.'
-    Assert-True (-not (Get-ChildItem -LiteralPath $InstallPath -Filter '.func.installation.json.tmp.*')) `
+    Assert-True (-not (Get-ChildItem -LiteralPath $InstallPath -Filter '.func.installation.json.tmp.*' -Force)) `
         'An atomic-write temporary file was left behind.'
-    Assert-True (-not (Get-ChildItem -LiteralPath $InstallPath -Filter '.func.installation.json.backup.*')) `
+    Assert-True (-not (Get-ChildItem -LiteralPath $InstallPath -Filter '.func.installation.json.backup.*' -Force)) `
         'An installation metadata backup file was left behind.'
+}
+
+function Get-RecoveryBackupDirectories {
+    return @(
+        Get-ChildItem -LiteralPath $installerTempRoot -Directory -Recurse -Filter 'publication-backup' -Force `
+            -ErrorAction SilentlyContinue
+    )
+}
+
+function Remove-RecoveryBackup {
+    param([Parameter(Mandatory)] [System.IO.DirectoryInfo] $BackupDirectory)
+
+    Remove-Item -LiteralPath $BackupDirectory.Parent.FullName -Recurse -Force
 }
 
 function Invoke-PowerShellInstaller {
@@ -81,6 +95,7 @@ function Invoke-PowerShellInstaller {
         [switch] $Force,
         [switch] $FailDownload,
         [switch] $FailWrapperChmod,
+        [switch] $FailRollback,
         [switch] $LockMetadata,
         [switch] $LockWrapper
     )
@@ -122,8 +137,12 @@ $arguments = @{
 if ($env:FUNC_INSTALLER_TEST_FORCE -eq 'true') {
     $arguments.Force = $true
 }
-if ($env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_CHMOD -eq 'true') {
+if ($env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_CHMOD -eq 'true' -or
+    $env:FUNC_INSTALLER_TEST_FAIL_ROLLBACK -eq 'true') {
     function global:chmod {
+        if ($env:FUNC_INSTALLER_TEST_FAIL_ROLLBACK -eq 'true') {
+            & /bin/chmod 0555 $env:FUNC_INSTALLER_TEST_ROOT
+        }
         $global:LASTEXITCODE = 75
     }
 }
@@ -148,6 +167,9 @@ try {
     if ($wrapperLock) {
         $wrapperLock.Dispose()
     }
+    if ($env:FUNC_INSTALLER_TEST_FAIL_ROLLBACK -eq 'true') {
+        & /bin/chmod 0755 $env:FUNC_INSTALLER_TEST_ROOT
+    }
 }
 '@ | Set-Content -LiteralPath $runnerPath -Encoding utf8NoBOM
 
@@ -155,24 +177,32 @@ try {
         Archive = $env:FUNC_INSTALLER_TEST_ARCHIVE
         ContentType = $env:FUNC_INSTALLER_TEST_CONTENT_TYPE
         Fail = $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD
+        FailRollback = $env:FUNC_INSTALLER_TEST_FAIL_ROLLBACK
         FailWrapperChmod = $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_CHMOD
         Force = $env:FUNC_INSTALLER_TEST_FORCE
         LockMetadata = $env:FUNC_INSTALLER_TEST_LOCK_METADATA
         LockWrapper = $env:FUNC_INSTALLER_TEST_LOCK_WRAPPER
         Root = $env:FUNC_INSTALLER_TEST_ROOT
         Script = $env:FUNC_INSTALLER_SCRIPT
+        Temp = $env:TEMP
+        Tmp = $env:TMP
+        TmpDir = $env:TMPDIR
     }
 
     try {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $ArchivePath
         $env:FUNC_INSTALLER_TEST_CONTENT_TYPE = if ($ArchivePath.EndsWith('.zip')) { 'application/zip' } else { 'application/gzip' }
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $FailDownload.ToString().ToLowerInvariant()
+        $env:FUNC_INSTALLER_TEST_FAIL_ROLLBACK = $FailRollback.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_CHMOD = $FailWrapperChmod.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_FORCE = $Force.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_LOCK_METADATA = $LockMetadata.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_LOCK_WRAPPER = $LockWrapper.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_ROOT = $InstallPath
         $env:FUNC_INSTALLER_SCRIPT = Join-Path $repoRoot 'install.ps1'
+        $env:TEMP = $installerTempRoot
+        $env:TMP = $installerTempRoot
+        $env:TMPDIR = $installerTempRoot
         $output = & pwsh -NoLogo -NoProfile -File $runnerPath
         $exitCode = $LASTEXITCODE
         $output | ForEach-Object { Write-Host $_ }
@@ -181,12 +211,16 @@ try {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $previousEnvironment.Archive
         $env:FUNC_INSTALLER_TEST_CONTENT_TYPE = $previousEnvironment.ContentType
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $previousEnvironment.Fail
+        $env:FUNC_INSTALLER_TEST_FAIL_ROLLBACK = $previousEnvironment.FailRollback
         $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_CHMOD = $previousEnvironment.FailWrapperChmod
         $env:FUNC_INSTALLER_TEST_FORCE = $previousEnvironment.Force
         $env:FUNC_INSTALLER_TEST_LOCK_METADATA = $previousEnvironment.LockMetadata
         $env:FUNC_INSTALLER_TEST_LOCK_WRAPPER = $previousEnvironment.LockWrapper
         $env:FUNC_INSTALLER_TEST_ROOT = $previousEnvironment.Root
         $env:FUNC_INSTALLER_SCRIPT = $previousEnvironment.Script
+        $env:TEMP = $previousEnvironment.Temp
+        $env:TMP = $previousEnvironment.Tmp
+        $env:TMPDIR = $previousEnvironment.TmpDir
     }
 }
 
@@ -199,6 +233,7 @@ function Invoke-BashInstaller {
         [switch] $Force,
         [switch] $FailDownload,
         [switch] $FailMetadataPublish,
+        [switch] $FailRollback,
         [switch] $FailWrapperPublish,
         [ValidateSet('Linux', 'Darwin')] [string] $OperatingSystem = 'Linux'
     )
@@ -207,18 +242,22 @@ function Invoke-BashInstaller {
         Archive = $env:FUNC_INSTALLER_TEST_ARCHIVE
         Fail = $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD
         FailMetadataPublish = $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH
+        FailRollback = $env:FUNC_INSTALLER_TEST_FAIL_ROLLBACK
         FailWrapperPublish = $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH
         Home = $env:HOME
         OperatingSystem = $env:FUNC_INSTALLER_TEST_OS
+        TmpDir = $env:TMPDIR
     }
 
     try {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = ConvertTo-BashPath $ArchivePath
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $FailDownload.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH = $FailMetadataPublish.ToString().ToLowerInvariant()
+        $env:FUNC_INSTALLER_TEST_FAIL_ROLLBACK = $FailRollback.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH = $FailWrapperPublish.ToString().ToLowerInvariant()
         $env:FUNC_INSTALLER_TEST_OS = $OperatingSystem
         $env:HOME = ConvertTo-BashPath $HomePath
+        $env:TMPDIR = ConvertTo-BashPath $installerTempRoot
 
         $arguments = @(
             (ConvertTo-BashPath (Join-Path $repoRoot 'install.sh')),
@@ -241,20 +280,26 @@ function Invoke-BashInstaller {
         $env:FUNC_INSTALLER_TEST_ARCHIVE = $previousEnvironment.Archive
         $env:FUNC_INSTALLER_TEST_FAIL_DOWNLOAD = $previousEnvironment.Fail
         $env:FUNC_INSTALLER_TEST_FAIL_METADATA_PUBLISH = $previousEnvironment.FailMetadataPublish
+        $env:FUNC_INSTALLER_TEST_FAIL_ROLLBACK = $previousEnvironment.FailRollback
         $env:FUNC_INSTALLER_TEST_FAIL_WRAPPER_PUBLISH = $previousEnvironment.FailWrapperPublish
         $env:FUNC_INSTALLER_TEST_OS = $previousEnvironment.OperatingSystem
         $env:HOME = $previousEnvironment.Home
+        $env:TMPDIR = $previousEnvironment.TmpDir
     }
 }
 
 try {
     New-Item -ItemType Directory -Path $testRoot | Out-Null
+    New-Item -ItemType Directory -Path $installerTempRoot | Out-Null
 
     $powerShellExecutableName = if ($isWindowsHost) { 'func.exe' } else { 'func' }
     $powerShellPayload = Join-Path $testRoot 'powershell-payload'
     New-Item -ItemType Directory -Path $powerShellPayload | Out-Null
     $powerShellExecutable = Join-Path $powerShellPayload $powerShellExecutableName
     Set-Content -LiteralPath $powerShellExecutable -Value 'test executable' -Encoding ascii
+    $powerShellLinkedContent = Join-Path $powerShellPayload 'linked-content/nested'
+    New-Item -ItemType Directory -Path $powerShellLinkedContent -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $powerShellLinkedContent 'sentinel.txt') -Value 'new external content' -Encoding ascii
     if (-not $isWindowsHost) {
         chmod +x $powerShellExecutable
         Assert-True ($LASTEXITCODE -eq 0) 'Could not make the PowerShell test payload executable.'
@@ -325,6 +370,16 @@ try {
             'install.ps1 stopped rollback before restoring the bash wrapper.'
         Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellInstall 'func5.cmd') -Raw).Trim() -eq 'existing cmd wrapper') `
             'install.ps1 stopped rollback before restoring the cmd wrapper.'
+        $powerShellRecoveryBackups = @(Get-RecoveryBackupDirectories)
+        Assert-True ($powerShellRecoveryBackups.Count -eq 1) `
+            'install.ps1 did not retain exactly one recovery backup after incomplete rollback.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellRecoveryBackups[0].FullName $powerShellExecutableName) -Raw).Trim() -eq
+            'existing executable') 'install.ps1 did not retain the executable recovery backup.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellRecoveryBackups[0].FullName 'func5') -Raw).Trim() -eq
+            'existing bash wrapper') 'install.ps1 did not retain the wrapper recovery backup.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellRecoveryBackups[0].FullName 'func5.cmd') -Raw).Trim() -eq
+            'existing cmd wrapper') 'install.ps1 did not retain the cmd wrapper recovery backup.'
+        Remove-RecoveryBackup -BackupDirectory $powerShellRecoveryBackups[0]
     } else {
         Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force `
             -FailWrapperChmod) -ne 0) 'install.ps1 unexpectedly succeeded after wrapper chmod failed.'
@@ -335,6 +390,17 @@ try {
             'install.ps1 did not restore the wrapper after wrapper chmod failed.'
         & /usr/bin/env test -x (Join-Path $powerShellInstall 'func5')
         Assert-True ($LASTEXITCODE -eq 0) 'install.ps1 did not restore the wrapper mode after wrapper chmod failed.'
+
+        Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force `
+            -FailRollback) -ne 0) 'install.ps1 unexpectedly reported successful rollback after restore failures.'
+        $powerShellRecoveryBackups = @(Get-RecoveryBackupDirectories)
+        Assert-True ($powerShellRecoveryBackups.Count -eq 1) `
+            'install.ps1 did not retain exactly one recovery backup after incomplete rollback.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellRecoveryBackups[0].FullName $powerShellExecutableName) -Raw).Trim() -eq
+            'existing executable') 'install.ps1 did not retain the executable recovery backup.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellRecoveryBackups[0].FullName 'func5') -Raw).Trim() -eq
+            'existing bash wrapper') 'install.ps1 did not retain the wrapper recovery backup.'
+        Remove-RecoveryBackup -BackupDirectory $powerShellRecoveryBackups[0]
     }
 
     $powerShellFailedInstall = Join-Path $testRoot 'failed powershell install'
@@ -360,10 +426,36 @@ try {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $powerShellDirectoryCollision 'func5'))) `
         'install.ps1 published a wrapper before rejecting a metadata directory collision.'
 
+    $powerShellLinkInstall = Join-Path $testRoot 'powershell destination link'
+    $powerShellExternalTarget = Join-Path $testRoot 'powershell external target'
+    New-Item -ItemType Directory -Path $powerShellLinkInstall | Out-Null
+    New-Item -ItemType Directory -Path $powerShellExternalTarget | Out-Null
+    Set-Content -LiteralPath (Join-Path $powerShellExternalTarget 'sentinel.txt') -Value 'existing external content' -Encoding ascii
+    New-Item -ItemType Directory -Path (Join-Path $powerShellLinkInstall 'linked-content') | Out-Null
+    $powerShellDestinationLink = Join-Path $powerShellLinkInstall 'linked-content/nested'
+    $linkType = if ($isWindowsHost) { 'Junction' } else { 'SymbolicLink' }
+    New-Item -ItemType $linkType -Path $powerShellDestinationLink -Target $powerShellExternalTarget | Out-Null
+    Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellLinkInstall) -ne 0) `
+        'install.ps1 published through an existing destination link.'
+    $powerShellLinkItem = Get-Item -LiteralPath $powerShellDestinationLink -Force
+    Assert-True ([bool] $powerShellLinkItem.LinkType -or
+        [bool] ($powerShellLinkItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) `
+        'install.ps1 removed the existing destination link.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $powerShellExternalTarget 'sentinel.txt') -Raw).Trim() -eq
+        'existing external content') 'install.ps1 modified a destination link target.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $powerShellLinkInstall $powerShellExecutableName))) `
+        'install.ps1 published the executable before rejecting a destination link.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $powerShellLinkInstall 'func.installation.json'))) `
+        'install.ps1 wrote metadata after rejecting a destination link.'
+    Remove-Item -LiteralPath $powerShellDestinationLink -Force
+
     $bashPayload = Join-Path $testRoot 'bash-payload'
     New-Item -ItemType Directory -Path $bashPayload | Out-Null
     $bashExecutable = Join-Path $bashPayload 'func'
     Set-Content -LiteralPath $bashExecutable -Value "#!/usr/bin/env bash`necho test`n" -Encoding utf8NoBOM
+    $bashLinkedContent = Join-Path $bashPayload 'linked-content/nested'
+    New-Item -ItemType Directory -Path $bashLinkedContent -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $bashLinkedContent 'sentinel.txt') -Value 'new external content' -Encoding ascii
     & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $bashExecutable)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the bash test payload executable.'
 
@@ -447,6 +539,27 @@ exec /usr/bin/env PATH=/usr/bin:/bin cat "$@"
     & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $fakeCat)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake cat executable.'
 
+    $fakeCp = Join-Path $fakeBin 'cp'
+    @'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${FUNC_INSTALLER_TEST_FAIL_ROLLBACK:-false}" == true ]]; then
+    source=
+    for argument in "$@"; do
+        case "$argument" in
+            -*) ;;
+            *) source="$argument"; break ;;
+        esac
+    done
+    if [[ "$source" == */publication-backup/* ]]; then
+        exit 76
+    fi
+fi
+exec /usr/bin/env PATH=/usr/bin:/bin cp "$@"
+'@ | Set-Content -LiteralPath $fakeCp -Encoding utf8NoBOM
+    & $bashCommand -c 'chmod +x "$1"' -- (ConvertTo-BashPath $fakeCp)
+    Assert-True ($LASTEXITCODE -eq 0) 'Could not make the fake cp executable.'
+
     $bashHome = Join-Path $testRoot 'bash-home'
     New-Item -ItemType Directory -Path $bashHome | Out-Null
     $bashInstall = Join-Path $testRoot 'custom-bash-install'
@@ -506,6 +619,18 @@ exec /usr/bin/env PATH=/usr/bin:/bin cat "$@"
     Assert-True ((Get-Content -LiteralPath (Join-Path $bashInstall 'func5') -Raw).Trim() -eq 'existing wrapper') `
         'install.sh did not restore the wrapper after wrapper publication failed.'
 
+    Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashInstall -HomePath $bashHome `
+        -FakeBinPath $fakeBin -Force -FailMetadataPublish -FailRollback) -ne 0) `
+        'install.sh unexpectedly reported successful rollback after restore failures.'
+    $bashRecoveryBackups = @(Get-RecoveryBackupDirectories)
+    Assert-True ($bashRecoveryBackups.Count -eq 1) `
+        'install.sh did not retain exactly one recovery backup after incomplete rollback.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $bashRecoveryBackups[0].FullName 'func') -Raw).Trim() -eq
+        'existing executable') 'install.sh did not retain the executable recovery backup.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $bashRecoveryBackups[0].FullName 'func5') -Raw).Trim() -eq
+        'existing wrapper') 'install.sh did not retain the wrapper recovery backup.'
+    Remove-RecoveryBackup -BackupDirectory $bashRecoveryBackups[0]
+
     $bashFailedInstall = Join-Path $testRoot 'failed-bash-install'
     Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashFailedInstall -HomePath $bashHome -FakeBinPath $fakeBin -FailDownload) -ne 0) `
         'install.sh unexpectedly succeeded after a download failure.'
@@ -529,10 +654,32 @@ exec /usr/bin/env PATH=/usr/bin:/bin cat "$@"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $bashDirectoryCollision 'func5'))) `
         'install.sh published a wrapper before rejecting a metadata directory collision.'
 
+    if (-not $isWindowsHost) {
+        $bashLinkInstall = Join-Path $testRoot 'bash destination link'
+        $bashExternalTarget = Join-Path $testRoot 'bash external target'
+        New-Item -ItemType Directory -Path $bashLinkInstall | Out-Null
+        New-Item -ItemType Directory -Path $bashExternalTarget | Out-Null
+        Set-Content -LiteralPath (Join-Path $bashExternalTarget 'sentinel.txt') -Value 'existing external content' -Encoding ascii
+        New-Item -ItemType Directory -Path (Join-Path $bashLinkInstall 'linked-content') | Out-Null
+        $bashDestinationLink = Join-Path $bashLinkInstall 'linked-content/nested'
+        New-Item -ItemType SymbolicLink -Path $bashDestinationLink -Target $bashExternalTarget | Out-Null
+        Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashLinkInstall -HomePath $bashHome `
+            -FakeBinPath $fakeBin) -ne 0) 'install.sh published through an existing destination link.'
+        $bashLinkItem = Get-Item -LiteralPath $bashDestinationLink -Force
+        Assert-True ([bool] $bashLinkItem.LinkType) 'install.sh removed the existing destination link.'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $bashExternalTarget 'sentinel.txt') -Raw).Trim() -eq
+            'existing external content') 'install.sh modified a destination link target.'
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path $bashLinkInstall 'func'))) `
+            'install.sh published the executable before rejecting a destination link.'
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path $bashLinkInstall 'func.installation.json'))) `
+            'install.sh wrote metadata after rejecting a destination link.'
+        Remove-Item -LiteralPath $bashDestinationLink -Force
+    }
+
     Write-Host 'Installation metadata installer tests passed.'
     exit 0
 } finally {
-    if (Test-Path -LiteralPath $testRoot) {
-        Remove-Item -LiteralPath $testRoot -Recurse -Force
+    if ([System.IO.Directory]::Exists($testRoot)) {
+        [System.IO.Directory]::Delete($testRoot, $true)
     }
 }

@@ -98,7 +98,13 @@ function Write-InstallationMetadata {
     $metadataCommitted = $false
 
     try {
-        if ([System.IO.Directory]::Exists($metadataPath)) {
+        $metadataItem = Get-Item -LiteralPath $metadataPath -Force -ErrorAction SilentlyContinue
+        if ($metadataItem -and
+            ($metadataItem.LinkType -or
+            ($metadataItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint))) {
+            throw "Cannot write installation metadata because $metadataPath is a link or reparse point."
+        }
+        if ($metadataItem -and $metadataItem.PSIsContainer) {
             throw "Cannot write installation metadata because $metadataPath is a directory."
         }
 
@@ -380,6 +386,7 @@ if ((Test-Path $funcPath) -and -not $Force) {
 
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "func-cli-install-$(Get-Random)"
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+$retainTempDir = [bool] $KeepArchive
 
 try {
     $downloadPath = Join-Path $tempDir $assetName
@@ -430,11 +437,30 @@ try {
             [void] $publicationNames.Add('func5.cmd')
         }
 
+        Get-ChildItem -LiteralPath $payloadPath -Force -Recurse | ForEach-Object {
+            $relativePath = $_.FullName.Substring($payloadPath.Length).TrimStart(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar)
+            $destinationPath = Join-Path $InstallPath $relativePath
+            $destinationItem = Get-Item -LiteralPath $destinationPath -Force -ErrorAction SilentlyContinue
+            if ($destinationItem -and
+                ($destinationItem.LinkType -or
+                ($destinationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint))) {
+                throw "Cannot install because $destinationPath is a link or reparse point."
+            }
+        }
+
         $backedUpNames = [System.Collections.Generic.HashSet[string]]::new(
             [System.StringComparer]::OrdinalIgnoreCase)
         foreach ($name in $publicationNames) {
             $destinationPath = Join-Path $InstallPath $name
-            if (Test-Path -LiteralPath $destinationPath) {
+            $destinationItem = Get-Item -LiteralPath $destinationPath -Force -ErrorAction SilentlyContinue
+            if ($destinationItem -and
+                ($destinationItem.LinkType -or
+                ($destinationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint))) {
+                throw "Cannot install because $destinationPath is a link or reparse point."
+            }
+            if ($destinationItem) {
                 if ($os -eq 'win') {
                     Copy-Item -LiteralPath $destinationPath -Destination $publicationBackupPath -Recurse -Force
                 } else {
@@ -504,15 +530,18 @@ try {
                 }
             }
             if ($rollbackFailed) {
+                $retainTempDir = $true
                 throw [System.InvalidOperationException]::new(
-                    "Installation failed and the previous installation could not be fully restored. Original error: $($originalError.Exception.Message)",
+                    "Installation failed and the previous installation could not be fully restored. " +
+                    "Recovery files are available at '$publicationBackupPath'. " +
+                    "Original error: $($originalError.Exception.Message)",
                     $originalError.Exception)
             }
             throw $originalError
         }
     }
 } finally {
-    if (-not $KeepArchive) {
+    if (-not $retainTempDir) {
         Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     } else {
         Write-Message "Keeping temp dir: $tempDir"
