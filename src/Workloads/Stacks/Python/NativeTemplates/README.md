@@ -161,6 +161,41 @@ facts and an explicit native-expansion callback, selecting only the original
 CLI jobs and refusing empty content. `PythonTemplateAppendExecutor` checks
 the approved raw SHA-256 and appends through the same open file handle,
 preserving original bytes, BOM, user code and the legacy newline rule.
+The native append preflight and executor also check every generated function's
+declared Python symbol and effective SDK name against the existing source.
+Repeating an explicit or default name, or colliding with a literal
+`@app.function_name(...)`, refuses before writing, including with `--force`.
+Force does not authorize replacement of arbitrary user-authored Python.
+Names follow the SDK's case-sensitive comparison; Python identifiers use
+Python's NFKC normalization, but explicit SDK name strings are not normalized.
+Comments, ordinary/raw/triple-quoted strings, and function/class-local symbols
+are not treated as module-level function declarations. Fixed-name multi-function
+payloads are checked in full, not only against the requested CLI name.
+Effective SDK names are recognized on `app` and its simple module-level aliases.
+Literal `app.function_name(...)` names applied as decorators or directly to
+the immediately preceding plain function remain checked in unconditional
+module-level call expressions or simple assignments, including route/trigger
+wrappers. Other execution contexts or intervening module code remain partial.
+Explicit definitions or assignments invalidate prior app/alias identity before
+the new binding is classified. A recognized new FunctionApp/DFApp constructor
+starts a new registry; unknown factory or alias bindings remain partial.
+Existing builders or multiple name
+settings remain partial rather than assuming the outer name overrides the SDK's
+first setting. Unknown Unicode identifier scalars stay in
+their whole token and make analysis partial instead of reserving a truncated
+name. The lexer is not a complete Python parser or identifier-domain validator.
+Computed names, conditional declarations, Blueprint/programmatic registration, other decorators, and
+unsupported lexical shapes make analysis partial; they do not by themselves
+refuse append. Known symbol/name collisions still refuse even alongside unknown
+registrations. An unregistered Blueprint's effective names are not assumed to
+belong to `app`. Blueprint/dynamic registration alone does not block append.
+Successful append and preview report a non-failing validation-limit diagnostic
+when source analysis is partial, in both plain and JSON output. Confirm actual
+application indexing before deployment: opaque computed or imported registrations
+may still collide, and static validation does not establish runtime uniqueness.
+This bounded source check does not execute Python, require a Python installation
+for scaffolding, resolve arbitrary imported aliases or data flow, or prove dynamic
+applications indexable. The legacy V2 renderer and raw payloads remain unchanged.
 Missing/changed targets, repeated stale effects and pre-cancellation refuse
 without writes. An I/O error or cancellation during writing can leave a
 partial append; it is not a transactional rollback implementation.

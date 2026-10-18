@@ -22,10 +22,13 @@ internal sealed class PythonAppendCapability(IFileSystem files, PythonTemplateSo
     private readonly WorkingDirectory _output = output ?? throw new ArgumentNullException(nameof(output));
     private readonly PythonAppendTargetGuard _targetGuard = targetGuard ?? new();
 
+    public string? ValidationNotice { get; private set; }
+
     public async Task<IReadOnlyList<string>> ValidateAsync(NativeTemplateEffectPlan plan, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(plan);
         cancellationToken.ThrowIfCancellationRequested();
+        ValidationNotice = null;
         try
         {
             PythonTemplateSource source = await _sources.ReadAsync(_selected, cancellationToken);
@@ -57,8 +60,20 @@ internal sealed class PythonAppendCapability(IFileSystem files, PythonTemplateSo
                 return [pathDiagnostic];
             }
 
-            return string.Equals(actual, append.ExpectedTargetSha256, StringComparison.OrdinalIgnoreCase)
-                ? [] : ["The Python app changed after preview. Nothing was appended."];
+            if (!string.Equals(actual, append.ExpectedTargetSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                return ["The Python app changed after preview. Nothing was appended."];
+            }
+
+            string? original = await _files.ReadAllTextIfExistsAsync(append.TargetPath, cancellationToken);
+            if (original is null)
+            {
+                return ["The approved Python app is missing. Nothing was appended."];
+            }
+
+            PythonFunctionNameValidation names = new PythonFunctionNameGuard().Analyze(original, append.Content, cancellationToken);
+            ValidationNotice = names.Complete ? null : PythonFunctionNameGuard.ValidationLimitNotice;
+            return names.Diagnostic is null ? [] : [names.Diagnostic];
         }
         catch (InvalidDataException exception)
         {

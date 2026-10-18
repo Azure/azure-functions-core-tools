@@ -26,7 +26,7 @@ public sealed partial class BundledPythonTemplateTests
     [InlineData("experimental", "OpenAI-RAG-Python", "CustomName", "CustomName")]
     [InlineData("stable", "HttpTrigger-Python", null, "http_trigger")]
     [InlineData("stable", "HttpTrigger-Python", "CustomName", "CustomName")]
-    public async Task PythonDefaultName_ActualComposerPreservesLegacyFallbackAndExplicitNamesWithoutChangingFunctionBytes(
+    public async Task PythonDefaultName_ActualComposerPreservesInitialBytesAndRefusesDuplicateEffectiveNames(
         string channel, string id, string? requestedName, string expectedName)
     {
         await InstallAsync();
@@ -63,11 +63,11 @@ public sealed partial class BundledPythonTemplateTests
 
         var appended = await RunPythonWorkflowAsync(request, channel: channel);
 
-        appended.Succeeded.Should().BeTrue(string.Join(" ", appended.Diagnostics));
+        appended.Succeeded.Should().BeFalse();
         appended.ItemName!.Name.Should().Be(expectedName);
-        appended.Invocation!.Effects!.Kind.Should().Be("applied");
-        File.ReadAllBytes(app).Take(beforeAppend.Length).Should().Equal(beforeAppend);
-        new V2TemplateEngine().Apply(source, expectedName, values, legacy, false).Should().BeOfType<TemplateApplicationResult.Created>();
+        appended.Invocation!.Effects!.Kind.Should().Be("preflightFailed");
+        appended.Diagnostics.Should().Contain(diagnostic => diagnostic.Contains("already exists", StringComparison.Ordinal));
+        File.ReadAllBytes(app).Should().Equal(beforeAppend);
         File.ReadAllBytes(app).Should().Equal(File.ReadAllBytes(Path.Combine(legacy.FullName, "function_app.py")));
         Directory.GetFiles(output.Info.FullName).Should().ContainSingle().Which.Should().Be(app);
     }

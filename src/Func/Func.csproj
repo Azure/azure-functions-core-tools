@@ -50,6 +50,7 @@
     <EmbeddedResource Include="../Workloads/Stacks/PowerShell/Templates/requirements.psd1" LogicalName="func.Templates.requirements.psd1" />
     <Compile Include="../Workloads/Stacks/Python/IPythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/IPythonTemplateAppendExecutor.cs" />
     <Compile Include="../Workloads/Stacks/Python/PythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/PythonTemplateAppendExecutor.cs" />
+    <Compile Include="../Workloads/Stacks/Python/PythonFunctionNameGuard.cs" Link="Templates/Python/Shared/PythonFunctionNameGuard.cs" />
   </ItemGroup>
 
   <ItemGroup>
