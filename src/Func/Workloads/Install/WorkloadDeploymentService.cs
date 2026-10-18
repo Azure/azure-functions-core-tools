@@ -128,7 +128,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
         if (metadata.Kind != entry.Kind || metadata.RuntimeIdentifier != entry.RuntimeIdentifier
             || metadata.EntryPoint?.AssemblyPath != entry.EntryPoint?.AssemblyPath || metadata.EntryPoint?.Type != entry.EntryPoint?.Type
-            || !_fileSystem.DirectoryExists(Path.Combine(directory, WorkloadMetadataReader.ContentDirectoryName))
+            || !_fileSystem.DirectoryExists(WorkloadPackageLayout.GetContentRoot(directory, metadata.RuntimeIdentifier))
             || (metadata.EntryPoint is { } entryPoint && !_fileSystem.FileExists(Path.Combine(directory, entryPoint.AssemblyPath))))
         {
             throw new InvalidWorkloadException($"The installed workload '{entry.PackageId}' {entry.PackageVersion} payload is damaged or conflicts with its registry entry. " +

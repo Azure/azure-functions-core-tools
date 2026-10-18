@@ -196,7 +196,7 @@ public abstract class WorkloadInstallerTestBase : IDisposable
     private protected void InstallImplementationOnDisk(string packageId, string version, string runtimeIdentifier)
     {
         string installDirectory = _paths.GetInstallDirectory(packageId, version);
-        string contentDirectory = Path.Combine(installDirectory, "tools", "any");
+        string contentDirectory = Path.Combine(installDirectory, "tools", runtimeIdentifier);
         Directory.CreateDirectory(contentDirectory);
         File.WriteAllText(Path.Combine(contentDirectory, "fixture.txt"), "Installed content fixture.");
         File.WriteAllText(

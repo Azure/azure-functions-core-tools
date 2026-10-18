@@ -126,6 +126,9 @@ validated retained outer asset when its exact registration, source origin and
 receipt still agree. Check-only remains read-only and fails while that archive
 is missing. Changed bytes, unknown ownership or conflicting receipts remain
 errors; repair does not replace them.
+Retained payload validation uses the declared package layout: `tools/<rid>` for
+RID-specific packages and `tools/any` for portable packages. A directory for a
+different runtime identifier cannot satisfy readiness.
 Check-only readiness (`func setup --check`) requires a clean native store during
 both bundled-asset preparation and later registration validation. A pending valid
 or corrupt native recovery journal is reported as requiring explicit recovery;
