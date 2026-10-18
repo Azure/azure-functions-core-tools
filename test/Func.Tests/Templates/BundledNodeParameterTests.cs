@@ -16,6 +16,17 @@ public sealed partial class BundledNodeTemplateTests
     private static string ExpectedOperativeNodeSource(NewTemplate template, string name, IReadOnlyDictionary<string, string?> values)
     {
         string expected = template.Files!.Single().Value.Replace("$(FUNCTION_NAME_INPUT)", name, StringComparison.Ordinal);
+        if (template.Id == "DaprPublishOutputBinding-JavaScript")
+        {
+            expected = expected.Replace("app.generic('DaprTopicTriggerNodeV4', {", $"app.generic('{name}_Topic', {{", StringComparison.Ordinal);
+        }
+        else if (template.Id == "DaprServiceInvocationTrigger-JavaScript")
+        {
+            expected = expected.Replace("app.http('InvokeOutputBinding', {", $"app.http('{name}_Invoke', {{", StringComparison.Ordinal)
+                .Replace("route: \"invoke/{appId}/{methodName}\"", $"route: \"{name}/invoke/{{appId}}/{{methodName}}\"", StringComparison.Ordinal)
+                .Replace("http://localhost:7071/api/invoke/functionapp/{yourFunctionName}", $"http://localhost:7071/api/{name}/invoke/functionapp/{name}", StringComparison.Ordinal)
+                .Replace("--method {yourFunctionName}", $"--method {name}", StringComparison.Ordinal);
+        }
         foreach (var input in template.Jobs![0].Inputs!.Where(input => input.ParamId != "trigger-functionName"))
         {
             string property = input.ParamId switch

@@ -52,12 +52,21 @@ internal sealed class NodeTemplateWorkflowProvider(IInteractionService interacti
         {
             NodeItemSource source = await NodeItemCompatibility.ReadSourceAsync(context.SelectedTemplate, cancellationToken);
             NodeItemSourceQualifier.ValidateArguments(source, context.Invocation.Parameters);
+            if (NodeItemSourceQualifier.ValidateDaprInvocation(source, context.Invocation.Name) is { } helperDiagnostic)
+            {
+                return NativeTemplateInvocationPreparation.Reject(helperDiagnostic);
+            }
             return NativeTemplateInvocationPreparation.Ready(context.Invocation with
             {
                 SourceSnapshot = new(context.SelectedTemplate.Entry.Identity,
                     context.SelectedTemplate.ConfigurationSha256 ?? throw new InvalidDataException("The selected Node configuration has no fingerprint."),
                     source.Sources, [new(Path.GetFileName(source.ContentPath), source.ContentSource)]),
             });
+        }
+        catch (NodeItemHelperCompatibilityException exception)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return NativeTemplateInvocationPreparation.Reject(_compatibility.DescribeUnsupportedHelpers(exception));
         }
         catch (NodeItemParameterCompatibilityException exception)
         {

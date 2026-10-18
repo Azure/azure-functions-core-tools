@@ -21,6 +21,8 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("queueBlockComment", false)]
     [InlineData("timerTemplateLiteral", false)]
     [InlineData("queueUnrelatedObject", false)]
+    [InlineData("daprCommentDecoy", false)]
+    [InlineData("daprHelperDrift", false)]
     public async Task Converter_ChangedSource_AssociatesOnlyReviewedDeclarationsOrFailsClosed(string change, bool succeeds)
     {
         string owned = NodeSourceDirectory();
@@ -34,9 +36,11 @@ public sealed partial class BundledNodeTemplateTests
         string catalog = Path.Combine(source, "templates", "templates.json");
         var templates = JsonNode.Parse(File.ReadAllBytes(catalog))!.AsArray();
         const string decoys = "\n// schedule: '0 */5 * * * *',\nconst unrelated = '0 */5 * * * *';\n";
-        foreach (string language in new[] { "JavaScript", "TypeScript" })
+        string[] languages = change.StartsWith("dapr", StringComparison.Ordinal) ? ["JavaScript"] : ["JavaScript", "TypeScript"];
+        foreach (string language in languages)
         {
-            string kind = change.StartsWith("queue", StringComparison.Ordinal) ? "QueueTrigger" : "TimerTrigger";
+            string kind = change.StartsWith("dapr", StringComparison.Ordinal) ? "DaprServiceInvocationTrigger"
+                : change.StartsWith("queue", StringComparison.Ordinal) ? "QueueTrigger" : "TimerTrigger";
             var raw = templates.Single(template => template!["id"]!.GetValue<string>() == kind + "-" + language)!;
             string file = language == "JavaScript" ? "function.js" : "function.ts";
             string body = raw["files"]![file]!.GetValue<string>();
@@ -51,6 +55,9 @@ public sealed partial class BundledNodeTemplateTests
                 + "\n/*\n    connection: '',\n*/\n";
             else if (change == "timerTemplateLiteral") raw["files"]![file] = body.Replace("schedule: '0 */5 * * * *'", "schedule: '0 */9 * * * *'")
                 + "\nconst decoy = `\n    schedule: '0 */5 * * * *',\n`;\n";
+            else if (change == "daprCommentDecoy") raw["files"]![file] = body.Replace("app.http('InvokeOutputBinding', {", "app.http('DifferentHelper', {")
+                + "\n// app.http('InvokeOutputBinding', {\n";
+            else if (change == "daprHelperDrift") raw["files"]![file] = body.Replace("route: \"invoke/", "route: \"changed/");
             else raw["files"]![file] = body.Replace("connection: ''", "connection: 'changed'")
                 + "\nconst decoy = {\n    connection: '',\n};\n";
         }

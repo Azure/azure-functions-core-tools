@@ -27,11 +27,20 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
     internal string DescribeUnsupportedParameters(NodeItemParameterCompatibilityException exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        return exception.Message + " "
+        return DescribeUpdate(exception.Message);
+    }
+
+    internal string DescribeUnsupportedHelpers(NodeItemHelperCompatibilityException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return DescribeUpdate(exception.Message);
+    }
+
+    private string DescribeUpdate(string message)
+        => message + " "
             + (updateHint?.Invoke() ?? "Explicitly update the installed Node workload that owns this selected template archive, then retry. "
                 + "Use 'func workload list' to identify that owner and 'func workload update <owner-package-id> --exact' to update it.")
             + " Nothing was generated; no workload was upgraded automatically.";
-    }
 
     public async Task<NativeItemCompatibilityResult> ResolveAsync(ResolvedTemplate selected, TemplateCandidateParseResult arguments,
         string? requestedName, bool canPrompt, CancellationToken cancellationToken)
@@ -56,7 +65,17 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
                 NodeItemSourceQualifier.ValidateArguments(current, arguments.ValuesByCanonicalName);
                 return await candidate.ReadPackageFileAsync(path, token);
             });
-            return await compatibility.ResolveAsync(selected, arguments, requestedName, canPrompt, cancellationToken);
+            NativeItemCompatibilityResult resolved = await compatibility.ResolveAsync(selected, arguments, requestedName, canPrompt, cancellationToken);
+            if (resolved.Succeeded && NodeItemSourceQualifier.ValidateDaprInvocation(source, resolved.Name) is { } helperDiagnostic)
+            {
+                return resolved with { Diagnostics = [helperDiagnostic] };
+            }
+            return resolved;
+        }
+        catch (NodeItemHelperCompatibilityException exception)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(null, "unresolved", [DescribeUnsupportedHelpers(exception)]);
         }
         catch (NodeItemParameterCompatibilityException exception)
         {

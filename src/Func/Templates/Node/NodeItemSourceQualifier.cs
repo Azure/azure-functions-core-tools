@@ -42,7 +42,7 @@ internal static class NodeItemSourceQualifier
         {
             throw Invalid("The original Node write action is not associated with exactly one owned source body.");
         }
-        if ((template.Jobs[0].Inputs ?? []).Any(input => input.AssignTo != "$(FUNCTION_NAME_INPUT)"))
+        if (HasDaprHelper(template.Id) || (template.Jobs[0].Inputs ?? []).Any(input => input.AssignTo != "$(FUNCTION_NAME_INPUT)"))
         {
             ValidateReviewedBody(template.Id, body);
         }
@@ -74,6 +74,19 @@ internal static class NodeItemSourceQualifier
             throw Invalid("The selected native Node source does not have the qualified single-file output layout.");
         }
         string expected = body.Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+        if (HasDaprHelper(template.Id))
+        {
+            _ = IsHistoricalEncoding(root);
+            if (sourceName != "funcNodeItem" || declaredSymbols.EnumerateObject().Count() != 1)
+            {
+                throw Invalid("The selected Node Dapr helper must use only its reviewed sourceName and host-bound output intent.");
+            }
+            string actual = Encoding.UTF8.GetString(source.Content.Span).ReplaceLineEndings("\n");
+            if (actual != expected.ReplaceLineEndings("\n"))
+            {
+                expected = AuthorDaprHelpers(template.Id!, body).Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+            }
+        }
         expected = QualifyParameters(template, root, expected);
         if (root.TryGetProperty("symbols", out JsonElement symbols) && symbols.TryGetProperty("AuthLevel", out JsonElement auth))
         {
@@ -96,6 +109,41 @@ internal static class NodeItemSourceQualifier
         }
     }
 
+    internal static string? ValidateDaprInvocation(NodeItemSource source, string? name)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (!HasDaprHelper(source.Template.Id))
+        {
+            return null;
+        }
+        using var configuration = JsonDocument.Parse(source.Configuration);
+        string sourceName = NodeItemCompatibility.Text(configuration.RootElement, "sourceName");
+        string original = source.Template.Files!.Single().Value.Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+        if (original.ReplaceLineEndings("\n") == Encoding.UTF8.GetString(source.Content.Span).ReplaceLineEndings("\n"))
+        {
+            throw new NodeItemHelperCompatibilityException(
+                $"The installed Node template '{source.Template.Id}' from '{source.Contract.Package?.Identifier}@{source.Contract.Package?.Version}' "
+                + "has a fixed auxiliary function name or HTTP route and cannot create name-scoped Dapr helpers safely.");
+        }
+        string suffix = source.Template.Id == "DaprPublishOutputBinding-JavaScript" ? "_Topic" : "_Invoke";
+        int maximum = 128 - suffix.Length;
+        return name is null || name.Length > maximum
+            ? $"Choose a function name of at most {maximum} characters for '{source.Template.Id}'; its '{suffix}' helper must fit the original 128-character function-name limit. Nothing was generated."
+            : null;
+    }
+
+    private static bool HasDaprHelper(string? identity)
+        => identity is "DaprPublishOutputBinding-JavaScript" or "DaprServiceInvocationTrigger-JavaScript";
+
+    private static string AuthorDaprHelpers(string identity, string body)
+        => identity == "DaprPublishOutputBinding-JavaScript"
+            ? body.Replace("app.generic('DaprTopicTriggerNodeV4', {", "app.generic('$(FUNCTION_NAME_INPUT)_Topic', {", StringComparison.Ordinal)
+            : body.Replace("app.http('InvokeOutputBinding', {", "app.http('$(FUNCTION_NAME_INPUT)_Invoke', {", StringComparison.Ordinal)
+                .Replace("route: \"invoke/{appId}/{methodName}\"", "route: \"$(FUNCTION_NAME_INPUT)/invoke/{appId}/{methodName}\"", StringComparison.Ordinal)
+                .Replace("http://localhost:7071/api/invoke/functionapp/{yourFunctionName}",
+                    "http://localhost:7071/api/$(FUNCTION_NAME_INPUT)/invoke/functionapp/$(FUNCTION_NAME_INPUT)", StringComparison.Ordinal)
+                .Replace("--method {yourFunctionName}", "--method $(FUNCTION_NAME_INPUT)", StringComparison.Ordinal);
+
     private static string QualifyParameters(NewTemplate template, JsonElement root, string body)
     {
         V2Input[] inputs = [.. (template.Jobs![0].Inputs ?? []).Where(input => input.AssignTo != "$(FUNCTION_NAME_INPUT)")];
@@ -103,17 +151,7 @@ internal static class NodeItemSourceQualifier
         {
             return body;
         }
-        const string expectedForms = """
-            {"nodeString":{"identifier":"chain","steps":["jsonEncode","nodeStringContent","nodeApostrophe"]},
-             "nodeStringContent":{"identifier":"replace","pattern":"^\"|\"$","replacement":""},
-             "nodeApostrophe":{"identifier":"replace","pattern":"'","replacement":"\\u0027"}}
-            """;
-        bool historical = !root.TryGetProperty("forms", out JsonElement declaredForms);
-        using var forms = JsonDocument.Parse(expectedForms);
-        if (!historical && !JsonElement.DeepEquals(declaredForms, forms.RootElement))
-        {
-            throw Invalid("The selected native Node string escaping differs from its owned conversion.");
-        }
+        bool historical = IsHistoricalEncoding(root);
         JsonElement symbols = NodeItemCompatibility.Property(root, "symbols");
         HashSet<string> expectedSymbols = ["InvocationOutputIntent"];
         foreach (V2Input input in inputs)
@@ -184,6 +222,25 @@ internal static class NodeItemSourceQualifier
         return body;
     }
 
+    private static bool IsHistoricalEncoding(JsonElement root)
+    {
+        const string expectedForms = """
+            {"nodeString":{"identifier":"chain","steps":["jsonEncode","nodeStringContent","nodeApostrophe"]},
+             "nodeStringContent":{"identifier":"replace","pattern":"^\"|\"$","replacement":""},
+             "nodeApostrophe":{"identifier":"replace","pattern":"'","replacement":"\\u0027"}}
+            """;
+        if (!root.TryGetProperty("forms", out JsonElement declaredForms))
+        {
+            return true;
+        }
+        using var forms = JsonDocument.Parse(expectedForms);
+        if (!JsonElement.DeepEquals(declaredForms, forms.RootElement))
+        {
+            throw Invalid("The selected native Node string escaping differs from its owned conversion.");
+        }
+        return false;
+    }
+
     internal static void ValidateArguments(NodeItemSource source, IReadOnlyDictionary<string, string?> parameters)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -232,6 +289,8 @@ internal static class NodeItemSourceQualifier
     {
         string expected = identity switch
         {
+            "DaprPublishOutputBinding-JavaScript" => "BB0CD1A84EB4D34590A7319738AF495E8EA44A1FA018EAE5F0851703A661DB4B",
+            "DaprServiceInvocationTrigger-JavaScript" => "3A5A71262E434CBBD82516C0F831C3F40F0BD49FC3DA16476A76D82479B9DF71",
             "BlobTrigger-JavaScript" => "773499147F9E697C074458C1B4D4152F32870FFEEE5A0301AC2EE4F95F135B02",
             "BlobTrigger-TypeScript" => "BD456F4A0FCAE70EF4EC73CD364215B3B76F07A3D3337150114488750C891527",
             "CosmosDBTrigger-JavaScript" => "A90F64FD9F3CB713EB54CAAC2F7235806C39246DB30FE4604AA41699DB1DAEF3",
@@ -264,3 +323,5 @@ internal static class NodeItemSourceQualifier
 }
 
 internal sealed class NodeItemParameterCompatibilityException(string message) : Exception(message);
+
+internal sealed class NodeItemHelperCompatibilityException(string message) : Exception(message);

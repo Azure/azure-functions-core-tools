@@ -29,6 +29,8 @@ $hiddenIds = @(
 $httpIds = @('HttpTrigger-JavaScript', 'HttpTrigger-TypeScript')
 $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 $reviewedBodies = @{
+    'DaprPublishOutputBinding-JavaScript' = 'BB0CD1A84EB4D34590A7319738AF495E8EA44A1FA018EAE5F0851703A661DB4B'
+    'DaprServiceInvocationTrigger-JavaScript' = '3A5A71262E434CBBD82516C0F831C3F40F0BD49FC3DA16476A76D82479B9DF71'
     'BlobTrigger-JavaScript' = '773499147F9E697C074458C1B4D4152F32870FFEEE5A0301AC2EE4F95F135B02'
     'BlobTrigger-TypeScript' = 'BD456F4A0FCAE70EF4EC73CD364215B3B76F07A3D3337150114488750C891527'
     'CosmosDBTrigger-JavaScript' = 'A90F64FD9F3CB713EB54CAAC2F7235806C39246DB30FE4604AA41699DB1DAEF3'
@@ -118,11 +120,22 @@ foreach ($template in $templates) {
     }
     $legacyTarget = ($parts[0..($parts.Count - 2)] -join '/') + '/'
     $content = [string] $template.files[$actions[0].filePath]
-    if (@($job.inputs | Where-Object { $_.assignTo -cne '$(FUNCTION_NAME_INPUT)' }).Count -gt 0) {
+    $hasDaprHelper = $id -cin @('DaprPublishOutputBinding-JavaScript', 'DaprServiceInvocationTrigger-JavaScript')
+    if ($hasDaprHelper -or @($job.inputs | Where-Object { $_.assignTo -cne '$(FUNCTION_NAME_INPUT)' }).Count -gt 0) {
         $normalized = $content.Replace("`r`n", "`n")
         $hash = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData([System.Text.Encoding]::UTF8.GetBytes($normalized)))
         if ($reviewedBodies.Keys -cnotcontains $id -or $hash -cne $reviewedBodies[$id]) {
             throw "Review the changed owned body/declaration association for '$id' before converting it."
+        }
+        if ($id -ceq 'DaprPublishOutputBinding-JavaScript') {
+            $content = $content.Replace("app.generic('DaprTopicTriggerNodeV4', {", "app.generic('`$(FUNCTION_NAME_INPUT)_Topic', {")
+        }
+        elseif ($id -ceq 'DaprServiceInvocationTrigger-JavaScript') {
+            $content = $content.Replace("app.http('InvokeOutputBinding', {", "app.http('`$(FUNCTION_NAME_INPUT)_Invoke', {")
+            $content = $content.Replace('route: "invoke/{appId}/{methodName}"', 'route: "$(FUNCTION_NAME_INPUT)/invoke/{appId}/{methodName}"')
+            $content = $content.Replace('http://localhost:7071/api/invoke/functionapp/{yourFunctionName}',
+                'http://localhost:7071/api/$(FUNCTION_NAME_INPUT)/invoke/functionapp/$(FUNCTION_NAME_INPUT)')
+            $content = $content.Replace('--method {yourFunctionName}', '--method $(FUNCTION_NAME_INPUT)')
         }
     }
     $symbols = [ordered]@{}
