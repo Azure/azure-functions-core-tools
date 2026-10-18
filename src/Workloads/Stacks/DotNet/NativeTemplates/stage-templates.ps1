@@ -15,9 +15,11 @@ $adaptedAuxiliaries = [Collections.Generic.HashSet[string]]::new([StringComparer
 $adaptedModels = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $bindingLiterals = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'binding-literals.json') -Raw | ConvertFrom-Json -NoEnumerate
 $qualifiedLiterals = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'binding-literals-qualified.json') -Raw | ConvertFrom-Json -NoEnumerate
+$fsharpControls = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'fsharp-control-sources.json') -Raw | ConvertFrom-Json -NoEnumerate
 . (Join-Path $PSScriptRoot 'stage-binding-literals.ps1')
 $adaptedIdentities = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $literalIdentities = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$controlIdentities = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 $separator = [IO.Path]::DirectorySeparatorChar
 $outputPrefix = $output.TrimEnd($separator) + $separator
@@ -149,6 +151,15 @@ foreach ($package in $sources.packages) {
             }).Count -gt 0) {
                 throw "The native item has an unclassified parameter usage: $($configuration.identity)."
             }
+            $control = @($fsharpControls | Where-Object identity -CEQ $configuration.identity)
+            if ($control.Count -gt 0) {
+                if ($control.Count -ne 1 -or $package.type -cne 'item' -or $configuration.tags.language -cne 'F#' -or
+                    $entry.FullName -cne ($control[0].path.Substring(0, $control[0].path.LastIndexOf('/')) + '/.template.config/template.json') -or
+                    (Get-FileHash -LiteralPath (Join-Path $output $control[0].path) -Algorithm SHA256).Hash -cne $control[0].sha256 -or
+                    -not $controlIdentities.Add($configuration.identity)) {
+                    throw "F# control source does not match its qualified native source: $($configuration.identity)."
+                }
+            }
             # CLI aliases live in host metadata only.
             $hostMetadata = @{ symbolInfo = @{} }
             if ($package.type -ceq 'project') {
@@ -172,4 +183,7 @@ if ($adaptedModels.Count -ne $nullableModels.Count) {
 }
 if ($literalIdentities.Count -ne $bindingLiterals.Count -or $literalIdentities.Count -ne $qualifiedLiterals.Count) {
     throw 'The qualified binding-literal inventory was not completely adapted.'
+}
+if ($controlIdentities.Count -ne $fsharpControls.Count) {
+    throw 'The qualified F# control source inventory was not completely verified.'
 }

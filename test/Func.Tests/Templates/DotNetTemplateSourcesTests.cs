@@ -14,6 +14,38 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public sealed class DotNetTemplateSourcesTests
 {
     [Fact]
+    public async Task ForcedFSharpControlQualification_ActualHttpAndEventGrid_RequireExactSelectedSourceAssociation()
+    {
+        using ZipArchive archive = OpenArchive();
+        DotNetTemplateSources sources = new();
+        foreach (string variant in new[] { "HttpTrigger", "EventGridTrigger" })
+        {
+            ResolvedTemplate selected = Select(archive, $"Azure.Function.FSharp.Isolated.{variant}.3.x", legacy: false);
+
+            NativeTemplateSourceSnapshot? snapshot = await sources.QualifyFSharpControlAsync(selected, CancellationToken.None);
+
+            snapshot.Should().NotBeNull();
+            snapshot!.Sources.Should().ContainSingle();
+            snapshot.Outputs.Should().ContainSingle().Which.Source.Should().Be(snapshot.Sources[0]);
+        }
+    }
+
+    [Theory]
+    [InlineData("source")]
+    [InlineData("configuration")]
+    [InlineData("owner")]
+    [InlineData("decoy")]
+    public async Task ForcedFSharpControlQualification_DriftOrMisboundSource_RefusesBeforeForce(string changed)
+    {
+        using ZipArchive archive = OpenArchive();
+        ResolvedTemplate selected = Select(archive, "Azure.Function.FSharp.Isolated.HttpTrigger.3.x", legacy: false, changed);
+
+        Func<Task> qualify = () => new DotNetTemplateSources().QualifyFSharpControlAsync(selected, CancellationToken.None);
+
+        await qualify.Should().ThrowAsync<InvalidDataException>();
+    }
+
+    [Fact]
     public async Task LiteralAndAuxiliaryQualification_ActualCombinedSignalR_BothProofsComposeWithoutLosingEither()
     {
         using ZipArchive archive = OpenArchive();
@@ -267,7 +299,7 @@ public sealed class DotNetTemplateSourcesTests
         string hash = Convert.ToHexString(SHA256.HashData(bytes.Span));
         return new(catalog, (_, _) => throw new InvalidOperationException("Qualification must not invoke the template."),
             (path, _) => Task.FromResult(
-                change == "source" && path.EndsWith(".cs", StringComparison.Ordinal)
+                change == "source" && Path.GetExtension(path) is ".cs" or ".fs"
                 || change == "configuration" && path == configurationPath ? new ReadOnlyMemory<byte>([1, 2, 3])
                     : change == "olderLiteral" && path.EndsWith(".cs", StringComparison.Ordinal)
                         ? Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(Read("provenance/upstream-content/" + path).Span).TrimStart('\ufeff'))

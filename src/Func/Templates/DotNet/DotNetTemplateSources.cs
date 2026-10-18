@@ -18,6 +18,8 @@ internal sealed partial class DotNetTemplateSources(NativeTemplateStackCompatibi
         .ToDictionary(source => source.Identity, StringComparer.Ordinal);
     private readonly IReadOnlyDictionary<string, LiteralSource> _literalSources = Load<LiteralSource[]>("binding-literals.json")
         .ToDictionary(source => source.Identity, StringComparer.Ordinal);
+    private readonly IReadOnlyDictionary<string, FSharpControlSource> _fsharpControls = Load<FSharpControlSource[]>("fsharp-control-sources.json")
+        .ToDictionary(source => source.Identity, StringComparer.Ordinal);
 
     public bool Matches(TemplateCatalogEntry entry, string? configurationSha256)
     {
@@ -28,6 +30,30 @@ internal sealed partial class DotNetTemplateSources(NativeTemplateStackCompatibi
             && entry.Language == source[2] && (Same(configurationSha256, source[3])
                 || (_literals.TryGetValue(entry.Identity, out LiteralQualification? literal)
                     && Same(configurationSha256, literal.ConfigurationSha256)));
+    }
+
+    /// <summary>
+    /// Qualifies the two F# item sources without binding literal parameters for explicitly forced native rendering.
+    /// </summary>
+    /// <exception cref="InvalidDataException">The selected F# source or mounted configuration does not match the reviewed source.</exception>
+    internal async Task<NativeTemplateSourceSnapshot?> QualifyFSharpControlAsync(ResolvedTemplate selected, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(selected);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_fsharpControls.TryGetValue(selected.Entry.Identity, out FSharpControlSource? pin))
+        {
+            return null;
+        }
+        string configurationPath = pin.Path[..pin.Path.LastIndexOf('/')] + "/.template.config/template.json";
+        if (selected.Entry.Language != "F#" || !Matches(selected.Entry, selected.ConfigurationSha256)
+            || selected.ConfigurationSourceIdentity?.EndsWith("::/" + configurationPath, StringComparison.Ordinal) != true
+            || !Same(Hash(await selected.ReadPackageFileAsync(configurationPath, cancellationToken)), selected.ConfigurationSha256)
+            || !Same(Hash(await selected.ReadPackageFileAsync(pin.Path, cancellationToken)), pin.Sha256))
+        {
+            throw new InvalidDataException("The selected F# item source or mounted configuration changed; no files were written.");
+        }
+        TemplateEffectSource source = new(selected.Entry.Identity, pin.Path, pin.Sha256);
+        return new(selected.Entry.Identity, selected.ConfigurationSha256!, [source], [new(Path.GetFileName(pin.Path), source)]);
     }
 
     /// <summary>
@@ -130,6 +156,8 @@ internal sealed partial class DotNetTemplateSources(NativeTemplateStackCompatibi
     }
 
     private sealed record LiteralSource(string Identity, string Path, string Sha256, string[][] Parameters);
+
+    private sealed record FSharpControlSource(string Identity, string Path, string Sha256);
 
     private sealed record LiteralQualification(string Identity, string ConfigurationSha256, string[] SourceSha256,
         string[] LegacySourceSha256, bool RawSourceCompatible = true);

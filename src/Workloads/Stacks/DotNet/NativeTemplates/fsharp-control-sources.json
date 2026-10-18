@@ -1,0 +1,12 @@
+[
+  {
+    "identity": "Azure.Function.FSharp.Isolated.HttpTrigger.3.x",
+    "path": "content/HttpTrigger-FSharp/HttpTriggerFSharp.fs",
+    "sha256": "D2C4F0D400650E2787F052E2CD602300483F048F473F5AB04EF1BE30B06AE2BC"
+  },
+  {
+    "identity": "Azure.Function.FSharp.Isolated.EventGridTrigger.3.x",
+    "path": "content/EventGridTrigger-FSharp/EventGridTriggerFSharp.fs",
+    "sha256": "CCFFBA6B390622798B9C227120B829B22AFE21ECA02CB34750D48E6F7E505C96"
+  }
+]

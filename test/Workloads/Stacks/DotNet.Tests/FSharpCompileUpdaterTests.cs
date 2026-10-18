@@ -31,6 +31,52 @@ public sealed class FSharpCompileUpdaterTests
         """;
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PlanAndApply_ReplacementAlreadyCompiledBeforeOtherSources_PreservesEntireProjectAndOrder(bool replacing)
+    {
+        string later = Path.Combine(_directory, "Later.fs");
+        string original = Original.Replace("    <Compile Include=\"Program.fs\" />",
+            "    <Compile Include=\"Http.fs\" />\n    <Compile Include=\"Later.fs\" />\n    <Compile Include=\"Program.fs\" />", StringComparison.Ordinal);
+        Setup(Encoding.UTF8.GetBytes(original), [Generated, later, Program]);
+        _files.Content[Generated] = Encoding.UTF8.GetBytes("native generated");
+        _files.Content[later] = Encoding.UTF8.GetBytes("later");
+        FSharpCompileUpdater updater = new(_runner, _files);
+        Func<Task<FSharpCompileUpdatePlan>> plan = () => updater.PlanAsync(Project, Hash(original), [Generated, later, Program],
+            [new(Generated, Hash("native generated"), replacing)], CancellationToken.None);
+
+        if (!replacing)
+        {
+            await plan.Should().ThrowAsync<InvalidOperationException>().WithMessage("*qualified order*");
+            return;
+        }
+        FSharpCompileUpdatePlan qualified = await plan();
+        qualified.ChangesProject.Should().BeFalse();
+        qualified.CompileOrder.Should().Equal(Generated, later, Program);
+        await updater.ApplyAsync(qualified, CancellationToken.None);
+        _files.Writes.Should().Be(0);
+        _files.Content[Project].Should().Equal(Encoding.UTF8.GetBytes(original));
+    }
+
+    [Fact]
+    public async Task PlanAndApply_ReplacementNotCompiled_UsesExistingExactInsertionContract()
+    {
+        Setup(Encoding.UTF8.GetBytes(Original));
+        _files.Content[Generated] = Encoding.UTF8.GetBytes("native generated");
+        FSharpCompileUpdater updater = new(_runner, _files);
+
+        FSharpCompileUpdatePlan plan = await updater.PlanAsync(Project, Hash(Original), [Program],
+            [new(Generated, Hash("native generated"), ReplacesExistingFile: true)], CancellationToken.None);
+        await updater.ApplyAsync(plan, CancellationToken.None);
+
+        plan.ChangesProject.Should().BeTrue();
+        Encoding.UTF8.GetString(_files.Content[Project]).Should().Be(
+            Original.Replace("    <Compile Include=\"Program.fs\" />",
+                "    <Compile Include=\"Http.fs\" />" + (Original.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n")
+                    + "    <Compile Include=\"Program.fs\" />", StringComparison.Ordinal));
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]

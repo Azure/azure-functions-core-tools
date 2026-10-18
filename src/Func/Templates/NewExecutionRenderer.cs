@@ -138,7 +138,9 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
                     {
                         foreach (TemplateGeneratedFSharpFile file in compile.GeneratedFiles)
                         {
-                            _interaction.WriteLine(line => line.Muted("Include before Program.fs: ").Code(file.Path));
+                            bool included = compile.EvaluatedCompileOrder.Contains(file.Path,
+                                Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+                            _interaction.WriteLine(line => line.Muted(included ? "Keep existing Compile entry: " : "Include before Program.fs: ").Code(file.Path));
                         }
                     }
                 }

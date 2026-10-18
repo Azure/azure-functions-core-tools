@@ -64,6 +64,8 @@
       LogicalName="Azure.Functions.Cli.Templates.DotNet.binding-literals.json" />
     <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/binding-literals-qualified.json"
       LogicalName="Azure.Functions.Cli.Templates.DotNet.binding-literals-qualified.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/fsharp-control-sources.json"
+      LogicalName="Azure.Functions.Cli.Templates.DotNet.fsharp-control-sources.json" />
   </ItemGroup>
 
   <ItemGroup>

@@ -270,6 +270,25 @@ An exact already-included sequence is a no-op. Path/digest/cancellation and
 commit-time guards do not claim a transaction against an unsynchronized
 external editor; changes are checked immediately before replacement.
 
+Explicit item `--force` also permits replacement of exact native-selected root
+`.fs` outputs, never project-root cleanup. Preparation captures each existing
+regular file's hash and the privately rendered replacement hash. Both dependency
+planning passes require force, the exact source/configuration proof, matching
+native Change/Overwrite effects and evaluated primary outputs. The engine
+rechecks existing target and project hashes immediately before writes, then
+verifies native-generated source hashes before controlled effects. Missing,
+drifted, linked, directory, inferred or out-of-root targets remain refusals.
+
+An already compiled replacement retains its exact evaluated/direct `Compile`
+position, even when later source files follow it; its project bytes are not
+rewritten and no duplicate entry is added. An existing but uncompiled file uses
+the same qualified insertion-before-`Program.fs` contract. Conditional/imported/
+globbed/partially included sequences are not newly supported. The two F# items
+without binding parameters have separate original source pins in
+`fsharp-control-sources.json`; literal-bearing items reuse their existing
+source proofs. No-force conflicts, cancellation and structured source failures
+retain their existing behavior.
+
 The original native omission characterization remains a before-state test.
 A separate actual native F# project/HTTP integration test applies the updater,
 executes the native package reference and restores the exact selected `.fsproj`,

@@ -24,6 +24,7 @@
     <Content Include="nullable-models.json" Pack="true" PackagePath="provenance/" />
     <Content Include="binding-literals.json" Pack="true" PackagePath="provenance/" />
     <Content Include="binding-literals-qualified.json" Pack="true" PackagePath="provenance/" />
+    <Content Include="fsharp-control-sources.json" Pack="true" PackagePath="provenance/" />
   </ItemGroup>
   <Target Name="StageUpstreamDotNetTemplates" BeforeTargets="_GetPackageFiles">
     <PropertyGroup>

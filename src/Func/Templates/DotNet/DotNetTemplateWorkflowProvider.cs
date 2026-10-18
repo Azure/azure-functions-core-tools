@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.DotNet.Shared;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.TemplateEngine.Abstractions;
 
 namespace Azure.Functions.Cli.Templates.DotNet;
 
@@ -100,6 +101,11 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
                 literalSources = await _sources.QualifyLiteralsAsync(selected, context.Invocation.Parameters, cancellationToken);
                 auxiliarySources = await _sources.QualifyAuxiliaryAsync(selected, cancellationToken);
                 sources = DotNetTemplateSources.CombineAuxiliarySources(literalSources, auxiliarySources);
+                if (context.Invocation.Force && selected.Entry.Language == "F#")
+                {
+                    sources = DotNetTemplateSources.CombineAuxiliarySources(sources,
+                        await _sources.QualifyFSharpControlAsync(selected, cancellationToken));
+                }
                 sources = DotNetTemplateSources.CombineAuxiliarySources(context.Invocation.SourceSnapshot, sources);
             }
             catch (InvalidDataException exception)
@@ -151,14 +157,26 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
             NativeTemplateEffectPlanningResult planned;
             if (selected.Entry.Language == "F#")
             {
-                TemplateGeneratedFSharpFile[] generated = [.. snapshot.ExpandedFiles.Select(file => new TemplateGeneratedFSharpFile(
-                    Path.GetFullPath(Path.Combine(request.OutputDirectory.Info.FullName, file.Key)),
-                    Convert.ToHexString(SHA256.HashData(file.Value.Span))))];
+                List<TemplateGeneratedFSharpFile> generated = [];
+                foreach (KeyValuePair<string, ReadOnlyMemory<byte>> file in snapshot.ExpandedFiles)
+                {
+                    string path = Path.GetFullPath(Path.Combine(request.OutputDirectory.Info.FullName, file.Key));
+                    IFileChange? change = snapshot.Effects.FileChanges.SingleOrDefault(change =>
+                        SamePath(Path.Combine(request.OutputDirectory.Info.FullName, change.TargetRelativePath), path));
+                    string? targetDigest = null;
+                    if (request.Force && change?.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite)
+                    {
+                        _paths.ValidatePath(path, project.Root.Info.FullName, mustExist: true);
+                        targetDigest = await _files.ComputeSha256Async(path, cancellationToken);
+                        _paths.ValidatePath(path, project.Root.Info.FullName, mustExist: true);
+                    }
+                    generated.Add(new(path, Convert.ToHexString(SHA256.HashData(file.Value.Span)), targetDigest));
+                }
                 TemplateFSharpCompileEffect repair = new(snapshot.Source, project.Properties.ProjectFilePath,
                     project.ProjectSha256, project.CompileOrder, generated);
                 request = request with { EffectSupport = request.EffectSupport! with { FSharpRepair = repair } };
                 planned = planner.PlanFSharpItemDependencies(project.Root, snapshot.Source, snapshot.Effects,
-                    request.OutputDirectory, project.Properties.ProjectFilePath, repair);
+                    request.OutputDirectory, project.Properties.ProjectFilePath, repair, request.Force);
             }
             else
             {

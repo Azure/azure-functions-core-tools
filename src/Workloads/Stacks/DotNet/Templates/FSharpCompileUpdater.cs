@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Templates.DotNet.Shared;
 namespace Azure.Functions.Cli.Workloads.DotNet;
 #endif
 
-internal sealed record FSharpGeneratedFile(string Path, string Sha256);
+internal sealed record FSharpGeneratedFile(string Path, string Sha256, bool ReplacesExistingFile = false);
 
 internal sealed class FSharpCompileUpdatePlan
 {
@@ -139,7 +139,7 @@ internal sealed class FSharpCompileUpdater(IDotnetCliRunner dotnetCli, FSharpPro
             "F# compile repair refuses a partially included generated file set.");
         if (missing.Length == 0)
         {
-            Require(compileOrder.TakeLast(generated.Length + 1).SequenceEqual(
+            Require(generated.All(file => file.ReplacesExistingFile) || compileOrder.TakeLast(generated.Length + 1).SequenceEqual(
                 generated.Select(file => file.Path).Append(Path.Combine(directory, "Program.fs")), _paths),
                 "Generated F# files already included in the project must retain the qualified order.");
             return new(projectPath, expectedProjectSha256, compileOrder, generated, original, changesProject: false);

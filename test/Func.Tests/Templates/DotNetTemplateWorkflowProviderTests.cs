@@ -44,6 +44,45 @@ public sealed class DotNetTemplateWorkflowProviderTests : IDisposable
     }
 
     [Theory]
+    [InlineData("Azure.Function.FSharp.Isolated.HttpTrigger.3.x", "--AccessRights", "Anonymous")]
+    [InlineData("Azure.Function.FSharp.Isolated.BlobTrigger.3.x", "--Path", "incoming/orders\\archive\"/入荷")]
+    public async Task ActualNewRunner_FSharpForcedReplacement_PreviewsWithoutWritesAndKeepsExistingCompilePosition(
+        string identity, string option, string value)
+    {
+        await InstallAsync();
+        using IServiceScope scope = Scope();
+        NativeTemplateWorkflowComposer workflow = scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>();
+        string root = Path.Combine(_root, "fsharp-force");
+        (await workflow.ExecuteProjectAsync(Init(root, "fsharp"), CancellationToken.None)).Succeeded.Should().BeTrue();
+        NewExecutionRequest first = Item(root) with { TemplateReference = identity, Name = "First", RawTemplateTokens = [option, value] };
+        (await workflow.ExecuteItemAsync(first, CancellationToken.None)).Succeeded.Should().BeTrue();
+        NewExecutionRequest later = Item(root) with { Name = "Later" };
+        (await workflow.ExecuteItemAsync(later, CancellationToken.None)).Succeeded.Should().BeTrue();
+        string project = Directory.GetFiles(root, "*.fsproj").Single();
+        byte[] projectBytes = File.ReadAllBytes(project);
+        string source = Path.Combine(root, "First.fs");
+        byte[] rendered = File.ReadAllBytes(source);
+        File.WriteAllText(source, "user content awaiting explicit replacement");
+        var before = Directory.GetFiles(root, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+        RecordingRunner runner = scope.ServiceProvider.GetRequiredService<RecordingRunner>();
+        runner.Commands.Clear();
+
+        NewExecutionResult preview = await workflow.ExecuteItemAsync(first with { Force = true, DryRun = true }, CancellationToken.None);
+
+        preview.Succeeded.Should().BeTrue(Diagnostics(preview));
+        foreach (var file in before)
+        {
+            File.ReadAllBytes(file.Key).Should().Equal(file.Value);
+        }
+        runner.Commands.Should().BeEmpty();
+        NewExecutionResult applied = await workflow.ExecuteItemAsync(first with { Force = true }, CancellationToken.None);
+        applied.Succeeded.Should().BeTrue(Diagnostics(applied));
+        File.ReadAllBytes(source).Should().Equal(rendered);
+        File.ReadAllBytes(project).Should().Equal(projectBytes);
+        (await CompileAsync(runner, project)).Should().Equal("First.fs", "Later.fs", "Program.fs");
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ActualNewRunner_CombinedSignalR_PreservesLiteralValuesAndAuxiliaryPrewriteAdmission(bool tooLong)
