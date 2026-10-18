@@ -66,7 +66,8 @@ internal sealed class DotNetTemplateEffectCapability(
             if (repair is not null)
             {
                 _compile = await _updater.PlanAsync(_project, repair.ExpectedProjectSha256, repair.EvaluatedCompileOrder,
-                    [.. repair.GeneratedFiles.Select(file => new FSharpGeneratedFile(file.Path, file.Sha256))], cancellationToken);
+                    [.. repair.GeneratedFiles.Select(file => new FSharpGeneratedFile(file.Path, file.Sha256,
+                        file.ExpectedTargetSha256 is not null))], cancellationToken);
             }
         }
         catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or DotnetCliException)

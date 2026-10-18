@@ -3,8 +3,16 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands.Workload;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Hosting.FirstRun;
+using Azure.Functions.Cli.Tests.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Catalog;
+using Azure.Functions.Cli.Workloads.Storage;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json.Linq;
 using NSubstitute;
+using NuGet.Protocol;
+using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 using PackageSource = NuGet.Configuration.PackageSource;
 
@@ -77,6 +85,77 @@ public class WorkloadSearchCommandTests
 
         exit.Should().Be(0);
         _interaction.Lines.Should().Contain(l => l.StartsWith("WARNING:") && l.Contains("No workloads found"));
+    }
+
+    [Fact]
+    public async Task Search_InvalidResponse_PreservesCauseInGracefulFailure()
+    {
+        var failure = new InvalidDataException("Invalid feed response.");
+        _catalog.SearchAsync(Arg.Any<CatalogSearchQuery>(), Arg.Any<CancellationToken>())
+            .Returns<Task<IReadOnlyList<CatalogSearchResult>>>(_ => throw failure);
+        var command = new WorkloadSearchCommand(_interaction, _catalog, _testCatalogOptions);
+
+        var exception = (await FluentActions.Awaiting(() => InvokeAsync(command, "--json"))
+            .Should().ThrowExactlyAsync<GracefulException>()).Which;
+
+        exception.InnerException.Should().BeSameAs(failure);
+        exception.Message.Should().Be(failure.Message);
+        exception.IsUserError.Should().BeTrue();
+        _interaction.Lines.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("""{}""", false)]
+    [InlineData("""{"data":null}""", false)]
+    [InlineData("""{"data":"not-an-array"}""", false)]
+    [InlineData("""{"data":{}}""", false)]
+    [InlineData("""{"data":0}""", false)]
+    [InlineData("""{"data":false}""", false)]
+    [InlineData("""{"data":[]}""", true)]
+    public async Task Search_PublicEntry_ValidatesResponseBeforeRenderingNoMatches(string? json, bool valid)
+    {
+        string home = Directory.CreateTempSubdirectory("func-search-response-").FullName;
+        try
+        {
+            var serviceIndex = new ServiceIndexResourceV3(JObject.Parse("""
+                {"version":"3.0.0","resources":[{"@id":"https://search.test/query","@type":"SearchQueryService"}]}
+                """), DateTime.UtcNow);
+            var client = new SearchResponseClient(TestRepository.Build(_stubSource, serviceIndex),
+                json is null ? null : JObject.Parse(json));
+            var sources = Substitute.For<IPackageSourceProvider>();
+            sources.GetSource(Arg.Any<string?>()).Returns(_stubSource);
+            var catalog = new WorkloadCatalog(_testCatalogOptions, sources, _ => client);
+            var firstRun = Substitute.For<IFirstRunCoordinator>();
+
+            int exit = await new NativeCliEntryPoint().ExecuteAsync(
+                ["workload", "search", "contract-probe-no-package", "--json", "--prerelease", "false", "--source", _stubSource.Source],
+                _interaction, new WorkloadPathsOptions(Path.Combine(home, "workloads")), new(home), CancellationToken.None,
+                services =>
+                {
+                    services.AddSingleton<IWorkloadCatalog>(catalog);
+                    services.AddSingleton(firstRun);
+                }, _ => Task.FromResult<string?>(null));
+
+            exit.Should().Be(valid ? 0 : 1, _interaction.AllOutput);
+            if (valid)
+            {
+                _interaction.Lines.Should().Contain("JSON: []");
+                _interaction.Lines.Should().NotContain(line => line.StartsWith("ERROR:", StringComparison.Ordinal));
+            }
+            else
+            {
+                _interaction.Lines.Should().Contain(line => line.StartsWith("ERROR:", StringComparison.Ordinal)
+                    && line.Contains(_stubSource.Source, StringComparison.Ordinal)
+                    && line.Contains("'data' array", StringComparison.Ordinal)
+                    && line.Contains("--source", StringComparison.Ordinal));
+                _interaction.AllOutput.Should().NotContain("unexpected error").And.NotContain("JSON: []").And.NotContain("No workloads found");
+            }
+        }
+        finally
+        {
+            Directory.Delete(home, recursive: true);
+        }
     }
 
     [Fact]
@@ -409,5 +488,14 @@ public class WorkloadSearchCommandTests
         root.Subcommands.Add(cmd);
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
         return root.Parse(new[] { cmd.Name }.Concat(args).ToArray()).InvokeAsync(config);
+    }
+
+    private sealed class SearchResponseClient(SourceRepository repository, JObject? response) : NuGetProtocolSourceClient(repository)
+    {
+        internal override Task<JObject?> FetchSearchResponseAsync(Uri searchUri, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(response);
+        }
     }
 }

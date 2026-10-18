@@ -127,7 +127,7 @@ internal sealed class JavaProjectInitializer(JavaProjectStack stack) : IProjectI
             : context.WorkingDirectory.Info.Name;
 
         IEnumerable<char> chars = raw.Trim().ToLowerInvariant().Replace(' ', '-')
-            .Where(c => char.IsLetterOrDigit(c) || c is '-' or '_');
+            .Where(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
         string sanitized = new([.. chars]);
         return string.IsNullOrEmpty(sanitized) ? DefaultArtifactId : sanitized;
     }

@@ -75,6 +75,11 @@ jobs:
         projects: ${{ parameters.projects }}
         arguments: -c ${{ parameters.configuration }} -v m --no-restore ${{ parameters.build_args }}
 
+    - task: NodeTool@0
+      displayName: Install Node.js
+      inputs:
+        versionSpec: 22.x
+
     - task: DotNetCoreCLI@2
       displayName: Unit tests
       inputs:
@@ -123,11 +128,6 @@ jobs:
           TargetFolder: $(publish_dir)
 
     - ${{ if containsValue(parameters.artifacts, 'npm') }}:
-      - task: NodeTool@0
-        displayName: Install Node.js
-        inputs:
-          versionSpec: 22.x
-
       - pwsh: |
           $ErrorActionPreference = 'Stop'
           $packageDirectory = '${{ parameters.npmPackageDirectory }}'

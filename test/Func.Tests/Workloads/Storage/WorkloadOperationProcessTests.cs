@@ -107,7 +107,8 @@ public sealed class WorkloadOperationProcessTests
         rows.Select(row => row.PackageId).Should().BeEquivalentTo(["fixture.stacka.test-rid", "fixture.stackb.test-rid"]);
         foreach (var row in rows)
         {
-            File.ReadAllText(Path.Combine(fixture.Paths.GetInstallDirectory(row.PackageId, row.PackageVersion), "tools", "any", "fixture.txt"))
+            File.ReadAllText(Path.Combine(WorkloadPackageLayout.GetContentRoot(
+                fixture.Paths.GetInstallDirectory(row.PackageId, row.PackageVersion), row.RuntimeIdentifier), "fixture.txt"))
                 .Should().Be("Installation fixture, not an activated stack implementation.");
         }
     }
@@ -188,7 +189,8 @@ public sealed class WorkloadOperationProcessTests
         await writer.WaitForAsync("PREPARED");
         await writer.SignalAsync();
         await writer.WaitForAsync("BEFORE_REGISTRY");
-        string payload = Path.Combine(fixture.Paths.GetInstallDirectory("fixture.stacka.test-rid", "1.0.0"), "tools", "any", "fixture.txt");
+        string payload = Path.Combine(WorkloadPackageLayout.GetContentRoot(
+            fixture.Paths.GetInstallDirectory("fixture.stacka.test-rid", "1.0.0"), "test-rid"), "fixture.txt");
         File.Exists(payload).Should().BeTrue();
         File.Exists(fixture.Paths.WorkloadRegistryPath).Should().BeFalse();
         File.Exists(Intent(fixture.Paths)).Should().BeTrue();

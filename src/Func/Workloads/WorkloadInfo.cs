@@ -54,6 +54,19 @@ internal sealed record RuntimeWorkloadInfo(
     : WorkloadInfo(WorkloadKind.Workload, PackageId, PackageVersion, Aliases, InstallDirectory, ContentRoot, DisplayName, Description);
 
 /// <summary>
+/// Describes a selected runtime package without loading its code during workload management.
+/// </summary>
+internal sealed record InstalledRuntimeWorkloadInfo(
+    string PackageId,
+    string PackageVersion,
+    IReadOnlyList<string> Aliases,
+    string InstallDirectory,
+    string ContentRoot,
+    string DisplayName,
+    string Description)
+    : WorkloadInfo(WorkloadKind.Workload, PackageId, PackageVersion, Aliases, InstallDirectory, ContentRoot, DisplayName, Description);
+
+/// <summary>
 /// CLI-side view of an installed content workload.
 /// </summary>
 /// <param name="PackageId">NuGet package id from the registry entry.</param>

@@ -14,6 +14,24 @@ public sealed class PythonTemplateAppendExecutorTests : IDisposable
     private string App => Path.Combine(_root, "function_app.py");
 
     [Theory]
+    [InlineData("@app.route(route='old')\ndef greeting(req):\n    pass\n")]
+    [InlineData("@app.route(route='old')\nasync def greeting(req):\n    pass\n")]
+    [InlineData("@app.function_name(name='greeting')\n@app.route(route='old')\ndef different(req):\n    pass\n")]
+    [InlineData("@app.function_name('greeting')\n@app.route(route='old')\ndef different(req):\n    pass\n")]
+    public async Task AppendAsync_ExistingFunctionNameCollision_RefusesBeforeAnyWrite(string original)
+    {
+        File.WriteAllText(App, original);
+        byte[] before = File.ReadAllBytes(App);
+        string digest = Convert.ToHexString(SHA256.HashData(before));
+
+        Func<Task> append = () => _executor.AppendAsync(App, "@app.route(route='new')\ndef greeting(req):\n    pass\n",
+            digest, CancellationToken.None);
+
+        await append.Should().ThrowAsync<InvalidOperationException>().WithMessage("*greeting*already*");
+        File.ReadAllBytes(App).Should().Equal(before);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("import logging\n")]
     [InlineData("import logging\r\n")]

@@ -23,10 +23,10 @@
   "forms": {
     "nameTrim": { "identifier": "replace", "pattern": "^\\s+|\\s+$", "replacement": "" },
     "nameSpaces": { "identifier": "replace", "pattern": " ", "replacement": "-" },
-    "nameCharacters": { "identifier": "replace", "pattern": "[^\\p{L}\\p{Nd}_-]", "replacement": "" },
+    "nameCharacters": { "identifier": "replace", "pattern": "[^a-z0-9_-]", "replacement": "" },
     "nameFallback": { "identifier": "replace", "pattern": "^$", "replacement": "app" },
-    "nameReserved": { "identifier": "replace", "pattern": "^(go|toolchain)$", "replacement": "app" },
-    "moduleName": { "identifier": "chain", "steps": ["nameTrim", "lowerCase", "nameSpaces", "nameCharacters", "nameFallback", "nameReserved"] }
+    "nameReserved": { "identifier": "replace", "pattern": "^(?:go|toolchain|con|prn|aux|nul|com[1-9]|lpt[1-9]|-.*)$", "replacement": "app" },
+    "moduleName": { "identifier": "chain", "steps": ["nameTrim", "lowerCaseInvariant", "nameSpaces", "nameCharacters", "nameFallback", "nameReserved"] }
   },
   "constraints": {
     "host": { "type": "host", "args": [{ "hostname": "func" }] },

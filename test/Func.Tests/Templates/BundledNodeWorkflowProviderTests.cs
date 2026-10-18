@@ -101,8 +101,8 @@ public sealed partial class BundledNodeTemplateTests
     {
         await _installer.InstallFromPackageAsync(BuiltArchive);
         string bundlePath = Path.Combine(_root, "provider-bundle");
-        Directory.CreateDirectory(Path.Combine(bundlePath, "bin"));
-        File.WriteAllText(Path.Combine(bundlePath, "bin", "extensions.json"), """{"extensions":[{"bindings":["ENTITYTRIGGER"]}]}""");
+        Directory.CreateDirectory(Path.Combine(bundlePath, "4.35.0", "bin"));
+        File.WriteAllText(Path.Combine(bundlePath, "4.35.0", "bin", "extensions.json"), """{"extensions":[{"bindings":["ENTITYTRIGGER"]}]}""");
         var bundle = await new TemplateEngineBundleContextReader(_files).ReadAsync(
             new ExtensionBundleResolution.Resolved(BundleHelpers.StableBundleId, "4.35.0", bundlePath, null), CancellationToken.None);
         var target = WorkingDirectory.FromExplicit(Path.Combine(_root, "provider-item"));

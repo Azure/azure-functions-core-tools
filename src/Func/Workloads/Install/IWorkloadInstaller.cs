@@ -24,6 +24,9 @@ internal interface IWorkloadInstaller
     /// <exception cref="Discovery.InvalidWorkloadException">Declared assets or native ownership are invalid, or check-only finds missing templates.</exception>
     /// <exception cref="BundledTemplateRegistrationException">The retained stack's template registration failed after protected recovery.</exception>
     /// <exception cref="BundledTemplateRegistrationCanceledException">Cancellation retained the stack after native recovery settled.</exception>
+    /// <exception cref="Azure.Functions.Cli.Templates.Engine.TemplateStoreRecoveryRequiredException">
+    /// Check-only readiness cannot inspect native state until an explicit mutation recovers its pending journal.
+    /// </exception>
     public Task<WorkloadInstallResult> EnsureInstalledAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool checkOnly = false);
     public Task<PreparedWorkloadInstall> PrepareFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
         bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken);
@@ -129,18 +132,30 @@ internal interface IWorkloadInstaller
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Removes the install directory and registry entry for
-    /// (<paramref name="packageId"/>, <paramref name="version"/>). Returns
-    /// <c>true</c> when an entry was removed, <c>false</c> when none existed.
+    /// Removes the requested exact explicit owner, retaining shared payloads and removing proven native assets only for the final owner.
+    /// Returns false when that owner is absent.
     /// </summary>
+    /// <exception cref="Discovery.InvalidWorkloadException">Ownership cannot be proven or payload cleanup requires recovery.</exception>
+    /// <exception cref="WorkloadPlanChangedException">Installed state no longer matches the prepared removal.</exception>
+    /// <exception cref="WorkloadRecoveryRequiredException">An interrupted operation requires reconciliation before mutation.</exception>
+    /// <exception cref="WorkloadLockNotSupportedException">The workload home cannot protect exclusive ownership.</exception>
     public Task<bool> UninstallAsync(string packageId, string version, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Removes only the specified owner, with the same protected native removal and recovery rules as explicit uninstall.
+    /// </summary>
+    /// <exception cref="Discovery.InvalidWorkloadException">Ownership cannot be proven or payload cleanup requires recovery.</exception>
+    /// <exception cref="WorkloadPlanChangedException">Installed state no longer matches the prepared removal.</exception>
+    /// <exception cref="WorkloadRecoveryRequiredException">An interrupted operation requires reconciliation before mutation.</exception>
+    /// <exception cref="WorkloadLockNotSupportedException">The workload home cannot protect exclusive ownership.</exception>
     public Task<bool> UninstallAsync(string packageId, string version,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Removes the specified ownership under an operation that already protects the caller's authoritative selection.
     /// </summary>
+    /// <exception cref="Discovery.InvalidWorkloadException">Ownership cannot be proven or payload cleanup requires recovery.</exception>
+    /// <exception cref="WorkloadPlanChangedException">Installed state no longer matches the prepared removal.</exception>
     public Task<bool> UninstallAsync(IWorkloadOperation operation, string packageId, string version,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken);
 }

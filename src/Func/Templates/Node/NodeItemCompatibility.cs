@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Templates.Node;
 /// <summary>
 /// Qualifies original Node item defaults and validators from the selected native package for the unused command bridge.
 /// </summary>
-internal sealed class NodeItemCompatibility(IInteractionService interaction) : INativeItemCompatibility
+internal sealed class NodeItemCompatibility(IInteractionService interaction, Func<string?>? updateHint = null) : INativeItemCompatibility
 {
     internal const string ManifestPath = "provenance/node/compatibility.json";
     internal const string PackageId = "Azure.Functions.Templates.Node.Basic";
@@ -23,6 +23,24 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction) : I
     private const string BindingsPath = "provenance/node/v2/templates/_bindings.json";
 
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
+
+    internal string DescribeUnsupportedParameters(NodeItemParameterCompatibilityException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return DescribeUpdate(exception.Message);
+    }
+
+    internal string DescribeUnsupportedHelpers(NodeItemHelperCompatibilityException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return DescribeUpdate(exception.Message);
+    }
+
+    private string DescribeUpdate(string message)
+        => message + " "
+            + (updateHint?.Invoke() ?? "Explicitly update the installed Node workload that owns this selected template archive, then retry. "
+                + "Use 'func workload list' to identify that owner and 'func workload update <owner-package-id> --exact' to update it.")
+            + " Nothing was generated; no workload was upgraded automatically.";
 
     public async Task<NativeItemCompatibilityResult> ResolveAsync(ResolvedTemplate selected, TemplateCandidateParseResult arguments,
         string? requestedName, bool canPrompt, CancellationToken cancellationToken)
@@ -37,14 +55,32 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction) : I
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            NativeTemplateLegacyContract contract = (await ReadSourceAsync(selected, cancellationToken)).Contract;
+            NodeItemSource source = await ReadSourceAsync(selected, cancellationToken);
+            NodeItemSourceQualifier.ValidateArguments(source, arguments.ValuesByCanonicalName);
+            NativeTemplateLegacyContract contract = source.Contract;
             NativeItemCompatibility compatibility = new(_interaction, _ => contract, async (candidate, path, token) =>
             {
                 // Re-read all source bindings before handing original bytes to the shared validator.
-                await ReadSourceAsync(candidate, token);
+                NodeItemSource current = await ReadSourceAsync(candidate, token);
+                NodeItemSourceQualifier.ValidateArguments(current, arguments.ValuesByCanonicalName);
                 return await candidate.ReadPackageFileAsync(path, token);
             });
-            return await compatibility.ResolveAsync(selected, arguments, requestedName, canPrompt, cancellationToken);
+            NativeItemCompatibilityResult resolved = await compatibility.ResolveAsync(selected, arguments, requestedName, canPrompt, cancellationToken);
+            if (resolved.Succeeded && NodeItemSourceQualifier.ValidateDaprInvocation(source, resolved.Name) is { } helperDiagnostic)
+            {
+                return resolved with { Diagnostics = [helperDiagnostic] };
+            }
+            return resolved;
+        }
+        catch (NodeItemHelperCompatibilityException exception)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(null, "unresolved", [DescribeUnsupportedHelpers(exception)]);
+        }
+        catch (NodeItemParameterCompatibilityException exception)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(null, "unresolved", [DescribeUnsupportedParameters(exception)]);
         }
         catch (InvalidDataException exception)
         {

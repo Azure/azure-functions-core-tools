@@ -83,6 +83,23 @@ public sealed partial class BundledPythonTemplateTests
             "# user-owned full entry", "def retained_helper():");
         File.Exists(Path.Combine(project, "function_app.py.py")).Should().BeFalse();
         var beforeRefusal = File.ReadAllBytes(app);
+        foreach (var duplicateName in new string?[] { null, "SecondGreeting" })
+        {
+            TestInteractionService collision = new();
+            string[] name = duplicateName is null ? [] : ["--name", duplicateName];
+            var duplicateExit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-Python", "--non-interactive",
+                "--output=json", .. name], collision, paths, new(home), CancellationToken.None,
+                TrackPythonEntry, _ => Task.FromResult<string?>(null));
+
+            duplicateExit.Should().Be(1, collision.AllOutput);
+            using var result = JsonDocument.Parse(collision.Lines.Single(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]);
+            result.RootElement.GetProperty("kind").GetString().Should().Be("invocationFailed");
+            result.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
+            result.RootElement.GetProperty("invocation").GetProperty("status").GetString().Should().Be("EffectFailure");
+            collision.AllOutput.Should().Contain("already exists");
+            File.ReadAllBytes(app).Should().Equal(beforeRefusal);
+        }
+
         TestInteractionService invalid = new();
         var rejected = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-Python", "--non-interactive",
             "--output=json", "--name", "bad-name", "--http-trigger-auth-level", "ANONYMOUS"],
@@ -98,7 +115,7 @@ public sealed partial class BundledPythonTemplateTests
         var helped = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-Python", "--help"],
             help, paths, new(home), CancellationToken.None, TrackPythonEntry, _ => Task.FromResult<string?>(null));
         helped.Should().Be(0, help.AllOutput);
-        help.AllOutput.Should().Contain("[path]", "--http-trigger-auth-level", "ANONYMOUS").And.NotContain("--dry-run");
+        help.AllOutput.Should().Contain("[path]", "--http-trigger-auth-level", "ANONYMOUS", "--dry-run");
         File.ReadAllBytes(app).Should().Equal(beforeRefusal);
         source.ReceivedCalls().Should().BeEmpty();
     }

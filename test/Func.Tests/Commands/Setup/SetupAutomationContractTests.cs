@@ -308,7 +308,8 @@ public sealed class SetupAutomationContractTests
             {
                 [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = projectRuntime,
             }).Build());
-        SetupFeatureResolver features = new(interaction, store, configuration);
+        SetupFeatureResolver features = new(interaction, store, configuration,
+            Substitute.For<Azure.Functions.Cli.Workloads.Catalog.IWorkloadCatalog>(), []);
         var profiles = Substitute.For<ISetupProfileScopeResolver>();
         profiles.ResolveProfileScopesAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<SetupRenderer>(), Arg.Any<CancellationToken>())
             .Returns([SetupProfileScope.Unconstrained]);

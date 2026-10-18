@@ -123,9 +123,11 @@ internal sealed class GoProjectInitializer(GoProjectStack stack) : IProjectIniti
             : context.WorkingDirectory.Info.Name;
 
         IEnumerable<char> chars = raw.Trim().ToLowerInvariant().Replace(' ', '-')
-            .Where(c => char.IsLetterOrDigit(c) || c is '-' or '_');
+            .Where(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
         string sanitized = new([.. chars]);
-        return string.IsNullOrEmpty(sanitized) || sanitized is "go" or "toolchain" ? DefaultModuleName : sanitized;
+        bool reserved = sanitized is "go" or "toolchain" or "con" or "prn" or "aux" or "nul"
+            || (sanitized.Length == 4 && sanitized[..3] is "com" or "lpt" && sanitized[3] is >= '1' and <= '9');
+        return string.IsNullOrEmpty(sanitized) || sanitized.StartsWith('-') || reserved ? DefaultModuleName : sanitized;
     }
 
     private static void EnsureExtensionBundle(JsonObject host, BundleChannel channel)

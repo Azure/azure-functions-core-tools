@@ -75,12 +75,16 @@ internal static class Parser
         // collision among them is a CLI bug, not a workload problem, so we
         // throw rather than skip.
         var reservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { helpCommand.Name };
+        reservedNames.UnionWith(helpCommand.Aliases);
         foreach (FuncCliCommand command in allCommands.OfType<IBuiltInCommand>().Cast<FuncCliCommand>())
         {
-            if (!reservedNames.Add(command.Name))
+            foreach (string name in command.Aliases.Prepend(command.Name).Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException(
-                    $"Two built-in commands share the name '{command.Name}'. This is a CLI bug.");
+                if (!reservedNames.Add(name))
+                {
+                    throw new InvalidOperationException(
+                        $"Two built-in commands share the name or alias '{name}'. This is a CLI bug.");
+                }
             }
 
             rootCommand.Subcommands.Add(command);
@@ -97,11 +101,12 @@ internal static class Parser
 
         foreach (ExternalCommand? command in workloadCommands)
         {
-            if (reservedNames.Contains(command.Name))
+            string? reserved = command.Aliases.Prepend(command.Name).FirstOrDefault(reservedNames.Contains);
+            if (reserved is not null)
             {
                 interaction.WriteWarning(
-                    $"Workload '{command.Workload.PackageId}' tried to register top-level command " +
-                    $"'{command.Name}', which is reserved by the CLI. This command was not loaded.");
+                    $"Workload '{command.Workload.PackageId}' tried to register top-level command or alias " +
+                    $"'{reserved}', which is reserved by the CLI. This command was not loaded.");
                 continue;
             }
 

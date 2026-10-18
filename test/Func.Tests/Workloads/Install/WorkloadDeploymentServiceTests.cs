@@ -31,6 +31,55 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
+    [Theory]
+    [InlineData(null, "any", true)]
+    [InlineData("win-x64", "win-x64", true)]
+    [InlineData("linux-arm64", "linux-arm64", true)]
+    [InlineData("win-x64", "any", false)]
+    [InlineData("win-x64", "linux-x64", false)]
+    [InlineData(null, "win-x64", false)]
+    public async Task PrepareReuseAsync_DeclaredPayloadLayout_RequiresMatchingPortableOrRidRoot(
+        string? runtimeIdentifier, string payloadDirectory, bool valid)
+    {
+        WorkloadEntry entry = new()
+        {
+            PackageId = "fixture.content",
+            PackageVersion = "1.0.0",
+            Kind = WorkloadKind.Content,
+            RuntimeIdentifier = runtimeIdentifier,
+        };
+        string directory = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        string content = Path.Combine(directory, "tools", payloadDirectory);
+        Directory.CreateDirectory(content);
+        string payload = Path.Combine(content, "fixture.txt");
+        File.WriteAllText(payload, "Retained payload must be validated without mutation.");
+        string manifest = Path.Combine(directory, "workload.json");
+        string ridProperty = runtimeIdentifier is null ? string.Empty : $",\"runtimeIdentifier\":\"{runtimeIdentifier}\"";
+        File.WriteAllText(manifest, $$"""{"$schema":"{{WorkloadManifestSchema.PackageManifestV1Schema}}","kind":"content"{{ridProperty}}}""");
+        string manifestBefore = File.ReadAllText(manifest);
+        string payloadBefore = File.ReadAllText(payload);
+        var deployment = new WorkloadDeploymentService(_paths, _store, new WorkloadMetadataReader(),
+            new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem(), Substitute.For<IBundledTemplateInstaller>());
+
+        if (valid)
+        {
+            using var prepared = await deployment.PrepareReuseAsync(entry, CancellationToken.None, requireCleanStore: true);
+            prepared.Entry.Should().BeSameAs(entry);
+            prepared.Hashes.Keys.Should().BeEquivalentTo("workload.json", Path.Combine("tools", payloadDirectory, "fixture.txt"));
+        }
+        else
+        {
+            Func<Task> prepare = () => deployment.PrepareReuseAsync(entry, CancellationToken.None, requireCleanStore: true);
+            await prepare.Should().ThrowAsync<InvalidWorkloadException>().WithMessage("*damaged or conflicts*");
+        }
+
+        File.ReadAllText(manifest).Should().Be(manifestBefore);
+        File.ReadAllText(payload).Should().Be(payloadBefore);
+        File.Exists(_paths.WorkloadRegistryPath).Should().BeFalse();
+        File.Exists(Path.Combine(_paths.Home, ".workload-operations", "dirty.intent")).Should().BeFalse();
+        _store.ReceivedCalls().Should().BeEmpty();
+    }
+
     [Fact]
     public async Task TryReuseExplicitAsync_InstalledPayload_ReturnsExistingEntry()
     {
@@ -171,6 +220,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task UninstallAsync_FinalOwnershipRemoved_DeletesPayload()
     {
         WorkloadEntry entry = Entry("example.workload", "1.0.0", explicitlyInstalled: true);
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
         string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
         Directory.CreateDirectory(installPath);
         _store.RemoveOwnershipAsync(Arg.Any<IWorkloadOperation>(), entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())

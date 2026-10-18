@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Versioning;
@@ -86,8 +87,20 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
             for (int i = 1; i < ordered.Count; i++)
             {
                 PruneCandidate candidate = ordered[i];
-                bool removed = await _installer.UninstallAsync(operation, candidate.PackageId, candidate.PackageVersion,
-                    candidate.Ownership, cancellationToken);
+                bool removed;
+                try
+                {
+                    removed = await _installer.UninstallAsync(operation, candidate.PackageId, candidate.PackageVersion,
+                        candidate.Ownership, cancellationToken);
+                }
+                catch (InvalidWorkloadException exception)
+                {
+                    throw new GracefulException(exception.Message, exception, isUserError: true);
+                }
+                catch (WorkloadPlanChangedException exception)
+                {
+                    throw new GracefulException(exception.Message, exception, isUserError: true);
+                }
                 if (removed)
                 {
                     removedCount++;

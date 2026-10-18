@@ -49,6 +49,8 @@ internal sealed record InitExecutionResult(string Kind, bool Succeeded)
 
     public TemplateInvocationResult? Preview { get; init; }
 
+    public IReadOnlyList<string> PlannedCleanup { get; init; } = [];
+
     public TemplateInvocationResult? Invocation { get; init; }
 
     public InitExistingProjectConfiguration? Configuration { get; init; }

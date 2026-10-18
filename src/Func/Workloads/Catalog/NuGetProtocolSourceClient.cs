@@ -46,7 +46,7 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
         }
 
         JObject? raw = await FetchSearchResponseAsync(searchUri, cancellationToken);
-        return raw is null ? [] : ParseV3Hits(raw, Source);
+        return ParseV3Hits(raw, Source);
     }
 
     public async Task<IReadOnlyList<NuGetVersion>> ListVersionsAsync(string packageId, CancellationToken cancellationToken)
@@ -155,11 +155,15 @@ internal class NuGetProtocolSourceClient(SourceRepository repository)
     /// azure-functions-core-tools#5198). Hits that omit <c>packageTypes</c>
     /// are kept, since some V3 feeds don't surface the field.
     /// </summary>
-    internal static IReadOnlyList<CatalogSearchResult> ParseV3Hits(JObject response, PackageSource source)
+    internal static IReadOnlyList<CatalogSearchResult> ParseV3Hits(JObject? response, PackageSource source)
     {
-        if (response["data"] is not JArray data)
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (response?["data"] is not JArray data)
         {
-            return [];
+            throw new InvalidDataException(
+                $"Source '{source.Source}' returned an invalid V3 search response: expected a JSON object with a 'data' array. "
+                + "Check the feed or choose another V3 feed with '--source'.");
         }
 
         var results = new List<CatalogSearchResult>(data.Count);

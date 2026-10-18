@@ -22,6 +22,7 @@ internal interface IWorkloadCatalog
     /// </summary>
     /// <param name="query">Filter, paging, and source-override bag.</param>
     /// <param name="cancellationToken">Cancellation propagated to the underlying request.</param>
+    /// <exception cref="InvalidDataException">The source returned invalid search response metadata.</exception>
     public Task<IReadOnlyList<CatalogSearchResult>> SearchAsync(CatalogSearchQuery query, CancellationToken cancellationToken = default);
 
     /// <summary>

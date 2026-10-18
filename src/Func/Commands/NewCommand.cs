@@ -41,6 +41,16 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         Description = "List available templates for this project instead of scaffolding.",
     };
 
+    public Option<string?> SearchOption { get; } = new("--search")
+    {
+        Description = "With --list, match installed template IDs, names, short names and descriptions (case-insensitive substring).",
+    };
+
+    public Option<bool> DryRunOption { get; } = new("--dry-run")
+    {
+        Description = "Preview file and dependency effects without applying them.",
+    };
+
     public Option<string?> OutputOption { get; } = new("--output")
     {
         Description = "Output mode (plain | json). Defaults to plain.",
@@ -69,6 +79,8 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         Options.Add(ForceOption);
         Options.Add(NonInteractiveOption);
         Options.Add(ListOption);
+        Options.Add(SearchOption);
+        Options.Add(DryRunOption);
         Options.Add(OutputOption);
 
         // Tolerate unrecognised options so ExecuteAsync can re-interpret

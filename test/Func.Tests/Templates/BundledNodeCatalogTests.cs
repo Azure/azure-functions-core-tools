@@ -173,7 +173,7 @@ public sealed partial class BundledNodeTemplateTests
             string extension = template.Language!.Equals("javascript", StringComparison.OrdinalIgnoreCase) ? ".js" : ".ts";
             string output = Path.Combine(target, name + extension);
             string source = template.Files!.Single().Value;
-            string expected = source.Replace("$(FUNCTION_NAME_INPUT)", name, StringComparison.Ordinal);
+            string expected = ExpectedOperativeNodeSource(template, name, values);
             if (template.Id!.StartsWith("HttpTrigger-", StringComparison.Ordinal))
             {
                 expected = expected.Replace("authLevel: 'anonymous'", "authLevel: 'admin'", StringComparison.Ordinal);
@@ -195,7 +195,7 @@ public sealed partial class BundledNodeTemplateTests
                 defaults.ValuesByCanonicalName, cancellationToken: CancellationToken.None);
             defaultCreated.Status.Should().Be(CreationResultStatus.Success, template.Id);
             string defaultName = V2TemplateProjection.Project(template, legacy, "node")!.DefaultFunctionName!;
-            string defaultExpected = source.Replace("$(FUNCTION_NAME_INPUT)", defaultName, StringComparison.Ordinal);
+            string defaultExpected = ExpectedOperativeNodeSource(template, defaultName, defaults.ValuesByCanonicalName);
             File.ReadAllText(Path.Combine(defaultTarget, defaultName + extension)).ReplaceLineEndings("\n")
                 .Should().Be(defaultExpected.ReplaceLineEndings("\n"), template.Id);
         }
@@ -236,8 +236,7 @@ public sealed partial class BundledNodeTemplateTests
         created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
         created.Changes.Should().BeEquivalentTo(preview.Changes);
         File.ReadAllText(existing).Should().Be("// preserved user implementation");
-        // The original owned payload ignores SCHEDULE_INPUT; migration must not silently change its semantics.
-        File.ReadAllText(Path.Combine(target, "NewTimer" + extension)).Should().Contain("schedule: '0 */5 * * * *'");
+        File.ReadAllText(Path.Combine(target, "NewTimer" + extension)).Should().Contain("schedule: '0 0 * * * *'");
     }
 
     [Theory]

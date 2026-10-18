@@ -160,13 +160,13 @@ public sealed partial class BundledNodeTemplateTests
 
         exit.Should().Be(0, output.AllOutput);
         output.AllOutput.Should().Contain("[path]").And.Contain("--authlevel").And.Contain("anonymous");
-        output.AllOutput.Should().NotContain("--dry-run").And.NotContain("--path").And.NotContain("INPUT:");
+        output.AllOutput.Should().Contain("--dry-run").And.NotContain("--path").And.NotContain("INPUT:");
         Directory.Exists(nested).Should().BeFalse();
 
         TestInteractionService help = new();
         (await entry.ExecuteAsync(["help", "new"], help, _paths, new(Home), CancellationToken.None,
             configure: TrackEntryContexts, versionCheck: _ => Task.FromResult<string?>(null))).Should().Be(0);
-        help.AllOutput.Should().Contain("[path]").And.NotContain("--dry-run");
+        help.AllOutput.Should().Contain("[path]").And.Contain("--dry-run");
     }
 
     [Theory]

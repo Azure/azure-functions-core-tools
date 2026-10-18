@@ -22,7 +22,7 @@ internal sealed class NativeTemplateEffectPlanner
 
     public NativeTemplateEffectPlanningResult PlanFSharpItemDependencies(WorkingDirectory projectDirectory,
         TemplateEffectSource source, ICreationEffects nativeEffects, WorkingDirectory itemOutputDirectory,
-        string exactProjectPath, TemplateFSharpCompileEffect repair)
+        string exactProjectPath, TemplateFSharpCompileEffect repair, bool force = false)
     {
         ArgumentNullException.ThrowIfNull(projectDirectory);
         ArgumentNullException.ThrowIfNull(source);
@@ -47,12 +47,21 @@ internal sealed class NativeTemplateEffectPlanner
         string[] primaryOutputs = [.. nativeEffects.CreationResult.PrimaryOutputs.Select(output =>
             Path.GetFullPath(Path.Combine(itemOutputDirectory.Info.FullName, output.Path)))];
         StringComparer comparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-        if (nativeFSharp.Any(change => change.ChangeKind != ChangeKind.Create)
+        if (nativeEffects.FileChanges.Count != generated.Length
+            || nativeFSharp.Any(change =>
+            {
+                string path = Path.GetFullPath(Path.Combine(itemOutputDirectory.Info.FullName, change.TargetRelativePath));
+                TemplateGeneratedFSharpFile? file = repair.GeneratedFiles.SingleOrDefault(file => SamePath(file.Path, path));
+                return file is null || (change.ChangeKind == ChangeKind.Create ? file.ExpectedTargetSha256 is not null
+                    : !force || change.ChangeKind is not (ChangeKind.Change or ChangeKind.Overwrite)
+                        || change is not IFileChange2 || file.ExpectedTargetSha256 is null);
+            })
             || !nativeFSharp.Select(change => Path.GetFullPath(Path.Combine(itemOutputDirectory.Info.FullName, change.TargetRelativePath)))
                 .Order(comparer).SequenceEqual(generated.Order(comparer), comparer)
             || !primaryOutputs.Order(comparer).SequenceEqual(generated.Order(comparer), comparer))
         {
-            return new(null, ["F# repair requires exactly the qualified native-created .fs files and their evaluated primary outputs; overwrites and inferred files are not supported."]);
+            return new(null, ["F# repair requires exactly the qualified native .fs files and their evaluated primary outputs; "
+                + "overwrites require explicit force and the exact existing target hashes. Inferred files are not supported."]);
         }
 
         return PlanDependencies(projectDirectory, source, nativeEffects.CreationResult, exactProjectPath, repair);
@@ -179,7 +188,8 @@ internal sealed class NativeTemplateEffectPlanner
                     || compile.EvaluatedCompileOrder.Select(Path.GetFullPath).Distinct(comparer).Count() != compile.EvaluatedCompileOrder.Count
                     || !SamePath(compile.EvaluatedCompileOrder[^1], Path.Combine(projectRoot, "Program.fs"))
                     || compile.GeneratedFiles.Any(file => file is null || !IsRootFSharpFile(file.Path, projectRoot)
-                        || !IsSha256(file.Sha256) || SamePath(file.Path, Path.Combine(projectRoot, "Program.fs")))
+                        || !IsSha256(file.Sha256) || (file.ExpectedTargetSha256 is not null && !IsSha256(file.ExpectedTargetSha256))
+                        || SamePath(file.Path, Path.Combine(projectRoot, "Program.fs")))
                     || compile.GeneratedFiles.Select(file => Path.GetFullPath(file.Path)).Distinct(comparer).Count() != compile.GeneratedFiles.Count)
                 {
                     diagnostics.Add("F# compile repair requires one exact .fsproj digest, a unique root-file compile sequence ending in Program.fs, and hashed native-generated root .fs files.");

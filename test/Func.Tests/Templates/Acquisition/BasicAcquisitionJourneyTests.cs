@@ -35,7 +35,7 @@ public sealed class BasicAcquisitionJourneyTests
         persisted.Should().ContainSingle().Which.LogicalPackage!.PackageId.Should().Be("fixture.stacka");
         persisted[0].PackageId.Should().Be("fixture.stacka.test-rid");
         File.ReadAllText(Path.Combine(fixture.Paths.GetInstallDirectory(persisted[0].PackageId, persisted[0].PackageVersion),
-            "tools", "any", "fixture.txt")).Should().Be("Installation fixture, not an activated stack implementation.");
+            "tools", "test-rid", "fixture.txt")).Should().Be("Installation fixture, not an activated stack implementation.");
         (await fixture.ReadTemplatesAsync()).Should().ContainSingle().Which.Identity.Should().Be("Fixture.Basic.Item");
         repeated.Status.Should().Be(BasicAcquisitionStatus.Completed);
         repeated.Completed.Should().OnlyContain(step => step.Reused);

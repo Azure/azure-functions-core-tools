@@ -3,7 +3,7 @@
 
 namespace Azure.Functions.Cli.Templates;
 
-internal sealed record TemplateGeneratedFSharpFile(string Path, string Sha256);
+internal sealed record TemplateGeneratedFSharpFile(string Path, string Sha256, string? ExpectedTargetSha256 = null);
 
 /// <summary>
 /// Pins a selected F# project and the native-generated sources for an explicitly composed compile-order repair.

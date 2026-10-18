@@ -14,8 +14,9 @@ the legacy unversioned project-template installer always resolved that version.
 The original packages declare package type `Template`; the adapter declares
 `FuncTemplate` rather than relaxing native package validation.
 
-Packing extracts upstream `content/` bytes unchanged after validating both
-digests, and retains both original nuspecs under `provenance/`. It adds only
+Packing validates both upstream archive digests and retains both original
+nuspecs under `provenance/`. Except for the qualified source and binding-literal
+adaptations described below, upstream `content/` bytes are unchanged. It adds
 `func.host.json` files, including `--target-framework` / `-tfm` aliases for the
 native project `Framework` parameter. The repository MIT license has the same
 copyright and grant as upstream's `LICENSE.txt`; its pinned source URL is in
@@ -24,9 +25,172 @@ rewritten as evidence of a different upstream release.
 
 The raw inventory is 36 items (29 C#, 7 F#) plus 2 projects (C#, F#). Those are
 native configuration records, **not deduplicated CLI-visible counts**.
-Template identities, group identities, short names, symbols, conditional
-sources, generated values, package versions, post-actions and source files
-are preserved, including F# project ordering and `_gitignore` renaming.
+Template identities, group identities, short names, parameter contracts, conditional
+sources, generated values, package versions, post-actions and unadapted source
+files are preserved, including F# project ordering and `_gitignore` renaming.
+
+## Scoped C# database supporting types
+
+The pinned SQL and MySQL output/trigger items each declare a namespace-level
+`ToDoItem`. Adding distinct functions from these templates could therefore
+make a previously compiling project fail with duplicate types. This is an
+inherited upstream limitation, not evidence of a native migration regression.
+
+Packing adapts only the four source files in `supporting-types.json`, after
+checking their identity, original configuration, exact source path and SHA-256.
+It nests the DTO inside its owning new function class and names it
+`<FunctionName>Item`, using the existing native `sourceName` substitution for
+every type reference. Nesting avoids collisions with other functions and
+existing user DTOs; the suffix also permits a function named `ToDoItem`.
+Namespaces, connection-string values and package dependencies remain unchanged.
+The supporting-type adaptation does not change configurations, SQL/MySQL input
+items or F# sources. No existing project source is inspected or rewritten.
+
+The original four source files remain byte-for-byte under
+`provenance/upstream-content/content/`; the source pins are also packaged in
+provenance. Unknown or changed upstream inputs fail packing rather than
+receiving a best-effort text rewrite. This changes the shape of newly generated
+example DTOs only; it does not migrate previously generated functions.
+
+The same exact-source pins qualify two additional authoring corrections.
+The MySQL trigger's source placeholder is `table`, matching its unchanged
+native parameter, instead of `table1`. Omitted `--table` now produces `table1`,
+not `table11`, and explicit values are not suffixed with `1`. SQL/MySQL input
+and output bindings and the SQL trigger retain their existing parameter maps.
+The SQL trigger logs its sample changes using the framework's
+`System.Text.Json` serializer instead of an undeclared `Newtonsoft.Json`
+dependency. The sample retains its JSON property names, numeric operations,
+row values and nulls; equivalent JSON escaping need not be byte-identical.
+Neither correction adds a project dependency or edits an existing function.
+
+## Name-owned auxiliary functions
+
+The six exact C# sources in `auxiliary-identities.json` also qualify their
+configuration and original source hashes before adaptation. The entity-class
+sample's `Counter` type and the entity-function sample's fixed `Counter` function
+ID now use the requested main function name. Orchestration activities use the
+ID `<FunctionName>-SayHello`, including all activity calls and logger references;
+the HTTP starter uses `<FunctionName>-HttpStart`. The C# activity method remains
+`<FunctionName>SayHello`.
+
+SignalR's main function ID and logger use the requested name rather than the
+fixed `negotiate`. Its connection model is nested as `<FunctionName>ConnectionInfo`.
+Dapr's auxiliary methods live directly in the new main class, with method names
+`<FunctionName>TopicTrigger` and `<FunctionName>Invoke`, and function IDs and
+loggers `<FunctionName>-TopicTrigger` and `<FunctionName>-Invoke`. They are not
+nested function classes, which the pinned worker SDK does not index.
+The invocation helper's HTTP route is
+`<FunctionName>/invoke/{appId}/{methodName}`; its sample curl and Dapr CLI
+references use the same requested main function. The external app/method
+binding placeholders, pubsub component and topic remain unchanged.
+
+All derived names use native `sourceName` substitution. No existing project
+source, namespace, user helper or previously generated route is rewritten.
+Raw sources remain byte-for-byte in `provenance/upstream-content/content/`.
+Unknown source, configuration or replacement shapes fail packing. These are
+intentional authoring changes for newly generated items, not a project
+migration or a requirement to upgrade an older compatible package. Older
+packages remain usable with their original fixed-helper/repeat limitations.
+Unique compiled worker metadata does not establish Dapr/Durable backend
+execution or validate deployment-specific routes.
+
+For these six newly authored sources, the CLI also qualifies the exact
+source/configuration pair and privately expands native output before writing
+the project. It checks the known class/function-attribute layouts, including
+the service helper route, rather than deriving an identifier from the filename
+or applying a second argv normalizer. Actual generated function IDs must start
+with an ASCII letter, contain only ASCII letters, digits, `_` or `-`, and fit
+within the host's 128-character limit; `host` is reserved. Orchestrations leave
+room for `-HttpStart` (main name at most 118 characters), publishers for
+`-TopicTrigger` (115), and service invocations for `-Invoke` (121). Native space
+and hyphen normalization is retained; Unicode-only, leading-digit and
+leading-underscore IDs are refused rather than producing host-invalid metadata.
+Raw older sources retain their existing behavior without a latest-version gate.
+Conflicting source proofs or changed canonical sources refuse before writes.
+The helper-ID hyphen separates these helpers from native C# primary IDs,
+whose `sourceName` normalization converts hyphens to underscores. Thus an
+ordinary `Foo_Invoke` primary does not collide with the helper `Foo-Invoke`.
+This is not project-wide semantic analysis of arbitrary authored function IDs,
+and existing projects are not automatically cleaned up.
+
+## Nullable example models
+
+`nullable-models.json` qualifies seven owned C# model sources and their exact
+preceding raw/J/auxiliary adaptation bytes. Fourteen uninitialized string
+properties are annotated `string?`: Cosmos DB's `id`/`Text`, SignalR's
+`Url`/`AccessToken`, and `Id`/`Description` in Kusto, SQL and MySQL output/trigger
+models. These properties already defaulted to null at runtime. No initializer,
+required member, null-forgiving operator, serializer attribute or warning
+suppression is added. CLR property types, missing/explicit-null JSON behavior
+and serialized property names/values remain unchanged.
+
+The Cosmos DB document and Kusto output model also become nested
+`<FunctionName>Document` and `<FunctionName>Item`, with every reference
+substituted by the native engine. This prevents the same fixed-model collision
+when repeating these items or keeping an existing user `MyDocument`/`ToDoItem`.
+Original provenance is checked and retained even when an earlier qualified
+adaptation already owns the source. No user DTO is inspected or rewritten.
+Generated-model integration checks compile repeated items with warnings as
+errors and exercise their actual CLR defaults and both supported sample JSON
+serializer shapes, without contacting any binding backend.
+
+## Binding string literals
+
+The 36 item configurations contain 23 literal-bearing items with 48 declared
+binding parameters. `binding-literals.json` pins their original sources and
+complete quoted source contexts. Namespace parameters, authorization choices,
+function names and SDK-bound/computed symbols are not string-literal inputs
+and are not escaped by this adaptation.
+
+Packing removes only the literal parameters' direct substitutions and adds
+native derived symbols using language-specific string-content forms. These
+chain the pinned engine's `jsonEncode` form with removal of its outer quotes.
+Its escapes (`\\`, `\"`, `\b`, `\f`, `\n`, `\r`, `\t`, `\uXXXX`) are valid
+in both ordinary C# and F# string literals; no JSON-only `\/` escape is emitted.
+Actual compiler and worker metadata checks separately qualify both languages.
+Only exact reviewed quoted contexts receive unique substitution tokens.
+SignalR's optional, default-less `HubName` retains its unique original token
+so omission still produces the authored `HubValue`, while explicit empty and
+nonempty values use the same literal form.
+Authored `SELECT * FROM ` prefixes and `/{name}` suffixes remain outside the
+transformation. Kusto example comments retain their original text instead of
+substituting user input into comments.
+
+Canonical parameters, defaults, help, choices and JSON argument reports retain
+the original values. Escaping happens once during native source rendering,
+not in argv parsing, the workflow request or generated applications.
+Original source bytes remain under `provenance/upstream-content/`; adapted
+configuration originals use `template.json.original` there, so the native
+engine cannot discover them as competing template definitions.
+
+`binding-literals-qualified.json` pins reviewed adapted configurations and
+sources for the CLI. Item preparation reads only the selected package, verifies
+the exact association and binds source hashes and the single source output
+through the native prewrite snapshot. Changed mappings, derived symbols,
+sources or package owners cannot borrow another installed template's proof.
+There is no new compiler or runtime dependency during ordinary scaffolding.
+The canonical authoring order is supporting types, auxiliary identities, nullable
+models, then binding literals. Overlapping source/configuration pairs are pinned
+after that composition. Literal, auxiliary and existing caller snapshots are
+combined without dropping a proof; mismatched hashes, identities, configurations
+or outputs produce a failed preparation. Known qualification failures retain
+the normal JSON failure result, while cancellation still propagates.
+
+Older compatible native packages retain their original configuration pins and
+can still render plain/default and valid Unicode inputs without newer
+provenance, receipt changes, cache migration or automatic update. Values needing
+source escaping are refused before writes with explicit selected-package
+update guidance. They are never pre-escaped into an old template or silently
+rendered with a different compiled binding value. This does not repair
+previously generated source or validate a value against a live binding backend.
+Unpaired UTF-16 surrogates are refused in both cohorts before source encoding;
+they are not valid Unicode and must not silently become replacement characters.
+The exact earlier literal-only SignalR source also retains its original fixed
+helper behavior rather than acquiring newer auxiliary-name admission implicitly.
+The original unfixed MySQL trigger source cannot preserve even a plain table
+value because its `table1` token appends an extra `1`. That exact incompatible
+source is refused with the same selected-owner update guidance; the corrected
+older supporting-type cohort remains usable.
 
 ## Deliberately staged
 
@@ -106,6 +270,25 @@ An exact already-included sequence is a no-op. Path/digest/cancellation and
 commit-time guards do not claim a transaction against an unsynchronized
 external editor; changes are checked immediately before replacement.
 
+Explicit item `--force` also permits replacement of exact native-selected root
+`.fs` outputs, never project-root cleanup. Preparation captures each existing
+regular file's hash and the privately rendered replacement hash. Both dependency
+planning passes require force, the exact source/configuration proof, matching
+native Change/Overwrite effects and evaluated primary outputs. The engine
+rechecks existing target and project hashes immediately before writes, then
+verifies native-generated source hashes before controlled effects. Missing,
+drifted, linked, directory, inferred or out-of-root targets remain refusals.
+
+An already compiled replacement retains its exact evaluated/direct `Compile`
+position, even when later source files follow it; its project bytes are not
+rewritten and no duplicate entry is added. An existing but uncompiled file uses
+the same qualified insertion-before-`Program.fs` contract. Conditional/imported/
+globbed/partially included sequences are not newly supported. The two F# items
+without binding parameters have separate original source pins in
+`fsharp-control-sources.json`; literal-bearing items reuse their existing
+source proofs. No-force conflicts, cancellation and structured source failures
+retain their existing behavior.
+
 The original native omission characterization remains a before-state test.
 A separate actual native F# project/HTTP integration test applies the updater,
 executes the native package reference and restores the exact selected `.fsproj`,
@@ -160,7 +343,7 @@ the upstream template defaults to `net8.0`; explicit unsupported framework
 input is rejected. Omitted namespace uses the evaluated project namespace,
 while explicit namespace is retained. Both distinctions use the authoritative
 canonical explicit-option provenance from the shared argument parser, not a
-second alias parser. Upstream template configurations remain unchanged.
+second alias parser. Except for the qualified literal-derived symbols, upstream template configurations remain unchanged.
 
 Actual `InitExecutionRunner` and `NewExecutionRunner` tests use this production
 provider/composer without private test capabilities for both languages. They

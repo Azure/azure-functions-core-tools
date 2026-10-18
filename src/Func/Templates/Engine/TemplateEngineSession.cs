@@ -349,9 +349,10 @@ internal class TemplateEngineSession : IDisposable
         if (expandFiles)
         {
             if (string.IsNullOrWhiteSpace(request.Name) || effects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create
-                && !(cleanupPreview && change.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite)))
+                && !(cleanupPreview && change.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite)
+                && !IsForcedItemReplacement(change)))
             {
-                return Failed("Private native expansion requires an explicit effective name and create-only native outputs.");
+                return Failed("Private native expansion requires an explicit effective name and create-only outputs or explicitly forced regular item files.");
             }
 
             using Common.TempDirectory temporary = fileSystem.CreateTempDirectory();
@@ -457,6 +458,15 @@ internal class TemplateEngineSession : IDisposable
 
         static NativeTemplatePreparationResult Failed(string message) =>
             new(null, new(TemplateInvocationStatus.InvalidTemplate, [], message));
+
+        bool IsForcedItemReplacement(IFileChange change)
+        {
+            string path = Path.GetFullPath(Path.Combine(request.OutputDirectory.Info.FullName, change.TargetRelativePath));
+            return request.Force && configuration.Type == TemplateType.Item
+                && change.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite
+                && change is IFileChange2 source && !sourcePlaceholders.Contains(Path.GetFileName(source.SourceRelativePath), StringComparer.Ordinal)
+                && _host.FileSystem.FileExists(path) && !_host.FileSystem.DirectoryExists(path);
+        }
     }
 
     public virtual async Task<IReadOnlyCollection<string>> ReadPackageTypesAsync(ITemplatePackage? package, CancellationToken cancellationToken)
@@ -568,7 +578,9 @@ internal class TemplateEngineSession : IDisposable
                 || !string.Equals(Context.Project?.Stack, "dotnet", StringComparison.OrdinalIgnoreCase)
                 || Context.Project?.Language != "F#"
                 || request.MsBuildBindings?.TargetFramework != "net10.0"
-                || Path.GetExtension(request.EffectSupport.ExactProjectPath) != ".fsproj"))
+                || Path.GetExtension(request.EffectSupport.ExactProjectPath) != ".fsproj"
+                || (request.EffectSupport.FSharpRepair.GeneratedFiles.Any(file => file.ExpectedTargetSha256 is not null)
+                    && (!request.Force || request.SourceSnapshot is null))))
         {
             return new(TemplateInvocationStatus.InvalidArguments, [],
                 "F# compile repair requires the selected F# item, an exact evaluated net10.0 .fsproj snapshot and its controlled dependency capability.");
@@ -711,7 +723,7 @@ internal class TemplateEngineSession : IDisposable
             NativeTemplateEffectPlanner planner = new();
             NativeTemplateEffectPlanningResult planned = effectSupport.FSharpRepair is { } repair
                 ? planner.PlanFSharpItemDependencies(effectSupport.ProjectDirectory, selectedSource, preview.CreationEffects,
-                    request.OutputDirectory, effectSupport.ExactProjectPath, repair)
+                    request.OutputDirectory, effectSupport.ExactProjectPath, repair, request.Force)
                 : planner.PlanDependencies(effectSupport.ProjectDirectory, selectedSource, preview.CreationEffects.CreationResult,
                     qualifiedDotNetProject ? configurationPlans.Single().PrimaryOutput : effectSupport.ExactProjectPath);
             if (planned.Plan is null)
@@ -755,6 +767,11 @@ internal class TemplateEngineSession : IDisposable
 
         if (request.DryRun)
         {
+            if (request.EffectSupport?.FSharpRepair is { } previewRepair
+                && await ValidateFSharpTargetsAsync(previewRepair, generated: false, cancellationToken) is { } targetFailure)
+            {
+                return new(TemplateInvocationStatus.TemplateChanged, [], targetFailure);
+            }
             return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null)
             {
                 ProjectConfigurations = configurationPlans,
@@ -779,6 +796,13 @@ internal class TemplateEngineSession : IDisposable
         if (outputFailure is not null)
         {
             return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
+        }
+        if (request.EffectSupport?.FSharpRepair is { } pendingRepair)
+        {
+            if (await ValidateFSharpTargetsAsync(pendingRepair, generated: false, cancellationToken) is { } targetFailure)
+            {
+                return new(TemplateInvocationStatus.TemplateChanged, [], targetFailure);
+            }
         }
 
         ITemplateCreationResult created;
@@ -830,6 +854,11 @@ internal class TemplateEngineSession : IDisposable
 
         if (projectSupport is null)
         {
+            if (request.EffectSupport?.FSharpRepair is { } appliedRepair
+                && await ValidateFSharpTargetsAsync(appliedRepair, generated: true, cancellationToken) is { } generatedFailure)
+            {
+                return new(TemplateInvocationStatus.EffectFailure, written, generatedFailure);
+            }
             if (effectPreview is not null && request.EffectSupport is { } effects)
             {
                 NativeTemplateEffectResult applied = await new NativeTemplateEffectWorkflow().ExecuteAsync(
@@ -915,6 +944,57 @@ internal class TemplateEngineSession : IDisposable
             ProjectConfigurations = configurationPlans,
             ConfiguredProjects = configuredProjects.AsReadOnly(),
         };
+    }
+
+    private async Task<string?> ValidateFSharpTargetsAsync(TemplateFSharpCompileEffect repair, bool generated, CancellationToken cancellationToken)
+    {
+        try
+        {
+            foreach (TemplateGeneratedFSharpFile file in repair.GeneratedFiles)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string? expected = generated ? file.Sha256 : file.ExpectedTargetSha256;
+                if (expected is null)
+                {
+                    if (_host.FileSystem.FileExists(file.Path) || _host.FileSystem.DirectoryExists(file.Path))
+                    {
+                        return "An F# native output became occupied after preparation; rerun the command.";
+                    }
+                    continue;
+                }
+                if (!_host.FileSystem.FileExists(file.Path) || _host.FileSystem.DirectoryExists(file.Path))
+                {
+                    return "The qualified F# native target is no longer a regular file; rerun the command.";
+                }
+                if ((_host.FileSystem.GetFileAttributes(file.Path) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+                {
+                    return "The qualified F# native target became linked or occupied; rerun the command.";
+                }
+                using Stream stream = _host.FileSystem.OpenRead(file.Path);
+                if (!string.Equals(Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken)),
+                    expected, StringComparison.OrdinalIgnoreCase))
+                {
+                    return generated ? "The native-generated F# source does not match its qualified rendered hash."
+                        : "The selected F# replacement target changed after preparation; rerun the command.";
+                }
+            }
+            if ((_host.FileSystem.GetFileAttributes(repair.ProjectPath) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+            {
+                return "The selected F# project became linked or occupied; rerun the command.";
+            }
+            using Stream project = _host.FileSystem.OpenRead(repair.ProjectPath);
+            return string.Equals(Convert.ToHexString(await SHA256.HashDataAsync(project, cancellationToken)),
+                repair.ExpectedProjectSha256, StringComparison.OrdinalIgnoreCase) ? null
+                    : "The selected F# project changed after preparation; rerun the command.";
+        }
+        catch (IOException exception)
+        {
+            return $"The qualified F# native target or project could not be read: {exception.Message}";
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return $"The qualified F# native target or project could not be read: {exception.Message}";
+        }
     }
 
     private static TemplateInvocationResult ConfigurationFailure(Exception exception, IReadOnlyList<TemplateFileChange> changes,

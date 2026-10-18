@@ -419,8 +419,8 @@ public sealed partial class BundledPythonTemplateTests : IDisposable
         using var archive = new PackageArchiveReader(_archive);
         var snapshot = _channels.RootElement.EnumerateArray().Single(entry => entry.GetProperty("channel").GetString() == channel);
         var root = Path.Combine(_root, "selected-bundles", channel);
-        Directory.CreateDirectory(Path.Combine(root, "bin"));
-        var path = Path.Combine(root, "bin", "extensions.json");
+        Directory.CreateDirectory(Path.Combine(root, snapshot.GetProperty("bundleVersion").GetString()!, "bin"));
+        var path = Path.Combine(root, snapshot.GetProperty("bundleVersion").GetString()!, "bin", "extensions.json");
         var json = Read(archive, $"source/bundles/{channel}/extensions.json");
         if (missingBinding is not null)
         {

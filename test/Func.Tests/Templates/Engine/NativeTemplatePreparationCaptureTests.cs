@@ -2,7 +2,9 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text;
+using System.Security.Cryptography;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge.Template;
@@ -108,6 +110,35 @@ public sealed class NativeTemplatePreparationCaptureTests : IDisposable
 
         await act.Should().ThrowAsync<OperationCanceledException>();
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Capture_ForcedItemThenSelectedSourceDrifts_InvokeRefusesWithoutOverwritingUserContent(bool configurationDrift)
+    {
+        using var templater = await OpenAsync();
+        var selected = (await templater.ResolveGroupAsync("Controlled.Preparation", TemplateType.Item)).Group![0];
+        string content = Path.Combine(Package, "ItemName.fs");
+        var pin = new TemplateEffectSource(selected.Entry.Identity, "ItemName.fs",
+            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(content))));
+        Directory.CreateDirectory(Target);
+        string occupied = Path.Combine(Target, "Named.fs");
+        File.WriteAllText(occupied, "preserved real source");
+        var request = new TemplateInvocationRequest(WorkingDirectory.FromExplicit(Target), new Dictionary<string, string?>(), "Named",
+            DryRun: true, Force: true)
+        {
+            SourceSnapshot = new(selected.Entry.Identity, selected.ConfigurationSha256!, [pin], [new("ItemName.fs", pin)]),
+        };
+        var captured = await selected.CaptureNativePreparationAsync(request, new PhysicalFileSystem(), expandFiles: true, CancellationToken.None);
+        captured.Failure.Should().BeNull(captured.Failure?.Diagnostic);
+        File.AppendAllText(configurationDrift ? Configuration : content, Environment.NewLine + "changed after capture");
+
+        var invoked = await selected.InvokeAsync(request with { DryRun = false }, CancellationToken.None);
+
+        invoked.Status.Should().Be(TemplateInvocationStatus.TemplateChanged);
+        File.ReadAllText(occupied).Should().Be("preserved real source");
+        Directory.GetFiles(Target).Should().Equal(occupied);
     }
 
     [Theory]

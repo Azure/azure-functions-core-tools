@@ -19,6 +19,8 @@ internal sealed record NewExecutionRequest(
     IReadOnlyList<string> RawTemplateTokens,
     IReadOnlySet<string> ReservedAliases)
 {
+    public string? Search { get; init; }
+
     public NativeItemOutputIntent OutputIntent { get; init; } = NativeItemOutputIntent.LiteralOutput;
 
     public INativeItemCompatibility? ItemCompatibility { get; init; }

@@ -18,7 +18,7 @@ internal interface IPythonTemplateAppendExecutor
     /// <exception cref="ArgumentException">A path, snippet or digest is invalid.</exception>
     /// <exception cref="FileNotFoundException">The approved app file no longer exists.</exception>
     /// <exception cref="DirectoryNotFoundException">The app's parent directory no longer exists.</exception>
-    /// <exception cref="InvalidOperationException">The approved app file's bytes have changed.</exception>
+    /// <exception cref="InvalidOperationException">The approved app changed or a statically known name collides.</exception>
     /// <exception cref="IOException">The file cannot be opened or appended; a failed write can leave a partial append.</exception>
     /// <exception cref="UnauthorizedAccessException">The app file cannot be accessed.</exception>
     /// <exception cref="OperationCanceledException">Cancellation interrupted the operation; cancellation during writing can leave a partial append.</exception>

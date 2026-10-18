@@ -37,6 +37,16 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
     internal static bool IsNonInteractive(NewCommand command, ParseResult parsed) => IsJsonOutput(command, parsed)
         || parsed.GetResult(command.NonInteractiveOption)?.GetValueOrDefault<bool>() == true;
 
+    internal static bool IsInitJsonOutput(InitCommand command, ParseResult parsed)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(parsed);
+        return string.Equals(parsed.GetResult(command.OutputOption)?.GetValueOrDefault<string?>(), "json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool IsInitNonInteractive(InitCommand command, ParseResult parsed) => IsInitJsonOutput(command, parsed)
+        || parsed.GetResult(command.NonInteractiveOption)?.GetValueOrDefault<bool>() == true;
+
     public IReadOnlyList<FuncCliCommand> CreateCommands()
     {
         InitCommand init = ActivatorUtilities.CreateInstance<InitCommand>(_services);
@@ -68,11 +78,23 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
             return _items.Render(NewExecutionResult.Reject("invalidPath", $"Supply a valid project path. {exception.Message}"), json);
         }
 
-        HashSet<Option> host = [command.NameOption, command.TemplateOption, command.ForceOption, command.NonInteractiveOption, command.ListOption, command.OutputOption];
+        HashSet<Option> host =
+        [
+            command.NameOption, command.TemplateOption, command.ForceOption, command.NonInteractiveOption,
+            command.ListOption, command.SearchOption, command.DryRunOption, command.OutputOption,
+        ];
         var input = NativeTemplateCommandInput.CaptureEntry(command, parsed, raw.Tokens, host, raw.PathIndex);
+        if (input.HostDiagnostics.Count > 0)
+        {
+            return _items.Render(NewExecutionResult.Reject("invalidArguments", [.. input.HostDiagnostics]), json);
+        }
         var request = new NewExecutionRequest(raw.Directory, parsed.GetValue(command.TemplateOption), parsed.GetValue(command.NameOption),
-            null, parsed.GetValue(command.ForceOption), IsNonInteractive(command, parsed), false, parsed.GetValue(command.ListOption),
-            json, input.NativeTokens, input.ReservedAliases) { OutputIntent = NativeItemOutputIntent.LegacyWorkflowRelative };
+            null, parsed.GetValue(command.ForceOption), IsNonInteractive(command, parsed), parsed.GetValue(command.DryRunOption),
+            parsed.GetValue(command.ListOption), json, input.NativeTokens, input.ReservedAliases)
+        {
+            OutputIntent = NativeItemOutputIntent.LegacyWorkflowRelative,
+            Search = parsed.GetValue(command.SearchOption),
+        };
         NewExecutionResult result = await _composer.Value.ExecuteItemAsync(request, cancellationToken);
         return _items.Render(result with
         {
@@ -82,6 +104,13 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
 
     private async Task<int> ExecuteInitAsync(InitCommand command, ParseResult parsed, CancellationToken cancellationToken)
     {
+        string? output = parsed.GetValue(command.OutputOption);
+        bool json = IsInitJsonOutput(command, parsed);
+        if (output is not null && !json && !string.Equals(output, "plain", StringComparison.OrdinalIgnoreCase))
+        {
+            return _projects.Render(InitExecutionResult.Reject("invalidOutput", "Use --output plain or --output json."), false);
+        }
+
         (IReadOnlyList<string> Tokens, int? PathIndex, Common.WorkingDirectory Directory) raw;
         try
         {
@@ -89,13 +118,22 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
         {
-            return _projects.Render(InitExecutionResult.Reject("invalidPath", $"Supply a valid project path. {exception.Message}"), false);
+            return _projects.Render(InitExecutionResult.Reject("invalidPath", $"Supply a valid project path. {exception.Message}"), json);
         }
         var input = NativeTemplateCommandInput.CaptureEntry(command, parsed, raw.Tokens,
-            new HashSet<Option> { command.StackOption, command.NameOption, command.LanguageOption, command.ForceOption }, raw.PathIndex);
+            new HashSet<Option>
+            {
+                command.StackOption, command.NameOption, command.LanguageOption, command.ForceOption,
+                command.DryRunOption, command.NonInteractiveOption, command.OutputOption,
+            }, raw.PathIndex);
+        if (input.HostDiagnostics.Count > 0)
+        {
+            return _projects.Render(InitExecutionResult.Reject("invalidArguments", [.. input.HostDiagnostics]), json);
+        }
         var request = new InitExecutionRequest(raw.Directory, null, parsed.GetValue(command.NameOption),
             parsed.GetValue(command.StackOption), parsed.GetValue(command.LanguageOption), parsed.GetValue(command.ForceOption),
-            !_interaction.IsInteractive, false, false, input.NativeTokens, input.ReservedAliases)
+            IsInitNonInteractive(command, parsed) || !_interaction.IsInteractive, parsed.GetValue(command.DryRunOption),
+            json, input.NativeTokens, input.ReservedAliases)
         {
             TargetPolicy = InitExecutionTargetPolicy.PublicCompatible,
             ExistingProjectTokens = NativeTemplateCommandInput.CaptureEntry(command, parsed, raw.Tokens,
@@ -105,7 +143,7 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
         return _projects.Render(result with
         {
             ArgumentResults = Array.AsReadOnly<TemplateCandidateParseResult>([.. result.ArgumentResults.Select(input.RestoreProvenance)]),
-        }, false);
+        }, json);
     }
 
     public CommandLineAction CreateHelpAction(HelpCommand help, CommandLineAction fallback)
@@ -140,7 +178,18 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
 
             TemplateConstraintEvaluationSnapshot availability = await binding._availability.CaptureAsync(cancellationToken);
             availability = binding._stackCompatibility.Value.ForStack(availability, context.Context!.Project!.Stack!);
-            using Templater templater = await binding._templates.CreateAsync(context.Context!, availability, cancellationToken);
+            Templater selectedTemplates;
+            try
+            {
+                selectedTemplates = await binding._templates.CreateAsync(
+                    context.Context! with { RequireCleanStore = true }, availability, cancellationToken);
+            }
+            catch (TemplateStoreRecoveryRequiredException exception)
+            {
+                binding._interaction.WriteError(exception.Message);
+                return 1;
+            }
+            using Templater templater = selectedTemplates;
             TemplateResolutionResult resolved;
             try
             {

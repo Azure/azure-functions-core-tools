@@ -74,13 +74,32 @@ remain `Azure.Functions.Node.Http.JavaScript|TypeScript`, with legacy IDs as
 source-declared aliases.
 
 Non-name parameters retain the original prompt IDs, kebab-case option aliases,
-required/default values, choices and resource descriptions. Only tokens actually
-present in the owned source are replaced. In particular, most existing
-connection/path/schedule prompts are no-ops in these payloads, and MCP
-resource/tool registration names are fixed literals. This migration does not
-silently repair those inherited semantics, add package dependencies, or run
-shell actions. The command-owned `--name` replaces the original function-name
-input where the payload uses it.
+required/default values, choices and resource descriptions. Native authoring
+now makes all 14 distinct advertised non-name prompts operative for JavaScript
+and TypeScript: Timer schedule; Queue connection/name; Blob and Event Grid
+Blob connection/path; Event Hub name; Service Bus connection/queue/topic/
+subscription; and the existing Cosmos connection/database/collection/lease
+properties. This intentionally repairs inherited raw payloads that ignored
+those inputs. Advertised defaults are authoritative, including Event Hub and
+Service Bus defaults that differ from their old hardcoded literals.
+
+The converter replaces exactly one reviewed property declaration associated
+with the original template kind, prompt ID, assignment token and literal.
+Before replacement, both the converter and runtime qualifier verify a reviewed
+fingerprint of the entire raw body for each parameterized item. Only CRLF/LF
+representation differences are normalized. Unexpected body edits, including
+comments, template literals and unrelated objects, require source-association
+review and updated reviewed fingerprints; a matching line alone grants no
+substitution authority. Normal owned comments and unrelated literals remain
+unchanged. Missing, changed or ambiguous declarations fail packing.
+Derived native symbols JSON-escape string
+content and escape apostrophes before insertion into single-quoted JavaScript
+strings. The lease choice is emitted as a lowercase Boolean literal, never a
+quoted string. These generated symbols are not extra user parameters. This
+does not introduce CRON validation, change Cosmos API property names, supply
+unadvertised Event Hub connections, add dependencies or run shell actions.
+MCP resource/tool registration names remain fixed literals. The command-owned
+`--name` replaces the original function-name input where the payload uses it.
 The native parameter projection reserves `name` for the command; it does not
 carry the legacy function-name regex. The baseline staged facade also supplies
 the output-directory name as the native fallback when `--name` is omitted.
@@ -133,8 +152,10 @@ all-required, case-insensitive binding checks and fresh source capture across
 stable/preview/experimental identities; they do not equate the old pack-time
 latest-channel filter with the selected runtime bundle. The bridge tests
 exercise all owned items' omitted/explicit names, display/ID aliases, hidden
-explicit IDs, original regex rejection, unchanged no-op prompt semantics and
-existing-source preservation. Missing or altered mapped provenance, native
+explicit IDs, original regex rejection and existing-source preservation.
+The canonical-options check separately executes the physical legacy engine
+to retain evidence of its unchanged ignored Queue inputs, then verifies the
+intentional native parameter behavior. Missing or altered mapped provenance, native
 payloads, package versions and configuration hashes refuse before generation.
 Public command routing and default service registration remain unchanged.
 
@@ -185,11 +206,26 @@ the source conditions; the native engine does both from the authored config.
 
 `NodeItemSourceQualifier` retains the original single-job/action/body
 association and native configuration/payload checks without selecting a
-target. `NodeTemplateWorkflowProvider` supplies a directory-free generic
+target. It independently reconstructs the reviewed property canonicalization
+and verifies its exact derived symbols and escaping forms. Raw source proof
+remains byte-exact and hash-bound; only the authored native body contains
+parameter placeholders. A changed raw declaration, assignment, escaping form,
+symbol source or native body refuses qualification rather than weakening the
+raw/native equality check. `NodeTemplateWorkflowProvider` supplies a directory-free generic
 source snapshot in both modes: exact selected identity/configuration hash,
 manifest, config, host, native body and all four original source-file pins,
 plus the expected native regular-file source. Shared engine guards revalidate
 these pins before preview and creation and reject extra/wrong-kind outputs.
+The exact historical encoding without forms or derived substitutions is also
+qualified through the same body fingerprints, graph, layout and selected-source
+pins. It can execute only when **every effective parameter** equals the
+independently reviewed raw operative literal. Thus an older Timer's default
+schedule remains usable without an update; a custom schedule it cannot apply
+refuses before writes with explicit same-owner workload-update guidance.
+Event Hub and Service Bus advertised defaults that disagree with their raw
+literals do not qualify by omission. Mixed encodings and unsupported inputs
+never fall back to silently ignored parameters. There is no version/latest
+allowlist, automatic workload update or native-cache migration.
 The runtime Node directory planner and typed placement override are removed.
 `LiteralOutput` remains the default for staged/direct-native callers.
 
@@ -207,6 +243,46 @@ base (the original command directory), not a CLI-derived target parent.
 Nested `invocation.changes` paths identify the actual authored destinations.
 This is an intentional internal result-semantics change; property names are
 unchanged.
+
+### Name-scoped Node Dapr helpers
+
+Newly authored JavaScript Dapr Publish items register the requested primary
+name and `<Name>-Topic`; Service Invocation items register the requested
+primary name and `<Name>-Invoke`. The service helper route is
+`<Name>/invoke/{appId}/{methodName}`. Both the Dapr CLI caller and HTTP caller
+examples use the generated primary name, and the HTTP example includes the
+same route prefix. Exact requested ASCII casing is preserved through the native
+`sourceName` substitution. Existing generic log messages, Dapr topic/pubsub,
+binding `appId`/`methodName` placeholders, payloads, HTTP methods and
+authorization remain unchanged.
+
+These two original raw bodies are pinned in full before exact helper/caller/
+route conversions, separately from their byte-exact vendor provenance.
+Partial conversions, extra replacement symbols or unreviewed body edits do
+not qualify. No TypeScript Dapr entries are synthesized. Different requested
+primary names produce different helpers and helper routes. The helper-only
+hyphen separates these IDs from primary names allowed by the unchanged owned
+Node validator, preventing ordinary CLI HTTP/Dapr primary names such as
+`Foo_Invoke` from colliding with `Foo-Invoke`. This is not a
+project-wide JavaScript registration or arbitrary user-code collision scan.
+Existing source files and routes are never rewritten.
+
+The existing 128-character function-name contract applies to generated helper
+IDs too: Publish primary names are limited to 122 characters and Service
+primary names to 121. Preview and creation reject longer names before writes,
+with a shorter-name instruction; names are never truncated or hashed.
+The reserved primary name `host` is also rejected case-insensitively before
+writes for these affected items.
+
+Older native archives containing the fixed helper IDs or fixed service route,
+and the earlier underscore-derived encoding without primary/helper separation,
+cannot meet this new repeat-safe helper contract. Selecting **either of these
+two items**, even for its first/default name, now requires an explicit update
+of the captured owning workload. No update occurs during generation. This
+intentional selected-feature incompatibility does not block old project
+initialization, HTTP items, matching-literal Timer items or other compatible
+templates. It does not silently retain duplicate helpers, scan/execute user
+JavaScript, impose a latest-version gate or migrate native caches.
 
 `NodeStagedEntryPlacementTests.cs` additionally exercises the explicit
 `NativeCliEntryPoint` full argv/boot/parser path. Existing public `[path]`

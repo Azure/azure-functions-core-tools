@@ -76,6 +76,7 @@ internal sealed class InitExecutionRunner(
         }
 
         InitExecutionTarget target;
+        IReadOnlyList<string> plannedCleanup = [];
         try
         {
             if (publicCompatibility && _targets.GetPathDiagnostic(request.WorkingDirectory) is { } pathDiagnostic)
@@ -85,6 +86,10 @@ internal sealed class InitExecutionRunner(
 
             target = publicCompatibility && request.Force ? new(InitExecutionTargetState.Empty)
                 : await _targets.InspectAsync(request.WorkingDirectory, cancellationToken);
+            if (publicCompatibility && request.Force)
+            {
+                plannedCleanup = _targets.GetPlannedCleanup(request.WorkingDirectory);
+            }
             if (publicCompatibility && target.State == InitExecutionTargetState.Unsupported)
             {
                 target = new(InitExecutionTargetState.Empty);
@@ -220,7 +225,10 @@ internal sealed class InitExecutionRunner(
         {
             availability = _stackCompatibility.ForStack(availability, requestedStack.Stack);
         }
-        TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null));
+        TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null))
+        {
+            RequireCleanStore = request.DryRun,
+        };
         cancellationToken.ThrowIfCancellationRequested();
         TemplateProjectSupport support = _projectSupport();
         if (_workflows is not null)
@@ -240,6 +248,7 @@ internal sealed class InitExecutionRunner(
         return result with
         {
             Context = context,
+            PlannedCleanup = plannedCleanup,
             Diagnostics = publicCompatibility && requestedStack is not null && _stackCompatibility is not null
                 && result.Kind is "noCompatibleTemplates" or "workflowUnavailable" or "workflowPreparationFailed" or "preparationUnavailable"
                 ? [.. result.Diagnostics, _stackCompatibility.RecoveryHint(requestedStack.Stack)] : result.Diagnostics,
@@ -765,7 +774,8 @@ internal sealed class InitExecutionRunner(
             if (_targets.HasNonGitContent(request.WorkingDirectory))
             {
                 _interaction.WriteWarning($"--force will delete all files in '{request.WorkingDirectory.Info.FullName}' (except .git) before initializing.");
-                if (!await _interaction.ConfirmAsync("Continue?", defaultValue: false, whenInputUnavailable: true, cancellationToken))
+                if (!request.NonInteractive
+                    && !await _interaction.ConfirmAsync("Continue?", defaultValue: false, whenInputUnavailable: true, cancellationToken))
                 {
                     return InitExecutionResult.Reject("declined", "Init cancelled. The directory was not modified.");
                 }

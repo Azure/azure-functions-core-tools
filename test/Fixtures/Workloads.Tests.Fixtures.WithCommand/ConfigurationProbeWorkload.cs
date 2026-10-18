@@ -20,7 +20,14 @@ public sealed class ConfigurationProbeWorkload : Workload
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddOptions<ProbeOptions>().Configure<IConfiguration>((options, configuration) => options.Value = configuration["review:value"]);
+        builder.Services.AddOptions<ProbeOptions>().Configure<IConfiguration>((options, configuration) =>
+        {
+            options.Value = configuration["review:value"];
+            if (configuration["review:configureMarker"] is { Length: > 0 } marker)
+            {
+                File.AppendAllText(marker, options.Value + "\n");
+            }
+        });
         builder.Services.AddOptions<ProbeOptions>("named").Configure<IConfiguration>((options, configuration) => options.Value = configuration["review:named"]);
         builder.RegisterCommand<ProbeCommand>();
     }
@@ -54,8 +61,8 @@ public sealed class ConfigurationProbeWorkload : Workload
         {
             ArgumentNullException.ThrowIfNull(context);
             cancellationToken.ThrowIfCancellationRequested();
-            bool values = context.GetValue(_target) is "new" or "init" or "ordinary"
-                && context.GetValue(_value) is "new" or "init" or "ordinary";
+            bool values = context.GetValue(_target) is "new" or "init" or "ordinary" or "workload"
+                && context.GetValue(_value) is "new" or "init" or "ordinary" or "workload";
             // A distinct nonzero witness proves the handler ran rather than first-run/help returning success.
             return Task.FromResult(values && _captured == "project" && _named == "project" && _direct == "project" ? 73 : 43);
         }

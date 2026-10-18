@@ -126,7 +126,7 @@ public sealed partial class BundledPythonTemplateTests
         builder.Tags.Add("alias:bundles");
         builder.PackageTypes.Add(new PackageType(WorkloadPackageTypes.Workload, new Version(0, 0)));
         builder.Files.Add(new PhysicalPackageFile { SourcePath = manifest, TargetPath = "workload.json" });
-        builder.Files.Add(new PhysicalPackageFile { SourcePath = extensions, TargetPath = "tools/any/bin/extensions.json" });
+        builder.Files.Add(new PhysicalPackageFile { SourcePath = extensions, TargetPath = "tools/any/4.35.0/bin/extensions.json" });
         var archive = Path.Combine(root, "metadata-bundle.nupkg");
         using var stream = File.Create(archive);
         builder.Save(stream);

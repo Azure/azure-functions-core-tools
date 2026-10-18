@@ -1194,13 +1194,39 @@ public sealed partial class BundledNodeTemplateTests
         JsonNode manifest;
         using (var input = new StreamReader(manifestEntry.Open())) manifest = JsonNode.Parse(input.ReadToEnd())!;
         manifest["runtimeIdentifier"] = runtimeIdentifier;
+        string contentRoot = $"tools/{runtimeIdentifier}/";
+        string assembly = manifest["entryPoint"]!["assemblyPath"]!.GetValue<string>();
+        manifest["entryPoint"]!["assemblyPath"] = contentRoot + assembly["tools/any/".Length..];
         manifestEntry.Delete();
-        using var writer = new StreamWriter(zip.CreateEntry("workload.json").Open());
-        writer.Write(manifest.ToJsonString());
+        using (var writer = new StreamWriter(zip.CreateEntry("workload.json").Open())) writer.Write(manifest.ToJsonString());
+        foreach (var entry in zip.Entries.Where(entry => entry.FullName.StartsWith("tools/any/", StringComparison.Ordinal)).ToArray())
+        {
+            string target = contentRoot + entry.FullName["tools/any/".Length..];
+            using var contents = new MemoryStream();
+            using (var input = entry.Open()) input.CopyTo(contents);
+            entry.Delete();
+            using var output = zip.CreateEntry(target).Open();
+            contents.WriteTo(output);
+        }
+        if (bundled)
+        {
+            var declaration = zip.GetEntry(BundledTemplateInstaller.ManifestName)!;
+            JsonNode inventory;
+            using (var input = new StreamReader(declaration.Open())) inventory = JsonNode.Parse(input.ReadToEnd())!;
+            foreach (var asset in inventory["assets"]!.AsArray())
+            {
+                string assetPath = asset!["path"]!.GetValue<string>();
+                asset["path"] = contentRoot + assetPath["tools/any/".Length..];
+            }
+            declaration.Delete();
+            using var writer = new StreamWriter(zip.CreateEntry(BundledTemplateInstaller.ManifestName).Open());
+            writer.Write(inventory.ToJsonString());
+        }
         return path;
     }
 
-    private WorkloadInstaller MigrationInstaller(IBasicArtifactInspector inspector, IFileSystem? bundleFiles = null, IWorkloadStore? store = null)
+    private WorkloadInstaller MigrationInstaller(IBasicArtifactInspector inspector, IFileSystem? bundleFiles = null, IWorkloadStore? store = null,
+        IFileSystem? deploymentFiles = null)
     {
         var coordinator = new FileWorkloadOperationCoordinator(_paths);
         var runtime = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
@@ -1208,7 +1234,7 @@ public sealed partial class BundledNodeTemplateTests
         var selector = new WorkloadRidPackageSelector(runtime);
         var metadata = new WorkloadMetadataReader();
         return new(_source, new WorkloadPackageInspector(metadata, selector), selector,
-            new WorkloadDeploymentService(_paths, store ?? _workloads, metadata, coordinator, _files,
+            new WorkloadDeploymentService(_paths, store ?? _workloads, metadata, coordinator, deploymentFiles ?? _files,
                 new BundledTemplateInstaller(_templates, inspector, bundleFiles ?? _files, new(Home))),
             coordinator, store ?? _workloads, _files);
     }
@@ -1217,8 +1243,9 @@ public sealed partial class BundledNodeTemplateTests
     {
         string inner = Path.Combine(_root, $"user-{Guid.NewGuid():N}.nupkg");
         using var archive = new NuGet.Packaging.PackageArchiveReader(outerArchive);
+        var manifest = BundledTemplateInstaller.ReadManifest(Read(archive, BundledTemplateInstaller.ManifestName));
         using var output = File.Create(inner);
-        archive.GetStream("tools/any/templates/node-basic.nupkg").CopyTo(output);
+        archive.GetStream(manifest.Assets.Single().Path).CopyTo(output);
         return inner;
     }
 

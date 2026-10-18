@@ -162,7 +162,7 @@ public sealed partial class BundledNodeTemplateTests
         string project = Path.Combine(_root, "composed-bindings");
         (await composer.ExecuteProjectAsync(NodeComposedInit(project, "ts", ["--skip-npm-install", "true"]), CancellationToken.None)).Succeeded.Should().BeTrue();
         string target = Path.Combine(project, "src", "functions");
-        string metadata = Path.Combine(_root, "composed-bundle", "tools", "any", "bin", "extensions.json");
+        string metadata = Path.Combine(_root, "composed-bundle", "tools", "any", "4.35.0", "bin", "extensions.json");
 
         var listed = await composer.ExecuteItemAsync(NodeComposedItem(target, null) with { List = true }, CancellationToken.None);
         listed.Templates.Should().NotContain(template => template.IsHidden);
@@ -246,8 +246,8 @@ public sealed partial class BundledNodeTemplateTests
         services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
         services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();
         string bundleRoot = Path.Combine(_root, "composed-bundle");
-        Directory.CreateDirectory(Path.Combine(bundleRoot, "tools", "any", "bin"));
-        File.WriteAllText(Path.Combine(bundleRoot, "tools", "any", "bin", "extensions.json"), NodeBridgeExtensions);
+        Directory.CreateDirectory(Path.Combine(bundleRoot, "tools", "any", "4.35.0", "bin"));
+        File.WriteAllText(Path.Combine(bundleRoot, "tools", "any", "4.35.0", "bin", "extensions.json"), NodeBridgeExtensions);
         var bundles = Substitute.For<IInstalledBundleWorkloads>();
         bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([new InstalledBundleWorkload("4.35.0", bundleRoot)]);
         services.AddSingleton(bundles);

@@ -55,9 +55,14 @@ internal sealed class NewExecutionRunner(
             return NewExecutionResult.Reject("invalidName", "Supply a nonempty --name.");
         }
 
-        if (request.List && (request.RawTemplateTokens.Count > 0 || request.DryRun))
+        if (request.Search is not null && (!request.List || string.IsNullOrWhiteSpace(request.Search)))
         {
-            return NewExecutionResult.Reject("invalidListArguments", "Use --list without template arguments or --dry-run.");
+            return NewExecutionResult.Reject("invalidSearch", "Use --list --search <nonempty text> to filter installed item templates.");
+        }
+
+        if (request.List && (request.RawTemplateTokens.Count > 0 || request.DryRun || request.Force || request.Name is not null))
+        {
+            return NewExecutionResult.Reject("invalidListArguments", "Use --list without template arguments, --name, --force or --dry-run.");
         }
 
         bool canPrompt = !request.NonInteractive && _interaction.IsInteractive;
@@ -69,6 +74,7 @@ internal sealed class NewExecutionRunner(
         }
 
         TemplateEngineContext context = resolved.Context ?? throw new InvalidOperationException("Context resolution returned no outcome.");
+        context = context with { RequireCleanStore = request.DryRun || request.List };
         if (_stackCompatibility?.GetDiagnostic(context.Project!.Stack!) is { } diagnostic)
         {
             return NewExecutionResult.Reject("stackUpdateRequired", diagnostic) with { Context = context };
@@ -119,6 +125,14 @@ internal sealed class NewExecutionRunner(
                 {
                     visible = [.. visible.Where(entry => string.Equals(entry.Identity, reference, StringComparison.Ordinal)
                         || entry.ShortNames.Contains(reference, StringComparer.OrdinalIgnoreCase))];
+                }
+
+                if (request.Search is { } search)
+                {
+                    visible = [.. visible.Where(entry => entry.Identity.Contains(search, StringComparison.OrdinalIgnoreCase)
+                        || entry.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                        || entry.ShortNames.Any(name => name.Contains(search, StringComparison.OrdinalIgnoreCase))
+                        || entry.Description?.Contains(search, StringComparison.OrdinalIgnoreCase) == true)];
                 }
 
                 return new("listed", true) { Templates = Array.AsReadOnly(visible) };

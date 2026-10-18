@@ -9,7 +9,10 @@ namespace Azure.Functions.Cli.Workloads.Install;
 internal interface IWorkloadDeploymentService
 {
     public bool HasBundledTemplates(WorkloadEntry entry);
-    public Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken);
+    /// <summary>
+    /// Prepares retained payload evidence, preserving clean native-store admission through preparation and later validation when requested.
+    /// </summary>
+    public Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool requireCleanStore = false);
     /// <summary>
     /// Revalidates the leased registry and payload, optionally checking native registration without registering packages.
     /// </summary>

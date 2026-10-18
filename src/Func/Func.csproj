@@ -50,6 +50,7 @@
     <EmbeddedResource Include="../Workloads/Stacks/PowerShell/Templates/requirements.psd1" LogicalName="func.Templates.requirements.psd1" />
     <Compile Include="../Workloads/Stacks/Python/IPythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/IPythonTemplateAppendExecutor.cs" />
     <Compile Include="../Workloads/Stacks/Python/PythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/PythonTemplateAppendExecutor.cs" />
+    <Compile Include="../Workloads/Stacks/Python/PythonFunctionNameGuard.cs" Link="Templates/Python/Shared/PythonFunctionNameGuard.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -57,6 +58,14 @@
     <EmbeddedResource Include="Templates/Acquisition/BasicCompanions.json" LogicalName="Azure.Functions.Cli.Templates.Acquisition.BasicCompanions.json" />
     <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/upstream-configurations.json"
       Link="Templates/DotNet/upstream-configurations.json" LogicalName="Azure.Functions.Cli.Templates.DotNet.upstream-configurations.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/auxiliary-identities.json"
+      Link="Templates/DotNet/auxiliary-identities.json" LogicalName="Azure.Functions.Cli.Templates.DotNet.auxiliary-identities.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/binding-literals.json"
+      LogicalName="Azure.Functions.Cli.Templates.DotNet.binding-literals.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/binding-literals-qualified.json"
+      LogicalName="Azure.Functions.Cli.Templates.DotNet.binding-literals-qualified.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/fsharp-control-sources.json"
+      LogicalName="Azure.Functions.Cli.Templates.DotNet.fsharp-control-sources.json" />
   </ItemGroup>
 
   <ItemGroup>

@@ -44,6 +44,120 @@ public sealed class DotNetTemplateWorkflowProviderTests : IDisposable
     }
 
     [Theory]
+    [InlineData("Azure.Function.FSharp.Isolated.HttpTrigger.3.x", "--AccessRights", "Anonymous")]
+    [InlineData("Azure.Function.FSharp.Isolated.BlobTrigger.3.x", "--Path", "incoming/orders\\archive\"/入荷")]
+    public async Task ActualNewRunner_FSharpForcedReplacement_PreviewsWithoutWritesAndKeepsExistingCompilePosition(
+        string identity, string option, string value)
+    {
+        await InstallAsync();
+        using IServiceScope scope = Scope();
+        NativeTemplateWorkflowComposer workflow = scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>();
+        string root = Path.Combine(_root, "fsharp-force");
+        (await workflow.ExecuteProjectAsync(Init(root, "fsharp"), CancellationToken.None)).Succeeded.Should().BeTrue();
+        NewExecutionRequest first = Item(root) with { TemplateReference = identity, Name = "First", RawTemplateTokens = [option, value] };
+        (await workflow.ExecuteItemAsync(first, CancellationToken.None)).Succeeded.Should().BeTrue();
+        NewExecutionRequest later = Item(root) with { Name = "Later" };
+        (await workflow.ExecuteItemAsync(later, CancellationToken.None)).Succeeded.Should().BeTrue();
+        string project = Directory.GetFiles(root, "*.fsproj").Single();
+        byte[] projectBytes = File.ReadAllBytes(project);
+        string source = Path.Combine(root, "First.fs");
+        byte[] rendered = File.ReadAllBytes(source);
+        File.WriteAllText(source, "user content awaiting explicit replacement");
+        var before = Directory.GetFiles(root, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+        RecordingRunner runner = scope.ServiceProvider.GetRequiredService<RecordingRunner>();
+        runner.Commands.Clear();
+
+        NewExecutionResult preview = await workflow.ExecuteItemAsync(first with { Force = true, DryRun = true }, CancellationToken.None);
+
+        preview.Succeeded.Should().BeTrue(Diagnostics(preview));
+        foreach (var file in before)
+        {
+            File.ReadAllBytes(file.Key).Should().Equal(file.Value);
+        }
+        runner.Commands.Should().BeEmpty();
+        NewExecutionResult applied = await workflow.ExecuteItemAsync(first with { Force = true }, CancellationToken.None);
+        applied.Succeeded.Should().BeTrue(Diagnostics(applied));
+        File.ReadAllBytes(source).Should().Equal(rendered);
+        File.ReadAllBytes(project).Should().Equal(projectBytes);
+        (await CompileAsync(runner, project)).Should().Equal("First.fs", "Later.fs", "Program.fs");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ActualNewRunner_CombinedSignalR_PreservesLiteralValuesAndAuxiliaryPrewriteAdmission(bool tooLong)
+    {
+        await InstallAsync();
+        using IServiceScope scope = Scope();
+        NativeTemplateWorkflowComposer workflow = scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>();
+        string root = Path.Combine(_root, "combined-signalr");
+        (await workflow.ExecuteProjectAsync(Init(root, "csharp"), CancellationToken.None)).Succeeded.Should().BeTrue();
+        NewExecutionRequest request = Item(root) with
+        {
+            TemplateReference = "Azure.Function.CSharp.Isolated.SignalR.3.x",
+            Name = tooLong ? new string('S', 129) : "SignalLiteral",
+            RawTemplateTokens = ["--HubName", "hub\\archive\"\t\n入荷"],
+        };
+        var before = Directory.GetFiles(root, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+
+        NewExecutionResult preview = await workflow.ExecuteItemAsync(request with { DryRun = true }, CancellationToken.None);
+        NewExecutionResult result = await workflow.ExecuteItemAsync(request, CancellationToken.None);
+
+        preview.Succeeded.Should().Be(!tooLong, Diagnostics(preview));
+        result.Succeeded.Should().Be(!tooLong, Diagnostics(result));
+        foreach (var file in before)
+        {
+            File.ReadAllBytes(file.Key).Should().Equal(file.Value);
+        }
+        if (tooLong)
+        {
+            Directory.GetFiles(root, "*", SearchOption.AllDirectories).Should().BeEquivalentTo(before.Keys);
+        }
+        else
+        {
+            result.ArgumentResults.Single().ValuesByCanonicalName["HubName"].Should().Be("hub\\archive\"\t\n入荷");
+            File.ReadAllText(Path.Combine(root, "SignalLiteral.cs")).Should().ContainAll(
+                "[Function(\"SignalLiteral\")]", "    public class SignalLiteralConnectionInfo", "HubName = \"hub\\\\archive\\\"\\t\\n入荷\"");
+        }
+    }
+
+    [Theory]
+    [InlineData("csharp", "Azure.Function.CSharp.Isolated.SqlTriggerBinding", "table", ".cs")]
+    [InlineData("fsharp", "Azure.Function.FSharp.Isolated.BlobTrigger.3.x", "Path", ".fs")]
+    public async Task ActualNewRunner_LiteralPreviewAndRepeatedOutput_PreserveFilesAndCanonicalValues(
+        string language, string identity, string parameter, string extension)
+    {
+        await InstallAsync();
+        using IServiceScope scope = Scope();
+        NativeTemplateWorkflowComposer workflow = scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>();
+        string root = Path.Combine(_root, "literal-preview");
+        (await workflow.ExecuteProjectAsync(Init(root, language), CancellationToken.None)).Succeeded.Should().BeTrue();
+        var before = Directory.GetFiles(root, "*", SearchOption.AllDirectories).ToDictionary(
+            path => path, File.ReadAllBytes, StringComparer.Ordinal);
+        NewExecutionRequest request = Item(root) with
+        {
+            TemplateReference = identity,
+            RawTemplateTokens = ["--" + parameter, "orders\\archive\"\t\n入荷"],
+        };
+
+        NewExecutionResult preview = await workflow.ExecuteItemAsync(request with { DryRun = true }, CancellationToken.None);
+
+        preview.Succeeded.Should().BeTrue(Diagnostics(preview));
+        preview.ArgumentResults.Single().ValuesByCanonicalName[parameter].Should().Be("orders\\archive\"\t\n入荷");
+        File.Exists(Path.Combine(root, "Greeting" + extension)).Should().BeFalse();
+        foreach (var file in before)
+        {
+            File.ReadAllBytes(file.Key).Should().Equal(file.Value);
+        }
+        NewExecutionResult created = await workflow.ExecuteItemAsync(request, CancellationToken.None);
+        created.Succeeded.Should().BeTrue(Diagnostics(created));
+        byte[] source = File.ReadAllBytes(Path.Combine(root, "Greeting" + extension));
+        NewExecutionResult repeated = await workflow.ExecuteItemAsync(request, CancellationToken.None);
+        repeated.Succeeded.Should().BeFalse();
+        File.ReadAllBytes(Path.Combine(root, "Greeting" + extension)).Should().Equal(source);
+    }
+
+    [Theory]
     [InlineData("C#", "csharp", ".csproj", ".cs")]
     [InlineData("F#", "fsharp", ".fsproj", ".fs")]
     public async Task ActualInitAndNewRunners_ProductionProvider_BothCandidateLanguagesCreateAndPrepareWithoutTestCapabilities(
@@ -352,7 +466,40 @@ public sealed class DotNetTemplateWorkflowProviderTests : IDisposable
         return provider.CreateScope();
     }
 
-    private async Task InstallAsync(bool changeItemConfiguration = false)
+    [Theory]
+    [InlineData("source")]
+    [InlineData("derived")]
+    public async Task ActualNewRunner_LiteralSourceOrDerivedSymbolDrift_RefusesPreviewAndCreationBeforeWrites(string drift)
+    {
+        await InstallAsync(literalDrift: drift);
+        using IServiceScope scope = Scope();
+        NativeTemplateWorkflowComposer workflow = scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>();
+        string root = Path.Combine(_root, "literal-drift");
+        (await workflow.ExecuteProjectAsync(Init(root, "csharp"), CancellationToken.None)).Succeeded.Should().BeTrue();
+        NewExecutionRequest request = Item(root) with
+        {
+            TemplateReference = "Azure.Function.CSharp.Isolated.SqlTriggerBinding",
+            RawTemplateTokens = ["--table", "orders\\archive"],
+        };
+        var before = Directory.GetFiles(root, "*", SearchOption.AllDirectories).ToDictionary(
+            path => path, File.ReadAllBytes, StringComparer.Ordinal);
+        RecordingRunner runner = scope.ServiceProvider.GetRequiredService<RecordingRunner>();
+        runner.Commands.Clear();
+
+        NewExecutionResult preview = await workflow.ExecuteItemAsync(request with { DryRun = true }, CancellationToken.None);
+        NewExecutionResult created = await workflow.ExecuteItemAsync(request, CancellationToken.None);
+
+        preview.Succeeded.Should().BeFalse();
+        created.Succeeded.Should().BeFalse();
+        Directory.GetFiles(root, "*", SearchOption.AllDirectories).Should().BeEquivalentTo(before.Keys);
+        foreach (var file in before)
+        {
+            File.ReadAllBytes(file.Key).Should().Equal(file.Value);
+        }
+        runner.Commands.Should().BeEmpty();
+    }
+
+    private async Task InstallAsync(bool changeItemConfiguration = false, string? literalDrift = null)
     {
         string outer = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "bundled-dotnet-artifacts"), "*.nupkg").Single();
         string archive = Path.Combine(_root, "native.nupkg");
@@ -372,6 +519,22 @@ public sealed class DotNetTemplateWorkflowProviderTests : IDisposable
             entry.Delete();
             using StreamWriter writer = new(package.CreateEntry("content/HttpTrigger-CSharp/.template.config/template.json").Open());
             writer.Write(content + "\n ");
+        }
+        if (literalDrift is not null)
+        {
+            using ZipArchive package = ZipFile.Open(archive, ZipArchiveMode.Update);
+            string path = "content/SqlTrigger-CSharp-Isolated/" + (literalDrift == "source"
+                ? "SqlTriggerBindingCSharp.cs" : ".template.config/template.json");
+            ZipArchiveEntry entry = package.GetEntry(path)!;
+            string content;
+            using (StreamReader reader = new(entry.Open()))
+            {
+                content = reader.ReadToEnd();
+            }
+            entry.Delete();
+            using StreamWriter writer = new(package.CreateEntry(path).Open());
+            writer.Write(literalDrift == "source" ? content.Replace("__FuncBinding_table__", "decoy", StringComparison.Ordinal)
+                : content.Replace("\"valueSource\": \"table\"", "\"valueSource\": \"connectionStringSetting\"", StringComparison.Ordinal));
         }
         await TemplateFixtures.InstallAsync(archive, Path.Combine(Home, "templates"), CancellationToken.None);
     }

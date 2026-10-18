@@ -53,6 +53,31 @@ without granting permission to invoke their legacy scaffolder.
 Missing retained native registration can be repaired explicitly using
 `func setup --features <stack> --install-policy if-needed`.
 
+Setup reports templates bundled with the selected installed stack as satisfied
+only after validating their retained native registration. It does not acquire an
+independent `Templates.*` companion when the stack already owns that capability.
+`--check` verifies without repairing; explicit setup can restore missing owned
+registration, but conflicting source origins or damaged retained payloads remain
+errors. Reuse the original source when repairing a bundled stack. Host readiness
+also requires the installed host executable, not just a registry row.
+Pending native-store recovery is a failed readiness dependency in setup JSON
+output, with an explicit recovery instruction rather than an unexpected-error
+escape from the event stream.
+When no installed bundle satisfies the effective version range, guidance asks for
+a published satisfying version if available; it does not suggest forcing an
+already installed incompatible version.
+
+Unknown setup features are validated before dependency installation. Built-in
+runtimes, registered stack IDs and worker aliases, selected-profile runtime
+descriptors, and published worker workloads remain supported; an unrecognized
+name cannot succeed by skipping its worker and installing only host and bundle.
+Omitted feature/profile lists retain their defaults; explicitly empty lists fail.
+Explicit profile worker ranges must be satisfiable even when an unconstrained
+worker would be optional. A known empty intersection between host.json and profile
+bundle ranges fails before that profile installs dependencies; completed earlier
+profiles are preserved.
+Setup JSON output remains NDJSON events, not a single result document.
+
 Explicit `func workload update <package> --source <v3-feed-url>` supports
 same-home unbundled-to-bundled migration and subsequent bundled updates. Use
 `--prerelease` when needed and `--major` to authorize crossing a major version.
@@ -66,14 +91,50 @@ owners and legacy sibling versions. An already installed destination is reused
 only with exact source, origin, and payload agreement.
 Native registrations and ownership receipts are version-qualified, so owners can
 retain different versions of the same inner package and template identities.
-Compatible older unqualified receipts remain readable without writes; only an
-explicit update migrates them under the protected writer/recovery protocol.
+Compatible older unqualified receipts remain readable without writes; explicit
+native registration/update migrates them under the protected writer/recovery protocol.
 Conflicting origins for the same native ID/version remain an explicit conflict,
 not a reason to reject every shared/sibling state.
 Native registration and workload admission remain protected through rollback;
 in-process failure or cancellation restores both stores before releasing the
 native lease. This is not a power-loss or cross-store crash-atomicity guarantee.
-Unrelated global bundled uninstall and force-install policies are unchanged.
+Explicit installs can retain bundled versions side-by-side in either order.
+`--force` allows the catalog install path to bypass the update prompt, but does
+not authorize replacing a bundled same-version payload or bypassing origin,
+archive-hash, and native-ownership checks. Local exact-version repeat installs
+verify and reuse their original payload. Inactive legacy versions may coexist
+without acquiring native template authority.
+
+`func workload uninstall <id> --version <installed-version>` detaches only the
+requested explicit or logical owner. A shared physical payload and its native
+registration remain until their final owner is removed. Final-owner removal
+requires exact origin, asset, and receipt agreement, removes only that version's
+native registration and receipt, and preserves sibling versions and registered
+user content. `func workload prune [id]` uses the same rules while retaining the
+highest installed version under the shared workload operation coordinator.
+Missing or conflicting ownership requires explicit repair; force never grants
+deletion authority. Projects are not traversed or removed.
+
+Native and registry failures/cancellation during final-owner removal restore both
+stores before releasing protection. If payload deletion fails after native and
+registry removal commit, the command reports the partial completion and retains
+the workload recovery intent rather than reporting successful uninstall. This
+is not cross-store crash atomicity or automatic crash recovery.
+
+Explicit setup repair can restore a missing owned native cache archive from its
+validated retained outer asset when its exact registration, source origin and
+receipt still agree. Check-only remains read-only and fails while that archive
+is missing. Changed bytes, unknown ownership or conflicting receipts remain
+errors; repair does not replace them.
+Retained payload validation uses the declared package layout: `tools/<rid>` for
+RID-specific packages and `tools/any` for portable packages. A directory for a
+different runtime identifier cannot satisfy readiness.
+Check-only readiness (`func setup --check`) requires a clean native store during
+both bundled-asset preparation and later registration validation. A pending valid
+or corrupt native recovery journal is reported as requiring explicit recovery;
+the check does not restore the hive, remove the journal or migrate receipts.
+Explicit install/update and setup repair retain their normal protected recovery
+behavior.
 On Windows a loaded old workload assembly can prevent best-effort deletion of its
 inactive directory; the committed registry and native owner select the new version.
 
@@ -91,9 +152,32 @@ retained installed inventories independently of the global deduplicating cache.
 Each invocation keeps the existing protected/private cache boundary, allowing
 retained v1, current v2, and retained v1 flows to interleave without cache leakage.
 
+Built-in `workload` management commands are identified by the shared command graph
+and parser before runtime registration, including normal aliases and response
+files. They use selected installed metadata without loading workload assemblies
+or calling workload `Configure`, so an active Windows stack can be removed without
+the command itself locking its runtime DLL. Runtime inventory is not reported as
+instance-loaded: default listing shows selected versions and `--all-versions`
+reports `loaded: false` for metadata-only runtime entries. Management inventory
+and help neither admit native recovery nor create a cold native hive.
+Built-in names and aliases are reserved against external commands. Other
+commands retain their normal external-command resolution, one workload
+configuration pass, and configuration-before-command-construction order. A later
+argument named `workload` or an errored preliminary parse cannot select the
+management boot path.
+
 Node, Python, and .NET retain their supported public item catalogs and placement;
 C#/F# dependency and compile-order work remains source-qualified. Go, Java, and
 PowerShell supply project workflows, not a new first-party item catalog.
+
+When item preparation needs rendered source bytes, explicit `new --force` may
+plan replacement of an existing regular target file. The engine retains that
+real-target change plan but renders the corresponding create-only files in a
+fresh private directory, without changing the project during preparation or
+preview. This does not authorize deletion, linked paths, directory replacement,
+or initialization-style cleanup. Exact output/source checks and pre-invocation
+source, path, and dependency guards still apply.
+
 Go names reserved by the toolchain (`go` and `toolchain`) use the existing `app`
 module fallback, including when derived from the target directory name.
 Go host preparation supplies a platform-native relative worker executable path,
@@ -101,15 +185,14 @@ including for `start --no-build`, without changing the shared worker asset.
 
 ## Prompt and completion policy
 
-For public `new`, the parsed host `--output=json` implies noninteractive execution
-before project/profile resolution, template selection, or required-value completion.
+For public `init` and `new`, the parsed host `--output=json` implies noninteractive
+execution before project/profile resolution, template selection, required-value
+completion or force confirmation.
 Template values that happen to contain output-option text do not set host policy.
 JSON and explicit `--non-interactive` also prevent version checks and alias nudges
 from starting or emitting advisory output. Plain interactive creation and other
 commands retain their existing advisory behavior. Bare parent commands dispatch
 both synchronous and asynchronous help actions through the common command base.
-The public `init` grammar has no host JSON output option; this does not add one or
-change the separate internal INIT harness's prompt policy.
 
 After native project creation and mandatory CLI configuration commit, cancellation
 anywhere in owned stack-preparation completion, including selected-source

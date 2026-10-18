@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Templates.DotNet;
 /// Explicitly composes CLI-owned .NET template helpers without installing a default workflow or SDK capability.
 /// </summary>
 internal sealed class DotNetTemplateWorkflowComposer(IFunctionsProjectResolver projects, IFileSystem files,
-    IDotnetCliRunner dotnetCli, FSharpProjectFiles paths)
+    IDotnetCliRunner dotnetCli, FSharpProjectFiles paths, NativeTemplateStackCompatibility? compatibility = null)
 {
     private readonly IFunctionsProjectResolver _projects = projects ?? throw new ArgumentNullException(nameof(projects));
     private readonly IFileSystem _files = files ?? throw new ArgumentNullException(nameof(files));
@@ -21,7 +21,7 @@ internal sealed class DotNetTemplateWorkflowComposer(IFunctionsProjectResolver p
     public DotNetTemplateWorkflowProvider Create()
     {
         DotNetTemplateProjectPreparation preparation = new(_dotnetCli);
-        return new(new(), new(_projects, _files, preparation, _dotnetCli, _paths), _files, _paths,
+        return new(new(compatibility), new(_projects, _files, preparation, _dotnetCli, _paths), _files, _paths,
             preparation, new(_dotnetCli), new(_dotnetCli, _paths));
     }
 }

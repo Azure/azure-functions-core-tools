@@ -62,7 +62,9 @@ internal sealed class PythonSelectedItemEffects(
 
         PythonAppendCapability capability = new(_files, _sources, _executor, selected, request.OutputDirectory);
         NativeSelectedItemAppendSupport support = new(_files, capability, ResolveAsync, confirmed);
-        return await support.InvokeAsync(templater, selected, current, request, cancellationToken);
+        TemplateInvocationResult? result = await support.InvokeAsync(templater, selected, current, request, cancellationToken);
+        return result is { Status: TemplateInvocationStatus.Success } && capability.ValidationNotice is { } notice
+            ? result with { Diagnostic = result.Diagnostic is null ? notice : result.Diagnostic + " " + notice } : result;
     }
 
     private static NativeSelectedItemBinding Failed(Exception exception, CancellationToken cancellationToken)

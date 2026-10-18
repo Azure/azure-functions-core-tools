@@ -28,13 +28,14 @@ public class BundleHintBuilderTests
         string hint = BundleHintBuilder.NoCompatibleInstall(
             "Microsoft.Azure.Functions.ExtensionBundle",
             "[4.22.0, 5.0.0)",
-            ["4.10.0", "4.20.0"],
-            suggestedVersion: "4.10.0");
+            ["4.10.0", "4.20.0"]);
 
         hint.Should().Contain("4.10.0");
         hint.Should().Contain("4.20.0");
         hint.Should().Contain("[4.22.0, 5.0.0)");
-        hint.Should().Contain($"func workload install {IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.10.0 --force");
+        hint.Should().Contain($"func workload install {IInstalledBundleWorkloads.BundleWorkloadPackageId}@<version>");
+        hint.Should().Contain("satisfying that range, if available");
+        hint.Should().NotContain("@4.10.0").And.NotContain("@4.20.0").And.NotContain("--force");
     }
 
     [Fact]
@@ -43,8 +44,7 @@ public class BundleHintBuilderTests
         string hint = BundleHintBuilder.NoCompatibleInstall(
             "Microsoft.Azure.Functions.ExtensionBundle",
             "[4.22.0, 5.0.0)",
-            [],
-            suggestedVersion: null);
+            []);
 
         hint.Should().Contain("No bundle workload is installed.");
         hint.Should().Contain("@<version>");
@@ -84,7 +84,6 @@ public class BundleHintBuilderTests
             "Microsoft.Azure.Functions.ExtensionBundle",
             "[4.22.0, 5.0.0)",
             ["4.10.0"],
-            suggestedVersion: "4.10.0",
             workerRuntime: "node");
 
         hint.Should().Contain("func setup --features node");

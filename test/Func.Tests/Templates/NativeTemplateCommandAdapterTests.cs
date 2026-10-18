@@ -50,7 +50,8 @@ public sealed class NativeTemplateCommandAdapterTests
         captured.ReservedAliases.Should().Contain(["--template", "-t", "--name", "-n", "--output", "--verbose"]);
         legacy.ReceivedCalls().Should().BeEmpty();
         command.PathArgument.Should().NotBeNull();
-        command.Options.Select(option => option.Name).Should().NotContain(["--path", "--dry-run", "--language"]);
+        command.Options.Select(option => option.Name).Should().NotContain(["--path", "--language"]);
+        command.Options.Select(option => option.Name).Should().Contain("--dry-run");
     }
 
     [Fact]
@@ -87,7 +88,8 @@ public sealed class NativeTemplateCommandAdapterTests
         captured.ReservedAliases.Should().Contain(["--stack", "-s", "--language", "-l"]);
         captured.ReservedAliases.Should().NotContain(["--no-bundles", "--bundles-channel", "-c"]);
         initializer.ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name == nameof(IProjectInitializer.InitializeAsync));
-        command.Options.Select(option => option.Name).Should().NotContain(["--template", "--dry-run", "--output"]);
+        command.Options.Select(option => option.Name).Should().NotContain("--template");
+        command.Options.Select(option => option.Name).Should().Contain(["--dry-run", "--output", "--non-interactive"]);
         command.Options.Single(option => option.Name == "--bundles-channel").Aliases.Should().Contain("-c");
     }
 

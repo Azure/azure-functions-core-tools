@@ -182,8 +182,8 @@ public sealed partial class BundledRemainingProjectTemplateTests : IDisposable
     [Theory]
     [InlineData("Go", "go", "!!!", "app")]
     [InlineData("Java", "java", "!!!", "azure-functions-java")]
-    [InlineData("Go", "go", " M\u00c9 App_42! ", "m\u00e9-app_42")]
-    [InlineData("Java", "java", " M\u00c9 App_42! ", "m\u00e9-app_42")]
+    [InlineData("Go", "go", " M\u00c9 App_42! ", "m-app_42")]
+    [InlineData("Java", "java", " M\u00c9 App_42! ", "m-app_42")]
     [InlineData("Go", "go", null, "default-name")]
     [InlineData("Java", "java", null, "default-name")]
     public async Task Project_NameForms_MatchInitializerNormalizationAndDirectoryFallback(string stack, string alias, string? name, string expected)

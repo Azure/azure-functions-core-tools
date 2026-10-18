@@ -4,10 +4,13 @@
 using System.Text.Json;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Setup;
+using Azure.Functions.Cli.Commands.Start.Host;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
@@ -32,11 +35,17 @@ public sealed class SetupRunnerTests : IDisposable
     private readonly IWorkloadInstaller _installer = Substitute.For<IWorkloadInstaller>();
     private readonly IProfileCatalog _profileCatalog = Substitute.For<IProfileCatalog>();
     private readonly IHostJsonBundleSectionReader _bundleReader = Substitute.For<IHostJsonBundleSectionReader>();
+    private readonly IFileSystem _files = Substitute.For<IFileSystem>();
+    private readonly WorkloadPathsOptions _paths;
 
     public SetupRunnerTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"func-setup-runner-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
+        _paths = new(_tempDir);
+        string hostRoot = WorkloadPackageLayout.GetContentRoot(
+            _paths.GetInstallDirectory($"{_hostPackageId}.win-x64", "4.0.0"), "win-x64");
+        _files.FileExists(HostProcessStartInfoFactory.ResolveExecutablePath(hostRoot)).Returns(true);
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);
         _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
             .Returns((HostJsonBundleSection?)null);
@@ -49,11 +58,14 @@ public sealed class SetupRunnerTests : IDisposable
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
+            .Returns(async callInfo =>
             {
                 string packageId = (string)callInfo[0]!;
                 var version = (NuGetVersion)callInfo[1]!;
-                return new WorkloadInstallResult(Entry(packageId, version.ToNormalizedString()), AlreadyInstalled: false);
+                WorkloadEntry entry = Entry(packageId, version.ToNormalizedString());
+                IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(callInfo.Arg<CancellationToken>());
+                _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns((IReadOnlyList<WorkloadEntry>)[.. installed, entry]);
+                return new WorkloadInstallResult(entry, AlreadyInstalled: false);
             });
     }
 
@@ -63,6 +75,67 @@ public sealed class SetupRunnerTests : IDisposable
         {
             Directory.Delete(_tempDir, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task RunAsync_DisjointBundleRanges_FailsBeforeAnyDependencyMutation()
+    {
+        _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+            .Returns(new HostJsonBundleSection(BundleHelpers.StableBundleId, "[4.0.0,5.0.0)"));
+        SetupRunner runner = CreateRunner(Catalog(), profileCatalog: BundleProfile("[6.0.0,7.0.0)"));
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["node"], profiles: ["private"]), CancellationToken.None);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.Lines.Should().Contain(line => line.Contains("do not overlap", StringComparison.Ordinal));
+        _installer.ReceivedCalls().Should().BeEmpty();
+        (await _store.GetWorkloadsAsync(CancellationToken.None)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_OverlappingBundleRanges_InstallsCompatibleDependencies()
+    {
+        _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
+            .Returns(new HostJsonBundleSection(BundleHelpers.StableBundleId, "[4.0.0,5.0.0)"));
+        FakeCatalog catalog = Catalog().WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(WorkerPackage("node"), "3.13.0")
+            .WithLatest("Azure.Functions.Cli.Workloads.Node", "1.0.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.35.0");
+        SetupRunner runner = CreateRunner(catalog, profileCatalog: BundleProfile("[4.0.0,6.0.0)"));
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["node"], profiles: ["private"]), CancellationToken.None);
+
+        result.ExitCode.Should().Be(0);
+        (await _store.GetWorkloadsAsync(CancellationToken.None)).Should().HaveCount(4);
+        _interaction.Lines.Should().NotContain(line => line.Contains("do not overlap", StringComparison.Ordinal));
+    }
+
+    private static ProfileCatalog BundleProfile(string range) => new([
+        new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.Project, "project"), [
+            new("private", new ProfileDefinition
+            {
+                Host = new ProfileVersionConstraint { Version = "[4.0.0,5.0.0)" },
+                ExtensionBundle = new ProfileVersionConstraint { Version = range },
+                SupportedRuntimes = ["node"],
+            }),
+        ]),
+    ], NullLogger<ProfileCatalog>.Instance);
+
+    [Fact]
+    public async Task RunAsync_UnknownFeature_FailsBeforePlanningOrInstalling()
+    {
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(features: ["n0de"]), CancellationToken.None);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.Lines.Should().Contain(line => line.Contains("n0de", StringComparison.Ordinal));
+        _bundleReader.ReceivedCalls().Should().BeEmpty();
+        _installer.ReceivedCalls().Should().BeEmpty();
+        catalog.ResolveLatestCallCount.Should().Be(1);
     }
 
     [Fact]
@@ -414,6 +487,50 @@ public sealed class SetupRunnerTests : IDisposable
 
         result.ExitCode.Should().Be(0);
         await _installer.Received(1).EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), check);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task RunAsync_CheckPendingNativeRecovery_EmitsFailedDependencyAndTerminalJson(int resolution)
+    {
+        var entry = new WorkloadEntry
+        {
+            PackageId = _hostPackageId,
+            PackageVersion = "4.0.0",
+            Source = "https://example.test/v3/index.json",
+            Kind = WorkloadKind.Content,
+            BundledTemplatesDeclared = true,
+        };
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+        var failure = new TemplateStoreRecoveryRequiredException();
+        _installer.EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), true)
+            .Returns(Task.FromException<WorkloadInstallResult>(failure));
+        FakeCatalog catalog = resolution == 1 ? Catalog().WithLatest(_hostPackageId, "4.0.0") : Catalog();
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: ["host"], installPolicy: resolution == 0 ? SetupInstallPolicy.IfNeeded : SetupInstallPolicy.LatestCompatible,
+                check: true, outputMode: SetupOutputMode.Json),
+            CancellationToken.None);
+
+        result.ExitCode.Should().Be(1);
+        JsonElement[] events = [.. _interaction.Lines.Select(line =>
+        {
+            using var document = JsonDocument.Parse(line);
+            return document.RootElement.Clone();
+        })];
+        events.Select(item => item.GetProperty("type").GetString()).Should().Equal(
+            "setup.started", "profile.started", "dependency.detected", "dependency.result", "profile.completed", "setup.failed");
+        JsonElement dependency = events[3];
+        dependency.GetProperty("status").GetString().Should().Be("failed");
+        dependency.GetProperty("message").GetString().Should().Be(failure.Message);
+        events[^1].GetProperty("failure_count").GetInt32().Should().Be(1);
+        await _installer.Received(1).EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), true);
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(), Arg.Any<bool?>(),
+            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -781,13 +898,13 @@ public sealed class SetupRunnerTests : IDisposable
         InteractiveTestInteractionService interactive = new();
         SetupRunner runner = new(
             interactive,
-            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>())),
+            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>()), catalog, []),
             new SetupProfileScopeResolver(
                 _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
             new SetupDependencyPlanBuilder(_bundleReader),
-            new SetupDependencyInstaller(interactive, _store, catalog, _installer));
+            new SetupDependencyInstaller(interactive, _store, catalog, _installer, _paths, _files));
 
         SetupRunResult result = await runner.RunAsync(
             new SetupCommandOptions(
@@ -854,13 +971,13 @@ public sealed class SetupRunnerTests : IDisposable
         InteractiveTestInteractionService interactive = new();
         SetupRunner runner = new(
             interactive,
-            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>())),
+            new SetupFeatureResolver(interactive, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>()), catalog, []),
             new SetupProfileScopeResolver(
                 _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
             new SetupDependencyPlanBuilder(_bundleReader),
-            new SetupDependencyInstaller(interactive, _store, catalog, _installer));
+            new SetupDependencyInstaller(interactive, _store, catalog, _installer, _paths, _files));
 
         _ = await runner.RunAsync(
             new SetupCommandOptions(
@@ -895,13 +1012,13 @@ public sealed class SetupRunnerTests : IDisposable
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
         SetupRunner runner = new(
             _interaction,
-            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>())),
+            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(new Dictionary<string, string?>()), catalog, []),
             new SetupProfileScopeResolver(
                 _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
             new SetupDependencyPlanBuilder(_bundleReader),
-            new SetupDependencyInstaller(_interaction, _store, catalog, _installer),
+            new SetupDependencyInstaller(_interaction, _store, catalog, _installer, _paths, _files),
             firstRunStore);
 
         SetupRunResult result = await runner.RunAsync(Options(), CancellationToken.None);
@@ -916,13 +1033,13 @@ public sealed class SetupRunnerTests : IDisposable
         IProfileCatalog? profileCatalog = null)
         => new(
             _interaction,
-            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(projectConfig ?? new Dictionary<string, string?>())),
+            new SetupFeatureResolver(_interaction, _store, new FakeCliConfigurationProvider(projectConfig ?? new Dictionary<string, string?>()), catalog, []),
             new SetupProfileScopeResolver(
                 profileCatalog ?? _profileCatalog,
                 new TestOptionsMonitor<ProjectProfileOptions>(new ProjectProfileOptions()),
                 new TestOptionsMonitor<UserProfilePreferenceOptions>(new UserProfilePreferenceOptions())),
             new SetupDependencyPlanBuilder(_bundleReader),
-            new SetupDependencyInstaller(_interaction, _store, catalog, _installer));
+            new SetupDependencyInstaller(_interaction, _store, catalog, _installer, _paths, _files));
 
     private SetupCommandOptions Options(
         IReadOnlyList<string>? features = null,

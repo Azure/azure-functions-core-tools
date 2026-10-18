@@ -148,6 +148,15 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
 
         if (result.Preview is { } preview)
         {
+            if (result.PlannedCleanup.Count > 0)
+            {
+                _interaction.WriteSectionHeader("Planned force cleanup (directories include their contents)");
+                foreach (string path in result.PlannedCleanup)
+                {
+                    _interaction.WriteLine(line => line.Muted("Delete: ").Code(path));
+                }
+            }
+
             _interaction.WriteSectionHeader("Planned effects");
             foreach (TemplateFileChange change in preview.Changes)
             {
@@ -208,7 +217,9 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             {
                 foreach (TemplateGeneratedFSharpFile file in compile.GeneratedFiles)
                 {
-                    _interaction.WriteLine(line => line.Muted("Include before Program.fs: ").Code(file.Path));
+                    bool included = compile.EvaluatedCompileOrder.Contains(file.Path,
+                        Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+                    _interaction.WriteLine(line => line.Muted(included ? "Keep existing Compile entry: " : "Include before Program.fs: ").Code(file.Path));
                 }
             }
         }
@@ -237,6 +248,10 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             ["plannedConfigurations"] = result.Preview?.ProjectConfigurations ?? [],
             ["configuredProjects"] = result.Invocation?.ConfiguredProjects ?? [],
         };
+        if (result.PlannedCleanup.Count > 0)
+        {
+            projected["plannedCleanup"] = result.PlannedCleanup;
+        }
         if (invocation.Diagnostic is { } diagnostic)
         {
             projected["diagnostic"] = diagnostic;

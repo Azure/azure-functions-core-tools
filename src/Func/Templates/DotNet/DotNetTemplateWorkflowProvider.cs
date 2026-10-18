@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.DotNet.Shared;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.TemplateEngine.Abstractions;
 
 namespace Azure.Functions.Cli.Templates.DotNet;
 
@@ -92,6 +93,25 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
 
         try
         {
+            NativeTemplateSourceSnapshot? literalSources;
+            NativeTemplateSourceSnapshot? auxiliarySources;
+            NativeTemplateSourceSnapshot? sources;
+            try
+            {
+                literalSources = await _sources.QualifyLiteralsAsync(selected, context.Invocation.Parameters, cancellationToken);
+                auxiliarySources = await _sources.QualifyAuxiliaryAsync(selected, cancellationToken);
+                sources = DotNetTemplateSources.CombineAuxiliarySources(literalSources, auxiliarySources);
+                if (context.Invocation.Force && selected.Entry.Language == "F#")
+                {
+                    sources = DotNetTemplateSources.CombineAuxiliarySources(sources,
+                        await _sources.QualifyFSharpControlAsync(selected, cancellationToken));
+                }
+                sources = DotNetTemplateSources.CombineAuxiliarySources(context.Invocation.SourceSnapshot, sources);
+            }
+            catch (InvalidDataException exception)
+            {
+                return NativeTemplateInvocationPreparation.Reject(exception.Message);
+            }
             DotNetInvocationProject project = await _projects.ResolveAsync(context.Templater.Context, cancellationToken);
             if (selected.Entry.Language != context.Templater.Context.Project?.Language)
             {
@@ -110,7 +130,6 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
             {
                 parameters["namespace"] = project.Properties.RootNamespace;
             }
-
             DotNetTemplateEffectCapability capability = Capability(selected, project.Root, project.Properties.ProjectFilePath,
                 project.ProjectSha256, createsProject: false);
             TemplateEffectSource source = Source(selected);
@@ -118,29 +137,46 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
             {
                 Name = name,
                 Parameters = parameters,
+                SourceSnapshot = sources,
                 EffectSupport = new(project.Root, project.Properties.ProjectFilePath, capability, Confirmed: true),
                 MsBuildBindings = new(project.Properties.ProjectFilePath, source.TemplateIdentity, source.Identity,
                     source.Sha256, project.Properties.TargetFramework, project.Properties.RootNamespace),
             };
             NativeTemplatePreparationResult captured = await selected.CaptureNativePreparationAsync(request, _files,
-                expandFiles: selected.Entry.Language == "F#", cancellationToken);
+                expandFiles: selected.Entry.Language == "F#" || auxiliarySources is not null, cancellationToken);
             if (captured.Snapshot is not { } snapshot)
             {
                 return NativeTemplateInvocationPreparation.Reject(captured.Failure?.Diagnostic ?? "Native .NET item preparation did not produce a selected output plan.");
             }
 
+            if (auxiliarySources is not null && DotNetAuxiliaryNameValidation.Validate(selected.Entry.Identity, snapshot) is { } nameDiagnostic)
+            {
+                return NativeTemplateInvocationPreparation.Reject(nameDiagnostic);
+            }
             NativeTemplateEffectPlanner planner = new();
             NativeTemplateEffectPlanningResult planned;
             if (selected.Entry.Language == "F#")
             {
-                TemplateGeneratedFSharpFile[] generated = [.. snapshot.ExpandedFiles.Select(file => new TemplateGeneratedFSharpFile(
-                    Path.GetFullPath(Path.Combine(request.OutputDirectory.Info.FullName, file.Key)),
-                    Convert.ToHexString(SHA256.HashData(file.Value.Span))))];
+                List<TemplateGeneratedFSharpFile> generated = [];
+                foreach (KeyValuePair<string, ReadOnlyMemory<byte>> file in snapshot.ExpandedFiles)
+                {
+                    string path = Path.GetFullPath(Path.Combine(request.OutputDirectory.Info.FullName, file.Key));
+                    IFileChange? change = snapshot.Effects.FileChanges.SingleOrDefault(change =>
+                        SamePath(Path.Combine(request.OutputDirectory.Info.FullName, change.TargetRelativePath), path));
+                    string? targetDigest = null;
+                    if (request.Force && change?.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite)
+                    {
+                        _paths.ValidatePath(path, project.Root.Info.FullName, mustExist: true);
+                        targetDigest = await _files.ComputeSha256Async(path, cancellationToken);
+                        _paths.ValidatePath(path, project.Root.Info.FullName, mustExist: true);
+                    }
+                    generated.Add(new(path, Convert.ToHexString(SHA256.HashData(file.Value.Span)), targetDigest));
+                }
                 TemplateFSharpCompileEffect repair = new(snapshot.Source, project.Properties.ProjectFilePath,
                     project.ProjectSha256, project.CompileOrder, generated);
                 request = request with { EffectSupport = request.EffectSupport! with { FSharpRepair = repair } };
                 planned = planner.PlanFSharpItemDependencies(project.Root, snapshot.Source, snapshot.Effects,
-                    request.OutputDirectory, project.Properties.ProjectFilePath, repair);
+                    request.OutputDirectory, project.Properties.ProjectFilePath, repair, request.Force);
             }
             else
             {

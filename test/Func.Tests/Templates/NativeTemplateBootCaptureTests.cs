@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -18,6 +19,58 @@ public sealed class NativeTemplateBootCaptureTests : IDisposable
     private const string Namespace = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.";
     private readonly string _home = Path.Combine(Path.GetTempPath(), "func-native-capture-" + Guid.NewGuid().ToString("N"));
     private readonly List<ServiceProvider> _providers = [];
+
+    [Fact]
+    public void StackCompatibility_MissingOrigin_UpdateHintDoesNotGuessAnOwnerOrVersion()
+    {
+        var stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns("dotnet");
+        stack.DisplayName.Returns("dotnet");
+        stack.SupportedLanguages.Returns(["C#"]);
+        stack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>());
+        NativeTemplateWorkloadCapture capture = new();
+        capture.Begin();
+        capture.Complete();
+        NativeTemplateStackCompatibility compatibility = new(capture, new([stack]));
+
+        string hint = compatibility.UpdateHint("dotnet");
+
+        hint.Should().Contain("Identify the installed workload").And.NotContain("func workload update").And.NotContain("--version");
+        compatibility.UpdateHint("missing").Should().Be(hint);
+        Action invalid = () => compatibility.UpdateHint(" ");
+        invalid.Should().Throw<ArgumentException>();
+        Action nullStack = () => compatibility.UpdateHint(null!);
+        nullStack.Should().Throw<ArgumentNullException>();
+    }
+
+    [Theory]
+    [InlineData(false, "SelectedPhysical", "2.0.0")]
+    [InlineData(true, "Published", "1.4.0")]
+    public async Task StackCompatibility_UpdateHint_UsesCapturedLogicalOrPhysicalOwnerAndInstalledRowVersion(
+        bool logical, string expectedOwner, string expectedVersion)
+    {
+        Stage([
+            Entry("SelectedPhysical", "1.0.0", "StubWorkload"),
+            Entry("SelectedPhysical", "2.0.0", "ConfiguredStackWorkload", logical),
+            Entry("UnrelatedHigher", "9.0.0", "StubWorkload"),
+        ]);
+        NativeTemplateWorkloadCapture capture = new();
+        ServiceCollection services = new();
+        await WorkloadRegistration.RegisterWorkloadsAsync(services, new(_home), new TestInteractionService(), capture, CancellationToken.None);
+        var provider = services.BuildServiceProvider();
+        _providers.Add(provider);
+        InstalledProjectStackCatalog stacks = new(capture.SelectConfiguredStacks(provider.GetServices<IProjectStack>().ToArray(), services));
+        NativeTemplateStackCompatibility compatibility = new(capture, stacks);
+        byte[] registry = File.ReadAllBytes(Path.Combine(_home, WorkloadPathsOptions.WorkloadRegistryFileName));
+
+        string hint = compatibility.UpdateHint("configured");
+
+        hint.Should().Contain($"func workload update {expectedOwner} --version {expectedVersion} --exact")
+            .And.Contain("installed version to replace, not the replacement version")
+            .And.NotContain("UnrelatedHigher").And.NotContain("9.0.0").And.NotContain("setup");
+        compatibility.UpdateHint("configured").Should().Be(hint);
+        File.ReadAllBytes(Path.Combine(_home, WorkloadPathsOptions.WorkloadRegistryFileName)).Should().Equal(registry);
+    }
 
     [Fact]
     public void InitializerMetadata_NullInitializer_RejectsInvalidDependency()

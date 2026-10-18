@@ -18,6 +18,30 @@ namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 public sealed class WorkloadOperationTests
 {
     [Fact]
+    public async Task Fixture_RidImplementation_UsesDeclaredPayloadRootBeforePreparingReuse()
+    {
+        using var fixture = new BasicAcquisitionFixture();
+        await fixture.SeedStackAsync("Fixture.StackA", "1.0.0");
+        var entry = (await fixture.Store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
+        string directory = fixture.Paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        var metadata = new WorkloadMetadataReader();
+        var declared = metadata.Read(directory);
+        entry.RuntimeIdentifier.Should().Be("test-rid");
+        declared.RuntimeIdentifier.Should().Be(entry.RuntimeIdentifier);
+        declared.Kind.Should().Be(WorkloadKind.Content);
+        Directory.Exists(Path.Combine(directory, "tools", "test-rid")).Should().BeTrue();
+        Directory.Exists(Path.Combine(directory, "tools", "any")).Should().BeFalse();
+        string registry = File.ReadAllText(fixture.Paths.WorkloadRegistryPath);
+        var deployment = new WorkloadDeploymentService(fixture.Paths, fixture.Store, metadata,
+            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem(), Substitute.For<IBundledTemplateInstaller>());
+
+        using var prepared = await deployment.PrepareReuseAsync(entry, CancellationToken.None, requireCleanStore: true);
+
+        prepared.Hashes.Keys.Should().Contain(Path.Combine("tools", "test-rid", "fixture.txt"));
+        File.ReadAllText(fixture.Paths.WorkloadRegistryPath).Should().Be(registry);
+    }
+
+    [Fact]
     public async Task StoreFailureAfterActualRegistryPersistence_PreservesPayloadInsteadOfGuessingRollback()
     {
         using var fixture = new BasicAcquisitionFixture();
@@ -57,7 +81,7 @@ public sealed class WorkloadOperationTests
 
         await commit.Should().ThrowAsync<IOException>().WithMessage("*intent completion*");
         var row = (await fixture.Store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
-        File.ReadAllText(Path.Combine(fixture.Paths.GetInstallDirectory(row.PackageId, row.PackageVersion), "tools", "any", "fixture.txt"))
+        File.ReadAllText(Path.Combine(fixture.Paths.GetInstallDirectory(row.PackageId, row.PackageVersion), "tools", "test-rid", "fixture.txt"))
             .Should().Be("Installation fixture, not an activated stack implementation.");
         owner.IsDirty.Should().BeTrue();
         File.Exists(Path.Combine(fixture.Paths.Home, FileWorkloadOperationCoordinator.ControlDirectoryName,
@@ -95,7 +119,7 @@ public sealed class WorkloadOperationTests
             File.Copy(archive, replacement);
         }
         using (var zip = System.IO.Compression.ZipFile.Open(replacement, System.IO.Compression.ZipArchiveMode.Update))
-        using (var text = new StreamWriter(zip.CreateEntry("tools/any/replacement.txt").Open()))
+        using (var text = new StreamWriter(zip.CreateEntry("tools/test-rid/replacement.txt").Open()))
         {
             text.Write("a different participating writer's actual payload");
         }
@@ -122,7 +146,7 @@ public sealed class WorkloadOperationTests
         WorkloadPackageInspector inspector = new(new WorkloadMetadataReader(), new(runtime));
         var inspected = await inspector.InspectAsync(archive, CancellationToken.None);
         using (var zip = System.IO.Compression.ZipFile.Open(archive, System.IO.Compression.ZipArchiveMode.Update))
-        using (var writer = new StreamWriter(zip.CreateEntry("tools/any/changed.txt").Open()))
+        using (var writer = new StreamWriter(zip.CreateEntry("tools/test-rid/changed.txt").Open()))
         {
             writer.Write("different selected bytes");
         }
@@ -203,7 +227,7 @@ public sealed class WorkloadOperationTests
             BasicAcquisitionFixture.Source, false, true, false, null, CancellationToken.None);
         if (change == "bytes")
         {
-            await File.WriteAllTextAsync(Path.Combine(prepared.Deployment!.StagingPath, "tools", "any", "fixture.txt"), "changed private payload");
+            await File.WriteAllTextAsync(Path.Combine(prepared.Deployment!.StagingPath, "tools", "test-rid", "fixture.txt"), "changed private payload");
         }
         else
         {

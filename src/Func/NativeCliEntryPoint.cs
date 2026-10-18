@@ -49,7 +49,7 @@ internal sealed class NativeCliEntryPoint
                     services.AddFirstPartyNativeWorkflows();
                     configure?.Invoke(services);
                 }, enableBundleBindingConstraints: true, cancellationToken,
-                deferProjectConfigurationErrors: true);
+                deferProjectConfigurationErrors: true, arguments: original);
             if (!host.HasProjectConfigurationFailure)
             {
                 await host.StartAsync(cancellationToken);
@@ -68,9 +68,18 @@ internal sealed class NativeCliEntryPoint
             }
             commandName = CommandNameResolver.ResolveCommandName(parsed, root);
             activity?.SetCommandName(commandName);
-            bool json = parsed.CommandResult.Command is NewCommand item && NativeEntryCommandBinding.IsJsonOutput(item, parsed);
-            bool nonInteractive = parsed.CommandResult.Command is NewCommand command
-                && NativeEntryCommandBinding.IsNonInteractive(command, parsed);
+            bool json = parsed.CommandResult.Command switch
+            {
+                NewCommand item => NativeEntryCommandBinding.IsJsonOutput(item, parsed),
+                InitCommand project => NativeEntryCommandBinding.IsInitJsonOutput(project, parsed),
+                _ => false,
+            };
+            bool nonInteractive = parsed.CommandResult.Command switch
+            {
+                NewCommand item => NativeEntryCommandBinding.IsNonInteractive(item, parsed),
+                InitCommand project => NativeEntryCommandBinding.IsInitNonInteractive(project, parsed),
+                _ => false,
+            };
             advisories = !nonInteractive && !SetupCommand.ShouldSuppressAdvisories(parsed);
             notice = advisories
                 ? (versionCheck ?? VersionChecker.CheckForUpdateAsync)(cancellationToken) : Task.FromResult<string?>(null);

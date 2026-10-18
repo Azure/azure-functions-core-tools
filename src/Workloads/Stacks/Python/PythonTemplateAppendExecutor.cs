@@ -39,6 +39,15 @@ internal sealed class PythonTemplateAppendExecutor : IPythonTemplateAppendExecut
             throw new InvalidOperationException("The Python app changed after preview. Preview the function again before appending it.");
         }
 
+        stream.Position = 0;
+        using StreamReader reader = new(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+        string original = await reader.ReadToEndAsync(cancellationToken);
+        string? diagnostic = new PythonFunctionNameGuard().GetDiagnostic(original, generatedSnippet, cancellationToken);
+        if (diagnostic is not null)
+        {
+            throw new InvalidOperationException(diagnostic);
+        }
+
         bool needsSeparator = false;
         if (stream.Length > 0)
         {

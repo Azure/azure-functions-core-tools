@@ -136,6 +136,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
         string installDir = _paths.GetInstallDirectory("test.workload", "1.0.0");
         Directory.CreateDirectory(installDir);
         File.WriteAllText(Path.Combine(installDir, "Test.dll"), "stub");
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([ExistingEntry("test.workload", "1.0.0")]);
         _store.RemoveOwnershipAsync(Arg.Any<IWorkloadOperation>(), "test.workload",
                 "1.0.0",
                 WorkloadOwnershipKind.Explicit,
@@ -218,6 +219,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
                 PackageId = implementationId,
                 PackageVersion = version,
                 RuntimeIdentifier = "win-x64",
+                Kind = WorkloadKind.Content,
                 Source = source.Source,
                 IsImplicitlyInstalled = false,
             },
@@ -283,6 +285,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
                 PackageId = implementationId,
                 PackageVersion = version,
                 RuntimeIdentifier = "win-x64",
+                Kind = WorkloadKind.Content,
                 Source = "https://other.test/v3/index.json",
                 IsImplicitlyInstalled = false,
             },

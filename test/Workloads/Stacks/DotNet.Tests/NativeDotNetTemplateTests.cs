@@ -2,9 +2,13 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
+using System.Reflection;
+using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
@@ -16,7 +20,7 @@ using NuGet.Packaging;
 
 namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 
-public sealed class NativeDotNetTemplateTests : IDisposable
+public sealed partial class NativeDotNetTemplateTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("func-native-dotnet-").FullName;
     private static readonly Guid _packageAction = new("B17581D1-C5C9-4489-8F0A-004BE667B814");
@@ -62,6 +66,31 @@ public sealed class NativeDotNetTemplateTests : IDisposable
     }
 
     [Theory]
+    [InlineData(null, "HubValue")]
+    [InlineData("", "")]
+    [InlineData("plain", "plain")]
+    [InlineData("quoted\"\\value", "quoted\\\"\\\\value")]
+    public async Task NativeSignalR_OptionalHubName_PreservesOmittedPlaceholderAndExplicitValues(string? value, string expected)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == "Azure.Function.CSharp.Isolated.SignalR.3.x");
+        Dictionary<string, string?> parameters = new() { ["namespace"] = "Safe.Namespace" };
+        if (value is not null)
+        {
+            parameters["HubName"] = value;
+        }
+        string output = Path.Combine(_root, "signalr");
+
+        ITemplateCreationResult result = await new TemplateCreator(session.Settings).InstantiateAsync(
+            template, "Example", "Example", output, parameters, cancellationToken: CancellationToken.None);
+
+        result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
+        File.ReadAllText(Path.Combine(output, "Example.cs")).Should().Contain($"HubName = \"{expected}\"");
+        template.ParameterDefinitions.Single(parameter => parameter.Name == "HubName").DefaultValue.Should().BeNull();
+    }
+
+    [Theory]
     [InlineData("itemtemplates", "4.0.5590", "C1BBCC22B2B84F1A9EFFB88956E44BFC784A0ECC74DDE3F4204B6B4AD7128A64")]
     [InlineData("projecttemplates", "4.0.5337", "3BA17330B6C903BA159510337FA50942BD426AAF132F5DAC7B949B78AE8B8299")]
     public void Pack_VerifiedUpstreamArchive_PreservesEveryNativeContentByte(string kind, string version, string digest)
@@ -71,15 +100,125 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         SHA256.HashData(File.ReadAllBytes(upstreamPath)).Should().Equal(Convert.FromHexString(digest));
         using var upstream = new ZipArchive(File.OpenRead(upstreamPath));
         using var inner = new PackageArchiveReader(ExtractInnerArchive());
+        using var adaptations = JsonDocument.Parse(inner.GetStream("provenance/supporting-types.json"));
+        var adapted = adaptations.RootElement.EnumerateArray()
+            .ToDictionary(row => row.GetProperty("path").GetString()!, row => row.GetProperty("sha256").GetString()!, StringComparer.Ordinal);
+        using var auxiliaries = JsonDocument.Parse(inner.GetStream("provenance/auxiliary-identities.json"));
+        foreach (JsonElement row in auxiliaries.RootElement.EnumerateArray())
+        {
+            adapted.Add(row.GetProperty("path").GetString()!, row.GetProperty("sha256").GetString()!);
+        }
+        using var models = JsonDocument.Parse(inner.GetStream("provenance/nullable-models.json"));
+        foreach (JsonElement row in models.RootElement.EnumerateArray())
+        {
+            adapted[row.GetProperty("path").GetString()!] = row.GetProperty("sha256").GetString()!;
+        }
+        using var literals = JsonDocument.Parse(inner.GetStream("provenance/binding-literals.json"));
+        foreach (JsonElement literal in literals.RootElement.EnumerateArray())
+        {
+            string path = literal.GetProperty("path").GetString()!;
+            adapted[path] = literal.GetProperty("sha256").GetString()!;
+            adapted[path[..path.LastIndexOf('/')] + "/.template.config/template.json"] = string.Empty;
+        }
         ZipArchiveEntry[] sourceFiles = [.. upstream.Entries.Where(entry => entry.FullName.StartsWith("content/", StringComparison.Ordinal)
             && entry.Name.Length > 0)];
         sourceFiles.Should().NotBeEmpty();
         foreach (ZipArchiveEntry source in sourceFiles)
         {
             using Stream expected = source.Open();
-            using Stream actual = inner.GetStream(source.FullName);
+            string actualPath = adapted.ContainsKey(source.FullName) ? "provenance/upstream-content/" + source.FullName
+                + (source.FullName.EndsWith("/template.json", StringComparison.Ordinal) ? ".original" : string.Empty) : source.FullName;
+            using Stream actual = inner.GetStream(actualPath);
             SHA256.HashData(actual).Should().Equal(SHA256.HashData(expected), source.FullName);
+            if (adapted.TryGetValue(source.FullName, out string? pinnedHash) && pinnedHash.Length > 0)
+            {
+                using Stream original = source.Open();
+                Convert.ToHexString(SHA256.HashData(original)).Should().Be(pinnedHash);
+                using Stream native = inner.GetStream(source.FullName);
+                using StreamReader reader = new(native);
+                reader.ReadToEnd().Should().NotContain("\npublic class ToDoItem\n");
+            }
         }
+    }
+
+    [Theory]
+    [InlineData("CSharp", "C#")]
+    [InlineData("FSharp", "F#")]
+    public async Task NativeLiteralParameters_QuotesBackslashesAndControls_AreEncodedOnlyAtAuthoredLiteralSites(
+        string language, string tag)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == $"Azure.Function.{language}.Isolated.BlobTrigger.3.x");
+        string output = Path.Combine(_root, language + "-literals");
+        TemplateCreator creator = new(session.Settings);
+        Dictionary<string, string?> parameters = new()
+        {
+            ["namespace"] = "Custom.Functions",
+            ["Path"] = "incoming/orders\\archive\"\t\n\r\b\f\u0007\u000b\u0085\u2028\u2029/入荷/😀",
+            ["Connection"] = "Connection\\value\"",
+        };
+
+        ITemplateCreationResult created = await creator.InstantiateAsync(template, "Example", "Example", output, parameters,
+            cancellationToken: CancellationToken.None);
+
+        created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+        string source = File.ReadAllText(Path.Combine(output, "Example" + (tag == "C#" ? ".cs" : ".fs")));
+        source.Should().Contain("namespace Custom.Functions");
+        source.Should().Contain("\"incoming/orders\\\\archive\\\"\\t\\n\\r\\b\\f\\u0007\\u000b\\u0085\\u2028\\u2029/入荷/😀/{name}\"");
+        source.Should().Contain("\"Connection\\\\value\\\"\"");
+        source.Should().NotContain("__FuncBinding_");
+        parameters["Path"].Should().Be("incoming/orders\\archive\"\t\n\r\b\f\u0007\u000b\u0085\u2028\u2029/入荷/😀");
+    }
+
+    [Fact]
+    public async Task NativeLiteralParameters_CompleteReviewedInventory_UsesDerivedFormsWithoutChangingTypedParameters()
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        IReadOnlyList<ITemplateInfo> templates = await session.Manager.GetTemplatesAsync(CancellationToken.None);
+        using var inner = new PackageArchiveReader(ExtractInnerArchive());
+        using var inventory = JsonDocument.Parse(inner.GetStream("provenance/binding-literals.json"));
+        int parameterCount = 0;
+        foreach (JsonElement row in inventory.RootElement.EnumerateArray())
+        {
+            ITemplateInfo template = templates.Single(item => item.Identity == row.GetProperty("identity").GetString());
+            string path = row.GetProperty("path").GetString()!;
+            using var configuration = JsonDocument.Parse(inner.GetStream(path[..path.LastIndexOf('/')] + "/.template.config/template.json"));
+            JsonElement symbols = configuration.RootElement.GetProperty("symbols");
+            Dictionary<string, string?> parameters = new() { ["namespace"] = "Safe.Namespace" };
+            foreach (JsonElement mapping in row.GetProperty("parameters").EnumerateArray())
+            {
+                string name = mapping[0].GetString()!;
+                template.ParameterDefinitions.Should().Contain(parameter => parameter.Name == name);
+                symbols.GetProperty(name).TryGetProperty("replaces", out _).Should().BeFalse();
+                JsonElement derived = symbols.GetProperty("FuncBinding_" + name);
+                derived.GetProperty("type").GetString().Should().Be("derived");
+                derived.GetProperty("valueSource").GetString().Should().Be(name);
+                derived.GetProperty("valueTransform").GetString().Should().Be(
+                    template.TagsCollection["language"] == "C#" ? "csharpStringContent" : "fsharpStringContent");
+                parameters[name] = "plain\\quote\"\t\n入荷";
+                parameterCount++;
+            }
+            string output = Path.Combine(_root, template.Identity);
+            ITemplateCreationResult result = await new TemplateCreator(session.Settings).InstantiateAsync(
+                template, "Example", "Example", output, parameters, cancellationToken: CancellationToken.None);
+            result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
+            string source = File.ReadAllText(Path.Combine(output, Path.GetFileName(path)
+                .Replace(configuration.RootElement.GetProperty("sourceName").GetString()!, "Example", StringComparison.Ordinal)));
+            source.Should().NotContain("__FuncBinding_");
+            source.Should().Contain("plain\\\\quote\\\"\\t\\n入荷");
+            source.Should().Contain("namespace Safe.Namespace");
+            string defaults = output + "-defaults";
+            ITemplateCreationResult defaultResult = await new TemplateCreator(session.Settings).InstantiateAsync(
+                template, "Example", "Example", defaults, new Dictionary<string, string?> { ["namespace"] = "Safe.Namespace" },
+                cancellationToken: CancellationToken.None);
+            defaultResult.Status.Should().Be(CreationResultStatus.Success, defaultResult.ErrorMessage);
+            File.ReadAllText(Path.Combine(defaults, Path.GetFileName(path)
+                .Replace(configuration.RootElement.GetProperty("sourceName").GetString()!, "Example", StringComparison.Ordinal)))
+                .Should().NotContain("__FuncBinding_");
+        }
+        inventory.RootElement.GetArrayLength().Should().Be(23);
+        parameterCount.Should().Be(48);
     }
 
     [Fact]
@@ -101,6 +240,212 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         ITemplateInfo project = templates.Single(template => template.Identity == "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x");
         project.ParameterDefinitions.Single(parameter => parameter.Name == "Framework").Choices!.Keys.Should().Contain("net10.0");
         (project as ITemplateInfoHostJsonCache)!.HostData.Should().Contain("target-framework", "tfm");
+    }
+
+    [Theory]
+    [InlineData("DurableFunctionsEntityClass.1.x")]
+    [InlineData("DurableFunctionsEntityFunction.1.x")]
+    [InlineData("DurableFunctionsOrchestration.1.x")]
+    [InlineData("SignalR.3.x")]
+    [InlineData("DaprPublishOutputBinding")]
+    [InlineData("DaprServiceInvocationTrigger")]
+    public async Task NativeAuxiliaryItems_RequestedNames_OwnEveryFunctionAndSupportingType(string variant)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == "Azure.Function.CSharp.Isolated." + variant);
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, "auxiliary");
+        Directory.CreateDirectory(output);
+        string custom = Path.Combine(output, "Custom.cs");
+        const string userSource = "namespace Custom.Functions; public class Counter { } public class MyConnectionInfo { } "
+            + "public class InvokeOutputBinding { } public class DaprTopicTriggerFuncApp { } "
+            + "public class FirstConnectionInfo { } public class FirstInvoke { } public class FirstTopicTrigger { }";
+        File.WriteAllText(custom, userSource);
+        foreach (string name in new[] { "First", "Second" })
+        {
+            var parameters = new Dictionary<string, string?> { ["namespace"] = "Custom.Functions" };
+            if (variant == "SignalR.3.x")
+            {
+                parameters["HubName"] = "customHub";
+            }
+
+            ITemplateCreationResult preview = await creator.InstantiateAsync(template, name, name, output, parameters,
+                dryRun: true, cancellationToken: CancellationToken.None);
+
+            preview.Status.Should().Be(CreationResultStatus.Success, preview.ErrorMessage);
+            File.Exists(Path.Combine(output, name + ".cs")).Should().BeFalse();
+            ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output, parameters,
+                cancellationToken: CancellationToken.None);
+            created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+            string source = File.ReadAllText(Path.Combine(output, name + ".cs"));
+            source.Should().Contain("namespace Custom.Functions");
+            switch (variant)
+            {
+                case "DurableFunctionsEntityClass.1.x":
+                    source.Should().ContainAll($"public class {name} : TaskEntity<int>", $"public {name}(ILogger<{name}> logger)",
+                        $"[Function(nameof({name}))]");
+                    source.Should().NotContain("Counter");
+                    break;
+                case "DurableFunctionsEntityFunction.1.x":
+                    source.Should().Contain($"[Function(nameof({name}))]").And.NotContain("\"Counter\"");
+                    break;
+                case "DurableFunctionsOrchestration.1.x":
+                    source.Should().ContainAll($"[Function(nameof({name}))]", $"public static string {name}SayHello(",
+                        $"[Function(\"{name}-SayHello\")]", $"GetLogger(\"{name}-SayHello\")",
+                        $"[Function(\"{name}-HttpStart\")]", $"nameof({name}));");
+                    source.Split($"CallActivityAsync<string>(\"{name}-SayHello\"").Should().HaveCount(4);
+                    break;
+                case "SignalR.3.x":
+                    source.Should().ContainAll($"[Function(\"{name}\")]", $"CreateLogger(\"{name}\")",
+                        $"        [SignalRConnectionInfoInput(HubName = \"customHub\")] {name}ConnectionInfo connectionInfo)",
+                        $"    public class {name}ConnectionInfo");
+                    source.Should().NotContain("MyConnectionInfo").And.NotContain("\"negotiate\"");
+                    break;
+                case "DaprPublishOutputBinding":
+                    source.Should().ContainAll($"[Function(\"{name}\")]", $"GetLogger(\"{name}\")",
+                        $"public static void {name}TopicTrigger(", $"[Function(\"{name}-TopicTrigger\")]",
+                        $"GetLogger(\"{name}-TopicTrigger\")", "[DaprPublishOutput(PubSubName = \"pubsub\", Topic = \"A\")]",
+                        "[DaprTopicTrigger(\"pubsub\", Topic = \"A\")]");
+                    source.Should().NotContain("DaprTopicTriggerFuncApp");
+                    break;
+                case "DaprServiceInvocationTrigger":
+                    source.Should().ContainAll($"[Function(\"{name}\")]", $"public static async Task<InvokeMethodParameters> {name}Invoke(",
+                        $"[Function(\"{name}-Invoke\")]", $"GetLogger(\"{name}-Invoke\")",
+                        $"Route = \"{name}/invoke/{{appId}}/{{methodName}}\"",
+                        "AppId = \"{appId}\", MethodName = \"{methodName}\"",
+                        $"--method {name}", $"/api/{name}/invoke/functionapp/{name}");
+                    source.Should().NotContain("InvokeOutputBinding").And.NotContain("{yourFunctionName}");
+                    break;
+            }
+            File.ReadAllText(custom).Should().Be(userSource);
+        }
+    }
+
+    [Theory]
+    [InlineData("MySqlOutputBinding", "WriteTodos", "Task<WriteTodosItem>", "orders")]
+    [InlineData("MySqlTriggerBinding", "WatchTodos", "MySqlChange<WatchTodosItem>", "orders")]
+    [InlineData("SqlOutputBinding", "ToDoItem", "Task<ToDoItemItem>", "orders")]
+    [InlineData("SqlTriggerBinding", "WatchSql", "SqlChange<WatchSqlItem>", "orders")]
+    public async Task NativeDatabaseItem_SupportingType_IsScopedToTheNewFunction(
+        string variant, string name, string expectedReference, string expectedTable)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(template => template.Identity == $"Azure.Function.CSharp.Isolated.{variant}");
+        string output = Path.Combine(_root, variant);
+        Directory.CreateDirectory(output);
+        string custom = Path.Combine(output, "Custom.cs");
+        string original = "namespace Custom.Functions; public class "
+            + (name == "ToDoItem" ? "ExistingDto" : "ToDoItem") + " { } public class WriteTodosItem { }";
+        File.WriteAllText(custom, original);
+        TemplateCreator creator = new(session.Settings);
+        Dictionary<string, string?> parameters = new()
+        {
+            ["namespace"] = "Custom.Functions",
+            ["table"] = "orders",
+            ["connectionStringSetting"] = "DatabaseConnection",
+        };
+
+        ITemplateCreationResult preview = await creator.InstantiateAsync(template, name, name, output, parameters,
+            dryRun: true, cancellationToken: CancellationToken.None);
+
+        preview.Status.Should().Be(CreationResultStatus.Success, preview.ErrorMessage);
+        Directory.GetFiles(output).Should().ContainSingle().Which.Should().Be(custom);
+        ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output, parameters,
+            cancellationToken: CancellationToken.None);
+        created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+        string source = File.ReadAllText(Path.Combine(output, name + ".cs"));
+        source.Should().ContainAll("namespace Custom.Functions;", $"public class {name}", $"[Function(\"{name}\")]",
+            $"    public class {name}Item", expectedReference, $"\"{expectedTable}\"", "\"DatabaseConnection\"");
+        source.Should().NotContain($"\npublic class {name}Item\n");
+        File.ReadAllText(custom).Should().Be(original);
+    }
+
+    [Theory]
+    [InlineData("MySql")]
+    [InlineData("Sql")]
+    public async Task NativeDatabaseItems_RepeatedOutputAndTrigger_KeepSupportingTypesInsideEachNewFunction(string provider)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        IReadOnlyList<ITemplateInfo> templates = await session.Manager.GetTemplatesAsync(CancellationToken.None);
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, provider);
+        foreach (string kind in new[] { "Output", "Trigger" })
+        {
+            ITemplateInfo template = templates.Single(item => item.Identity == $"Azure.Function.CSharp.Isolated.{provider}{kind}Binding");
+            foreach (string suffix in new[] { "First", "Second" })
+            {
+                string name = kind + suffix;
+                ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output,
+                    new Dictionary<string, string?> { ["namespace"] = "Shared.Functions" }, cancellationToken: CancellationToken.None);
+
+                created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+                string source = File.ReadAllText(Path.Combine(output, name + ".cs"));
+                source.Should().ContainAll($"public class {name}\n", $"    public class {name}Item\n",
+                    $"<{name}Item>", $"[Function(\"{name}\")]");
+                source.Should().NotContain("ToDoItem");
+            }
+        }
+        Directory.GetFiles(output, "*.cs").Should().HaveCount(4);
+    }
+
+    [Theory]
+    [InlineData("MySql", "Input", "object", "table1")]
+    [InlineData("MySql", "Output", "table", "table1")]
+    [InlineData("MySql", "Trigger", "table", "table1")]
+    [InlineData("Sql", "Input", "object", "[dbo].[table1]")]
+    [InlineData("Sql", "Output", "table", "[dbo].[table1]")]
+    [InlineData("Sql", "Trigger", "table", "[dbo].[table1]")]
+    public async Task NativeDatabaseItems_TableParameter_MatchesTheCompleteBindingValue(
+        string provider, string kind, string parameter, string defaultValue)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == $"Azure.Function.CSharp.Isolated.{provider}{kind}Binding");
+        TemplateCreator creator = new(session.Settings);
+        foreach (bool explicitValue in new[] { false, true })
+        {
+            Dictionary<string, string?> arguments = new() { ["namespace"] = "Custom.Functions" };
+            string table = defaultValue;
+            if (explicitValue)
+            {
+                table = "sales.orders";
+                arguments[parameter] = table;
+                arguments["connectionStringSetting"] = "DatabaseConnection";
+            }
+            string output = Path.Combine(_root, explicitValue.ToString());
+
+            ITemplateCreationResult created = await creator.InstantiateAsync(template, "Example", "Example", output,
+                arguments, cancellationToken: CancellationToken.None);
+
+            created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+            string source = File.ReadAllText(Path.Combine(output, "Example.cs"));
+            string command = kind == "Input" ? "SELECT * FROM " + table : table;
+            source.Should().Contain($"[{provider}{kind}(\"{command}\",");
+            source.Should().Contain("namespace Custom.Functions;");
+            source.Should().Contain(explicitValue ? "\"DatabaseConnection\"" : "\"\"");
+        }
+    }
+
+    [Fact]
+    public async Task NativeSqlTrigger_Serializer_IsAvailableWithoutAnUndeclaredPackage()
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == "Azure.Function.CSharp.Isolated.SqlTriggerBinding");
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, "sql-serializer");
+
+        ITemplateCreationResult created = await creator.InstantiateAsync(template, "WatchSql", "WatchSql", output,
+            new Dictionary<string, string?> { ["namespace"] = "Custom.Functions" }, cancellationToken: CancellationToken.None);
+
+        created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+        string source = File.ReadAllText(Path.Combine(output, "WatchSql.cs"));
+        source.Should().ContainAll("using System.Text.Json;", "JsonSerializer.Serialize(changes)");
+        source.Should().NotContain("Newtonsoft").And.NotContain("JsonConvert");
+        created.CreationEffects!.CreationResult.PostActions.Where(action => action.ActionId == _packageAction)
+            .Select(action => action.Args["reference"]).Should().Equal("Microsoft.Azure.Functions.Worker.Extensions.Sql");
     }
 
     [Theory]
@@ -249,6 +594,231 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "bin", "Debug", "net10.0", "functions.metadata")));
         metadata.RootElement.EnumerateArray().Select(function => function.GetProperty("name").GetString())
             .Should().Contain("RepairedHttp", "the actual native F# HTTP file must participate in the built function metadata");
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task NativeAuxiliaryItems_DeclaredDependencies_BuildWithUniqueFunctionNamesAndHttpRoutes()
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        IReadOnlyList<ITemplateInfo> templates = await session.Manager.GetTemplatesAsync(CancellationToken.None);
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, "auxiliary-build");
+        using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(5));
+        ITemplateInfo projectTemplate = templates.Single(template =>
+            template.Identity == "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x");
+        ITemplateCreationResult projectResult = await creator.InstantiateAsync(projectTemplate, "Sample", "Sample", output,
+            new Dictionary<string, string?> { ["Framework"] = "net10.0" }, cancellationToken: timeout.Token);
+        projectResult.Status.Should().Be(CreationResultStatus.Success, projectResult.ErrorMessage);
+        List<IPostAction> actions = [.. projectResult.CreationEffects!.CreationResult.PostActions];
+        List<string> expectedNames = [];
+        Dictionary<string, string> expectedRoutes = new(StringComparer.Ordinal);
+        (string Variant, string Prefix, string[] Suffixes)[] cases =
+        [
+            ("DurableFunctionsEntityClass.1.x", "EntityClass", [""]),
+            ("DurableFunctionsEntityFunction.1.x", "EntityFunction", [""]),
+            ("DurableFunctionsOrchestration.1.x", "Orchestrate", ["", "-SayHello", "-HttpStart"]),
+            ("SignalR.3.x", "Negotiate", [""]),
+            ("DaprPublishOutputBinding", "Publish", ["", "-TopicTrigger"]),
+            ("DaprServiceInvocationTrigger", "Service", ["", "-Invoke"]),
+        ];
+        foreach ((string variant, string prefix, string[] suffixes) in cases)
+        {
+            ITemplateInfo template = templates.Single(item => item.Identity == "Azure.Function.CSharp.Isolated." + variant);
+            foreach (string ordinal in new[] { "First", "Second" })
+            {
+                string name = prefix + ordinal;
+                ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output,
+                    new Dictionary<string, string?> { ["namespace"] = "Sample" }, cancellationToken: timeout.Token);
+                created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+                actions.AddRange(created.CreationEffects!.CreationResult.PostActions);
+                expectedNames.AddRange(suffixes.Select(suffix => name + suffix));
+                if (prefix == "Service")
+                {
+                    expectedRoutes.Add(name + "-Invoke", name + "/invoke/{appId}/{methodName}");
+                }
+            }
+        }
+        ITemplateInfo http = templates.Single(item => item.Identity == "Azure.Function.CSharp.Isolated.HttpTrigger.3.x");
+        foreach ((string requested, string actual) in new[]
+        {
+            ("ServiceFirst_Invoke", "ServiceFirst_Invoke"),
+            ("OrchestrateFirst_HttpStart", "OrchestrateFirst_HttpStart"),
+            ("PublishFirst_TopicTrigger", "PublishFirst_TopicTrigger"),
+            ("Hyphen-Primary", "Hyphen_Primary"),
+        })
+        {
+            ITemplateCreationResult created = await creator.InstantiateAsync(http, requested, requested, output,
+                new Dictionary<string, string?> { ["namespace"] = "Sample" }, cancellationToken: timeout.Token);
+            created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+            actions.AddRange(created.CreationEffects!.CreationResult.PostActions);
+            expectedNames.Add(actual);
+        }
+        string customPath = Path.Combine(output, "Custom.cs");
+        const string userSource = "namespace Sample; public class Counter { } public class MyConnectionInfo { } "
+            + "public class InvokeOutputBinding { } public class DaprTopicTriggerFuncApp { } "
+            + "public class NegotiateFirstConnectionInfo { } public class ServiceFirstInvoke { } public class PublishFirstTopicTrigger { }";
+        File.WriteAllText(customPath, userSource);
+        DirectoryInfo repository = new(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(repository.FullName, "NuGet.Config")))
+        {
+            repository = repository.Parent ?? throw new InvalidOperationException("The repository NuGet.Config was not found.");
+        }
+        File.Copy(Path.Combine(repository.FullName, "NuGet.Config"), Path.Combine(output, "NuGet.Config"));
+        IDotnetPathResolver resolver = Substitute.For<IDotnetPathResolver>();
+        resolver.Resolve().Returns("dotnet");
+        DotnetCliRunner runner = new(resolver);
+        DotNetTemplateDependencyExecutor dependencies = new(runner);
+        string project = Path.Combine(output, "Sample.csproj");
+        foreach (IPostAction action in actions.Where(action => action.ActionId == _packageAction)
+            .DistinctBy(action => (action.Args["reference"], action.Args["version"])))
+        {
+            await dependencies.AddPackageReferenceAsync(project,
+                new(action.Args["reference"], action.Args["version"], action.Args["projectFileExtensions"]), timeout.Token);
+        }
+        await dependencies.RestoreAsync(project, timeout.Token);
+
+        await runner.RunAsync(["build", project, "--no-restore", "-m:1", "-v:minimal"], output, timeout.Token);
+
+        using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "bin", "Debug", "net10.0", "functions.metadata")));
+        JsonElement[] functions = [.. metadata.RootElement.EnumerateArray()];
+        functions.Select(function => function.GetProperty("name").GetString()).Should().BeEquivalentTo(expectedNames)
+            .And.OnlyHaveUniqueItems();
+        foreach ((string name, string route) in expectedRoutes)
+        {
+            JsonElement function = functions.Single(function => function.GetProperty("name").GetString() == name);
+            JsonElement trigger = function.GetProperty("bindings").EnumerateArray()
+                .Single(binding => binding.GetProperty("type").GetString() == "httpTrigger");
+            trigger.GetProperty("route").GetString().Should().Be(route);
+            JsonElement binding = function.GetProperty("bindings").EnumerateArray()
+                .Single(binding => binding.GetProperty("type").GetString() == "daprInvoke");
+            binding.GetProperty("appId").GetString().Should().Be("{appId}");
+            binding.GetProperty("methodName").GetString().Should().Be("{methodName}");
+        }
+        File.ReadAllText(customPath).Should().Be(userSource);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task NativeDatabaseItems_DeclaredDependencies_BuildRepeatedFunctionsAndPreserveSampleSqlLogging()
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        IReadOnlyList<ITemplateInfo> templates = await session.Manager.GetTemplatesAsync(CancellationToken.None);
+        ITemplateInfo projectTemplate = templates.Single(template =>
+            template.Identity == "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x");
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, "database-build");
+        using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(5));
+        ITemplateCreationResult projectResult = await creator.InstantiateAsync(projectTemplate, "Sample", "Sample", output,
+            new Dictionary<string, string?> { ["Framework"] = "net10.0" }, cancellationToken: timeout.Token);
+        projectResult.Status.Should().Be(CreationResultStatus.Success, projectResult.ErrorMessage);
+        string project = Path.Combine(output, "Sample.csproj");
+        string customPath = Path.Combine(output, "Custom.cs");
+        const string customSource = "namespace Sample; public class ToDoItem { } public class SqlOutputFirstItem { }";
+        File.WriteAllText(customPath, customSource);
+        List<IPostAction> actions = [.. projectResult.CreationEffects!.CreationResult.PostActions];
+        List<string> names = [];
+        foreach (string provider in new[] { "MySql", "Sql" })
+        {
+            foreach (string kind in new[] { "Output", "Trigger" })
+            {
+                ITemplateInfo template = templates.Single(item => item.Identity == $"Azure.Function.CSharp.Isolated.{provider}{kind}Binding");
+                foreach (string suffix in new[] { "First", "Second" })
+                {
+                    string name = provider + kind + suffix;
+                    ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output,
+                        new Dictionary<string, string?> { ["namespace"] = "Sample" }, cancellationToken: timeout.Token);
+                    created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+                    names.Add(name);
+                    actions.AddRange(created.CreationEffects!.CreationResult.PostActions);
+                }
+            }
+        }
+        File.ReadAllText(customPath).Should().Be(customSource);
+        DirectoryInfo repository = new(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(repository.FullName, "NuGet.Config")))
+        {
+            repository = repository.Parent ?? throw new InvalidOperationException("The repository NuGet.Config was not found.");
+        }
+        File.Copy(Path.Combine(repository.FullName, "NuGet.Config"), Path.Combine(output, "NuGet.Config"));
+        IDotnetPathResolver resolver = Substitute.For<IDotnetPathResolver>();
+        resolver.Resolve().Returns("dotnet");
+        DotnetCliRunner runner = new(resolver);
+        DotNetTemplateDependencyExecutor dependencies = new(runner);
+        foreach (IPostAction action in actions.Where(action => action.ActionId == _packageAction)
+            .DistinctBy(action => (action.Args["reference"], action.Args["version"])))
+        {
+            await dependencies.AddPackageReferenceAsync(project,
+                new(action.Args["reference"], action.Args["version"], action.Args["projectFileExtensions"]), timeout.Token);
+        }
+        await dependencies.RestoreAsync(project, timeout.Token);
+
+        await runner.RunAsync(["build", project, "--no-restore", "-m:1", "-v:minimal"], output, timeout.Token);
+
+        string built = Path.Combine(output, "bin", "Debug", "net10.0");
+        using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(built, "functions.metadata")));
+        metadata.RootElement.EnumerateArray().Select(function => function.GetProperty("name").GetString())
+            .Should().BeEquivalentTo(names);
+        File.ReadAllText(project).Should().NotContain("Newtonsoft");
+        File.ReadAllText(customPath).Should().Be(customSource);
+        AssemblyLoadContext load = new("native-sql-sample", isCollectible: true);
+        load.Resolving += (context, name) =>
+        {
+            if (name.Name == typeof(ILogger).Assembly.GetName().Name)
+            {
+                return typeof(ILogger).Assembly;
+            }
+            string path = Path.Combine(built, name.Name + ".dll");
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+            using FileStream dependency = File.OpenRead(path);
+            return context.LoadFromStream(dependency);
+        };
+        try
+        {
+            using FileStream source = File.OpenRead(Path.Combine(built, "Sample.dll"));
+            Assembly assembly = load.LoadFromStream(source);
+            Type functionType = assembly.GetType("Sample.SqlTriggerFirst", throwOnError: true)!;
+            Type dtoType = assembly.GetType("Sample.SqlTriggerFirst+SqlTriggerFirstItem", throwOnError: true)!;
+            MethodInfo run = functionType.GetMethod("Run")!;
+            Type changeType = run.GetParameters()[0].ParameterType.GetGenericArguments()[0];
+            Type operationType = changeType.GetConstructors().Single().GetParameters()[0].ParameterType;
+            var changes = Array.CreateInstance(changeType, 3);
+            string[] operations = ["Insert", "Update", "Delete"];
+            string?[] descriptions = ["<quoted \"value\"> \u96EA", string.Empty, null];
+            for (int index = 0; index < changes.Length; index++)
+            {
+                object row = Activator.CreateInstance(dtoType)!;
+                dtoType.GetProperty("Id")!.SetValue(row, (index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                dtoType.GetProperty("Priority")!.SetValue(row, index - 1);
+                dtoType.GetProperty("Description")!.SetValue(row, descriptions[index]);
+                changes.SetValue(Activator.CreateInstance(changeType, Enum.Parse(operationType, operations[index]), row), index);
+            }
+            ILogger logger = Substitute.For<ILogger>();
+            ILoggerFactory factory = Substitute.For<ILoggerFactory>();
+            factory.CreateLogger(Arg.Any<string>()).Returns(logger);
+            object function = Activator.CreateInstance(functionType, factory)!;
+
+            run.Invoke(function, [changes, null]);
+
+            string logged = logger.ReceivedCalls().Single(call => call.GetMethodInfo().Name == "Log")
+                .GetArguments()[2]!.ToString()!;
+            logged.Should().StartWith("SQL Changes: ");
+            string actualJson = logged["SQL Changes: ".Length..];
+            string originalJson = Newtonsoft.Json.JsonConvert.SerializeObject(changes);
+            JsonNode.DeepEquals(JsonNode.Parse(actualJson), JsonNode.Parse(originalJson)).Should().BeTrue(
+                "the sample's row values, property names, numeric operations and nulls must survive the serializer correction");
+            using var json = JsonDocument.Parse(actualJson);
+            json.RootElement[0].GetProperty("Item").GetProperty("Description").GetString().Should().Be(descriptions[0]);
+            json.RootElement[1].GetProperty("Item").GetProperty("Priority").GetInt32().Should().Be(0);
+            json.RootElement[2].GetProperty("Item").GetProperty("Description").ValueKind.Should().Be(JsonValueKind.Null);
+        }
+        finally
+        {
+            load.Unload();
+        }
     }
 
     [Fact]

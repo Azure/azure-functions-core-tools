@@ -64,6 +64,16 @@ func init --stack dotnet
 # Create a new function
 func new --template HttpTrigger --name MyFunction
 
+# Search installed item templates for the current project
+func new --list --search http
+
+# Inspect the selected template's effective parameters, defaults and choices
+func new --template http --help
+
+# Preview a project or function without writing files or running preparation tools
+func init MyApp --stack node --language js --dry-run --output json
+func new --template http --name MyFunction --dry-run --output json
+
 # Run the Functions host
 func run
 
@@ -82,6 +92,33 @@ func workload list
 # Set up all dependencies for the current project
 func setup
 ```
+
+`init` and `new` accept `--output plain|json` and `--non-interactive`. JSON is a
+single result document and never prompts. `--dry-run` uses the same template
+selection, parameter validation and path guards as creation, but does not create
+the target, write CLI configuration, acquire packages or run preparation tools.
+With `init --force --dry-run`, existing files (including `.git`) are not deleted.
+The preview separately lists planned force-cleanup entries; listed directories
+include their contents.
+Adoption and repair previews report planned configuration without persisting it.
+Before loading installed templates, generation previews, item listings and
+selected-template help refuse pending recovery without restoring the live
+registry. Run an explicit workload install or update to recover the store, then
+retry. Configuration-only adoption and repair previews do not load templates.
+
+`new --list` shows eligible installed items for the project's language and selected
+workload owner, not remote quickstarts or available workload packages. Add
+`--search <text>` for a case-insensitive substring match against identity, display
+name, short names and description; no matches is a successful empty list.
+`--template` can further restrict the list to an exact identity or short name.
+Do not combine listing with generation parameters, `--name`, `--force` or
+`--dry-run`. Use `--list --output json` for package and eligibility metadata.
+
+Template options take explicit scalar values, including booleans. Use
+`--option=value` for dash-prefixed literals or empty strings where supported.
+Repeated options and invalid choices fail before generation. When a template
+alias conflicts with a CLI option, selected-template help shows the effective
+`--param:<CanonicalName>` alias.
 
 ## Additional documentation
 
