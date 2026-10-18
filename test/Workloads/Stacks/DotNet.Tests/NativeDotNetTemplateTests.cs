@@ -20,7 +20,7 @@ using NuGet.Packaging;
 
 namespace Azure.Functions.Cli.Workloads.DotNet.Tests;
 
-public sealed class NativeDotNetTemplateTests : IDisposable
+public sealed partial class NativeDotNetTemplateTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("func-native-dotnet-").FullName;
     private static readonly Guid _packageAction = new("B17581D1-C5C9-4489-8F0A-004BE667B814");
@@ -82,6 +82,11 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         foreach (JsonElement row in auxiliaries.RootElement.EnumerateArray())
         {
             adapted.Add(row.GetProperty("path").GetString()!, row.GetProperty("sha256").GetString()!);
+        }
+        using var models = JsonDocument.Parse(inner.GetStream("provenance/nullable-models.json"));
+        foreach (JsonElement row in models.RootElement.EnumerateArray())
+        {
+            adapted[row.GetProperty("path").GetString()!] = row.GetProperty("sha256").GetString()!;
         }
         ZipArchiveEntry[] sourceFiles = [.. upstream.Entries.Where(entry => entry.FullName.StartsWith("content/", StringComparison.Ordinal)
             && entry.Name.Length > 0)];

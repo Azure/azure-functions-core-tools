@@ -10,8 +10,10 @@ $sources = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'upstream-sources.j
 $qualifiedConfigurations = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'upstream-configurations.json') -Raw | ConvertFrom-Json -NoEnumerate
 $supportingTypes = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'supporting-types.json') -Raw | ConvertFrom-Json -NoEnumerate
 $auxiliaryIdentities = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'auxiliary-identities.json') -Raw | ConvertFrom-Json -NoEnumerate
+$nullableModels = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'nullable-models.json') -Raw | ConvertFrom-Json -NoEnumerate
 $adaptedIdentities = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $adaptedAuxiliaries = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$adaptedModels = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 $separator = [IO.Path]::DirectorySeparatorChar
 $outputPrefix = $output.TrimEnd($separator) + $separator
@@ -112,10 +114,15 @@ foreach ($package in $sources.packages) {
                     throw "Duplicate supporting-type adaptation: $($configuration.identity)."
                 }
             }
-            $auxiliary = & (Join-Path $PSScriptRoot 'stage-auxiliary-identities.ps1') -OutputDirectory $output `
+            $auxiliary = & (Join-Path $PSScriptRoot 'stage-qualified-source.ps1') -OutputDirectory $output `
                 -ConfigurationPath $configPath -Configuration $configuration -Pins $auxiliaryIdentities
             if ($null -ne $auxiliary -and -not $adaptedAuxiliaries.Add($auxiliary)) {
                 throw "Duplicate auxiliary-identity adaptation: $auxiliary."
+            }
+            $model = & (Join-Path $PSScriptRoot 'stage-qualified-source.ps1') -OutputDirectory $output `
+                -ConfigurationPath $configPath -Configuration $configuration -Pins $nullableModels
+            if ($null -ne $model -and -not $adaptedModels.Add($model)) {
+                throw "Duplicate nullable-model adaptation: $model."
             }
             # Keep every template.json unchanged. CLI aliases live in host metadata only.
             $hostMetadata = @{ symbolInfo = @{} }
@@ -134,4 +141,7 @@ if ($adaptedIdentities.Count -ne $supportingTypes.Count) {
 }
 if ($adaptedAuxiliaries.Count -ne $auxiliaryIdentities.Count) {
     throw 'The qualified auxiliary-identity inventory was not completely adapted.'
+}
+if ($adaptedModels.Count -ne $nullableModels.Count) {
+    throw 'The qualified nullable-model inventory was not completely adapted.'
 }

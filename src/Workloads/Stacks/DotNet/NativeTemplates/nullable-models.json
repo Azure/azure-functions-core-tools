@@ -1,0 +1,81 @@
+[
+  {
+    "identity": "Azure.Function.CSharp.Isolated.CosmosDBTrigger.4.x",
+    "path": "content/CosmosDBTrigger-CSharp/CosmosDBTriggerCSharp.cs",
+    "sha256": "A845374D78FCE58444898EE0FF50B6676A896BDC30D87A23C7AF4EEBAF303389",
+    "configurationSha256": "F908D19DFE7B583AAE96A7FDEE050EA1EF4D6BE4747BDA45D87CB9A0FD077153",
+    "replacements": [
+      { "from": "MyDocument", "to": "CosmosDBTriggerCSharpDocument", "count": 2 },
+      { "from": "public string id { get; set; }", "to": "public string? id { get; set; }", "count": 1 },
+      { "from": "public string Text { get; set; }", "to": "public string? Text { get; set; }", "count": 1 }
+    ],
+    "nest": { "declaration": "public class CosmosDBTriggerCSharpDocument", "indent": 0, "suffix": "" }
+  },
+  {
+    "identity": "Azure.Function.CSharp.KustoOutputBindingIsolated",
+    "path": "content/KustoOutputBinding-CSharp-Isolated/KustoOutputBindingIsolated.cs",
+    "sha256": "A44C21626B381B20EF72EB530473DC933FC01FE30C3F4EF43E8FE3BCF150FF32",
+    "configurationSha256": "3331E27B39A295D1A5C5E96B8C825744B4091C05A1298EB37576E022B1416B03",
+    "replacements": [
+      { "from": "ToDoItem", "to": "KustoOutputBindingIsolatedItem", "count": 5 },
+      { "from": "public string Id { get; set; }", "to": "public string? Id { get; set; }", "count": 1 },
+      { "from": "public string Description { get; set; }", "to": "public string? Description { get; set; }", "count": 1 }
+    ],
+    "nest": { "declaration": "public class KustoOutputBindingIsolatedItem", "indent": 0, "suffix": "" }
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.SignalR.3.x",
+    "path": "content/SignalRConnectionInfoHttpTrigger-CSharp/SignalRConnectionInfoHttpTriggerCSharp.cs",
+    "sha256": "C066CBB033F303DF60F98AC4E296D8018A4630E831CE12573F0A378B2A8C7B7E",
+    "inputSha256": "4488416D98BE80F307B491281C1177E0DA79B21004B82CB3C2EEFEFF7CB823B7",
+    "configurationSha256": "EF5A7EDD7FF0D84484281924818E79D2A8CDF18C51D52EBEFEE2BC2E43410E4E",
+    "replacements": [
+      { "from": "public string Url { get; set; }", "to": "public string? Url { get; set; }", "count": 1 },
+      { "from": "public string AccessToken { get; set; }", "to": "public string? AccessToken { get; set; }", "count": 1 }
+    ]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.SqlOutputBinding",
+    "path": "content/SqlOutputBinding-CSharp-Isolated/SqlOutputBindingHttpTriggerCSharp.cs",
+    "sha256": "D8947264417E3C68BF838A2466CAAEF82323674FA8101D773024DB9BF0A29F2D",
+    "inputSha256": "2182C7E0886D9C353DFFE7BDC8468B4C18B7CC065874F2075A0ED1DC1018C261",
+    "configurationSha256": "E0609D3D1AE396C5D1B7DD946F5E2158B19D573AA02090A0F752AA156350D648",
+    "replacements": [
+      { "from": "public string Id { get; set; }", "to": "public string? Id { get; set; }", "count": 1 },
+      { "from": "public string Description { get; set; }", "to": "public string? Description { get; set; }", "count": 1 }
+    ]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.SqlTriggerBinding",
+    "path": "content/SqlTrigger-CSharp-Isolated/SqlTriggerBindingCSharp.cs",
+    "sha256": "16885FCA8FF9E94D6FFFF7E31A189262753C4D383D727EC3FF8FF4B2AA6759D4",
+    "inputSha256": "71A9522306674BF1CDAC2240A2453CC0BB74BB63BAF06D2F4085BD7ECA499448",
+    "configurationSha256": "490F92F70FF97F6825AF2B900F1C76CA48280B29B186E305ED7C90E993896413",
+    "replacements": [
+      { "from": "public string Id { get; set; }", "to": "public string? Id { get; set; }", "count": 1 },
+      { "from": "public string Description { get; set; }", "to": "public string? Description { get; set; }", "count": 1 }
+    ]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.MySqlOutputBinding",
+    "path": "content/MySqlOutputBinding-CSharp-Isolated/MySqlOutputBindingHttpTriggerCSharp.cs",
+    "sha256": "C4C8AD024E03AAF96699BF88017727BA8CFD7CFA0AA6E7E2DD068A0401F301B2",
+    "inputSha256": "6B8D774D256BE850E963984636A51D033FC90E8C81F7B13FA523AEBC809D1861",
+    "configurationSha256": "82E9E05769BF563EBFDEC99E8AF2D2CA406A4C43FE4B3BC7CB8F13C448013321",
+    "replacements": [
+      { "from": "public string Id { get; set; }", "to": "public string? Id { get; set; }", "count": 1 },
+      { "from": "public string Description { get; set; }", "to": "public string? Description { get; set; }", "count": 1 }
+    ]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.MySqlTriggerBinding",
+    "path": "content/MySqlTrigger-CSharp-Isolated/MySqlTriggerBindingCSharp.cs",
+    "sha256": "88EE11F656117F0EF0134CA02385C6A205C21C64DAE99B6290F8DA58F1D4D21E",
+    "inputSha256": "CDC644E899D0082A38A435989C1D36DFF3EB64CACEC527551FC367F6B9D486FD",
+    "configurationSha256": "6628AA1D20FAA2906C6EF9C87404EFB8FDF7B96054AA2EB59D8BCCCED7A39817",
+    "replacements": [
+      { "from": "public string Id { get; set; }", "to": "public string? Id { get; set; }", "count": 1 },
+      { "from": "public string Description { get; set; }", "to": "public string? Description { get; set; }", "count": 1 }
+    ]
+  }
+]

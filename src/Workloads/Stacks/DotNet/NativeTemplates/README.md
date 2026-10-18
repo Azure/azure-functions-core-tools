@@ -113,6 +113,27 @@ ordinary `Foo_Invoke` primary does not collide with the helper `Foo-Invoke`.
 This is not project-wide semantic analysis of arbitrary authored function IDs,
 and existing projects are not automatically cleaned up.
 
+## Nullable example models
+
+`nullable-models.json` qualifies seven owned C# model sources and their exact
+preceding raw/J/auxiliary adaptation bytes. Fourteen uninitialized string
+properties are annotated `string?`: Cosmos DB's `id`/`Text`, SignalR's
+`Url`/`AccessToken`, and `Id`/`Description` in Kusto, SQL and MySQL output/trigger
+models. These properties already defaulted to null at runtime. No initializer,
+required member, null-forgiving operator, serializer attribute or warning
+suppression is added. CLR property types, missing/explicit-null JSON behavior
+and serialized property names/values remain unchanged.
+
+The Cosmos DB document and Kusto output model also become nested
+`<FunctionName>Document` and `<FunctionName>Item`, with every reference
+substituted by the native engine. This prevents the same fixed-model collision
+when repeating these items or keeping an existing user `MyDocument`/`ToDoItem`.
+Original provenance is checked and retained even when an earlier qualified
+adaptation already owns the source. No user DTO is inspected or rewritten.
+Generated-model integration checks compile repeated items with warnings as
+errors and exercise their actual CLR defaults and both supported sample JSON
+serializer shapes, without contacting any binding backend.
+
 ## Deliberately staged
 
 This change does not register or switch public `func init` / `func new`.
