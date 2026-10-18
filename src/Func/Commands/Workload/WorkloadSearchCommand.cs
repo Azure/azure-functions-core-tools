@@ -109,6 +109,10 @@ internal sealed class WorkloadSearchCommand : FuncCliCommand
         {
             throw new GracefulException(ex.Message, isUserError: true);
         }
+        catch (InvalidDataException ex)
+        {
+            throw new GracefulException(ex.Message, ex, isUserError: true);
+        }
 
         if (stackOnly)
         {

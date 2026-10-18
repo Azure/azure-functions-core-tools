@@ -84,6 +84,8 @@ func <command> [path] [options]
 | `func version` | Display version information |
 | `func help [command]` | Display help for a command |
 
+`func workload search` treats a missing, null, or non-array V3 search `data` field as a feed error, not as no matches. A valid empty `data` array remains a successful empty result. Check the feed or use `--source` to select another V3 feed if its response is invalid.
+
 ## Architecture
 
 The v5 CLI is a ground-up rebuild using:

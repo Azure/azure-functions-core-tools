@@ -93,12 +93,64 @@ public sealed class NuGetProtocolSourceClientTests
         NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().BeEmpty();
     }
 
-    [Fact]
-    public void ParseV3Hits_ReturnsEmptyWhenDataMissing()
+    [Theory]
+    [InlineData("""{ "totalHits": 0 }""")]
+    [InlineData("""{ "data": null }""")]
+    [InlineData("""{ "data": "not-an-array" }""")]
+    [InlineData("""{ "data": {} }""")]
+    [InlineData("""{ "data": 0 }""")]
+    [InlineData("""{ "data": false }""")]
+    public void ParseV3Hits_InvalidData_ThrowsInsteadOfReportingNoMatches(string json)
     {
-        var response = JObject.Parse("""{ "totalHits": 0 }""");
+        var response = JObject.Parse(json);
+
+        Action parse = () => NuGetProtocolSourceClient.ParseV3Hits(response, _source);
+
+        parse.Should().ThrowExactly<InvalidDataException>()
+            .WithMessage("*https://feed.test/v3/index.json*'data' array*--source*");
+    }
+
+    [Fact]
+    public void ParseV3Hits_ValidEmptyArray_ReturnsNoMatches()
+    {
+        var response = JObject.Parse("""{ "data": [] }""");
 
         NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ParseV3Hits_NullResponse_ThrowsInvalidData()
+    {
+        Action parse = () => NuGetProtocolSourceClient.ParseV3Hits(null, _source);
+
+        parse.Should().ThrowExactly<InvalidDataException>().WithMessage("*'data' array*--source*");
+    }
+
+    [Fact]
+    public void ParseV3Hits_NullSource_ThrowsArgumentNull()
+    {
+        Action parse = () => NuGetProtocolSourceClient.ParseV3Hits(JObject.Parse("""{"data":[]}"""), null!);
+
+        parse.Should().ThrowExactly<ArgumentNullException>().WithParameterName("source");
+    }
+
+    [Theory]
+    [InlineData("""null""")]
+    [InlineData("""[]""")]
+    public void ParseV3Hits_OptionalPackageTypesAndMetadata_PreserveValidHit(string packageTypes)
+    {
+        var response = JObject.Parse($$$"""
+            {"data":[{"id":"Workloads.Example","version":"1.2.3","packageTypes":{{{packageTypes}}},
+            "tags":["alias:example","kind:workload","rid:win-x64"],"constraints":{"custom":"unchanged"}}]}
+            """);
+
+        var result = NuGetProtocolSourceClient.ParseV3Hits(response, _source).Should().ContainSingle().Which;
+
+        result.PackageId.Should().Be("workloads.example");
+        result.LatestVersion.Should().Be(NuGetVersion.Parse("1.2.3"));
+        result.Aliases.Should().Equal("example");
+        result.Kind.Should().Be("workload");
+        result.Rid.Should().Be("win-x64");
     }
 
     [Fact]
