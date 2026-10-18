@@ -12,11 +12,11 @@ namespace Azure.Functions.Cli.Commands.Workload;
 /// <summary>
 /// <c>func workload list [--all-versions|-a] [--json] [--verbose]</c>.
 /// Default view is a compact 3-column table (Alias, Display Name, Version)
-/// showing only the loaded version per workload. <c>--verbose</c> switches
+/// showing the selected version per workload. <c>--verbose</c> switches
 /// to the same definition-list "card" layout as <c>func workload search</c>
 /// so package id and full description get their own lines. <c>--all-versions</c>
 /// switches to a grouped layout that lists every installed side-by-side
-/// version and marks the loaded one.
+/// version and marks entries that are actually loaded.
 /// </summary>
 internal sealed class WorkloadListCommand : FuncCliCommand
 {
@@ -29,7 +29,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
 
     public Option<bool> AllVersionsOption { get; } = new("--all-versions", "-a")
     {
-        Description = "List every installed version of every workload. Default: loaded version only.",
+        Description = "List every installed version of every workload. Default: active version only.",
     };
 
     public Option<bool> JsonOption { get; } = new("--json")
@@ -56,7 +56,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
 
         IReadOnlyList<ListRow> rows = allVersions
             ? await BuildAllVersionsRowsAsync(cancellationToken)
-            : await BuildLoadedRowsAsync(cancellationToken);
+            : await BuildActiveRowsAsync(cancellationToken);
 
         if (json)
         {
@@ -200,7 +200,7 @@ internal sealed class WorkloadListCommand : FuncCliCommand
         _interaction.WriteHint($"{rows.Count} {Plural(rows.Count, "workload")} installed.");
     }
 
-    private async Task<IReadOnlyList<ListRow>> BuildLoadedRowsAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ListRow>> BuildActiveRowsAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadInfo> workloads = _workloads.GetWorkloads();
         IReadOnlyList<WorkloadEntry>? installed = await _store.GetWorkloadsAsync(cancellationToken);
@@ -239,7 +239,8 @@ internal sealed class WorkloadListCommand : FuncCliCommand
         return [.. installed
             .Select(e =>
             {
-                bool loaded = loadedByKey.TryGetValue((e.PackageId, e.PackageVersion), out WorkloadInfo? info);
+                bool loaded = loadedByKey.TryGetValue((e.PackageId, e.PackageVersion), out WorkloadInfo? info)
+                    && info is not InstalledRuntimeWorkloadInfo;
                 return CreateRow(e, loaded, info);
             })
             .OrderBy(e => e.PackageId, StringComparer.OrdinalIgnoreCase)

@@ -49,7 +49,7 @@ internal sealed class NativeCliEntryPoint
                     services.AddFirstPartyNativeWorkflows();
                     configure?.Invoke(services);
                 }, enableBundleBindingConstraints: true, cancellationToken,
-                deferProjectConfigurationErrors: true);
+                deferProjectConfigurationErrors: true, arguments: original);
             if (!host.HasProjectConfigurationFailure)
             {
                 await host.StartAsync(cancellationToken);

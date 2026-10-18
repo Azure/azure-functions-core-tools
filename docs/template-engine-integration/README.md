@@ -149,6 +149,20 @@ retained installed inventories independently of the global deduplicating cache.
 Each invocation keeps the existing protected/private cache boundary, allowing
 retained v1, current v2, and retained v1 flows to interleave without cache leakage.
 
+Built-in `workload` management commands are identified by the shared command graph
+and parser before runtime registration, including normal aliases and response
+files. They use selected installed metadata without loading workload assemblies
+or calling workload `Configure`, so an active Windows stack can be removed without
+the command itself locking its runtime DLL. Runtime inventory is not reported as
+instance-loaded: default listing shows selected versions and `--all-versions`
+reports `loaded: false` for metadata-only runtime entries. Management inventory
+and help neither admit native recovery nor create a cold native hive.
+Built-in names and aliases are reserved against external commands. Other
+commands retain their normal external-command resolution, one workload
+configuration pass, and configuration-before-command-construction order. A later
+argument named `workload` or an errored preliminary parse cannot select the
+management boot path.
+
 Node, Python, and .NET retain their supported public item catalogs and placement;
 C#/F# dependency and compile-order work remains source-qualified. Go, Java, and
 PowerShell supply project workflows, not a new first-party item catalog.

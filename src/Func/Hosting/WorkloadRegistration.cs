@@ -65,8 +65,18 @@ internal static class WorkloadRegistration
         return RegisterAsync(services, paths, interaction, capture, cancellationToken);
     }
 
+    /// <summary>
+    /// Registers selected installed metadata without loading or configuring runtime assemblies.
+    /// </summary>
+    internal static Task RegisterWorkloadMetadataAsync(IServiceCollection services, WorkloadPathsOptions paths, IInteractionService interaction,
+        NativeTemplateWorkloadCapture capture, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        return RegisterAsync(services, paths, interaction, capture, cancellationToken, loadRuntime: false);
+    }
+
     private static async Task RegisterAsync(IServiceCollection services, WorkloadPathsOptions paths, IInteractionService interaction,
-        NativeTemplateWorkloadCapture? capture, CancellationToken cancellationToken)
+        NativeTemplateWorkloadCapture? capture, CancellationToken cancellationToken, bool loadRuntime = true)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(paths);
@@ -79,7 +89,7 @@ internal static class WorkloadRegistration
         using Activity? activity = CliTelemetry.Trace.StartWorkloadBootActivity();
         try
         {
-            int loadedCount = await RegisterCoreAsync(services, paths, interaction, capture, cancellationToken);
+            int loadedCount = await RegisterCoreAsync(services, paths, interaction, capture, cancellationToken, loadRuntime);
             activity?.SetTag(TelemetryConventions.CliWorkloadCount, loadedCount);
         }
         catch (Exception ex)
@@ -94,12 +104,11 @@ internal static class WorkloadRegistration
         WorkloadPathsOptions paths,
         IInteractionService interaction,
         NativeTemplateWorkloadCapture? capture,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool loadRuntime)
     {
         var store = new WorkloadStore(paths, new FileWorkloadOperationCoordinator(paths));
         var runtimeIdentifierProvider = new WorkloadRuntimeIdentifierProvider();
-        var loader = new WorkloadLoader(paths, runtimeIdentifierProvider);
-
         IReadOnlyList<WorkloadEntry> allEntries = await store.GetWorkloadsAsync(cancellationToken);
         if (capture is not null)
         {
@@ -114,32 +123,45 @@ internal static class WorkloadRegistration
 
         var runtimeWorkloads = new List<RuntimeWorkloadInfo>(liveEntries.Count);
         Dictionary<RuntimeWorkloadInfo, WorkloadEntry>? selectedEntries = capture is null ? null : new(ReferenceEqualityComparer.Instance);
-        foreach (WorkloadEntry entry in liveEntries)
+        if (loadRuntime)
         {
-            RuntimeWorkloadInfo? loadedWorkload = null;
-            string? failure = null;
-            try
+            var loader = new WorkloadLoader(paths, runtimeIdentifierProvider);
+            foreach (WorkloadEntry entry in liveEntries)
             {
-                // Load per-entry so one failure becomes a warning instead of
-                // aborting discovery for the rest.
-                IReadOnlyList<RuntimeWorkloadInfo> loaded = loader.Load([entry]);
-                loadedWorkload = loaded[0];
-            }
-            catch (Exception ex)
-            {
-                interaction.WriteWarning(
-                    $"Workload '{entry.PackageId}@{entry.PackageVersion}' could not be loaded: {ex.Message}");
-                failure = ex.Message;
-            }
+                RuntimeWorkloadInfo? loadedWorkload = null;
+                string? failure = null;
+                try
+                {
+                    // Load per-entry so one failure becomes a warning instead of
+                    // aborting discovery for the rest.
+                    IReadOnlyList<RuntimeWorkloadInfo> loaded = loader.Load([entry]);
+                    loadedWorkload = loaded[0];
+                }
+                catch (Exception ex)
+                {
+                    interaction.WriteWarning(
+                        $"Workload '{entry.PackageId}@{entry.PackageVersion}' could not be loaded: {ex.Message}");
+                    failure = ex.Message;
+                }
 
-            if (loadedWorkload is not null)
-            {
-                runtimeWorkloads.Add(loadedWorkload);
-                selectedEntries?.Add(loadedWorkload, entry);
+                if (loadedWorkload is not null)
+                {
+                    runtimeWorkloads.Add(loadedWorkload);
+                    selectedEntries?.Add(loadedWorkload, entry);
+                }
+                else
+                {
+                    capture?.Record(entry, null, failure);
+                }
             }
-            else
+        }
+        else
+        {
+            foreach (WorkloadEntry entry in liveEntries)
             {
-                capture?.Record(entry, null, failure);
+                string directory = paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+                services.AddSingleton<WorkloadInfo>(new InstalledRuntimeWorkloadInfo(entry.PackageId, entry.PackageVersion, entry.Aliases,
+                    directory, WorkloadPackageLayout.GetContentRoot(directory, entry.RuntimeIdentifier), GetDisplayName(entry), entry.Description));
             }
         }
 
