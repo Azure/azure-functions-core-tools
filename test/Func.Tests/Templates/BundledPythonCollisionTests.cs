@@ -108,6 +108,8 @@ public sealed partial class BundledPythonTemplateTests
     [InlineData("def Different(req):\n    pass\ncreated = app.function_name('Greeting')(app.route(route='old')(Different)) if False else None\n")]
     [InlineData("def Different(req):\n    pass\n@app.function_name('Inner')\n@app.route(route='old')\ndef Different(req):\n    pass\napp.function_name('Greeting')(Different)\n")]
     [InlineData("alias = app\nalias = (app)\ndef Different(timer):\n    pass\nalias.timer_trigger(arg_name='timer', schedule='0 * * * * *')(Different)\n")]
+    [InlineData("def register_user_handler(target):\n    def DynamicExisting(req):\n        pass\n"
+        + "    target.route(route='existing')(DynamicExisting)\nregister_user_handler(app)\n")]
     public async Task SelectedAppend_PartialNameAnalysis_PreviewAndApplySucceedWithValidationLimit(string original)
     {
         await InstallAsync();

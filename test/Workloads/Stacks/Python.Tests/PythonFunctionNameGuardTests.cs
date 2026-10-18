@@ -154,6 +154,46 @@ public sealed class PythonFunctionNameGuardTests
         validation.Complete.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("register_user_handler(app)\n")]
+    [InlineData("register_user_handler(target=app)\n")]
+    [InlineData("register_user_handler(other, app)\n")]
+    [InlineData("alias = app\nregister_user_handler(alias)\n")]
+    public void Analyze_AppPassedToOpaqueRegistrationHelper_AllowsWithValidationLimit(string invocation)
+    {
+        const string helper = "def register_user_handler(target):\n"
+            + "    def DynamicExisting(req):\n        pass\n"
+            + "    target.route(route='existing')(DynamicExisting)\n";
+
+        PythonFunctionNameValidation validation = _guard.Analyze(helper + invocation, Snippet, CancellationToken.None);
+
+        validation.Diagnostic.Should().BeNull();
+        validation.Complete.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("def register_user_handler(target):\n    def DynamicExisting(req):\n        pass\n    target.route(route='old')(DynamicExisting)\n")]
+    [InlineData("def helper(app):\n    pass\n")]
+    [InlineData("def helper(target=app):\n    pass\n")]
+    [InlineData("helper(other)\n")]
+    [InlineData("# register_user_handler(app)\ntext = 'register_user_handler(app)'\n")]
+    public void Analyze_NoOpaqueInvocationOfKnownApp_DoesNotInventRegistrationEvidence(string original)
+    {
+        PythonFunctionNameValidation validation = _guard.Analyze(original, Snippet, CancellationToken.None);
+
+        validation.Diagnostic.Should().BeNull();
+        validation.Complete.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Analyze_OpaqueHelperInvocation_DoesNotHideKnownLiteralCollision()
+    {
+        PythonFunctionNameValidation validation = _guard.Analyze("register_user_handler(app)\n" + Snippet, Snippet, CancellationToken.None);
+
+        validation.Diagnostic.Should().Contain("'Greeting' already exists");
+        validation.Complete.Should().BeFalse();
+    }
+
     [Fact]
     public void GetDiagnostic_LetterNumberIdentifier_NormalizesWholePythonIdentifier()
     {

@@ -236,8 +236,18 @@ internal sealed class PythonFunctionNameGuard
 
     private static bool HasRegistrationCall(List<Token> tokens, bool decorator, HashSet<string> receivers)
     {
+        int offset = tokens[0].Text == "async" ? 1 : 0;
+        bool definition = tokens.ElementAtOrDefault(offset)?.Text is "def" or "class";
+        int depth = 0;
         for (int index = 1; index + 1 < tokens.Count; index++)
         {
+            depth += tokens[index - 1].Text is "(" or "[" or "{" ? 1 : tokens[index - 1].Text is ")" or "]" or "}" ? -1 : 0;
+            if (!decorator && !definition && depth > 0 && receivers.Contains(tokens[index].Text)
+                && tokens[index - 1].Text is "(" or "," or "=" && tokens[index + 1].Text is ")" or ",")
+            {
+                return true;
+            }
+
             if (index >= 2 && tokens[index - 1].Text == "." && tokens[index + 1].Text == "("
                 && (tokens[index].Text is "register_functions" or "register_blueprint"
                     || (!decorator && (tokens[index].Text == "function_name"

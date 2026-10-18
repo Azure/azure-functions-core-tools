@@ -184,6 +184,8 @@ settings remain partial rather than assuming the outer name overrides the SDK's
 first setting. Unknown Unicode identifier scalars stay in
 their whole token and make analysis partial instead of reserving a truncated
 name. The lexer is not a complete Python parser or identifier-domain validator.
+Passing a recognized app or alias as a value to an opaque helper also makes
+analysis partial, without inspecting that helper's registrations or inferring names.
 Computed names, conditional declarations, Blueprint/programmatic registration, other decorators, and
 unsupported lexical shapes make analysis partial; they do not by themselves
 refuse append. Known symbol/name collisions still refuse even alongside unknown
