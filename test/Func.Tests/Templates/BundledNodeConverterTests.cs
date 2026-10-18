@@ -4,11 +4,84 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed partial class BundledNodeTemplateTests
 {
+    [Theory]
+    [InlineData("comments", true)]
+    [InlineData("changedLiteral", false)]
+    [InlineData("ambiguousDeclaration", false)]
+    [InlineData("changedAssignment", false)]
+    public async Task Converter_ChangedSource_AssociatesOnlyReviewedDeclarationsOrFailsClosed(string change, bool succeeds)
+    {
+        string owned = NodeSourceDirectory();
+        string source = Path.Combine(_root, "converter-input");
+        foreach (string relative in new[] { "templates/templates.json", "templates/_bindings.json", "bindings/userPrompts.json", "resources/Resources.json" })
+        {
+            string target = Path.Combine(source, relative.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(Path.Combine(owned, relative.Replace('/', Path.DirectorySeparatorChar)), target);
+        }
+        string catalog = Path.Combine(source, "templates", "templates.json");
+        var templates = JsonNode.Parse(File.ReadAllBytes(catalog))!.AsArray();
+        const string decoys = "\n// schedule: '0 */5 * * * *',\nconst unrelated = '0 */5 * * * *';\n";
+        foreach (string language in new[] { "JavaScript", "TypeScript" })
+        {
+            var raw = templates.Single(template => template!["id"]!.GetValue<string>() == "TimerTrigger-" + language)!;
+            string file = language == "JavaScript" ? "function.js" : "function.ts";
+            string body = raw["files"]![file]!.GetValue<string>();
+            if (change == "comments") raw["files"]![file] = body + decoys;
+            else if (change == "changedLiteral") raw["files"]![file] = body.Replace("schedule: '0 */5 * * * *'", "schedule: 'changed'");
+            else if (change == "ambiguousDeclaration") raw["files"]![file] = body + "\n    schedule: '0 */5 * * * *',\n";
+            else raw["jobs"]![0]!["inputs"]![1]!["assignTo"] = "$(OTHER_INPUT)";
+        }
+        File.WriteAllText(catalog, templates.ToJsonString());
+        string items = Path.Combine(_root, "converted-items");
+        string provenance = Path.Combine(_root, "converted-provenance");
+        string native = Path.GetFullPath(Path.Combine(owned, "..", "..", "..", "..", "Stacks", "Node", "NativeTemplates"));
+        ProcessStartInfo start = new("pwsh") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        foreach (string argument in new[] { "-NoProfile", "-File", Path.Combine(native, "Convert-NodeItemTemplates.ps1"),
+            "-SourceDirectory", source, "-OutputDirectory", items, "-ProvenanceDirectory", provenance,
+            "-PackageId", "Azure.Functions.Templates.Node.Basic", "-PackageVersion", "1.2.3-guard-test" })
+        {
+            start.ArgumentList.Add(argument);
+        }
+        using var process = Process.Start(start)!;
+        Task<string> stdout = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        Task<string> stderr = process.StandardError.ReadToEndAsync(CancellationToken.None);
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(20));
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            }
+        }
+        string errors = await stderr;
+        (await stdout).Should().BeEmpty();
+        process.ExitCode.Should().Be(succeeds ? 0 : 1, errors);
+        if (succeeds)
+        {
+            foreach (string language in new[] { "JavaScript", "TypeScript" })
+            {
+                string extension = language == "JavaScript" ? ".js" : ".ts";
+                File.ReadAllText(Path.Combine(items, "TimerTrigger-" + language, "funcNodeItem" + extension)).Should()
+                    .Contain("schedule: '__FUNC_NODE_timerTrigger-schedule__',").And.EndWith(decoys);
+            }
+        }
+        else
+        {
+            errors.Should().Contain(change == "changedAssignment" ? "property association" : "declaration");
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

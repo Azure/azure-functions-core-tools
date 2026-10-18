@@ -39,6 +39,30 @@ function ConvertTo-OptionName([string] $value) {
     return ([regex]::Replace($value, '([^A-Z])([A-Z])', '$1-$2')).ToLowerInvariant()
 }
 
+function Get-PropertyMapping([string] $id, $templateInput) {
+    $kind = ($id -split '-')[0]
+    if ($kind -eq 'EventGridBlobTrigger') { $kind = 'BlobTrigger' }
+    $key = "$kind|$($templateInput.paramId)|$($templateInput.assignTo)"
+    switch -CaseSensitive ($key) {
+        'TimerTrigger|timerTrigger-schedule|$(SCHEDULE_INPUT)' { return @('schedule', "'0 */5 * * * *'") }
+        'QueueTrigger|queueTrigger-connection|$(CONNECTION_INPUT)' { return @('connection', "''") }
+        'QueueTrigger|queueTrigger-name|$(QUEUE_NAME_INPUT)' { return @('queueName', "'js-queue-items'") }
+        'BlobTrigger|blobTrigger-connection|$(CONNECTION_INPUT)' { return @('connection', "''") }
+        'BlobTrigger|blobTrigger-path|$(PATH_INPUT)' { return @('path', "'samples-workitems/{name}'") }
+        'EventHubTrigger|eventHubTrigger-name|$(EVENT_HUB_NAME_INPUT)' { return @('eventHubName', "'samples-workitems'") }
+        'ServiceBusQueueTrigger|serviceBusTrigger-connection|$(CONNECTION_INPUT)' { return @('connection', "''") }
+        'ServiceBusQueueTrigger|serviceBusTrigger-name|$(QUEUE_NAME_INPUT)' { return @('queueName', "'myinputqueue'") }
+        'ServiceBusTopicTrigger|serviceBusTrigger-connection|$(CONNECTION_INPUT)' { return @('connection', "''") }
+        'ServiceBusTopicTrigger|serviceBusTrigger-topic|$(TOPIC_NAME_INPUT)' { return @('topicName', "'mytopic'") }
+        'ServiceBusTopicTrigger|serviceBusTrigger-subscription|$(SUBSCRIPTION_NAME_INPUT)' { return @('subscriptionName', "'mysubscription'") }
+        'CosmosDBTrigger|cosmosTrigger-connection|$(CONNECTION_INPUT)' { return @('connectionStringSetting', "''") }
+        'CosmosDBTrigger|cosmosTrigger-database|$(DATABASE_INPUT)' { return @('databaseName', "''") }
+        'CosmosDBTrigger|cosmosTrigger-collection|$(COLLECTION_INPUT)' { return @('collectionName', "''") }
+        'CosmosDBTrigger|cosmosTrigger-createLease|$(CREATE_LEASE_INPUT)' { return @('createLeaseCollectionIfNotExists', 'true') }
+        default { throw "Review the property association for '$key' before converting '$id'." }
+    }
+}
+
 foreach ($template in $templates) {
     $id = [string] $template.id
     if ($id -notmatch '^[A-Za-z0-9]+-(JavaScript|TypeScript)$' -or -not $seen.Add($id)) {
@@ -97,8 +121,33 @@ foreach ($template in $templates) {
         if ($prompt['enum']) {
             $symbol.choices = @($prompt.enum | ForEach-Object { @{ choice = $_.value; displayName = $_.display } })
         }
-        # Do not invent substitutions for prompts absent from the owned payload.
-        if ($content.Contains([string] $templateInput.assignTo)) { $symbol.replaces = $templateInput.assignTo }
+        $mapping = Get-PropertyMapping $id $templateInput
+        $property = $mapping[0]
+        $literal = $mapping[1]
+        $declaration = "    ${property}: $literal,"
+        $pattern = '(?m)^' + [regex]::Escape($declaration) + '(?=\r?$)'
+        if ([regex]::Matches($content, $pattern).Count -ne 1) {
+            throw "The owned '$property' declaration in '$id' changed or is ambiguous. Review its parameter association."
+        }
+        $token = "__FUNC_NODE_$($templateInput.paramId)__"
+        $isBoolean = $templateInput.paramId -ceq 'cosmosTrigger-createLease'
+        if ($isBoolean) {
+            if ($symbol.datatype -cne 'choice' -or (@($symbol.choices.choice) -join ',') -cne 'true,false') {
+                throw "The owned Boolean choices in '$id' changed."
+            }
+            $symbols.Add("$($templateInput.paramId)-NodeBoolean", @{
+                type = 'derived'; valueSource = $templateInput.paramId; valueTransform = 'lowerCase'; replaces = $token
+            })
+            $replacement = "    ${property}: $token,"
+        }
+        else {
+            if ($symbol.datatype -cne 'string') { throw "The owned string parameter in '$id' changed type." }
+            $symbols.Add("$($templateInput.paramId)-NodeString", @{
+                type = 'derived'; valueSource = $templateInput.paramId; valueTransform = 'nodeString'; replaces = $token
+            })
+            $replacement = "    ${property}: '$token',"
+        }
+        $content = [regex]::Replace($content, $pattern, [System.Text.RegularExpressions.MatchEvaluator] { param($match) $replacement })
         $symbols.Add($templateInput.paramId, $symbol)
         $symbolInfo.Add($templateInput.paramId, @{ longName = ConvertTo-OptionName $templateInput.paramId })
     }
@@ -140,6 +189,11 @@ foreach ($template in $templates) {
         defaultName = $defaultName
         preferNameDirectory = $false
         symbols = $symbols
+        forms = @{
+            nodeString = @{ identifier = 'chain'; steps = @('jsonEncode', 'nodeStringContent', 'nodeApostrophe') }
+            nodeStringContent = @{ identifier = 'replace'; pattern = '^"|"$'; replacement = '' }
+            nodeApostrophe = @{ identifier = 'replace'; pattern = "'"; replacement = '\u0027' }
+        }
         constraints = $constraints
         sources = @(
             @{ source = './'; target = $legacyTarget; condition = '(InvocationOutputIntent == "legacy")' }

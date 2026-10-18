@@ -3,6 +3,7 @@
 
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Templates.V2;
 
 namespace Azure.Functions.Cli.Templates.Node;
@@ -68,6 +69,7 @@ internal static class NodeItemSourceQualifier
             throw Invalid("The selected native Node source does not have the qualified single-file output layout.");
         }
         string expected = body.Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+        expected = QualifyParameters(template, root, expected);
         if (root.TryGetProperty("symbols", out JsonElement symbols) && symbols.TryGetProperty("AuthLevel", out JsonElement auth))
         {
             if (NodeItemCompatibility.Text(auth, "type") != "parameter" || NodeItemCompatibility.Text(auth, "datatype") != "choice"
@@ -87,6 +89,91 @@ internal static class NodeItemSourceQualifier
         {
             throw Invalid("The selected native Node payload differs from the original write action's owned source body.");
         }
+    }
+
+    private static string QualifyParameters(NewTemplate template, JsonElement root, string body)
+    {
+        V2Input[] inputs = [.. (template.Jobs![0].Inputs ?? []).Where(input => input.AssignTo != "$(FUNCTION_NAME_INPUT)")];
+        if (inputs.Length == 0)
+        {
+            return body;
+        }
+        const string expectedForms = """
+            {"nodeString":{"identifier":"chain","steps":["jsonEncode","nodeStringContent","nodeApostrophe"]},
+             "nodeStringContent":{"identifier":"replace","pattern":"^\"|\"$","replacement":""},
+             "nodeApostrophe":{"identifier":"replace","pattern":"'","replacement":"\\u0027"}}
+            """;
+        using var forms = JsonDocument.Parse(expectedForms);
+        if (!JsonElement.DeepEquals(NodeItemCompatibility.Property(root, "forms"), forms.RootElement))
+        {
+            throw Invalid("The selected native Node string escaping differs from its owned conversion.");
+        }
+        JsonElement symbols = NodeItemCompatibility.Property(root, "symbols");
+        HashSet<string> expectedSymbols = ["InvocationOutputIntent"];
+        foreach (V2Input input in inputs)
+        {
+            expectedSymbols.Add(input.ParamId!);
+            expectedSymbols.Add(input.ParamId + (input.ParamId == "cosmosTrigger-createLease" ? "-NodeBoolean" : "-NodeString"));
+        }
+        if (!expectedSymbols.SetEquals(symbols.EnumerateObject().Select(symbol => symbol.Name)))
+        {
+            throw Invalid("The selected native Node property symbols differ from its owned conversion.");
+        }
+        string kind = template.Id!.Split('-')[0];
+        foreach (V2Input input in inputs)
+        {
+            (string property, string literal) = (kind, input.ParamId, input.AssignTo) switch
+            {
+                ("TimerTrigger", "timerTrigger-schedule", "$(SCHEDULE_INPUT)") => ("schedule", "'0 */5 * * * *'"),
+                ("QueueTrigger", "queueTrigger-connection", "$(CONNECTION_INPUT)") => ("connection", "''"),
+                ("QueueTrigger", "queueTrigger-name", "$(QUEUE_NAME_INPUT)") => ("queueName", "'js-queue-items'"),
+                ("BlobTrigger" or "EventGridBlobTrigger", "blobTrigger-connection", "$(CONNECTION_INPUT)") => ("connection", "''"),
+                ("BlobTrigger" or "EventGridBlobTrigger", "blobTrigger-path", "$(PATH_INPUT)") => ("path", "'samples-workitems/{name}'"),
+                ("EventHubTrigger", "eventHubTrigger-name", "$(EVENT_HUB_NAME_INPUT)") => ("eventHubName", "'samples-workitems'"),
+                ("ServiceBusQueueTrigger" or "ServiceBusTopicTrigger", "serviceBusTrigger-connection", "$(CONNECTION_INPUT)") => ("connection", "''"),
+                ("ServiceBusQueueTrigger", "serviceBusTrigger-name", "$(QUEUE_NAME_INPUT)") => ("queueName", "'myinputqueue'"),
+                ("ServiceBusTopicTrigger", "serviceBusTrigger-topic", "$(TOPIC_NAME_INPUT)") => ("topicName", "'mytopic'"),
+                ("ServiceBusTopicTrigger", "serviceBusTrigger-subscription", "$(SUBSCRIPTION_NAME_INPUT)") => ("subscriptionName", "'mysubscription'"),
+                ("CosmosDBTrigger", "cosmosTrigger-connection", "$(CONNECTION_INPUT)") => ("connectionStringSetting", "''"),
+                ("CosmosDBTrigger", "cosmosTrigger-database", "$(DATABASE_INPUT)") => ("databaseName", "''"),
+                ("CosmosDBTrigger", "cosmosTrigger-collection", "$(COLLECTION_INPUT)") => ("collectionName", "''"),
+                ("CosmosDBTrigger", "cosmosTrigger-createLease", "$(CREATE_LEASE_INPUT)") => ("createLeaseCollectionIfNotExists", "true"),
+                _ => throw Invalid("The original Node prompt has no reviewed property association."),
+            };
+            string token = $"__FUNC_NODE_{input.ParamId}__";
+            bool isBoolean = input.ParamId == "cosmosTrigger-createLease";
+            JsonElement parameter = NodeItemCompatibility.Property(symbols, input.ParamId!);
+            if (NodeItemCompatibility.Text(parameter, "type") != "parameter"
+                || NodeItemCompatibility.Text(parameter, "datatype") != (isBoolean ? "choice" : "string"))
+            {
+                throw Invalid("The selected native Node property parameter changed type.");
+            }
+            if (isBoolean)
+            {
+                string[] choices = [.. NodeItemCompatibility.Array(parameter, "choices").Select(choice => NodeItemCompatibility.Text(choice, "choice"))];
+                if (!choices.SequenceEqual(["true", "false"]))
+                {
+                    throw Invalid("The selected native Node Boolean substitution differs from its owned conversion.");
+                }
+            }
+            JsonElement derived = NodeItemCompatibility.Property(symbols, input.ParamId + (isBoolean ? "-NodeBoolean" : "-NodeString"));
+            if (parameter.TryGetProperty("replaces", out _) || derived.EnumerateObject().Count() != 4
+                || NodeItemCompatibility.Text(derived, "type") != "derived"
+                || NodeItemCompatibility.Text(derived, "valueSource") != input.ParamId
+                || NodeItemCompatibility.Text(derived, "valueTransform") != (isBoolean ? "lowerCase" : "nodeString")
+                || NodeItemCompatibility.Text(derived, "replaces") != token)
+            {
+                throw Invalid("The selected native Node literal substitution differs from its owned conversion.");
+            }
+            string declaration = $"    {property}: {literal},";
+            string pattern = "(?m)^" + Regex.Escape(declaration) + "(?=\\r?$)";
+            if (Regex.Matches(body, pattern).Count != 1)
+            {
+                throw Invalid("The original Node parameter property is missing, changed or ambiguous.");
+            }
+            body = Regex.Replace(body, pattern, _ => $"    {property}: {(isBoolean ? token : "'" + token + "'")},");
+        }
+        return body;
     }
 
     private static bool IsSegment(string value) => !string.IsNullOrWhiteSpace(value) && value is not ("." or "..")

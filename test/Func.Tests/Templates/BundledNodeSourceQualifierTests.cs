@@ -122,6 +122,53 @@ public sealed partial class BundledNodeTemplateTests
     }
 
     [Theory]
+    [InlineData("transform")]
+    [InlineData("valueSource")]
+    [InlineData("replaceToken")]
+    [InlineData("unescapedParameter")]
+    [InlineData("stringForm")]
+    [InlineData("assignTo")]
+    [InlineData("missingDeclaration")]
+    [InlineData("duplicateDeclaration")]
+    [InlineData("extraReplacement")]
+    public async Task SourceQualifier_ChangedParameterAssociation_RefusesInsteadOfTrustingCanonicalization(string corruption)
+    {
+        NodeItemSource source = await ReadQualifiedSourceAsync();
+        var config = JsonNode.Parse(source.Configuration.Span)!;
+        var derived = config["symbols"]!["timerTrigger-schedule-NodeString"]!;
+        if (corruption == "transform") derived["valueTransform"] = "identity";
+        else if (corruption == "valueSource") derived["valueSource"] = "name";
+        else if (corruption == "replaceToken") derived["replaces"] = "Timer";
+        else if (corruption == "unescapedParameter") config["symbols"]!["timerTrigger-schedule"]!["replaces"] = "__FUNC_NODE_timerTrigger-schedule__";
+        else if (corruption == "stringForm") config["forms"]!["nodeApostrophe"]!["replacement"] = "";
+        else if (corruption == "extraReplacement") config["symbols"]!["Unrelated"] =
+            JsonNode.Parse("""{"type":"parameter","datatype":"string","replaces":"Timer"}""");
+        else if (corruption == "assignTo") source.Template.Jobs![0].Inputs![1].AssignTo = "$(UNRELATED_INPUT)";
+        else if (corruption == "missingDeclaration") source.Template.Files!["function.js"] =
+            source.Template.Files["function.js"].Replace("schedule: ", "differentProperty: ", StringComparison.Ordinal);
+        else source.Template.Files!["function.js"] += "\n    schedule: '0 */5 * * * *',\n";
+        source = source with { Configuration = Encoding.UTF8.GetBytes(config.ToJsonString()) };
+
+        Action qualify = () => NodeItemSourceQualifier.Validate(source, "JavaScript");
+
+        qualify.Should().Throw<InvalidDataException>();
+    }
+
+    [Fact]
+    public async Task SourceQualifier_CommentsAndUnrelatedEqualLiterals_RemainByteEquivalentOutsideReviewedDeclaration()
+    {
+        NodeItemSource source = await ReadQualifiedSourceAsync();
+        const string decoys = "\n// schedule: '0 */5 * * * *',\nconst unrelated = '0 */5 * * * *';\n";
+        source.Template.Files!["function.js"] += decoys;
+        source = source with { Content = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(source.Content.Span) + decoys) };
+
+        Action qualify = () => NodeItemSourceQualifier.Validate(source, "JavaScript");
+
+        qualify.Should().NotThrow();
+        source.Content.Span.ToArray().Should().EndWith(Encoding.UTF8.GetBytes(decoys));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task SourceQualifier_ProviderBothModes_EmitsOnlyGenericSourcePinsWithoutChangingRequestedTarget(bool legacy)

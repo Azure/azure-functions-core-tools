@@ -74,13 +74,26 @@ remain `Azure.Functions.Node.Http.JavaScript|TypeScript`, with legacy IDs as
 source-declared aliases.
 
 Non-name parameters retain the original prompt IDs, kebab-case option aliases,
-required/default values, choices and resource descriptions. Only tokens actually
-present in the owned source are replaced. In particular, most existing
-connection/path/schedule prompts are no-ops in these payloads, and MCP
-resource/tool registration names are fixed literals. This migration does not
-silently repair those inherited semantics, add package dependencies, or run
-shell actions. The command-owned `--name` replaces the original function-name
-input where the payload uses it.
+required/default values, choices and resource descriptions. Native authoring
+now makes all 14 distinct advertised non-name prompts operative for JavaScript
+and TypeScript: Timer schedule; Queue connection/name; Blob and Event Grid
+Blob connection/path; Event Hub name; Service Bus connection/queue/topic/
+subscription; and the existing Cosmos connection/database/collection/lease
+properties. This intentionally repairs inherited raw payloads that ignored
+those inputs. Advertised defaults are authoritative, including Event Hub and
+Service Bus defaults that differ from their old hardcoded literals.
+
+The converter replaces exactly one reviewed property declaration associated
+with the original template kind, prompt ID, assignment token and literal.
+Missing, changed or ambiguous declarations fail packing; unrelated literals
+and comments are not replacements. Derived native symbols JSON-escape string
+content and escape apostrophes before insertion into single-quoted JavaScript
+strings. The lease choice is emitted as a lowercase Boolean literal, never a
+quoted string. These generated symbols are not extra user parameters. This
+does not introduce CRON validation, change Cosmos API property names, supply
+unadvertised Event Hub connections, add dependencies or run shell actions.
+MCP resource/tool registration names remain fixed literals. The command-owned
+`--name` replaces the original function-name input where the payload uses it.
 The native parameter projection reserves `name` for the command; it does not
 carry the legacy function-name regex. The baseline staged facade also supplies
 the output-directory name as the native fallback when `--name` is omitted.
@@ -133,8 +146,10 @@ all-required, case-insensitive binding checks and fresh source capture across
 stable/preview/experimental identities; they do not equate the old pack-time
 latest-channel filter with the selected runtime bundle. The bridge tests
 exercise all owned items' omitted/explicit names, display/ID aliases, hidden
-explicit IDs, original regex rejection, unchanged no-op prompt semantics and
-existing-source preservation. Missing or altered mapped provenance, native
+explicit IDs, original regex rejection and existing-source preservation.
+The canonical-options check separately executes the physical legacy engine
+to retain evidence of its unchanged ignored Queue inputs, then verifies the
+intentional native parameter behavior. Missing or altered mapped provenance, native
 payloads, package versions and configuration hashes refuse before generation.
 Public command routing and default service registration remain unchanged.
 
@@ -185,7 +200,12 @@ the source conditions; the native engine does both from the authored config.
 
 `NodeItemSourceQualifier` retains the original single-job/action/body
 association and native configuration/payload checks without selecting a
-target. `NodeTemplateWorkflowProvider` supplies a directory-free generic
+target. It independently reconstructs the reviewed property canonicalization
+and verifies its exact derived symbols and escaping forms. Raw source proof
+remains byte-exact and hash-bound; only the authored native body contains
+parameter placeholders. A changed raw declaration, assignment, escaping form,
+symbol source or native body refuses qualification rather than weakening the
+raw/native equality check. `NodeTemplateWorkflowProvider` supplies a directory-free generic
 source snapshot in both modes: exact selected identity/configuration hash,
 manifest, config, host, native body and all four original source-file pins,
 plus the expected native regular-file source. Shared engine guards revalidate

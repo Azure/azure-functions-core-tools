@@ -123,7 +123,7 @@ public sealed partial class BundledNodeTemplateTests
             created.Context!.Bundle!.Bindings!.Contains("BLOBTRIGGER").Should().BeTrue();
             created.ItemName.Should().BeEquivalentTo(preview.ItemName);
             created.Invocation!.Changes.Should().BeEquivalentTo(preview.Invocation!.Changes);
-            string expected = template.Files!.Single().Value.Replace("$(FUNCTION_NAME_INPUT)", name, StringComparison.Ordinal);
+            string expected = ExpectedOperativeNodeSource(template, name, created.ArgumentResults.Single().ValuesByCanonicalName);
             File.ReadAllText(Path.Combine(target, name + extension)).ReplaceLineEndings("\n").Should().Be(expected.ReplaceLineEndings("\n"));
         }
         File.ReadAllText(user).Should().Be("// preserve existing user code\n");
@@ -370,7 +370,7 @@ public sealed partial class BundledNodeTemplateTests
     }
 
     [Fact]
-    public async Task Bridge_CanonicalNoOpOptions_KeepOwnedPayloadBehaviorAndRefuseExistingUserFile()
+    public async Task Bridge_CanonicalOptions_ApplyNativePropertiesWhileRetainingRawLegacyNoOpEvidenceAndConflictSafety()
     {
         await _installer.InstallFromPackageAsync(BuiltArchive);
         using var bridge = await CreateNodeBridgeAsync();
@@ -387,9 +387,18 @@ public sealed partial class BundledNodeTemplateTests
         result.ArgumentResults.Single().ValuesByCanonicalName.Should().Contain("queueTrigger-connection", "CustomStorageSetting")
             .And.Contain("queueTrigger-name", "custom-queue-name");
         string output = Path.Combine(target, "OriginalQueue.js");
-        string expected = ReadNodeSource().Templates.Single(template => template.Id == "QueueTrigger-JavaScript").Files!.Single().Value
-            .Replace("$(FUNCTION_NAME_INPUT)", "OriginalQueue", StringComparison.Ordinal);
+        var raw = ReadNodeSource().Templates.Single(template => template.Id == "QueueTrigger-JavaScript");
+        var legacy = new V2TemplateEngine();
+        string legacyTarget = Directory.CreateDirectory(Path.Combine(_root, "physical-legacy")).FullName;
+        var legacyValues = result.ArgumentResults.Single().ValuesByCanonicalName.ToDictionary(pair => pair.Key, pair => pair.Value);
+        legacyValues["trigger-functionName"] = "OriginalQueue";
+        var legacyResult = legacy.Apply(raw, "OriginalQueue", legacyValues, new DirectoryInfo(legacyTarget), force: false);
+        legacyResult.Should().BeOfType<TemplateApplicationResult.Created>();
+        File.ReadAllText(Path.Combine(legacyTarget, "src", "functions", "OriginalQueue.js")).Should()
+            .Contain("connection: ''", "queueName: 'js-queue-items'").And.NotContain("CustomStorageSetting", "custom-queue-name");
+        string expected = ExpectedOperativeNodeSource(raw, "OriginalQueue", result.ArgumentResults.Single().ValuesByCanonicalName);
         File.ReadAllText(output).ReplaceLineEndings("\n").Should().Be(expected.ReplaceLineEndings("\n"));
+        File.ReadAllText(output).Should().Contain("connection: 'CustomStorageSetting'", "queueName: 'custom-queue-name'");
         File.WriteAllText(output, "// user replacement must survive conflict");
 
         (await InvokeNodeBridgeAsync(bridge.Adapter.ParseNewInvocation(bridge.NewCommand(), tokens))).Should().Be(1, _interaction.AllOutput);
