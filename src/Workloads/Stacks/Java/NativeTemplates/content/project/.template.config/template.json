@@ -23,9 +23,9 @@
   "forms": {
     "nameTrim": { "identifier": "replace", "pattern": "^\\s+|\\s+$", "replacement": "" },
     "nameSpaces": { "identifier": "replace", "pattern": " ", "replacement": "-" },
-    "nameCharacters": { "identifier": "replace", "pattern": "[^\\p{L}\\p{Nd}_-]", "replacement": "" },
+    "nameCharacters": { "identifier": "replace", "pattern": "[^a-z0-9_-]", "replacement": "" },
     "nameFallback": { "identifier": "replace", "pattern": "^$", "replacement": "azure-functions-java" },
-    "artifactName": { "identifier": "chain", "steps": ["nameTrim", "lowerCase", "nameSpaces", "nameCharacters", "nameFallback"] }
+    "artifactName": { "identifier": "chain", "steps": ["nameTrim", "lowerCaseInvariant", "nameSpaces", "nameCharacters", "nameFallback"] }
   },
   "constraints": {
     "host": { "type": "host", "args": [{ "hostname": "func" }] },

@@ -1,10 +1,12 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.CommandLine;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
@@ -18,6 +20,78 @@ namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed partial class BundledRemainingProjectTemplateTests
 {
+    [Theory]
+    [InlineData(" M\u00c9 App_42! ", "Default Name", "m-app_42")]
+    [InlineData("\u00c9\u4e2d\u6587\u0661", "Default Name", "app")]
+    [InlineData("App\u0661\u0662\u0663_42", "Default Name", "app_42")]
+    [InlineData("\ud83d\ude80My App", "Default Name", "my-app")]
+    [InlineData("\u00c9-app", "Default Name", "app")]
+    [InlineData("-my-app", "Default Name", "app")]
+    [InlineData("---", "Default Name", "app")]
+    [InlineData("CON", "Default Name", "app")]
+    [InlineData("PRN", "Default Name", "app")]
+    [InlineData("AUX", "Default Name", "app")]
+    [InlineData("NUL", "Default Name", "app")]
+    [InlineData("COM1", "Default Name", "app")]
+    [InlineData("COM2", "Default Name", "app")]
+    [InlineData("COM3", "Default Name", "app")]
+    [InlineData("COM4", "Default Name", "app")]
+    [InlineData("COM5", "Default Name", "app")]
+    [InlineData("COM6", "Default Name", "app")]
+    [InlineData("COM7", "Default Name", "app")]
+    [InlineData("COM8", "Default Name", "app")]
+    [InlineData("COM9", "Default Name", "app")]
+    [InlineData("LPT1", "Default Name", "app")]
+    [InlineData("LPT2", "Default Name", "app")]
+    [InlineData("LPT3", "Default Name", "app")]
+    [InlineData("LPT4", "Default Name", "app")]
+    [InlineData("LPT5", "Default Name", "app")]
+    [InlineData("LPT6", "Default Name", "app")]
+    [InlineData("LPT7", "Default Name", "app")]
+    [InlineData("LPT8", "Default Name", "app")]
+    [InlineData("LPT9", "Default Name", "app")]
+    [InlineData(" My App_42! ", "Default Name", "my-app_42")]
+    [InlineData("APP", "Default Name", "app")]
+    [InlineData("!!!", "Default Name", "app")]
+    [InlineData("GO", "Default Name", "app")]
+    [InlineData("TOOLCHAIN", "Default Name", "app")]
+    [InlineData("123", "Default Name", "123")]
+    [InlineData("_", "Default Name", "_")]
+    [InlineData("_my-app_", "Default Name", "_my-app_")]
+    [InlineData("app--", "Default Name", "app--")]
+    [InlineData("com0", "Default Name", "com0")]
+    [InlineData("com10", "Default Name", "com10")]
+    [InlineData("lpt0", "Default Name", "lpt0")]
+    [InlineData("lpt10", "Default Name", "lpt10")]
+    [InlineData("con-app", "Default Name", "con-app")]
+    [InlineData(null, "M\u00c9 Project", "m-project")]
+    [InlineData("", "M\u00c9 Project", "m-project")]
+    [InlineData(null, "\u4e2d\u6587", "app")]
+    [InlineData(null, "go", "app")]
+    [InlineData(null, "toolchain", "app")]
+    public async Task GoModuleName_NativeAndPhysical_DeriveExpectedPortableName(string? name, string directoryName, string expected)
+    {
+        using var services = await InstallAsync("Go");
+        var native = WorkingDirectory.FromExplicit(Path.Combine(_root, "native", directoryName));
+        var physical = WorkingDirectory.FromExplicit(Path.Combine(_root, "physical", directoryName));
+        Directory.CreateDirectory(physical.Info.FullName);
+        using var templater = ProjectTemplater(services, native, "go");
+        var selected = (await templater.ResolveGroupAsync("Azure.Functions.Go.Basic", TemplateType.Project, CancellationToken.None)).Group!.Single();
+        var initializer = services.GetRequiredService<IProjectInitializer>();
+        var command = new RootCommand();
+        initializer.GetInitOptions(new InitOptionRegistry(command));
+
+        var created = await selected.InvokeAsync(
+            new(native, new Dictionary<string, string?> { ["SkipGoModTidy"] = "true" }, name), CancellationToken.None);
+        await initializer.InitializeAsync(new(physical, name, Language: null, Force: false),
+            command.Parse("--skip-go-mod-tidy"), CancellationToken.None);
+
+        created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
+        File.ReadLines(Path.Combine(native.Info.FullName, "go.mod")).First().Should().Be("module " + expected);
+        File.ReadAllBytes(Path.Combine(physical.Info.FullName, "go.mod")).Should()
+            .Equal(File.ReadAllBytes(Path.Combine(native.Info.FullName, "go.mod")));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

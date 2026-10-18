@@ -5,6 +5,14 @@ feed. It packages the stack's existing worker SDK sources without copying or
 rewriting them. The native template retains module-name normalization, the
 `native` worker setting, and the extension bundle options.
 
+Both native generation and the physical initializer derive the module name from
+the project name, or the directory name when omitted. They trim whitespace,
+lowercase invariantly, replace ASCII spaces with hyphens, and retain only ASCII
+letters, digits, underscores, and hyphens. Empty results, leading hyphens,
+`go`, `toolchain`, and Go-disallowed Windows device names (`con`, `prn`, `aux`,
+`nul`, `com1`-`com9`, `lpt1`-`lpt9`) use `app`. Unicode directory paths remain
+supported; their names are not copied verbatim into `go.mod`.
+
 The `SkipGoModTidy` parameter describes the existing init preparation option;
 the template engine does not execute Go. Default `go mod tidy` preparation must
 be supplied by the shared workflow before public activation. The current public

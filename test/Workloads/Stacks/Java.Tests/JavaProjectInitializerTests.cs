@@ -95,6 +95,46 @@ public class JavaProjectInitializerTests : IDisposable
         Assert.DoesNotContain("{FunctionAppName}", pom);
     }
 
+    [Theory]
+    [InlineData(" M\u00c9 App_42! ", "m-app_42")]
+    [InlineData("\u00c9\u4e2d\u6587\u0661", "azure-functions-java")]
+    [InlineData("App\u0661\u0662\u0663_42", "app_42")]
+    [InlineData("\ud83d\ude80My App", "my-app")]
+    [InlineData(" My App_42! ", "my-app_42")]
+    [InlineData("!!!", "azure-functions-java")]
+    [InlineData("-my-app", "-my-app")]
+    [InlineData("CON", "con")]
+    [InlineData("go", "go")]
+    [InlineData("toolchain", "toolchain")]
+    [InlineData("_", "_")]
+    [InlineData("123", "123")]
+    public async Task InitializeAsync_ProjectName_DerivesMavenArtifactAndAppProperty(string name, string expected)
+    {
+        await RunAsync(projectName: name, force: false);
+
+        string pom = File.ReadAllText(Path.Combine(_projectDir.FullName, "pom.xml"));
+        pom.Should().Contain("<artifactId>" + expected + "</artifactId>")
+            .And.Contain("<functionAppName>" + expected + "</functionAppName>");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task InitializeAsync_OmittedName_UsesAsciiArtifactFromUnicodeDirectory(string? name)
+    {
+        string directory = Directory.CreateDirectory(Path.Combine(_projectDir.FullName, "M\u00c9 Project")).FullName;
+        var initializer = new JavaProjectInitializer(new JavaProjectStack());
+        var root = new RootCommand();
+        initializer.GetInitOptions(new InitOptionRegistry(root));
+        var context = new InitContext(WorkingDirectory.FromExplicit(directory), name, Language: null, Force: false);
+
+        await initializer.InitializeAsync(context, root.Parse([]), CancellationToken.None);
+
+        File.ReadAllText(Path.Combine(directory, "pom.xml")).Should().Contain("<artifactId>m-project</artifactId>")
+            .And.Contain("<functionAppName>m-project</functionAppName>");
+    }
+
     [Fact]
     public async Task InitializeAsync_AppendsExtensionBundle_IntoExistingHostJson()
     {

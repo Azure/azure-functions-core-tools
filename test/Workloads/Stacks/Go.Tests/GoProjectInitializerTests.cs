@@ -100,6 +100,60 @@ public class GoProjectInitializerTests : IDisposable
         File.ReadAllText(Path.Combine(_projectDir.FullName, "go.mod")).Should().StartWith("module app");
     }
 
+    [Theory]
+    [InlineData(" M\u00c9 App_42! ", "m-app_42")]
+    [InlineData("\u00c9\u4e2d\u6587\u0661", "app")]
+    [InlineData("App\u0661\u0662\u0663_42", "app_42")]
+    [InlineData("\ud83d\ude80My App", "my-app")]
+    [InlineData("\u00c9-app", "app")]
+    [InlineData("-my-app", "app")]
+    [InlineData("---", "app")]
+    [InlineData("CON", "app")]
+    [InlineData("prn", "app")]
+    [InlineData("AuX", "app")]
+    [InlineData("nul", "app")]
+    [InlineData("COM1", "app")]
+    [InlineData("COM9", "app")]
+    [InlineData("LPT1", "app")]
+    [InlineData("LPT9", "app")]
+    [InlineData(" My App_42! ", "my-app_42")]
+    [InlineData("APP", "app")]
+    [InlineData("!!!", "app")]
+    [InlineData("GO", "app")]
+    [InlineData("TOOLCHAIN", "app")]
+    [InlineData("123", "123")]
+    [InlineData("_", "_")]
+    [InlineData("_my-app_", "_my-app_")]
+    [InlineData("app--", "app--")]
+    [InlineData("com0", "com0")]
+    [InlineData("com10", "com10")]
+    [InlineData("lpt0", "lpt0")]
+    [InlineData("lpt10", "lpt10")]
+    [InlineData("con-app", "con-app")]
+    public async Task InitializeAsync_ProjectName_DerivesPortableModuleName(string name, string expected)
+    {
+        await RunAsync(projectName: name, force: false);
+
+        File.ReadLines(Path.Combine(_projectDir.FullName, "go.mod")).First().Should().Be("module " + expected);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task InitializeAsync_OmittedName_UsesPortableUnicodeDirectoryName(string? name)
+    {
+        string directory = Directory.CreateDirectory(Path.Combine(_projectDir.FullName, "M\u00c9 Project")).FullName;
+        var initializer = new GoProjectInitializer(new GoProjectStack());
+        var root = new RootCommand();
+        initializer.GetInitOptions(new InitOptionRegistry(root));
+        var context = new InitContext(WorkingDirectory.FromExplicit(directory), name, Language: null, Force: false);
+
+        await initializer.InitializeAsync(context, root.Parse("--skip-go-mod-tidy"), CancellationToken.None);
+
+        File.ReadLines(Path.Combine(directory, "go.mod")).First().Should().Be("module m-project");
+    }
+
     [Fact]
     public async Task InitializeAsync_AppendsExtensionBundle_IntoExistingHostJson()
     {
