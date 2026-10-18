@@ -87,8 +87,7 @@ internal sealed class ExtensionBundleResolver(
         IReadOnlyList<InstalledBundle> installed)
     {
         IReadOnlyList<string> installedVersions = [.. installed.Select(b => b.Version.ToNormalizedString())];
-        string? suggested = installedVersions.FirstOrDefault();
-        string hint = BundleHintBuilder.NoCompatibleInstall(context.BundleId, constraintRange, installedVersions, suggested, context.WorkerRuntime);
+        string hint = BundleHintBuilder.NoCompatibleInstall(context.BundleId, constraintRange, installedVersions, context.WorkerRuntime);
 
         return new ExtensionBundleResolution.NoCompatibleInstall(constraintRange, installedVersions, hint);
     }

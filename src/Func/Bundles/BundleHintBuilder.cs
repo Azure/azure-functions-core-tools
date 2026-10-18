@@ -54,7 +54,6 @@ internal static class BundleHintBuilder
         string bundleId,
         string constraintRange,
         IReadOnlyList<string> installedVersions,
-        string? suggestedVersion,
         string? workerRuntime = null)
     {
         var sb = new StringBuilder();
@@ -65,15 +64,8 @@ internal static class BundleHintBuilder
             ? string.Format(CultureInfo.InvariantCulture, "Installed versions: {0}.", string.Join(", ", installedVersions))
             : "No bundle workload is installed.");
 
-        sb.AppendLine("Install a satisfying version with:");
-        if (string.IsNullOrWhiteSpace(suggestedVersion))
-        {
-            sb.Append(CultureInfo.InvariantCulture, $"  {InstallCommandPrefix}@<version> --force");
-        }
-        else
-        {
-            sb.Append(CultureInfo.InvariantCulture, $"  {InstallCommandPrefix}@{suggestedVersion} --force");
-        }
+        sb.AppendLine("Install a published version satisfying that range, if available:");
+        sb.Append(CultureInfo.InvariantCulture, $"  {InstallCommandPrefix}@<version>");
 
         AppendSetupHint(sb, workerRuntime);
         return sb.ToString();

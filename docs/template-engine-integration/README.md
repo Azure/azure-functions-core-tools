@@ -60,6 +60,9 @@ independent `Templates.*` companion when the stack already owns that capability.
 registration, but conflicting source origins or damaged retained payloads remain
 errors. Reuse the original source when repairing a bundled stack. Host readiness
 also requires the installed host executable, not just a registry row.
+When no installed bundle satisfies the effective version range, guidance asks for
+a published satisfying version if available; it does not suggest forcing an
+already installed incompatible version.
 
 Unknown setup features are validated before dependency installation. Built-in
 runtimes, registered stack IDs and worker aliases, selected-profile runtime

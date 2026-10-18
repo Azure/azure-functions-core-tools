@@ -54,6 +54,20 @@ public class ExtensionBundleResolverTests
     }
 
     [Fact]
+    public async Task NoInstalledMatch_DoesNotSuggestReinstallingAnIncompatibleVersion()
+    {
+        ExtensionBundleResolution result = await Build([Row("4.35.0")])
+            .ResolveAsync(Context(host: "[4.99.0,5.0.0)", workerRuntime: "node"));
+
+        ExtensionBundleResolution.NoCompatibleInstall none = result.Should().BeOfType<ExtensionBundleResolution.NoCompatibleInstall>().Subject;
+        none.InstalledVersions.Should().Equal("4.35.0");
+        none.Hint.Should().Contain("[4.99.0,5.0.0)").And.Contain("Installed versions: 4.35.0.");
+        none.Hint.Should().Contain($"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@<version>");
+        none.Hint.Should().NotContain("@4.35.0").And.NotContain("--force");
+        none.Hint.Should().Contain("func setup --features node");
+    }
+
+    [Fact]
     public async Task NoInstalledRows_ReturnsWorkloadMissing()
     {
         ExtensionBundleResolution result = await Build([]).ResolveAsync(Context(host: "[4.0.0, 5.0.0)"));
