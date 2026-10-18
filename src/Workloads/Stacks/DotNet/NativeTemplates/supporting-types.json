@@ -9,7 +9,13 @@
     "identity": "Azure.Function.CSharp.Isolated.MySqlTriggerBinding",
     "path": "content/MySqlTrigger-CSharp-Isolated/MySqlTriggerBindingCSharp.cs",
     "sha256": "88EE11F656117F0EF0134CA02385C6A205C21C64DAE99B6290F8DA58F1D4D21E",
-    "references": 4
+    "references": 4,
+    "replacements": [
+      {
+        "from": "[MySqlTrigger(\"table1\", \"MySqlConnectionString\")]",
+        "to": "[MySqlTrigger(\"table\", \"MySqlConnectionString\")]"
+      }
+    ]
   },
   {
     "identity": "Azure.Function.CSharp.Isolated.SqlOutputBinding",
@@ -21,6 +27,16 @@
     "identity": "Azure.Function.CSharp.Isolated.SqlTriggerBinding",
     "path": "content/SqlTrigger-CSharp-Isolated/SqlTriggerBindingCSharp.cs",
     "sha256": "16885FCA8FF9E94D6FFFF7E31A189262753C4D383D727EC3FF8FF4B2AA6759D4",
-    "references": 2
+    "references": 2,
+    "replacements": [
+      {
+        "from": "using Newtonsoft.Json;",
+        "to": "using System.Text.Json;"
+      },
+      {
+        "from": "JsonConvert.SerializeObject(changes)",
+        "to": "JsonSerializer.Serialize(changes)"
+      }
+    ]
   }
 ]

@@ -2,9 +2,13 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
+using System.Reflection;
+using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
@@ -117,11 +121,11 @@ public sealed class NativeDotNetTemplateTests : IDisposable
 
     [Theory]
     [InlineData("MySqlOutputBinding", "WriteTodos", "Task<WriteTodosItem>", "orders")]
-    [InlineData("MySqlTriggerBinding", "WatchTodos", "MySqlChange<WatchTodosItem>", "orders1")]
+    [InlineData("MySqlTriggerBinding", "WatchTodos", "MySqlChange<WatchTodosItem>", "orders")]
     [InlineData("SqlOutputBinding", "ToDoItem", "Task<ToDoItemItem>", "orders")]
     [InlineData("SqlTriggerBinding", "WatchSql", "SqlChange<WatchSqlItem>", "orders")]
     public async Task NativeDatabaseItem_SupportingType_IsScopedToTheNewFunction(
-        string variant, string name, string expectedReference, string inheritedTable)
+        string variant, string name, string expectedReference, string expectedTable)
     {
         using NativeSession session = await OpenNativeSessionAsync();
         ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
@@ -150,7 +154,7 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
         string source = File.ReadAllText(Path.Combine(output, name + ".cs"));
         source.Should().ContainAll("namespace Custom.Functions;", $"public class {name}", $"[Function(\"{name}\")]",
-            $"    public class {name}Item", expectedReference, $"\"{inheritedTable}\"", "\"DatabaseConnection\"");
+            $"    public class {name}Item", expectedReference, $"\"{expectedTable}\"", "\"DatabaseConnection\"");
         source.Should().NotContain($"\npublic class {name}Item\n");
         File.ReadAllText(custom).Should().Be(original);
     }
@@ -181,6 +185,64 @@ public sealed class NativeDotNetTemplateTests : IDisposable
             }
         }
         Directory.GetFiles(output, "*.cs").Should().HaveCount(4);
+    }
+
+    [Theory]
+    [InlineData("MySql", "Input", "object", "table1")]
+    [InlineData("MySql", "Output", "table", "table1")]
+    [InlineData("MySql", "Trigger", "table", "table1")]
+    [InlineData("Sql", "Input", "object", "[dbo].[table1]")]
+    [InlineData("Sql", "Output", "table", "[dbo].[table1]")]
+    [InlineData("Sql", "Trigger", "table", "[dbo].[table1]")]
+    public async Task NativeDatabaseItems_TableParameter_MatchesTheCompleteBindingValue(
+        string provider, string kind, string parameter, string defaultValue)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == $"Azure.Function.CSharp.Isolated.{provider}{kind}Binding");
+        TemplateCreator creator = new(session.Settings);
+        foreach (bool explicitValue in new[] { false, true })
+        {
+            Dictionary<string, string?> arguments = new() { ["namespace"] = "Custom.Functions" };
+            string table = defaultValue;
+            if (explicitValue)
+            {
+                table = "sales.orders";
+                arguments[parameter] = table;
+                arguments["connectionStringSetting"] = "DatabaseConnection";
+            }
+            string output = Path.Combine(_root, explicitValue.ToString());
+
+            ITemplateCreationResult created = await creator.InstantiateAsync(template, "Example", "Example", output,
+                arguments, cancellationToken: CancellationToken.None);
+
+            created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+            string source = File.ReadAllText(Path.Combine(output, "Example.cs"));
+            string command = kind == "Input" ? "SELECT * FROM " + table : table;
+            source.Should().Contain($"[{provider}{kind}(\"{command}\",");
+            source.Should().Contain("namespace Custom.Functions;");
+            source.Should().Contain(explicitValue ? "\"DatabaseConnection\"" : "\"\"");
+        }
+    }
+
+    [Fact]
+    public async Task NativeSqlTrigger_Serializer_IsAvailableWithoutAnUndeclaredPackage()
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == "Azure.Function.CSharp.Isolated.SqlTriggerBinding");
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, "sql-serializer");
+
+        ITemplateCreationResult created = await creator.InstantiateAsync(template, "WatchSql", "WatchSql", output,
+            new Dictionary<string, string?> { ["namespace"] = "Custom.Functions" }, cancellationToken: CancellationToken.None);
+
+        created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+        string source = File.ReadAllText(Path.Combine(output, "WatchSql.cs"));
+        source.Should().ContainAll("using System.Text.Json;", "JsonSerializer.Serialize(changes)");
+        source.Should().NotContain("Newtonsoft").And.NotContain("JsonConvert");
+        created.CreationEffects!.CreationResult.PostActions.Where(action => action.ActionId == _packageAction)
+            .Select(action => action.Args["reference"]).Should().Equal("Microsoft.Azure.Functions.Worker.Extensions.Sql");
     }
 
     [Theory]
@@ -329,6 +391,129 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "bin", "Debug", "net10.0", "functions.metadata")));
         metadata.RootElement.EnumerateArray().Select(function => function.GetProperty("name").GetString())
             .Should().Contain("RepairedHttp", "the actual native F# HTTP file must participate in the built function metadata");
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task NativeDatabaseItems_DeclaredDependencies_BuildRepeatedFunctionsAndPreserveSampleSqlLogging()
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        IReadOnlyList<ITemplateInfo> templates = await session.Manager.GetTemplatesAsync(CancellationToken.None);
+        ITemplateInfo projectTemplate = templates.Single(template =>
+            template.Identity == "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x");
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, "database-build");
+        using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(5));
+        ITemplateCreationResult projectResult = await creator.InstantiateAsync(projectTemplate, "Sample", "Sample", output,
+            new Dictionary<string, string?> { ["Framework"] = "net10.0" }, cancellationToken: timeout.Token);
+        projectResult.Status.Should().Be(CreationResultStatus.Success, projectResult.ErrorMessage);
+        string project = Path.Combine(output, "Sample.csproj");
+        string customPath = Path.Combine(output, "Custom.cs");
+        const string customSource = "namespace Sample; public class ToDoItem { } public class SqlOutputFirstItem { }";
+        File.WriteAllText(customPath, customSource);
+        List<IPostAction> actions = [.. projectResult.CreationEffects!.CreationResult.PostActions];
+        List<string> names = [];
+        foreach (string provider in new[] { "MySql", "Sql" })
+        {
+            foreach (string kind in new[] { "Output", "Trigger" })
+            {
+                ITemplateInfo template = templates.Single(item => item.Identity == $"Azure.Function.CSharp.Isolated.{provider}{kind}Binding");
+                foreach (string suffix in new[] { "First", "Second" })
+                {
+                    string name = provider + kind + suffix;
+                    ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output,
+                        new Dictionary<string, string?> { ["namespace"] = "Sample" }, cancellationToken: timeout.Token);
+                    created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+                    names.Add(name);
+                    actions.AddRange(created.CreationEffects!.CreationResult.PostActions);
+                }
+            }
+        }
+        File.ReadAllText(customPath).Should().Be(customSource);
+        DirectoryInfo repository = new(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(repository.FullName, "NuGet.Config")))
+        {
+            repository = repository.Parent ?? throw new InvalidOperationException("The repository NuGet.Config was not found.");
+        }
+        File.Copy(Path.Combine(repository.FullName, "NuGet.Config"), Path.Combine(output, "NuGet.Config"));
+        IDotnetPathResolver resolver = Substitute.For<IDotnetPathResolver>();
+        resolver.Resolve().Returns("dotnet");
+        DotnetCliRunner runner = new(resolver);
+        DotNetTemplateDependencyExecutor dependencies = new(runner);
+        foreach (IPostAction action in actions.Where(action => action.ActionId == _packageAction)
+            .DistinctBy(action => (action.Args["reference"], action.Args["version"])))
+        {
+            await dependencies.AddPackageReferenceAsync(project,
+                new(action.Args["reference"], action.Args["version"], action.Args["projectFileExtensions"]), timeout.Token);
+        }
+        await dependencies.RestoreAsync(project, timeout.Token);
+
+        await runner.RunAsync(["build", project, "--no-restore", "-m:1", "-v:minimal"], output, timeout.Token);
+
+        string built = Path.Combine(output, "bin", "Debug", "net10.0");
+        using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(built, "functions.metadata")));
+        metadata.RootElement.EnumerateArray().Select(function => function.GetProperty("name").GetString())
+            .Should().BeEquivalentTo(names);
+        File.ReadAllText(project).Should().NotContain("Newtonsoft");
+        File.ReadAllText(customPath).Should().Be(customSource);
+        AssemblyLoadContext load = new("native-sql-sample", isCollectible: true);
+        load.Resolving += (context, name) =>
+        {
+            if (name.Name == typeof(ILogger).Assembly.GetName().Name)
+            {
+                return typeof(ILogger).Assembly;
+            }
+            string path = Path.Combine(built, name.Name + ".dll");
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+            using FileStream dependency = File.OpenRead(path);
+            return context.LoadFromStream(dependency);
+        };
+        try
+        {
+            using FileStream source = File.OpenRead(Path.Combine(built, "Sample.dll"));
+            Assembly assembly = load.LoadFromStream(source);
+            Type functionType = assembly.GetType("Sample.SqlTriggerFirst", throwOnError: true)!;
+            Type dtoType = assembly.GetType("Sample.SqlTriggerFirst+SqlTriggerFirstItem", throwOnError: true)!;
+            MethodInfo run = functionType.GetMethod("Run")!;
+            Type changeType = run.GetParameters()[0].ParameterType.GetGenericArguments()[0];
+            Type operationType = changeType.GetConstructors().Single().GetParameters()[0].ParameterType;
+            var changes = Array.CreateInstance(changeType, 3);
+            string[] operations = ["Insert", "Update", "Delete"];
+            string?[] descriptions = ["<quoted \"value\"> \u96EA", string.Empty, null];
+            for (int index = 0; index < changes.Length; index++)
+            {
+                object row = Activator.CreateInstance(dtoType)!;
+                dtoType.GetProperty("Id")!.SetValue(row, (index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                dtoType.GetProperty("Priority")!.SetValue(row, index - 1);
+                dtoType.GetProperty("Description")!.SetValue(row, descriptions[index]);
+                changes.SetValue(Activator.CreateInstance(changeType, Enum.Parse(operationType, operations[index]), row), index);
+            }
+            ILogger logger = Substitute.For<ILogger>();
+            ILoggerFactory factory = Substitute.For<ILoggerFactory>();
+            factory.CreateLogger(Arg.Any<string>()).Returns(logger);
+            object function = Activator.CreateInstance(functionType, factory)!;
+
+            run.Invoke(function, [changes, null]);
+
+            string logged = logger.ReceivedCalls().Single(call => call.GetMethodInfo().Name == "Log")
+                .GetArguments()[2]!.ToString()!;
+            logged.Should().StartWith("SQL Changes: ");
+            string actualJson = logged["SQL Changes: ".Length..];
+            string originalJson = Newtonsoft.Json.JsonConvert.SerializeObject(changes);
+            JsonNode.DeepEquals(JsonNode.Parse(actualJson), JsonNode.Parse(originalJson)).Should().BeTrue(
+                "the sample's row values, property names, numeric operations and nulls must survive the serializer correction");
+            using var json = JsonDocument.Parse(actualJson);
+            json.RootElement[0].GetProperty("Item").GetProperty("Description").GetString().Should().Be(descriptions[0]);
+            json.RootElement[1].GetProperty("Item").GetProperty("Priority").GetInt32().Should().Be(0);
+            json.RootElement[2].GetProperty("Item").GetProperty("Description").ValueKind.Should().Be(JsonValueKind.Null);
+        }
+        finally
+        {
+            load.Unload();
+        }
     }
 
     [Fact]

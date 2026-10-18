@@ -42,8 +42,8 @@ It nests the DTO inside its owning new function class and names it
 `<FunctionName>Item`, using the existing native `sourceName` substitution for
 every type reference. Nesting avoids collisions with other functions and
 existing user DTOs; the suffix also permits a function named `ToDoItem`.
-Binding table/connection strings, namespaces, package dependencies and all
-native configuration bytes remain unchanged. SQL/MySQL input items and F#
+Namespaces, connection-string settings, package dependencies and all native
+configuration bytes remain unchanged. SQL/MySQL input items and F#
 sources are not adapted. No existing project source is inspected or rewritten.
 
 The original four source files remain byte-for-byte under
@@ -51,6 +51,17 @@ The original four source files remain byte-for-byte under
 provenance. Unknown or changed upstream inputs fail packing rather than
 receiving a best-effort text rewrite. This changes the shape of newly generated
 example DTOs only; it does not migrate previously generated functions.
+
+The same exact-source pins qualify two additional authoring corrections.
+The MySQL trigger's source placeholder is `table`, matching its unchanged
+native parameter, instead of `table1`. Omitted `--table` now produces `table1`,
+not `table11`, and explicit values are not suffixed with `1`. SQL/MySQL input
+and output bindings and the SQL trigger retain their existing parameter maps.
+The SQL trigger logs its sample changes using the framework's
+`System.Text.Json` serializer instead of an undeclared `Newtonsoft.Json`
+dependency. The sample retains its JSON property names, numeric operations,
+row values and nulls; equivalent JSON escaping need not be byte-identical.
+Neither correction adds a project dependency or edits an existing function.
 
 ## Deliberately staged
 

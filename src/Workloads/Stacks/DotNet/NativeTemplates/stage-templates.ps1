@@ -84,6 +84,13 @@ foreach ($package in $sources.packages) {
                 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($originalPath)) | Out-Null
                 [IO.File]::Copy($sourcePath, $originalPath)
                 $source = [IO.File]::ReadAllText($sourcePath).Replace("`r`n", "`n")
+                foreach ($replacement in $pin.replacements) {
+                    $index = $source.IndexOf($replacement.from, [StringComparison]::Ordinal)
+                    if ($index -lt 0 -or $index -ne $source.LastIndexOf($replacement.from, [StringComparison]::Ordinal)) {
+                        throw "Unexpected qualified authoring replacement in $sourceRelative."
+                    }
+                    $source = $source.Replace($replacement.from, $replacement.to)
+                }
                 if ([regex]::Matches($source, '\bToDoItem\b').Count -ne $pin.references) {
                     throw "Unexpected supporting-type references in $sourceRelative."
                 }
