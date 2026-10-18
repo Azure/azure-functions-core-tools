@@ -58,6 +58,8 @@
     <EmbeddedResource Include="Templates/Acquisition/BasicCompanions.json" LogicalName="Azure.Functions.Cli.Templates.Acquisition.BasicCompanions.json" />
     <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/upstream-configurations.json"
       Link="Templates/DotNet/upstream-configurations.json" LogicalName="Azure.Functions.Cli.Templates.DotNet.upstream-configurations.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/auxiliary-identities.json"
+      Link="Templates/DotNet/auxiliary-identities.json" LogicalName="Azure.Functions.Cli.Templates.DotNet.auxiliary-identities.json" />
   </ItemGroup>
 
   <ItemGroup>

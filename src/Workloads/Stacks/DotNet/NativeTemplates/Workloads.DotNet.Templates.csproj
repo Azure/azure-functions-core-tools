@@ -20,6 +20,7 @@
     <Content Include="upstream-sources.json" Pack="true" PackagePath="provenance/" />
     <Content Include="upstream-configurations.json" Pack="true" PackagePath="provenance/" />
     <Content Include="supporting-types.json" Pack="true" PackagePath="provenance/" />
+    <Content Include="auxiliary-identities.json" Pack="true" PackagePath="provenance/" />
   </ItemGroup>
   <Target Name="StageUpstreamDotNetTemplates" BeforeTargets="_GetPackageFiles">
     <PropertyGroup>

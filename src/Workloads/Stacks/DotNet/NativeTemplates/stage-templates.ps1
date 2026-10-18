@@ -9,7 +9,9 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $sources = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'upstream-sources.json') -Raw | ConvertFrom-Json
 $qualifiedConfigurations = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'upstream-configurations.json') -Raw | ConvertFrom-Json -NoEnumerate
 $supportingTypes = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'supporting-types.json') -Raw | ConvertFrom-Json -NoEnumerate
+$auxiliaryIdentities = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'auxiliary-identities.json') -Raw | ConvertFrom-Json -NoEnumerate
 $adaptedIdentities = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$adaptedAuxiliaries = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 $separator = [IO.Path]::DirectorySeparatorChar
 $outputPrefix = $output.TrimEnd($separator) + $separator
@@ -110,6 +112,11 @@ foreach ($package in $sources.packages) {
                     throw "Duplicate supporting-type adaptation: $($configuration.identity)."
                 }
             }
+            $auxiliary = & (Join-Path $PSScriptRoot 'stage-auxiliary-identities.ps1') -OutputDirectory $output `
+                -ConfigurationPath $configPath -Configuration $configuration -Pins $auxiliaryIdentities
+            if ($null -ne $auxiliary -and -not $adaptedAuxiliaries.Add($auxiliary)) {
+                throw "Duplicate auxiliary-identity adaptation: $auxiliary."
+            }
             # Keep every template.json unchanged. CLI aliases live in host metadata only.
             $hostMetadata = @{ symbolInfo = @{} }
             if ($package.type -ceq 'project') {
@@ -124,4 +131,7 @@ foreach ($package in $sources.packages) {
 }
 if ($adaptedIdentities.Count -ne $supportingTypes.Count) {
     throw 'The qualified supporting-type inventory was not completely adapted.'
+}
+if ($adaptedAuxiliaries.Count -ne $auxiliaryIdentities.Count) {
+    throw 'The qualified auxiliary-identity inventory was not completely adapted.'
 }

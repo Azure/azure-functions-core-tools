@@ -110,6 +110,7 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
             {
                 parameters["namespace"] = project.Properties.RootNamespace;
             }
+            NativeTemplateSourceSnapshot? auxiliarySources = await _sources.QualifyAuxiliaryAsync(selected, cancellationToken);
 
             DotNetTemplateEffectCapability capability = Capability(selected, project.Root, project.Properties.ProjectFilePath,
                 project.ProjectSha256, createsProject: false);
@@ -118,17 +119,22 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
             {
                 Name = name,
                 Parameters = parameters,
+                SourceSnapshot = DotNetTemplateSources.CombineAuxiliarySources(context.Invocation.SourceSnapshot, auxiliarySources),
                 EffectSupport = new(project.Root, project.Properties.ProjectFilePath, capability, Confirmed: true),
                 MsBuildBindings = new(project.Properties.ProjectFilePath, source.TemplateIdentity, source.Identity,
                     source.Sha256, project.Properties.TargetFramework, project.Properties.RootNamespace),
             };
             NativeTemplatePreparationResult captured = await selected.CaptureNativePreparationAsync(request, _files,
-                expandFiles: selected.Entry.Language == "F#", cancellationToken);
+                expandFiles: selected.Entry.Language == "F#" || auxiliarySources is not null, cancellationToken);
             if (captured.Snapshot is not { } snapshot)
             {
                 return NativeTemplateInvocationPreparation.Reject(captured.Failure?.Diagnostic ?? "Native .NET item preparation did not produce a selected output plan.");
             }
 
+            if (auxiliarySources is not null && DotNetAuxiliaryNameValidation.Validate(selected.Entry.Identity, snapshot) is { } nameDiagnostic)
+            {
+                return NativeTemplateInvocationPreparation.Reject(nameDiagnostic);
+            }
             NativeTemplateEffectPlanner planner = new();
             NativeTemplateEffectPlanningResult planned;
             if (selected.Entry.Language == "F#")

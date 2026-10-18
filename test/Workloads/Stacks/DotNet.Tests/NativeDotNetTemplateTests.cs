@@ -78,6 +78,11 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         using var adaptations = JsonDocument.Parse(inner.GetStream("provenance/supporting-types.json"));
         var adapted = adaptations.RootElement.EnumerateArray()
             .ToDictionary(row => row.GetProperty("path").GetString()!, row => row.GetProperty("sha256").GetString()!, StringComparer.Ordinal);
+        using var auxiliaries = JsonDocument.Parse(inner.GetStream("provenance/auxiliary-identities.json"));
+        foreach (JsonElement row in auxiliaries.RootElement.EnumerateArray())
+        {
+            adapted.Add(row.GetProperty("path").GetString()!, row.GetProperty("sha256").GetString()!);
+        }
         ZipArchiveEntry[] sourceFiles = [.. upstream.Entries.Where(entry => entry.FullName.StartsWith("content/", StringComparison.Ordinal)
             && entry.Name.Length > 0)];
         sourceFiles.Should().NotBeEmpty();
@@ -117,6 +122,86 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         ITemplateInfo project = templates.Single(template => template.Identity == "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x");
         project.ParameterDefinitions.Single(parameter => parameter.Name == "Framework").Choices!.Keys.Should().Contain("net10.0");
         (project as ITemplateInfoHostJsonCache)!.HostData.Should().Contain("target-framework", "tfm");
+    }
+
+    [Theory]
+    [InlineData("DurableFunctionsEntityClass.1.x")]
+    [InlineData("DurableFunctionsEntityFunction.1.x")]
+    [InlineData("DurableFunctionsOrchestration.1.x")]
+    [InlineData("SignalR.3.x")]
+    [InlineData("DaprPublishOutputBinding")]
+    [InlineData("DaprServiceInvocationTrigger")]
+    public async Task NativeAuxiliaryItems_RequestedNames_OwnEveryFunctionAndSupportingType(string variant)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == "Azure.Function.CSharp.Isolated." + variant);
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, "auxiliary");
+        Directory.CreateDirectory(output);
+        string custom = Path.Combine(output, "Custom.cs");
+        const string userSource = "namespace Custom.Functions; public class Counter { } public class MyConnectionInfo { } "
+            + "public class InvokeOutputBinding { } public class DaprTopicTriggerFuncApp { } "
+            + "public class FirstConnectionInfo { } public class FirstInvoke { } public class FirstTopicTrigger { }";
+        File.WriteAllText(custom, userSource);
+        foreach (string name in new[] { "First", "Second" })
+        {
+            var parameters = new Dictionary<string, string?> { ["namespace"] = "Custom.Functions" };
+            if (variant == "SignalR.3.x")
+            {
+                parameters["HubName"] = "customHub";
+            }
+
+            ITemplateCreationResult preview = await creator.InstantiateAsync(template, name, name, output, parameters,
+                dryRun: true, cancellationToken: CancellationToken.None);
+
+            preview.Status.Should().Be(CreationResultStatus.Success, preview.ErrorMessage);
+            File.Exists(Path.Combine(output, name + ".cs")).Should().BeFalse();
+            ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output, parameters,
+                cancellationToken: CancellationToken.None);
+            created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+            string source = File.ReadAllText(Path.Combine(output, name + ".cs"));
+            source.Should().Contain("namespace Custom.Functions");
+            switch (variant)
+            {
+                case "DurableFunctionsEntityClass.1.x":
+                    source.Should().ContainAll($"public class {name} : TaskEntity<int>", $"public {name}(ILogger<{name}> logger)",
+                        $"[Function(nameof({name}))]");
+                    source.Should().NotContain("Counter");
+                    break;
+                case "DurableFunctionsEntityFunction.1.x":
+                    source.Should().Contain($"[Function(nameof({name}))]").And.NotContain("\"Counter\"");
+                    break;
+                case "DurableFunctionsOrchestration.1.x":
+                    source.Should().ContainAll($"[Function(nameof({name}))]", $"public static string {name}SayHello(",
+                        $"[Function(nameof({name}SayHello))]", $"GetLogger(\"{name}SayHello\")",
+                        $"[Function(\"{name}_HttpStart\")]", $"nameof({name}));");
+                    source.Split($"CallActivityAsync<string>(nameof({name}SayHello)").Should().HaveCount(4);
+                    break;
+                case "SignalR.3.x":
+                    source.Should().ContainAll($"[Function(\"{name}\")]", $"CreateLogger(\"{name}\")",
+                        $"        [SignalRConnectionInfoInput(HubName = \"customHub\")] {name}ConnectionInfo connectionInfo)",
+                        $"    public class {name}ConnectionInfo");
+                    source.Should().NotContain("MyConnectionInfo").And.NotContain("\"negotiate\"");
+                    break;
+                case "DaprPublishOutputBinding":
+                    source.Should().ContainAll($"[Function(\"{name}\")]", $"GetLogger(\"{name}\")",
+                        $"public static void {name}TopicTrigger(", $"[Function(\"{name}_TopicTrigger\")]",
+                        $"GetLogger(\"{name}_TopicTrigger\")", "[DaprPublishOutput(PubSubName = \"pubsub\", Topic = \"A\")]",
+                        "[DaprTopicTrigger(\"pubsub\", Topic = \"A\")]");
+                    source.Should().NotContain("DaprTopicTriggerFuncApp");
+                    break;
+                case "DaprServiceInvocationTrigger":
+                    source.Should().ContainAll($"[Function(\"{name}\")]", $"public static async Task<InvokeMethodParameters> {name}Invoke(",
+                        $"[Function(\"{name}_Invoke\")]", $"GetLogger(\"{name}_Invoke\")",
+                        $"Route = \"{name}/invoke/{{appId}}/{{methodName}}\"",
+                        "AppId = \"{appId}\", MethodName = \"{methodName}\"",
+                        $"--method {name}", $"/api/{name}/invoke/functionapp/{name}");
+                    source.Should().NotContain("InvokeOutputBinding").And.NotContain("{yourFunctionName}");
+                    break;
+            }
+            File.ReadAllText(custom).Should().Be(userSource);
+        }
     }
 
     [Theory]
@@ -391,6 +476,93 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "bin", "Debug", "net10.0", "functions.metadata")));
         metadata.RootElement.EnumerateArray().Select(function => function.GetProperty("name").GetString())
             .Should().Contain("RepairedHttp", "the actual native F# HTTP file must participate in the built function metadata");
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task NativeAuxiliaryItems_DeclaredDependencies_BuildWithUniqueFunctionNamesAndHttpRoutes()
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        IReadOnlyList<ITemplateInfo> templates = await session.Manager.GetTemplatesAsync(CancellationToken.None);
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, "auxiliary-build");
+        using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(5));
+        ITemplateInfo projectTemplate = templates.Single(template =>
+            template.Identity == "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x");
+        ITemplateCreationResult projectResult = await creator.InstantiateAsync(projectTemplate, "Sample", "Sample", output,
+            new Dictionary<string, string?> { ["Framework"] = "net10.0" }, cancellationToken: timeout.Token);
+        projectResult.Status.Should().Be(CreationResultStatus.Success, projectResult.ErrorMessage);
+        List<IPostAction> actions = [.. projectResult.CreationEffects!.CreationResult.PostActions];
+        List<string> expectedNames = [];
+        Dictionary<string, string> expectedRoutes = new(StringComparer.Ordinal);
+        (string Variant, string Prefix, string[] Suffixes)[] cases =
+        [
+            ("DurableFunctionsEntityClass.1.x", "EntityClass", [""]),
+            ("DurableFunctionsEntityFunction.1.x", "EntityFunction", [""]),
+            ("DurableFunctionsOrchestration.1.x", "Orchestrate", ["", "SayHello", "_HttpStart"]),
+            ("SignalR.3.x", "Negotiate", [""]),
+            ("DaprPublishOutputBinding", "Publish", ["", "_TopicTrigger"]),
+            ("DaprServiceInvocationTrigger", "Service", ["", "_Invoke"]),
+        ];
+        foreach ((string variant, string prefix, string[] suffixes) in cases)
+        {
+            ITemplateInfo template = templates.Single(item => item.Identity == "Azure.Function.CSharp.Isolated." + variant);
+            foreach (string ordinal in new[] { "First", "Second" })
+            {
+                string name = prefix + ordinal;
+                ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output,
+                    new Dictionary<string, string?> { ["namespace"] = "Sample" }, cancellationToken: timeout.Token);
+                created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+                actions.AddRange(created.CreationEffects!.CreationResult.PostActions);
+                expectedNames.AddRange(suffixes.Select(suffix => name + suffix));
+                if (prefix == "Service")
+                {
+                    expectedRoutes.Add(name + "_Invoke", name + "/invoke/{appId}/{methodName}");
+                }
+            }
+        }
+        string customPath = Path.Combine(output, "Custom.cs");
+        const string userSource = "namespace Sample; public class Counter { } public class MyConnectionInfo { } "
+            + "public class InvokeOutputBinding { } public class DaprTopicTriggerFuncApp { } "
+            + "public class NegotiateFirstConnectionInfo { } public class ServiceFirstInvoke { } public class PublishFirstTopicTrigger { }";
+        File.WriteAllText(customPath, userSource);
+        DirectoryInfo repository = new(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(repository.FullName, "NuGet.Config")))
+        {
+            repository = repository.Parent ?? throw new InvalidOperationException("The repository NuGet.Config was not found.");
+        }
+        File.Copy(Path.Combine(repository.FullName, "NuGet.Config"), Path.Combine(output, "NuGet.Config"));
+        IDotnetPathResolver resolver = Substitute.For<IDotnetPathResolver>();
+        resolver.Resolve().Returns("dotnet");
+        DotnetCliRunner runner = new(resolver);
+        DotNetTemplateDependencyExecutor dependencies = new(runner);
+        string project = Path.Combine(output, "Sample.csproj");
+        foreach (IPostAction action in actions.Where(action => action.ActionId == _packageAction)
+            .DistinctBy(action => (action.Args["reference"], action.Args["version"])))
+        {
+            await dependencies.AddPackageReferenceAsync(project,
+                new(action.Args["reference"], action.Args["version"], action.Args["projectFileExtensions"]), timeout.Token);
+        }
+        await dependencies.RestoreAsync(project, timeout.Token);
+
+        await runner.RunAsync(["build", project, "--no-restore", "-m:1", "-v:minimal"], output, timeout.Token);
+
+        using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "bin", "Debug", "net10.0", "functions.metadata")));
+        JsonElement[] functions = [.. metadata.RootElement.EnumerateArray()];
+        functions.Select(function => function.GetProperty("name").GetString()).Should().BeEquivalentTo(expectedNames)
+            .And.OnlyHaveUniqueItems();
+        foreach ((string name, string route) in expectedRoutes)
+        {
+            JsonElement function = functions.Single(function => function.GetProperty("name").GetString() == name);
+            JsonElement trigger = function.GetProperty("bindings").EnumerateArray()
+                .Single(binding => binding.GetProperty("type").GetString() == "httpTrigger");
+            trigger.GetProperty("route").GetString().Should().Be(route);
+            JsonElement binding = function.GetProperty("bindings").EnumerateArray()
+                .Single(binding => binding.GetProperty("type").GetString() == "daprInvoke");
+            binding.GetProperty("appId").GetString().Should().Be("{appId}");
+            binding.GetProperty("methodName").GetString().Should().Be("{methodName}");
+        }
+        File.ReadAllText(customPath).Should().Be(userSource);
     }
 
     [Fact]

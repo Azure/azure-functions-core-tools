@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Templates.DotNet;
 /// <summary>
 /// Matches the pinned native configuration bytes supported by the controlled .NET workflow adapter.
 /// </summary>
-internal sealed class DotNetTemplateSources
+internal sealed partial class DotNetTemplateSources
 {
     private readonly IReadOnlyDictionary<string, string[]> _sources;
 

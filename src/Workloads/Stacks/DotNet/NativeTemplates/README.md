@@ -15,8 +15,8 @@ The original packages declare package type `Template`; the adapter declares
 `FuncTemplate` rather than relaxing native package validation.
 
 Packing validates both upstream archive digests and retains both original
-nuspecs under `provenance/`. Except for the four qualified supporting-type
-adaptations described below, upstream `content/` bytes are unchanged. It adds
+nuspecs under `provenance/`. Except for the qualified source adaptations
+described below, upstream `content/` bytes are unchanged. It adds
 `func.host.json` files, including `--target-framework` / `-tfm` aliases for the
 native project `Framework` parameter. The repository MIT license has the same
 copyright and grant as upstream's `LICENSE.txt`; its pinned source URL is in
@@ -62,6 +62,53 @@ The SQL trigger logs its sample changes using the framework's
 dependency. The sample retains its JSON property names, numeric operations,
 row values and nulls; equivalent JSON escaping need not be byte-identical.
 Neither correction adds a project dependency or edits an existing function.
+
+## Name-owned auxiliary functions
+
+The six exact C# sources in `auxiliary-identities.json` also qualify their
+configuration and original source hashes before adaptation. The entity-class
+sample's `Counter` type and the entity-function sample's fixed `Counter` function
+ID now use the requested main function name. Orchestration activities use
+`<FunctionName>SayHello`, including all activity calls and logger references;
+the existing `<FunctionName>_HttpStart` entry point is retained.
+
+SignalR's main function ID and logger use the requested name rather than the
+fixed `negotiate`. Its connection model is nested as `<FunctionName>ConnectionInfo`.
+Dapr's auxiliary methods live directly in the new main class, with method names
+`<FunctionName>TopicTrigger` and `<FunctionName>Invoke`, and function IDs and
+loggers `<FunctionName>_TopicTrigger` and `<FunctionName>_Invoke`. They are not
+nested function classes, which the pinned worker SDK does not index.
+The invocation helper's HTTP route is
+`<FunctionName>/invoke/{appId}/{methodName}`; its sample curl and Dapr CLI
+references use the same requested main function. The external app/method
+binding placeholders, pubsub component and topic remain unchanged.
+
+All derived names use native `sourceName` substitution. No existing project
+source, namespace, user helper or previously generated route is rewritten.
+Raw sources remain byte-for-byte in `provenance/upstream-content/content/`.
+Unknown source, configuration or replacement shapes fail packing. These are
+intentional authoring changes for newly generated items, not a project
+migration or a requirement to upgrade an older compatible package. Older
+packages remain usable with their original fixed-helper/repeat limitations.
+Unique compiled worker metadata does not establish Dapr/Durable backend
+execution or validate deployment-specific routes.
+
+For these six newly authored sources, the CLI also qualifies the exact
+source/configuration pair and privately expands native output before writing
+the project. It checks the known class/function-attribute layouts, including
+the service helper route, rather than deriving an identifier from the filename
+or applying a second argv normalizer. Actual generated function IDs must start
+with an ASCII letter, contain only ASCII letters, digits, `_` or `-`, and fit
+within the host's 128-character limit; `host` is reserved. Orchestrations leave
+room for `_HttpStart` (main name at most 118 characters), publishers for
+`_TopicTrigger` (115), and service invocations for `_Invoke` (121). Native space
+and hyphen normalization is retained; Unicode-only, leading-digit and
+leading-underscore IDs are refused rather than producing host-invalid metadata.
+Raw older sources retain their existing behavior without a latest-version gate.
+Conflicting source proofs or changed canonical sources refuse before writes.
+This is not project-wide semantic analysis of pre-existing function IDs:
+choosing another function's derived helper ID as a new main name can still
+collide, and existing projects are not automatically cleaned up.
 
 ## Deliberately staged
 

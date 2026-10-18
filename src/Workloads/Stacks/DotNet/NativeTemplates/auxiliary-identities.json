@@ -1,0 +1,85 @@
+[
+  {
+    "identity": "Azure.Function.CSharp.Isolated.DurableFunctionsEntityClass.1.x",
+    "path": "content/DurableFunctionsEntityClass-CSharp/DurableFunctionsEntityClassCSharp.cs",
+    "sha256": "EF1BB651647B33786C43F246C778F82DDBAF930669195B10B6670E406EC90FC8",
+    "configurationSha256": "74987D3336C76E74ADEFC8A66A7B4A3BB55EA52BAE123EF647F22ABFD9256F4C",
+    "authoredSources": [
+      { "configurationSha256": "74987D3336C76E74ADEFC8A66A7B4A3BB55EA52BAE123EF647F22ABFD9256F4C", "sha256": "A45F4D34C8BB4CDD1153F1E58ED0D3DD4226EED61FA1D93F479C6DF48C230A5F" }
+    ],
+    "replacements": [
+      { "from": "Counter", "to": "DurableFunctionsEntityClassCSharp", "count": 4 }
+    ]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.DurableFunctionsEntityFunction.1.x",
+    "path": "content/DurableFunctionsEntityFunction-CSharp/DurableFunctionsEntityFunctionCSharp.cs",
+    "sha256": "CDA37C50A5F8D62E03C97040EF03133D9B58E066DF13332BBE921DE52DA67B19",
+    "configurationSha256": "67C666CAB5D89E4A3830CED8BC47E41305128477358BEEA5543BE565D8F9FA18",
+    "authoredSources": [
+      { "configurationSha256": "67C666CAB5D89E4A3830CED8BC47E41305128477358BEEA5543BE565D8F9FA18", "sha256": "0A8D74267375010FADB70B71C469D3999C7309274F9483D48B427E065954C381" }
+    ],
+    "replacements": [
+      { "from": "[Function(\"Counter\")]", "to": "[Function(nameof(DurableFunctionsEntityFunctionCSharp))]", "count": 1 }
+    ]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.DurableFunctionsOrchestration.1.x",
+    "path": "content/DurableFunctionsOrchestration-CSharp/DurableFunctionsOrchestrationCSharp.cs",
+    "sha256": "D9E4AEE6A649B753A71ECC19B11FA8E811D44C399EC0FD9760A2346DA21001C2",
+    "configurationSha256": "B2F78551DE0FB8BA21505FFA38D24C5B3EBE33FB8ECCAA59406AEDE88FD27FA1",
+    "authoredSources": [
+      { "configurationSha256": "B2F78551DE0FB8BA21505FFA38D24C5B3EBE33FB8ECCAA59406AEDE88FD27FA1", "sha256": "99F0C5FDC0AA3D824B7CA754CE51012139CDC0DBF19060295BF736135F06884B" }
+    ],
+    "replacements": [
+      { "from": "SayHello", "to": "DurableFunctionsOrchestrationCSharpSayHello", "count": 6 }
+    ]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.SignalR.3.x",
+    "path": "content/SignalRConnectionInfoHttpTrigger-CSharp/SignalRConnectionInfoHttpTriggerCSharp.cs",
+    "sha256": "C066CBB033F303DF60F98AC4E296D8018A4630E831CE12573F0A378B2A8C7B7E",
+    "configurationSha256": "EF5A7EDD7FF0D84484281924818E79D2A8CDF18C51D52EBEFEE2BC2E43410E4E",
+    "authoredSources": [
+      { "configurationSha256": "EF5A7EDD7FF0D84484281924818E79D2A8CDF18C51D52EBEFEE2BC2E43410E4E", "sha256": "4488416D98BE80F307B491281C1177E0DA79B21004B82CB3C2EEFEFF7CB823B7" }
+    ],
+    "replacements": [
+      { "from": "\"negotiate\"", "to": "\"SignalRConnectionInfoHttpTriggerCSharp\"", "count": 2 },
+      { "from": "MyConnectionInfo", "to": "SignalRConnectionInfoHttpTriggerCSharpConnectionInfo", "count": 2 }
+    ],
+    "nest": { "declaration": "public class SignalRConnectionInfoHttpTriggerCSharpConnectionInfo", "indent": 0, "suffix": "" }
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.DaprPublishOutputBinding",
+    "path": "content/DaprPublishOutputBinding-CSharp-Isolated/DaprPublishOutputBindingCSharp.cs",
+    "sha256": "1CEA7C1504459BB50CED8890D67DC960040A8F532E7965258A7A90AAFA6D19F3",
+    "configurationSha256": "2C669376FE1EC865A772C2773645A4B68BB5ABED45FACFF682435BC2F98194C8",
+    "authoredSources": [
+      { "configurationSha256": "2C669376FE1EC865A772C2773645A4B68BB5ABED45FACFF682435BC2F98194C8", "sha256": "52C53D5032D3B2E6B73E573547687897F830DDCAD57F785325AD385484FA5A4E" }
+    ],
+    "replacements": [
+      { "from": "\"DaprPublishOutputCSharp\"", "to": "\"DaprPublishOutputBindingCSharp\"", "count": 1 },
+      { "from": "\"DaprTopicTriggerFuncApp\"", "to": "\"DaprPublishOutputBindingCSharp_TopicTrigger\"", "count": 2 },
+      { "from": "    // Below Azure function will receive message published on topic A, and it will log the message\n", "to": "", "count": 1 },
+      { "from": "    }\n\n    public static class DaprTopicTriggerFuncApp\n    {\n", "to": "\n", "count": 1 },
+      { "from": "public static void Run(", "to": "public static void DaprPublishOutputBindingCSharpTopicTrigger(", "count": 1 }
+    ]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.DaprServiceInvocationTrigger",
+    "path": "content/DaprServiceInvocationTrigger-CSharp-Isolated/DaprServiceInvocationTriggerCSharp.cs",
+    "sha256": "45E3BFA8F5121F351B4360A1B08AA228B55283DAE6A96B6A55E47643B34556BE",
+    "configurationSha256": "9E33F913529139E9C2E22EA14596897D3E31766D5ED8B594E90752B2ABE87E18",
+    "authoredSources": [
+      { "configurationSha256": "9E33F913529139E9C2E22EA14596897D3E31766D5ED8B594E90752B2ABE87E18", "sha256": "42CB2A59F20539846153FDC9B174930B55191AA8FBA33FBF22F85895E957C7E6" }
+    ],
+    "replacements": [
+      { "from": "    }\n\n    public static class InvokeOutputBinding\n    {\n", "to": "\n", "count": 1 },
+      { "from": "public static async Task<InvokeMethodParameters> Run(", "to": "public static async Task<InvokeMethodParameters> DaprServiceInvocationTriggerCSharpInvoke(", "count": 1 },
+      { "from": "\"InvokeOutputBinding\"", "to": "\"DaprServiceInvocationTriggerCSharp_Invoke\"", "count": 2 },
+      { "from": "Route = \"invoke/{appId}/{methodName}\"", "to": "Route = \"DaprServiceInvocationTriggerCSharp/invoke/{appId}/{methodName}\"", "count": 1 },
+      { "from": "--method {yourFunctionName}", "to": "--method DaprServiceInvocationTriggerCSharp", "count": 1 },
+      { "from": "/api/invoke/functionapp/{yourFunctionName}", "to": "/api/DaprServiceInvocationTriggerCSharp/invoke/functionapp/DaprServiceInvocationTriggerCSharp", "count": 1 }
+    ]
+  }
+]
