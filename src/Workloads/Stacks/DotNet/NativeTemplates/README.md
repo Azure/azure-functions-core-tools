@@ -15,8 +15,8 @@ The original packages declare package type `Template`; the adapter declares
 `FuncTemplate` rather than relaxing native package validation.
 
 Packing validates both upstream archive digests and retains both original
-nuspecs under `provenance/`. Except for the qualified source adaptations
-described below, upstream `content/` bytes are unchanged. It adds
+nuspecs under `provenance/`. Except for the qualified source and binding-literal
+adaptations described below, upstream `content/` bytes are unchanged. It adds
 `func.host.json` files, including `--target-framework` / `-tfm` aliases for the
 native project `Framework` parameter. The repository MIT license has the same
 copyright and grant as upstream's `LICENSE.txt`; its pinned source URL is in
@@ -25,7 +25,7 @@ rewritten as evidence of a different upstream release.
 
 The raw inventory is 36 items (29 C#, 7 F#) plus 2 projects (C#, F#). Those are
 native configuration records, **not deduplicated CLI-visible counts**.
-Template identities, group identities, short names, symbols, conditional
+Template identities, group identities, short names, parameter contracts, conditional
 sources, generated values, package versions, post-actions and unadapted source
 files are preserved, including F# project ordering and `_gitignore` renaming.
 
@@ -42,9 +42,9 @@ It nests the DTO inside its owning new function class and names it
 `<FunctionName>Item`, using the existing native `sourceName` substitution for
 every type reference. Nesting avoids collisions with other functions and
 existing user DTOs; the suffix also permits a function named `ToDoItem`.
-Namespaces, connection-string settings, package dependencies and all native
-configuration bytes remain unchanged. SQL/MySQL input items and F#
-sources are not adapted. No existing project source is inspected or rewritten.
+Namespaces, connection-string values and package dependencies remain unchanged.
+The supporting-type adaptation does not change configurations, SQL/MySQL input
+items or F# sources. No existing project source is inspected or rewritten.
 
 The original four source files remain byte-for-byte under
 `provenance/upstream-content/content/`; the source pins are also packaged in
@@ -133,6 +133,64 @@ adaptation already owns the source. No user DTO is inspected or rewritten.
 Generated-model integration checks compile repeated items with warnings as
 errors and exercise their actual CLR defaults and both supported sample JSON
 serializer shapes, without contacting any binding backend.
+
+## Binding string literals
+
+The 36 item configurations contain 23 literal-bearing items with 48 declared
+binding parameters. `binding-literals.json` pins their original sources and
+complete quoted source contexts. Namespace parameters, authorization choices,
+function names and SDK-bound/computed symbols are not string-literal inputs
+and are not escaped by this adaptation.
+
+Packing removes only the literal parameters' direct substitutions and adds
+native derived symbols using language-specific string-content forms. These
+chain the pinned engine's `jsonEncode` form with removal of its outer quotes.
+Its escapes (`\\`, `\"`, `\b`, `\f`, `\n`, `\r`, `\t`, `\uXXXX`) are valid
+in both ordinary C# and F# string literals; no JSON-only `\/` escape is emitted.
+Actual compiler and worker metadata checks separately qualify both languages.
+Only exact reviewed quoted contexts receive unique substitution tokens.
+SignalR's optional, default-less `HubName` retains its unique original token
+so omission still produces the authored `HubValue`, while explicit empty and
+nonempty values use the same literal form.
+Authored `SELECT * FROM ` prefixes and `/{name}` suffixes remain outside the
+transformation. Kusto example comments retain their original text instead of
+substituting user input into comments.
+
+Canonical parameters, defaults, help, choices and JSON argument reports retain
+the original values. Escaping happens once during native source rendering,
+not in argv parsing, the workflow request or generated applications.
+Original source bytes remain under `provenance/upstream-content/`; adapted
+configuration originals use `template.json.original` there, so the native
+engine cannot discover them as competing template definitions.
+
+`binding-literals-qualified.json` pins reviewed adapted configurations and
+sources for the CLI. Item preparation reads only the selected package, verifies
+the exact association and binds source hashes and the single source output
+through the native prewrite snapshot. Changed mappings, derived symbols,
+sources or package owners cannot borrow another installed template's proof.
+There is no new compiler or runtime dependency during ordinary scaffolding.
+The canonical authoring order is supporting types, auxiliary identities, nullable
+models, then binding literals. Overlapping source/configuration pairs are pinned
+after that composition. Literal, auxiliary and existing caller snapshots are
+combined without dropping a proof; mismatched hashes, identities, configurations
+or outputs produce a failed preparation. Known qualification failures retain
+the normal JSON failure result, while cancellation still propagates.
+
+Older compatible native packages retain their original configuration pins and
+can still render plain/default and valid Unicode inputs without newer
+provenance, receipt changes, cache migration or automatic update. Values needing
+source escaping are refused before writes with explicit selected-package
+update guidance. They are never pre-escaped into an old template or silently
+rendered with a different compiled binding value. This does not repair
+previously generated source or validate a value against a live binding backend.
+Unpaired UTF-16 surrogates are refused in both cohorts before source encoding;
+they are not valid Unicode and must not silently become replacement characters.
+The exact earlier literal-only SignalR source also retains its original fixed
+helper behavior rather than acquiring newer auxiliary-name admission implicitly.
+The original unfixed MySQL trigger source cannot preserve even a plain table
+value because its `table1` token appends an extra `1`. That exact incompatible
+source is refused with the same selected-owner update guidance; the corrected
+older supporting-type cohort remains usable.
 
 ## Deliberately staged
 
@@ -266,7 +324,7 @@ the upstream template defaults to `net8.0`; explicit unsupported framework
 input is rejected. Omitted namespace uses the evaluated project namespace,
 while explicit namespace is retained. Both distinctions use the authoritative
 canonical explicit-option provenance from the shared argument parser, not a
-second alias parser. Upstream template configurations remain unchanged.
+second alias parser. Except for the qualified literal-derived symbols, upstream template configurations remain unchanged.
 
 Actual `InitExecutionRunner` and `NewExecutionRunner` tests use this production
 provider/composer without private test capabilities for both languages. They

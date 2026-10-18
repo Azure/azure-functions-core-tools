@@ -66,6 +66,31 @@ public sealed partial class NativeDotNetTemplateTests : IDisposable
     }
 
     [Theory]
+    [InlineData(null, "HubValue")]
+    [InlineData("", "")]
+    [InlineData("plain", "plain")]
+    [InlineData("quoted\"\\value", "quoted\\\"\\\\value")]
+    public async Task NativeSignalR_OptionalHubName_PreservesOmittedPlaceholderAndExplicitValues(string? value, string expected)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == "Azure.Function.CSharp.Isolated.SignalR.3.x");
+        Dictionary<string, string?> parameters = new() { ["namespace"] = "Safe.Namespace" };
+        if (value is not null)
+        {
+            parameters["HubName"] = value;
+        }
+        string output = Path.Combine(_root, "signalr");
+
+        ITemplateCreationResult result = await new TemplateCreator(session.Settings).InstantiateAsync(
+            template, "Example", "Example", output, parameters, cancellationToken: CancellationToken.None);
+
+        result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
+        File.ReadAllText(Path.Combine(output, "Example.cs")).Should().Contain($"HubName = \"{expected}\"");
+        template.ParameterDefinitions.Single(parameter => parameter.Name == "HubName").DefaultValue.Should().BeNull();
+    }
+
+    [Theory]
     [InlineData("itemtemplates", "4.0.5590", "C1BBCC22B2B84F1A9EFFB88956E44BFC784A0ECC74DDE3F4204B6B4AD7128A64")]
     [InlineData("projecttemplates", "4.0.5337", "3BA17330B6C903BA159510337FA50942BD426AAF132F5DAC7B949B78AE8B8299")]
     public void Pack_VerifiedUpstreamArchive_PreservesEveryNativeContentByte(string kind, string version, string digest)
@@ -88,16 +113,24 @@ public sealed partial class NativeDotNetTemplateTests : IDisposable
         {
             adapted[row.GetProperty("path").GetString()!] = row.GetProperty("sha256").GetString()!;
         }
+        using var literals = JsonDocument.Parse(inner.GetStream("provenance/binding-literals.json"));
+        foreach (JsonElement literal in literals.RootElement.EnumerateArray())
+        {
+            string path = literal.GetProperty("path").GetString()!;
+            adapted[path] = literal.GetProperty("sha256").GetString()!;
+            adapted[path[..path.LastIndexOf('/')] + "/.template.config/template.json"] = string.Empty;
+        }
         ZipArchiveEntry[] sourceFiles = [.. upstream.Entries.Where(entry => entry.FullName.StartsWith("content/", StringComparison.Ordinal)
             && entry.Name.Length > 0)];
         sourceFiles.Should().NotBeEmpty();
         foreach (ZipArchiveEntry source in sourceFiles)
         {
             using Stream expected = source.Open();
-            string actualPath = adapted.ContainsKey(source.FullName) ? "provenance/upstream-content/" + source.FullName : source.FullName;
+            string actualPath = adapted.ContainsKey(source.FullName) ? "provenance/upstream-content/" + source.FullName
+                + (source.FullName.EndsWith("/template.json", StringComparison.Ordinal) ? ".original" : string.Empty) : source.FullName;
             using Stream actual = inner.GetStream(actualPath);
             SHA256.HashData(actual).Should().Equal(SHA256.HashData(expected), source.FullName);
-            if (adapted.TryGetValue(source.FullName, out string? pinnedHash))
+            if (adapted.TryGetValue(source.FullName, out string? pinnedHash) && pinnedHash.Length > 0)
             {
                 using Stream original = source.Open();
                 Convert.ToHexString(SHA256.HashData(original)).Should().Be(pinnedHash);
@@ -106,6 +139,86 @@ public sealed partial class NativeDotNetTemplateTests : IDisposable
                 reader.ReadToEnd().Should().NotContain("\npublic class ToDoItem\n");
             }
         }
+    }
+
+    [Theory]
+    [InlineData("CSharp", "C#")]
+    [InlineData("FSharp", "F#")]
+    public async Task NativeLiteralParameters_QuotesBackslashesAndControls_AreEncodedOnlyAtAuthoredLiteralSites(
+        string language, string tag)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == $"Azure.Function.{language}.Isolated.BlobTrigger.3.x");
+        string output = Path.Combine(_root, language + "-literals");
+        TemplateCreator creator = new(session.Settings);
+        Dictionary<string, string?> parameters = new()
+        {
+            ["namespace"] = "Custom.Functions",
+            ["Path"] = "incoming/orders\\archive\"\t\n\r\b\f\u0007\u000b\u0085\u2028\u2029/入荷/😀",
+            ["Connection"] = "Connection\\value\"",
+        };
+
+        ITemplateCreationResult created = await creator.InstantiateAsync(template, "Example", "Example", output, parameters,
+            cancellationToken: CancellationToken.None);
+
+        created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+        string source = File.ReadAllText(Path.Combine(output, "Example" + (tag == "C#" ? ".cs" : ".fs")));
+        source.Should().Contain("namespace Custom.Functions");
+        source.Should().Contain("\"incoming/orders\\\\archive\\\"\\t\\n\\r\\b\\f\\u0007\\u000b\\u0085\\u2028\\u2029/入荷/😀/{name}\"");
+        source.Should().Contain("\"Connection\\\\value\\\"\"");
+        source.Should().NotContain("__FuncBinding_");
+        parameters["Path"].Should().Be("incoming/orders\\archive\"\t\n\r\b\f\u0007\u000b\u0085\u2028\u2029/入荷/😀");
+    }
+
+    [Fact]
+    public async Task NativeLiteralParameters_CompleteReviewedInventory_UsesDerivedFormsWithoutChangingTypedParameters()
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        IReadOnlyList<ITemplateInfo> templates = await session.Manager.GetTemplatesAsync(CancellationToken.None);
+        using var inner = new PackageArchiveReader(ExtractInnerArchive());
+        using var inventory = JsonDocument.Parse(inner.GetStream("provenance/binding-literals.json"));
+        int parameterCount = 0;
+        foreach (JsonElement row in inventory.RootElement.EnumerateArray())
+        {
+            ITemplateInfo template = templates.Single(item => item.Identity == row.GetProperty("identity").GetString());
+            string path = row.GetProperty("path").GetString()!;
+            using var configuration = JsonDocument.Parse(inner.GetStream(path[..path.LastIndexOf('/')] + "/.template.config/template.json"));
+            JsonElement symbols = configuration.RootElement.GetProperty("symbols");
+            Dictionary<string, string?> parameters = new() { ["namespace"] = "Safe.Namespace" };
+            foreach (JsonElement mapping in row.GetProperty("parameters").EnumerateArray())
+            {
+                string name = mapping[0].GetString()!;
+                template.ParameterDefinitions.Should().Contain(parameter => parameter.Name == name);
+                symbols.GetProperty(name).TryGetProperty("replaces", out _).Should().BeFalse();
+                JsonElement derived = symbols.GetProperty("FuncBinding_" + name);
+                derived.GetProperty("type").GetString().Should().Be("derived");
+                derived.GetProperty("valueSource").GetString().Should().Be(name);
+                derived.GetProperty("valueTransform").GetString().Should().Be(
+                    template.TagsCollection["language"] == "C#" ? "csharpStringContent" : "fsharpStringContent");
+                parameters[name] = "plain\\quote\"\t\n入荷";
+                parameterCount++;
+            }
+            string output = Path.Combine(_root, template.Identity);
+            ITemplateCreationResult result = await new TemplateCreator(session.Settings).InstantiateAsync(
+                template, "Example", "Example", output, parameters, cancellationToken: CancellationToken.None);
+            result.Status.Should().Be(CreationResultStatus.Success, result.ErrorMessage);
+            string source = File.ReadAllText(Path.Combine(output, Path.GetFileName(path)
+                .Replace(configuration.RootElement.GetProperty("sourceName").GetString()!, "Example", StringComparison.Ordinal)));
+            source.Should().NotContain("__FuncBinding_");
+            source.Should().Contain("plain\\\\quote\\\"\\t\\n入荷");
+            source.Should().Contain("namespace Safe.Namespace");
+            string defaults = output + "-defaults";
+            ITemplateCreationResult defaultResult = await new TemplateCreator(session.Settings).InstantiateAsync(
+                template, "Example", "Example", defaults, new Dictionary<string, string?> { ["namespace"] = "Safe.Namespace" },
+                cancellationToken: CancellationToken.None);
+            defaultResult.Status.Should().Be(CreationResultStatus.Success, defaultResult.ErrorMessage);
+            File.ReadAllText(Path.Combine(defaults, Path.GetFileName(path)
+                .Replace(configuration.RootElement.GetProperty("sourceName").GetString()!, "Example", StringComparison.Ordinal)))
+                .Should().NotContain("__FuncBinding_");
+        }
+        inventory.RootElement.GetArrayLength().Should().Be(23);
+        parameterCount.Should().Be(48);
     }
 
     [Fact]

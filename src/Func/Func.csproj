@@ -60,6 +60,10 @@
       Link="Templates/DotNet/upstream-configurations.json" LogicalName="Azure.Functions.Cli.Templates.DotNet.upstream-configurations.json" />
     <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/auxiliary-identities.json"
       Link="Templates/DotNet/auxiliary-identities.json" LogicalName="Azure.Functions.Cli.Templates.DotNet.auxiliary-identities.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/binding-literals.json"
+      LogicalName="Azure.Functions.Cli.Templates.DotNet.binding-literals.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/binding-literals-qualified.json"
+      LogicalName="Azure.Functions.Cli.Templates.DotNet.binding-literals-qualified.json" />
   </ItemGroup>
 
   <ItemGroup>

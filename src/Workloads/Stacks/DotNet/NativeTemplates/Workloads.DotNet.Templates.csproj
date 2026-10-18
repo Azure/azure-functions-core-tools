@@ -22,6 +22,8 @@
     <Content Include="supporting-types.json" Pack="true" PackagePath="provenance/" />
     <Content Include="auxiliary-identities.json" Pack="true" PackagePath="provenance/" />
     <Content Include="nullable-models.json" Pack="true" PackagePath="provenance/" />
+    <Content Include="binding-literals.json" Pack="true" PackagePath="provenance/" />
+    <Content Include="binding-literals-qualified.json" Pack="true" PackagePath="provenance/" />
   </ItemGroup>
   <Target Name="StageUpstreamDotNetTemplates" BeforeTargets="_GetPackageFiles">
     <PropertyGroup>

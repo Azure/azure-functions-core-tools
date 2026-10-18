@@ -1,0 +1,140 @@
+[
+  {
+    "identity": "Azure.Function.CSharp.Isolated.QueueTrigger.3.x",
+    "path": "content/QueueTrigger-CSharpS/QueueTriggerCSharp.cs",
+    "sha256": "69BADCB9C364A28566FEB47D2AED1E9F30E697622D0C8642455E68BF0EEA7326",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["QueueName", "\"PathValue\""]]
+  },
+  {
+    "identity": "Azure.Function.FSharp.Isolated.QueueTrigger.3.x",
+    "path": "content/QueueTrigger-FSharp/QueueTriggerFSharp.fs",
+    "sha256": "9D6DA3F6BA5AF6E9BFA620DBC2C0C21A04713BFA83716AB4C11644303336AC0D",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["QueueName", "\"PathValue\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.BlobTrigger.3.x",
+    "path": "content/BlobTrigger-CSharp/BlobTriggerCSharp.cs",
+    "sha256": "8DC998677447324A461FE6B476FC8368185A3FEAEB0747DDB9A065D51DF7E3E7",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["Path", "\"PathValue/{name}\""]]
+  },
+  {
+    "identity": "Azure.Function.FSharp.Isolated.BlobTrigger.3.x",
+    "path": "content/BlobTrigger-FSharp/BlobTriggerFSharp.fs",
+    "sha256": "69767E45A6FE73805057330AA3D19B6B25BB52282B8CAFA540B3DD78B0C24E17",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["Path", "\"PathValue/{name}\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.TimerTrigger.3.x",
+    "path": "content/TimerTrigger-CSharp/TimerTriggerCSharp.cs",
+    "sha256": "43BAEEBC2AC1916A27C381BE284A89F3FA7E26CC3C2928DA3A519D02F75C5CDA",
+    "parameters": [["Schedule", "\"ScheduleValue\""]]
+  },
+  {
+    "identity": "Azure.Function.FSharp.Isolated.TimerTrigger.3.x",
+    "path": "content/TimerTrigger-FSharp/TimerTriggerFSharp.fs",
+    "sha256": "B1962776F3F179F5D5AAFE8632B6ACD18BA35088C776FF64136C91332DF9EC62",
+    "parameters": [["Schedule", "\"ScheduleValue\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.EventHubTrigger.3.x",
+    "path": "content/EventHubTrigger-CSharp/EventHubTriggerCSharp.cs",
+    "sha256": "E121D5921D04E5053D75FD24BAF6B87F95256285B1497B777978172369E7D6A0",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["EventHubName", "\"eventHubNameValue\""]]
+  },
+  {
+    "identity": "Azure.Function.FSharp.Isolated.EventHubTrigger.3.x",
+    "path": "content/EventHubTrigger-FSharp/EventHubTriggerFSharp.fs",
+    "sha256": "92C9AA5CBA2D664C8C2A88595024944E7A80DB6F596BD59B8FB94DAD0E81DBB7",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["EventHubName", "\"eventHubNameValue\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.ServiceBusQueueTrigger.3.x",
+    "path": "content/ServiceBusQueueTrigger-CSharp/ServiceBusQueueTriggerCSharp.cs",
+    "sha256": "23AE24631D45DCF227718425935D6DC106CB58A11601AD49A483763D76DEB511",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["QueueName", "\"QueueNameValue\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.ServiceBusTopicTrigger.3.x",
+    "path": "content/ServiceBusTopicTrigger-CSharp/ServiceBusTopicTriggerCSharp.cs",
+    "sha256": "92543B00E000FCF9C01924FC8F330F632C59808E04B211EF0FF3DEC257C7CEC0",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["TopicName", "\"TopicNameValue\""], ["SubscriptionName", "\"SubscriptionNameValue\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.CosmosDBTrigger.4.x",
+    "path": "content/CosmosDBTrigger-CSharp/CosmosDBTriggerCSharp.cs",
+    "sha256": "A845374D78FCE58444898EE0FF50B6676A896BDC30D87A23C7AF4EEBAF303389",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["DatabaseName", "\"DatabaseValue\""], ["ContainerName", "\"ContainerValue\""]]
+  },
+  {
+    "identity": "Azure.Function.FSharp.Isolated.CosmosDBTrigger.4.x",
+    "path": "content/CosmosDBTrigger-FShar/CosmosDBTriggerFSharp.fs",
+    "sha256": "40670EE4AC25ECC02008A9762860F9C6885D8C96136DEF44B9B1A67B68496863",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["DatabaseName", "\"DatabaseValue\""], ["ContainerName", "\"ContainerValue\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.SignalR.3.x",
+    "path": "content/SignalRConnectionInfoHttpTrigger-CSharp/SignalRConnectionInfoHttpTriggerCSharp.cs",
+    "sha256": "C066CBB033F303DF60F98AC4E296D8018A4630E831CE12573F0A378B2A8C7B7E",
+    "parameters": [["HubName", "\"HubValue\"", "HubValue"]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.RabbitMQTrigger.3.x",
+    "path": "content/RabbitMQTrigger-CSharp/RabbitMQTriggerCSharp.cs",
+    "sha256": "DFFBD9D2311FC37D5707FF64CBD36B08BA8E81FC3E64C3A607857518C7036605",
+    "parameters": [["ConnectionStringSetting", "\"ConnectionValue\""], ["QueueName", "\"NameOfQueue\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.SqlInputBinding",
+    "path": "content/SqlInputBinding-CSharp-Isolated/SqlInputBindingHttpTriggerCSharp.cs",
+    "sha256": "2C98D42ED3BD2008DD717FBA4200D60126E5E20D44F17A3A7948731FEDF1F787",
+    "parameters": [["connectionStringSetting", "\"SqlConnectionString\""], ["object", "\"SELECT * FROM object\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.SqlOutputBinding",
+    "path": "content/SqlOutputBinding-CSharp-Isolated/SqlOutputBindingHttpTriggerCSharp.cs",
+    "sha256": "D8947264417E3C68BF838A2466CAAEF82323674FA8101D773024DB9BF0A29F2D",
+    "parameters": [["connectionStringSetting", "\"SqlConnectionString\""], ["table", "\"table\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.KustoInputBindingIsolated",
+    "path": "content/KustoInputBinding-CSharp-Isolated/KustoInputBindingIsolated.cs",
+    "sha256": "4B41BD4763D9DB188323CE9EE669CE96C7E58CBDBDF9FB84A2E114DC2778CC47",
+    "parameters": [["connection", "\"KustoConnectionString\""], ["kqlCommand", "\"Table\""], ["database", "\"DB\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.KustoOutputBindingIsolated",
+    "path": "content/KustoOutputBinding-CSharp-Isolated/KustoOutputBindingIsolated.cs",
+    "sha256": "A44C21626B381B20EF72EB530473DC933FC01FE30C3F4EF43E8FE3BCF150FF32",
+    "parameters": [["connection", "\"KustoConnectionString\""], ["tableName", "\"TargetTable\""], ["database", "\"DB\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.SqlTriggerBinding",
+    "path": "content/SqlTrigger-CSharp-Isolated/SqlTriggerBindingCSharp.cs",
+    "sha256": "16885FCA8FF9E94D6FFFF7E31A189262753C4D383D727EC3FF8FF4B2AA6759D4",
+    "parameters": [["connectionStringSetting", "\"SqlConnectionString\""], ["table", "\"table\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.EventGridBlobTrigger.6.x",
+    "path": "content/EventGridBlobTrigger-CSharp-Isolated-6.x/EventGridBlobTriggerCSharp.cs",
+    "sha256": "A7751ABD0F9EE08B5BFAAF80403B9773B62211D44FD58AF4FD84B192AB89D027",
+    "parameters": [["Connection", "\"ConnectionValue\""], ["Path", "\"PathValue/{name}\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.MySqlInputBinding",
+    "path": "content/MySqlInputBinding-CSharp-Isolated/MySqlInputBindingHttpTriggerCSharp.cs",
+    "sha256": "3D6CDFCEF903450797881042F060D13C2A93106137D2A55AD128F63802546075",
+    "parameters": [["connectionStringSetting", "\"MySqlConnectionString\""], ["object", "\"SELECT * FROM object\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.MySqlOutputBinding",
+    "path": "content/MySqlOutputBinding-CSharp-Isolated/MySqlOutputBindingHttpTriggerCSharp.cs",
+    "sha256": "C4C8AD024E03AAF96699BF88017727BA8CFD7CFA0AA6E7E2DD068A0401F301B2",
+    "parameters": [["connectionStringSetting", "\"MySqlConnectionString\""], ["table", "\"table\""]]
+  },
+  {
+    "identity": "Azure.Function.CSharp.Isolated.MySqlTriggerBinding",
+    "path": "content/MySqlTrigger-CSharp-Isolated/MySqlTriggerBindingCSharp.cs",
+    "sha256": "88EE11F656117F0EF0134CA02385C6A205C21C64DAE99B6290F8DA58F1D4D21E",
+    "parameters": [["connectionStringSetting", "\"MySqlConnectionString\""], ["table", "\"table\""]]
+  }
+]

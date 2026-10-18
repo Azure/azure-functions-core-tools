@@ -92,6 +92,20 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
 
         try
         {
+            NativeTemplateSourceSnapshot? literalSources;
+            NativeTemplateSourceSnapshot? auxiliarySources;
+            NativeTemplateSourceSnapshot? sources;
+            try
+            {
+                literalSources = await _sources.QualifyLiteralsAsync(selected, context.Invocation.Parameters, cancellationToken);
+                auxiliarySources = await _sources.QualifyAuxiliaryAsync(selected, cancellationToken);
+                sources = DotNetTemplateSources.CombineAuxiliarySources(literalSources, auxiliarySources);
+                sources = DotNetTemplateSources.CombineAuxiliarySources(context.Invocation.SourceSnapshot, sources);
+            }
+            catch (InvalidDataException exception)
+            {
+                return NativeTemplateInvocationPreparation.Reject(exception.Message);
+            }
             DotNetInvocationProject project = await _projects.ResolveAsync(context.Templater.Context, cancellationToken);
             if (selected.Entry.Language != context.Templater.Context.Project?.Language)
             {
@@ -110,8 +124,6 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
             {
                 parameters["namespace"] = project.Properties.RootNamespace;
             }
-            NativeTemplateSourceSnapshot? auxiliarySources = await _sources.QualifyAuxiliaryAsync(selected, cancellationToken);
-
             DotNetTemplateEffectCapability capability = Capability(selected, project.Root, project.Properties.ProjectFilePath,
                 project.ProjectSha256, createsProject: false);
             TemplateEffectSource source = Source(selected);
@@ -119,7 +131,7 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
             {
                 Name = name,
                 Parameters = parameters,
-                SourceSnapshot = DotNetTemplateSources.CombineAuxiliarySources(context.Invocation.SourceSnapshot, auxiliarySources),
+                SourceSnapshot = sources,
                 EffectSupport = new(project.Root, project.Properties.ProjectFilePath, capability, Confirmed: true),
                 MsBuildBindings = new(project.Properties.ProjectFilePath, source.TemplateIdentity, source.Identity,
                     source.Sha256, project.Properties.TargetFramework, project.Properties.RootNamespace),

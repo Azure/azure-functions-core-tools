@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text;
+using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.DotNet;
@@ -11,6 +12,66 @@ namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed partial class DotNetDirectProviderTests
 {
+    [Theory]
+    [InlineData("source")]
+    [InlineData("mounted")]
+    [InlineData("snapshot")]
+    public async Task AuxiliaryProvider_SourceProofRefusal_RendersOneJsonFailureWithoutProjectWrites(string invalid)
+    {
+        using var fixture = await OpenAsync("C#");
+        var selected = (await fixture.Templater.ResolveGroupAsync("Azure.Function.CSharp.Isolated.DaprServiceInvocationTrigger",
+            TemplateType.Item, _deadline.Token)).Group!.Single();
+        const string path = "content/DaprServiceInvocationTrigger-CSharp-Isolated/DaprServiceInvocationTriggerCSharp.cs";
+        ResolvedTemplate candidate = new(selected.Entry, selected.InvokeAsync,
+            (requested, token) => invalid == "source" && requested == path
+                ? Task.FromResult<ReadOnlyMemory<byte>>(Encoding.UTF8.GetBytes("unsupported auxiliary body"))
+                : selected.ReadPackageFileAsync(requested, token),
+            selected.ConfigurationSha256, selected.ValidateConfigurationAsync,
+            invalid == "mounted" ? "archive::/decoy/.template.config/template.json" : selected.ConfigurationSourceIdentity);
+        var context = ItemContext(fixture, candidate, Parse(selected, ["--namespace", "Explicit.Functions"]), "Denied");
+        if (invalid == "snapshot")
+        {
+            TemplateEffectSource conflicting = new(selected.Entry.Identity, path, new string('0', 64));
+            NativeTemplateSourceSnapshot previous = new(selected.Entry.Identity, selected.ConfigurationSha256!,
+                [conflicting], [new(Path.GetFileName(path), conflicting)]);
+            context = context with { Invocation = context.Invocation with { SourceSnapshot = previous } };
+        }
+        var before = Directory.GetFiles(fixture.Directory.Info.FullName, "*", SearchOption.AllDirectories)
+            .ToDictionary(file => file, File.ReadAllBytes);
+
+        var prepared = await fixture.Provider.PrepareAsync(context, _deadline.Token);
+
+        prepared.Request.Should().BeNull();
+        prepared.Diagnostics.Should().ContainSingle();
+        TestInteractionService interaction = new();
+        int exit = new NewExecutionRenderer(interaction).Render(
+            NewExecutionResult.Reject("workflowPreparationFailed", [.. prepared.Diagnostics]), jsonOutput: true);
+        exit.Should().Be(1);
+        interaction.Lines.Should().ContainSingle();
+        string json = interaction.Lines.Single()["JSON: ".Length..];
+        using var document = JsonDocument.Parse(json);
+        document.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
+        Directory.GetFiles(fixture.Directory.Info.FullName, "*", SearchOption.AllDirectories).Should().BeEquivalentTo(before.Keys);
+        foreach (var file in before)
+        {
+            File.ReadAllBytes(file.Key).Should().Equal(file.Value);
+        }
+        fixture.Runner.Commands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AuxiliaryProvider_CanceledSourceQualification_PropagatesCancellationInsteadOfRenderingARefusal()
+    {
+        using var fixture = await OpenAsync("C#");
+        var selected = (await fixture.Templater.ResolveGroupAsync("Azure.Function.CSharp.Isolated.DaprServiceInvocationTrigger",
+            TemplateType.Item, _deadline.Token)).Group!.Single();
+        var context = ItemContext(fixture, selected, Parse(selected, []), "Canceled");
+
+        Func<Task> prepare = () => fixture.Provider.PrepareAsync(context, new CancellationToken(canceled: true));
+
+        await prepare.Should().ThrowAsync<OperationCanceledException>();
+    }
+
     [Theory]
     [InlineData("DurableFunctionsEntityClass.1.x", 128)]
     [InlineData("DurableFunctionsEntityFunction.1.x", 128)]

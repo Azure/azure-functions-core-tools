@@ -33,8 +33,11 @@ internal sealed partial class DotNetTemplateSources
         }
         ReadOnlyMemory<byte> bytes = await selected.ReadPackageFileAsync(path, cancellationToken);
         string hash = Convert.ToHexString(SHA256.HashData(bytes.Span));
-        if (Same(hash, pin.GetProperty("sha256").GetString())
+        if ((Same(hash, pin.GetProperty("sha256").GetString())
             && Same(selected.ConfigurationSha256, pin.GetProperty("configurationSha256").GetString()))
+            || (pin.TryGetProperty("compatibleSources", out JsonElement compatible)
+                && compatible.EnumerateArray().Any(source => Same(hash, source.GetProperty("sha256").GetString())
+                    && Same(selected.ConfigurationSha256, source.GetProperty("configurationSha256").GetString()))))
         {
             // Compatible older packages retain their authored helper names and limitations.
             return null;

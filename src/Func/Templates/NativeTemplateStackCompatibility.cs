@@ -56,4 +56,21 @@ internal sealed class NativeTemplateStackCompatibility(NativeTemplateWorkloadCap
         return $"Run 'func setup --features {stack} --install-policy if-needed' to explicitly repair retained bundled-template registration, "
             + $"or 'func workload update {origin?.LogicalPackageId ?? origin?.PackageId ?? stack}' to install a compatible version. No templates are acquired automatically.";
     }
+
+    public string UpdateHint(string stack)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        IProjectStack? installed = _stacks.FindStack(stack);
+        NativeTemplateWorkloadRegistration? origin = installed is null ? null : _capture.GetStackOrigin(installed);
+        if (origin is null)
+        {
+            return "Identify the installed workload that owns the selected templates and update that owner explicitly; no workload was upgraded automatically.";
+        }
+
+        string package = origin.LogicalPackageId ?? origin.PackageId;
+        string version = origin.LogicalPackageId is null ? origin.PackageVersion : origin.LogicalPackageVersion
+            ?? throw new InvalidOperationException("The captured logical workload owner has no installed version.");
+        return $"Run 'func workload update {package} --version {version} --exact' to update the selected owner. "
+            + "--version selects the installed version to replace, not the replacement version. No workload was upgraded automatically.";
+    }
 }
