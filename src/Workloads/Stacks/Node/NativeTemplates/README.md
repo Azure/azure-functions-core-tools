@@ -247,8 +247,8 @@ unchanged.
 ### Name-scoped Node Dapr helpers
 
 Newly authored JavaScript Dapr Publish items register the requested primary
-name and `<Name>_Topic`; Service Invocation items register the requested
-primary name and `<Name>_Invoke`. The service helper route is
+name and `<Name>-Topic`; Service Invocation items register the requested
+primary name and `<Name>-Invoke`. The service helper route is
 `<Name>/invoke/{appId}/{methodName}`. Both the Dapr CLI caller and HTTP caller
 examples use the generated primary name, and the HTTP example includes the
 same route prefix. Exact requested ASCII casing is preserved through the native
@@ -260,7 +260,10 @@ These two original raw bodies are pinned in full before exact helper/caller/
 route conversions, separately from their byte-exact vendor provenance.
 Partial conversions, extra replacement symbols or unreviewed body edits do
 not qualify. No TypeScript Dapr entries are synthesized. Different requested
-primary names produce different helpers and helper routes; this is not a
+primary names produce different helpers and helper routes. The helper-only
+hyphen separates these IDs from primary names allowed by the unchanged owned
+Node validator, preventing ordinary CLI HTTP/Dapr primary names such as
+`Foo_Invoke` from colliding with `Foo-Invoke`. This is not a
 project-wide JavaScript registration or arbitrary user-code collision scan.
 Existing source files and routes are never rewritten.
 
@@ -268,8 +271,11 @@ The existing 128-character function-name contract applies to generated helper
 IDs too: Publish primary names are limited to 122 characters and Service
 primary names to 121. Preview and creation reject longer names before writes,
 with a shorter-name instruction; names are never truncated or hashed.
+The reserved primary name `host` is also rejected case-insensitively before
+writes for these affected items.
 
-Older native archives containing the fixed helper IDs or fixed service route
+Older native archives containing the fixed helper IDs or fixed service route,
+and the earlier underscore-derived encoding without primary/helper separation,
 cannot meet this new repeat-safe helper contract. Selecting **either of these
 two items**, even for its first/default name, now requires an explicit update
 of the captured owning workload. No update occurs during generation. This

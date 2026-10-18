@@ -128,10 +128,10 @@ foreach ($template in $templates) {
             throw "Review the changed owned body/declaration association for '$id' before converting it."
         }
         if ($id -ceq 'DaprPublishOutputBinding-JavaScript') {
-            $content = $content.Replace("app.generic('DaprTopicTriggerNodeV4', {", "app.generic('`$(FUNCTION_NAME_INPUT)_Topic', {")
+            $content = $content.Replace("app.generic('DaprTopicTriggerNodeV4', {", "app.generic('`$(FUNCTION_NAME_INPUT)-Topic', {")
         }
         elseif ($id -ceq 'DaprServiceInvocationTrigger-JavaScript') {
-            $content = $content.Replace("app.http('InvokeOutputBinding', {", "app.http('`$(FUNCTION_NAME_INPUT)_Invoke', {")
+            $content = $content.Replace("app.http('InvokeOutputBinding', {", "app.http('`$(FUNCTION_NAME_INPUT)-Invoke', {")
             $content = $content.Replace('route: "invoke/{appId}/{methodName}"', 'route: "$(FUNCTION_NAME_INPUT)/invoke/{appId}/{methodName}"')
             $content = $content.Replace('http://localhost:7071/api/invoke/functionapp/{yourFunctionName}',
                 'http://localhost:7071/api/$(FUNCTION_NAME_INPUT)/invoke/functionapp/$(FUNCTION_NAME_INPUT)')

@@ -17,8 +17,69 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public sealed partial class BundledNodeTemplateTests
 {
     [Theory]
-    [InlineData("DaprPublishOutputBinding-JavaScript", "_Topic")]
-    [InlineData("DaprServiceInvocationTrigger-JavaScript", "_Invoke")]
+    [InlineData("DaprServiceInvocationTrigger-JavaScript", "Azure.Functions.Node.Http.JavaScript", "Foo_Invoke")]
+    [InlineData("DaprServiceInvocationTrigger-JavaScript", "DaprServiceInvocationTrigger-JavaScript", "Foo_Invoke")]
+    [InlineData("DaprPublishOutputBinding-JavaScript", "Azure.Functions.Node.Http.JavaScript", "Foo_Topic")]
+    [InlineData("DaprPublishOutputBinding-JavaScript", "DaprPublishOutputBinding-JavaScript", "Foo_Topic")]
+    public async Task DaprHelpers_CliReachableCrossRoleNames_DoNotOverlapPrimaryAndHelperDomains(
+        string firstIdentity, string secondIdentity, string secondName)
+    {
+        await _installer.InstallFromPackageAsync(BuiltArchive);
+        using var session = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None);
+        var natives = await session.PackageManager.GetTemplatesAsync(CancellationToken.None);
+        var creator = new TemplateCreator(session.Settings);
+        string target = Path.Combine(_root, "cross-role");
+        foreach (var (identity, name) in new[] { (firstIdentity, "Foo"), (secondIdentity, secondName) })
+        {
+            var native = natives.Single(item => item.Identity == identity);
+            var created = await creator.InstantiateAsync(native, name, name, target, new Dictionary<string, string?>(),
+                cancellationToken: CancellationToken.None);
+            created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+        }
+        using var captured = JsonDocument.Parse(await EvaluateDaprRegistrationsAsync(
+            Path.Combine(target, "Foo.js"), Path.Combine(target, secondName + ".js")));
+        string suffix = firstIdentity.StartsWith("DaprService", StringComparison.Ordinal) ? "-Invoke" : "-Topic";
+        string?[] expected = secondIdentity.StartsWith("Dapr", StringComparison.Ordinal)
+            ? ["Foo", "Foo" + suffix, secondName, secondName + suffix] : ["Foo", "Foo" + suffix, secondName];
+        string?[] names = [.. captured.RootElement.EnumerateArray().Select(item => item.GetProperty("name").GetString())];
+
+        names.Should().Equal(expected);
+        names.Distinct(StringComparer.OrdinalIgnoreCase).Should().HaveCount(names.Length);
+    }
+
+    [Theory]
+    [InlineData("DaprServiceInvocationTrigger-JavaScript", "host")]
+    [InlineData("DaprServiceInvocationTrigger-JavaScript", "Host")]
+    [InlineData("DaprServiceInvocationTrigger-JavaScript", "hOsT")]
+    [InlineData("DaprPublishOutputBinding-JavaScript", "host")]
+    [InlineData("DaprPublishOutputBinding-JavaScript", "Host")]
+    [InlineData("DaprPublishOutputBinding-JavaScript", "hOsT")]
+    public async Task DaprHelpers_ReservedHostName_RefusesPreviewAndCreationBeforeWrites(string identity, string name)
+    {
+        await _installer.InstallFromPackageAsync(BuiltArchive);
+        using var services = await CreateNodeWorkflowServicesAsync(new NodeNpmInstaller());
+        using var scope = services.CreateScope();
+        var composer = scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>();
+        string project = Path.Combine(_root, "reserved-project");
+        (await composer.ExecuteProjectAsync(NodeComposedInit(project, "js", ["--skip-npm-install", "true"]), CancellationToken.None))
+            .Succeeded.Should().BeTrue();
+        var before = Directory.GetFiles(project, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+        var command = NodeComposedItem(Path.Combine(project, "src", "functions"), identity) with { Name = name };
+
+        var preview = await composer.ExecuteItemAsync(command with { DryRun = true }, CancellationToken.None);
+        var created = await composer.ExecuteItemAsync(command, CancellationToken.None);
+
+        preview.Succeeded.Should().BeFalse();
+        created.Succeeded.Should().BeFalse();
+        preview.Invocation.Should().BeNull();
+        created.Invocation.Should().BeNull();
+        created.Diagnostics.Should().ContainSingle().Which.Should().Contain("reserved").And.Contain("Nothing was generated");
+        Directory.GetFiles(project, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes).Should().BeEquivalentTo(before);
+    }
+
+    [Theory]
+    [InlineData("DaprPublishOutputBinding-JavaScript", "-Topic")]
+    [InlineData("DaprServiceInvocationTrigger-JavaScript", "-Invoke")]
     public async Task DaprHelpers_ActualNativeBackend_TwoDifferentNamesHaveDistinctAssociatedRegistrationsAndRoutes(string identity, string suffix)
     {
         await _installer.InstallFromPackageAsync(BuiltArchive);
@@ -46,7 +107,7 @@ public sealed partial class BundledNodeTemplateTests
         var registrations = captured.RootElement.EnumerateArray().ToArray();
         registrations.Select(item => item.GetProperty("name").GetString()).Should()
             .Equal("FirstMixedName", "FirstMixedName" + suffix, "SecondMixedName", "SecondMixedName" + suffix);
-        if (suffix == "_Invoke")
+        if (suffix == "-Invoke")
         {
             foreach (string name in new[] { "FirstMixedName", "SecondMixedName" })
             {
@@ -117,7 +178,7 @@ public sealed partial class BundledNodeTemplateTests
         {
             created.Invocation!.Changes.Should().BeEquivalentTo(preview.Invocation!.Changes);
             string content = File.ReadAllText(Path.Combine(target, name + ".js"));
-            content.Should().Contain(name + (identity.StartsWith("DaprPublish", StringComparison.Ordinal) ? "_Topic" : "_Invoke"));
+            content.Should().Contain(name + (identity.StartsWith("DaprPublish", StringComparison.Ordinal) ? "-Topic" : "-Invoke"));
         }
         else
         {
@@ -146,7 +207,39 @@ public sealed partial class BundledNodeTemplateTests
         var failure = validate.Should().Throw<NodeItemHelperCompatibilityException>().Which;
         var compatibility = new NodeItemCompatibility(_interaction, () => hint);
         compatibility.DescribeUnsupportedHelpers(failure).Should().Contain(hint).And.Contain(identity)
-            .And.Contain("fixed auxiliary function").And.Contain("Nothing was generated").And.Contain("no workload was upgraded automatically");
+            .And.Contain("does not separate").And.Contain("Nothing was generated").And.Contain("no workload was upgraded automatically");
+    }
+
+    [Theory]
+    [InlineData("DaprPublishOutputBinding-JavaScript", "-Topic", "_Topic")]
+    [InlineData("DaprServiceInvocationTrigger-JavaScript", "-Invoke", "_Invoke")]
+    public async Task DaprHelpers_PreviousUnderscoreEncoding_RequiresExplicitUpdateRatherThanReintroducingCrossRoleCollisions(
+        string identity, string currentSuffix, string previousSuffix)
+    {
+        NodeItemSource source = await ReadQualifiedSourceAsync(identity);
+        source = source with
+        {
+            Content = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(source.Content.Span).Replace(
+                "funcNodeItem" + currentSuffix, "funcNodeItem" + previousSuffix, StringComparison.Ordinal)),
+        };
+
+        NodeItemSourceQualifier.Validate(source, "JavaScript");
+        Action invoke = () => NodeItemSourceQualifier.ValidateDaprInvocation(source, "Foo");
+
+        invoke.Should().Throw<NodeItemHelperCompatibilityException>().WithMessage("*does not separate*");
+    }
+
+    [Theory]
+    [InlineData("hosts")]
+    [InlineData("HostFunction")]
+    [InlineData("myhost")]
+    public async Task DaprHelpers_ReservedNamePredicate_DoesNotRejectNonreservedNames(string name)
+    {
+        NodeItemSource source = await ReadQualifiedSourceAsync("DaprServiceInvocationTrigger-JavaScript");
+
+        string? diagnostic = NodeItemSourceQualifier.ValidateDaprInvocation(source, name);
+
+        diagnostic.Should().BeNull();
     }
 
     [Theory]
@@ -160,13 +253,13 @@ public sealed partial class BundledNodeTemplateTests
     {
         NodeItemSource source = await ReadQualifiedSourceAsync("DaprServiceInvocationTrigger-JavaScript");
         string native = Encoding.UTF8.GetString(source.Content.Span);
-        if (corruption == "helperName") native = native.Replace("funcNodeItem_Invoke", "OtherHelper", StringComparison.Ordinal);
+        if (corruption == "helperName") native = native.Replace("funcNodeItem-Invoke", "OtherHelper", StringComparison.Ordinal);
         else if (corruption == "routeOnly") native = native.Replace("funcNodeItem/invoke/{appId}/{methodName}", "invoke/{appId}/{methodName}", StringComparison.Ordinal);
         else if (corruption == "commentCaller") native = native.Replace("--method funcNodeItem", "--method OtherMain", StringComparison.Ordinal);
         else if (corruption == "rawCommentDecoy")
         {
             source.Template.Files!["function.js"] += "\n// app.http('InvokeOutputBinding', {\n";
-            native += "\n// app.http('funcNodeItem_Invoke', {\n";
+            native += "\n// app.http('funcNodeItem-Invoke', {\n";
         }
         else if (corruption == "extraSymbol")
         {

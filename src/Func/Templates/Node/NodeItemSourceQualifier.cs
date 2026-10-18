@@ -84,7 +84,9 @@ internal static class NodeItemSourceQualifier
             string actual = Encoding.UTF8.GetString(source.Content.Span).ReplaceLineEndings("\n");
             if (actual != expected.ReplaceLineEndings("\n"))
             {
-                expected = AuthorDaprHelpers(template.Id!, body).Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+                string previous = AuthorDaprHelpers(template.Id!, body, "_").Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+                expected = actual == previous.ReplaceLineEndings("\n") ? previous
+                    : AuthorDaprHelpers(template.Id!, body).Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
             }
         }
         expected = QualifyParameters(template, root, expected);
@@ -118,14 +120,22 @@ internal static class NodeItemSourceQualifier
         }
         using var configuration = JsonDocument.Parse(source.Configuration);
         string sourceName = NodeItemCompatibility.Text(configuration.RootElement, "sourceName");
-        string original = source.Template.Files!.Single().Value.Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
-        if (original.ReplaceLineEndings("\n") == Encoding.UTF8.GetString(source.Content.Span).ReplaceLineEndings("\n"))
+        string raw = source.Template.Files!.Single().Value;
+        string original = raw.Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+        string actual = Encoding.UTF8.GetString(source.Content.Span).ReplaceLineEndings("\n");
+        string previous = AuthorDaprHelpers(source.Template.Id!, raw, "_")
+            .Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+        if (original.ReplaceLineEndings("\n") == actual || previous.ReplaceLineEndings("\n") == actual)
         {
             throw new NodeItemHelperCompatibilityException(
                 $"The installed Node template '{source.Template.Id}' from '{source.Contract.Package?.Identifier}@{source.Contract.Package?.Version}' "
-                + "has a fixed auxiliary function name or HTTP route and cannot create name-scoped Dapr helpers safely.");
+                + "does not separate its auxiliary function names or HTTP routes from CLI primary functions and cannot create Dapr helpers safely.");
         }
-        string suffix = source.Template.Id == "DaprPublishOutputBinding-JavaScript" ? "_Topic" : "_Invoke";
+        if (string.Equals(name, "host", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Choose a different function name; 'host' is reserved by the Azure Functions host (case-insensitive). Nothing was generated.";
+        }
+        string suffix = source.Template.Id == "DaprPublishOutputBinding-JavaScript" ? "-Topic" : "-Invoke";
         int maximum = 128 - suffix.Length;
         return name is null || name.Length > maximum
             ? $"Choose a function name of at most {maximum} characters for '{source.Template.Id}'; its '{suffix}' helper must fit the original 128-character function-name limit. Nothing was generated."
@@ -135,10 +145,10 @@ internal static class NodeItemSourceQualifier
     private static bool HasDaprHelper(string? identity)
         => identity is "DaprPublishOutputBinding-JavaScript" or "DaprServiceInvocationTrigger-JavaScript";
 
-    private static string AuthorDaprHelpers(string identity, string body)
+    private static string AuthorDaprHelpers(string identity, string body, string separator = "-")
         => identity == "DaprPublishOutputBinding-JavaScript"
-            ? body.Replace("app.generic('DaprTopicTriggerNodeV4', {", "app.generic('$(FUNCTION_NAME_INPUT)_Topic', {", StringComparison.Ordinal)
-            : body.Replace("app.http('InvokeOutputBinding', {", "app.http('$(FUNCTION_NAME_INPUT)_Invoke', {", StringComparison.Ordinal)
+            ? body.Replace("app.generic('DaprTopicTriggerNodeV4', {", $"app.generic('$(FUNCTION_NAME_INPUT){separator}Topic', {{", StringComparison.Ordinal)
+            : body.Replace("app.http('InvokeOutputBinding', {", $"app.http('$(FUNCTION_NAME_INPUT){separator}Invoke', {{", StringComparison.Ordinal)
                 .Replace("route: \"invoke/{appId}/{methodName}\"", "route: \"$(FUNCTION_NAME_INPUT)/invoke/{appId}/{methodName}\"", StringComparison.Ordinal)
                 .Replace("http://localhost:7071/api/invoke/functionapp/{yourFunctionName}",
                     "http://localhost:7071/api/$(FUNCTION_NAME_INPUT)/invoke/functionapp/$(FUNCTION_NAME_INPUT)", StringComparison.Ordinal)

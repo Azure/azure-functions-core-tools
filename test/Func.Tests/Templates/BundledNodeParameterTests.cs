@@ -18,11 +18,11 @@ public sealed partial class BundledNodeTemplateTests
         string expected = template.Files!.Single().Value.Replace("$(FUNCTION_NAME_INPUT)", name, StringComparison.Ordinal);
         if (template.Id == "DaprPublishOutputBinding-JavaScript")
         {
-            expected = expected.Replace("app.generic('DaprTopicTriggerNodeV4', {", $"app.generic('{name}_Topic', {{", StringComparison.Ordinal);
+            expected = expected.Replace("app.generic('DaprTopicTriggerNodeV4', {", $"app.generic('{name}-Topic', {{", StringComparison.Ordinal);
         }
         else if (template.Id == "DaprServiceInvocationTrigger-JavaScript")
         {
-            expected = expected.Replace("app.http('InvokeOutputBinding', {", $"app.http('{name}_Invoke', {{", StringComparison.Ordinal)
+            expected = expected.Replace("app.http('InvokeOutputBinding', {", $"app.http('{name}-Invoke', {{", StringComparison.Ordinal)
                 .Replace("route: \"invoke/{appId}/{methodName}\"", $"route: \"{name}/invoke/{{appId}}/{{methodName}}\"", StringComparison.Ordinal)
                 .Replace("http://localhost:7071/api/invoke/functionapp/{yourFunctionName}", $"http://localhost:7071/api/{name}/invoke/functionapp/{name}", StringComparison.Ordinal)
                 .Replace("--method {yourFunctionName}", $"--method {name}", StringComparison.Ordinal);
