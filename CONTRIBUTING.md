@@ -112,3 +112,14 @@ Tests can be run using:
 ```bash
 dotnet test test/Func.Tests/Func.Tests.csproj
 ```
+
+#### CLI Process Smoke Tests
+
+`WorkloadProgramSmokeTests` and `SetupProgramAdvisoryTests` run bounded CLI processes with isolated user, workload, cache, and temporary state.
+`CliProcessTestRunner.RunAsync` retains the test-built CLI as its default. `RunExecutableAsync` requires an absolute executable/apphost path and
+launches that target directly, without the test assembly's runtime configuration or dependency file. Invalid targets fail without a default-target fallback.
+
+The empty-inventory test also exercises the normal host-platform product output. Its path comes from the resolved CLI project reference through
+test assembly metadata; no artifact download, dependency copying, global CLI installation, or separate publish is required.
+Explicit-target diagnostics include the executable SHA-256, available file-version metadata, and a deterministic fingerprint of the provisioned
+directory's relative paths and file hashes. These identify the tested inputs; they do not establish release trust or perform Preview 3 differential qualification.

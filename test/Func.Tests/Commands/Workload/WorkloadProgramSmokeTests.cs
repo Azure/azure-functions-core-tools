@@ -1,6 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Globalization;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
@@ -13,9 +16,11 @@ namespace Azure.Functions.Cli.Tests.Commands.Workload;
 
 public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
 {
-    [Fact]
+    [Theory]
     [Trait("Category", "Integration")]
-    public async Task WorkloadListJson_EmptyIsolatedHome_EmitsEmptyArray()
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WorkloadListJson_EmptyIsolatedHome_EmitsEmptyArray(bool explicitTarget)
     {
         string directory = Path.Combine(Path.GetTempPath(), $"func-workload-smoke-{Guid.NewGuid():N}");
         CliConfigurationPathsOptions paths = new(Path.Combine(directory, "home"));
@@ -24,7 +29,11 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
         string source = Path.Combine(project, "source.txt");
         const string SourceContent = "Project source must remain unchanged.";
         using CancellationTokenSource cancellation = new(CliProcessTestRunner.ExecutionTimeout);
-        CliProcessTestRunner runner = new(output);
+        RecordingOutput diagnostics = new(output);
+        CliProcessTestRunner runner = new(diagnostics);
+        List<(string Path, byte[] Bytes, DateTime Timestamp)> targetSnapshots = [];
+        string? artifactDirectory = null;
+        string[]? artifactInventory = null;
 
         try
         {
@@ -41,8 +50,43 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
             await File.WriteAllTextAsync(paths.VersionCachePath, cachedVersion, cancellation.Token);
             DateTime cacheTimestamp = File.GetLastWriteTimeUtc(paths.VersionCachePath);
 
-            CliProcessTestRunner.CliResult result = await runner.RunAsync(
-                directory, paths.Home, workloads.Home, project, ["workload", "list", "--json"], cancellation.Token);
+            CliProcessTestRunner.CliResult result;
+            if (explicitTarget)
+            {
+                string productAssembly = typeof(CliProcessTestRunner).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                    .Single(attribute => attribute.Key == "CliProductAssemblyPath").Value
+                    ?? throw new InvalidOperationException("The test build did not record the CLI product output.");
+                string executable = Path.ChangeExtension(productAssembly, OperatingSystem.IsWindows() ? ".exe" : null);
+                artifactDirectory = Path.GetDirectoryName(executable)
+                    ?? throw new InvalidOperationException("The CLI product output has no containing directory.");
+                artifactInventory = Directory.GetFileSystemEntries(artifactDirectory, "*", SearchOption.AllDirectories);
+                string[] targetFiles =
+                [
+                    executable, productAssembly, Path.ChangeExtension(productAssembly, ".runtimeconfig.json"),
+                    Path.ChangeExtension(productAssembly, ".deps.json"),
+                ];
+                foreach (string file in targetFiles)
+                {
+                    targetSnapshots.Add((file, await File.ReadAllBytesAsync(file, cancellation.Token), File.GetLastWriteTimeUtc(file)));
+                }
+
+                result = await runner.RunExecutableAsync(
+                    executable, directory, paths.Home, workloads.Home, project, ["workload", "list", "--json"], cancellation.Token);
+
+                diagnostics.Lines.Should().Contain($"CLI explicit executable: {executable}");
+                diagnostics.Lines.Should().Contain($"CLI executable SHA-256: {Convert.ToHexString(SHA256.HashData(targetSnapshots[0].Bytes))}");
+                diagnostics.Lines.Should().Contain(
+                    $"Command: func workload list --json; host: {executable}; working directory: {project}");
+                diagnostics.Lines.Should().ContainSingle(line => line.StartsWith("CLI artifact directory: ", StringComparison.Ordinal))
+                    .Which.Should().Contain(artifactDirectory).And.MatchRegex("SHA-256: [0-9A-F]{64}$");
+                diagnostics.Lines.Should().NotContain(line => line.StartsWith("CLI assembly: ", StringComparison.Ordinal)
+                    || line.StartsWith("CLI version/source: ", StringComparison.Ordinal));
+            }
+            else
+            {
+                result = await runner.RunAsync(
+                    directory, paths.Home, workloads.Home, project, ["workload", "list", "--json"], cancellation.Token);
+            }
 
             result.ExitCode.Should().Be(0);
             result.StandardError.Should().BeEmpty();
@@ -63,6 +107,53 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
 
             string[] permittedPaths = [paths.Home, workloads.Home, project, Path.Combine(directory, CliProcessTestRunner.StateDirectoryName)];
             Directory.EnumerateFileSystemEntries(directory).Should().BeEquivalentTo(permittedPaths);
+            foreach ((string file, byte[] bytes, DateTime timestamp) in targetSnapshots)
+            {
+                (await File.ReadAllBytesAsync(file, cancellation.Token)).Should().Equal(bytes, "execution must not rewrite {0}", file);
+                File.GetLastWriteTimeUtc(file).Should().Be(timestamp, "execution must not touch {0}", file);
+            }
+
+            if (artifactDirectory is not null && artifactInventory is not null)
+            {
+                Directory.GetFileSystemEntries(artifactDirectory, "*", SearchOption.AllDirectories).Should().BeEquivalentTo(artifactInventory);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunExecutableAsync_InvalidTarget_FailsBeforeCreatingProcessState(bool absolutePath)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-invalid-target-{Guid.NewGuid():N}");
+        string executable = absolutePath ? Path.Combine(directory, "missing-func.exe") : "missing-func.exe";
+        CliProcessTestRunner runner = new(output);
+
+        try
+        {
+            Func<Task> act = () => runner.RunExecutableAsync(
+                executable, directory, Path.Combine(directory, "home"), Path.Combine(directory, "workload-home"),
+                Path.Combine(directory, "project"), ["workload", "list", "--json"], CancellationToken.None);
+
+            if (absolutePath)
+            {
+                FileNotFoundException failure = (await act.Should().ThrowExactlyAsync<FileNotFoundException>()).Which;
+                failure.FileName.Should().Be(executable);
+                failure.Message.Should().Contain(executable);
+            }
+            else
+            {
+                (await act.Should().ThrowExactlyAsync<ArgumentException>()).Which.ParamName.Should().Be("executablePath");
+            }
+
+            Directory.Exists(directory).Should().BeFalse("invalid explicit targets must not fall back to the default CLI");
         }
         finally
         {
@@ -178,5 +269,21 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
                 Directory.Delete(directory, recursive: true);
             }
         }
+    }
+
+    private sealed class RecordingOutput(ITestOutputHelper output) : ITestOutputHelper
+    {
+        private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
+
+        internal List<string> Lines { get; } = [];
+
+        public void WriteLine(string message)
+        {
+            Lines.Add(message);
+            _output.WriteLine(message);
+        }
+
+        public void WriteLine(string format, params object[] args)
+            => WriteLine(string.Format(CultureInfo.InvariantCulture, format, args));
     }
 }

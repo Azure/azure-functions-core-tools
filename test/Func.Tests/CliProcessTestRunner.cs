@@ -3,6 +3,8 @@
 
 using System.Diagnostics;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Xunit.Abstractions;
@@ -10,7 +12,7 @@ using Xunit.Abstractions;
 namespace Azure.Functions.Cli.Tests;
 
 /// <summary>
-/// Runs the built CLI in a separate process with isolated user and cache state.
+/// Runs the built CLI or an explicit executable with isolated user and cache state.
 /// </summary>
 internal sealed class CliProcessTestRunner(ITestOutputHelper output)
 {
@@ -21,8 +23,31 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
 
     private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
 
-    internal async Task<CliResult> RunAsync(
+    internal Task<CliResult> RunAsync(
         string directory, string home, string workloadsHome, string project, IReadOnlyList<string> args, CancellationToken cancellationToken)
+        => RunCoreAsync(directory, home, workloadsHome, project, args, executablePath: null, cancellationToken);
+
+    internal Task<CliResult> RunExecutableAsync(
+        string executablePath, string directory, string home, string workloadsHome, string project,
+        IReadOnlyList<string> args, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
+        if (!Path.IsPathFullyQualified(executablePath))
+        {
+            throw new ArgumentException("The explicit CLI executable path must be absolute.", nameof(executablePath));
+        }
+
+        if (!File.Exists(executablePath))
+        {
+            throw new FileNotFoundException($"The explicit CLI executable '{executablePath}' does not exist.", executablePath);
+        }
+
+        return RunCoreAsync(directory, home, workloadsHome, project, args, executablePath, cancellationToken);
+    }
+
+    private async Task<CliResult> RunCoreAsync(
+        string directory, string home, string workloadsHome, string project, IReadOnlyList<string> args,
+        string? executablePath, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentException.ThrowIfNullOrWhiteSpace(home);
@@ -30,11 +55,9 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
         ArgumentException.ThrowIfNullOrWhiteSpace(project);
         ArgumentNullException.ThrowIfNull(args);
 
-        string testAssembly = typeof(CliProcessTestRunner).Assembly.Location;
-        Assembly cliAssembly = typeof(FuncRootCommand).Assembly;
         ProcessStartInfo startInfo = new()
         {
-            FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
+            FileName = executablePath ?? Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
             WorkingDirectory = project,
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -42,12 +65,21 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
             RedirectStandardInput = true,
             CreateNoWindow = true,
         };
-        startInfo.ArgumentList.Add("exec");
-        startInfo.ArgumentList.Add("--runtimeconfig");
-        startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".runtimeconfig.json"));
-        startInfo.ArgumentList.Add("--depsfile");
-        startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".deps.json"));
-        startInfo.ArgumentList.Add(cliAssembly.Location);
+        if (executablePath is null)
+        {
+            string testAssembly = typeof(CliProcessTestRunner).Assembly.Location;
+            Assembly cliAssembly = typeof(FuncRootCommand).Assembly;
+            startInfo.ArgumentList.Add("exec");
+            startInfo.ArgumentList.Add("--runtimeconfig");
+            startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".runtimeconfig.json"));
+            startInfo.ArgumentList.Add("--depsfile");
+            startInfo.ArgumentList.Add(Path.ChangeExtension(testAssembly, ".deps.json"));
+            startInfo.ArgumentList.Add(cliAssembly.Location);
+            _output.WriteLine("CLI assembly: {0}", cliAssembly.Location);
+            _output.WriteLine("CLI version/source: {0}; module: {1}",
+                AssemblyCliVersionProvider.Instance.InformationalVersion, cliAssembly.ManifestModule.ModuleVersionId);
+        }
+
         foreach (string arg in args)
         {
             startInfo.ArgumentList.Add(arg);
@@ -92,17 +124,19 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
         startInfo.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1";
         startInfo.Environment["NO_COLOR"] = "1";
 
-        _output.WriteLine("CLI assembly: {0}", cliAssembly.Location);
-        _output.WriteLine("CLI version/source: {0}; module: {1}",
-            AssemblyCliVersionProvider.Instance.InformationalVersion, cliAssembly.ManifestModule.ModuleVersionId);
         _output.WriteLine("Command: func {0}; host: {1}; working directory: {2}", string.Join(" ", args), startInfo.FileName, project);
         _output.WriteLine("Isolated root: {0}; CLI home: {1}; workload home: {2}", directory, home, workloadsHome);
 
         var duration = Stopwatch.StartNew();
+        using var execution = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        execution.CancelAfter(ExecutionTimeout);
         try
         {
-            using var execution = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            execution.CancelAfter(ExecutionTimeout);
+            if (executablePath is not null)
+            {
+                await WriteExecutableProvenanceAsync(executablePath, execution.Token);
+            }
+
             using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start the CLI test process.");
             process.StandardInput.Close();
             using StreamReader standardOutput = process.StandardOutput;
@@ -114,11 +148,8 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
             {
                 await process.WaitForExitAsync(execution.Token);
                 await Task.WhenAll(stdout, stderr).WaitAsync(execution.Token);
+                _output.WriteLine("CLI exit code: {0}", process.ExitCode);
                 return new CliResult(process.ExitCode, await stdout, await stderr, duration.Elapsed);
-            }
-            catch (OperationCanceledException ex) when (execution.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-            {
-                throw new TimeoutException($"CLI execution exceeded {ExecutionTimeout.TotalSeconds} seconds.", ex);
             }
             finally
             {
@@ -155,12 +186,53 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
                 }
             }
         }
+        catch (OperationCanceledException ex) when (execution.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"CLI execution exceeded {ExecutionTimeout.TotalSeconds} seconds.", ex);
+        }
         finally
         {
             duration.Stop();
             _output.WriteLine("CLI duration (including cleanup): {0:F0} ms; execution limit: {1} s; cleanup limit: {2} s.",
                 duration.Elapsed.TotalMilliseconds, ExecutionTimeout.TotalSeconds, _cleanupTimeout.TotalSeconds);
         }
+    }
+
+    private async Task WriteExecutableProvenanceAsync(string executablePath, CancellationToken cancellationToken)
+    {
+        _output.WriteLine("CLI explicit executable: {0}", executablePath);
+        await using FileStream executable = File.OpenRead(executablePath);
+        string executableHash = Convert.ToHexString(await SHA256.HashDataAsync(executable, cancellationToken));
+        _output.WriteLine("CLI executable SHA-256: {0}", executableHash);
+
+        var version = FileVersionInfo.GetVersionInfo(executablePath);
+        _output.WriteLine("Executable product version (file metadata): {0}", version.ProductVersion ?? "<unavailable>");
+
+        string artifactDirectory = Path.GetDirectoryName(executablePath)
+            ?? throw new InvalidOperationException("The explicit CLI executable has no containing directory.");
+        string managedPayload = Path.Combine(artifactDirectory, "func.dll");
+        if (File.Exists(managedPayload))
+        {
+            _output.WriteLine("CLI managed payload: {0}; product version (file metadata): {1}",
+                managedPayload, FileVersionInfo.GetVersionInfo(managedPayload).ProductVersion ?? "<unavailable>");
+        }
+
+        // An apphost hash alone does not identify its provisioned managed payload and runtime.
+        string[] files = Directory.GetFiles(artifactDirectory, "*", SearchOption.AllDirectories);
+        Array.Sort(files, StringComparer.Ordinal);
+        using var artifactHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (string file in files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string relativePath = Path.GetRelativePath(artifactDirectory, file).Replace(Path.DirectorySeparatorChar, '/');
+            artifactHash.AppendData(Encoding.UTF8.GetBytes(relativePath));
+            artifactHash.AppendData([0]);
+            await using FileStream content = File.OpenRead(file);
+            artifactHash.AppendData(await SHA256.HashDataAsync(content, cancellationToken));
+        }
+
+        _output.WriteLine("CLI artifact directory: {0}; files: {1}; SHA-256: {2}",
+            artifactDirectory, files.Length, Convert.ToHexString(artifactHash.GetHashAndReset()));
     }
 
     internal sealed record CliResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Duration);
