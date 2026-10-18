@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
@@ -419,6 +420,10 @@ internal sealed class SetupDependencyInstaller(
             return exception.Message;
         }
         catch (InvalidWorkloadException exception)
+        {
+            return exception.Message;
+        }
+        catch (TemplateStoreRecoveryRequiredException exception)
         {
             return exception.Message;
         }

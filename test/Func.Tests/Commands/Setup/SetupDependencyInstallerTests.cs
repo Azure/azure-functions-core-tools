@@ -180,6 +180,21 @@ public sealed class SetupDependencyInstallerTests
     }
 
     [Fact]
+    public async Task EnsureDependencyAsync_UnexpectedRetainedFailure_IsNotConvertedToReadinessResult()
+    {
+        WorkloadEntry entry = Stack();
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+        InvalidOperationException failure = new("Unexpected retained verification failure.");
+        _installer.EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), true)
+            .Returns(Task.FromException<WorkloadInstallResult>(failure));
+
+        Func<Task> ensure = () => CreateInstaller().EnsureDependencyAsync(
+            Options(check: true), SetupDependency.Stack("node"), CancellationToken.None);
+
+        (await ensure.Should().ThrowAsync<InvalidOperationException>()).Which.Should().BeSameAs(failure);
+    }
+
+    [Fact]
     public async Task EnsureDependencyAsync_ProfileWorkerVersionUnavailable_DoesNotSkipExplicitConstraint()
     {
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([]);

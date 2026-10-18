@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Install;
@@ -486,6 +487,50 @@ public sealed class SetupRunnerTests : IDisposable
 
         result.ExitCode.Should().Be(0);
         await _installer.Received(1).EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), check);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task RunAsync_CheckPendingNativeRecovery_EmitsFailedDependencyAndTerminalJson(int resolution)
+    {
+        var entry = new WorkloadEntry
+        {
+            PackageId = _hostPackageId,
+            PackageVersion = "4.0.0",
+            Source = "https://example.test/v3/index.json",
+            Kind = WorkloadKind.Content,
+            BundledTemplatesDeclared = true,
+        };
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+        var failure = new TemplateStoreRecoveryRequiredException();
+        _installer.EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), true)
+            .Returns(Task.FromException<WorkloadInstallResult>(failure));
+        FakeCatalog catalog = resolution == 1 ? Catalog().WithLatest(_hostPackageId, "4.0.0") : Catalog();
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: ["host"], installPolicy: resolution == 0 ? SetupInstallPolicy.IfNeeded : SetupInstallPolicy.LatestCompatible,
+                check: true, outputMode: SetupOutputMode.Json),
+            CancellationToken.None);
+
+        result.ExitCode.Should().Be(1);
+        JsonElement[] events = [.. _interaction.Lines.Select(line =>
+        {
+            using var document = JsonDocument.Parse(line);
+            return document.RootElement.Clone();
+        })];
+        events.Select(item => item.GetProperty("type").GetString()).Should().Equal(
+            "setup.started", "profile.started", "dependency.detected", "dependency.result", "profile.completed", "setup.failed");
+        JsonElement dependency = events[3];
+        dependency.GetProperty("status").GetString().Should().Be("failed");
+        dependency.GetProperty("message").GetString().Should().Be(failure.Message);
+        events[^1].GetProperty("failure_count").GetInt32().Should().Be(1);
+        await _installer.Received(1).EnsureInstalledAsync(entry, Arg.Any<CancellationToken>(), true);
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(), Arg.Any<bool?>(),
+            Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
