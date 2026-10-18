@@ -30,6 +30,10 @@ internal sealed class NativeTemplateWorkflowComposer(INativeTemplateAvailability
         {
             return NewExecutionResult.Reject("nativeCohortUnavailable", exception.Message);
         }
+        catch (TemplateStoreRecoveryRequiredException exception)
+        {
+            return NewExecutionResult.Reject("templateStoreRecoveryRequired", exception.Message);
+        }
     }
 
     public async Task<InitExecutionResult> ExecuteProjectAsync(InitExecutionRequest request, CancellationToken cancellationToken)
@@ -44,6 +48,10 @@ internal sealed class NativeTemplateWorkflowComposer(INativeTemplateAvailability
         catch (NativeTemplateCohortException exception)
         {
             return InitExecutionResult.Reject("nativeCohortUnavailable", exception.Message);
+        }
+        catch (TemplateStoreRecoveryRequiredException exception)
+        {
+            return InitExecutionResult.Reject("templateStoreRecoveryRequired", exception.Message);
         }
     }
 

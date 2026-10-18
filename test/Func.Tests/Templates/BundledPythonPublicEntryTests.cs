@@ -98,7 +98,7 @@ public sealed partial class BundledPythonTemplateTests
         var helped = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-Python", "--help"],
             help, paths, new(home), CancellationToken.None, TrackPythonEntry, _ => Task.FromResult<string?>(null));
         helped.Should().Be(0, help.AllOutput);
-        help.AllOutput.Should().Contain("[path]", "--http-trigger-auth-level", "ANONYMOUS").And.NotContain("--dry-run");
+        help.AllOutput.Should().Contain("[path]", "--http-trigger-auth-level", "ANONYMOUS", "--dry-run");
         File.ReadAllBytes(app).Should().Equal(beforeRefusal);
         source.ReceivedCalls().Should().BeEmpty();
     }

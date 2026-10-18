@@ -148,6 +148,15 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
 
         if (result.Preview is { } preview)
         {
+            if (result.PlannedCleanup.Count > 0)
+            {
+                _interaction.WriteSectionHeader("Planned force cleanup (directories include their contents)");
+                foreach (string path in result.PlannedCleanup)
+                {
+                    _interaction.WriteLine(line => line.Muted("Delete: ").Code(path));
+                }
+            }
+
             _interaction.WriteSectionHeader("Planned effects");
             foreach (TemplateFileChange change in preview.Changes)
             {
@@ -237,6 +246,10 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             ["plannedConfigurations"] = result.Preview?.ProjectConfigurations ?? [],
             ["configuredProjects"] = result.Invocation?.ConfiguredProjects ?? [],
         };
+        if (result.PlannedCleanup.Count > 0)
+        {
+            projected["plannedCleanup"] = result.PlannedCleanup;
+        }
         if (invocation.Diagnostic is { } diagnostic)
         {
             projected["diagnostic"] = diagnostic;

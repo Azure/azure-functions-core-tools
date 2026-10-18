@@ -260,7 +260,7 @@ public sealed class BundleBindingConstraintTests
         string? metadata, string expected)
     {
         var files = Substitute.For<IFileSystem>();
-        files.ReadAllTextIfExistsAsync(Path.Combine(_path, "bin", "extensions.json"), Arg.Any<CancellationToken>()).Returns(metadata);
+        files.ReadAllTextIfExistsAsync(Path.Combine(_path, "4.20.0", "bin", "extensions.json"), Arg.Any<CancellationToken>()).Returns(metadata);
         TemplateEngineBundleContextReader reader = new(files);
         var bundle = await reader.ReadAsync(new ExtensionBundleResolution.Resolved("selected.bundle", "4.20.0", _path, null), CancellationToken.None);
         var context = new TemplateEngineContext(new(new DirectoryInfo(_path), WasExplicit: true), bundle: bundle, enableBundleBindingConstraints: true);

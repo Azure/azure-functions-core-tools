@@ -16,13 +16,14 @@ internal sealed class NativeTemplateCommandInput
     private readonly IReadOnlyList<int> _sourceIndices;
 
     private NativeTemplateCommandInput(string[] originalTokens, string[] templateTokens, string[] nativeTokens,
-        int[] sourceIndices, IReadOnlySet<string> reservedAliases)
+        int[] sourceIndices, IReadOnlySet<string> reservedAliases, string[] hostDiagnostics)
     {
         OriginalTokens = Array.AsReadOnly(originalTokens);
         TemplateTokens = Array.AsReadOnly(templateTokens);
         NativeTokens = Array.AsReadOnly(nativeTokens);
         _sourceIndices = Array.AsReadOnly(sourceIndices);
         ReservedAliases = reservedAliases;
+        HostDiagnostics = Array.AsReadOnly(hostDiagnostics);
     }
 
     public IReadOnlyList<string> OriginalTokens { get; }
@@ -32,6 +33,8 @@ internal sealed class NativeTemplateCommandInput
     public IReadOnlyList<string> NativeTokens { get; }
 
     public IReadOnlySet<string> ReservedAliases { get; }
+
+    public IReadOnlyList<string> HostDiagnostics { get; }
 
     public static NativeTemplateCommandInput Capture(
         FuncCliCommand command, ParseResult parsed, IReadOnlyList<string> originalTokens, IReadOnlySet<Option> hostOptions)
@@ -85,6 +88,7 @@ internal sealed class NativeTemplateCommandInput
         List<string> template = [];
         List<string> native = [];
         List<int> sources = [];
+        List<string> hostDiagnostics = [];
         for (int index = 0; index < originalTokens.Count; index++)
         {
             string token = originalTokens[index];
@@ -103,18 +107,24 @@ internal sealed class NativeTemplateCommandInput
 
             Option? option = null;
             bool inline = false;
+            bool emptyInline = false;
             if (!afterDelimiter && !aliases.TryGetValue(token, out option))
             {
                 int separator = token.IndexOfAny(['=', ':']);
                 if (separator > 0 && aliases.TryGetValue(token[..separator], out option))
                 {
                     inline = true;
+                    emptyInline = separator == token.Length - 1;
                 }
             }
 
             if (option is not null)
             {
                 bool host = consumedOptions.Contains(option);
+                if (host && emptyInline && option.Arity.MaximumNumberOfValues > 0)
+                {
+                    hostDiagnostics.Add($"Option '{option.Name}' requires a nonempty value. Omit it to use its default.");
+                }
                 if (!host)
                 {
                     Add(token);
@@ -158,7 +168,7 @@ internal sealed class NativeTemplateCommandInput
         }
 
         return new([.. originalTokens], [.. template], [.. native], [.. sources],
-            consumedOptions.SelectMany(option => option.Aliases.Prepend(option.Name)).ToFrozenSet(StringComparer.Ordinal));
+            consumedOptions.SelectMany(option => option.Aliases.Prepend(option.Name)).ToFrozenSet(StringComparer.Ordinal), [.. hostDiagnostics]);
 
         void Add(string token)
         {

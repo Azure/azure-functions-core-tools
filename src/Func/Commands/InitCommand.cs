@@ -52,6 +52,21 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Description = "Re-initialize the directory: deletes its contents (except .git) before scaffolding the new project."
     };
 
+    public Option<bool> DryRunOption { get; } = new("--dry-run")
+    {
+        Description = "Preview project files, CLI configuration and preparation without writing or running tools."
+    };
+
+    public Option<bool> NonInteractiveOption { get; } = new("--non-interactive")
+    {
+        Description = "Refuse to prompt; exit 1 if any required input is missing."
+    };
+
+    public Option<string?> OutputOption { get; } = new("--output")
+    {
+        Description = "Output mode (plain | json). Defaults to plain."
+    };
+
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettingsProvider;
@@ -98,6 +113,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(NameOption);
         Options.Add(LanguageOption);
         Options.Add(ForceOption);
+        Options.Add(DryRunOption);
+        Options.Add(NonInteractiveOption);
+        Options.Add(OutputOption);
 
         // Workload-contributed options are attached after built-ins so they
         // appear as a clearly-grouped block in --help output. Multiple workloads

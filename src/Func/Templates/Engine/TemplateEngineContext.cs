@@ -45,6 +45,8 @@ internal sealed record TemplateEngineContext
 
     public NativeItemOutputIntent ItemOutputIntent { get; }
 
+    public bool RequireCleanStore { get; init; }
+
     internal string ItemOutputIntentValue => ItemOutputIntent == NativeItemOutputIntent.LiteralOutput ? "literal" : "legacy";
 }
 

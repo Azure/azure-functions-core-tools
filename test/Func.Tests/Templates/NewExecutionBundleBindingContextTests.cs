@@ -53,7 +53,7 @@ public sealed class NewExecutionBundleBindingContextTests
     public async Task ResolveAsync_ControlledComposition_RetainsExactResolutionAndReadsOnlyWhenEnabled(bool enabled)
     {
         using CancellationTokenSource cancellation = new();
-        var metadataPath = Path.Combine(_bundlePath, "bin", "extensions.json");
+        var metadataPath = Path.Combine(_bundlePath, "4.20.0", "bin", "extensions.json");
         _files.ReadAllTextIfExistsAsync(metadataPath, cancellation.Token)
             .Returns("""{"extensions":[{"bindings":["blob"]}]}""");
         var resolver = Resolver(enabled);
@@ -85,9 +85,9 @@ public sealed class NewExecutionBundleBindingContextTests
         var first = new ExtensionBundleResolution.Resolved(BundleHelpers.StableBundleId, "4.20.0", _bundlePath, null);
         var second = new ExtensionBundleResolution.Resolved(BundleHelpers.PreviewBundleId, "4.21.0", secondPath, null);
         _bundles.ResolveAsync(Arg.Any<ExtensionBundleProjectContext>(), Arg.Any<CancellationToken>()).Returns(first, second, first);
-        _files.ReadAllTextIfExistsAsync(Path.Combine(_bundlePath, "bin", "extensions.json"), Arg.Any<CancellationToken>())
+        _files.ReadAllTextIfExistsAsync(Path.Combine(_bundlePath, "4.20.0", "bin", "extensions.json"), Arg.Any<CancellationToken>())
             .Returns("""{"extensions":[{"bindings":["blob"]}]}""");
-        _files.ReadAllTextIfExistsAsync(Path.Combine(secondPath, "bin", "extensions.json"), Arg.Any<CancellationToken>())
+        _files.ReadAllTextIfExistsAsync(Path.Combine(secondPath, "4.21.0", "bin", "extensions.json"), Arg.Any<CancellationToken>())
             .Returns("""{"extensions":[{"bindings":["queue"]}]}""");
         var resolver = Resolver(enabled: true);
         var before = await resolver.ResolveAsync(Request(), false, CancellationToken.None);

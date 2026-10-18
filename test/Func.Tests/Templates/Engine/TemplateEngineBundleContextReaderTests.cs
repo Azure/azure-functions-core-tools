@@ -14,12 +14,48 @@ public sealed class TemplateEngineBundleContextReaderTests
     private readonly IFileSystem _files = Substitute.For<IFileSystem>();
     private readonly string _path = Path.GetFullPath("selected-bundle");
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ReadAsync_VersionNestedPayload_UsesOnlySelectedVersionAndNeverFlatOrSiblingMetadata(bool selectedPresent)
+    {
+        var root = Directory.CreateTempSubdirectory("func-bundle-layout-").FullName;
+        try
+        {
+            string downloadPath = Path.Combine(root, "tools", "any");
+            string selected = Path.Combine(downloadPath, "4.35.0", "bin", "extensions.json");
+            string sibling = Path.Combine(downloadPath, "4.99.0", "bin", "extensions.json");
+            string flat = Path.Combine(downloadPath, "bin", "extensions.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(selected)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(sibling)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(flat)!);
+            if (selectedPresent) File.WriteAllText(selected, """{"extensions":[{"bindings":["queueTrigger"]}]}""");
+            File.WriteAllText(sibling, """{"extensions":[{"bindings":["blobTrigger"]}]}""");
+            File.WriteAllText(flat, """{"extensions":[{"bindings":["eventHubTrigger"]}]}""");
+            TemplateEngineBundleContextReader reader = new(new PhysicalFileSystem());
+
+            var bundle = await reader.ReadAsync(new("selected.bundle", "4.35.0", downloadPath, null), CancellationToken.None);
+
+            bundle.Path.Should().Be(downloadPath);
+            bundle.Bindings!.MatchesSource(bundle).Should().BeTrue();
+            bundle.Bindings.Contains("queueTrigger").Should().Be(selectedPresent);
+            bundle.Bindings.Contains("blobTrigger").Should().BeFalse();
+            bundle.Bindings.Contains("eventHubTrigger").Should().BeFalse();
+            if (selectedPresent) bundle.Bindings.Diagnostic.Should().BeNull();
+            else bundle.Bindings.Diagnostic.Should().Contain(selected).And.Contain("missing");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ReadAsync_SelectedResolution_ReadsOnlyItsLocalMetadataAndCapturesEveryExtension()
     {
         using CancellationTokenSource cancellation = new();
         var resolution = Resolution();
-        var metadataPath = Path.Combine(_path, "bin", "extensions.json");
+        var metadataPath = Path.Combine(_path, "4.20.0", "bin", "extensions.json");
         _files.ReadAllTextIfExistsAsync(metadataPath, cancellation.Token).Returns(
             """{"extensions":[{"name":"storage","bindings":["blobTrigger","blob"]},{"name":"events","bindings":["eventGridTrigger"]},{"name":"startup"}]}""");
         TemplateEngineBundleContextReader reader = new(_files);

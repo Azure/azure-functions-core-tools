@@ -22,8 +22,8 @@ public sealed partial class BundledNodeTemplateTests
     {
         await _installer.InstallFromPackageAsync(BuiltArchive);
         string metadataRoot = Path.Combine(_root, "layout-bundle");
-        Directory.CreateDirectory(Path.Combine(metadataRoot, "bin"));
-        File.WriteAllText(Path.Combine(metadataRoot, "bin", "extensions.json"), NodeBridgeExtensions);
+        Directory.CreateDirectory(Path.Combine(metadataRoot, "4.35.0", "bin"));
+        File.WriteAllText(Path.Combine(metadataRoot, "4.35.0", "bin", "extensions.json"), NodeBridgeExtensions);
         var bundle = await new TemplateEngineBundleContextReader(_files).ReadAsync(
             new ExtensionBundleResolution.Resolved(BundleHelpers.StableBundleId, "4.35.0", metadataRoot, null), CancellationToken.None);
         var context = new TemplateEngineContext(WorkingDirectory.FromExplicit(_root), bundle: bundle, enableBundleBindingConstraints: true);

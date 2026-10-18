@@ -221,7 +221,7 @@ public sealed partial class BundledNodeTemplateTests
         string project = Path.Combine(_root, "project");
         await CreateNodeBridgeProjectAsync(bridge, project, "js", channel);
         string target = Path.Combine(project, "src", "functions");
-        string metadata = Path.Combine(bridge.BundlePath, "bin", "extensions.json");
+        string metadata = Path.Combine(bridge.BundlePath, "4.35.0", "bin", "extensions.json");
 
         (await InvokeNodeBridgeAsync(bridge.Adapter.ParseNewInvocation(bridge.NewCommand(),
             [target, "-t", "EventGridBlobTrigger-JavaScript", "--non-interactive", "--output", "json"], dryRun: true)))
@@ -439,8 +439,8 @@ public sealed partial class BundledNodeTemplateTests
         var scope = services.CreateScope();
         string bundleRoot = Path.Combine(_root, "selected-" + channel);
         string bundle = Path.Combine(bundleRoot, "tools", "any");
-        Directory.CreateDirectory(Path.Combine(bundle, "bin"));
-        File.WriteAllText(Path.Combine(bundle, "bin", "extensions.json"), metadata);
+        Directory.CreateDirectory(Path.Combine(bundle, "4.35.0", "bin"));
+        File.WriteAllText(Path.Combine(bundle, "4.35.0", "bin", "extensions.json"), metadata);
         var installed = Substitute.For<IInstalledBundleWorkloads>();
         string version = "4.35.0" + (channel == "stable" ? string.Empty : "-" + channel);
         installed.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([new InstalledBundleWorkload(version, bundleRoot)]);

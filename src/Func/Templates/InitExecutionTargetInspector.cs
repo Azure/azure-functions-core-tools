@@ -82,6 +82,15 @@ internal class InitExecutionTargetInspector(IFileSystem fileSystem)
     public virtual bool HasNonGitContent(WorkingDirectory target) =>
         _fileSystem.DirectoryExists(target.Info.FullName) && DirectoryGuard.HasNonGitContent(target.Info);
 
+    public virtual IReadOnlyList<string> GetPlannedCleanup(WorkingDirectory target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return !_fileSystem.DirectoryExists(target.Info.FullName) ? []
+            : [.. _fileSystem.GetFileSystemEntries(target.Info.FullName)
+                .Where(path => !(_fileSystem.DirectoryExists(path) && Path.GetFileName(path) == ".git"))
+                .Select(path => Path.GetRelativePath(target.Info.FullName, path)).Order(StringComparer.Ordinal)];
+    }
+
     public virtual void ClearExceptGit(WorkingDirectory target)
     {
         if (_fileSystem.DirectoryExists(target.Info.FullName))

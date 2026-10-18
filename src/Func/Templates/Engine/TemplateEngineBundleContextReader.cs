@@ -20,7 +20,7 @@ internal sealed class TemplateEngineBundleContextReader(IFileSystem fileSystem)
         ArgumentException.ThrowIfNullOrWhiteSpace(resolution.Path);
         cancellationToken.ThrowIfCancellationRequested();
         TemplateEngineBundleContext source = new(resolution.BundleId, resolution.Version, resolution.Path);
-        string metadataPath = Path.Combine(source.Path!, "bin", "extensions.json");
+        string metadataPath = Path.Combine(source.Path!, source.Version, "bin", "extensions.json");
         string? metadata;
         try
         {

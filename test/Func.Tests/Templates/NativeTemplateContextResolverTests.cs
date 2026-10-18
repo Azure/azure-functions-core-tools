@@ -72,7 +72,7 @@ public sealed class NativeTemplateContextResolverTests
     {
         using CancellationTokenSource cancellation = new();
         var path = Path.Combine(_selected, "tools", "any");
-        var metadata = Path.Combine(path, "bin", "extensions.json");
+        var metadata = Path.Combine(path, "4.20.0", "bin", "extensions.json");
         _files.ReadAllTextIfExistsAsync(metadata, cancellation.Token).Returns("""{"extensions":[{"bindings":["blob"]}]}""");
         var nested = new WorkingDirectory(new DirectoryInfo(Path.Combine(_root.Info.FullName, "functions", "nested")), true);
         var resolver = Create(enabled);

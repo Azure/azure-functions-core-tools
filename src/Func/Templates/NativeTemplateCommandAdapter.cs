@@ -38,15 +38,31 @@ internal sealed class NativeTemplateCommandAdapter(
         string[] original = [.. tokens];
         execution ??= new();
         NativeInitExecutionOptions settings = execution;
-        HashSet<Option> hostOptions = [command.StackOption, command.NameOption, command.LanguageOption, command.ForceOption];
+        HashSet<Option> hostOptions =
+        [
+            command.StackOption, command.NameOption, command.LanguageOption, command.ForceOption,
+            command.DryRunOption, command.NonInteractiveOption, command.OutputOption,
+        ];
         command.TreatUnmatchedTokensAsErrors = false;
         command.SetAction(async (parsed, cancellationToken) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
+            string? output = parsed.GetValue(command.OutputOption);
+            bool json = settings.JsonOutput || string.Equals(output, "json", StringComparison.OrdinalIgnoreCase);
+            if (output is not null && !string.Equals(output, "json", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(output, "plain", StringComparison.OrdinalIgnoreCase))
+            {
+                return _initRenderer.Render(InitExecutionResult.Reject("invalidOutput", "Use --output plain or --output json."), false);
+            }
             var input = NativeTemplateCommandInput.Capture(command, parsed, original, hostOptions);
+            if (input.HostDiagnostics.Count > 0)
+            {
+                return _initRenderer.Render(InitExecutionResult.Reject("invalidArguments", [.. input.HostDiagnostics]), json);
+            }
             var request = new InitExecutionRequest(parsed.GetValue(command.PathArgument!)!, settings.TemplateReference,
                 parsed.GetValue(command.NameOption), parsed.GetValue(command.StackOption), parsed.GetValue(command.LanguageOption),
-                parsed.GetValue(command.ForceOption), settings.NonInteractive, settings.DryRun, settings.JsonOutput,
+                parsed.GetValue(command.ForceOption), settings.NonInteractive || json || parsed.GetValue(command.NonInteractiveOption),
+                settings.DryRun || parsed.GetValue(command.DryRunOption), json,
                 input.NativeTokens, input.ReservedAliases)
             {
                 ProjectPreparation = _projectPreparation,
@@ -59,7 +75,7 @@ internal sealed class NativeTemplateCommandAdapter(
             return _initRenderer.Render(result with
             {
                 ArgumentResults = Array.AsReadOnly<TemplateCandidateParseResult>([.. result.ArgumentResults.Select(input.RestoreProvenance)]),
-            }, settings.JsonOutput);
+            }, json);
         });
         return Parse(command, original);
     }
@@ -73,7 +89,7 @@ internal sealed class NativeTemplateCommandAdapter(
         HashSet<Option> hostOptions =
         [
             command.NameOption, command.TemplateOption, command.ForceOption, command.NonInteractiveOption,
-            command.ListOption, command.OutputOption,
+            command.ListOption, command.SearchOption, command.DryRunOption, command.OutputOption,
         ];
         command.SetAction(async (parsed, cancellationToken) =>
         {
@@ -86,13 +102,18 @@ internal sealed class NativeTemplateCommandAdapter(
             }
 
             var input = NativeTemplateCommandInput.Capture(command, parsed, original, hostOptions);
+            if (input.HostDiagnostics.Count > 0)
+            {
+                return _itemRenderer.Render(NewExecutionResult.Reject("invalidArguments", [.. input.HostDiagnostics]), json);
+            }
             var request = new NewExecutionRequest(parsed.GetValue(command.PathArgument!)!, parsed.GetValue(command.TemplateOption),
                 parsed.GetValue(command.NameOption), ExplicitLanguage: null, parsed.GetValue(command.ForceOption),
-                parsed.GetValue(command.NonInteractiveOption), dryRun, parsed.GetValue(command.ListOption), json,
+                parsed.GetValue(command.NonInteractiveOption), dryRun || parsed.GetValue(command.DryRunOption), parsed.GetValue(command.ListOption), json,
                 input.NativeTokens, input.ReservedAliases)
             {
                 ItemCompatibility = _itemCompatibility,
                 SelectedItemEffects = _selectedItemEffects,
+                Search = parsed.GetValue(command.SearchOption),
             };
             NewExecutionResult result = await _items.ExecuteAsync(request, _availability, cancellationToken);
             if (request.DryRun || !result.HasCompletedCreation)
