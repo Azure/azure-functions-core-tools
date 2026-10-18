@@ -94,6 +94,9 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
             () => installer.PrepareAsync(_root, null!, CancellationToken.None),
             () => installer.CommitAsync(null!, _ => Task.FromResult<WorkloadInstallResult>(null!), CancellationToken.None),
             () => installer.ValidateInstalledAsync(null!, CancellationToken.None),
+            () => installer.RemoveAsync(null!, _ => Task.CompletedTask, _ => Task.CompletedTask, CancellationToken.None),
+            () => installer.WithRetainedOwnersAsync(null!, _ => Task.FromResult<WorkloadInstallResult>(null!), CancellationToken.None),
+            () => installer.WithRetainedOwnersAsync([], null!, CancellationToken.None),
             () => _installer.EnsureInstalledAsync(null!, CancellationToken.None),
         ];
         foreach (var call in calls)
@@ -268,15 +271,14 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     }
 
     [Fact]
-    public async Task BundledUninstall_IsExplicitlyUnsupportedAndPreservesNativeAndStackState()
+    public async Task BundledUninstall_RemovesProvenLastOwnerNativeAndStackState()
     {
         var installed = await _installer.InstallFromPackageAsync(BuiltArchive);
-        Func<Task> remove = () => _installer.UninstallAsync(installed.Entry.PackageId, installed.Entry.PackageVersion);
-
-        await remove.Should().ThrowAsync<InvalidWorkloadException>().WithMessage("*not supported*Nothing was removed*");
-        (await _workloads.GetWorkloadsAsync()).Should().ContainSingle();
+        (await _installer.UninstallAsync(installed.Entry.PackageId, installed.Entry.PackageVersion)).Should().BeTrue();
+        (await _workloads.GetWorkloadsAsync()).Should().BeEmpty();
+        Directory.Exists(_paths.GetInstallDirectory(installed.Entry.PackageId, installed.Entry.PackageVersion)).Should().BeFalse();
         using var fresh = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None);
-        (await fresh.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None)).Should().ContainSingle();
+        (await fresh.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None)).Should().BeEmpty();
     }
 
     [Theory]
@@ -472,14 +474,16 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     }
 
     [Fact]
-    public async Task UndeclaredOlderVersion_CannotEnterSideBySideWithBundledIncumbent()
+    public async Task UndeclaredOlderVersion_CanRemainSideBySideWithoutAcquiringBundledTemplateAuthority()
     {
         await _installer.InstallFromPackageAsync(BuiltArchive);
         string incoming = CopyUndeclared("undeclared-older.nupkg", "0.1.0");
-        Func<Task> install = () => _installer.InstallFromPackageAsync(incoming);
+        var installed = await _installer.InstallFromPackageAsync(incoming);
 
-        await install.Should().ThrowAsync<InvalidWorkloadException>().WithMessage("*Side-by-side*not supported*");
-        (await _workloads.GetWorkloadsAsync()).Should().ContainSingle().Which.BundledTemplatesDeclared.Should().BeTrue();
+        installed.Entry.BundledTemplatesDeclared.Should().BeFalse();
+        (await _workloads.GetWorkloadsAsync()).Should().HaveCount(2);
+        using var native = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None);
+        (await native.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None)).Should().ContainSingle();
     }
 
     [Fact]

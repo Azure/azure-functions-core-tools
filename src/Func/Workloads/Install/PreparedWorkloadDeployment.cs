@@ -25,6 +25,7 @@ internal sealed class PreparedWorkloadDeployment(TempDirectory staging, Inspecte
     public PreparedBundledTemplates? BundledTemplates { get; init; }
     public PreparedWorkloadReuse? UpdateFrom { get; init; }
     public PreparedWorkloadReuse? Destination { get; init; }
+    public IReadOnlyList<PreparedWorkloadReuse> Retained { get; init; } = [];
     public string CaptureState(IReadOnlyList<WorkloadEntry> installed)
         => WorkloadStateSnapshot.CaptureAffected(installed, Package.Identity.PackageId, LogicalPackage?.PackageId);
     public void Dispose()
@@ -32,6 +33,10 @@ internal sealed class PreparedWorkloadDeployment(TempDirectory staging, Inspecte
         BundledTemplates?.Dispose();
         UpdateFrom?.Dispose();
         Destination?.Dispose();
+        foreach (PreparedWorkloadReuse retained in Retained)
+        {
+            retained.Dispose();
+        }
         staging.Dispose();
     }
 }

@@ -116,6 +116,24 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
     {
         ArgumentNullException.ThrowIfNull(entry);
         string directory = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        WorkloadMetadata metadata;
+        try
+        {
+            metadata = _metadataReader.Read(directory);
+        }
+        catch (Exception exception) when (exception is InvalidWorkloadException or DirectoryNotFoundException)
+        {
+            throw new InvalidWorkloadException($"The installed workload '{entry.PackageId}' {entry.PackageVersion} payload is damaged. " +
+                "Preserve the installation and explicitly repair it from its original source.", exception);
+        }
+        if (metadata.Kind != entry.Kind || metadata.RuntimeIdentifier != entry.RuntimeIdentifier
+            || metadata.EntryPoint?.AssemblyPath != entry.EntryPoint?.AssemblyPath || metadata.EntryPoint?.Type != entry.EntryPoint?.Type
+            || !_fileSystem.DirectoryExists(Path.Combine(directory, WorkloadMetadataReader.ContentDirectoryName))
+            || (metadata.EntryPoint is { } entryPoint && !_fileSystem.FileExists(Path.Combine(directory, entryPoint.AssemblyPath))))
+        {
+            throw new InvalidWorkloadException($"The installed workload '{entry.PackageId}' {entry.PackageVersion} payload is damaged or conflicts with its registry entry. " +
+                "Preserve the installation and explicitly repair it from its original source.");
+        }
         Dictionary<string, string> hashes = new(StringComparer.Ordinal);
         foreach (string file in _fileSystem.GetFiles(directory))
         {
@@ -245,8 +263,21 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         PreparedBundledTemplates? bundled = null;
         PreparedWorkloadReuse? previous = null;
         PreparedWorkloadReuse? destination = null;
+        List<PreparedWorkloadReuse> retained = [];
         try
         {
+            if (updateFrom is null)
+            {
+                IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
+                foreach (WorkloadEntry sibling in installed.Where(entry =>
+                    string.Equals(entry.PackageId, package.Identity.PackageId, StringComparison.OrdinalIgnoreCase)
+                    && entry.PackageVersion != package.Identity.Version && HasBundledTemplates(entry)))
+                {
+                    PreparedWorkloadReuse reuse = await PrepareReuseAsync(sibling, cancellationToken);
+                    retained.Add(reuse);
+                    await _bundledTemplates.ValidateInstalledAsync(reuse.BundledTemplates!, cancellationToken);
+                }
+            }
             progress?.Report(new(WorkloadInstallPhase.Extracting, $"Extracting workload '{package.Identity.PackageId}' {package.Identity.Version}"));
             using (PackageArchiveReader reader = OpenPackage(package.Path))
             {
@@ -320,6 +351,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                 BundledTemplates = bundled,
                 UpdateFrom = previous,
                 Destination = destination,
+                Retained = retained.AsReadOnly(),
             };
         }
         catch
@@ -327,6 +359,10 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             bundled?.Dispose();
             previous?.Dispose();
             destination?.Dispose();
+            foreach (PreparedWorkloadReuse reuse in retained)
+            {
+                reuse.Dispose();
+            }
             staging.Dispose();
             throw;
         }
@@ -345,9 +381,15 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
     {
         ValidateOperation(operation);
         ArgumentNullException.ThrowIfNull(prepared);
-        return prepared.BundledTemplates is null
+        IReadOnlyList<PreparedBundledTemplates> retained = [.. prepared.Retained.Select(owner => owner.BundledTemplates!)];
+        if (prepared.BundledTemplates is not null)
+        {
+            return await _bundledTemplates.CommitAsync(prepared.BundledTemplates,
+                token => InstallPreparedCoreAsync(operation, prepared, progress, token), cancellationToken, retained: retained);
+        }
+        return retained.Count == 0
             ? await InstallPreparedCoreAsync(operation, prepared, progress, cancellationToken)
-            : await _bundledTemplates.CommitAsync(prepared.BundledTemplates,
+            : await _bundledTemplates.WithRetainedOwnersAsync(retained,
                 token => InstallPreparedCoreAsync(operation, prepared, progress, token), cancellationToken);
     }
 
@@ -357,6 +399,10 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         ValidateOperation(operation);
         ArgumentNullException.ThrowIfNull(prepared);
         await ValidatePreparedAsync(prepared, cancellationToken);
+        foreach (PreparedWorkloadReuse retained in prepared.Retained)
+        {
+            await ValidateReuseAsync(operation, retained, cancellationToken);
+        }
         InspectedWorkloadPackage package = prepared.Package;
         WorkloadOwnershipKind ownership = prepared.Ownership;
         LogicalPackage? logicalPackage = prepared.LogicalPackage;
@@ -383,12 +429,6 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         if (existing is not null && HasBundledTemplates(existing) && prepared.BundledTemplates is null)
         {
             throw new InvalidWorkloadException("An undeclared artifact cannot complete or replace an installed bundled stack. Retry with its original declared artifact.");
-        }
-
-        if (installed.Any(entry => string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
-            && entry.PackageVersion != version && (HasBundledTemplates(entry) || prepared.BundledTemplates is not null)))
-        {
-            throw new InvalidWorkloadException("Side-by-side installation involving bundled stack versions is not supported. Preserve the existing installation.");
         }
 
         bool existingValid = !prepared.Force && existing is not null && IsExistingInstallationValid(existing, package.Metadata);
@@ -619,6 +659,10 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         ValidateOperation(operation);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        if (!Enum.IsDefined(ownership))
+        {
+            throw new ArgumentOutOfRangeException(nameof(ownership));
+        }
 
         string physicalPackageId = packageId;
         string physicalVersion = version;
@@ -644,14 +688,16 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             physicalVersion = logicalMatches[0].PackageVersion;
         }
 
-        string physicalDirectory = _paths.GetInstallDirectory(physicalPackageId, physicalVersion);
-        bool bundledDeclared = (await _store.GetWorkloadsAsync(cancellationToken)).Any(entry =>
+        WorkloadEntry? current = (await _store.GetWorkloadsAsync(cancellationToken)).SingleOrDefault(entry =>
             string.Equals(entry.PackageId, physicalPackageId, StringComparison.OrdinalIgnoreCase)
-            && entry.PackageVersion == physicalVersion && entry.BundledTemplatesDeclared);
-        if (bundledDeclared || _fileSystem.FileExists(Path.Combine(physicalDirectory, BundledTemplateInstaller.ManifestName))
-            || _fileSystem.FileExists(Path.Combine(physicalDirectory, BundledTemplateInstaller.OriginName)))
+            && entry.PackageVersion == physicalVersion);
+        if (current is null || !HasOwnership(current, ownership))
         {
-            throw new InvalidWorkloadException("Uninstalling a bundled stack requires an explicit template ownership policy and is not supported yet. Nothing was removed.");
+            return false;
+        }
+        if (HasBundledTemplates(current))
+        {
+            return await UninstallBundledAsync(operation, current, ownership, cancellationToken);
         }
 
         WorkloadOwnershipRemovalResult result = await _store.RemoveOwnershipAsync(operation, physicalPackageId, physicalVersion, ownership, cancellationToken);
@@ -665,6 +711,62 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             DeleteInstallDirectory(_paths.GetInstallDirectory(physicalPackageId, physicalVersion));
         }
 
+        operation.CompleteMutation();
+        return true;
+    }
+
+    private async Task<bool> UninstallBundledAsync(IWorkloadOperation operation, WorkloadEntry current,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
+    {
+        using PreparedWorkloadReuse prepared = await PrepareReuseAsync(current, cancellationToken);
+        await ValidateReuseAsync(operation, prepared, cancellationToken, checkOnly: true);
+        if (current.InstallRefCount > 1)
+        {
+            WorkloadOwnershipRemovalResult detached = await _store.RemoveOwnershipAsync(operation, current.PackageId, current.PackageVersion,
+                ownership, cancellationToken);
+            if (!detached.OwnershipRemoved || detached.EntryRemoved)
+            {
+                throw new WorkloadPlanChangedException();
+            }
+            operation.CompleteMutation();
+            return true;
+        }
+
+        string registry = await _fileSystem.ReadAllTextIfExistsAsync(_paths.WorkloadRegistryPath, cancellationToken)
+            ?? throw new WorkloadPlanChangedException();
+        await _bundledTemplates.RemoveAsync(prepared.BundledTemplates!, async token =>
+        {
+            await ValidateReuseAsync(operation, prepared, token);
+            WorkloadOwnershipRemovalResult removed = await _store.RemoveOwnershipAsync(operation, current.PackageId, current.PackageVersion,
+                ownership, token);
+            if (!removed.OwnershipRemoved || !removed.EntryRemoved
+                || (await _store.GetWorkloadsAsync(CancellationToken.None)).Any(entry =>
+                    string.Equals(entry.PackageId, current.PackageId, StringComparison.OrdinalIgnoreCase)
+                    && entry.PackageVersion == current.PackageVersion))
+            {
+                throw new WorkloadPlanChangedException();
+            }
+        }, async token =>
+        {
+            if (operation.IsDirty)
+            {
+                await _fileSystem.WriteAllTextAsync(_paths.WorkloadRegistryPath, registry, token);
+                operation.CompleteMutation();
+            }
+        }, cancellationToken);
+
+        string path = _paths.GetInstallDirectory(current.PackageId, current.PackageVersion);
+        try
+        {
+            // Native removal and registry admission have committed; finish payload cleanup even after cancellation.
+            DeleteInstallDirectory(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidWorkloadException($"Workload '{current.PackageId}' {current.PackageVersion} ownership and native templates were removed, " +
+                $"but its payload at '{path}' could not be deleted. Preserve the workload operation intent and reconcile the remaining payload before retrying.",
+                exception);
+        }
         operation.CompleteMutation();
         return true;
     }
@@ -683,12 +785,6 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         if (existing is null)
         {
             return null;
-        }
-
-        if (currentLogicalOwner is null && installed.Any(entry => string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
-            && entry.PackageVersion != version && HasBundledTemplates(entry)))
-        {
-            throw new InvalidWorkloadException("Cached ownership reuse beside a bundled sibling version is not supported. Nothing was changed.");
         }
 
         WorkloadOwnershipRules.ValidateDestination(existing, logicalPackage, WorkloadOwnershipKind.Logical);
@@ -1093,17 +1189,17 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
     }
 
-    private static void DeleteInstallDirectory(string path)
+    private void DeleteInstallDirectory(string path)
     {
-        if (!Directory.Exists(path))
+        if (!_fileSystem.DirectoryExists(path))
         {
             return;
         }
 
-        Directory.Delete(path, recursive: true);
+        _fileSystem.DeleteDirectory(path);
 
         // Windows can report a successful delete while the directory lingers until the last handle closes.
-        if (Directory.Exists(path))
+        if (_fileSystem.DirectoryExists(path))
         {
             throw new IOException($"Failed to remove the existing install directory '{path}'.");
         }

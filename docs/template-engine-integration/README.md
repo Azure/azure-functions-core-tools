@@ -88,14 +88,41 @@ owners and legacy sibling versions. An already installed destination is reused
 only with exact source, origin, and payload agreement.
 Native registrations and ownership receipts are version-qualified, so owners can
 retain different versions of the same inner package and template identities.
-Compatible older unqualified receipts remain readable without writes; only an
-explicit update migrates them under the protected writer/recovery protocol.
+Compatible older unqualified receipts remain readable without writes; explicit
+native registration/update migrates them under the protected writer/recovery protocol.
 Conflicting origins for the same native ID/version remain an explicit conflict,
 not a reason to reject every shared/sibling state.
 Native registration and workload admission remain protected through rollback;
 in-process failure or cancellation restores both stores before releasing the
 native lease. This is not a power-loss or cross-store crash-atomicity guarantee.
-Unrelated global bundled uninstall and force-install policies are unchanged.
+Explicit installs can retain bundled versions side-by-side in either order.
+`--force` allows the catalog install path to bypass the update prompt, but does
+not authorize replacing a bundled same-version payload or bypassing origin,
+archive-hash, and native-ownership checks. Local exact-version repeat installs
+verify and reuse their original payload. Inactive legacy versions may coexist
+without acquiring native template authority.
+
+`func workload uninstall <id> --version <installed-version>` detaches only the
+requested explicit or logical owner. A shared physical payload and its native
+registration remain until their final owner is removed. Final-owner removal
+requires exact origin, asset, and receipt agreement, removes only that version's
+native registration and receipt, and preserves sibling versions and registered
+user content. `func workload prune [id]` uses the same rules while retaining the
+highest installed version under the shared workload operation coordinator.
+Missing or conflicting ownership requires explicit repair; force never grants
+deletion authority. Projects are not traversed or removed.
+
+Native and registry failures/cancellation during final-owner removal restore both
+stores before releasing protection. If payload deletion fails after native and
+registry removal commit, the command reports the partial completion and retains
+the workload recovery intent rather than reporting successful uninstall. This
+is not cross-store crash atomicity or automatic crash recovery.
+
+Explicit setup repair can restore a missing owned native cache archive from its
+validated retained outer asset when its exact registration, source origin and
+receipt still agree. Check-only remains read-only and fails while that archive
+is missing. Changed bytes, unknown ownership or conflicting receipts remain
+errors; repair does not replace them.
 On Windows a loaded old workload assembly can prevent best-effort deletion of its
 inactive directory; the committed registry and native owner select the new version.
 

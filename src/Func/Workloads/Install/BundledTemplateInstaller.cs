@@ -36,8 +36,20 @@ internal interface IBundledTemplateInstaller
     /// <exception cref="BundledTemplateRegistrationCanceledException">Cancellation retains the admitted stack after native recovery.</exception>
     public Task<WorkloadInstallResult> CommitAsync(PreparedBundledTemplates prepared,
         Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken,
-        Func<CancellationToken, Task>? rollbackWorkload = null);
+        Func<CancellationToken, Task>? rollbackWorkload = null, IReadOnlyList<PreparedBundledTemplates>? retained = null);
     public Task ValidateInstalledAsync(PreparedBundledTemplates prepared, CancellationToken cancellationToken);
+    /// <summary>
+    /// Retains native read ownership while validating captured owners and admitting a workload without native effects.
+    /// </summary>
+    /// <exception cref="InvalidWorkloadException">A retained exact native owner changed after preparation.</exception>
+    public Task<WorkloadInstallResult> WithRetainedOwnersAsync(IReadOnlyList<PreparedBundledTemplates> retained,
+        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken);
+    /// <summary>
+    /// Removes only proven exact native assets, restoring both stores on failure before releasing native ownership.
+    /// </summary>
+    /// <exception cref="InvalidWorkloadException">Exact native ownership cannot be proven or removal cannot be validated.</exception>
+    public Task RemoveAsync(PreparedBundledTemplates prepared, Func<CancellationToken, Task> removeWorkload,
+        Func<CancellationToken, Task> rollbackWorkload, CancellationToken cancellationToken);
 }
 
 internal sealed record BundledTemplateOrigin(string PackageId, string Version, string Sha256, string Source,
@@ -197,7 +209,7 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
 
     public async Task<WorkloadInstallResult> CommitAsync(PreparedBundledTemplates prepared,
         Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken,
-        Func<CancellationToken, Task>? rollbackWorkload = null)
+        Func<CancellationToken, Task>? rollbackWorkload = null, IReadOnlyList<PreparedBundledTemplates>? retained = null)
     {
         ArgumentNullException.ThrowIfNull(prepared);
         ArgumentNullException.ThrowIfNull(admitWorkload);
@@ -220,6 +232,10 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             {
                 await transaction.ExecuteAsync(async (session, token) =>
                 {
+                    foreach (PreparedBundledTemplates owner in retained ?? [])
+                    {
+                        await ValidateReplacementAsync(session, owner, token);
+                    }
                     await ValidateReplacementAsync(session, prepared.Replacing, token);
                     List<bool> reused = [];
                     foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
@@ -242,7 +258,8 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
                         token.ThrowIfCancellationRequested();
                         if (!reused[index])
                         {
-                            await InstallAsync(session, prepared.Assets[index].Archive, token);
+                            bool repairOwnedCache = await PrepareRegistrationAsync(session, prepared.Origin, prepared.Assets[index].Artifact, token);
+                            await InstallAsync(session, prepared.Assets[index].Archive, token, repairOwnedCache);
                         }
                     }
                 }, async (session, token) =>
@@ -254,6 +271,10 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
                         await WriteOwnerAsync(owner, token);
                     }
                     await ValidateRetainedOwnersAsync(session, prepared, protectedOwners, token);
+                    foreach (PreparedBundledTemplates owner in retained ?? [])
+                    {
+                        await ValidateReplacementAsync(session, owner, token);
+                    }
                 }, cancellationToken);
             }
             catch when (admissionStarted && rollbackWorkload is not null)
@@ -289,6 +310,100 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             }
         }
     }
+
+    public async Task<WorkloadInstallResult> WithRetainedOwnersAsync(IReadOnlyList<PreparedBundledTemplates> retained,
+        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(retained);
+        ArgumentNullException.ThrowIfNull(admitWorkload);
+        using TemplateEngineSession session = await _store.OpenReadAsync(Context(_paths.Home), cancellationToken);
+        foreach (PreparedBundledTemplates owner in retained)
+        {
+            ArgumentNullException.ThrowIfNull(owner);
+            await ValidateReplacementAsync(session, owner, cancellationToken);
+        }
+        return await admitWorkload(cancellationToken);
+    }
+
+    public async Task RemoveAsync(PreparedBundledTemplates prepared, Func<CancellationToken, Task> removeWorkload,
+        Func<CancellationToken, Task> rollbackWorkload, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        ArgumentNullException.ThrowIfNull(removeWorkload);
+        ArgumentNullException.ThrowIfNull(rollbackWorkload);
+        using TemplateStoreWriteSession transaction = await _store.OpenWriteAsync(Context(_paths.Home), cancellationToken);
+        bool removalStarted = false;
+        IReadOnlyList<(IManagedTemplatePackage Package, IReadOnlyDictionary<string, string> Hashes)> retained = [];
+        try
+        {
+            await transaction.ExecuteAsync(async (session, token) =>
+            {
+                await ValidateReplacementAsync(session, prepared, token);
+                IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, token);
+                List<(IManagedTemplatePackage Package, IReadOnlyDictionary<string, string> Hashes)> protectedPackages = [];
+                foreach (IManagedTemplatePackage package in packages.Where(package => !IsAsset(prepared, package)))
+                {
+                    protectedPackages.Add((package, await SnapshotPackageAsync(package.MountPointUri, token)));
+                }
+                retained = protectedPackages;
+                await RemoveReplacementAsync(session, prepared, token);
+                token.ThrowIfCancellationRequested();
+                removalStarted = true;
+                await removeWorkload(token);
+            }, async (session, token) =>
+            {
+                IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, token);
+                if (packages.Any(package => IsAsset(prepared, package)) || packages.Count != retained.Count)
+                {
+                    throw Invalid("The native provider did not remove only the requested exact bundled assets.");
+                }
+                foreach ((IManagedTemplatePackage package, IReadOnlyDictionary<string, string> hashes) in retained)
+                {
+                    IReadOnlyDictionary<string, string> actual = await SnapshotPackageAsync(package.MountPointUri, token);
+                    if (packages.Count(candidate => candidate.Identifier == package.Identifier && candidate.Version == package.Version
+                        && candidate.MountPointUri == package.MountPointUri) != 1
+                        || actual.Count != hashes.Count || actual.Any(file => !hashes.TryGetValue(file.Key, out string? hash) || file.Value != hash))
+                    {
+                        throw Invalid($"Retained native package '{package.Identifier}' {package.Version} changed during removal.");
+                    }
+                }
+                foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
+                {
+                    if (await ReadOwnerAsync(artifact.PackageId, artifact.Version.ToNormalizedString(), token) is not null)
+                    {
+                        throw Invalid($"The removed package '{artifact.PackageId}' still has an ownership receipt.");
+                    }
+                }
+            }, cancellationToken);
+        }
+        catch when (removalStarted)
+        {
+            if (transaction.State != TemplateStoreTransactionState.Restored)
+            {
+                throw Invalid("Native removal recovery is incomplete. Preserve both stores and the workload operation intent; request explicit recovery before retrying.");
+            }
+            await rollbackWorkload(CancellationToken.None);
+            throw;
+        }
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>> SnapshotPackageAsync(string path, CancellationToken cancellationToken)
+    {
+        if (!_fileSystem.FileExists(path) && !_fileSystem.DirectoryExists(path))
+        {
+            throw Invalid($"Retained native package '{path}' is missing. Preserve the store and request explicit repair.");
+        }
+        Dictionary<string, string> hashes = new(StringComparer.Ordinal);
+        foreach (string file in _fileSystem.DirectoryExists(path) ? _fileSystem.GetFiles(path) : [path])
+        {
+            hashes.Add(file, await _fileSystem.ComputeSha256Async(file, cancellationToken));
+        }
+        return hashes;
+    }
+
+    private static bool IsAsset(PreparedBundledTemplates prepared, IManagedTemplatePackage package)
+        => prepared.Assets.Any(asset => string.Equals(asset.Artifact.PackageId, package.Identifier, StringComparison.OrdinalIgnoreCase)
+            && HasVersion(package, asset.Artifact.Version));
 
     private async Task<bool> CheckIncumbentAsync(TemplateEngineSession session, BundledTemplateOrigin origin,
         BasicTemplateArtifact artifact, CancellationToken cancellationToken, PreparedBundledTemplates? replacing = null)
@@ -353,7 +468,15 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             {
                 throw Invalid($"Bundled ownership for '{artifact.PackageId}' {artifact.Version} conflicts. No replacement is authorized.");
             }
-
+            string cached = CachedArchivePath(artifact);
+            if (_fileSystem.FileExists(cached))
+            {
+                if (incumbent != expectedOwner)
+                {
+                    throw Invalid($"Cached package '{artifact.PackageId}' has unknown ownership. No cache replacement is authorized.");
+                }
+                await ValidateArtifactAsync(cached, artifact, cancellationToken);
+            }
             return false;
         }
 
@@ -362,9 +485,55 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             throw Invalid($"Package '{artifact.PackageId}' has unknown or conflicting native ownership. No replacement is authorized.");
         }
 
+        if (!_fileSystem.FileExists(matches[0].MountPointUri) && !_fileSystem.DirectoryExists(matches[0].MountPointUri))
+        {
+            return false;
+        }
         await ValidateInstalledAsync(session, artifact, cancellationToken);
         return true;
     }
+
+    private async Task<bool> PrepareRegistrationAsync(TemplateEngineSession session, BundledTemplateOrigin origin,
+        BasicTemplateArtifact artifact, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, cancellationToken);
+        IManagedTemplatePackage? missing = packages.SingleOrDefault(package =>
+            string.Equals(package.Identifier, artifact.PackageId, StringComparison.OrdinalIgnoreCase) && HasVersion(package, artifact.Version));
+        if (missing is null)
+        {
+            string cached = CachedArchivePath(artifact);
+            if (!_fileSystem.FileExists(cached))
+            {
+                return false;
+            }
+            BundledTemplateOwner expectedOwner = new(origin, artifact.PackageId, artifact.Version.ToNormalizedString(), artifact.Sha256);
+            if (await ReadOwnerAsync(artifact.PackageId, artifact.Version.ToNormalizedString(), cancellationToken) != expectedOwner
+                || packages.Any(package => string.Equals(package.MountPointUri, cached,
+                    OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)))
+            {
+                throw Invalid($"Cached package '{artifact.PackageId}' has unknown or conflicting ownership. No cache replacement is authorized.");
+            }
+            await ValidateArtifactAsync(cached, artifact, cancellationToken);
+            // The native installer refuses an orphaned destination without force, even when its proven bytes are identical.
+            return true;
+        }
+        BundledTemplateOwner expected = new(origin, artifact.PackageId, artifact.Version.ToNormalizedString(), artifact.Sha256);
+        if (_fileSystem.FileExists(missing.MountPointUri) || _fileSystem.DirectoryExists(missing.MountPointUri)
+            || await ReadOwnerAsync(artifact.PackageId, artifact.Version.ToNormalizedString(), cancellationToken) != expected)
+        {
+            throw Invalid($"The registration for '{artifact.PackageId}' changed before explicit repair. No replacement is authorized.");
+        }
+        IManagedTemplatePackageProvider provider = session.PackageManager.GetBuiltInManagedProvider(InstallationScope.Global);
+        IReadOnlyList<UninstallResult> results = await provider.UninstallAsync([missing], cancellationToken);
+        if (results.Count != 1 || !results[0].Success)
+        {
+            throw Invalid($"The missing owned registration for '{artifact.PackageId}' could not be removed for explicit repair.");
+        }
+        return false;
+    }
+
+    private string CachedArchivePath(BasicTemplateArtifact artifact)
+        => Path.Combine(_paths.Home, "templates", "packages", $"{artifact.PackageId}.{artifact.Version.ToNormalizedString()}.nupkg");
 
     private async Task ValidateReplacementAsync(TemplateEngineSession session, PreparedBundledTemplates? replacing,
         CancellationToken cancellationToken)
@@ -468,10 +637,10 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
         }
     }
 
-    private static async Task InstallAsync(TemplateEngineSession session, string archive, CancellationToken cancellationToken)
+    private static async Task InstallAsync(TemplateEngineSession session, string archive, CancellationToken cancellationToken, bool repairOwnedCache = false)
     {
         IManagedTemplatePackageProvider provider = session.PackageManager.GetBuiltInManagedProvider(InstallationScope.Global);
-        IReadOnlyList<InstallResult> results = await provider.InstallAsync([new InstallRequest(archive)], cancellationToken);
+        IReadOnlyList<InstallResult> results = await provider.InstallAsync([new InstallRequest(archive, force: repairOwnedCache)], cancellationToken);
         if (results.Count != 1 || !results[0].Success)
         {
             throw Invalid($"Native bundled-template registration failed: {string.Join("; ", results.Select(result => result.ErrorMessage))}");
@@ -567,7 +736,14 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             BundledTemplateOwner? owner = await ReadOwnerAsync(package.Identifier, version.ToNormalizedString(), cancellationToken);
             if (owner is not null)
             {
-                await ValidateOwnerArchiveAsync(package, owner, cancellationToken);
+                bool repairMissing = owner.Origin == prepared.Origin
+                    && prepared.Assets.Any(asset => string.Equals(asset.Artifact.PackageId, owner.PackageId, StringComparison.OrdinalIgnoreCase)
+                        && SameVersion(asset.Artifact.Version.ToNormalizedString(), owner.Version) && asset.Artifact.Sha256 == owner.Sha256)
+                    && !_fileSystem.FileExists(package.MountPointUri) && !_fileSystem.DirectoryExists(package.MountPointUri);
+                if (!repairMissing)
+                {
+                    await ValidateOwnerArchiveAsync(package, owner, cancellationToken);
+                }
                 owners.Add((owner, package.MountPointUri));
                 if (!_fileSystem.FileExists(OwnerPath(owner.PackageId, owner.Version))
                     || await ReadOwnerFileAsync(LegacyOwnerPath(owner.PackageId), owner.PackageId, cancellationToken) == owner)

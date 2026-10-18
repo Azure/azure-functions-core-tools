@@ -1200,7 +1200,8 @@ public sealed partial class BundledNodeTemplateTests
         return path;
     }
 
-    private WorkloadInstaller MigrationInstaller(IBasicArtifactInspector inspector, IFileSystem? bundleFiles = null, IWorkloadStore? store = null)
+    private WorkloadInstaller MigrationInstaller(IBasicArtifactInspector inspector, IFileSystem? bundleFiles = null, IWorkloadStore? store = null,
+        IFileSystem? deploymentFiles = null)
     {
         var coordinator = new FileWorkloadOperationCoordinator(_paths);
         var runtime = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
@@ -1208,7 +1209,7 @@ public sealed partial class BundledNodeTemplateTests
         var selector = new WorkloadRidPackageSelector(runtime);
         var metadata = new WorkloadMetadataReader();
         return new(_source, new WorkloadPackageInspector(metadata, selector), selector,
-            new WorkloadDeploymentService(_paths, store ?? _workloads, metadata, coordinator, _files,
+            new WorkloadDeploymentService(_paths, store ?? _workloads, metadata, coordinator, deploymentFiles ?? _files,
                 new BundledTemplateInstaller(_templates, inspector, bundleFiles ?? _files, new(Home))),
             coordinator, store ?? _workloads, _files);
     }

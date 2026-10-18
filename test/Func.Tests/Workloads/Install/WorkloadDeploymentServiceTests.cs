@@ -171,6 +171,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task UninstallAsync_FinalOwnershipRemoved_DeletesPayload()
     {
         WorkloadEntry entry = Entry("example.workload", "1.0.0", explicitlyInstalled: true);
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
         string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
         Directory.CreateDirectory(installPath);
         _store.RemoveOwnershipAsync(Arg.Any<IWorkloadOperation>(), entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
