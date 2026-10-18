@@ -14,8 +14,9 @@ the legacy unversioned project-template installer always resolved that version.
 The original packages declare package type `Template`; the adapter declares
 `FuncTemplate` rather than relaxing native package validation.
 
-Packing extracts upstream `content/` bytes unchanged after validating both
-digests, and retains both original nuspecs under `provenance/`. It adds only
+Packing validates both upstream archive digests and retains both original
+nuspecs under `provenance/`. Except for the four qualified supporting-type
+adaptations described below, upstream `content/` bytes are unchanged. It adds
 `func.host.json` files, including `--target-framework` / `-tfm` aliases for the
 native project `Framework` parameter. The repository MIT license has the same
 copyright and grant as upstream's `LICENSE.txt`; its pinned source URL is in
@@ -25,8 +26,31 @@ rewritten as evidence of a different upstream release.
 The raw inventory is 36 items (29 C#, 7 F#) plus 2 projects (C#, F#). Those are
 native configuration records, **not deduplicated CLI-visible counts**.
 Template identities, group identities, short names, symbols, conditional
-sources, generated values, package versions, post-actions and source files
-are preserved, including F# project ordering and `_gitignore` renaming.
+sources, generated values, package versions, post-actions and unadapted source
+files are preserved, including F# project ordering and `_gitignore` renaming.
+
+## Scoped C# database supporting types
+
+The pinned SQL and MySQL output/trigger items each declare a namespace-level
+`ToDoItem`. Adding distinct functions from these templates could therefore
+make a previously compiling project fail with duplicate types. This is an
+inherited upstream limitation, not evidence of a native migration regression.
+
+Packing adapts only the four source files in `supporting-types.json`, after
+checking their identity, original configuration, exact source path and SHA-256.
+It nests the DTO inside its owning new function class and names it
+`<FunctionName>Item`, using the existing native `sourceName` substitution for
+every type reference. Nesting avoids collisions with other functions and
+existing user DTOs; the suffix also permits a function named `ToDoItem`.
+Binding table/connection strings, namespaces, package dependencies and all
+native configuration bytes remain unchanged. SQL/MySQL input items and F#
+sources are not adapted. No existing project source is inspected or rewritten.
+
+The original four source files remain byte-for-byte under
+`provenance/upstream-content/content/`; the source pins are also packaged in
+provenance. Unknown or changed upstream inputs fail packing rather than
+receiving a best-effort text rewrite. This changes the shape of newly generated
+example DTOs only; it does not migrate previously generated functions.
 
 ## Deliberately staged
 

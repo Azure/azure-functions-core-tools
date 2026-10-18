@@ -8,6 +8,8 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $sources = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'upstream-sources.json') -Raw | ConvertFrom-Json
 $qualifiedConfigurations = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'upstream-configurations.json') -Raw | ConvertFrom-Json -NoEnumerate
+$supportingTypes = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'supporting-types.json') -Raw | ConvertFrom-Json -NoEnumerate
+$adaptedIdentities = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 $separator = [IO.Path]::DirectorySeparatorChar
 $outputPrefix = $output.TrimEnd($separator) + $separator
@@ -67,7 +69,41 @@ foreach ($package in $sources.packages) {
                 $qualified[0][3] -cne (Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash) {
                 throw "Native configuration does not match the qualified CLI adapter source: $($entry.FullName)."
             }
-            # Keep template.json and every source byte unchanged. CLI aliases live in host metadata only.
+            $adaptation = @($supportingTypes | Where-Object identity -CEQ $configuration.identity)
+            if ($adaptation.Count -gt 0) {
+                if ($adaptation.Count -ne 1 -or $package.type -cne 'item' -or $configuration.tags.language -cne 'C#') {
+                    throw "Ambiguous supporting-type adaptation at $($entry.FullName)."
+                }
+                $pin = $adaptation[0]
+                $sourceRelative = $entry.FullName.Replace('.template.config/template.json', "$($configuration.sourceName).cs")
+                $sourcePath = Join-Path $output $sourceRelative
+                if ($sourceRelative -cne $pin.path -or (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash -cne $pin.sha256) {
+                    throw "Supporting-type source does not match the qualified baseline: $sourceRelative."
+                }
+                $originalPath = Join-Path $output "provenance/upstream-content/$sourceRelative"
+                [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($originalPath)) | Out-Null
+                [IO.File]::Copy($sourcePath, $originalPath)
+                $source = [IO.File]::ReadAllText($sourcePath).Replace("`r`n", "`n")
+                if ([regex]::Matches($source, '\bToDoItem\b').Count -ne $pin.references) {
+                    throw "Unexpected supporting-type references in $sourceRelative."
+                }
+                # Native sourceName substitution also renames the nested DTO, including when the function is named ToDoItem.
+                $helperName = "$($configuration.sourceName)Item"
+                $source = [regex]::Replace($source, '\bToDoItem\b', $helperName)
+                $boundary = "`n}`n`npublic class $helperName`n"
+                $split = $source.IndexOf($boundary, [StringComparison]::Ordinal)
+                if ($split -lt 0 -or $split -ne $source.LastIndexOf($boundary, [StringComparison]::Ordinal)) {
+                    throw "Unexpected supporting-type layout in $sourceRelative."
+                }
+                $helper = $source.Substring($split + 4).TrimEnd("`n")
+                $nested = ($helper.Split("`n") | ForEach-Object { "    $_" }) -join "`n"
+                [IO.File]::WriteAllText($sourcePath, $source.Substring(0, $split) + "`n`n$nested`n}`n",
+                    [Text.UTF8Encoding]::new($false))
+                if (-not $adaptedIdentities.Add($configuration.identity)) {
+                    throw "Duplicate supporting-type adaptation: $($configuration.identity)."
+                }
+            }
+            # Keep every template.json unchanged. CLI aliases live in host metadata only.
             $hostMetadata = @{ symbolInfo = @{} }
             if ($package.type -ceq 'project') {
                 $hostMetadata.symbolInfo.Framework = @{ longName = 'target-framework'; shortName = 'tfm' }
@@ -78,4 +114,7 @@ foreach ($package in $sources.packages) {
     } finally {
         $zip.Dispose()
     }
+}
+if ($adaptedIdentities.Count -ne $supportingTypes.Count) {
+    throw 'The qualified supporting-type inventory was not completely adapted.'
 }

@@ -71,14 +71,26 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         SHA256.HashData(File.ReadAllBytes(upstreamPath)).Should().Equal(Convert.FromHexString(digest));
         using var upstream = new ZipArchive(File.OpenRead(upstreamPath));
         using var inner = new PackageArchiveReader(ExtractInnerArchive());
+        using var adaptations = JsonDocument.Parse(inner.GetStream("provenance/supporting-types.json"));
+        var adapted = adaptations.RootElement.EnumerateArray()
+            .ToDictionary(row => row.GetProperty("path").GetString()!, row => row.GetProperty("sha256").GetString()!, StringComparer.Ordinal);
         ZipArchiveEntry[] sourceFiles = [.. upstream.Entries.Where(entry => entry.FullName.StartsWith("content/", StringComparison.Ordinal)
             && entry.Name.Length > 0)];
         sourceFiles.Should().NotBeEmpty();
         foreach (ZipArchiveEntry source in sourceFiles)
         {
             using Stream expected = source.Open();
-            using Stream actual = inner.GetStream(source.FullName);
+            string actualPath = adapted.ContainsKey(source.FullName) ? "provenance/upstream-content/" + source.FullName : source.FullName;
+            using Stream actual = inner.GetStream(actualPath);
             SHA256.HashData(actual).Should().Equal(SHA256.HashData(expected), source.FullName);
+            if (adapted.TryGetValue(source.FullName, out string? pinnedHash))
+            {
+                using Stream original = source.Open();
+                Convert.ToHexString(SHA256.HashData(original)).Should().Be(pinnedHash);
+                using Stream native = inner.GetStream(source.FullName);
+                using StreamReader reader = new(native);
+                reader.ReadToEnd().Should().NotContain("\npublic class ToDoItem\n");
+            }
         }
     }
 
@@ -101,6 +113,74 @@ public sealed class NativeDotNetTemplateTests : IDisposable
         ITemplateInfo project = templates.Single(template => template.Identity == "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x");
         project.ParameterDefinitions.Single(parameter => parameter.Name == "Framework").Choices!.Keys.Should().Contain("net10.0");
         (project as ITemplateInfoHostJsonCache)!.HostData.Should().Contain("target-framework", "tfm");
+    }
+
+    [Theory]
+    [InlineData("MySqlOutputBinding", "WriteTodos", "Task<WriteTodosItem>", "orders")]
+    [InlineData("MySqlTriggerBinding", "WatchTodos", "MySqlChange<WatchTodosItem>", "orders1")]
+    [InlineData("SqlOutputBinding", "ToDoItem", "Task<ToDoItemItem>", "orders")]
+    [InlineData("SqlTriggerBinding", "WatchSql", "SqlChange<WatchSqlItem>", "orders")]
+    public async Task NativeDatabaseItem_SupportingType_IsScopedToTheNewFunction(
+        string variant, string name, string expectedReference, string inheritedTable)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(template => template.Identity == $"Azure.Function.CSharp.Isolated.{variant}");
+        string output = Path.Combine(_root, variant);
+        Directory.CreateDirectory(output);
+        string custom = Path.Combine(output, "Custom.cs");
+        string original = "namespace Custom.Functions; public class "
+            + (name == "ToDoItem" ? "ExistingDto" : "ToDoItem") + " { } public class WriteTodosItem { }";
+        File.WriteAllText(custom, original);
+        TemplateCreator creator = new(session.Settings);
+        Dictionary<string, string?> parameters = new()
+        {
+            ["namespace"] = "Custom.Functions",
+            ["table"] = "orders",
+            ["connectionStringSetting"] = "DatabaseConnection",
+        };
+
+        ITemplateCreationResult preview = await creator.InstantiateAsync(template, name, name, output, parameters,
+            dryRun: true, cancellationToken: CancellationToken.None);
+
+        preview.Status.Should().Be(CreationResultStatus.Success, preview.ErrorMessage);
+        Directory.GetFiles(output).Should().ContainSingle().Which.Should().Be(custom);
+        ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output, parameters,
+            cancellationToken: CancellationToken.None);
+        created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+        string source = File.ReadAllText(Path.Combine(output, name + ".cs"));
+        source.Should().ContainAll("namespace Custom.Functions;", $"public class {name}", $"[Function(\"{name}\")]",
+            $"    public class {name}Item", expectedReference, $"\"{inheritedTable}\"", "\"DatabaseConnection\"");
+        source.Should().NotContain($"\npublic class {name}Item\n");
+        File.ReadAllText(custom).Should().Be(original);
+    }
+
+    [Theory]
+    [InlineData("MySql")]
+    [InlineData("Sql")]
+    public async Task NativeDatabaseItems_RepeatedOutputAndTrigger_KeepSupportingTypesInsideEachNewFunction(string provider)
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        IReadOnlyList<ITemplateInfo> templates = await session.Manager.GetTemplatesAsync(CancellationToken.None);
+        TemplateCreator creator = new(session.Settings);
+        string output = Path.Combine(_root, provider);
+        foreach (string kind in new[] { "Output", "Trigger" })
+        {
+            ITemplateInfo template = templates.Single(item => item.Identity == $"Azure.Function.CSharp.Isolated.{provider}{kind}Binding");
+            foreach (string suffix in new[] { "First", "Second" })
+            {
+                string name = kind + suffix;
+                ITemplateCreationResult created = await creator.InstantiateAsync(template, name, name, output,
+                    new Dictionary<string, string?> { ["namespace"] = "Shared.Functions" }, cancellationToken: CancellationToken.None);
+
+                created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
+                string source = File.ReadAllText(Path.Combine(output, name + ".cs"));
+                source.Should().ContainAll($"public class {name}\n", $"    public class {name}Item\n",
+                    $"<{name}Item>", $"[Function(\"{name}\")]");
+                source.Should().NotContain("ToDoItem");
+            }
+        }
+        Directory.GetFiles(output, "*.cs").Should().HaveCount(4);
     }
 
     [Theory]
