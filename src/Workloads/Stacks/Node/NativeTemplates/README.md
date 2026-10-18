@@ -85,8 +85,14 @@ Service Bus defaults that differ from their old hardcoded literals.
 
 The converter replaces exactly one reviewed property declaration associated
 with the original template kind, prompt ID, assignment token and literal.
-Missing, changed or ambiguous declarations fail packing; unrelated literals
-and comments are not replacements. Derived native symbols JSON-escape string
+Before replacement, both the converter and runtime qualifier verify a reviewed
+fingerprint of the entire raw body for each parameterized item. Only CRLF/LF
+representation differences are normalized. Unexpected body edits, including
+comments, template literals and unrelated objects, require source-association
+review and updated reviewed fingerprints; a matching line alone grants no
+substitution authority. Normal owned comments and unrelated literals remain
+unchanged. Missing, changed or ambiguous declarations fail packing.
+Derived native symbols JSON-escape string
 content and escape apostrophes before insertion into single-quoted JavaScript
 strings. The lease choice is emitted as a lowercase Boolean literal, never a
 quoted string. These generated symbols are not extra user parameters. This
@@ -210,6 +216,16 @@ source snapshot in both modes: exact selected identity/configuration hash,
 manifest, config, host, native body and all four original source-file pins,
 plus the expected native regular-file source. Shared engine guards revalidate
 these pins before preview and creation and reject extra/wrong-kind outputs.
+The exact historical encoding without forms or derived substitutions is also
+qualified through the same body fingerprints, graph, layout and selected-source
+pins. It can execute only when **every effective parameter** equals the
+independently reviewed raw operative literal. Thus an older Timer's default
+schedule remains usable without an update; a custom schedule it cannot apply
+refuses before writes with explicit same-owner workload-update guidance.
+Event Hub and Service Bus advertised defaults that disagree with their raw
+literals do not qualify by omission. Mixed encodings and unsupported inputs
+never fall back to silently ignored parameters. There is no version/latest
+allowlist, automatic workload update or native-cache migration.
 The runtime Node directory planner and typed placement override are removed.
 `LiteralOutput` remains the default for staged/direct-native callers.
 

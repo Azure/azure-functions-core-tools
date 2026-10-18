@@ -28,6 +28,24 @@ $hiddenIds = @(
 )
 $httpIds = @('HttpTrigger-JavaScript', 'HttpTrigger-TypeScript')
 $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+$reviewedBodies = @{
+    'BlobTrigger-JavaScript' = '773499147F9E697C074458C1B4D4152F32870FFEEE5A0301AC2EE4F95F135B02'
+    'BlobTrigger-TypeScript' = 'BD456F4A0FCAE70EF4EC73CD364215B3B76F07A3D3337150114488750C891527'
+    'CosmosDBTrigger-JavaScript' = 'A90F64FD9F3CB713EB54CAAC2F7235806C39246DB30FE4604AA41699DB1DAEF3'
+    'CosmosDBTrigger-TypeScript' = '6F59394D49AB665B37BAA32F68B0E92CFD6C152EC563815B6BEEE2EEAD00EBAC'
+    'EventGridBlobTrigger-JavaScript' = 'D9F6EE6440831BE28725966D1C29D0D214E8F6D578EA1D8515E4C95CA6A1975A'
+    'EventGridBlobTrigger-TypeScript' = 'DE9FDAB6587A18ECA548E6E49E9A14A616CB9C98E379BDF93ABB5F41F9B3D35A'
+    'EventHubTrigger-JavaScript' = 'E6F56D5053168C3768D607F66472F9A66B6CEAF4B050209396D545C723A859D1'
+    'EventHubTrigger-TypeScript' = 'E5546062A26396BF0290A8AC481004E714E6BA786DB3532EAD6B6AEF59BCB75A'
+    'QueueTrigger-JavaScript' = 'CF8C0BCE5551F941D5D6854109C76E7AA7B145311178C2B39594E7242191637D'
+    'QueueTrigger-TypeScript' = '3C76C6362E0CE9979776DA0E442CD648BD3A4163B1947A75F16F67725C06EE4E'
+    'ServiceBusQueueTrigger-JavaScript' = 'D9229D627355FFE8502D3CFE42024F1C36C95856CA05E1239866CD00043C7A12'
+    'ServiceBusQueueTrigger-TypeScript' = 'C8022455CE0534CF3EF838859165AB694F922238F79847DFEB522DFB62805015'
+    'ServiceBusTopicTrigger-JavaScript' = 'E5A29EEBB6F74659B3BFDBB849A81C88E0F5C82A2B2675DEBD1F294DC8F1208F'
+    'ServiceBusTopicTrigger-TypeScript' = 'F369B1B548DF93C16B22F5F79F3032AEFCD7B6B807A1DAC406E52C73B04E8A11'
+    'TimerTrigger-JavaScript' = 'CAF047F47111295F4DF1AC15C7791082855ED7727952CF889FE9A501C8A7E5A1'
+    'TimerTrigger-TypeScript' = 'FFACD7BBBF87FDF7518D188A5A6E75CF44398F05CA5768155626A04EAE8A29A5'
+}
 
 function Resolve-Resource([string] $value) {
     if ($value.StartsWith('$') -and $resources.Contains($value.Substring(1))) { return $resources[$value.Substring(1)] }
@@ -100,6 +118,13 @@ foreach ($template in $templates) {
     }
     $legacyTarget = ($parts[0..($parts.Count - 2)] -join '/') + '/'
     $content = [string] $template.files[$actions[0].filePath]
+    if (@($job.inputs | Where-Object { $_.assignTo -cne '$(FUNCTION_NAME_INPUT)' }).Count -gt 0) {
+        $normalized = $content.Replace("`r`n", "`n")
+        $hash = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData([System.Text.Encoding]::UTF8.GetBytes($normalized)))
+        if ($reviewedBodies.Keys -cnotcontains $id -or $hash -cne $reviewedBodies[$id]) {
+            throw "Review the changed owned body/declaration association for '$id' before converting it."
+        }
+    }
     $symbols = [ordered]@{}
     $symbolInfo = [ordered]@{}
     $defaultName = $null
