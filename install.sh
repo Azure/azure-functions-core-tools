@@ -402,7 +402,7 @@ fi
 
 # --- Download and extract ---
 
-TEMP_DIR=$(mktemp -d)
+TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/func-cli-install.XXXXXXXXXX")
 REMOVE_TEMP_DIR_ON_EXIT=true
 if [[ "$KEEP_ARCHIVE" == true ]]; then
     REMOVE_TEMP_DIR_ON_EXIT=false
