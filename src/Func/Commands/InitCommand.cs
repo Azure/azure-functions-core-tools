@@ -42,6 +42,11 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Description = "The name of the Function App project"
     };
 
+    public Option<string?> TemplateOption { get; } = new("--template")
+    {
+        Description = "Installed project template identity or short name.",
+    };
+
     public Option<string?> LanguageOption { get; } = new("--language", "-l")
     {
         Description = "The programming language (e.g., C#, F#, JavaScript, TypeScript, Python)"
@@ -111,6 +116,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         AddPathArgument();
         Options.Add(StackOption);
         Options.Add(NameOption);
+        Options.Add(TemplateOption);
         Options.Add(LanguageOption);
         Options.Add(ForceOption);
         Options.Add(DryRunOption);

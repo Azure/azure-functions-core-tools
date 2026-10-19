@@ -2,12 +2,22 @@
 
 Define the context-bound Microsoft.TemplateEngine integration layer for listing, resolving, and invoking installed templates.
 
+## Independent acceptance gates
+
+The [engine-first architecture gate](engine-first-acceptance.md) maps native
+capabilities, host responsibilities and remaining adapter coupling. It is
+independently blocking alongside genuine original-to-current public template
+parity; engine invocation and green suites do not close either gate.
+
 ## Public native entry
 
 `Program` runs `NativeCliEntryPoint` by default. Ordinary `func init` and `func new`
 use installed Microsoft.TemplateEngine templates and CLI-owned stack workflows;
 there is no opt-in flag, environment switch, or automatic legacy-template fallback.
 The old command implementations remain available only to internal compatibility controls.
+`func init --template <installed-identity-or-short-name>` selects an installed
+project through the shared native resolver when more than one family is available.
+It does not bypass the selected stack's source-qualified workflow provider.
 Unrelated commands retain the common command graph, start-argument normalization,
 first-run handling, telemetry, version notices, and cancellation wiring.
 Command ownership comes from that real graph, including aliases and nested

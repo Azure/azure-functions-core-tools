@@ -18,6 +18,52 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public sealed partial class BundledNodeTemplateTests
 {
     [Theory]
+    [InlineData("Azure.Functions.Node.Basic.JavaScript")]
+    [InlineData("basic")]
+    public async Task StagedEntry_InitTemplateReference_UsesSharedProjectSelection(string reference)
+    {
+        await _installer.InstallFromPackageAsync(BuiltArchive);
+        string project = Path.Combine(_root, "selected-project");
+        TestInteractionService output = new();
+
+        int exit = await new NativeCliEntryPoint().ExecuteAsync(
+            ["init", "--template", reference, project, "--stack", "node", "--language", "js",
+                "--no-bundles", "--skip-npm-install", "--non-interactive", "--output", "json"],
+            output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
+
+        exit.Should().Be(0, output.AllOutput);
+        using var json = JsonDocument.Parse(output.Lines.Single(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]);
+        json.RootElement.GetProperty("kind").GetString().Should().Be("created");
+        json.RootElement.GetProperty("selectedTemplate").GetProperty("identity").GetString()
+            .Should().Be("Azure.Functions.Node.Basic.JavaScript");
+        File.Exists(Path.Combine(project, "host.json")).Should().BeTrue();
+        File.Exists(Path.Combine(project, ".func", "config.json")).Should().BeTrue();
+        _source.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("not-installed", "NotFound")]
+    [InlineData("HttpTrigger-JavaScript", "WrongType")]
+    public async Task StagedEntry_InvalidProjectReference_RejectsBeforeCreatingTarget(string reference, string kind)
+    {
+        await _installer.InstallFromPackageAsync(BuiltArchive);
+        string project = Path.Combine(_root, "rejected-project");
+        TestInteractionService output = new();
+
+        int exit = await new NativeCliEntryPoint().ExecuteAsync(
+            ["init", project, "--template=" + reference, "--stack", "node", "--language", "js",
+                "--no-bundles", "--skip-npm-install", "--non-interactive", "--output", "json"],
+            output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
+
+        exit.Should().Be(1, output.AllOutput);
+        using var json = JsonDocument.Parse(output.Lines.Single(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]);
+        json.RootElement.GetProperty("kind").GetString().Should().Be(kind);
+        json.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
+        Directory.Exists(project).Should().BeFalse();
+        _source.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
     [InlineData("en-US", "-1", "before")]
     [InlineData("en-US", "-1", "inline")]
     [InlineData("en-US", "-1", "pathFirst")]

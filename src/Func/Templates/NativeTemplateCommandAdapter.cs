@@ -40,7 +40,7 @@ internal sealed class NativeTemplateCommandAdapter(
         NativeInitExecutionOptions settings = execution;
         HashSet<Option> hostOptions =
         [
-            command.StackOption, command.NameOption, command.LanguageOption, command.ForceOption,
+            command.StackOption, command.NameOption, command.TemplateOption, command.LanguageOption, command.ForceOption,
             command.DryRunOption, command.NonInteractiveOption, command.OutputOption,
         ];
         command.TreatUnmatchedTokensAsErrors = false;
@@ -59,7 +59,7 @@ internal sealed class NativeTemplateCommandAdapter(
             {
                 return _initRenderer.Render(InitExecutionResult.Reject("invalidArguments", [.. input.HostDiagnostics]), json);
             }
-            var request = new InitExecutionRequest(parsed.GetValue(command.PathArgument!)!, settings.TemplateReference,
+            var request = new InitExecutionRequest(parsed.GetValue(command.PathArgument!)!, settings.TemplateReference ?? parsed.GetValue(command.TemplateOption),
                 parsed.GetValue(command.NameOption), parsed.GetValue(command.StackOption), parsed.GetValue(command.LanguageOption),
                 parsed.GetValue(command.ForceOption), settings.NonInteractive || json || parsed.GetValue(command.NonInteractiveOption),
                 settings.DryRun || parsed.GetValue(command.DryRunOption), json,

@@ -88,9 +88,29 @@ public sealed class NativeTemplateCommandAdapterTests
         captured.ReservedAliases.Should().Contain(["--stack", "-s", "--language", "-l"]);
         captured.ReservedAliases.Should().NotContain(["--no-bundles", "--bundles-channel", "-c"]);
         initializer.ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name == nameof(IProjectInitializer.InitializeAsync));
-        command.Options.Select(option => option.Name).Should().NotContain("--template");
-        command.Options.Select(option => option.Name).Should().Contain(["--dry-run", "--output", "--non-interactive"]);
+        command.Options.Select(option => option.Name).Should().Contain(["--template", "--dry-run", "--output", "--non-interactive"]);
         command.Options.Single(option => option.Name == "--bundles-channel").Aliases.Should().Contain("-c");
+    }
+
+    [Theory]
+    [InlineData("--template", "project")]
+    [InlineData("--template=project")]
+    public async Task Init_ExplicitTemplateReference_IsHostSelectionRatherThanNativeParameter(params string[] selector)
+    {
+        InitExecutionRequest? captured = null;
+        _init.ExecuteAsync(Arg.Do<InitExecutionRequest>(request => captured = request), _availability, Arg.Any<CancellationToken>())
+            .Returns(InitExecutionResult.Reject("control"));
+        var command = CreateInitCommand([]);
+        string target = Path.Combine(Path.GetTempPath(), "native-explicit-init-adapter");
+        var parsed = CreateAdapter().ParseInitInvocation(command, [.. selector, target, "--non-interactive"]);
+
+        int exit = await parsed.InvokeAsync();
+
+        exit.Should().Be(1);
+        captured!.TemplateReference.Should().Be("project");
+        captured.WorkingDirectory.Info.FullName.Should().Be(target);
+        captured.RawTemplateTokens.Should().BeEmpty();
+        captured.ReservedAliases.Should().Contain("--template");
     }
 
     [Fact]

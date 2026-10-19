@@ -123,14 +123,14 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
         var input = NativeTemplateCommandInput.CaptureEntry(command, parsed, raw.Tokens,
             new HashSet<Option>
             {
-                command.StackOption, command.NameOption, command.LanguageOption, command.ForceOption,
+                command.StackOption, command.NameOption, command.TemplateOption, command.LanguageOption, command.ForceOption,
                 command.DryRunOption, command.NonInteractiveOption, command.OutputOption,
             }, raw.PathIndex);
         if (input.HostDiagnostics.Count > 0)
         {
             return _projects.Render(InitExecutionResult.Reject("invalidArguments", [.. input.HostDiagnostics]), json);
         }
-        var request = new InitExecutionRequest(raw.Directory, null, parsed.GetValue(command.NameOption),
+        var request = new InitExecutionRequest(raw.Directory, parsed.GetValue(command.TemplateOption), parsed.GetValue(command.NameOption),
             parsed.GetValue(command.StackOption), parsed.GetValue(command.LanguageOption), parsed.GetValue(command.ForceOption),
             IsInitNonInteractive(command, parsed) || !_interaction.IsInteractive, parsed.GetValue(command.DryRunOption),
             json, input.NativeTokens, input.ReservedAliases)
