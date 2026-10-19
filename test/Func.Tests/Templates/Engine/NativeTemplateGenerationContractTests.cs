@@ -188,7 +188,7 @@ public sealed class NativeTemplateGenerationContractTests
     [InlineData("nested/.func/profile.json", false)]
     [InlineData(".func. /config.json", false)]
     public void ItemOutputDiagnostic_PreservesTheCliConfigurationBoundary(string path, bool permitted)
-        => (NativeTemplateGenerationContract.ItemOutputDiagnostic([new(path, "Create")]) is null).Should().Be(permitted);
+        => (NativeTemplateGenerationContract.ItemOutputDiagnostic([new(path, TemplateFileChangeKind.Create)]) is null).Should().Be(permitted);
 
     [Fact]
     public void Read_NullInputs_AreProgrammerErrors()

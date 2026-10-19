@@ -45,7 +45,7 @@ public sealed partial class BundledPythonTemplateTests
 
         preview!.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
         preview.Effects!.Kind.Should().Be("previewed");
-        preview.Changes.Should().Equal(new TemplateFileChange("function_app.py", "Append"));
+        preview.Changes.Should().Equal(new TemplateFileChange("function_app.py", TemplateFileChangeKind.Append));
         File.ReadAllText(app).Should().Be(original);
         capability.Executions.Should().Be(0);
 

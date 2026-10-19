@@ -169,7 +169,7 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             _interaction.WriteSectionHeader("Planned effects");
             foreach (TemplateFileChange change in preview.Changes)
             {
-                _interaction.WriteLine(line => line.Muted($"{change.Kind}: ").Code(change.Path));
+                _interaction.WriteLine(line => line.Muted($"{change.GetKindName()}: ").Code(change.Path));
             }
         }
 
@@ -181,7 +181,7 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
                 _interaction.WriteSectionHeader("Completed effects");
                 foreach (TemplateFileChange change in completed)
                 {
-                    _interaction.WriteLine(line => line.Muted($"{change.Kind}: ").Code(change.Path));
+                    _interaction.WriteLine(line => line.Muted($"{change.GetKindName()}: ").Code(change.Path));
                 }
             }
 
@@ -252,8 +252,8 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
         Dictionary<string, object> projected = new()
         {
             ["status"] = invocation.Status.ToString(),
-            ["plannedChanges"] = result.Preview?.Changes ?? [],
-            ["completedChanges"] = GetCompletedChanges(result.Invocation),
+            ["plannedChanges"] = (result.Preview?.Changes ?? []).Select(change => new { change.Path, Kind = change.GetKindName() }),
+            ["completedChanges"] = GetCompletedChanges(result.Invocation).Select(change => new { change.Path, Kind = change.GetKindName() }),
             ["plannedConfigurations"] = result.Preview?.ProjectConfigurations ?? [],
             ["configuredProjects"] = result.Invocation?.ConfiguredProjects ?? [],
         };

@@ -88,7 +88,7 @@ public sealed partial class BundledPythonTemplateTests
                     Directory.Exists(expanded.Info.FullName).Should().BeFalse();
                     var result = await selected.InvokeAsync(request with { DryRun = false }, token);
                     result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
-                    result.Changes.Should().ContainSingle().Which.Kind.Should().Be("Create");
+                    result.Changes.Should().ContainSingle().Which.Kind.Should().Be(TemplateFileChangeKind.Create);
                     var path = Path.Combine(expanded.Info.FullName, helper.GetProperty("expectedOutput").GetString()!);
                     Directory.GetFiles(expanded.Info.FullName, "*", SearchOption.AllDirectories).Should().ContainSingle().Which.Should().Be(path);
                     File.GetAttributes(path).HasFlag(FileAttributes.Directory).Should().BeFalse();

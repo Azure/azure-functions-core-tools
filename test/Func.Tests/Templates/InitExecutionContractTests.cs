@@ -269,11 +269,11 @@ public sealed class InitExecutionContractTests
         TestInteractionService interaction = new();
         var result = InitExecutionResult.Reject("invocationFailed", "Native creation failed.") with
         {
-            Preview = new(TemplateInvocationStatus.Success, [new("host.json", "Create")])
+            Preview = new(TemplateInvocationStatus.Success, [new("host.json", TemplateFileChangeKind.Create)])
             {
                 ProjectConfigurations = [new(Path.Combine(Path.GetTempPath(), "consumer-project", "host.json"), "node", "JavaScript")],
             },
-            Invocation = new(TemplateInvocationStatus.Failed, [new("host.json", "Create")])
+            Invocation = new(TemplateInvocationStatus.Failed, [new("host.json", TemplateFileChangeKind.Create)])
             {
                 ProjectConfigurations = [new(Path.Combine(Path.GetTempPath(), "consumer-project", "host.json"), "node", "JavaScript")],
             },
@@ -307,8 +307,8 @@ public sealed class InitExecutionContractTests
     {
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
-        TemplateFileChange host = new("host.json", "Create");
-        TemplateFileChange config = new(".func/config.json", "Create");
+        TemplateFileChange host = new("host.json", TemplateFileChangeKind.Create);
+        TemplateFileChange config = new(".func/config.json", TemplateFileChangeKind.Create);
         var result = InitExecutionResult.Reject("invocationFailed", "Existing user configuration was preserved.") with
         {
             Preview = new(TemplateInvocationStatus.Success, [host, config]),
@@ -352,7 +352,7 @@ public sealed class InitExecutionContractTests
         TemplateInvocationStatus status = Enum.Parse<TemplateInvocationStatus>(statusName);
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
-        TemplateFileChange effect = new("host.json", "Create");
+        TemplateFileChange effect = new("host.json", TemplateFileChangeKind.Create);
         InitExecutionResult result = new("control", status == TemplateInvocationStatus.Success)
         {
             Preview = new(TemplateInvocationStatus.Success, [effect]),

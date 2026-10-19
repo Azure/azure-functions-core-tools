@@ -56,7 +56,7 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
         created!.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
         File.ReadAllText(Target).Should().Be("# user-owned\n\nChosenName|CanonicalValue|python");
         capability.Executions.Should().Be(1);
-        created.Changes.Should().Equal(new TemplateFileChange("function_app.py", "Append"));
+        created.Changes.Should().Equal(new TemplateFileChange("function_app.py", TemplateFileChangeKind.Append));
     }
 
     [Theory]

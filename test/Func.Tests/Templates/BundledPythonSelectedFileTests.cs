@@ -53,7 +53,7 @@ public sealed partial class BundledPythonTemplateTests
         var preview = await provider.Effects.InvokeAsync(templater, selected, binding, request, CancellationToken.None);
 
         preview!.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
-        preview.Changes.Should().Equal(new TemplateFileChange("selected_app.py", "Append"));
+        preview.Changes.Should().Equal(new TemplateFileChange("selected_app.py", TemplateFileChangeKind.Append));
         File.ReadAllText(canonical).Should().Be(SelectedAppPrefix);
         File.ReadAllText(target).Should().Be(SelectedAppPrefix);
 
@@ -92,7 +92,7 @@ public sealed partial class BundledPythonTemplateTests
             new(output, parsed.ValuesByCanonicalName, "CanonicalOnly"), CancellationToken.None);
 
         result!.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
-        result.Changes.Should().Equal(new TemplateFileChange("function_app.py", "Append"));
+        result.Changes.Should().Equal(new TemplateFileChange("function_app.py", TemplateFileChangeKind.Append));
         File.ReadAllText(canonical).Should().Contain("def CanonicalOnly(");
         File.ReadAllText(alternate).Should().Be(SelectedAppPrefix);
     }
@@ -315,7 +315,7 @@ public sealed partial class BundledPythonTemplateTests
 
         expanded.Should().BeTrue();
         result!.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
-        result.Changes.Should().Equal(new TemplateFileChange("selected_app.py", "Append"));
+        result.Changes.Should().Equal(new TemplateFileChange("selected_app.py", TemplateFileChangeKind.Append));
         File.ReadAllText(canonical).Should().Be(SelectedAppPrefix);
         File.ReadAllText(target).Should().Contain("def Captured(");
     }

@@ -122,7 +122,7 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
         {
             foreach (TemplateFileChange change in invocation.Changes)
             {
-                _interaction.WriteLine(line => line.Muted($"{change.Kind}: ").Code(change.Path));
+                _interaction.WriteLine(line => line.Muted($"{change.GetKindName()}: ").Code(change.Path));
             }
 
             if (invocation.Status == TemplateInvocationStatus.FileConflict)
@@ -158,13 +158,18 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
     {
         if (invocation.Effects is not { } effects)
         {
-            return new { status = invocation.Status.ToString(), invocation.Changes, invocation.Diagnostic };
+            return new
+            {
+                status = invocation.Status.ToString(),
+                Changes = invocation.Changes.Select(change => new { change.Path, Kind = change.GetKindName() }),
+                invocation.Diagnostic,
+            };
         }
 
         return new
         {
             status = invocation.Status.ToString(),
-            invocation.Changes,
+            Changes = invocation.Changes.Select(change => new { change.Path, Kind = change.GetKindName() }),
             invocation.Diagnostic,
             effects = ProjectEffects(effects),
         };

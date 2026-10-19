@@ -145,7 +145,7 @@ public sealed class NativeTemplateForceCaptureTests : IDisposable
         captured.Failure.Should().BeNull(captured.Failure?.Diagnostic);
         TemplateInvocationResult preview = await session.InvokeAsync(template, configuration, request, CancellationToken.None);
         preview.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
-        preview.Changes.Should().ContainSingle().Which.Kind.Should().BeOneOf("Change", "Overwrite");
+        preview.Changes.Should().ContainSingle().Which.Kind.Should().BeOneOf(TemplateFileChangeKind.Change, TemplateFileChangeKind.Overwrite);
         Snapshot(target).Should().Equal(before);
         await capability.DidNotReceive().ExecuteAsync(Arg.Any<TemplateEffect>(), Arg.Any<CancellationToken>());
 

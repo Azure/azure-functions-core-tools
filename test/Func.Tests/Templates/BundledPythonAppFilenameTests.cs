@@ -37,7 +37,7 @@ public sealed partial class BundledPythonTemplateTests
         preview!.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
         var change = preview.Changes.Should().ContainSingle().Subject;
         NativeTemplateSourceSnapshot.Normalize(change.Path).Should().Be(filename);
-        change.Kind.Should().Be("Create");
+        change.Kind.Should().Be(TemplateFileChangeKind.Create);
         Directory.Exists(output.Info.FullName).Should().BeFalse();
 
         var created = await provider.Effects.InvokeAsync(templater, selected, binding, request with { DryRun = false }, CancellationToken.None);
@@ -133,7 +133,7 @@ public sealed partial class BundledPythonTemplateTests
             new(output, parsed.ValuesByCanonicalName, "Appended"), CancellationToken.None);
 
         result!.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
-        result.Changes.Should().Equal(new TemplateFileChange("function_app.py", "Append"));
+        result.Changes.Should().Equal(new TemplateFileChange("function_app.py", TemplateFileChangeKind.Append));
         File.ReadAllText(target).Should().StartWith(original).And.Contain("def Appended(");
         File.Exists(Path.Combine(output.Info.FullName, "unused_create_name.py")).Should().BeFalse();
     }

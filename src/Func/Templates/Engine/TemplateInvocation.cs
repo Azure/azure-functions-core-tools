@@ -40,7 +40,38 @@ internal enum TemplateInvocationStatus
     EffectFailure,
 }
 
-internal sealed record TemplateFileChange(string Path, string Kind);
+internal enum TemplateFileChangeKind
+{
+    Create,
+    Change,
+    Overwrite,
+    Delete,
+    Append,
+    Preserve,
+}
+
+internal sealed record TemplateFileChange(string Path, TemplateFileChangeKind Kind)
+{
+    public static TemplateFileChange FromNative(string path, ChangeKind kind) => new(path, kind switch
+    {
+        ChangeKind.Create => TemplateFileChangeKind.Create,
+        ChangeKind.Change => TemplateFileChangeKind.Change,
+        ChangeKind.Overwrite => TemplateFileChangeKind.Overwrite,
+        ChangeKind.Delete => TemplateFileChangeKind.Delete,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "The template engine returned an unsupported file-change kind."),
+    });
+
+    public string GetKindName() => Kind switch
+    {
+        TemplateFileChangeKind.Create => "Create",
+        TemplateFileChangeKind.Change => "Change",
+        TemplateFileChangeKind.Overwrite => "Overwrite",
+        TemplateFileChangeKind.Delete => "Delete",
+        TemplateFileChangeKind.Append => "Append",
+        TemplateFileChangeKind.Preserve => "Preserve",
+        _ => throw new ArgumentOutOfRangeException(nameof(Kind), Kind, "Unsupported internal template file-change kind."),
+    };
+}
 
 internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status, IReadOnlyList<TemplateFileChange> Changes, string? Diagnostic = null)
 {

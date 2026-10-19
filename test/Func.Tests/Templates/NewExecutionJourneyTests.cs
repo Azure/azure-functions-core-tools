@@ -417,7 +417,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
 
         previewExit.Should().Be(0);
         preview.Kind.Should().Be("previewed");
-        preview.Invocation!.Changes.Should().Contain(change => change.Kind != "Create");
+        preview.Invocation!.Changes.Should().Contain(change => change.Kind != TemplateFileChangeKind.Create);
         preview.Invocation.Diagnostic.Should().Contain("force");
         refusedExit.Should().Be(1);
         refused.Invocation!.Status.Should().Be(TemplateInvocationStatus.FileConflict);

@@ -346,7 +346,7 @@ internal class TemplateEngineSession : IDisposable
             return Failed("Native preparation does not match the qualified regular-file sources.");
         }
 
-        TemplateFileChange[] changes = [.. effects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))];
+        TemplateFileChange[] changes = [.. effects.FileChanges.Select(change => TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind))];
         if (configuration.NativeGeneration is not null && configuration.Type == TemplateType.Item
             && NativeTemplateGenerationContract.ItemOutputDiagnostic(changes) is { } configurationOutput)
         {
@@ -651,7 +651,7 @@ internal class TemplateEngineSession : IDisposable
         }
 
         IReadOnlyList<TemplateFileChange> templateChanges = Array.AsReadOnly<TemplateFileChange>(
-            [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+            [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind))]);
         if (configuration.NativeGeneration is not null && configuration.Type == TemplateType.Item
             && NativeTemplateGenerationContract.ItemOutputDiagnostic(templateChanges) is { } configurationOutput)
         {
@@ -663,7 +663,7 @@ internal class TemplateEngineSession : IDisposable
             preserved.UnionWith(templateChanges.Select(change => Path.GetFullPath(Path.Combine(output, change.Path)))
                 .Where(_settings.Host.FileSystem.FileExists));
             templateChanges = Array.AsReadOnly<TemplateFileChange>([.. templateChanges.Select(change =>
-                preserved.Contains(Path.GetFullPath(Path.Combine(output, change.Path))) ? change with { Kind = "Preserve" } : change)]);
+                preserved.Contains(Path.GetFullPath(Path.Combine(output, change.Path))) ? change with { Kind = TemplateFileChangeKind.Preserve } : change)]);
         }
         using var configurationStream = new MemoryStream(Encoding.UTF8.GetBytes(configuration.Content));
         string? placeholder = TemplateConfigModel.FromStream(configurationStream).PlaceholderFilename;
@@ -702,7 +702,7 @@ internal class TemplateEngineSession : IDisposable
                 }
 
                 changes = Array.AsReadOnly<TemplateFileChange>([.. changes,
-                    .. configurationPlans.Select(plan => new TemplateFileChange(Path.GetRelativePath(output, plan.ConfigurationPath), "Create"))]);
+                    .. configurationPlans.Select(plan => new TemplateFileChange(Path.GetRelativePath(output, plan.ConfigurationPath), TemplateFileChangeKind.Create))]);
             }
             catch (InvalidTemplateMetadataException exception)
             {
@@ -767,8 +767,8 @@ internal class TemplateEngineSession : IDisposable
             }
         }
 
-        bool requiresForce = !request.Force && changes.Any(change => change.Kind != "Create"
-            && !(request.PreserveExistingFiles && change.Kind == "Preserve"));
+        bool requiresForce = !request.Force && changes.Any(change => change.Kind != TemplateFileChangeKind.Create
+            && !(request.PreserveExistingFiles && change.Kind == TemplateFileChangeKind.Preserve));
         if (!request.DryRun && requiresForce)
         {
             return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.")
@@ -858,8 +858,9 @@ internal class TemplateEngineSession : IDisposable
         }
 
         IReadOnlyList<TemplateFileChange> written = Array.AsReadOnly<TemplateFileChange>(
-            [.. created.CreationEffects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath,
-                preserved.Contains(Path.GetFullPath(Path.Combine(output, change.TargetRelativePath))) ? "Preserve" : change.ChangeKind.ToString()))]);
+            [.. created.CreationEffects.FileChanges.Select(change => TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind))
+                .Select(change => preserved.Contains(Path.GetFullPath(Path.Combine(output, change.Path)))
+                    ? change with { Kind = TemplateFileChangeKind.Preserve } : change)]);
         if (!written.Select(change => change.Path).Order(StringComparer.Ordinal).SequenceEqual(templateChanges.Select(change => change.Path).Order(StringComparer.Ordinal), StringComparer.Ordinal)
             || ValidateOutputPaths(output, templateChanges) is not null
             || (request.SourceSnapshot is { } writtenSources && !MatchesOutputSources(writtenSources, created.CreationEffects.FileChanges))
@@ -927,7 +928,7 @@ internal class TemplateEngineSession : IDisposable
             }
 
             configuredProjects.Add(plan.Root);
-            completedChanges.Add(new(Path.GetRelativePath(output, plan.ConfigurationPath), "Create"));
+            completedChanges.Add(new(Path.GetRelativePath(output, plan.ConfigurationPath), TemplateFileChangeKind.Create));
         }
 
         if (qualifiedDotNetProject && effectPreview is not null && request.EffectSupport is { } projectEffects)
@@ -1231,7 +1232,7 @@ internal class TemplateEngineSession : IDisposable
         string path = Path.Combine(output, change.Path);
         bool file = _settings.Host.FileSystem.FileExists(path);
         bool directory = _settings.Host.FileSystem.DirectoryExists(path);
-        if (string.Equals(change.Kind, "Delete", StringComparison.Ordinal))
+        if (change.Kind == TemplateFileChangeKind.Delete)
         {
             return !file && !directory;
         }

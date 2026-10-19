@@ -122,7 +122,7 @@ public sealed class TemplaterTests : IDisposable
         created.Changes.Select(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path))).Should().BeEquivalentTo(
             Path.Combine(output.Info.FullName, "host.json"), Path.Combine(output.Info.FullName, "Project.txt"),
             Path.Combine(output.Info.FullName, ".func", "config.json"));
-        created.Changes.Should().OnlyContain(change => change.Kind == "Create");
+        created.Changes.Should().OnlyContain(change => change.Kind == TemplateFileChangeKind.Create);
         File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
         File.ReadAllText(Path.Combine(output.Info.FullName, "Project.txt")).Should().Be("Project welcome");
         var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(output.Info.FullName, ".func", "config.json")).Build();
@@ -422,6 +422,37 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task ProjectJourney_PreserveExistingHost_ReportsPreserveWithoutMutatingUserBytesOrRequiringForce()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        using Templater templater = CreateProjectTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "preserved-host-output"));
+        Directory.CreateDirectory(output.Info.FullName);
+        string host = Path.Combine(output.Info.FullName, "host.json");
+        const string original = """{"version":"2.0","custom":"preserve"}""";
+        File.WriteAllText(host, original);
+        byte[] before = File.ReadAllBytes(host);
+        var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>()) { PreserveExistingFiles = true };
+
+        var preview = await selected.InvokeAsync(request with { DryRun = true }, CancellationToken.None);
+
+        preview.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
+        preview.Changes.Should().ContainSingle(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path)) == host)
+            .Which.Kind.Should().Be(TemplateFileChangeKind.Preserve);
+        File.ReadAllBytes(host).Should().Equal(before);
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeFalse();
+
+        var created = await selected.InvokeAsync(request, CancellationToken.None);
+
+        created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
+        created.Changes.Should().ContainSingle(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path)) == host)
+            .Which.Kind.Should().Be(TemplateFileChangeKind.Preserve);
+        File.ReadAllBytes(host).Should().Equal(before);
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ProjectJourney_UndeclaredHostRoot_FailsBeforeCreation()
     {
         var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
@@ -659,6 +690,23 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task ProjectJourney_UnknownNativeChangeKind_FailsLoudlyBeforeCreationOrConfiguration()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        var session = new ControlledProjectSession(new(WorkingDirectory.FromExplicit(_root)), _hive,
+            new(CreateProjectPlanner(), new(new PhysicalFileSystem()))) { UnknownHostEffect = true };
+        using Templater templater = new(session);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "unknown-host-effect"));
+
+        Func<Task> invoke = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
+
+        await invoke.Should().ThrowAsync<ArgumentOutOfRangeException>().WithParameterName("kind");
+        session.CreationCalls.Should().Be(0);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ProjectJourney_OutputAncestorBecomesFileAfterCreation_ReportsConfigurationFailureWithoutWriting()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
@@ -759,7 +807,7 @@ public sealed class TemplaterTests : IDisposable
         result.Changes.Select(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path))).Should().BeEquivalentTo(
             Path.Combine(output.Info.FullName, "host.json"), Path.Combine(output.Info.FullName, "Project.txt"),
             Path.Combine(output.Info.FullName, ".func", "config.json"));
-        result.Changes.Should().OnlyContain(change => change.Kind == "Create");
+        result.Changes.Should().OnlyContain(change => change.Kind == TemplateFileChangeKind.Create);
         var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(output.Info.FullName, ".func", "config.json")).Build();
         StackOptions options = new();
         new StackOptionsSetup(configuration).Configure(options);
@@ -1531,7 +1579,7 @@ public sealed class TemplaterTests : IDisposable
         else
         {
             var change = result.Changes.Should().ContainSingle().Subject;
-            change.Kind.Should().Be("Create");
+            change.Kind.Should().Be(TemplateFileChangeKind.Create);
             Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path)).Should().Be(Path.Combine(output.Info.FullName, "Created.txt"));
         }
     }
@@ -1908,6 +1956,8 @@ public sealed class TemplaterTests : IDisposable
 
         public bool DeleteHostEffect { get; init; }
 
+        public bool UnknownHostEffect { get; init; }
+
         public Action? AfterCreation { get; init; }
 
         public int CreationCalls { get; private set; }
@@ -1931,11 +1981,11 @@ public sealed class TemplaterTests : IDisposable
                 return missing;
             }
 
-            if (DeleteHostEffect)
+            if (DeleteHostEffect || UnknownHostEffect)
             {
                 var change = Substitute.For<IFileChange>();
                 change.TargetRelativePath.Returns("host.json");
-                change.ChangeKind.Returns(ChangeKind.Delete);
+                change.ChangeKind.Returns(UnknownHostEffect ? (ChangeKind)999 : ChangeKind.Delete);
                 var effects = Substitute.For<ICreationEffects>();
                 effects.FileChanges.Returns([change]);
                 effects.CreationResult.Returns(native.CreationEffects!.CreationResult);

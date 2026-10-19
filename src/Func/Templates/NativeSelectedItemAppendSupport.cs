@@ -178,7 +178,7 @@ internal sealed class NativeSelectedItemAppendSupport(IFileSystem fileSystem, IN
             planned.Plan, _capability, request.DryRun, confirmed, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return new(applied.Succeeded ? TemplateInvocationStatus.Success : TemplateInvocationStatus.EffectFailure,
-            request.DryRun || applied.CompletedEffects.Count > 0 ? [new(mapping.AppendTargetFileName, "Append")] : [],
+            request.DryRun || applied.CompletedEffects.Count > 0 ? [new(mapping.AppendTargetFileName, TemplateFileChangeKind.Append)] : [],
             applied.Diagnostics.Count == 0 ? null : string.Join(" ", applied.Diagnostics))
         {
             Effects = applied,
