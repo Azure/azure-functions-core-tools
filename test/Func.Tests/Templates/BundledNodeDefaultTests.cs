@@ -22,13 +22,22 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("ServiceBusTopicTrigger-JavaScript", "serviceBusTrigger-topic", "--service-bus-trigger-topic", "topicName", "mytopic")]
     [InlineData("ServiceBusTopicTrigger-JavaScript", "serviceBusTrigger-subscription", "--service-bus-trigger-subscription",
         "subscriptionName", "mysubscription")]
-    public async Task Defaults_ApprovedJavaScriptEntities_PreserveOmittedValuesAndKeepExplicitIncludingEmptyOperative(
+    [InlineData("EventHubTrigger-TypeScript", "eventHubTrigger-name", "--event-hub-trigger-name", "eventHubName", "samples-workitems")]
+    [InlineData("ServiceBusQueueTrigger-TypeScript", "serviceBusTrigger-name", "--service-bus-trigger-name", "queueName", "myinputqueue")]
+    [InlineData("ServiceBusTopicTrigger-TypeScript", "serviceBusTrigger-topic", "--service-bus-trigger-topic", "topicName", "mytopic")]
+    [InlineData("ServiceBusTopicTrigger-TypeScript", "serviceBusTrigger-subscription", "--service-bus-trigger-subscription",
+        "subscriptionName", "mysubscription")]
+    public async Task Defaults_ApprovedEntityNames_PreserveOmittedValuesAndKeepExplicitIncludingEmptyOperative(
         string identity, string canonical, string option, string property, string omitted)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        RecordingNodeSourceAuthority authority = new();
+        NodeItemSource qualified = await ReadQualifiedSourceAsync(identity, authority);
+        authority.Calls.Should().Be(1);
+        qualified.HasHostSourceQualification.Should().Be(identity.EndsWith("-JavaScript", StringComparison.Ordinal));
         using var bridge = await CreateNodeBridgeAsync();
         string project = Path.Combine(_root, "defaults-project");
-        await CreateNodeBridgeProjectAsync(bridge, project, "js");
+        string extension = identity.EndsWith("-TypeScript", StringComparison.Ordinal) ? "ts" : "js";
+        await CreateNodeBridgeProjectAsync(bridge, project, extension);
         string target = Path.Combine(project, "src", "functions");
         using var session = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(target)), CancellationToken.None);
         using var templater = new Templater(session);
@@ -45,17 +54,22 @@ public sealed partial class BundledNodeTemplateTests
 
             (await InvokeNodeBridgeAsync(bridge.Adapter.ParseNewInvocation(bridge.NewCommand(), tokens, dryRun: true)))
                 .Should().Be(0, _interaction.AllOutput);
-            File.Exists(Path.Combine(target, name + ".js")).Should().BeFalse();
+            File.Exists(Path.Combine(target, name + "." + extension)).Should().BeFalse();
             (await InvokeNodeBridgeAsync(bridge.Adapter.ParseNewInvocation(bridge.NewCommand(), tokens)))
                 .Should().Be(0, _interaction.AllOutput);
 
             var result = bridge.Runner.Last!;
             result.ArgumentResults.Single().ValuesByCanonicalName[canonical].Should().Be(value ?? omitted);
             result.ArgumentResults.Single().MissingRequiredParameters.Should().BeEmpty();
-            File.ReadAllText(Path.Combine(target, name + ".js")).Should().Contain($"{property}: '{value ?? omitted}',");
-            if (identity != "EventHubTrigger-JavaScript")
+            string content = File.ReadAllText(Path.Combine(target, name + "." + extension));
+            content.Should().Contain($"{property}: '{value ?? omitted}',");
+            if (identity == "EventHubTrigger-TypeScript")
             {
-                File.ReadAllText(Path.Combine(target, name + ".js")).Should().Contain("connection: '',");
+                content.Should().Contain("connection: '%connection%',");
+            }
+            else if (identity != "EventHubTrigger-JavaScript")
+            {
+                content.Should().Contain("connection: '',");
             }
         }
     }
@@ -72,9 +86,21 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("duplicateParameter")]
     [InlineData("requiredFlag")]
     [InlineData("noDescriptorOriginalDefaults", true)]
-    public async Task Defaults_SelectedSource_RequiresExactOriginalAndNativeAssociations(string corruption, bool succeeds = false)
+    [InlineData("missingDescriptor", false, "TypeScript")]
+    [InlineData("missingSource", false, "TypeScript")]
+    [InlineData("sourceHash", false, "TypeScript")]
+    [InlineData("foreignSourcePath", false, "TypeScript")]
+    [InlineData("otherIdentity", false, "TypeScript")]
+    [InlineData("originalDefault", false, "TypeScript")]
+    [InlineData("nativeDefault", false, "TypeScript")]
+    [InlineData("unknownParameter", false, "TypeScript")]
+    [InlineData("duplicateParameter", false, "TypeScript")]
+    [InlineData("requiredFlag", false, "TypeScript")]
+    [InlineData("noDescriptorOriginalDefaults", true, "TypeScript")]
+    public async Task Defaults_SelectedSource_RequiresExactOriginalAndNativeAssociations(
+        string corruption, bool succeeds = false, string language = "JavaScript")
     {
-        const string identity = "ServiceBusQueueTrigger-JavaScript";
+        string identity = "ServiceBusQueueTrigger-" + language;
         const string canonical = "serviceBusTrigger-name";
         const string path = "provenance/node/native-defaults.json";
         string archive = Path.Combine(_root, "default-association.nupkg");
@@ -143,16 +169,20 @@ public sealed partial class BundledNodeTemplateTests
         var selected = (await templater.ResolveGroupAsync(identity, TemplateType.Item, CancellationToken.None)).Group!.Single();
         var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));
 
-        var result = await new NodeItemCompatibility(_interaction).ResolveAsync(selected, arguments, null, false, CancellationToken.None);
+        RecordingNodeSourceAuthority authority = new();
+        var result = await new NodeItemCompatibility(_interaction, sourceAuthority: authority)
+            .ResolveAsync(selected, arguments, null, false, CancellationToken.None);
 
         result.Succeeded.Should().Be(succeeds);
         if (succeeds)
         {
             arguments.ValuesByCanonicalName[canonical].Should().Be("js-queue-items");
+            authority.Calls.Should().BeGreaterThan(0);
         }
         else
         {
             result.Diagnostics.Should().ContainSingle().Which.Should().Contain("owned compatibility source");
+            authority.Calls.Should().Be(0, "original and native default/source validation must reject before host proof");
         }
         Directory.Exists(Path.Combine(_root, "src")).Should().BeFalse();
     }
@@ -164,6 +194,21 @@ public sealed partial class BundledNodeTemplateTests
             ("ServiceBusQueueTrigger-JavaScript", "serviceBusTrigger-name") => "myinputqueue",
             ("ServiceBusTopicTrigger-JavaScript", "serviceBusTrigger-topic") => "mytopic",
             ("ServiceBusTopicTrigger-JavaScript", "serviceBusTrigger-subscription") => "mysubscription",
+            ("EventHubTrigger-TypeScript", "eventHubTrigger-name") => "samples-workitems",
+            ("ServiceBusQueueTrigger-TypeScript", "serviceBusTrigger-name") => "myinputqueue",
+            ("ServiceBusTopicTrigger-TypeScript", "serviceBusTrigger-topic") => "mytopic",
+            ("ServiceBusTopicTrigger-TypeScript", "serviceBusTrigger-subscription") => "mysubscription",
             _ => original,
         };
+
+    private sealed class RecordingNodeSourceAuthority : NodeConvertedSourceAuthority
+    {
+        public int Calls { get; private set; }
+
+        public override bool Matches(NodeItemSource source)
+        {
+            Calls++;
+            return base.Matches(source);
+        }
+    }
 }

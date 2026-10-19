@@ -80,13 +80,14 @@ and TypeScript: Timer schedule; Queue connection/name; Blob and Event Grid
 Blob connection/path; Event Hub name; Service Bus connection/queue/topic/
 subscription; and the existing Cosmos connection/database/collection/lease
 properties. This intentionally repairs inherited raw payloads that ignored
-those inputs. `native-defaults.json` explicitly authors the JavaScript omitted
+those inputs. `native-defaults.json` explicitly authors the JavaScript and TypeScript omitted
 entity-name defaults to preserve the old generated targets: Event Hub
 `samples-workitems`, Service Bus queue `myinputqueue`, and Service Bus topic
 `mytopic` / subscription `mysubscription`. The converter emits these as native
 symbol defaults, so help, canonical argument values and generation agree.
-Explicit values, including accepted empty strings, remain operative. TypeScript
-defaults, connection defaults and Dapr policy are unchanged.
+Explicit values, including accepted empty strings, remain operative. Other
+defaults, connection values (including TypeScript Event Hub's `%connection%`
+literal) and Dapr policy are unchanged.
 
 The converter replaces exactly one reviewed property declaration associated
 with the original template kind, prompt ID, assignment token and literal.
@@ -175,7 +176,7 @@ The inner archive additionally contains the byte-exact original
 under `provenance/node/v2/`. A Node-local pack-generated
 `provenance/node/compatibility.json` binds each original ID to its native
 identity, package ID/version, configuration, host metadata and payload hashes.
-The three JavaScript mappings additionally pin the byte-exact
+The six JavaScript/TypeScript entity-template mappings additionally pin the byte-exact
 `provenance/node/native-defaults.json` authoring source. Each changed default
 must match both its original prompt default and its authored native value;
 other parameters and packages without this descriptor retain the original

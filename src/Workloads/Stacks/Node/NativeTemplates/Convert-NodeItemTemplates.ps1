@@ -22,8 +22,8 @@ $nativeDefaults = Get-Content -LiteralPath $nativeDefaultsPath -Raw | ConvertFro
 $promptById = @{}
 foreach ($prompt in $prompts) { $promptById.Add($prompt.id, $prompt) }
 foreach ($id in $nativeDefaults.Keys) {
-    $matches = @($templates | Where-Object { $_.id -ceq $id -and $_.language -ceq 'javascript' })
-    if ($matches.Count -ne 1 -or $nativeDefaults[$id].Count -eq 0) { throw "Native defaults require one owned JavaScript item '$id'." }
+    $matches = @($templates | Where-Object { $_.id -ceq $id -and $_.language -cin @('javascript', 'typescript') })
+    if ($matches.Count -ne 1 -or $nativeDefaults[$id].Count -eq 0) { throw "Native defaults require one owned Node item '$id'." }
     foreach ($canonical in $nativeDefaults[$id].Keys) {
         $inputs = @($matches[0].jobs.inputs | Where-Object { $_.paramId -ceq $canonical -and $_.assignTo -cne '$(FUNCTION_NAME_INPUT)' })
         if ($inputs.Count -ne 1) { throw "Native default '$id/$canonical' requires one owned non-name parameter." }

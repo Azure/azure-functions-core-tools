@@ -19,12 +19,14 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("ambiguousDeclaration", false)]
     [InlineData("changedAssignment", false)]
     [InlineData("changedSourceDefault", false)]
+    [InlineData("changedSourceDefault", false, "TypeScript")]
     [InlineData("queueBlockComment", false)]
     [InlineData("timerTemplateLiteral", false)]
     [InlineData("queueUnrelatedObject", false)]
     [InlineData("daprCommentDecoy", false)]
     [InlineData("daprHelperDrift", false)]
-    public async Task Converter_ChangedSource_AssociatesOnlyReviewedDeclarationsOrFailsClosed(string change, bool succeeds)
+    public async Task Converter_ChangedSource_AssociatesOnlyReviewedDeclarationsOrFailsClosed(
+        string change, bool succeeds, string? sourceLanguage = null)
     {
         string owned = NodeSourceDirectory();
         string source = Path.Combine(_root, "converter-input");
@@ -37,7 +39,8 @@ public sealed partial class BundledNodeTemplateTests
         string catalog = Path.Combine(source, "templates", "templates.json");
         var templates = JsonNode.Parse(File.ReadAllBytes(catalog))!.AsArray();
         const string decoys = "\n// schedule: '0 */5 * * * *',\nconst unrelated = '0 */5 * * * *';\n";
-        string[] languages = change.StartsWith("dapr", StringComparison.Ordinal) || change == "changedSourceDefault"
+        string[] languages = sourceLanguage is not null ? [sourceLanguage]
+            : change.StartsWith("dapr", StringComparison.Ordinal) || change == "changedSourceDefault"
             ? ["JavaScript"] : ["JavaScript", "TypeScript"];
         foreach (string language in languages)
         {
@@ -228,7 +231,8 @@ public sealed partial class BundledNodeTemplateTests
         var defaults = manifest.RootElement.GetProperty("templates").EnumerateArray().Where(mapping => mapping.TryGetProperty("nativeDefaults", out _))
             .ToArray();
         defaults.Select(mapping => mapping.GetProperty("legacyId").GetString()).Should()
-            .BeEquivalentTo("EventHubTrigger-JavaScript", "ServiceBusQueueTrigger-JavaScript", "ServiceBusTopicTrigger-JavaScript");
+            .BeEquivalentTo("EventHubTrigger-JavaScript", "ServiceBusQueueTrigger-JavaScript", "ServiceBusTopicTrigger-JavaScript",
+                "EventHubTrigger-TypeScript", "ServiceBusQueueTrigger-TypeScript", "ServiceBusTopicTrigger-TypeScript");
         byte[] authored = File.ReadAllBytes(Path.Combine(native, "native-defaults.json"));
         File.ReadAllBytes(Path.Combine(provenance, "native-defaults.json")).Should().Equal(authored);
         foreach (var mapping in defaults)

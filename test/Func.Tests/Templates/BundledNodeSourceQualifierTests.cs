@@ -31,6 +31,8 @@ public sealed partial class BundledNodeTemplateTests
         using var session = await _templates.OpenReadAsync(context, CancellationToken.None, availability);
         using var templater = new Templater(session);
         NodeConvertedSourceAuthority authority = new();
+        List<string> enrolled = [];
+        List<string> fallback = [];
         foreach (var raw in ReadNodeSource().Templates)
         {
             var selected = (await templater.ResolveGroupAsync(raw.Id!, TemplateType.Item, CancellationToken.None)).Group!.Single();
@@ -38,11 +40,15 @@ public sealed partial class BundledNodeTemplateTests
             var source = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
             var approved = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None, authority);
 
-            approved.HasHostSourceQualification.Should().BeTrue(raw.Id);
+            bool requiresFallback = raw.Id is "EventHubTrigger-TypeScript" or "ServiceBusQueueTrigger-TypeScript"
+                or "ServiceBusTopicTrigger-TypeScript";
+            approved.HasHostSourceQualification.Should().Be(!requiresFallback, raw.Id);
+            (requiresFallback ? fallback : enrolled).Add(raw.Id!);
             approved.Content.ToArray().Should().Equal(source.Content.ToArray());
             approved.Sources.Should().Equal(source.Sources);
             source.Sources.Should().HaveCount(raw.Id is "EventHubTrigger-JavaScript" or "ServiceBusQueueTrigger-JavaScript"
-                or "ServiceBusTopicTrigger-JavaScript" ? 9 : 8);
+                or "ServiceBusTopicTrigger-JavaScript" or "EventHubTrigger-TypeScript" or "ServiceBusQueueTrigger-TypeScript"
+                or "ServiceBusTopicTrigger-TypeScript" ? 9 : 8);
             foreach (var pin in source.Sources)
             {
                 pin.TemplateIdentity.Should().Be(selected.Entry.Identity);
@@ -51,6 +57,9 @@ public sealed partial class BundledNodeTemplateTests
             }
             source.Sources.Should().Contain(source.ContentSource);
         }
+        enrolled.Should().HaveCount(30);
+        fallback.Should().BeEquivalentTo("EventHubTrigger-TypeScript", "ServiceBusQueueTrigger-TypeScript",
+            "ServiceBusTopicTrigger-TypeScript");
         Directory.Exists(Path.Combine(_root, "src")).Should().BeFalse();
     }
 

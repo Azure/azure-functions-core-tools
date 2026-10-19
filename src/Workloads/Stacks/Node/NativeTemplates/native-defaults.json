@@ -20,5 +20,27 @@
       "sourceDefaultValue": "",
       "defaultValue": "mysubscription"
     }
+  },
+  "EventHubTrigger-TypeScript": {
+    "eventHubTrigger-name": {
+      "sourceDefaultValue": "",
+      "defaultValue": "samples-workitems"
+    }
+  },
+  "ServiceBusQueueTrigger-TypeScript": {
+    "serviceBusTrigger-name": {
+      "sourceDefaultValue": "js-queue-items",
+      "defaultValue": "myinputqueue"
+    }
+  },
+  "ServiceBusTopicTrigger-TypeScript": {
+    "serviceBusTrigger-topic": {
+      "sourceDefaultValue": "",
+      "defaultValue": "mytopic"
+    },
+    "serviceBusTrigger-subscription": {
+      "sourceDefaultValue": "",
+      "defaultValue": "mysubscription"
+    }
   }
 }
