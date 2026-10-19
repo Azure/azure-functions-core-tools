@@ -106,10 +106,7 @@ internal sealed class TemplateOptionHydrator
             _ => BuildStringOption(template, prompt, longName),
         };
 
-        if (!string.IsNullOrWhiteSpace(prompt.Description))
-        {
-            option.Description = prompt.Description;
-        }
+        option.Description = BuildDescription(prompt);
 
         if (!string.IsNullOrWhiteSpace(prompt.ShortAlias))
         {
@@ -117,6 +114,18 @@ internal sealed class TemplateOptionHydrator
         }
 
         return option;
+    }
+
+    private static string BuildDescription(TemplateUserPrompt prompt)
+    {
+        if (string.IsNullOrWhiteSpace(prompt.Description))
+        {
+            return $"Value for template parameter '{prompt.Id}'.";
+        }
+
+        return string.Join(
+            ' ',
+            prompt.Description.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
     }
 
     private Option BuildStringOption(FunctionTemplateInfo template, TemplateUserPrompt prompt, string longName)

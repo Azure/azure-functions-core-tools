@@ -37,6 +37,11 @@ public class PowerShellProjectInitializerTests
         IReadOnlyList<Option> options = new PowerShellProjectInitializer(new PowerShellProjectStack()).GetInitOptions(new InitOptionRegistry(root));
 
         options.Count.Should().Be(4);
+        options.Should().OnlyContain(option =>
+            option.Description != null &&
+            !string.IsNullOrWhiteSpace(option.Description) &&
+            !option.Description.Contains('\r') &&
+            !option.Description.Contains('\n'));
     }
 
     [Fact]

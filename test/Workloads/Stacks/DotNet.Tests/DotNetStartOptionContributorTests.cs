@@ -39,7 +39,13 @@ public class DotNetStartOptionContributorTests
 
         root.Options.Select(o => o.Name).Should().Contain(
             ["--dotnet-isolated-debug", "--enable-json-output", "--json-output-file"]);
-        contributor.GetStartOptions(new StartOptionRegistry(root)).Should().HaveCount(3);
+        IReadOnlyList<Option> options = contributor.GetStartOptions(new StartOptionRegistry(root));
+        options.Should().HaveCount(3);
+        options.Should().OnlyContain(option =>
+            option.Description != null &&
+            !string.IsNullOrWhiteSpace(option.Description) &&
+            !option.Description.Contains('\r') &&
+            !option.Description.Contains('\n'));
     }
 
     [Fact]

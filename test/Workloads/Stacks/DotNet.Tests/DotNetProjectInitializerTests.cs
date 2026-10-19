@@ -45,6 +45,11 @@ public class DotNetProjectInitializerTests : IDisposable
 
         options.Should().ContainSingle();
         options[0].Should().BeSameAs(initializer.FrameworkOption);
+        options.Should().OnlyContain(option =>
+            option.Description != null &&
+            !string.IsNullOrWhiteSpace(option.Description) &&
+            !option.Description.Contains('\r') &&
+            !option.Description.Contains('\n'));
     }
 
     [Fact]
