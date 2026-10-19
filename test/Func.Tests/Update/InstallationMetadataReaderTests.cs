@@ -18,23 +18,18 @@ public sealed class InstallationMetadataReaderTests
     private static readonly byte[] _invalidUtf8 = [0xC3, 0x28];
 
     [Theory]
-    [InlineData("standalone", "in-place", (int)InstallationUpdatePolicy.InPlace)]
-    [InlineData("future-package-manager", "external", (int)InstallationUpdatePolicy.External)]
-    [InlineData("future-installer", "in-place", (int)InstallationUpdatePolicy.InPlace)]
-    public async Task ReadAsync_ValidMetadata_ReturnsOpaqueInstallMethodAndPolicy(
-        string method,
-        string policy,
-        int expectedPolicy)
+    [InlineData("in-place", (int)InstallationUpdatePolicy.InPlace)]
+    [InlineData("external", (int)InstallationUpdatePolicy.External)]
+    public async Task ReadAsync_ValidMetadata_ReturnsPolicy(string policy, int expectedPolicy)
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
-        SetMetadata(fileSystem, ValidJson(method, policy));
+        SetMetadata(fileSystem, ValidJson(policy));
 
         // Act
         InstallationMetadata metadata = await reader.ReadAsync(CancellationToken.None);
 
         // Assert
-        metadata.InstallMethod.Should().Be(method);
         metadata.UpdatePolicy.Should().Be((InstallationUpdatePolicy)expectedPolicy);
     }
 
@@ -44,7 +39,7 @@ public sealed class InstallationMetadataReaderTests
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
         CancellationToken cancellationToken = CancellationToken.None;
-        SetMetadata(fileSystem, ValidJson("standalone", "in-place"));
+        SetMetadata(fileSystem, ValidJson("in-place"));
 
         // Act
         await reader.ReadAsync(cancellationToken);
@@ -60,7 +55,7 @@ public sealed class InstallationMetadataReaderTests
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
         string metadataPath = Path.Combine(AppContext.BaseDirectory, InstallationMetadataReader.MetadataFileName);
         fileSystem.OpenReadIfExists(metadataPath)
-            .Returns(_ => new MemoryStream(Encoding.UTF8.GetBytes(ValidJson("standalone", "in-place"))));
+            .Returns(_ => new MemoryStream(Encoding.UTF8.GetBytes(ValidJson("in-place"))));
         InstallationMetadataReader reader = new(
             fileSystem,
             Options.Create(new CliEnvironmentOptions()));
@@ -77,7 +72,7 @@ public sealed class InstallationMetadataReaderTests
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
-        string json = ValidJson("standalone", "in-place");
+        string json = ValidJson("in-place");
         string paddedJson = json.PadRight(InstallationMetadataReader.MaximumMetadataByteCount);
         Encoding.UTF8.GetByteCount(paddedJson).Should().Be(InstallationMetadataReader.MaximumMetadataByteCount);
         SetMetadata(fileSystem, paddedJson);
@@ -86,7 +81,7 @@ public sealed class InstallationMetadataReaderTests
         InstallationMetadata metadata = await reader.ReadAsync(CancellationToken.None);
 
         // Assert
-        metadata.Should().Be(new InstallationMetadata("standalone", InstallationUpdatePolicy.InPlace));
+        metadata.Should().Be(new InstallationMetadata(InstallationUpdatePolicy.InPlace));
     }
 
     [Fact]
@@ -101,7 +96,7 @@ public sealed class InstallationMetadataReaderTests
         // Assert
         FileNotFoundException exception = (await act.Should().ThrowAsync<FileNotFoundException>()).Which;
         exception.FileName.Should().Be(_metadataPath);
-        exception.Message.Should().Contain("Could not determine the installation method");
+        exception.Message.Should().Contain("Could not determine the update policy");
         exception.Message.Should().Contain(Constants.DocsUrl);
     }
 
@@ -141,13 +136,11 @@ public sealed class InstallationMetadataReaderTests
 
     [Theory]
     [InlineData("{}")]
-    [InlineData("""{"installMethod":"standalone","updatePolicy":"in-place"}""")]
-    [InlineData("""{"schemaVersion":1,"updatePolicy":"in-place"}""")]
-    [InlineData("""{"schemaVersion":1,"installMethod":"standalone"}""")]
-    [InlineData("""{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place","future":true}""")]
-    [InlineData("""{"schemaVersion":2,"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}""")]
-    [InlineData("""{"schemaVersion":1,"installMethod":"npm","installMethod":"standalone","updatePolicy":"in-place"}""")]
-    [InlineData("""{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"external","updatePolicy":"in-place"}""")]
+    [InlineData("""{"updatePolicy":"in-place"}""")]
+    [InlineData("""{"schemaVersion":1}""")]
+    [InlineData("""{"schemaVersion":1,"updatePolicy":"in-place","future":true}""")]
+    [InlineData("""{"schemaVersion":2,"schemaVersion":1,"updatePolicy":"in-place"}""")]
+    [InlineData("""{"schemaVersion":1,"updatePolicy":"external","updatePolicy":"in-place"}""")]
     [InlineData("null")]
     public async Task ReadAsync_MissingOrUnknownProperty_ThrowsInvalidInstallationMetadataException(string json)
     {
@@ -167,9 +160,7 @@ public sealed class InstallationMetadataReaderTests
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
-        SetMetadata(
-            fileSystem,
-            """{"schemaVersion":2,"installMethod":"standalone","updatePolicy":"in-place"}""");
+        SetMetadata(fileSystem, """{"schemaVersion":2,"updatePolicy":"in-place"}""");
 
         // Act
         Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
@@ -192,30 +183,12 @@ public sealed class InstallationMetadataReaderTests
         await act.Should().ThrowAsync<UnsupportedInstallationMetadataSchemaException>();
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData(" ")]
-    [InlineData(" npm")]
-    [InlineData("npm ")]
-    public async Task ReadAsync_InvalidInstallMethod_ThrowsInvalidInstallationMetadataException(string method)
-    {
-        // Arrange
-        (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
-        SetMetadata(fileSystem, ValidJson(method, "external"));
-
-        // Act
-        Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidInstallationMetadataException>();
-    }
-
     [Fact]
     public async Task ReadAsync_UnknownUpdatePolicy_ThrowsInvalidInstallationMetadataException()
     {
         // Arrange
         (InstallationMetadataReader reader, IFileSystem fileSystem) = CreateReader();
-        SetMetadata(fileSystem, ValidJson("standalone", "managed"));
+        SetMetadata(fileSystem, ValidJson("managed"));
 
         // Act
         Func<Task> act = () => reader.ReadAsync(CancellationToken.None);
@@ -315,6 +288,6 @@ public sealed class InstallationMetadataReaderTests
             .Returns(_ => new MemoryStream(Encoding.UTF8.GetBytes(json)));
     }
 
-    private static string ValidJson(string method, string policy) =>
-        $$"""{"schemaVersion":1,"installMethod":"{{method}}","updatePolicy":"{{policy}}"}""";
+    private static string ValidJson(string policy) =>
+        $$"""{"schemaVersion":1,"updatePolicy":"{{policy}}"}""";
 }

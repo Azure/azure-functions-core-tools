@@ -6,7 +6,7 @@ param()
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$expectedJson = '{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}' + "`n"
+$expectedJson = '{"schemaVersion":1,"updatePolicy":"in-place"}' + "`n"
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) "func-installer-metadata-$([Guid]::NewGuid().ToString('N'))"
 $installerTempRoot = Join-Path $testRoot 'installer-temp'
 $isWindowsHost = $IsWindows -or $env:OS -eq 'Windows_NT'
@@ -65,9 +65,8 @@ function Assert-Metadata {
 
     $metadata = [System.Text.Encoding]::UTF8.GetString($actualBytes) | ConvertFrom-Json
     Assert-True ($metadata.schemaVersion -eq 1) 'schemaVersion was not 1.'
-    Assert-True ($metadata.installMethod -eq 'standalone') 'installMethod was not standalone.'
     Assert-True ($metadata.updatePolicy -eq 'in-place') 'updatePolicy was not in-place.'
-    Assert-True (($metadata.PSObject.Properties.Name | Sort-Object) -join ',' -eq 'installMethod,schemaVersion,updatePolicy') `
+    Assert-True (($metadata.PSObject.Properties.Name | Sort-Object) -join ',' -eq 'schemaVersion,updatePolicy') `
         'Metadata contained fields outside the installation contract.'
     Assert-True (-not (Get-ChildItem -LiteralPath $InstallPath -Filter '.func.installation.json.tmp.*' -Force)) `
         'An atomic-write temporary file was left behind.'

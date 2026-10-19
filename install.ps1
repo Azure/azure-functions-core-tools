@@ -58,7 +58,7 @@ $Script:DefaultInstallDir = Join-Path $HOME '.azure-functions'
 $Script:DownloadBaseUrl = 'https://cdn.functions.azure.com'
 $Script:VersionManifestUrl = "$Script:DownloadBaseUrl/public/cli/v5/version.json"
 $Script:InstallationMetadataFile = 'func.installation.json'
-$Script:InstallationMetadataJson = '{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}'
+$Script:InstallationMetadataJson = '{"schemaVersion":1,"updatePolicy":"in-place"}'
 
 # True when invoked as a file (pwsh -File ... or .\install.ps1), false when piped
 # into iex. We use this so a piped 'exit' doesn't kill the user's pwsh session.
