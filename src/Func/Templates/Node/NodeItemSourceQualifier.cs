@@ -142,7 +142,7 @@ internal static class NodeItemSourceQualifier
             : null;
     }
 
-    private static bool HasDaprHelper(string? identity)
+    internal static bool HasDaprHelper(string? identity)
         => identity is "DaprPublishOutputBinding-JavaScript" or "DaprServiceInvocationTrigger-JavaScript";
 
     private static string AuthorDaprHelpers(string identity, string body, string separator = "-")

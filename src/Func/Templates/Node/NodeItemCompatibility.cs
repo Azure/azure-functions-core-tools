@@ -11,7 +11,7 @@ using NuGet.Versioning;
 namespace Azure.Functions.Cli.Templates.Node;
 
 /// <summary>
-/// Qualifies original Node item defaults and validators from the selected native package for the unused command bridge.
+/// Retains original Node defaults and validators without reconstructing explicitly native definitions.
 /// </summary>
 internal sealed class NodeItemCompatibility(IInteractionService interaction, Func<string?>? updateHint = null) : INativeItemCompatibility
 {
@@ -55,14 +55,26 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            if (selected.Entry.NativeGeneration is not null && !await HasLegacyMappingAsync(selected, cancellationToken))
+            {
+                string? name = requestedName ?? selected.Entry.DefaultName;
+                string? diagnostic = NativeTemplateGenerationContract.FunctionNameDiagnostic(name);
+                return new(name, requestedName is null ? "authoredDefault" : "explicit", diagnostic is null ? [] : [diagnostic]);
+            }
             NodeItemSource source = await ReadSourceAsync(selected, cancellationToken);
-            NodeItemSourceQualifier.ValidateArguments(source, arguments.ValuesByCanonicalName);
+            if (selected.Entry.NativeGeneration is null)
+            {
+                NodeItemSourceQualifier.ValidateArguments(source, arguments.ValuesByCanonicalName);
+            }
             NativeTemplateLegacyContract contract = source.Contract;
             NativeItemCompatibility compatibility = new(_interaction, _ => contract, async (candidate, path, token) =>
             {
                 // Re-read all source bindings before handing original bytes to the shared validator.
                 NodeItemSource current = await ReadSourceAsync(candidate, token);
-                NodeItemSourceQualifier.ValidateArguments(current, arguments.ValuesByCanonicalName);
+                if (candidate.Entry.NativeGeneration is null)
+                {
+                    NodeItemSourceQualifier.ValidateArguments(current, arguments.ValuesByCanonicalName);
+                }
                 return await candidate.ReadPackageFileAsync(path, token);
             });
             NativeItemCompatibilityResult resolved = await compatibility.ResolveAsync(selected, arguments, requestedName, canPrompt, cancellationToken);
@@ -116,7 +128,7 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
 
         ReadOnlyMemory<byte> manifestBytes = await selected.ReadPackageFileAsync(ManifestPath, cancellationToken);
         List<TemplateEffectSource> pins = [new(entry.Identity, ManifestPath, Convert.ToHexString(SHA256.HashData(manifestBytes.Span)))];
-        using var manifest = JsonDocument.Parse(manifestBytes);
+        using JsonDocument manifest = ParseManifest(manifestBytes);
         JsonElement root = manifest.RootElement;
         if (Text(root, "packageId") != package.Identifier
             || !NuGetVersion.TryParse(Text(root, "packageVersion"), out NuGetVersion? version)
@@ -215,7 +227,11 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
             package, projected.DefaultFunctionName, functionName, null, rules);
         NodeItemSource qualified = new(contract, raw, configBytes, contentBytes, Text(contentDescriptor, "path"), Text(configuration, "path"),
             pins.AsReadOnly(), pins.Single(pin => pin.Identity == Text(contentDescriptor, "path")));
-        NodeItemSourceQualifier.Validate(qualified, entry.Language);
+        // Auxiliary function identities still require their narrow source-shape proof.
+        if (entry.NativeGeneration is null || NodeItemSourceQualifier.HasDaprHelper(raw.Id))
+        {
+            NodeItemSourceQualifier.Validate(qualified, entry.Language);
+        }
         return qualified;
 
         async Task<ReadOnlyMemory<byte>> ReadPinnedAsync(JsonElement descriptor)
@@ -223,6 +239,81 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
             ReadOnlyMemory<byte> bytes = await ReadVerifiedAsync(selected, descriptor, cancellationToken);
             pins.Add(new(entry.Identity, Text(descriptor, "path"), Convert.ToHexString(SHA256.HashData(bytes.Span))));
             return bytes;
+        }
+    }
+
+    private static async Task<bool> HasLegacyMappingAsync(ResolvedTemplate selected, CancellationToken cancellationToken)
+    {
+        ReadOnlyMemory<byte> bytes;
+        try
+        {
+            bytes = await selected.ReadPackageFileAsync(ManifestPath, cancellationToken);
+        }
+        catch (FileNotFoundException)
+        {
+            // Native-only definitions need not claim a historical conversion or validator contract.
+            return false;
+        }
+
+        using JsonDocument manifest = ParseManifest(bytes);
+        JsonElement root = manifest.RootElement;
+        if (selected.Entry.Package is not { } package || Text(root, "packageId") != package.Identifier
+            || !NuGetVersion.TryParse(Text(root, "packageVersion"), out NuGetVersion? declared)
+            || !NuGetVersion.TryParse(package.Version, out NuGetVersion? installed) || declared != installed)
+        {
+            throw Invalid("Native Node compatibility provenance does not match its selected package/version.");
+        }
+        JsonElement[] mappings = [.. Array(root, "templates").Where(mapping => Text(mapping, "identity") == selected.Entry.Identity)];
+        return mappings.Length <= 1 ? mappings.Length == 1
+            : throw Invalid("The selected native identity has multiple original Node compatibility mappings.");
+    }
+
+    private static JsonDocument ParseManifest(ReadOnlyMemory<byte> bytes)
+    {
+        var document = JsonDocument.Parse(bytes);
+        try
+        {
+            ValidateUniqueProperties(document.RootElement);
+            return document;
+        }
+        catch (InvalidDataException)
+        {
+            document.Dispose();
+            throw;
+        }
+    }
+
+    private static void ValidateUniqueProperties(JsonElement value)
+    {
+        try
+        {
+            if (value.ValueKind == JsonValueKind.Object)
+            {
+                HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
+                foreach (JsonProperty property in value.EnumerateObject())
+                {
+                    if (!names.Add(property.Name))
+                    {
+                        throw Invalid($"Duplicate Node provenance property '{property.Name}'.");
+                    }
+                    ValidateUniqueProperties(property.Value);
+                }
+            }
+            else if (value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement item in value.EnumerateArray())
+                {
+                    ValidateUniqueProperties(item);
+                }
+            }
+            else if (value.ValueKind == JsonValueKind.String)
+            {
+                _ = value.GetString();
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new InvalidDataException("Node provenance contains invalid Unicode text.", exception);
         }
     }
 

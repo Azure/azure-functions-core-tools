@@ -218,7 +218,16 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
                 item.Options.ToHashSet(), raw.PathIndex);
             foreach (ResolvedTemplate selected in visible)
             {
-                INativeItemWorkflowProvider? provider = binding._workflows.Value.FindItem(context.Context!.Project!.Stack!);
+                INativeItemWorkflowProvider? provider;
+                try
+                {
+                    provider = binding._workflows.Value.FindItem(context.Context!.Project!.Stack!, selected.Entry);
+                }
+                catch (InvalidTemplateMetadataException exception)
+                {
+                    binding._interaction.WriteError(exception.Message);
+                    return 1;
+                }
                 NativeItemHelpProjection overlay = provider is null ? new(selected.Parameters, [])
                     : await provider.DescribeHelpAsync(new(selected, context.Context), cancellationToken);
                 if (overlay.Parameters.Count != selected.Parameters.Count || selected.Parameters.Any(parameter =>

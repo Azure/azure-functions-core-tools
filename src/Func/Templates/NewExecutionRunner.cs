@@ -100,15 +100,19 @@ internal sealed class NewExecutionRunner(
     {
         string language = templater.Context.Project!.Language!;
         INativeItemWorkflowProvider? provider = _workflows?.FindItem(templater.Context.Project.Stack!);
-        if (_workflows is not null && provider is null)
+        bool requiresNative = _workflows is not null && provider is null;
+        if (requiresNative)
         {
-            return NewExecutionResult.Reject("workflowUnavailable",
-                $"Stack '{templater.Context.Project.Stack}' does not supply a first-party function-item workflow. "
-                + "Use the stack's project tooling to add functions; no project files were changed.");
+            IReadOnlyList<TemplateCatalogEntry> installed = await templater.ListAsync(TemplateType.Item, cancellationToken);
+            if (!installed.Any(entry => entry.NativeGeneration is not null
+                && string.Equals(entry.Language, language, StringComparison.OrdinalIgnoreCase)))
+            {
+                return NewExecutionResult.Reject("workflowUnavailable",
+                    $"Stack '{templater.Context.Project.Stack}' does not supply a first-party function-item workflow. "
+                    + "Use the stack's project tooling to add functions; no project files were changed.");
+            }
         }
 
-        INativeItemCompatibility? compatibility = provider?.Compatibility ?? (_workflows is null ? request.ItemCompatibility : null);
-        INativeSelectedItemEffects? selectedEffects = provider?.Effects ?? (_workflows is null ? request.SelectedItemEffects : null);
         List<TemplateGroup> groups = [];
         List<TemplateCandidateParseResult> parsed = [];
         List<TemplateCatalogEntry> considered = [];
@@ -118,6 +122,7 @@ internal sealed class NewExecutionRunner(
             considered.AddRange(catalog.Where(entry => !entry.IsHidden));
             TemplateCatalogEntry[] visible = [.. catalog.Where(entry => !entry.IsHidden && entry.DeclaredInternalRole is null
                 && entry.MetadataDiagnostic is null && entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible
+                && (!requiresNative || entry.NativeGeneration is not null)
                 && string.Equals(entry.Language, language, StringComparison.OrdinalIgnoreCase))];
             if (request.List)
             {
@@ -238,6 +243,25 @@ internal sealed class NewExecutionRunner(
                 "This item declares an internal role and cannot be invoked as an ordinary function template.") with { SelectedTemplate = selected.Entry };
         }
 
+        bool native;
+        try
+        {
+            native = _workflows?.UsesNativeDefinition(selected.Entry, templater.Context.Project.Stack!) == true;
+        }
+        catch (InvalidTemplateMetadataException exception)
+        {
+            return NewExecutionResult.Reject("workflowPreparationFailed", exception.Message) with { SelectedTemplate = selected.Entry };
+        }
+
+        INativeItemCompatibility? nativeCompatibility = native
+            ? _workflows?.FindNativeCompatibility(templater.Context.Project.Stack!) : null;
+        if (native)
+        {
+            provider = null;
+        }
+        INativeItemCompatibility? compatibility = native ? nativeCompatibility
+            : provider?.Compatibility ?? (_workflows is null ? request.ItemCompatibility : null);
+        INativeSelectedItemEffects? selectedEffects = provider?.Effects ?? (_workflows is null ? request.SelectedItemEffects : null);
         NativeSelectedItemBinding? effectBinding = null;
         if (selectedEffects is { } effectSupport)
         {
@@ -273,6 +297,15 @@ internal sealed class NewExecutionRunner(
             };
         }
 
+        if (native && NativeTemplateGenerationContract.FunctionNameDiagnostic(request.Name ?? selected.Entry.DefaultName) is { } nameDiagnostic)
+        {
+            return NewExecutionResult.Reject("invalidName", nameDiagnostic) with
+            {
+                SelectedTemplate = selected.Entry,
+                ArgumentResults = [final],
+            };
+        }
+
         NativeItemCompatibilityResult? itemName = null;
         if (compatibility is not null)
         {
@@ -292,7 +325,7 @@ internal sealed class NewExecutionRunner(
         cancellationToken.ThrowIfCancellationRequested();
         var invocationRequest = new TemplateInvocationRequest(
             request.WorkingDirectory, final.ValuesByCanonicalName,
-            itemName?.Name ?? request.Name ?? (provider is null ? null : selected.Entry.DefaultName), request.DryRun, request.Force);
+            itemName?.Name ?? request.Name ?? (provider is null && !native ? null : selected.Entry.DefaultName), request.DryRun, request.Force);
         if (provider is not null)
         {
             NativeTemplateInvocationPreparation prepared = await provider.PrepareAsync(
@@ -343,6 +376,12 @@ internal sealed class NewExecutionRunner(
         {
             considered.AddRange(group.Select(template => template.Entry));
             TemplateGroup matchingLanguage = group.FilterByLanguage(language);
+            if (requiresNative)
+            {
+                matchingLanguage = matchingLanguage.FilterByArguments(matchingLanguage
+                    .Where(template => template.Entry.NativeGeneration is not null)
+                    .Select(template => template.Entry.Identity).ToHashSet(StringComparer.Ordinal));
+            }
             TemplateCandidateParseResult[] results = [.. matchingLanguage.Select(template => _arguments.Parse(new(
                 template.Entry.Identity, template.Parameters, request.ReservedAliases, request.RawTemplateTokens), cancellationToken))];
             parsed.AddRange(results);

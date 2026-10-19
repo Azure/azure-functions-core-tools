@@ -39,6 +39,8 @@ internal sealed record TemplateCatalogEntry(
 
     public string? DeclaredInternalRole { get; init; }
 
+    public NativeTemplateGenerationContract? NativeGeneration { get; init; }
+
     public TemplateConstraintEvaluation ConstraintEvaluation { get; init; } = TemplateConstraintEvaluation.NotEvaluated;
 
     public IReadOnlyList<TemplateProjectConfigurationDeclaration>? ProjectConfigurations { get; init; }

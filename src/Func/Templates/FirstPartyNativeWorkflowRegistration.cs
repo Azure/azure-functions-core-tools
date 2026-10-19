@@ -24,6 +24,7 @@ internal static class FirstPartyNativeWorkflowRegistration
         services.AddSingleton<Workloads.Node.NodeNpmInstaller>();
         services.AddScoped<NodeTemplateWorkflowProvider>();
         services.AddScoped<INativeItemWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
+        services.AddScoped<INativeItemValidationProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
         services.AddScoped<INativeProjectWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
         services.AddScoped<PythonTemplateSourceReader>();
         services.AddScoped<PythonItemCompatibility>();

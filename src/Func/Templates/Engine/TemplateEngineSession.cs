@@ -119,6 +119,15 @@ internal class TemplateEngineSession : IDisposable
         return scope.ValidateArchiveAsync(_settings.Host.FileSystem, archive, expected, cancellationToken);
     }
 
+    internal NativeTemplatePackagePin? VerifiedNativePackage(ITemplatePackage? package)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return PackageInfo(package) is { } info
+            && _packageScope?.ReceiptBoundPin(info) is { } pin
+            && _packagePins.TryGetValue(package!.MountPointUri, out string? verified)
+            && string.Equals(verified, pin.Sha256, StringComparison.OrdinalIgnoreCase) ? pin : null;
+    }
+
     private static TemplatePackageInfo? PackageInfo(ITemplatePackage? package) =>
         package is IManagedTemplatePackage managed ? new(managed.Identifier, managed.Version) : null;
 
@@ -338,6 +347,11 @@ internal class TemplateEngineSession : IDisposable
         }
 
         TemplateFileChange[] changes = [.. effects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))];
+        if (configuration.NativeGeneration is not null && configuration.Type == TemplateType.Item
+            && NativeTemplateGenerationContract.ItemOutputDiagnostic(changes) is { } configurationOutput)
+        {
+            return Failed(configurationOutput);
+        }
         bool cleanupPreview = IsCleanupPreview(template, request);
         diagnostic = ValidateOutputPaths(request.OutputDirectory.Info.FullName, changes, cleanupPreview);
         if (diagnostic is not null)
@@ -638,6 +652,11 @@ internal class TemplateEngineSession : IDisposable
 
         IReadOnlyList<TemplateFileChange> templateChanges = Array.AsReadOnly<TemplateFileChange>(
             [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+        if (configuration.NativeGeneration is not null && configuration.Type == TemplateType.Item
+            && NativeTemplateGenerationContract.ItemOutputDiagnostic(templateChanges) is { } configurationOutput)
+        {
+            return new(TemplateInvocationStatus.InvalidTemplate, [], configurationOutput);
+        }
         HashSet<string> preserved = new(Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         if (request.PreserveExistingFiles)
         {

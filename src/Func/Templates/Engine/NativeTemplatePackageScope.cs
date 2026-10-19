@@ -95,6 +95,18 @@ internal sealed class NativeTemplatePackageScope(IReadOnlyList<NativeTemplatePac
         };
     }
 
+    internal NativeTemplatePackagePin? ReceiptBoundPin(TemplatePackageInfo package)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        if (ownership is null)
+        {
+            return null;
+        }
+
+        NativeTemplatePackagePin[] matches = [.. _active.Where(pin => Matches(pin, package)).Distinct()];
+        return matches is [{ Origin: not null } pin] ? pin : null;
+    }
+
     public async Task<string?> ValidateArchiveAsync(IPhysicalFileSystem files, string archive, string expected,
         CancellationToken cancellationToken)
     {

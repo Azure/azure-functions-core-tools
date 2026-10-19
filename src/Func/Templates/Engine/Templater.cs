@@ -194,6 +194,12 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
                 }
 
                 IReadOnlyCollection<string> packageTypes = await metadata;
+                entry = entry with
+                {
+                    NativeGeneration = NativeTemplateGenerationContract.Read(entry, configuration, packageTypes,
+                        _session.VerifiedNativePackage(package), _session.Context.Project),
+                };
+                configuration = configuration with { NativeGeneration = entry.NativeGeneration };
                 TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Content, cancellationToken, packageTypes);
                 if (entry.Type == TemplateType.Project && _session.ProjectTemplatesEnabled)
                 {

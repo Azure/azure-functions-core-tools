@@ -18,6 +18,11 @@ The old command implementations remain available only to internal compatibility 
 `func init --template <installed-identity-or-short-name>` selects an installed
 project through the shared native resolver when more than one family is available.
 It does not bypass the selected stack's source-qualified workflow provider.
+Definitions explicitly declaring `tags.func-generation: "native"` can instead
+use the [owned native source contract](engine-first-acceptance.md#additive-owned-native-source-contract):
+the selected physical workload's verified archive, native capabilities and shared
+Functions configuration policy, without another template identity list. The
+classification alone grants neither source authority nor language effects.
 Unrelated commands retain the common command graph, start-argument normalization,
 first-run handling, telemetry, version notices, and cancellation wiring.
 Command ownership comes from that real graph, including aliases and nested

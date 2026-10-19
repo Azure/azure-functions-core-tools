@@ -12,21 +12,30 @@ namespace Azure.Functions.Cli.Templates;
 internal sealed class NativeTemplateWorkflowRegistry(
     InstalledProjectStackCatalog stacks,
     IEnumerable<INativeItemWorkflowProvider> items,
-    IEnumerable<INativeProjectWorkflowProvider> projects)
+    IEnumerable<INativeProjectWorkflowProvider> projects,
+    NativeTemplateWorkloadCapture? capture = null,
+    IEnumerable<INativeItemValidationProvider>? validations = null)
 {
     private readonly InstalledProjectStackCatalog _stacks = stacks ?? throw new ArgumentNullException(nameof(stacks));
     private readonly IReadOnlyList<INativeItemWorkflowProvider> _items =
         Array.AsReadOnly<INativeItemWorkflowProvider>([.. items ?? throw new ArgumentNullException(nameof(items))]);
     private readonly IReadOnlyList<INativeProjectWorkflowProvider> _projects =
         Array.AsReadOnly<INativeProjectWorkflowProvider>([.. projects ?? throw new ArgumentNullException(nameof(projects))]);
+    private readonly IReadOnlyList<INativeItemValidationProvider> _validations =
+        Array.AsReadOnly<INativeItemValidationProvider>([.. validations ?? []]);
 
-    public INativeItemWorkflowProvider? FindItem(string stack)
+    public INativeItemWorkflowProvider? FindItem(string stack, TemplateCatalogEntry? entry = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stack);
         IProjectStack? installed = _stacks.FindStack(stack);
         if (installed is null)
         {
             throw new InvalidOperationException($"Native item workflow stack '{stack}' is not installed.");
+        }
+
+        if (entry is not null && UsesNativeDefinition(entry, installed.Stack))
+        {
+            return null;
         }
 
         INativeItemWorkflowProvider[] matches = [.. _items.Where(provider =>
@@ -42,6 +51,12 @@ internal sealed class NativeTemplateWorkflowRegistry(
     public INativeProjectWorkflowProvider? FindProject(TemplateCatalogEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
+        if (entry.NativeGeneration is { } native)
+        {
+            UsesNativeDefinition(entry, native.Stack);
+            return null;
+        }
+
         INativeProjectWorkflowProvider[] matches = [.. _projects.Where(provider =>
             _stacks.FindStack(provider.Stack) is not null && provider.Handles(entry))];
         if (matches.Length > 1)
@@ -69,6 +84,49 @@ internal sealed class NativeTemplateWorkflowRegistry(
         }
 
         return selected;
+    }
+
+    internal INativeItemCompatibility? FindNativeCompatibility(string stack)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        IProjectStack installed = _stacks.FindStack(stack)
+            ?? throw new InvalidOperationException($"Native validation stack '{stack}' is not installed.");
+        INativeItemValidationProvider[] matches = [.. _validations.Where(provider =>
+            string.Equals(provider.Stack, installed.Stack, StringComparison.OrdinalIgnoreCase))];
+        return matches.Length switch
+        {
+            0 => null,
+            1 => matches[0].Compatibility,
+            _ => throw new InvalidOperationException($"Multiple native input validators claim stack '{installed.Stack}'."),
+        };
+    }
+
+    internal bool UsesNativeDefinition(TemplateCatalogEntry entry, string stack)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        if (entry.NativeGeneration is not { } native)
+        {
+            return false;
+        }
+
+        IProjectStack? installed = _stacks.FindStack(stack);
+        NativeTemplateWorkloadRegistration? owner = installed is null ? null : capture?.GetStackOrigin(installed);
+        if (installed is null || owner is null || native.Package.Origin is not { } origin
+            || !string.Equals(native.Stack, installed.Stack, StringComparison.Ordinal)
+            || !installed.SupportedLanguages.Contains(native.Language, StringComparer.Ordinal)
+            || entry.Language != native.Language
+            || !string.Equals(origin.PackageId, owner.PackageId, StringComparison.OrdinalIgnoreCase)
+            || origin.Version != owner.PackageVersion
+            || !owner.TemplatePackages.Contains(native.Package)
+            || (entry.ProjectConfigurations is { } declarations
+                && declarations.Any(declaration => declaration.Stack != installed.Stack || declaration.Language != native.Language)))
+        {
+            throw new InvalidTemplateMetadataException(
+                "Native generation does not match the selected installed stack, canonical language and verified physical workload asset.");
+        }
+
+        return true;
     }
 
     public Task<DotNetProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)

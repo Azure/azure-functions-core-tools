@@ -4,7 +4,7 @@ This is a blocking acceptance gate alongside, not a replacement for, original-to
 
 **Audit baseline:** `5a1dcc189df912ff99c56fe5c0253bfb15b24d9b`, tree `5bfd56d45be4d7bb77119684c2504fb021753f3e`. The separate original, already-native migration, and hardening epochs retain their existing identities. The findings below do not establish original public parity.
 
-**Current disposition: open.** Native generation, Node placement, and literal forms are in use, but ordinary package-only extensibility remains restricted by runtime source qualification and provider selection. The bounded selector correction below removes one demonstrated integration obstacle without changing those authorization boundaries.
+**Current disposition: open, with an additive owned-native path qualified.** Explicit native, effect-free Functions definitions can use the selected physical owner's verified archive without a new CLI template identity list. Markerless historical packages keep their existing compatibility path. The remaining legacy conversion and effectful/language-adapter migrations are not accepted waivers; their disposition remains part of this gate. The separately frozen selector increment is `99a97e64`.
 
 ## Acceptance conditions
 
@@ -72,11 +72,105 @@ Observed before/after:
 
 **Precise remaining limitation:** a package author cannot add the demonstrated ordinary Node item or project and have it execute without satisfying the CLI's closed legacy/source/provider contracts. Python and .NET have additional traced inventory constraints listed above; equivalent public extension probes for those stacks were not run. Declaring the native engine unable to render them would be incorrect.
 
+## Additive owned-native source contract
+
+The original falsifier above records the selector-only boundary, not the final
+native capability. A definition can now explicitly declare:
+
+```json
+{
+  "tags": {
+    "type": "item",
+    "language": "JavaScript",
+    "func-generation": "native"
+  },
+  "constraints": {
+    "host": { "type": "host", "args": [{ "hostname": "func" }] },
+    "stack": { "type": "func-workload", "args": "node" }
+  }
+}
+```
+
+This one classification is not a rendering or effect DSL. The actual sources,
+symbols, forms, conditions and output paths remain native definitions. The
+classification alone is insufficient:
+
+- `NativeTemplatePackageScope.ReceiptBoundPin` and
+  `TemplateEngineSession.VerifiedNativePackage` expose only an active physical
+  asset whose existing registration receipt and entire archive hash were
+  validated. No folder, unowned package, inferred owner or inactive cohort gains
+  this authority.
+- `Engine/NativeTemplateGenerationContract.cs` binds the mounted identity,
+  canonical type/language, exclusive `FuncTemplate` package, func-only host and
+  matching stack declaration to that proof. `NativeTemplateWorkflowRegistry`
+  independently matches the asset to the actual installed stack's captured
+  physical owner and supported language.
+- The existing engine session revalidates the same whole archive, configuration
+  and host content before invocation. Whole-archive equality covers every native
+  source; a second runtime list of expected rendered bodies is not its content
+  authority. Native items cannot write the reserved `.func` namespace, including
+  case and trailing-dot/space aliases, even with force.
+- Native item declarations cannot grant post-action dispatch, Python append,
+  restore, arbitrary scripts or F# compile integration. F# effect-free items and
+  additional configuration files remain explicit refusals. Native projects still
+  require the existing mandatory configuration declaration, host-root closure
+  and create-only host writer; the classification does not request npm or other
+  implicit preparation.
+
+`NewExecutionRunner` uses the common parser, name policy, preview and invocation
+for this contract. It does not call a per-template renderer. Contextual help uses
+the same authored native parameters rather than an unrelated legacy default
+projection. A qualified native definition does not require a stack-specific item
+provider. When no such provider exists, only qualified native definitions enter
+the item catalog/selection path; a markerless stack without that capability keeps
+its previous unavailable-workflow result. This is covered by controlled
+composition, not a claim that new public Go/Java/Python catalogs were exercised.
+
+For a Node native definition that retains an original mapping,
+`NodeItemCompatibility` still verifies its package/version, configuration, host,
+content and original metadata descriptors and applies source-derived original
+defaults/validators. It no longer reconstructs the pack-time body transformation
+for that explicitly native definition. The separately registered
+`INativeItemValidationProvider` carries only this validation, never output
+placement or rendering. Removing an optional generation adapter does not remove
+the required validator; both native-only success and mapped/helper refusals are
+checked in that composition. A native-only
+definition need not invent historical provenance; malformed or duplicate claimed
+mappings are failures, not fallbacks. Markerless packages retain the entire
+previous conversion qualifier. Mapping detection and mapped-source reading share
+strict recursive provenance parsing, so duplicate members cannot discard a
+claimed validator. Mapped Dapr helpers retain their complete existing
+source-shape qualification, not merely comparisons with known unsafe bodies;
+their actual generated helper identities/routes remain a narrow language/legacy
+exception.
+
+This is an additive pack contract, not a blanket relabeling of the existing
+catalog. A mapped template opting in must retain its original validation mapping
+and pass the independent compatibility gate. Existing shipped converters and
+projects are not automatically switched, and effects requiring language adapters
+are not silently omitted. Existing direct-engine controls without owner receipts
+must not be made green by fabricating owner proof.
+
+The new public probe uses legitimate Node v4 `@azure/functions` / `app.http`
+content, native name/auth/string symbols, a conditional file and a real
+host/runtime/package scaffold with the mandatory Functions configuration action.
+It adds different identities than the repository tests, through a genuine
+workload install with real ownership receipts. The same package is exercised
+against frozen H2 and the additive candidate: H2's item/source and project/provider
+refusals become native preview/create success. Authored defaults, explicit
+authorization/string values, template-owned placement and conditional files are
+checked, with local Node syntax checks rather than execution of generated code.
+A reclassified original HTTP definition retains its original name validator and
+unchanged generated body; an altered content descriptor, changed retained
+archive, reserved configuration target and unauthorized action remain refusals.
+These are bounded H2-to-successor/capability controls, not original public parity
+or live Functions host/indexing proof.
+
 ## Remaining work and evidence boundaries
 
 Removing the duplicate Node conversion proof, fixed Python inventory, or embedded .NET qualification inventories is not a mechanical deletion. A successor design must identify the authoritative package representation and maintain exact source association, old-cohort compatibility, owner selection, effect authorization and genuine public parity without implementing a second runtime converter. This audit does not silently replace those guarantees with trust in self-declared metadata.
 
-The selector correction and capability tests are deliberately bounded. No broad renderer/provider rewrite, dependency upgrade, arbitrary script dispatch, source guard removal, CI retry, permission/network change or protected PR/ref/review/Ready/merge operation is included.
+The selector and additive native source contract are deliberately bounded. No broad renderer/provider rewrite, dependency upgrade, arbitrary script dispatch, deletion of historical source guards, CI retry, permission/network change or protected PR/ref/review/Ready/merge operation is included.
 
 The local evidence packet records exact CLI/package hashes, argv, isolated homes, stdout/stderr, ownership receipt hashes and source/test inventories. Intermediate fixture failures are retained separately: console encoding, initial ambiguous control selection, a refused same-version changed-archive replacement, and an undeclared option on the custom project. They are not counted as successful architecture qualification.
 

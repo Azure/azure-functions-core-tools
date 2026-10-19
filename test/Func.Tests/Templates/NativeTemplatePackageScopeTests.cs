@@ -9,6 +9,29 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public sealed class NativeTemplatePackageScopeTests
 {
     [Fact]
+    public void ReceiptBoundPin_RequiresOneActiveOwnerAndARealReceiptReader()
+    {
+        NativeTemplatePackagePin first = new("Owned", "1.0.0", new string('a', 64))
+        {
+            Origin = new BundledTemplateOrigin("Stack.A", "1.0.0", new string('c', 64), "source-a"),
+        };
+        NativeTemplatePackagePin other = first with
+        {
+            Origin = new BundledTemplateOrigin("Stack.B", "1.0.0", new string('d', 64), "source-b"),
+        };
+        NativeTemplateOwnershipReader reader = (_, _, _) => Task.FromResult(new NativeTemplateOwnership(true));
+
+        new NativeTemplatePackageScope([first], [first]).ReceiptBoundPin(new("Owned", "1.0.0")).Should().BeNull();
+        new NativeTemplatePackageScope([first], [], reader).ReceiptBoundPin(new("Owned", "1.0.0")).Should().BeNull();
+        new NativeTemplatePackageScope([first], [first with { Origin = null }], reader)
+            .ReceiptBoundPin(new("Owned", "1.0.0")).Should().BeNull();
+        new NativeTemplatePackageScope([first, other], [first, other], reader)
+            .ReceiptBoundPin(new("Owned", "1.0.0")).Should().BeNull();
+        new NativeTemplatePackageScope([first], [first], reader).ReceiptBoundPin(new("Owned", "1.0.0")).Should().Be(first);
+        new NativeTemplatePackageScope([first], [first], reader).ReceiptBoundPin(new("Unowned", "1.0.0")).Should().BeNull();
+    }
+
+    [Fact]
     public void SelectedPhysicalOwner_RestrictsAssetsWithoutMutatingTheOriginalScope()
     {
         NativeTemplatePackagePin first = new("Owned", "1.0.0", new string('a', 64))

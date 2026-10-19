@@ -15,7 +15,7 @@ namespace Azure.Functions.Cli.Templates.Node;
 /// </summary>
 internal sealed class NodeTemplateWorkflowProvider(IInteractionService interaction, IFileSystem fileSystem, NodeNpmInstaller npmInstaller,
     NativeTemplateWorkloadCapture? capture = null, InstalledProjectStackCatalog? stacks = null)
-    : INativeItemWorkflowProvider, INativeProjectWorkflowProvider
+    : INativeItemWorkflowProvider, INativeProjectWorkflowProvider, INativeItemValidationProvider
 {
     private readonly NodeItemCompatibility _compatibility = new(interaction ?? throw new ArgumentNullException(nameof(interaction)), () =>
     {

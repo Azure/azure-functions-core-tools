@@ -5,12 +5,59 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Workloads.Install;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed class NativeTemplateWorkflowRegistryTests
 {
+    [Fact]
+    public void NativeValidation_IsIndependentOfGenerationProviderAvailability()
+    {
+        var compatibility = Substitute.For<INativeItemCompatibility>();
+        var validator = Substitute.For<INativeItemValidationProvider>();
+        validator.Stack.Returns("node");
+        validator.Compatibility.Returns(compatibility);
+        NativeTemplateWorkflowRegistry registry = new(Catalog(), [], [], validations: [validator]);
+
+        registry.FindItem("node").Should().BeNull();
+        registry.FindNativeCompatibility("node-runtime").Should().BeSameAs(compatibility);
+        Action unknown = () => registry.FindNativeCompatibility("uninstalled");
+        unknown.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void NativeValidation_DuplicateClaims_RefusesRatherThanChoosingAnOrder()
+    {
+        var first = Substitute.For<INativeItemValidationProvider>();
+        var second = Substitute.For<INativeItemValidationProvider>();
+        first.Stack.Returns("node");
+        second.Stack.Returns("NODE");
+        NativeTemplateWorkflowRegistry registry = new(Catalog(), [], [], validations: [first, second]);
+
+        Action act = () => registry.FindNativeCompatibility("node");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Multiple native input validators*");
+    }
+
+    [Fact]
+    public void NativeDefinition_WithoutCapturedInstalledOwner_CannotSkipAStackProvider()
+    {
+        NativeTemplatePackagePin package = new("Owned.Package", "1.0.0", new string('a', 64))
+        {
+            Origin = new BundledTemplateOrigin("Stack.Owner", "1.0.0", new string('b', 64), "source"),
+        };
+        TemplateCatalogEntry entry = Project() with { NativeGeneration = new("node", "JavaScript", package) };
+        NativeTemplateWorkflowRegistry registry = new(Catalog(), [], []);
+
+        Action project = () => registry.FindProject(entry);
+        Action item = () => registry.FindItem("node", entry with { Type = TemplateType.Item });
+
+        project.Should().Throw<InvalidTemplateMetadataException>().WithMessage("*verified physical workload asset*");
+        item.Should().Throw<InvalidTemplateMetadataException>().WithMessage("*verified physical workload asset*");
+    }
+
     [Fact]
     public void FindItem_UsesCanonicalInstalledStackAndRefusesMissingInstallation()
     {

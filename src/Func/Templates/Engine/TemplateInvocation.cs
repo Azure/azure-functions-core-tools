@@ -53,6 +53,8 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
 
 internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters)
 {
+    public NativeTemplateGenerationContract? NativeGeneration { get; init; }
+
     public string? DefaultName { get; init; }
 
     public string? HostConfigPlace { get; init; }

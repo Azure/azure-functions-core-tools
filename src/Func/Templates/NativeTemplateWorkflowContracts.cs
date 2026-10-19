@@ -62,6 +62,16 @@ internal interface INativeItemWorkflowProvider
 }
 
 /// <summary>
+/// Supplies required input and source validation independently of an optional generation adapter.
+/// </summary>
+internal interface INativeItemValidationProvider
+{
+    public string Stack { get; }
+
+    public INativeItemCompatibility Compatibility { get; }
+}
+
+/// <summary>
 /// Supplies source-qualified candidate layout and selected project preparation without invoking a legacy initializer.
 /// </summary>
 internal interface INativeProjectWorkflowProvider
