@@ -44,6 +44,46 @@ public sealed class DotNetTemplateWorkflowProviderTests : IDisposable
     }
 
     [Theory]
+    [InlineData("fsharp", "cosmos", "FSharp", true)]
+    [InlineData("fsharp", "CosmosDB", "FSharp", true)]
+    [InlineData("csharp", "cosmos", "CSharp", true)]
+    [InlineData("fsharp", "unknown-cosmos-selector", "FSharp", false)]
+    [InlineData("csharp", "Azure.Function.FSharp.Isolated.CosmosDBTrigger.4.x", "FSharp", false)]
+    public async Task ActualNewRunner_CosmosSelectors_PreserveLanguageSelectionAndNonmutatingLiteralPreview(
+        string language, string selector, string identityLanguage, bool succeeds)
+    {
+        await InstallAsync();
+        using IServiceScope scope = Scope();
+        NativeTemplateWorkflowComposer workflow = scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>();
+        string root = Path.Combine(_root, "cosmos-selector");
+        (await workflow.ExecuteProjectAsync(Init(root, language), CancellationToken.None)).Succeeded.Should().BeTrue();
+        var before = Directory.GetFiles(root, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+        RecordingRunner runner = scope.ServiceProvider.GetRequiredService<RecordingRunner>();
+        runner.Commands.Clear();
+        NewExecutionRequest request = Item(root) with
+        {
+            TemplateReference = selector,
+            DryRun = true,
+            RawTemplateTokens = ["--Connection", "Cosmos\\account\"/入荷"],
+        };
+
+        NewExecutionResult result = await workflow.ExecuteItemAsync(request, CancellationToken.None);
+
+        result.Succeeded.Should().Be(succeeds, Diagnostics(result));
+        if (succeeds)
+        {
+            result.SelectedTemplate!.Identity.Should().Be($"Azure.Function.{identityLanguage}.Isolated.CosmosDBTrigger.4.x");
+            result.ArgumentResults.Single().ValuesByCanonicalName["Connection"].Should().Be("Cosmos\\account\"/入荷");
+        }
+        Directory.GetFiles(root, "*", SearchOption.AllDirectories).Should().BeEquivalentTo(before.Keys);
+        foreach (var file in before)
+        {
+            File.ReadAllBytes(file.Key).Should().Equal(file.Value);
+        }
+        runner.Commands.Should().BeEmpty();
+    }
+
+    [Theory]
     [InlineData("Azure.Function.FSharp.Isolated.HttpTrigger.3.x", "--AccessRights", "Anonymous")]
     [InlineData("Azure.Function.FSharp.Isolated.BlobTrigger.3.x", "--Path", "incoming/orders\\archive\"/入荷")]
     public async Task ActualNewRunner_FSharpForcedReplacement_PreviewsWithoutWritesAndKeepsExistingCompilePosition(

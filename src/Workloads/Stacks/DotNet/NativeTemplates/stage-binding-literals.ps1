@@ -19,6 +19,12 @@ function Set-NativeBindingLiterals {
     $originalConfiguration = Join-Path $Output "provenance/upstream-content/$($Pin.path.Substring(0, $Pin.path.LastIndexOf('/')))/.template.config/template.json.original"
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($originalConfiguration)) | Out-Null
     [IO.File]::Copy($ConfigurationPath, $originalConfiguration)
+    if ($Configuration.identity -ceq 'Azure.Function.FSharp.Isolated.CosmosDBTrigger.4.x') {
+        if ($Configuration.shortName -cne 'CosmosDB') {
+            throw 'Unexpected F# Cosmos template short name.'
+        }
+        $Configuration.shortName = @('CosmosDB', 'cosmos')
+    }
     $source = [IO.File]::ReadAllText($sourcePath)
     $parameters = @($Configuration.symbols.Keys | Where-Object {
         $Configuration.symbols[$_].type -ceq 'parameter' -and $_ -cne 'namespace' -and $Configuration.symbols[$_].datatype -cne 'choice'

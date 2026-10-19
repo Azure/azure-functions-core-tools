@@ -90,6 +90,22 @@ public sealed partial class NativeDotNetTemplateTests : IDisposable
         template.ParameterDefinitions.Single(parameter => parameter.Name == "HubName").DefaultValue.Should().BeNull();
     }
 
+    [Fact]
+    public async Task NativeCatalog_FSharpCosmos_RetainsOriginalShortNameAndAddsPublicCompatibilityAlias()
+    {
+        using NativeSession session = await OpenNativeSessionAsync();
+        ITemplateInfo template = (await session.Manager.GetTemplatesAsync(CancellationToken.None))
+            .Single(item => item.Identity == "Azure.Function.FSharp.Isolated.CosmosDBTrigger.4.x");
+
+        template.ShortNameList.Should().Equal("CosmosDB", "cosmos");
+        template.GroupIdentity.Should().Be("Azure.Function.CosmosDBTrigger");
+        template.TagsCollection["language"].Should().Be("F#");
+        template.TagsCollection["type"].Should().Be("item");
+        template.ParameterDefinitions.Single(parameter => parameter.Name == "Connection").DefaultValue.Should().BeEmpty();
+        template.ParameterDefinitions.Single(parameter => parameter.Name == "DatabaseName").DefaultValue.Should().Be("databaseName");
+        template.ParameterDefinitions.Single(parameter => parameter.Name == "ContainerName").DefaultValue.Should().Be("containerName");
+    }
+
     [Theory]
     [InlineData("itemtemplates", "4.0.5590", "C1BBCC22B2B84F1A9EFFB88956E44BFC784A0ECC74DDE3F4204B6B4AD7128A64")]
     [InlineData("projecttemplates", "4.0.5337", "3BA17330B6C903BA159510337FA50942BD426AAF132F5DAC7B949B78AE8B8299")]

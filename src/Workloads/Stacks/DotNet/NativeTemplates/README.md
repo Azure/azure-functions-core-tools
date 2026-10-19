@@ -15,8 +15,8 @@ The original packages declare package type `Template`; the adapter declares
 `FuncTemplate` rather than relaxing native package validation.
 
 Packing validates both upstream archive digests and retains both original
-nuspecs under `provenance/`. Except for the qualified source and binding-literal
-adaptations described below, upstream `content/` bytes are unchanged. It adds
+nuspecs under `provenance/`. Except for the qualified source, binding-literal and
+F# Cosmos selector adaptations described below, upstream `content/` bytes are unchanged. It adds
 `func.host.json` files, including `--target-framework` / `-tfm` aliases for the
 native project `Framework` parameter. The repository MIT license has the same
 copyright and grant as upstream's `LICENSE.txt`; its pinned source URL is in
@@ -25,9 +25,17 @@ rewritten as evidence of a different upstream release.
 
 The raw inventory is 36 items (29 C#, 7 F#) plus 2 projects (C#, F#). Those are
 native configuration records, **not deduplicated CLI-visible counts**.
-Template identities, group identities, short names, parameter contracts, conditional
+Template identities, group identities, existing short names, parameter contracts, conditional
 sources, generated values, package versions, post-actions and unadapted source
 files are preserved, including F# project ordering and `_gitignore` renaming.
+
+The F# Cosmos item additionally declares the public compatibility selector `cosmos`
+in native `shortName` metadata, retaining `CosmosDB`. Both select
+`Azure.Function.FSharp.Isolated.CosmosDBTrigger.4.x` in an F# project; C# `cosmos`
+continues to select the C# item. Original configuration bytes remain in provenance.
+The new configuration and the earlier literal-encoded configuration are separately
+pinned to the same reviewed F# source; adding an alias to arbitrary configuration
+bytes does not qualify it for literal encoding or bypass owner, language or type checks.
 
 ## Scoped C# database supporting types
 
@@ -343,7 +351,8 @@ the upstream template defaults to `net8.0`; explicit unsupported framework
 input is rejected. Omitted namespace uses the evaluated project namespace,
 while explicit namespace is retained. Both distinctions use the authoritative
 canonical explicit-option provenance from the shared argument parser, not a
-second alias parser. Except for the qualified literal-derived symbols, upstream template configurations remain unchanged.
+second alias parser. Except for the qualified literal-derived symbols and additive
+F# Cosmos selector, upstream template configurations remain unchanged.
 
 Actual `InitExecutionRunner` and `NewExecutionRunner` tests use this production
 provider/composer without private test capabilities for both languages. They

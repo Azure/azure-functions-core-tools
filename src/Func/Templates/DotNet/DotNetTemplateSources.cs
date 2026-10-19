@@ -29,7 +29,7 @@ internal sealed partial class DotNetTemplateSources(NativeTemplateStackCompatibi
             && entry.Type.ToString().Equals(source[1], StringComparison.OrdinalIgnoreCase)
             && entry.Language == source[2] && (Same(configurationSha256, source[3])
                 || (_literals.TryGetValue(entry.Identity, out LiteralQualification? literal)
-                    && Same(configurationSha256, literal.ConfigurationSha256)));
+                    && IsEncodedConfiguration(literal, configurationSha256)));
     }
 
     /// <summary>
@@ -83,7 +83,7 @@ internal sealed partial class DotNetTemplateSources(NativeTemplateStackCompatibi
         }
 
         LiteralQualification qualified = _literals[selected.Entry.Identity];
-        bool encoded = Same(selected.ConfigurationSha256, qualified.ConfigurationSha256);
+        bool encoded = IsEncodedConfiguration(qualified, selected.ConfigurationSha256);
         if (pin.Parameters.Any(mapping => parameters.TryGetValue(mapping[0], out string? value)
             && value is not null && !IsWellFormedUnicode(value)))
         {
@@ -123,6 +123,10 @@ internal sealed partial class DotNetTemplateSources(NativeTemplateStackCompatibi
     private static bool RequiresEncoding(char value) => value is '\\' or '"' or '\u0085' or '\u2028' or '\u2029'
         || char.IsControl(value);
 
+    private static bool IsEncodedConfiguration(LiteralQualification qualified, string? sha256)
+        => Same(sha256, qualified.ConfigurationSha256)
+            || qualified.PreviousConfigurationSha256?.Any(hash => Same(sha256, hash)) == true;
+
     private InvalidDataException UnsupportedLiteral(ResolvedTemplate selected)
         => new($"The selected {selected.Entry.Package!.Identifier} {selected.Entry.Package.Version} item cannot preserve this binding value in source code. "
             + (compatibility?.UpdateHint("dotnet") ?? "Identify the installed workload that owns these selected templates and update that owner explicitly.")
@@ -160,5 +164,5 @@ internal sealed partial class DotNetTemplateSources(NativeTemplateStackCompatibi
     private sealed record FSharpControlSource(string Identity, string Path, string Sha256);
 
     private sealed record LiteralQualification(string Identity, string ConfigurationSha256, string[] SourceSha256,
-        string[] LegacySourceSha256, bool RawSourceCompatible = true);
+        string[] LegacySourceSha256, bool RawSourceCompatible = true, string[]? PreviousConfigurationSha256 = null);
 }

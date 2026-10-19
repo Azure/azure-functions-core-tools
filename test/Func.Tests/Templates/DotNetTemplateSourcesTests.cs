@@ -13,6 +13,60 @@ namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed class DotNetTemplateSourcesTests
 {
+    [Theory]
+    [InlineData("native", false, true)]
+    [InlineData("native", true, true)]
+    [InlineData("previousConfiguration", false, true)]
+    [InlineData("previousConfiguration", true, true)]
+    [InlineData("raw", false, true)]
+    [InlineData("raw", true, false)]
+    public async Task LiteralQualification_FSharpCosmos_KeepsOriginalAndEncodedConfigurationContracts(
+        string revision, bool specialValue, bool qualifies)
+    {
+        using ZipArchive archive = OpenArchive();
+        ResolvedTemplate selected = Select(archive, "Azure.Function.FSharp.Isolated.CosmosDBTrigger.4.x",
+            legacy: revision == "raw", revision);
+        DotNetTemplateSources sources = new();
+        sources.Matches(selected.Entry, selected.ConfigurationSha256).Should().BeTrue();
+        if (revision == "previousConfiguration")
+        {
+            selected.ConfigurationSha256.Should().Be("C3D3AABAF1A8D64382726384C026DE0EA4FE43CD1CD9595A5B093EBF58F16749");
+        }
+        sources.Matches(selected.Entry with { Language = "C#" }, selected.ConfigurationSha256).Should().BeFalse();
+        sources.Matches(selected.Entry with { Type = TemplateType.Project }, selected.ConfigurationSha256).Should().BeFalse();
+        sources.Matches(selected.Entry with { Package = new("Unknown.Owner", "1.0.0") }, selected.ConfigurationSha256).Should().BeFalse();
+        Dictionary<string, string?> parameters = new() { ["Connection"] = specialValue ? "account\\quoted\"" : "account" };
+
+        Func<Task> qualify = async () => await sources.QualifyLiteralsAsync(selected, parameters, CancellationToken.None);
+
+        if (qualifies)
+        {
+            await qualify.Should().NotThrowAsync();
+        }
+        else
+        {
+            await qualify.Should().ThrowAsync<InvalidDataException>().WithMessage("*cannot preserve this binding value*");
+        }
+    }
+
+    [Theory]
+    [InlineData("source")]
+    [InlineData("configuration")]
+    [InlineData("owner")]
+    [InlineData("decoy")]
+    [InlineData("aliasOnlyRaw")]
+    public async Task LiteralQualification_FSharpCosmos_UnknownAliasBytesOrMisboundSourceCannotBorrowEncodingPermission(string change)
+    {
+        using ZipArchive archive = OpenArchive();
+        ResolvedTemplate selected = Select(archive, "Azure.Function.FSharp.Isolated.CosmosDBTrigger.4.x",
+            legacy: change == "aliasOnlyRaw", change);
+
+        Func<Task> qualify = async () => await new DotNetTemplateSources().QualifyLiteralsAsync(
+            selected, new Dictionary<string, string?> { ["Connection"] = "account" }, CancellationToken.None);
+
+        await qualify.Should().ThrowAsync<InvalidDataException>();
+    }
+
     [Fact]
     public async Task ForcedFSharpControlQualification_ActualHttpAndEventGrid_RequireExactSelectedSourceAssociation()
     {
@@ -288,6 +342,13 @@ public sealed class DotNetTemplateSourcesTests
         });
         string configurationPath = configuration.FullName;
         ReadOnlyMemory<byte> bytes = Read(legacy ? "provenance/upstream-content/" + configurationPath + ".original" : configurationPath);
+        if (change is "previousConfiguration" or "aliasOnlyRaw")
+        {
+            string text = Encoding.UTF8.GetString(bytes.Span);
+            bytes = Encoding.UTF8.GetBytes(change == "previousConfiguration"
+                ? text.Replace("\"shortName\": [\n    \"CosmosDB\",\n    \"cosmos\"\n  ]", "\"shortName\": \"CosmosDB\"", StringComparison.Ordinal)
+                : text.Replace("\"shortName\": \"CosmosDB\"", "\"shortName\": [\"CosmosDB\", \"cosmos\"]", StringComparison.Ordinal));
+        }
         using var config = JsonDocument.Parse(bytes);
         JsonElement root = config.RootElement;
         TemplateCatalogEntry catalog = new(identity, root.GetProperty("name").GetString()!, null, TemplateType.Item,
@@ -301,6 +362,7 @@ public sealed class DotNetTemplateSourcesTests
             (path, _) => Task.FromResult(
                 change == "source" && Path.GetExtension(path) is ".cs" or ".fs"
                 || change == "configuration" && path == configurationPath ? new ReadOnlyMemory<byte>([1, 2, 3])
+                    : path == configurationPath ? bytes
                     : change == "olderLiteral" && path.EndsWith(".cs", StringComparison.Ordinal)
                         ? Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(Read("provenance/upstream-content/" + path).Span).TrimStart('\ufeff'))
                         : Read(legacy ? "provenance/upstream-content/" + path
