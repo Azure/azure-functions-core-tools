@@ -132,6 +132,42 @@ it does not bypass the production facade or claim an unavailable item is
 workflow-qualified. Separate facade checks cover timer preview/create, conflict
 refusal/source preservation and binding-dependent unavailability.
 
+## Host-approved conversion output
+
+`Export-SourceQualification.ps1` exports a reviewable source association from
+explicit, already-built physical Node workload archives. It verifies the inner
+archive digest and original/configuration/host/payload descriptors before
+recording original input pins, complete native definitions and normalized payload hashes.
+It does not convert, render, install or execute template content. For example:
+
+```powershell
+.\Export-SourceQualification.ps1 -WorkloadArchives @('<reviewed-workload.nupkg>') -OutputPath '<qualified-sources.json>'
+```
+
+The CLI embeds the reviewed `qualified-sources.json`; it never loads a replacement
+from a workload or user path. Matching requires the selected original source
+pins, original model, exact source paths, complete native configuration/host
+semantics and payload. Native source/host property order is insignificant;
+payload comparison retains only the existing line-ending equivalence.
+The selected archive/configuration and actual source hashes are still checked.
+Adding a package's own assertion cannot change the embedded authority.
+
+Matching approved conversions need no runtime property replacement or Dapr body
+reconstruction. Native definitions alone render values, names and placement.
+Existing original prompt/default/choice validation remains independent of this
+source proof, and Dapr reserved names and auxiliary-name length limits still
+apply. Unmatched historical packages retain their unchanged compatibility path;
+the frozen legacy qualifier must not acquire a parallel implementation of each
+new pack-time rule.
+
+This host inventory exists only to preserve the stronger historical claim that
+a converted definition corresponds to the reviewed original source. A workload
+receipt proves ownership and unchanged bytes, not that conversion relationship.
+It is not enrollment for ordinary `func-generation=native` templates: those use
+the shared owner/archive contract without a CLI identity list. Newly generated
+qualification data require source/output review and focused compatibility
+evidence; running the exporter is not semantic approval.
+
 ## Selected-source compatibility in the unused bridge
 
 The inner archive additionally contains the byte-exact original

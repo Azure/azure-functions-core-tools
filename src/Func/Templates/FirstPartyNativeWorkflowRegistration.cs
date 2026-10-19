@@ -22,6 +22,7 @@ internal static class FirstPartyNativeWorkflowRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
         services.AddSingleton<Workloads.Node.NodeNpmInstaller>();
+        services.AddSingleton<NodeConvertedSourceAuthority>();
         services.AddScoped<NodeTemplateWorkflowProvider>();
         services.AddScoped<INativeItemWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
         services.AddScoped<INativeItemValidationProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());

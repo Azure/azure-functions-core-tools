@@ -14,7 +14,7 @@ namespace Azure.Functions.Cli.Templates.Node;
 /// Supplies the CLI-owned Node adapters to explicitly composed, invocation-scoped native workflows.
 /// </summary>
 internal sealed class NodeTemplateWorkflowProvider(IInteractionService interaction, IFileSystem fileSystem, NodeNpmInstaller npmInstaller,
-    NativeTemplateWorkloadCapture? capture = null, InstalledProjectStackCatalog? stacks = null)
+    NativeTemplateWorkloadCapture? capture = null, InstalledProjectStackCatalog? stacks = null, NodeConvertedSourceAuthority? sourceAuthority = null)
     : INativeItemWorkflowProvider, INativeProjectWorkflowProvider, INativeItemValidationProvider
 {
     private readonly NodeItemCompatibility _compatibility = new(interaction ?? throw new ArgumentNullException(nameof(interaction)), () =>
@@ -34,7 +34,7 @@ internal sealed class NodeTemplateWorkflowProvider(IInteractionService interacti
         return $"The selected template archive is owned by physical workload '{owner.PackageId}@{owner.PackageVersion}'. "
             + $"Run 'func workload update {owner.LogicalPackageId ?? owner.PackageId} "
             + $"--version {owner.LogicalPackageVersion ?? owner.PackageVersion} --exact' to explicitly install a compatible version for this selected owner, then retry.";
-    });
+    }, sourceAuthority);
     private readonly NodeProjectPreparation _preparation = new(fileSystem ?? throw new ArgumentNullException(nameof(fileSystem)),
         npmInstaller ?? throw new ArgumentNullException(nameof(npmInstaller)));
 
@@ -50,7 +50,7 @@ internal sealed class NodeTemplateWorkflowProvider(IInteractionService interacti
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            NodeItemSource source = await NodeItemCompatibility.ReadSourceAsync(context.SelectedTemplate, cancellationToken);
+            NodeItemSource source = await NodeItemCompatibility.ReadSourceAsync(context.SelectedTemplate, cancellationToken, sourceAuthority);
             NodeItemSourceQualifier.ValidateArguments(source, context.Invocation.Parameters);
             if (NodeItemSourceQualifier.ValidateDaprInvocation(source, context.Invocation.Name) is { } helperDiagnostic)
             {

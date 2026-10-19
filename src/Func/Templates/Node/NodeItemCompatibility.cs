@@ -13,7 +13,8 @@ namespace Azure.Functions.Cli.Templates.Node;
 /// <summary>
 /// Retains original Node defaults and validators without reconstructing explicitly native definitions.
 /// </summary>
-internal sealed class NodeItemCompatibility(IInteractionService interaction, Func<string?>? updateHint = null) : INativeItemCompatibility
+internal sealed class NodeItemCompatibility(IInteractionService interaction, Func<string?>? updateHint = null,
+    NodeConvertedSourceAuthority? sourceAuthority = null) : INativeItemCompatibility
 {
     internal const string ManifestPath = "provenance/node/compatibility.json";
     internal const string PackageId = "Azure.Functions.Templates.Node.Basic";
@@ -61,7 +62,7 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
                 string? diagnostic = NativeTemplateGenerationContract.FunctionNameDiagnostic(name);
                 return new(name, requestedName is null ? "authoredDefault" : "explicit", diagnostic is null ? [] : [diagnostic]);
             }
-            NodeItemSource source = await ReadSourceAsync(selected, cancellationToken);
+            NodeItemSource source = await ReadSourceAsync(selected, cancellationToken, sourceAuthority);
             if (selected.Entry.NativeGeneration is null)
             {
                 NodeItemSourceQualifier.ValidateArguments(source, arguments.ValuesByCanonicalName);
@@ -70,7 +71,7 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
             NativeItemCompatibility compatibility = new(_interaction, _ => contract, async (candidate, path, token) =>
             {
                 // Re-read all source bindings before handing original bytes to the shared validator.
-                NodeItemSource current = await ReadSourceAsync(candidate, token);
+                NodeItemSource current = await ReadSourceAsync(candidate, token, sourceAuthority);
                 if (candidate.Entry.NativeGeneration is null)
                 {
                     NodeItemSourceQualifier.ValidateArguments(current, arguments.ValuesByCanonicalName);
@@ -112,7 +113,8 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
         }
     }
 
-    internal static async Task<NodeItemSource> ReadSourceAsync(ResolvedTemplate selected, CancellationToken cancellationToken)
+    internal static async Task<NodeItemSource> ReadSourceAsync(ResolvedTemplate selected, CancellationToken cancellationToken,
+        NodeConvertedSourceAuthority? sourceAuthority = null)
     {
         TemplateCatalogEntry entry = selected.Entry;
         if (entry.Package is not { } package || package.Identifier != PackageId || package.Version is null)
@@ -151,7 +153,7 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
         }
 
         ReadOnlyMemory<byte> configBytes = await ReadPinnedAsync(configuration);
-        await ReadPinnedAsync(Property(mapping, "host"));
+        ReadOnlyMemory<byte> hostBytes = await ReadPinnedAsync(Property(mapping, "host"));
         JsonElement contentDescriptor = Property(mapping, "content");
         ReadOnlyMemory<byte> contentBytes = await ReadPinnedAsync(contentDescriptor);
         using var nativeConfiguration = JsonDocument.Parse(configBytes);
@@ -254,7 +256,15 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
         NativeTemplateLegacyContract contract = new(new(entry.Identity, ManifestPath, Convert.ToHexString(SHA256.HashData(manifestBytes.Span))),
             package, projected.DefaultFunctionName, functionName, null, rules);
         NodeItemSource qualified = new(contract, raw, configBytes, contentBytes, Text(contentDescriptor, "path"), Text(configuration, "path"),
-            pins.AsReadOnly(), pins.Single(pin => pin.Identity == Text(contentDescriptor, "path")));
+            pins.AsReadOnly(), pins.Single(pin => pin.Identity == Text(contentDescriptor, "path")))
+        {
+            HostConfiguration = hostBytes,
+            OriginalTemplates = sources[TemplatesPath],
+        };
+        if (sourceAuthority?.Matches(qualified) == true)
+        {
+            return qualified with { HasHostSourceQualification = true };
+        }
         // Auxiliary function identities still require their narrow source-shape proof.
         if (entry.NativeGeneration is null || NodeItemSourceQualifier.HasDaprHelper(raw.Id))
         {
@@ -311,7 +321,7 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
         }
     }
 
-    private static void ValidateUniqueProperties(JsonElement value)
+    internal static void ValidateUniqueProperties(JsonElement value)
     {
         try
         {
@@ -386,4 +396,11 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
 }
 
 internal sealed record NodeItemSource(NativeTemplateLegacyContract Contract, NewTemplate Template, ReadOnlyMemory<byte> Configuration,
-    ReadOnlyMemory<byte> Content, string ContentPath, string ConfigurationPath, IReadOnlyList<TemplateEffectSource> Sources, TemplateEffectSource ContentSource);
+    ReadOnlyMemory<byte> Content, string ContentPath, string ConfigurationPath, IReadOnlyList<TemplateEffectSource> Sources, TemplateEffectSource ContentSource)
+{
+    internal ReadOnlyMemory<byte> HostConfiguration { get; init; }
+
+    internal ReadOnlyMemory<byte> OriginalTemplates { get; init; }
+
+    internal bool HasHostSourceQualification { get; init; }
+}

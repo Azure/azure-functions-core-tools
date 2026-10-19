@@ -30,12 +30,17 @@ public sealed partial class BundledNodeTemplateTests
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         using var session = await _templates.OpenReadAsync(context, CancellationToken.None, availability);
         using var templater = new Templater(session);
+        NodeConvertedSourceAuthority authority = new();
         foreach (var raw in ReadNodeSource().Templates)
         {
             var selected = (await templater.ResolveGroupAsync(raw.Id!, TemplateType.Item, CancellationToken.None)).Group!.Single();
 
             var source = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
+            var approved = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None, authority);
 
+            approved.HasHostSourceQualification.Should().BeTrue(raw.Id);
+            approved.Content.ToArray().Should().Equal(source.Content.ToArray());
+            approved.Sources.Should().Equal(source.Sources);
             source.Sources.Should().HaveCount(raw.Id is "EventHubTrigger-JavaScript" or "ServiceBusQueueTrigger-JavaScript"
                 or "ServiceBusTopicTrigger-JavaScript" ? 9 : 8);
             foreach (var pin in source.Sources)
@@ -361,7 +366,8 @@ public sealed partial class BundledNodeTemplateTests
         Directory.Exists(commandDirectory.Info.FullName).Should().BeFalse();
     }
 
-    private async Task<NodeItemSource> ReadQualifiedSourceAsync(string identity = "TimerTrigger-JavaScript")
+    private async Task<NodeItemSource> ReadQualifiedSourceAsync(string identity = "TimerTrigger-JavaScript",
+        NodeConvertedSourceAuthority? sourceAuthority = null)
     {
         await _installer.InstallFromPackageAsync(BuiltArchive);
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
@@ -374,6 +380,6 @@ public sealed partial class BundledNodeTemplateTests
             enableBundleBindingConstraints: true), CancellationToken.None, availability);
         using var templater = new Templater(session);
         var selected = (await templater.ResolveGroupAsync(identity, TemplateType.Item, CancellationToken.None)).Group!.Single();
-        return await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
+        return await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None, sourceAuthority);
     }
 }

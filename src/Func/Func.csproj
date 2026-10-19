@@ -56,6 +56,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Profiles/BuiltInProfiles.json" LogicalName="Azure.Functions.Cli.Profiles.BuiltInProfiles.json" />
     <EmbeddedResource Include="Templates/Acquisition/BasicCompanions.json" LogicalName="Azure.Functions.Cli.Templates.Acquisition.BasicCompanions.json" />
+    <EmbeddedResource Include="../Workloads/Stacks/Node/NativeTemplates/qualified-sources.json"
+      LogicalName="Azure.Functions.Cli.Templates.Node.qualified-sources.json" />
     <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/upstream-configurations.json"
       Link="Templates/DotNet/upstream-configurations.json" LogicalName="Azure.Functions.Cli.Templates.DotNet.upstream-configurations.json" />
     <EmbeddedResource Include="../Workloads/Stacks/DotNet/NativeTemplates/auxiliary-identities.json"

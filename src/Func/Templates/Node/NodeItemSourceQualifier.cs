@@ -118,18 +118,21 @@ internal static class NodeItemSourceQualifier
         {
             return null;
         }
-        using var configuration = JsonDocument.Parse(source.Configuration);
-        string sourceName = NodeItemCompatibility.Text(configuration.RootElement, "sourceName");
-        string raw = source.Template.Files!.Single().Value;
-        string original = raw.Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
-        string actual = Encoding.UTF8.GetString(source.Content.Span).ReplaceLineEndings("\n");
-        string previous = AuthorDaprHelpers(source.Template.Id!, raw, "_")
-            .Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
-        if (original.ReplaceLineEndings("\n") == actual || previous.ReplaceLineEndings("\n") == actual)
+        if (!source.HasHostSourceQualification)
         {
-            throw new NodeItemHelperCompatibilityException(
-                $"The installed Node template '{source.Template.Id}' from '{source.Contract.Package?.Identifier}@{source.Contract.Package?.Version}' "
-                + "does not separate its auxiliary function names or HTTP routes from CLI primary functions and cannot create Dapr helpers safely.");
+            using var configuration = JsonDocument.Parse(source.Configuration);
+            string sourceName = NodeItemCompatibility.Text(configuration.RootElement, "sourceName");
+            string raw = source.Template.Files!.Single().Value;
+            string original = raw.Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+            string actual = Encoding.UTF8.GetString(source.Content.Span).ReplaceLineEndings("\n");
+            string previous = AuthorDaprHelpers(source.Template.Id!, raw, "_")
+                .Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+            if (original.ReplaceLineEndings("\n") == actual || previous.ReplaceLineEndings("\n") == actual)
+            {
+                throw new NodeItemHelperCompatibilityException(
+                    $"The installed Node template '{source.Template.Id}' from '{source.Contract.Package?.Identifier}@{source.Contract.Package?.Version}' "
+                    + "does not separate its auxiliary function names or HTTP routes from CLI primary functions and cannot create Dapr helpers safely.");
+            }
         }
         if (string.Equals(name, "host", StringComparison.OrdinalIgnoreCase))
         {
