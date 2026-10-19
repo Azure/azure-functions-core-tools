@@ -108,17 +108,20 @@ rename files after generation or transform the Python body. Its default remains
 schema without renaming its `function_body.py` output.
 
 The restored generation contract covers a new, safe, project-relative `.py`
-filename in an authored no-app project. The Python adapter validates that name,
+filename or an extensionless basename using only ASCII letters, digits,
+underscores or hyphens in an authored no-app project. The extensionless name is
+used literally, without adding `.py`. The Python adapter validates that name,
 revalidates the selected package/source mapping and captures the engine's output.
 Creation requires exactly one new regular output at that filename, from the
 owned create source. Extra sources, changed descriptors, path escapes and
 occupied targets refuse before writing. This create-only capability does not
 authorize `--force` replacement. Existing default-app detection still enters
-the original source-qualified append path; a create-only filename is not an
-append target or a way around app/Blueprint analysis.
+the original source-qualified append path for existing `.py` options; an
+extensionless option is not newly admitted when a canonical app already exists.
+A create-only filename is not an append target or a way around app/Blueprint analysis.
 
 This does not reinterpret the four suffix-corrected source actions, establish
-legacy extensionless/other file-option behavior, change the separate
+arbitrary filename extensions or other file-option behavior, change the separate
 `--trigger-function-name` axis, or prove that a nondefault filename is loaded by
 the Python worker/SDK. No script-file environment setting, app import, pip,
 worker, SDK or host execution is added.

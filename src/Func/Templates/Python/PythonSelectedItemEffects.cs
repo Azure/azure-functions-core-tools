@@ -64,13 +64,14 @@ internal sealed class PythonSelectedItemEffects(
         if (mapping.CreateFileNameParameter is { } parameter)
         {
             string? filename = request.Parameters.TryGetValue(parameter, out string? supplied) ? supplied : mapping.CreateTargetFileName;
-            if (PythonAppFileName.GetDiagnostic(filename) is { } filenameDiagnostic)
+            string defaultTarget = Path.Combine(request.OutputDirectory.Info.FullName, mapping.CreateTargetFileName);
+            bool defaultTargetMissing = !_files.FileExists(defaultTarget) && !_files.DirectoryExists(defaultTarget);
+            if (PythonAppFileName.GetDiagnostic(filename, allowExtensionless: defaultTargetMissing) is { } filenameDiagnostic)
             {
                 return new(TemplateInvocationStatus.InvalidArguments, [], filenameDiagnostic);
             }
 
-            string defaultTarget = Path.Combine(request.OutputDirectory.Info.FullName, mapping.CreateTargetFileName);
-            if (filename != mapping.CreateTargetFileName && !_files.FileExists(defaultTarget) && !_files.DirectoryExists(defaultTarget))
+            if (filename != mapping.CreateTargetFileName && defaultTargetMissing)
             {
                 return await CreateNamedAppAsync(selected, mapping, request, filename!, cancellationToken);
             }
@@ -90,7 +91,7 @@ internal sealed class PythonSelectedItemEffects(
         if (request.Force || _files.FileExists(target) || _files.DirectoryExists(target))
         {
             return new(TemplateInvocationStatus.FileConflict, [],
-                "Custom Python app filenames support create-only generation. Omit --force and choose a new '.py' filename; existing files were retained.");
+                "Custom Python app filenames support create-only generation. Omit --force and choose a new supported filename; existing files were retained.");
         }
         if (request.SourceSnapshot is not null)
         {
@@ -114,6 +115,12 @@ internal sealed class PythonSelectedItemEffects(
         {
             return new(TemplateInvocationStatus.InvalidTemplate, [],
                 "Custom Python filename generation requires exactly its declared, native-previewed create output.");
+        }
+        string defaultTarget = Path.Combine(request.OutputDirectory.Info.FullName, mapping.CreateTargetFileName);
+        if (_files.FileExists(defaultTarget) || _files.DirectoryExists(defaultTarget))
+        {
+            return new(TemplateInvocationStatus.FileConflict, [],
+                "The canonical Python app target appeared after filename preview. Nothing was generated; retry against the current project.");
         }
 
         return await selected.InvokeAsync(planned, cancellationToken);

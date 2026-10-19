@@ -5,15 +5,18 @@ namespace Azure.Functions.Cli.Templates.Python;
 
 internal static class PythonAppFileName
 {
-    public static string? GetDiagnostic(string? value)
+    public static string? GetDiagnostic(string? value, bool allowExtensionless = false)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Trim() != value || value.Contains('/') || value.Contains('\\')
             || value.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || value.Any(char.IsControl)
             || value.IndexOfAny(['<', '>', ':', '"', '|', '?', '*']) >= 0
-            || !value.EndsWith(".py", StringComparison.OrdinalIgnoreCase) || value.Length <= ".py".Length
+            || !(value.EndsWith(".py", StringComparison.OrdinalIgnoreCase) && value.Length > ".py".Length
+                || allowExtensionless && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-'))
             || value.TrimEnd(' ', '.') != value)
         {
-            return "Supply one project-relative Python filename ending in '.py', without directories, invalid characters or trailing spaces.";
+            return allowExtensionless
+                ? "Supply one project-relative '.py' filename or an extensionless name using ASCII letters, digits, underscores or hyphens, without directories or trailing spaces."
+                : "Supply one project-relative Python filename ending in '.py', without directories, invalid characters or trailing spaces.";
         }
 
         string stem = value.Split('.')[0];
