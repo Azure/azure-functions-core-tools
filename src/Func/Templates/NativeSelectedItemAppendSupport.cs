@@ -9,7 +9,10 @@ namespace Azure.Functions.Cli.Templates;
 
 internal sealed record NativeItemAppendMapping(TemplatePackageInfo Package, string ConfigurationSha256,
     TemplateEffectSource MappingSource, TemplateEffectSource CreateSource, string CreateTargetFileName, string AppendTargetFileName,
-    string HelperIdentity, string HelperConfigurationSha256, TemplateEffectSource HelperSource, string ExpectedHelperOutput);
+    string HelperIdentity, string HelperConfigurationSha256, TemplateEffectSource HelperSource, string ExpectedHelperOutput)
+{
+    public string? CreateFileNameParameter { get; init; }
+}
 
 internal sealed record NativeSelectedItemBinding(
     bool InternalExpansionOnly, NativeItemAppendMapping? Append, IReadOnlyList<string> Diagnostics);

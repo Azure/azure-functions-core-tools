@@ -65,6 +65,14 @@
     "OpenAI-Assistant-Python"
   ],
   "symbols": {
+    "app-fileName": {
+      "datatype": "string",
+      "defaultValue": "function_app.py",
+      "description": "Provide a filename for your function",
+      "fileRename": "function_app.py",
+      "isRequired": false,
+      "type": "parameter"
+    },
     "chat-model-name": {
       "datatype": "string",
       "defaultValue": "gpt-3.5-turbo",

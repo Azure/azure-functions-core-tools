@@ -1,6 +1,9 @@
 {
   "isHidden": false,
   "symbolInfo": {
+    "app-FileName": {
+      "longName": "app-file-name"
+    },
     "timerTrigger-schedule": {
       "longName": "timer-trigger-schedule"
     }

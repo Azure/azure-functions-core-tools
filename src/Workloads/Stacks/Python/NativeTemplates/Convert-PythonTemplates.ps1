@@ -216,6 +216,26 @@ foreach ($record in $records.Values) {
     elseif ($legacyCreateTarget -cne 'function_app.py') {
         throw "Template '$id' requires a separate filename decision; no general normalization is applied."
     }
+    if ($createAction[0].filePath -ceq '$(APP_FILENAME)') {
+        $filenameInputs = @($createJob[0].inputs | Where-Object assignTo -ceq '$(APP_FILENAME)')
+        if ($filenameInputs.Count -ne 1 -or $filenameInputs[0].defaultValue -cne 'function_app.py') {
+            throw "Template '$id' requires one original app filename input with the unchanged default."
+        }
+        $filenameInput = $filenameInputs[0]
+        $filenamePrompt = $promptsById[$filenameInput.paramId]
+        if ($null -eq $filenamePrompt -or $filenamePrompt.FileExtension -cne '.py') {
+            throw "Template '$id' requires the original Python filename prompt."
+        }
+        $description = $filenamePrompt.label
+        if ($description.StartsWith('$') -and $resources.ContainsKey($description.Substring(1))) {
+            $description = $resources[$description.Substring(1)]
+        }
+        $symbols[$filenameInput.paramId] = [ordered]@{
+            type = 'parameter'; datatype = 'string'; defaultValue = 'function_app.py'
+            description = $description; fileRename = 'function_app.py'; isRequired = $false
+        }
+        $symbolInfo[$filenameInput.paramId] = @{ longName = 'app-file-name' }
+    }
     foreach ($candidate in @('function_app.py', 'function_app.py.py')) {
         if ($candidate -ne $createTarget -and (Test-Path (Join-Path $path $candidate))) {
             throw "Template '$id' retains a stale generated target '$candidate'; review and remove that exact owned file before regeneration."

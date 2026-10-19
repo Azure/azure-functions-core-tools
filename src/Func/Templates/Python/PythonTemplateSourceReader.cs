@@ -187,7 +187,9 @@ internal sealed class PythonTemplateSourceReader
             (jobs[0].Inputs ?? []).Any(input => input.ParamId == prompt.Id
                 && input.AssignTo is not ("$(APP_FILENAME)" or "$(FUNCTION_NAME_INPUT)")))
             .Select(prompt => new NativeTemplateValidationRule(prompt.Id, prompt))];
-        Require(entry.Parameters.Count == rules.Length, "Python native parameter inventory differs from the original create job.");
+        string? filenameParameter = ReadFilenameParameter(entry, native.RootElement, raw, jobs[0]);
+        Require(entry.Parameters.Count == rules.Length + (filenameParameter is null ? 0 : 1),
+            "Python native parameter inventory differs from the original create job and declared filename capability.");
         foreach (NativeTemplateValidationRule rule in rules)
         {
             TemplateParameterDefinition? parameter = entry.Parameters.SingleOrDefault(item => item.CanonicalName == rule.CanonicalName);
@@ -201,10 +203,37 @@ internal sealed class PythonTemplateSourceReader
         TemplateEffectSource helperSource = new(helperIdentity, helperSourcePath, Text(helper, "sourceSha256"));
         NativeItemAppendMapping mapping = new(package, Text(application, "configurationSha256"),
             new(originalIdentity, ManifestPath, Hash(manifest)), new(originalIdentity, createSourcePath, Text(application, "createSourceSha256")),
-            "function_app.py", "function_app.py", helperIdentity, Text(helper, "configurationSha256"), helperSource, "function_body.py");
+            "function_app.py", "function_app.py", helperIdentity, Text(helper, "configurationSha256"), helperSource, "function_body.py")
+        {
+            CreateFileNameParameter = filenameParameter,
+        };
         NativeTemplateLegacyContract contract = new(new(entry.Identity, ManifestPath, Hash(manifest)), package, expectedDefault, functionName, null, rules);
         cancellationToken.ThrowIfCancellationRequested();
         return new(new(internalHelper, internalHelper ? null : mapping, []), internalHelper ? null : contract, helperSource);
+    }
+
+    private static string? ReadFilenameParameter(TemplateCatalogEntry entry, JsonElement configuration, NewTemplate raw, V2Job create)
+    {
+        V2Input[] inputs = [.. (create.Inputs ?? []).Where(input => input.AssignTo == "$(APP_FILENAME)")];
+        JsonElement symbols = Property(configuration, "symbols");
+        if (inputs.Length != 1 || inputs[0].ParamId is not { } canonical || !symbols.TryGetProperty(canonical, out JsonElement symbol))
+        {
+            return null;
+        }
+        V2Action[] writes = [.. (raw.Actions ?? []).Where(action => action.Type == "WriteToFile"
+            && (create.Actions ?? []).Contains(action.Name!))];
+        Require(writes is [{ FilePath: "$(APP_FILENAME)" }] && inputs[0].DefaultValue == "function_app.py",
+            "Python filename parameters require the original literal app filename write, not a suffix correction.");
+        RequireKeys(symbol, ["type", "datatype", "defaultValue", "description", "fileRename", "isRequired"]);
+        Require(Text(symbol, "type") == "parameter" && Text(symbol, "datatype") == "string"
+            && Text(symbol, "defaultValue") == "function_app.py" && Text(symbol, "fileRename") == "function_app.py"
+            && Property(symbol, "isRequired").ValueKind == JsonValueKind.False,
+            "Python filename parameters require the qualified native parameter rename and unchanged default.");
+        TemplateParameterDefinition? parameter = entry.Parameters.SingleOrDefault(parameter => parameter.CanonicalName == canonical);
+        Require(parameter is { DataType: "string", DefaultValue: "function_app.py", IsRequired: false, IsHidden: false }
+            && parameter.LongName == "app-file-name" && parameter.Choices.Count == 0,
+            "Python filename metadata must retain its canonical source input, public alias and default.");
+        return canonical;
     }
 
     private async Task<ReadOnlyMemory<byte>> ReadVerifiedAsync(ResolvedTemplate selected, string path, string sha256, CancellationToken cancellationToken)

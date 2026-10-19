@@ -1,6 +1,9 @@
 {
   "isHidden": false,
   "symbolInfo": {
+    "app-fileName": {
+      "longName": "app-file-name"
+    },
     "httpTrigger-authLevel": {
       "longName": "http-trigger-auth-level"
     }

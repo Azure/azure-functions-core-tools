@@ -60,11 +60,63 @@ internal sealed class PythonSelectedItemEffects(
                 ? string.Join(" ", current.Diagnostics) : "The Python source-qualified mapping changed or is not an ordinary item. Nothing was generated.");
         }
 
+        NativeItemAppendMapping mapping = current.Append;
+        if (mapping.CreateFileNameParameter is { } parameter)
+        {
+            string? filename = request.Parameters.TryGetValue(parameter, out string? supplied) ? supplied : mapping.CreateTargetFileName;
+            if (PythonAppFileName.GetDiagnostic(filename) is { } filenameDiagnostic)
+            {
+                return new(TemplateInvocationStatus.InvalidArguments, [], filenameDiagnostic);
+            }
+
+            string defaultTarget = Path.Combine(request.OutputDirectory.Info.FullName, mapping.CreateTargetFileName);
+            if (filename != mapping.CreateTargetFileName && !_files.FileExists(defaultTarget) && !_files.DirectoryExists(defaultTarget))
+            {
+                return await CreateNamedAppAsync(selected, mapping, request, filename!, cancellationToken);
+            }
+        }
+
         PythonAppendCapability capability = new(_files, _sources, _executor, selected, request.OutputDirectory);
         NativeSelectedItemAppendSupport support = new(_files, capability, ResolveAsync, confirmed);
         TemplateInvocationResult? result = await support.InvokeAsync(templater, selected, current, request, cancellationToken);
         return result is { Status: TemplateInvocationStatus.Success } && capability.ValidationNotice is { } notice
             ? result with { Diagnostic = result.Diagnostic is null ? notice : result.Diagnostic + " " + notice } : result;
+    }
+
+    private async Task<TemplateInvocationResult> CreateNamedAppAsync(ResolvedTemplate selected, NativeItemAppendMapping mapping,
+        TemplateInvocationRequest request, string filename, CancellationToken cancellationToken)
+    {
+        string target = Path.Combine(request.OutputDirectory.Info.FullName, filename);
+        if (request.Force || _files.FileExists(target) || _files.DirectoryExists(target))
+        {
+            return new(TemplateInvocationStatus.FileConflict, [],
+                "Custom Python app filenames support create-only generation. Omit --force and choose a new '.py' filename; existing files were retained.");
+        }
+        if (request.SourceSnapshot is not null)
+        {
+            return new(TemplateInvocationStatus.InvalidArguments, [], "Custom Python app generation cannot replace a supplied source plan.");
+        }
+
+        TemplateInvocationRequest planned = request with
+        {
+            SourceSnapshot = new(selected.Entry.Identity, mapping.ConfigurationSha256,
+                [mapping.MappingSource, mapping.CreateSource], [new(mapping.CreateTargetFileName, mapping.CreateSource)]),
+        };
+        NativeTemplatePreparationResult captured = await selected.CaptureNativePreparationAsync(planned, _files, expandFiles: false, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (captured.Snapshot is not { } snapshot)
+        {
+            return captured.Failure ?? new(TemplateInvocationStatus.InvalidTemplate, [], "Python filename preview did not produce an owned native output.");
+        }
+        if (snapshot.Effects.FileChanges.Count != 1 || snapshot.Effects.FileChanges[0].ChangeKind != Microsoft.TemplateEngine.Abstractions.ChangeKind.Create
+            || Path.GetFullPath(Path.Combine(request.OutputDirectory.Info.FullName, snapshot.Effects.FileChanges[0].TargetRelativePath))
+                != Path.GetFullPath(target))
+        {
+            return new(TemplateInvocationStatus.InvalidTemplate, [],
+                "Custom Python filename generation requires exactly its declared, native-previewed create output.");
+        }
+
+        return await selected.InvokeAsync(planned, cancellationToken);
     }
 
     private static NativeSelectedItemBinding Failed(Exception exception, CancellationToken cancellationToken)

@@ -288,7 +288,7 @@ public sealed partial class BundledPythonTemplateTests : IDisposable
         await InstallAsync();
         using var templater = CreateTemplater(new("Microsoft.Azure.Functions.ExtensionBundle", "4.35.0"));
         var selected = (await templater.ResolveGroupAsync("HttpTrigger-Python", TemplateType.Item)).Group!.Single();
-        var parameter = selected.Entry.Parameters.Should().ContainSingle().Subject;
+        var parameter = selected.Entry.Parameters.Should().ContainSingle(parameter => parameter.CanonicalName == "httpTrigger-authLevel").Subject;
         parameter.CanonicalName.Should().Be("httpTrigger-authLevel");
         parameter.LongName.Should().Be("http-trigger-auth-level");
         parameter.IsRequired.Should().BeTrue();

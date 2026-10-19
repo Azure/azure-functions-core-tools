@@ -1,4 +1,8 @@
 {
   "isHidden": true,
-  "symbolInfo": {}
+  "symbolInfo": {
+    "app-fileName": {
+      "longName": "app-file-name"
+    }
+  }
 }

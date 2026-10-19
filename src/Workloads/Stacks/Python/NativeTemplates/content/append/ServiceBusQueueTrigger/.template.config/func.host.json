@@ -1,6 +1,9 @@
 {
   "isHidden": true,
   "symbolInfo": {
+    "app-fileName": {
+      "longName": "app-file-name"
+    },
     "serviceBusTrigger-connection": {
       "longName": "service-bus-trigger-connection"
     },

@@ -1,6 +1,9 @@
 {
   "isHidden": false,
   "symbolInfo": {
+    "app-fileName": {
+      "longName": "app-file-name"
+    },
     "embedding-model-name": {
       "longName": "embedding-model-name"
     },

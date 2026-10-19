@@ -1,6 +1,9 @@
 {
   "isHidden": false,
   "symbolInfo": {
+    "app-fileName": {
+      "longName": "app-file-name"
+    },
     "cosmosDbTrigger-connection": {
       "longName": "cosmos-db-trigger-connection"
     },

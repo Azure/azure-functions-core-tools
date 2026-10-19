@@ -1,6 +1,9 @@
 {
   "isHidden": false,
   "symbolInfo": {
+    "app-fileName": {
+      "longName": "app-file-name"
+    },
     "queueTrigger-connection": {
       "longName": "queue-trigger-connection"
     },

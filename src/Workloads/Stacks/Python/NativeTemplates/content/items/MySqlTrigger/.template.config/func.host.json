@@ -1,6 +1,9 @@
 {
   "isHidden": false,
   "symbolInfo": {
+    "app-fileName": {
+      "longName": "app-file-name"
+    },
     "mysqlTrigger-connection": {
       "longName": "mysql-trigger-connection"
     },

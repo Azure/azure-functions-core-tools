@@ -59,6 +59,14 @@
     "McpPromptTrigger-Python"
   ],
   "symbols": {
+    "app-fileName": {
+      "datatype": "string",
+      "defaultValue": "function_app.py",
+      "description": "Provide a filename for your function",
+      "fileRename": "function_app.py",
+      "isRequired": false,
+      "type": "parameter"
+    },
     "FunctionIdentifier": {
       "replaces": "__FUNCTION_NAME__",
       "type": "derived",

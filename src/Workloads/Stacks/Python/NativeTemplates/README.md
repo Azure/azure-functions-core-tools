@@ -98,6 +98,31 @@ requirements installation belong to host preparation, not template generation.
 
 ## Controlled native append expansion (internal)
 
+### Qualified custom app filename creation
+
+For an original create action whose path is literally `$(APP_FILENAME)`, the
+converter exposes its original filename input through `--app-file-name`. The
+native parameter owns the `function_app.py` filename rename; the CLI does not
+rename files after generation or transform the Python body. Its default remains
+`function_app.py`, and the matching internal helper keeps the same parameter
+schema without renaming its `function_body.py` output.
+
+The restored generation contract covers a new, safe, project-relative `.py`
+filename in an authored no-app project. The Python adapter validates that name,
+revalidates the selected package/source mapping and captures the engine's output.
+Creation requires exactly one new regular output at that filename, from the
+owned create source. Extra sources, changed descriptors, path escapes and
+occupied targets refuse before writing. This create-only capability does not
+authorize `--force` replacement. Existing default-app detection still enters
+the original source-qualified append path; a create-only filename is not an
+append target or a way around app/Blueprint analysis.
+
+This does not reinterpret the four suffix-corrected source actions, establish
+legacy extensionless/other file-option behavior, change the separate
+`--trigger-function-name` axis, or prove that a nondefault filename is loaded by
+the Python worker/SDK. No script-file environment setting, app import, pip,
+worker, SDK or host execution is added.
+
 The native item create sources preserve each original `function_app.py`.
 `snippets/<stem>/function_body.py` preserves the matching append payload,
 with the same name replacement and all remaining parameter tokens. Packing
