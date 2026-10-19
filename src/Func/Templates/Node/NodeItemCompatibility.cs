@@ -212,10 +212,38 @@ internal sealed class NodeItemCompatibility(IInteractionService interaction, Fun
         TemplateUserPrompt functionName = projected.Metadata.UserPrompts.Single(prompt => prompt.Id == namePromptId);
         NativeTemplateValidationRule[] rules = [.. projected.Metadata.UserPrompts
             .Where(prompt => prompt.Id != namePromptId).Select(prompt => new NativeTemplateValidationRule(prompt.Id, prompt))];
+        Dictionary<string, string> defaults = new(StringComparer.Ordinal);
+        if (mapping.TryGetProperty("nativeDefaults", out JsonElement defaultsDescriptor))
+        {
+            if (Text(defaultsDescriptor, "path") != "provenance/node/native-defaults.json")
+            {
+                throw Invalid("Native Node defaults must come from their exact owned authoring source.");
+            }
+            using JsonDocument authoredDefaults = ParseManifest(await ReadPinnedAsync(defaultsDescriptor));
+            JsonElement authored = Property(authoredDefaults.RootElement, legacyId);
+            if (authored.ValueKind != JsonValueKind.Object || !authored.EnumerateObject().Any())
+            {
+                throw Invalid("The selected Node item has no authored native default associations.");
+            }
+            foreach (JsonProperty declaration in authored.EnumerateObject())
+            {
+                NativeTemplateValidationRule? rule = rules.SingleOrDefault(rule => rule.CanonicalName == declaration.Name);
+                JsonElement original = Property(declaration.Value, "sourceDefaultValue");
+                JsonElement native = Property(declaration.Value, "defaultValue");
+                if (rule is null || declaration.Value.EnumerateObject().Count() != 2
+                    || original.ValueKind != JsonValueKind.String || native.ValueKind != JsonValueKind.String
+                    || original.GetString() != rule.Prompt.DefaultValue)
+                {
+                    throw Invalid("A native Node default differs from its owned original prompt association.");
+                }
+                defaults.Add(declaration.Name, native.GetString()!);
+            }
+        }
         foreach (NativeTemplateValidationRule rule in rules)
         {
             TemplateParameterDefinition? parameter = entry.Parameters.SingleOrDefault(parameter => parameter.CanonicalName == rule.CanonicalName);
-            if (parameter is null || parameter.DefaultValue != rule.Prompt.DefaultValue || parameter.IsRequired != rule.Prompt.IsRequired
+            string? expectedDefault = defaults.TryGetValue(rule.CanonicalName, out string? authoredDefault) ? authoredDefault : rule.Prompt.DefaultValue;
+            if (parameter is null || parameter.DefaultValue != expectedDefault || parameter.IsRequired != rule.Prompt.IsRequired
                 || parameter.DataType != rule.Prompt.DataType || !parameter.Choices.Select(choice => choice.Value).SequenceEqual(rule.Prompt.Choices ?? []))
             {
                 throw Invalid($"Original Node prompt '{rule.Prompt.Id}' differs from the selected native parameter.");

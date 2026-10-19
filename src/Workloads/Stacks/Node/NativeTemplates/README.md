@@ -74,14 +74,19 @@ remain `Azure.Functions.Node.Http.JavaScript|TypeScript`, with legacy IDs as
 source-declared aliases.
 
 Non-name parameters retain the original prompt IDs, kebab-case option aliases,
-required/default values, choices and resource descriptions. Native authoring
+required flags, choices and resource descriptions. Native authoring
 now makes all 14 distinct advertised non-name prompts operative for JavaScript
 and TypeScript: Timer schedule; Queue connection/name; Blob and Event Grid
 Blob connection/path; Event Hub name; Service Bus connection/queue/topic/
 subscription; and the existing Cosmos connection/database/collection/lease
 properties. This intentionally repairs inherited raw payloads that ignored
-those inputs. Advertised defaults are authoritative, including Event Hub and
-Service Bus defaults that differ from their old hardcoded literals.
+those inputs. `native-defaults.json` explicitly authors the JavaScript omitted
+entity-name defaults to preserve the old generated targets: Event Hub
+`samples-workitems`, Service Bus queue `myinputqueue`, and Service Bus topic
+`mytopic` / subscription `mysubscription`. The converter emits these as native
+symbol defaults, so help, canonical argument values and generation agree.
+Explicit values, including accepted empty strings, remain operative. TypeScript
+defaults, connection defaults and Dapr policy are unchanged.
 
 The converter replaces exactly one reviewed property declaration associated
 with the original template kind, prompt ID, assignment token and literal.
@@ -134,6 +139,11 @@ The inner archive additionally contains the byte-exact original
 under `provenance/node/v2/`. A Node-local pack-generated
 `provenance/node/compatibility.json` binds each original ID to its native
 identity, package ID/version, configuration, host metadata and payload hashes.
+The three JavaScript mappings additionally pin the byte-exact
+`provenance/node/native-defaults.json` authoring source. Each changed default
+must match both its original prompt default and its authored native value;
+other parameters and packages without this descriptor retain the original
+default comparison. The runtime does not maintain a per-template default table.
 These are internal qualification records, not a second catalog, release,
 user-supplied metadata policy or stable authoring ABI.
 

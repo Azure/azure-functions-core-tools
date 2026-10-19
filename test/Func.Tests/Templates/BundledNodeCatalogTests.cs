@@ -56,7 +56,7 @@ public sealed partial class BundledNodeTemplateTests
             {
                 var symbol = symbols.GetProperty(prompt.Id);
                 symbol.GetProperty("datatype").GetString().Should().Be(prompt.DataType);
-                symbol.GetProperty("defaultValue").GetString().Should().Be(prompt.DefaultValue);
+                symbol.GetProperty("defaultValue").GetString().Should().Be(ExpectedNodeDefault(template.Id!, prompt.Id, prompt.DefaultValue));
                 symbol.GetProperty("isRequired").GetBoolean().Should().Be(prompt.IsRequired);
                 symbol.GetProperty("description").GetString().Should().Be(prompt.Description);
                 metadata.Symbols[prompt.Id].LongName.Should()
@@ -121,7 +121,7 @@ public sealed partial class BundledNodeTemplateTests
             foreach (var prompt in expected.Metadata.UserPrompts.Where(prompt => prompt.Id != "trigger-functionName"))
             {
                 var parameter = item.Parameters.Single(parameter => parameter.CanonicalName == prompt.Id);
-                parameter.DefaultValue.Should().Be(prompt.DefaultValue);
+                parameter.DefaultValue.Should().Be(ExpectedNodeDefault(template.Id!, prompt.Id, prompt.DefaultValue));
                 parameter.IsRequired.Should().Be(prompt.IsRequired);
                 parameter.Choices.Select(choice => choice.Value).Should().Equal(prompt.Choices ?? []);
             }

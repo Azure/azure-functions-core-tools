@@ -36,7 +36,8 @@ public sealed partial class BundledNodeTemplateTests
 
             var source = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
 
-            source.Sources.Should().HaveCount(8);
+            source.Sources.Should().HaveCount(raw.Id is "EventHubTrigger-JavaScript" or "ServiceBusQueueTrigger-JavaScript"
+                or "ServiceBusTopicTrigger-JavaScript" ? 9 : 8);
             foreach (var pin in source.Sources)
             {
                 pin.TemplateIdentity.Should().Be(selected.Entry.Identity);

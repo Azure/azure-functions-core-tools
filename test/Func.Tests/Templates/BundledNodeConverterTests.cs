@@ -18,6 +18,7 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("changedLiteral", false)]
     [InlineData("ambiguousDeclaration", false)]
     [InlineData("changedAssignment", false)]
+    [InlineData("changedSourceDefault", false)]
     [InlineData("queueBlockComment", false)]
     [InlineData("timerTemplateLiteral", false)]
     [InlineData("queueUnrelatedObject", false)]
@@ -36,10 +37,12 @@ public sealed partial class BundledNodeTemplateTests
         string catalog = Path.Combine(source, "templates", "templates.json");
         var templates = JsonNode.Parse(File.ReadAllBytes(catalog))!.AsArray();
         const string decoys = "\n// schedule: '0 */5 * * * *',\nconst unrelated = '0 */5 * * * *';\n";
-        string[] languages = change.StartsWith("dapr", StringComparison.Ordinal) ? ["JavaScript"] : ["JavaScript", "TypeScript"];
+        string[] languages = change.StartsWith("dapr", StringComparison.Ordinal) || change == "changedSourceDefault"
+            ? ["JavaScript"] : ["JavaScript", "TypeScript"];
         foreach (string language in languages)
         {
             string kind = change.StartsWith("dapr", StringComparison.Ordinal) ? "DaprServiceInvocationTrigger"
+                : change == "changedSourceDefault" ? "EventHubTrigger"
                 : change.StartsWith("queue", StringComparison.Ordinal) ? "QueueTrigger" : "TimerTrigger";
             var raw = templates.Single(template => template!["id"]!.GetValue<string>() == kind + "-" + language)!;
             string file = language == "JavaScript" ? "function.js" : "function.ts";
@@ -51,6 +54,7 @@ public sealed partial class BundledNodeTemplateTests
             else if (change == "changedLiteral") raw["files"]![file] = body.Replace("schedule: '0 */5 * * * *'", "schedule: 'changed'");
             else if (change == "ambiguousDeclaration") raw["files"]![file] = body + "\n    schedule: '0 */5 * * * *',\n";
             else if (change == "changedAssignment") raw["jobs"]![0]!["inputs"]![1]!["assignTo"] = "$(OTHER_INPUT)";
+            else if (change == "changedSourceDefault") raw["jobs"]![0]!["inputs"]![1]!["defaultValue"] = "changed-source-default";
             else if (change == "queueBlockComment") raw["files"]![file] = body.Replace("connection: ''", "connection: 'changed'")
                 + "\n/*\n    connection: '',\n*/\n";
             else if (change == "timerTemplateLiteral") raw["files"]![file] = body.Replace("schedule: '0 */5 * * * *'", "schedule: '0 */9 * * * *'")
@@ -116,7 +120,8 @@ public sealed partial class BundledNodeTemplateTests
         }
         else
         {
-            errors.Should().Contain(change == "changedAssignment" ? "property association" : "declaration");
+            errors.Should().Contain(change == "changedAssignment" ? "property association"
+                : change == "changedSourceDefault" ? "default association" : "declaration");
         }
     }
 
@@ -220,6 +225,17 @@ public sealed partial class BundledNodeTemplateTests
         manifest.RootElement.GetProperty("templates").EnumerateArray().Select(mapping => mapping.GetProperty("legacyId").GetString())
             .Should().BeEquivalentTo(ReadNodeSource().Templates.Select(template => template.Id));
         manifest.RootElement.GetProperty("projects").GetArrayLength().Should().Be(2);
+        var defaults = manifest.RootElement.GetProperty("templates").EnumerateArray().Where(mapping => mapping.TryGetProperty("nativeDefaults", out _))
+            .ToArray();
+        defaults.Select(mapping => mapping.GetProperty("legacyId").GetString()).Should()
+            .BeEquivalentTo("EventHubTrigger-JavaScript", "ServiceBusQueueTrigger-JavaScript", "ServiceBusTopicTrigger-JavaScript");
+        byte[] authored = File.ReadAllBytes(Path.Combine(native, "native-defaults.json"));
+        File.ReadAllBytes(Path.Combine(provenance, "native-defaults.json")).Should().Equal(authored);
+        foreach (var mapping in defaults)
+        {
+            mapping.GetProperty("nativeDefaults").GetProperty("path").GetString().Should().Be("provenance/node/native-defaults.json");
+            mapping.GetProperty("nativeDefaults").GetProperty("sha256").GetString().Should().Be(Convert.ToHexString(SHA256.HashData(authored)));
+        }
         var pins = manifest.RootElement.GetProperty("sources").EnumerateArray().ToArray();
         pins.Should().HaveCount(4);
         foreach (var pin in pins)

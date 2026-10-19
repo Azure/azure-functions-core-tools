@@ -17,8 +17,18 @@ $templates = Get-Content -LiteralPath (Join-Path $SourceDirectory 'templates/tem
 $bindings = Get-Content -LiteralPath (Join-Path $SourceDirectory 'templates/_bindings.json') -Raw | ConvertFrom-Json -AsHashtable
 $prompts = Get-Content -LiteralPath (Join-Path $SourceDirectory 'bindings/userPrompts.json') -Raw | ConvertFrom-Json -AsHashtable
 $resources = Get-Content -LiteralPath (Join-Path $SourceDirectory 'resources/Resources.json') -Raw | ConvertFrom-Json -AsHashtable
+$nativeDefaultsPath = Join-Path $PSScriptRoot 'native-defaults.json'
+$nativeDefaults = Get-Content -LiteralPath $nativeDefaultsPath -Raw | ConvertFrom-Json -AsHashtable
 $promptById = @{}
 foreach ($prompt in $prompts) { $promptById.Add($prompt.id, $prompt) }
+foreach ($id in $nativeDefaults.Keys) {
+    $matches = @($templates | Where-Object { $_.id -ceq $id -and $_.language -ceq 'javascript' })
+    if ($matches.Count -ne 1 -or $nativeDefaults[$id].Count -eq 0) { throw "Native defaults require one owned JavaScript item '$id'." }
+    foreach ($canonical in $nativeDefaults[$id].Keys) {
+        $inputs = @($matches[0].jobs.inputs | Where-Object { $_.paramId -ceq $canonical -and $_.assignTo -cne '$(FUNCTION_NAME_INPUT)' })
+        if ($inputs.Count -ne 1) { throw "Native default '$id/$canonical' requires one owned non-name parameter." }
+    }
+}
 
 # Keep known-id application available for the entries hidden by V2HiddenTemplates.
 $hiddenIds = @(
@@ -156,6 +166,14 @@ foreach ($template in $templates) {
         }
         if ($templateInput.Contains('defaultValue')) { $symbol.defaultValue = [string] $templateInput.defaultValue }
         elseif ($prompt.Contains('defaultValue')) { $symbol.defaultValue = [string] $prompt.defaultValue }
+        if ($nativeDefaults.Contains($id) -and $nativeDefaults[$id].Contains($templateInput.paramId)) {
+            $authored = $nativeDefaults[$id][$templateInput.paramId]
+            if ($authored.Count -ne 2 -or $authored['sourceDefaultValue'] -isnot [string] -or $authored['defaultValue'] -isnot [string] `
+                -or -not $symbol.Contains('defaultValue') -or $symbol.defaultValue -cne $authored.sourceDefaultValue) {
+                throw "Review the changed original/native default association for '$id/$($templateInput.paramId)'."
+            }
+            $symbol.defaultValue = $authored.defaultValue
+        }
         if ($prompt['enum']) {
             $symbol.choices = @($prompt.enum | ForEach-Object { @{ choice = $_.value; displayName = $_.display } })
         }
@@ -255,6 +273,7 @@ $sources = @($sourceFiles | ForEach-Object {
     [System.IO.File]::Copy($source, $destination, $true)
     @{ path = "provenance/node/v2/$_"; sha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash }
 })
+[System.IO.File]::Copy($nativeDefaultsPath, (Join-Path $ProvenanceDirectory 'native-defaults.json'), $true)
 $mappings = @($templates | ForEach-Object {
     $id = $_.id
     if ($httpIds -contains $id) {
@@ -272,7 +291,7 @@ $mappings = @($templates | ForEach-Object {
         $identity = $id
     }
     $extension = if ($_.language -eq 'javascript') { 'js' } else { 'ts' }
-    @{
+    $mapping = @{
         legacyId = $id
         identity = $identity
         configuration = @{
@@ -288,6 +307,13 @@ $mappings = @($templates | ForEach-Object {
             sha256 = (Get-FileHash -LiteralPath (Join-Path $directory "$sourceName.$extension") -Algorithm SHA256).Hash
         }
     }
+    if ($nativeDefaults.Contains($id)) {
+        $mapping.nativeDefaults = @{
+            path = 'provenance/node/native-defaults.json'
+            sha256 = (Get-FileHash -LiteralPath $nativeDefaultsPath -Algorithm SHA256).Hash
+        }
+    }
+    $mapping
 })
 $projects = @('project-js', 'project-ts') | ForEach-Object {
     $directory = Join-Path $PSScriptRoot "content/$_"

@@ -1,0 +1,24 @@
+{
+  "EventHubTrigger-JavaScript": {
+    "eventHubTrigger-name": {
+      "sourceDefaultValue": "",
+      "defaultValue": "samples-workitems"
+    }
+  },
+  "ServiceBusQueueTrigger-JavaScript": {
+    "serviceBusTrigger-name": {
+      "sourceDefaultValue": "js-queue-items",
+      "defaultValue": "myinputqueue"
+    }
+  },
+  "ServiceBusTopicTrigger-JavaScript": {
+    "serviceBusTrigger-topic": {
+      "sourceDefaultValue": "",
+      "defaultValue": "mytopic"
+    },
+    "serviceBusTrigger-subscription": {
+      "sourceDefaultValue": "",
+      "defaultValue": "mysubscription"
+    }
+  }
+}
