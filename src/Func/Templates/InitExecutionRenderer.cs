@@ -33,6 +33,15 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
                 {
                     parsed.TemplateIdentity,
                     parsed.ValuesByCanonicalName,
+                    parameters = parsed.Parameters.Select(parameter => new
+                    {
+                        parameter.Definition.CanonicalName,
+                        parameter.LongAlias,
+                        parameter.LongAliases,
+                        parameter.ShortAlias,
+                        parameter.Definition.DataType,
+                        parameter.Definition.Choices,
+                    }),
                     parsed.InvalidInputDiagnostics,
                     parsed.DefinitionDiagnostics,
                     missingRequired = parsed.MissingRequiredParameters.Select(parameter => parameter.LongAlias),

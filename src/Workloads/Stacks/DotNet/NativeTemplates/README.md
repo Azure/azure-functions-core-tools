@@ -37,6 +37,22 @@ The new configuration and the earlier literal-encoded configuration are separate
 pinned to the same reviewed F# source; adding an alias to arbitrary configuration
 bytes does not qualify it for literal encoding or bypass owner, language or type checks.
 
+Item `func.host.json` files add the original kebab-case parameter spellings
+through optional `symbolInfo.<canonicalName>.longAliases` arrays. Names have no
+leading dashes; the primary long name and any short name remain unchanged.
+The build-time conversion follows `TemplateOptionHydrator`'s existing casing rule.
+Canonical inputs such as `--AccessRights` and `--DatabaseName` therefore remain
+accepted alongside `--access-rights` and `--database-name`, with the same types,
+choices, defaults and canonical values. This projection applies only to item
+user parameters, not derived/bound symbols or project `Framework` options.
+
+The shared native metadata reader validates the array shape, and the projector
+and strict parser validate names and collisions. Parsing, help and argument
+reports share the effective aliases, including the existing `--param:<canonical>`
+fallback for host-reserved long names. Two spellings cannot supply one parameter
+twice. Missing `longAliases` retains the previous metadata behavior; selected
+host bytes remain part of the existing mounted-schema validation.
+
 ## Scoped C# database supporting types
 
 The pinned SQL and MySQL output/trigger items each declare a namespace-level

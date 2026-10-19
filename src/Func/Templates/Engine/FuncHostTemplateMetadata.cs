@@ -22,4 +22,7 @@ internal sealed record FuncHostTemplateMetadata(bool IsHidden, IReadOnlyDictiona
 /// <param name="ShortName">Short alias without the <c>-</c> prefix, or <c>null</c> when it's missing, empty or null.</param>
 /// <param name="IsHidden">Whether the symbol is hidden from ordinary details while staying parseable.</param>
 /// <param name="AlwaysShow">Whether the symbol always appears in combined help.</param>
-internal sealed record FuncHostSymbolMetadata(string? LongName, string? ShortName, bool IsHidden, bool AlwaysShow);
+internal sealed record FuncHostSymbolMetadata(string? LongName, string? ShortName, bool IsHidden, bool AlwaysShow)
+{
+    public IReadOnlyList<string> LongAliases { get; init; } = [];
+}

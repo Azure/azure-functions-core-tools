@@ -24,6 +24,20 @@ $output = [IO.Path]::GetFullPath($OutputDirectory)
 $separator = [IO.Path]::DirectorySeparatorChar
 $outputPrefix = $output.TrimEnd($separator) + $separator
 
+function ConvertTo-ParameterAlias([string] $Name) {
+    $alias = [Text.StringBuilder]::new($Name.Length + 4)
+    for ($index = 0; $index -lt $Name.Length; $index++) {
+        $character = $Name[$index]
+        if ($index -gt 0 -and [char]::IsUpper($character) -and
+            (-not [char]::IsUpper($Name[$index - 1]) -or
+             ($index + 1 -lt $Name.Length -and [char]::IsLower($Name[$index + 1])))) {
+            $alias.Append('-') | Out-Null
+        }
+        $alias.Append([char]::ToLowerInvariant($character)) | Out-Null
+    }
+    return $alias.ToString()
+}
+
 # Check every input before replacing the generated staging directory.
 foreach ($package in $sources.packages) {
     $id = $package.id.ToLowerInvariant()
@@ -160,10 +174,19 @@ foreach ($package in $sources.packages) {
                     throw "F# control source does not match its qualified native source: $($configuration.identity)."
                 }
             }
-            # CLI aliases live in host metadata only.
+            # Parameter aliases belong to the host, not the native template's symbol identities.
             $hostMetadata = @{ symbolInfo = @{} }
             if ($package.type -ceq 'project') {
                 $hostMetadata.symbolInfo.Framework = @{ longName = 'target-framework'; shortName = 'tfm' }
+            } else {
+                foreach ($name in $configuration.symbols.Keys) {
+                    if ($configuration.symbols[$name].type -ceq 'parameter' -and $name -cne 'name') {
+                        $alias = ConvertTo-ParameterAlias $name
+                        if ($alias -cne $name) {
+                            $hostMetadata.symbolInfo[$name] = @{ longAliases = @($alias) }
+                        }
+                    }
+                }
             }
             $hostPath = Join-Path ([IO.Path]::GetDirectoryName($configPath)) 'func.host.json'
             $hostMetadata | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $hostPath -Encoding utf8NoBOM

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Text.Json;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
@@ -237,7 +238,10 @@ public sealed class NativeTemplateCommandAdapterTests
         [
             new("Auth", "output", "n", "Authorization", "choice",
                 [new("anonymous", null, null), new("function", null, null)], "function", false, false, false),
-            new("Enabled", "enabled", "e", "Explicit Boolean", "bool", [], "false", false, false, true),
+            new("Enabled", "enabled", "e", "Explicit Boolean", "bool", [], "false", false, false, true)
+            {
+                LongAliases = ["enable-feature"],
+            },
             new("Secret", "secret", null, "Hidden", "string", [], null, false, true, false),
         ];
         TemplateCatalogEntry entry = new("controlled", "Controlled", null, TemplateType.Item, [], null,
@@ -251,13 +255,39 @@ public sealed class NativeTemplateCommandAdapterTests
         help.TemplateId.Should().Be(entry.Identity);
         help.HydratedOptions.Select(option => option.Name).Should().Equal("--param:Auth", "--enabled");
         help.HydratedOptions[0].Aliases.Should().NotContain("-n");
+        help.HydratedOptions[1].Aliases.Should().Contain("--enable-feature");
         help.HydratedOptions.Should().OnlyContain(option => option.Arity.Equals(ArgumentArity.ExactlyOne));
         help.HydratedOptions.Select(option => option.Name).Should().BeEquivalentTo(
             parsed.Parameters.Where(parameter => !parameter.Definition.IsHidden).Select(parameter => parameter.LongAlias));
         new HelpCommand(_interaction, [], Substitute.For<ICliVersionProvider>())
             .WriteOptionsSection("Template options", help.HydratedOptions);
         _interaction.AllOutput.Should().Contain("--param:Auth").And.Contain("Choices: anonymous, function.")
-            .And.Contain("Default: function.").And.Contain("Explicit value (bool).").And.NotContain("--secret");
+            .And.Contain("--enable-feature").And.Contain("Default: function.").And.Contain("Explicit value (bool).").And.NotContain("--secret");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ArgumentReports_AdditionalLongAliases_MatchTheEffectiveParserSurface(bool project)
+    {
+        TemplateParameterDefinition definition = new("Mode", "Mode", null, null, "string", [], null, false, false, false)
+        {
+            LongAliases = ["force"],
+        };
+        TemplateCandidateParseResult parsed = new TemplateArgumentParser().Parse(
+            new("controlled", [definition], new HashSet<string>(["--force"]), ["--param:Mode", "value"]));
+        TestInteractionService interaction = new();
+
+        int exit = project
+            ? new InitExecutionRenderer(interaction).Render(new("control", true) { ArgumentResults = [parsed] }, jsonOutput: true)
+            : new NewExecutionRenderer(interaction).Render(new("control", true) { ArgumentResults = [parsed] }, jsonOutput: true);
+
+        exit.Should().Be(0);
+        using var json = JsonDocument.Parse(interaction.Lines.Single()["JSON: ".Length..]);
+        JsonElement parameter = json.RootElement.GetProperty("argumentResults")[0].GetProperty("parameters")[0];
+        parameter.GetProperty("canonicalName").GetString().Should().Be("Mode");
+        parameter.GetProperty("longAlias").GetString().Should().Be("--Mode");
+        parameter.GetProperty("longAliases").EnumerateArray().Select(alias => alias.GetString()).Should().Equal("--param:Mode");
     }
 
     private NativeTemplateCommandAdapter CreateAdapter() => new(

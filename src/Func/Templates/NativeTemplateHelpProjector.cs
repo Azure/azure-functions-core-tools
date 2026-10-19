@@ -56,6 +56,10 @@ internal sealed class NativeTemplateHelpProjector(ITemplateArgumentParser argume
                 Description = string.Join(" ", description),
                 Arity = ArgumentArity.ExactlyOne,
             };
+            foreach (string alias in parameter.LongAliases)
+            {
+                option.Aliases.Add(alias);
+            }
             if (parameter.ShortAlias is { } shortAlias)
             {
                 option.Aliases.Add(shortAlias);

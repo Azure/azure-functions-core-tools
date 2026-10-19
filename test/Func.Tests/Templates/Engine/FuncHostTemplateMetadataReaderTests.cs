@@ -54,6 +54,34 @@ public sealed class FuncHostTemplateMetadataReaderTests : IDisposable
         });
     }
 
+    [Fact]
+    public void Read_AdditionalLongAliases_PreservesPrimaryAndShortNames()
+    {
+        FuncHostTemplateMetadata metadata = FuncHostTemplateMetadataReader.Read(HostConfigPlace,
+            """{"symbolInfo":{"AccessRights":{"longName":"AccessRights","longAliases":["access-rights","access"],"shortName":"a"}}}""");
+
+        metadata.Symbols["AccessRights"].LongName.Should().Be("AccessRights");
+        metadata.Symbols["AccessRights"].ShortName.Should().Be("a");
+        metadata.Symbols["AccessRights"].LongAliases.Should().Equal("access-rights", "access");
+        metadata.Symbols["AccessRights"].LongAliases.Should().BeAssignableTo<IList<string>>()
+            .Which.IsReadOnly.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("\"access-rights\"")]
+    [InlineData("{}")]
+    [InlineData("[null]")]
+    [InlineData("[42]")]
+    [InlineData("[\"\"]")]
+    public void Read_MalformedAdditionalLongAliases_ThrowsRatherThanIgnoringMetadata(string value)
+    {
+        Action read = () => FuncHostTemplateMetadataReader.Read(HostConfigPlace,
+            """{"symbolInfo":{"AccessRights":{"longAliases":""" + value + "}}}");
+
+        read.Should().Throw<InvalidTemplateMetadataException>();
+    }
+
     [Theory]
     [InlineData("""{ "isHidden": true }""", true, false)]
     [InlineData("""{ "isHidden": "True" }""", true, false)]

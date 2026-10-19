@@ -16,6 +16,109 @@ public sealed class TemplateArgumentParserTests
     private readonly ITemplateArgumentParser _parser = new TemplateArgumentParser();
 
     [Theory]
+    [InlineData("--AccessRights", "safe")]
+    [InlineData("--access-rights", "safe")]
+    [InlineData("--access-rights=strict", null)]
+    [InlineData("--access-rights:strict", null)]
+    public void Parse_AdditionalLongAliases_UseTheSameCanonicalChoiceAndExplicitProvenance(string alias, string? value)
+    {
+        var definition = Choice(longName: "AccessRights") with { LongAliases = ["access-rights"] };
+        string[] tokens = value is null ? [alias] : [alias, value];
+
+        var result = _parser.Parse(Request([definition], tokens));
+
+        result.IsComplete.Should().BeTrue();
+        result.ValuesByCanonicalName["Mode"].Should().Be(value ?? "strict");
+        result.ExplicitParameterNames.Should().BeEquivalentTo("Mode");
+        result.Parameters.Single().LongAlias.Should().Be("--AccessRights");
+        result.Parameters.Single().LongAliases.Should().Equal("--access-rights");
+    }
+
+    [Theory]
+    [InlineData("first", "second")]
+    [InlineData("second", "first")]
+    public void Parse_AdditionalLongAliases_CannotRepeatTheCanonicalParameter(string first, string second)
+    {
+        var definition = Parameter("Mode", "first") with { LongAliases = ["second"] };
+
+        var result = _parser.Parse(Request([definition], ["--" + first, "one", "--" + second, "two"]));
+
+        result.InvalidInputDiagnostics.Should().ContainSingle(diagnostic =>
+            diagnostic.Message.Contains("cannot be repeated", StringComparison.Ordinal)).Which.TokenIndices.Should().Equal(0, 2);
+        result.InvalidInputDiagnostics.Should().BeEquivalentTo(
+            _parser.Parse(Request([definition], ["--first", "one", "--first", "two"])).InvalidInputDiagnostics);
+        result.ValuesByCanonicalName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Parse_ReservedAdditionalLongAlias_UsesTheExistingCanonicalFallbackAndCannotShadowHostInput()
+    {
+        var definition = Parameter("Mode", "Mode") with { LongAliases = ["force"] };
+
+        var result = _parser.Parse(Request([definition], ["--param:Mode", "safe"], ["--force"]));
+        var reserved = _parser.Parse(Request([definition], ["--force", "safe"], ["--force"]));
+
+        result.IsComplete.Should().BeTrue();
+        result.Parameters.Single().LongAliases.Should().Equal("--param:Mode");
+        result.ValuesByCanonicalName["Mode"].Should().Be("safe");
+        reserved.IsComplete.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("--mode")]
+    [InlineData("bad value")]
+    [InlineData("mode:alias")]
+    [InlineData("mode=alias")]
+    [InlineData("Mode")]
+    [InlineData("Other")]
+    public void Parse_InvalidOrCollidingAdditionalLongAliases_FailDefinitionValidation(string alias)
+    {
+        var definition = Parameter("Mode", "Mode") with { LongAliases = [alias] };
+
+        var result = _parser.Parse(Request([definition, Parameter("Other", "Other")], []));
+
+        result.DefinitionDiagnostics.Should().NotBeEmpty();
+        result.ValuesByCanonicalName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Parse_AdditionalAliasFallbackCollision_IsAnAuthoringFailureRatherThanAHiddenAlias()
+    {
+        var definition = Parameter("Mode", "force") with { LongAliases = ["output"] };
+
+        var result = _parser.Parse(Request([definition], [], ["--force", "--output"]));
+
+        result.DefinitionDiagnostics.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Parse_AdditionalAliasReservedFallback_InvalidCanonicalNameCannotCreateAnAmbiguousAlias()
+    {
+        var definition = Parameter("Invalid:Symbol", "valid") with { LongAliases = ["force"] };
+
+        var result = _parser.Parse(Request([definition], [], ["--force"]));
+
+        result.DefinitionDiagnostics.Should().ContainSingle().Which.Should().Contain("cannot form an unambiguous fallback alias");
+    }
+
+    [Fact]
+    public void Parse_AdditionalLongAliases_AreSnapshottedAndDoNotEnableUnadvertisedCaseVariants()
+    {
+        List<string> aliases = ["legacy"];
+        var definition = Parameter("Mode", "Mode") with { LongAliases = aliases };
+
+        var result = _parser.Parse(Request([definition], ["--legacy", "value"]));
+        aliases[0] = "changed";
+        var unknown = _parser.Parse(Request([definition], ["--LEGACY", "value"]));
+
+        result.IsComplete.Should().BeTrue();
+        result.Parameters.Single().Definition.LongAliases.Should().Equal("legacy");
+        result.Parameters.Single().LongAliases.Should().Equal("--legacy");
+        unknown.IsComplete.Should().BeFalse();
+    }
+
+    [Theory]
     [InlineData("--greeting", "two words")]
     [InlineData("-g", "x=y:z")]
     [InlineData("--greeting", "")]

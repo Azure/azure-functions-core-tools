@@ -30,7 +30,10 @@ internal sealed record TemplateCandidateParseResult(
 /// <summary>
 /// Pairs a canonical definition with the aliases used consistently by parsing, help and required-value prompting.
 /// </summary>
-internal sealed record TemplateArgumentParameter(TemplateParameterDefinition Definition, string LongAlias, string? ShortAlias);
+internal sealed record TemplateArgumentParameter(TemplateParameterDefinition Definition, string LongAlias, string? ShortAlias)
+{
+    public IReadOnlyList<string> LongAliases { get; init; } = [];
+}
 
 /// <summary>
 /// Identifies invalid input using zero-based indices in the original template tokens, or no indices for completion values.

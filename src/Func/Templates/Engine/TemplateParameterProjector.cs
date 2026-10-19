@@ -37,8 +37,8 @@ internal static class TemplateParameterProjector
         }
 
         TemplateParameterDefinition[] definitions = [.. userParameters.Select(parameter => Project(parameter, metadata))];
-        EnsureUnique(definitions, definition => definition.LongName, "long name");
-        EnsureUnique(definitions, definition => definition.ShortName, "short name");
+        EnsureUnique(definitions, definition => [definition.LongName, .. definition.LongAliases], "long name");
+        EnsureUnique(definitions, definition => [definition.ShortName], "short name");
         return definitions;
     }
 
@@ -58,6 +58,10 @@ internal static class TemplateParameterProjector
         if (symbol?.ShortName is { } shortName)
         {
             EnsureValidAlias(parameter.Name, shortName, "short name");
+        }
+        foreach (string alias in symbol?.LongAliases ?? [])
+        {
+            EnsureValidAlias(parameter.Name, alias, "additional long name");
         }
 
         IReadOnlyList<TemplateParameterChoice> choices = parameter.Choices is null
@@ -82,13 +86,16 @@ internal static class TemplateParameterProjector
             parameter.DefaultValue,
             precedence == PrecedenceDefinition.Required,
             (symbol?.IsHidden ?? false) || precedence == PrecedenceDefinition.Disabled,
-            symbol?.AlwaysShow ?? false);
+            symbol?.AlwaysShow ?? false)
+        {
+            LongAliases = Array.AsReadOnly<string>([.. symbol?.LongAliases ?? []]),
+        };
     }
 
     // The parser adds the dashes, and ':' and '=' separate an option from its value.
     private static void EnsureValidAlias(string parameterName, string alias, string kind)
     {
-        if (alias.StartsWith('-') || alias.Any(character => char.IsWhiteSpace(character) || character is ':' or '='))
+        if (string.IsNullOrEmpty(alias) || alias.StartsWith('-') || alias.Any(character => char.IsWhiteSpace(character) || character is ':' or '='))
         {
             throw new InvalidTemplateMetadataException(
                 $"Parameter '{parameterName}' has an invalid {kind} '{alias}'. Aliases can't start with '-' or contain whitespace, ':' or '='. "
@@ -98,17 +105,17 @@ internal static class TemplateParameterProjector
 
     private static void EnsureUnique(
         IEnumerable<TemplateParameterDefinition> definitions,
-        Func<TemplateParameterDefinition, string?> alias,
+        Func<TemplateParameterDefinition, IEnumerable<string?>> aliases,
         string kind)
     {
-        IGrouping<string, TemplateParameterDefinition>? shared = definitions
-            .Where(definition => alias(definition) is not null)
-            .GroupBy(definition => alias(definition)!, StringComparer.Ordinal)
+        IGrouping<string, (string Alias, TemplateParameterDefinition Definition)>? shared = definitions.SelectMany(definition => aliases(definition)
+                .Where(alias => alias is not null).Select(alias => (Alias: alias!, Definition: definition)))
+            .GroupBy(value => value.Alias, StringComparer.Ordinal)
             .FirstOrDefault(group => group.Count() > 1);
 
         if (shared is not null)
         {
-            string names = string.Join(" and ", shared.Select(definition => $"'{definition.CanonicalName}'"));
+            string names = string.Join(" and ", shared.Select(value => $"'{value.Definition.CanonicalName}'"));
             throw new InvalidTemplateMetadataException(
                 $"Parameters {names} share the {kind} '{shared.Key}'. Give each a different {kind} in {FuncHostTemplateMetadataReader.FileName}.");
         }

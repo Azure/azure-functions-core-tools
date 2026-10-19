@@ -36,6 +36,7 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
                     {
                         parameter.Definition.CanonicalName,
                         parameter.LongAlias,
+                        parameter.LongAliases,
                         parameter.ShortAlias,
                         parameter.Definition.DataType,
                         parameter.Definition.Choices,

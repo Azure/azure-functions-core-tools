@@ -56,6 +56,10 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
                 AllowMultipleArgumentsPerToken = false,
             };
             parserAliases.Add(parameter.LongAlias, option.Name);
+            foreach (string alias in parameter.LongAliases)
+            {
+                parserAliases.Add(alias, option.Name);
+            }
             if (parameter.ShortAlias is not null)
             {
                 parserAliases.Add(parameter.ShortAlias, option.Name);
@@ -305,7 +309,8 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
                 continue;
             }
 
-            if (!IsValidAliasName(definition.LongName) || (!string.IsNullOrEmpty(definition.ShortName) && !IsValidAliasName(definition.ShortName)))
+            if (!IsValidAliasName(definition.LongName) || (!string.IsNullOrEmpty(definition.ShortName) && !IsValidAliasName(definition.ShortName))
+                || definition.LongAliases is null || definition.LongAliases.Any(alias => !IsValidAliasName(alias)))
             {
                 diagnostics.Add($"Parameter '{definition.CanonicalName}' has an invalid projected alias. Correct func.host.json.");
                 continue;
@@ -326,14 +331,14 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
             }
 
             string longAlias = $"--{definition.LongName}";
+            if ((IsReserved(longAlias) || definition.LongAliases.Any(alias => IsReserved("--" + alias)))
+                && !IsValidAliasName(definition.CanonicalName))
+            {
+                diagnostics.Add($"Parameter '{definition.CanonicalName}' cannot form an unambiguous fallback alias. Correct the template definition.");
+                continue;
+            }
             if (IsReserved(longAlias))
             {
-                if (!IsValidAliasName(definition.CanonicalName))
-                {
-                    diagnostics.Add($"Parameter '{definition.CanonicalName}' cannot form an unambiguous fallback alias. Correct the template definition.");
-                    continue;
-                }
-
                 longAlias = $"--param:{definition.CanonicalName}";
             }
 
@@ -342,9 +347,12 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
             {
                 shortAlias = $"-p:{definition.ShortName}";
             }
+            string[] additionalAliases = [.. definition.LongAliases.Select(alias => IsReserved("--" + alias)
+                ? $"--param:{definition.CanonicalName}" : "--" + alias)];
 
             if (IsReserved(longAlias) || !aliases.Add(longAlias)
-                || (shortAlias is not null && (IsReserved(shortAlias) || !aliases.Add(shortAlias))))
+                || (shortAlias is not null && (IsReserved(shortAlias) || !aliases.Add(shortAlias)))
+                || additionalAliases.Any(alias => IsReserved(alias) || !aliases.Add(alias)))
             {
                 diagnostics.Add($"Parameter '{definition.CanonicalName}' has a reserved or duplicate effective alias. Correct the template aliases or command reservation.");
                 continue;
@@ -353,8 +361,9 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
             TemplateParameterDefinition snapshot = definition with
             {
                 Choices = Array.AsReadOnly<TemplateParameterChoice>([.. definition.Choices]),
+                LongAliases = Array.AsReadOnly<string>([.. definition.LongAliases]),
             };
-            parameters.Add(new(snapshot, longAlias, shortAlias));
+            parameters.Add(new(snapshot, longAlias, shortAlias) { LongAliases = Array.AsReadOnly(additionalAliases) });
         }
 
         return parameters;

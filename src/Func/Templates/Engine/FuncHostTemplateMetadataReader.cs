@@ -107,6 +107,7 @@ internal static class FuncHostTemplateMetadataReader
 
         string? longName = null;
         string? shortName = null;
+        IReadOnlyList<string> longAliases = [];
         bool isHidden = false;
         bool alwaysShow = false;
         foreach (JsonProperty property in symbol.Value.EnumerateObject())
@@ -119,6 +120,15 @@ internal static class FuncHostTemplateMetadataReader
             {
                 shortName = ReadOptionalString(property, source);
             }
+            else if (IsKey(property, "longAliases"))
+            {
+                if (property.Value.ValueKind != JsonValueKind.Array || property.Value.EnumerateArray().Any(
+                    alias => alias.ValueKind != JsonValueKind.String || string.IsNullOrEmpty(alias.GetString())))
+                {
+                    throw InvalidValue(property, source);
+                }
+                longAliases = Array.AsReadOnly<string>([.. property.Value.EnumerateArray().Select(alias => alias.GetString()!)]);
+            }
             else if (IsKey(property, "isHidden"))
             {
                 isHidden = ReadBoolean(property, source);
@@ -129,7 +139,7 @@ internal static class FuncHostTemplateMetadataReader
             }
         }
 
-        return new(longName, shortName, isHidden, alwaysShow);
+        return new(longName, shortName, isHidden, alwaysShow) { LongAliases = longAliases };
     }
 
     private static string? ReadOptionalString(JsonProperty property, string source) => property.Value.ValueKind switch

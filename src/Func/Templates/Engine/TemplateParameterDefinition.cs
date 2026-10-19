@@ -28,7 +28,10 @@ internal sealed record TemplateParameterDefinition(
     string? DefaultValue,
     bool IsRequired,
     bool IsHidden,
-    bool AlwaysShow);
+    bool AlwaysShow)
+{
+    public IReadOnlyList<string> LongAliases { get; init; } = [];
+}
 
 /// <summary>
 /// One allowed value of a choice parameter.

@@ -14,6 +14,29 @@ public sealed class TemplateMountedSchemaTests : IDisposable
 
     private string Hive => Path.Combine(_root, "hive");
 
+    [Fact]
+    public async Task InvokeAsync_AdditionalLongAliasesChangedAfterSelection_RequiresFreshMountedMetadataWithoutWrites()
+    {
+        var package = TemplateFixtures.WriteJourneyPackage(_root);
+        var host = Path.Combine(package, "item", ".template.config", "func.host.json");
+        File.WriteAllText(host, """{"symbolInfo":{"Greeting":{"longAliases":["legacy-greeting"]}}}""");
+        await TemplateFixtures.InstallAsync(package, Hive);
+        using Templater flow = CreateTemplater();
+        var selected = (await flow.ResolveGroupAsync("Func.Tests.Journey", TemplateType.Item, CancellationToken.None)).Group![0];
+        selected.Parameters.Single().LongAliases.Should().Equal("legacy-greeting");
+        File.WriteAllText(host, """{"symbolInfo":{"Greeting":{"longAliases":["changed-greeting"]}}}""");
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "changed-extra-alias"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "NoWrite", DryRun: true), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.TemplateChanged);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+        selected.Parameters.Single().LongAliases.Should().Equal("legacy-greeting");
+        using Templater fresh = CreateTemplater();
+        (await fresh.ResolveGroupAsync("Func.Tests.Journey", TemplateType.Item, CancellationToken.None))
+            .Group![0].Parameters.Single().LongAliases.Should().Equal("changed-greeting");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

@@ -52,6 +52,48 @@ public sealed class TemplateParameterProjectorTests : IDisposable
     }
 
     [Fact]
+    public void Project_AdditionalLongAliases_AreSnapshottedWithoutReplacingExistingNames()
+    {
+        List<string> aliases = ["log-level"];
+        FuncHostTemplateMetadata metadata = Metadata(("Level", Symbol(shortName: "l") with { LongAliases = aliases }));
+
+        TemplateParameterDefinition definition = TemplateParameterProjector.Project([Parameter("Level")], metadata).Single();
+        aliases[0] = "caller-change";
+
+        definition.LongName.Should().Be("Level");
+        definition.ShortName.Should().Be("l");
+        definition.LongAliases.Should().Equal("log-level");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("--level")]
+    [InlineData("log level")]
+    [InlineData("log:level")]
+    [InlineData("log=level")]
+    public void Project_InvalidAdditionalLongAlias_Throws(string alias)
+    {
+        FuncHostTemplateMetadata metadata = Metadata(("Level", Symbol() with { LongAliases = [alias] }));
+
+        Action project = () => TemplateParameterProjector.Project([Parameter("Level")], metadata);
+
+        project.Should().Throw<InvalidTemplateMetadataException>();
+    }
+
+    [Theory]
+    [InlineData("Level", "other")]
+    [InlineData("log-level", "log-level")]
+    [InlineData("Verbosity", "other")]
+    public void Project_AdditionalLongAliasCollisions_Throw(string first, string second)
+    {
+        FuncHostTemplateMetadata metadata = Metadata(("Level", Symbol() with { LongAliases = [first, second] }));
+
+        Action project = () => TemplateParameterProjector.Project([Parameter("Level"), Parameter("Verbosity")], metadata);
+
+        project.Should().Throw<InvalidTemplateMetadataException>().WithMessage("*share the long name*");
+    }
+
+    [Fact]
     public void Project_HostMetadataWithoutLongName_UsesCanonicalName()
     {
         FuncHostTemplateMetadata metadata = Metadata(("Level", Symbol(shortName: "l")));

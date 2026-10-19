@@ -106,6 +106,37 @@ public sealed partial class NativeDotNetTemplateTests : IDisposable
         template.ParameterDefinitions.Single(parameter => parameter.Name == "ContainerName").DefaultValue.Should().Be("containerName");
     }
 
+    [Fact]
+    public void Pack_AdditionalParameterAliases_OnlyNameItemUserParametersAndPreserveProjectFrameworkAliases()
+    {
+        using var inner = new PackageArchiveReader(ExtractInnerArchive());
+        foreach (string path in inner.GetFiles().Where(path => path.EndsWith("/.template.config/func.host.json", StringComparison.Ordinal)))
+        {
+            using var host = JsonDocument.Parse(inner.GetStream(path));
+            using var configuration = JsonDocument.Parse(inner.GetStream(path.Replace("func.host.json", "template.json", StringComparison.Ordinal)));
+            JsonElement symbols = host.RootElement.GetProperty("symbolInfo");
+            if (configuration.RootElement.GetProperty("tags").GetProperty("type").GetString() == "project")
+            {
+                symbols.EnumerateObject().Should().ContainSingle();
+                symbols.GetProperty("Framework").GetProperty("longName").GetString().Should().Be("target-framework");
+                symbols.GetProperty("Framework").GetProperty("shortName").GetString().Should().Be("tfm");
+                symbols.GetProperty("Framework").TryGetProperty("longAliases", out _).Should().BeFalse();
+            }
+            else
+            {
+                foreach (JsonProperty symbol in symbols.EnumerateObject())
+                {
+                    symbol.Name.Should().NotBe("name");
+                    configuration.RootElement.GetProperty("symbols").GetProperty(symbol.Name)
+                        .GetProperty("type").GetString().Should().Be("parameter");
+                    symbol.Value.GetProperty("longAliases").EnumerateArray().Should().ContainSingle();
+                    symbol.Value.TryGetProperty("longName", out _).Should().BeFalse();
+                    symbol.Value.TryGetProperty("shortName", out _).Should().BeFalse();
+                }
+            }
+        }
+    }
+
     [Theory]
     [InlineData("itemtemplates", "4.0.5590", "C1BBCC22B2B84F1A9EFFB88956E44BFC784A0ECC74DDE3F4204B6B4AD7128A64")]
     [InlineData("projecttemplates", "4.0.5337", "3BA17330B6C903BA159510337FA50942BD426AAF132F5DAC7B949B78AE8B8299")]
