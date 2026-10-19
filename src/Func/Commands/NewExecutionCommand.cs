@@ -73,7 +73,7 @@ internal sealed class NewExecutionCommand : FuncCliCommand
         CustomParser = ParsePath,
     };
 
-    public Option<string?> NameOption { get; } = new("--name", "-n")
+    public Option<string?> NameOption { get; } = new("--name", "-n", "--trigger-function-name")
     {
         Description = "Name passed to the selected template.",
         Arity = ArgumentArity.ExactlyOne,

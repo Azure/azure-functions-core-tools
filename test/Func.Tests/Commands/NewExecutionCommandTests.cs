@@ -297,6 +297,55 @@ public sealed class NewExecutionCommandTests
         return (root, command);
     }
 
+    [Theory]
+    [InlineData("--name")]
+    [InlineData("-n")]
+    [InlineData("--trigger-function-name")]
+    [InlineData("--trigger-function-name=NamedTimer")]
+    public async Task NameAlias_StagedBinding_IsHostNameNotTemplateTail(string alias)
+    {
+        var (root, _) = CreateCommand();
+        _runner.ExecuteAsync(Arg.Any<NewExecutionRequest>(), _availability, Arg.Any<CancellationToken>())
+            .Returns(NewExecutionResult.Reject("control"));
+        string[] name = alias.Contains('=') ? [alias] : [alias, "NamedTimer"];
+
+        await Parse(root, ["timer", .. name, "--non-interactive"]).InvokeAsync();
+
+        await _runner.Received(1).ExecuteAsync(Arg.Is<NewExecutionRequest>(request =>
+            request.Name == "NamedTimer" && request.RawTemplateTokens.Count == 0
+                && request.ReservedAliases.Contains("--trigger-function-name")), _availability, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("--name", "-n")]
+    [InlineData("--trigger-function-name", "--name")]
+    [InlineData("-n", "--trigger-function-name")]
+    [InlineData("--trigger-function-name", "--trigger-function-name")]
+    public async Task NameAlias_StagedDuplicateSpellings_RejectBeforeRunner(string first, string second)
+    {
+        var (root, _) = CreateCommand();
+        var parsed = Parse(root, ["timer", first, "First", second, "Second"]);
+
+        int exit = await parsed.InvokeAsync();
+
+        exit.Should().NotBe(0);
+        parsed.Errors.Should().NotBeEmpty();
+        _runner.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task NameAlias_StagedMissingValue_RejectsBeforeRunner()
+    {
+        var (root, _) = CreateCommand();
+        var parsed = Parse(root, ["timer", "--trigger-function-name"]);
+
+        int exit = await parsed.InvokeAsync();
+
+        exit.Should().NotBe(0);
+        parsed.Errors.Should().NotBeEmpty();
+        _runner.ReceivedCalls().Should().BeEmpty();
+    }
+
     internal static ParseResult Parse(RootCommand root, string[] tokens)
         => root.Subcommands.OfType<NewExecutionCommand>().Single().ParseInvocation(tokens);
 }

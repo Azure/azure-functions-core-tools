@@ -16,7 +16,7 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwareHelpProvider
 {
-    public Option<string?> NameOption { get; } = new("--name", "-n")
+    public Option<string?> NameOption { get; } = new("--name", "-n", "--trigger-function-name")
     {
         Description = "Function name. Defaults to the template's default function name.",
     };
@@ -59,6 +59,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     private readonly INewCommandRunner _runner;
     private readonly INewCommandTemplateOptionProvider _templateOptions;
     private readonly HashSet<string> _builtInOptionNames;
+    private readonly HashSet<string> _builtInOptionAliases;
     private readonly Dictionary<string, string> _optionNameToPromptId = new(StringComparer.OrdinalIgnoreCase);
 
     // Template id whose options are currently attached to this command.
@@ -98,6 +99,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         _builtInOptionNames = new HashSet<string>(
             Options.Select(o => o.Name),
             StringComparer.Ordinal);
+        _builtInOptionAliases = new(Options.SelectMany(option => option.Aliases.Prepend(option.Name)), StringComparer.Ordinal);
     }
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
@@ -310,7 +312,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
 
         foreach (HydratedTemplateOption pair in hydrated)
         {
-            if (_builtInOptionNames.Contains(pair.Option.Name))
+            if (pair.Option.Aliases.Prepend(pair.Option.Name).Any(_builtInOptionAliases.Contains))
             {
                 continue;
             }
@@ -413,7 +415,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         {
             // Skip names that collide with built-ins so we don't shadow
             // them with template-defined duplicates.
-            if (_builtInOptionNames.Contains(o.Name))
+            if (o.Aliases.Prepend(o.Name).Any(_builtInOptionAliases.Contains))
             {
                 continue;
             }
