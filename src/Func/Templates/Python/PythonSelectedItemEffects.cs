@@ -12,7 +12,8 @@ namespace Azure.Functions.Cli.Templates.Python;
 /// Binds native Python append expansion to selected-package metadata and an explicitly approved owned executor.
 /// </summary>
 internal sealed class PythonSelectedItemEffects(
-    IFileSystem files, PythonTemplateSourceReader sources, IPythonTemplateAppendExecutor executor, bool confirmed) : INativeSelectedItemEffects
+    IFileSystem files, PythonTemplateSourceReader sources, IPythonTemplateAppendExecutor executor, bool confirmed,
+    IFileIdentityReader? identities = null) : INativeSelectedItemEffects
 {
     private readonly IFileSystem _files = files ?? throw new ArgumentNullException(nameof(files));
     private readonly PythonTemplateSourceReader _sources = sources ?? throw new ArgumentNullException(nameof(sources));
@@ -51,7 +52,9 @@ internal sealed class PythonSelectedItemEffects(
         ArgumentNullException.ThrowIfNull(selected);
         ArgumentNullException.ThrowIfNull(binding);
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.Parameters);
         cancellationToken.ThrowIfCancellationRequested();
+        request = request with { Parameters = new Dictionary<string, string?>(request.Parameters, StringComparer.Ordinal) };
         NativeSelectedItemBinding current = await ResolveAsync(selected, cancellationToken);
         if (binding.InternalExpansionOnly || binding.Diagnostics.Count > 0 || current.Diagnostics.Count > 0
             || current.InternalExpansionOnly || current.Append is null || current.Append != binding.Append)
@@ -61,11 +64,57 @@ internal sealed class PythonSelectedItemEffects(
         }
 
         NativeItemAppendMapping mapping = current.Append;
+        PythonAppendTargetSelection selection;
+        try
+        {
+            selection = PythonAppendTargetSelection.Capture(mapping, request.Parameters);
+        }
+        catch (InvalidDataException exception)
+        {
+            return new(TemplateInvocationStatus.InvalidArguments, [], exception.Message);
+        }
+        if (selection.IsAlternate)
+        {
+            if (request.SourceSnapshot is not null)
+            {
+                return new(TemplateInvocationStatus.InvalidArguments, [],
+                    "Selected-file append cannot replace a supplied source plan. Nothing was generated.");
+            }
+            string canonical = Path.Combine(request.OutputDirectory.Info.FullName, mapping.CreateTargetFileName);
+            string target = Path.Combine(request.OutputDirectory.Info.FullName, selection.FileName);
+            if (!_files.FileExists(canonical) || _files.DirectoryExists(canonical)
+                || !_files.FileExists(target) || _files.DirectoryExists(target))
+            {
+                return new(TemplateInvocationStatus.EffectFailure, [],
+                    "Selected-file append requires existing regular canonical and selected Python apps. Nothing was created or appended.");
+            }
+            if (identities is null)
+            {
+                return new(TemplateInvocationStatus.EffectFailure, [], "Selected-file append requires a configured filesystem identity reader.");
+            }
+            try
+            {
+                selection = selection.WithIdentity(identities.Read(target));
+                FileIdentity canonicalIdentity = identities.Read(canonical);
+                if (!canonicalIdentity.IsRegular || selection.ExpectedIdentity!.Value.Identifies(canonicalIdentity))
+                {
+                    return new(TemplateInvocationStatus.EffectFailure, [], "A different selected basename cannot alias the canonical Python app.");
+                }
+            }
+            catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
+            {
+                return new(TemplateInvocationStatus.EffectFailure, [], $"Cannot qualify the selected app identity: {exception.Message} Nothing was appended.");
+            }
+        }
         if (mapping.CreateFileNameParameter is { } parameter)
         {
             string? filename = request.Parameters.TryGetValue(parameter, out string? supplied) ? supplied : mapping.CreateTargetFileName;
             string defaultTarget = Path.Combine(request.OutputDirectory.Info.FullName, mapping.CreateTargetFileName);
             bool defaultTargetMissing = !_files.FileExists(defaultTarget) && !_files.DirectoryExists(defaultTarget);
+            if (selection.IsAlternate && defaultTargetMissing)
+            {
+                return new(TemplateInvocationStatus.EffectFailure, [], "The canonical Python app changed before selected-file append. Nothing was generated.");
+            }
             if (PythonAppFileName.GetDiagnostic(filename, allowExtensionless: defaultTargetMissing) is { } filenameDiagnostic)
             {
                 return new(TemplateInvocationStatus.InvalidArguments, [], filenameDiagnostic);
@@ -77,9 +126,15 @@ internal sealed class PythonSelectedItemEffects(
             }
         }
 
-        PythonAppendCapability capability = new(_files, _sources, _executor, selected, request.OutputDirectory);
+        PythonAppendCapability capability = new(_files, _sources, _executor, selected, request.OutputDirectory,
+            selection: selection, identities: identities);
         NativeSelectedItemAppendSupport support = new(_files, capability, ResolveAsync, confirmed);
-        TemplateInvocationResult? result = await support.InvokeAsync(templater, selected, current, request, cancellationToken);
+        TemplateInvocationResult? result = await support.InvokeAsync(templater, selected,
+            current with { Append = selection.Bind(mapping) }, request, cancellationToken);
+        if (selection.IsAlternate && result is null)
+        {
+            return new(TemplateInvocationStatus.EffectFailure, [], "Selected-file append is unavailable in the current project. Nothing was generated.");
+        }
         return result is { Status: TemplateInvocationStatus.Success } && capability.ValidationNotice is { } notice
             ? result with { Diagnostic = result.Diagnostic is null ? notice : result.Diagnostic + " " + notice } : result;
     }

@@ -4,6 +4,9 @@
     "app-FileName": {
       "longName": "app-file-name"
     },
+    "app-selectedFileName": {
+      "longName": "app-selected-file-name"
+    },
     "timerTrigger-schedule": {
       "longName": "timer-trigger-schedule"
     }

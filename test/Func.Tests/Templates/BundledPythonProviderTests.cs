@@ -307,7 +307,7 @@ public sealed partial class BundledPythonTemplateTests
     {
         var sources = new PythonTemplateSourceReader();
         return new(new(Substitute.For<IInteractionService>(), sources),
-            new(new PhysicalFileSystem(), sources, new PythonTemplateAppendExecutor(), confirmed));
+            new(new PhysicalFileSystem(), sources, new PythonTemplateAppendExecutor(), confirmed, new PlatformFileIdentityReader()));
     }
 
     private void CorruptPythonProviderArchive(string corruption)

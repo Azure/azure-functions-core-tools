@@ -4,6 +4,9 @@
     "app-fileName": {
       "longName": "app-file-name"
     },
+    "app-selectedFileName": {
+      "longName": "app-selected-file-name"
+    },
     "chat-model-name": {
       "longName": "chat-model-name"
     }

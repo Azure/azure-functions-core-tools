@@ -3,7 +3,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/BlobTrigger/.template.config/template.json",
-        "configurationSha256": "1f63a24d59bca4d059070fe82ee9f4b0188c07cae3ae63bf2e1e8158c88400ac",
+        "configurationSha256": "81507958b8191f3e20359d90ed77ff4599de34579ad79f1d8042670d3e2a696f",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -15,7 +15,7 @@
       "appendSourceSha256": "3111af4237184d3056f026d1b83c342ea389acc78f5d7763e9879d21ddbf168b",
       "appendTarget": "function_app.py",
       "configuration": "content/items/BlobTrigger/.template.config/template.json",
-      "configurationSha256": "787a0159df3159522f715c0e2c1cfc7a97648eeffac40da03979f930ede049ed",
+      "configurationSha256": "a04aa6ff47afc63f7093152fc660c30376ef538909501ec2777d27be639e8098",
       "createSource": "content/items/BlobTrigger/function_app.py",
       "createSourceSha256": "a33731836c2a78f560fc57b387c431f234323d06a5d1d35683367a693583a59c",
       "createTarget": "function_app.py",
@@ -26,7 +26,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/CosmosDbTrigger/.template.config/template.json",
-        "configurationSha256": "2c9eafaa3e960cd661f543860536db5a3b4f67f207366139532c9d3b191cec71",
+        "configurationSha256": "4902991f0fa0886be341621835cab1b7c3ce966acf5c18ec9c6d8b61a396167a",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -38,7 +38,7 @@
       "appendSourceSha256": "a3ab374bf543088c204535a83c4efa3aff6ba471ed60ae3aa0e94080bab50c76",
       "appendTarget": "function_app.py",
       "configuration": "content/items/CosmosDbTrigger/.template.config/template.json",
-      "configurationSha256": "61067368abf53b1f6ac907e96558c72623f7626f77caa632c0f5b07c3658759f",
+      "configurationSha256": "a692af280ca81186d0973c96a7af3716a3289a6e169b8ef8159998b0ffb9e6b5",
       "createSource": "content/items/CosmosDbTrigger/function_app.py",
       "createSourceSha256": "b1577dc847bf888c14ed40aa9a9b519a97af6ef5e0d5cf5d1c2f8227111b8fdf",
       "createTarget": "function_app.py",
@@ -49,7 +49,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/DaprPublishOutputBinding/.template.config/template.json",
-        "configurationSha256": "5cf7dd313527ee2ca541457af0263a1426b94cc6b9fdd12fc29e65d4043cb0ed",
+        "configurationSha256": "932c4d2652cc5a5fe0fcde12ab0ef33e1e2c85cee9f1aee93f36669a2af5ab6e",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -61,7 +61,7 @@
       "appendSourceSha256": "54b8cbde9d01d2790929f48c8063186cd485bf8ce9e842454128560894b787ce",
       "appendTarget": "function_app.py",
       "configuration": "content/items/DaprPublishOutputBinding/.template.config/template.json",
-      "configurationSha256": "41d1c2ac2363c9f03ae0803c74774f5387b0c064a9cc27f5934076f2da886881",
+      "configurationSha256": "a1f93f2d806b93f2cf2205c6b2a649fc6ab68342ada4d893545c2c859fe9171a",
       "createSource": "content/items/DaprPublishOutputBinding/function_app.py",
       "createSourceSha256": "8bac3c1fdd86002e565102b46396495a5d197b6a224a69b3d70236d3c0692c54",
       "createTarget": "function_app.py",
@@ -72,7 +72,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/DaprServiceInvocationTrigger/.template.config/template.json",
-        "configurationSha256": "9baa2cea229b14ffd2de152e92f40ba9a04da443bbcdbcb72f9ad029a2157ed2",
+        "configurationSha256": "84b0e90faf141dea8b00981b5de3eb3067f7746ba3c001fd3236d9ef896a4745",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -84,7 +84,7 @@
       "appendSourceSha256": "37f7ebf150178d8c9e3d4c145865d891f0bd7562d64b284f8b15f705909071af",
       "appendTarget": "function_app.py",
       "configuration": "content/items/DaprServiceInvocationTrigger/.template.config/template.json",
-      "configurationSha256": "deccaf27b737aadc025e1f3dcb23f33351aa56389a3b7e499e90611f79f9118c",
+      "configurationSha256": "8598e5d7bb70e9096c34608c9ccbe730fce8829f275f967b1ec97e06a263ae6b",
       "createSource": "content/items/DaprServiceInvocationTrigger/function_app.py",
       "createSourceSha256": "735d80bb846e93772e01a15dd01ec6c83886acfff82e440a8380dd896cfe0595",
       "createTarget": "function_app.py",
@@ -95,7 +95,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/DaprTopicTrigger/.template.config/template.json",
-        "configurationSha256": "35301a1a8409f1dc587b8773df128c59d5d1c168db13577156e21a8e9d72b9a6",
+        "configurationSha256": "0780d55baae28648a778b007748486ccbd60145e5eb528ac6edc50ab39773dbb",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -107,7 +107,7 @@
       "appendSourceSha256": "040b7caa906fc69e8d6c107b4c22ee4b5cabb3fcc7372d9a405fc675ab55880e",
       "appendTarget": "function_app.py",
       "configuration": "content/items/DaprTopicTrigger/.template.config/template.json",
-      "configurationSha256": "979a2b76d46dff541700ef56c7e8d449ea998782b5b39f24fb189b1e7c7d8f2c",
+      "configurationSha256": "d5cf836580c89636d686dce6e986f509bba1e4fd6593f3688ea03cf790aad5d1",
       "createSource": "content/items/DaprTopicTrigger/function_app.py",
       "createSourceSha256": "8a9d3d4ce467bbc352776e1297df6c7edd08aae2e88ad5fcf332237faaca200b",
       "createTarget": "function_app.py",
@@ -118,7 +118,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/DurableFunctionsEntityTrigger/.template.config/template.json",
-        "configurationSha256": "56b37bca97e2e15aaabf55899fe0c626f304e3440d9688bb35dfb1793ae2dc0f",
+        "configurationSha256": "06da6e32d1d983f6595d273fedd0dde69521f2b77d501714e91795d4ec58e1a6",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -130,7 +130,7 @@
       "appendSourceSha256": "0b3de96641a3be6e6c0e43c2a6fc4205e2059d96d8e386e2badb03a8e88d9f3c",
       "appendTarget": "function_app.py",
       "configuration": "content/items/DurableFunctionsEntityTrigger/.template.config/template.json",
-      "configurationSha256": "880f06c0d06f4ad136cbc400816e821b753aa394638e54b6a80944d573ddb5bd",
+      "configurationSha256": "80c28c070354a22429aab7dc1e78e5ef8372d760eef5812901679e161cee0cef",
       "createSource": "content/items/DurableFunctionsEntityTrigger/function_app.py",
       "createSourceSha256": "fc921dcee63541f0274fedf6f3ac6a7941f09dd94b3842404cada766cf192c9c",
       "createTarget": "function_app.py",
@@ -141,7 +141,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/DurableFunctionsOrchestration/.template.config/template.json",
-        "configurationSha256": "21f616d7658b4ea485a4d286100021dcffaece21953ccd6579cc9638784c93b6",
+        "configurationSha256": "9dd1d5724d0f126c76c39b66cb7cb7477d1c760674e039d226fa4b998c4018f2",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -153,7 +153,7 @@
       "appendSourceSha256": "6acba61c6642e6358ab4f66ee7439820dcbceb5a4611e65667839a0adfcd8637",
       "appendTarget": "function_app.py",
       "configuration": "content/items/DurableFunctionsOrchestration/.template.config/template.json",
-      "configurationSha256": "946ec216751405aaae0c8c585f72c661661dd26c2da886e5dc3d48ac7bf06cec",
+      "configurationSha256": "c24bf4e4cd281e2f285a01619dd1b91137cfe319607c4b3b2d1c0b7c6119b92d",
       "createSource": "content/items/DurableFunctionsOrchestration/function_app.py",
       "createSourceSha256": "8b533928b3fecc1bc86e229b8392ada2ae886003640d2d7e5cc2250dccf4316b",
       "createTarget": "function_app.py",
@@ -164,7 +164,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/EventGridBlobTrigger/.template.config/template.json",
-        "configurationSha256": "c89f27dc05fea34e11d8afae13f20799773c53e8e69697eff00981836e8ef807",
+        "configurationSha256": "da9d9ae93a117ad2803fb617ff6e2cef4e5ba3917a72a2b1fb6855c29803906f",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -176,7 +176,7 @@
       "appendSourceSha256": "9b5ce8f1a1afdca8e5ce05b667990596c3c2fd7ba2ae9955a71ab96f16e1463e",
       "appendTarget": "function_app.py",
       "configuration": "content/items/EventGridBlobTrigger/.template.config/template.json",
-      "configurationSha256": "1878d358d07697ebf10b5d697cbdf3c100faff72d46b7c0c0ce416a1bb5a607d",
+      "configurationSha256": "7eb12529f519f069f024935adad5ef458f868687f26ab794112a8546342cc2d7",
       "createSource": "content/items/EventGridBlobTrigger/function_app.py",
       "createSourceSha256": "fc7d0555d4a0770b418c32a7baf128a6cbe501d5f54607a83162c399c6756cd0",
       "createTarget": "function_app.py",
@@ -187,7 +187,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/EventGridTrigger/.template.config/template.json",
-        "configurationSha256": "0bf48b36fe855605d38270a501ffc8f464279bb60bc455020371668a1eaa5220",
+        "configurationSha256": "756d13bebfbd593d5a8f9ff04ec16f910039b510c5dbde2ac5035c8b68df8a88",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -199,7 +199,7 @@
       "appendSourceSha256": "7795f9709c52c8ee8eb23f06e4a2b239ac3a0db6a0a391a8e572ac9d1a3def71",
       "appendTarget": "function_app.py",
       "configuration": "content/items/EventGridTrigger/.template.config/template.json",
-      "configurationSha256": "0ba00a2d7cda632ccd2ad5269a8a6a98eceb4eb1db8897c34992368596a119cc",
+      "configurationSha256": "7b8daa411e516f5503130e3cb0173de159acf66b97e2ca8881a2533597564650",
       "createSource": "content/items/EventGridTrigger/function_app.py",
       "createSourceSha256": "3283ff82bc44f0a6e9d111993cfce5fc466e03e0147fa8081f148c79c2448340",
       "createTarget": "function_app.py",
@@ -210,7 +210,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/EventHubTrigger/.template.config/template.json",
-        "configurationSha256": "cd0d7b3abcfc113bfc392996f8ced7062ac812c0979a2649c0051824c4f4cab6",
+        "configurationSha256": "b60773651f1784e8fc9d86b487d6ffe5fbf0cd7bd34c5294ea5d4825e2ce843c",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -222,7 +222,7 @@
       "appendSourceSha256": "41352b1143375f17df943aa98d7b97743055451f17520fea7dfea08e32a41c4b",
       "appendTarget": "function_app.py",
       "configuration": "content/items/EventHubTrigger/.template.config/template.json",
-      "configurationSha256": "8ad37afd3ab2ee80afa4c8ce9aa2334fb5322d3443c48943657c83cd64ec6faf",
+      "configurationSha256": "d3d49cf746180cb920e82a384999fcbcefe2c63002fdf0a37952ea7c447f8227",
       "createSource": "content/items/EventHubTrigger/function_app.py",
       "createSourceSha256": "b87aebae49cf29e7dd4ea7628cbdaef545b8a01cecd4b99c394e6cbce8b4de85",
       "createTarget": "function_app.py",
@@ -233,7 +233,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/HttpTrigger/.template.config/template.json",
-        "configurationSha256": "26649bf5a1c44392e7f03f0c1ddc0c4cbe912a89be8d9275632dd2c50e795c04",
+        "configurationSha256": "0552529150bd74489c6d8d9274fe7d5404c7ae6db31a6ea5a0852527414e57dd",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -245,7 +245,7 @@
       "appendSourceSha256": "3be9a2f26ba4cfaee6f41fb6e75bb3d60f9fb1f6852e2364df0d52d966513dee",
       "appendTarget": "function_app.py",
       "configuration": "content/items/HttpTrigger/.template.config/template.json",
-      "configurationSha256": "5c6cbc04dd2cef0d2fa1811e18dec232ea8635d4613412fd64db84d00e993bfa",
+      "configurationSha256": "bcc8ba74587f7f35f2863731282ceb7470ecc4b042dc1fcea5dad31c3ea9eaa8",
       "createSource": "content/items/HttpTrigger/function_app.py",
       "createSourceSha256": "b2d2ee8284fcecc2f1a3e0a67e97aaecb3a15243b3bc385a98739990bedc134c",
       "createTarget": "function_app.py",
@@ -256,7 +256,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/MCPResourceTrigger/.template.config/template.json",
-        "configurationSha256": "3a521e87a1af985fe97c02ad1d64b5b3f09b73c5f35cef8bacd6f3a71193edf8",
+        "configurationSha256": "47cdc149808aee56a614a880ea80b50bc60ab7f0e880562460641870e651d2e5",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -268,7 +268,7 @@
       "appendSourceSha256": "e5f5984f07df433339a0dd448b54f5d6d1a067c1bf57d451525834a1ec2f9442",
       "appendTarget": "function_app.py",
       "configuration": "content/items/MCPResourceTrigger/.template.config/template.json",
-      "configurationSha256": "8628c58c34ff47452a36d8b48213a679b122892df2cfc4dff3ac49c4f23e06f0",
+      "configurationSha256": "ddec176df1707487190352ec06b62ea16fc79ab21cfa56ea31fdcb6c0c972023",
       "createSource": "content/items/MCPResourceTrigger/function_app.py",
       "createSourceSha256": "1e790df33d37041da22324e231bc7fc2e923d4c63272321ba938d9a653e5085e",
       "createTarget": "function_app.py",
@@ -279,7 +279,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/MCPTrigger/.template.config/template.json",
-        "configurationSha256": "8d54a7055922bc9ada4f4428826e56322572f5fe291e41cdb641037883ff7648",
+        "configurationSha256": "5d59b552b3c87aca3f10143724d140343b69b75b697ed075e7d282dff3d92f3b",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -291,7 +291,7 @@
       "appendSourceSha256": "27d40604f8f046984b6140f180bdbf55b5d0fb62dc86a16b5c2d97eb1ad2a86e",
       "appendTarget": "function_app.py",
       "configuration": "content/items/MCPTrigger/.template.config/template.json",
-      "configurationSha256": "65e7a4bf94d243ce616746ab806ce8b70fc53c181e6d0ce04cc826d0cf07af63",
+      "configurationSha256": "a060dce2b84f96fb7b3637429bc5b455c5409527dfc094a286d35bd3eb63b55a",
       "createSource": "content/items/MCPTrigger/function_app.py",
       "createSourceSha256": "57353feab39ae1c77f69d4393a9e26df27378f305e160376b774428771df53b5",
       "createTarget": "function_app.py",
@@ -302,7 +302,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/MySqlTrigger/.template.config/template.json",
-        "configurationSha256": "b9c78db6f460e2dd80440c67056daaad56738d4ec756e6fcc66075c3f0c080bf",
+        "configurationSha256": "c09257ed3321d0082bd199a186f9384e1a1d6b0564b23e42872526933beea9fa",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -314,7 +314,7 @@
       "appendSourceSha256": "27582570a410c39a48621d0cad82cc4f5d5be48eb855f429a9e0da90828eacd7",
       "appendTarget": "function_app.py",
       "configuration": "content/items/MySqlTrigger/.template.config/template.json",
-      "configurationSha256": "961a3b9784886cc65357c61960bbbb31cca2fa91a7ec2ceb610e694bc278c34f",
+      "configurationSha256": "91847e7506df2d89613b8a3306b75dba932628bf13c382e838ab30be89084a63",
       "createSource": "content/items/MySqlTrigger/function_app.py",
       "createSourceSha256": "0d6f8a1f2f9bdca88102354103c43a9affc5ff6435629c5519f53066d278de78",
       "createTarget": "function_app.py",
@@ -325,7 +325,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/QueueTrigger/.template.config/template.json",
-        "configurationSha256": "90c2fdbbf7436c31a99223af8963cd5cd452f88b4019b3b140fe816c6d2014f7",
+        "configurationSha256": "6d2e7f0447ba1463fdef3d3e7f8b38ef5331ced4e98bd9790e83c9ca79a71988",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -337,7 +337,7 @@
       "appendSourceSha256": "a967b245ba4b5660fab2377eb7a9196baac8a388b5872a31236584f5a77495ce",
       "appendTarget": "function_app.py",
       "configuration": "content/items/QueueTrigger/.template.config/template.json",
-      "configurationSha256": "079f30a954806333e2d1fab0ac7aef88d6654775444176973523a659b55e3dc7",
+      "configurationSha256": "0d6065f28e56c247ac1dafc49c0101ce3b5cdceeab8f92ecc33569822c544cb9",
       "createSource": "content/items/QueueTrigger/function_app.py",
       "createSourceSha256": "6286fba279cb321f479401eee14b2b08d7576e53ac7c4eec6f42351cd4f363c2",
       "createTarget": "function_app.py",
@@ -348,7 +348,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/ServiceBusQueueTrigger/.template.config/template.json",
-        "configurationSha256": "4d3336f1a00f222b8e171e83278586840a530ca59b4a4294ba0c34498d26d0e5",
+        "configurationSha256": "4c5708c36872829ce187e7e3920d276a2c07c3ddcc41bfe14eafe2eac9b7ce41",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -360,7 +360,7 @@
       "appendSourceSha256": "7264ae9abeddf79967e424b3445825bed07a31569e306c162ea21e0ce4e4f2dc",
       "appendTarget": "function_app.py",
       "configuration": "content/items/ServiceBusQueueTrigger/.template.config/template.json",
-      "configurationSha256": "dc10dfc118470fc7c48ae0f5a6ddda40554045489a238624bfc79af34ed81467",
+      "configurationSha256": "c208ea38ebdfda11ec4e3533977998a22fdb35aa001011e4a29d34eb25877245",
       "createSource": "content/items/ServiceBusQueueTrigger/function_app.py",
       "createSourceSha256": "cfdc45b32a32886563b347f624cc5e2d778a9c2559850f55bbce0ee465ccab89",
       "createTarget": "function_app.py",
@@ -371,7 +371,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/ServiceBusTopicTrigger/.template.config/template.json",
-        "configurationSha256": "45e119c20dbf6c2a3b2b7ca7511cee7e7553a105b45113913f6183cc75f4e912",
+        "configurationSha256": "d486419782dcd3a5f00435f5c02cd294028a746933106e216300b406af7eeff9",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -383,7 +383,7 @@
       "appendSourceSha256": "64260a923aa3aaf26d10ed9d655ae4de5106fe152fc14ee832bc1544fd3a4829",
       "appendTarget": "function_app.py",
       "configuration": "content/items/ServiceBusTopicTrigger/.template.config/template.json",
-      "configurationSha256": "6cfcb9fe685d121e29d8b1a1db0ced1d50d61a61738807182af62d8c7eceb151",
+      "configurationSha256": "e096dc9b6020f77a21a511989a6d65c1f087629f3db422ed6c2948a94e09bdaf",
       "createSource": "content/items/ServiceBusTopicTrigger/function_app.py",
       "createSourceSha256": "fb4b12903d6b81ccc87702db2151c0cfbd67d51cf6493f00d3674dd209701cbb",
       "createTarget": "function_app.py",
@@ -394,7 +394,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/TimerTrigger/.template.config/template.json",
-        "configurationSha256": "7f244f2fb4ba04ff1741f511f5cf434f4348ca1f70093d6d816379394384cdfe",
+        "configurationSha256": "b6af352d929cd99fb2c6ed02c515e25df14488364b281f0b71317c2bc86d187a",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -406,7 +406,7 @@
       "appendSourceSha256": "cb670a779e9b517612f531ec37bea6e8c685267e510426d7e23ccfa0235c55f0",
       "appendTarget": "function_app.py",
       "configuration": "content/items/TimerTrigger/.template.config/template.json",
-      "configurationSha256": "91b19a12e4f503d6c346845257be46cee759c26cb68a0e8a2a63cb0dddc6447e",
+      "configurationSha256": "5f4d714f7e0e20c14788ed13f036bf649d7f9277230fc628c8c03d30ee952fa3",
       "createSource": "content/items/TimerTrigger/function_app.py",
       "createSourceSha256": "d5775a3c9bf4fe262b0c40bab88617798da018c86bfee830f07338796c1e49df",
       "createTarget": "function_app.py",
@@ -417,7 +417,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/McpPromptTrigger/.template.config/template.json",
-        "configurationSha256": "0c8c274d1ee188a1d8da689483bf743e6512e95561eba5793d45ecb4e6794358",
+        "configurationSha256": "4e947ff4f27247edcd479e6947d72b33fddfb77a84ef5d992e70ad63af1fd755",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -429,7 +429,7 @@
       "appendSourceSha256": "75713878d6351408dbc47a2bcbf9a10a651133c4ed519644885a418a091bda50",
       "appendTarget": "function_app.py",
       "configuration": "content/items/McpPromptTrigger/.template.config/template.json",
-      "configurationSha256": "32a79818e850bfee39bea39a6df9c38ff92ad98086917c9c7f46826cd6368e4a",
+      "configurationSha256": "6aefe12a680396ed594fd63124b5fd8fc2eca8220830fc495bd48e988b4a5fbe",
       "createSource": "content/items/McpPromptTrigger/function_app.py",
       "createSourceSha256": "60cbb98f03c34970f33f78c6409d16bdcd213d04f3ca3e3db0783e7937652113",
       "createTarget": "function_app.py",
@@ -440,7 +440,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/MCPToolTrigger/.template.config/template.json",
-        "configurationSha256": "a8f0d51f313cc6443c2d2bcf1e3a0120f58780204084e7f3c6cd55000d58e64f",
+        "configurationSha256": "038020bb6e228cf2681abd9aa889645da774da0a4751860a7feb54714d7fbad4",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -452,7 +452,7 @@
       "appendSourceSha256": "27d40604f8f046984b6140f180bdbf55b5d0fb62dc86a16b5c2d97eb1ad2a86e",
       "appendTarget": "function_app.py",
       "configuration": "content/items/MCPToolTrigger/.template.config/template.json",
-      "configurationSha256": "2ede7a9113e4b0f38e7a84be353e63a0722ffb9efa381f978ec9be6922eda41b",
+      "configurationSha256": "367f5976fa5057073330c381ca0d186e49da13b8e2dbc28b547a9de29c5a3e78",
       "createSource": "content/items/MCPToolTrigger/function_app.py",
       "createSourceSha256": "57353feab39ae1c77f69d4393a9e26df27378f305e160376b774428771df53b5",
       "createTarget": "function_app.py",
@@ -463,7 +463,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/OpenAI-Assistant/.template.config/template.json",
-        "configurationSha256": "7e92b2dc9e3867d73600acbbe76c0127c4312938c7be830a934d6364469e5ca1",
+        "configurationSha256": "0d59e490b758f05ca3b251132801556e53dea2fc55398120a748cc962ba4fccb",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -475,7 +475,7 @@
       "appendSourceSha256": "a80efdd50cf0abe34b41f06860b5dc68b1cdbd243568253370d579ed882d1b07",
       "appendTarget": "function_app.py",
       "configuration": "content/items/OpenAI-Assistant/.template.config/template.json",
-      "configurationSha256": "08282ba90b523bdf6cf5952553283e00fca75eab558554170822d56d50ea5351",
+      "configurationSha256": "1b55b24c711ee43a81abb04efa56ec997caeef3ed9b6a8d396518961bef46cfd",
       "createSource": "content/items/OpenAI-Assistant/function_app.py",
       "createSourceSha256": "3cfc4a91f45cfaaf4fa6f1f2e002a31181be004459f44772ba9a666287e02e2a",
       "createTarget": "function_app.py",
@@ -486,7 +486,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/OpenAI-Chat/.template.config/template.json",
-        "configurationSha256": "97e536c4a7207053ce35efe87b03c7a9d0a61cc7d0416d1738515a290bed4fa4",
+        "configurationSha256": "03cb75f84d4b804fc2a4f4579f2143af9a12cd4dd08d1ca119ac4f144e33738e",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -498,7 +498,7 @@
       "appendSourceSha256": "8373984818faabec00e56f98a661719a9e1babfcb57e3422314b0e7ab8e5d1dc",
       "appendTarget": "function_app.py",
       "configuration": "content/items/OpenAI-Chat/.template.config/template.json",
-      "configurationSha256": "1203d3745dd9116c29768d8c51d608dd3365aabc66d343d33528d5fa2a118676",
+      "configurationSha256": "f8b86f23bf1e041368a3fe4dd14de6f7ad80ec87becd406c49fedefaa5cc9ebd",
       "createSource": "content/items/OpenAI-Chat/function_app.py",
       "createSourceSha256": "2f1802b0a8cf0e1ee39f052ba07a239e6289f11e7d798263af16854f368a7d17",
       "createTarget": "function_app.py",
@@ -509,7 +509,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/OpenAI-Embeddings/.template.config/template.json",
-        "configurationSha256": "4fbfcf69da0074815282a4ed7b5e05a4328aeff5d0d20b583bbb083d4715fb8a",
+        "configurationSha256": "fa3d5eb4e462878dcefd2bbf97a1cbf41766408c2cf25e2a18c8d10cd73bbbaf",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -521,7 +521,7 @@
       "appendSourceSha256": "4d45d0a54afac426dd252717be8a6bf8be1516a4d48e48c9053036d24ba80a4f",
       "appendTarget": "function_app.py",
       "configuration": "content/items/OpenAI-Embeddings/.template.config/template.json",
-      "configurationSha256": "1e6db59d9a1ab7368a96e3b2f18b238c4cd3e7b58baddfe4f08067dc74e9cb89",
+      "configurationSha256": "b9db27fcb3c15a5b330458cdafa830e47eb4040ed1cc8d48609832457026d595",
       "createSource": "content/items/OpenAI-Embeddings/function_app.py",
       "createSourceSha256": "a6a5f8d2b895ba65a6facdaaa3149bd02a05aea0d6b317b5f7807897dbde583e",
       "createTarget": "function_app.py",
@@ -532,7 +532,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/OpenAI-RAG/.template.config/template.json",
-        "configurationSha256": "749d7451e21690328d88eafc638e42e655918fa7b232bc12c7560079ceac4844",
+        "configurationSha256": "ac887e6eb74f99dd15c9ec2e16ce5868fdd95442ab5b78e6621911d7b9d184db",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -544,7 +544,7 @@
       "appendSourceSha256": "c7a92a5ae4052492c3db031660e8926b81243e7de881d856965b3f7e43f4478b",
       "appendTarget": "function_app.py",
       "configuration": "content/items/OpenAI-RAG/.template.config/template.json",
-      "configurationSha256": "0917bd6f1ff4d4a05115cb7c314f8a6e6a05274b69ac9c307774b597ad8d6911",
+      "configurationSha256": "d481cc3634ea5b2e93b3f37466f4ccb9616e0d192c52d8951b5da0bc82d47b86",
       "createSource": "content/items/OpenAI-RAG/function_app.py",
       "createSourceSha256": "be9e278b6b23e325f978d42483d974d5183d3fd37c81254c5f84e4487e946141",
       "createTarget": "function_app.py",
@@ -555,7 +555,7 @@
     {
       "appendHelper": {
         "configuration": "content/append/OpenAI-TextCompletion/.template.config/template.json",
-        "configurationSha256": "288913152596c0af736d0922a33854ed298d6d72dd7db51ff98433ccf25c636b",
+        "configurationSha256": "5eb3981d643980c034919929c3fc5a39a1cdbf7a059e91bcd4251adcaa4269d1",
         "expectedOutput": "function_body.py",
         "expectedOutputKind": "File",
         "role": "internal-expansion",
@@ -567,7 +567,7 @@
       "appendSourceSha256": "f8d5f2c30849573ff99dd2d6454c935858fa379470c10edcf84ac04976b31ca8",
       "appendTarget": "function_app.py",
       "configuration": "content/items/OpenAI-TextCompletion/.template.config/template.json",
-      "configurationSha256": "e334669e10c1808e2ce627d9552c45ae156570b8117d17ff64063a8043876b47",
+      "configurationSha256": "bed34b1e51a326dd75a381ce7d32e3bb292dc950ddb1aa2989769b841123a561",
       "createSource": "content/items/OpenAI-TextCompletion/function_app.py",
       "createSourceSha256": "760c9e1b29fb13b4c3196d9b629305de9d93d59f37da304a46cac43fd938b62c",
       "createTarget": "function_app.py",

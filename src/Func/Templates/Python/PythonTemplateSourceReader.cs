@@ -188,8 +188,9 @@ internal sealed class PythonTemplateSourceReader
                 && input.AssignTo is not ("$(APP_FILENAME)" or "$(FUNCTION_NAME_INPUT)")))
             .Select(prompt => new NativeTemplateValidationRule(prompt.Id, prompt))];
         string? filenameParameter = ReadFilenameParameter(entry, native.RootElement, raw, jobs[0]);
-        Require(entry.Parameters.Count == rules.Length + (filenameParameter is null ? 0 : 1),
-            "Python native parameter inventory differs from the original create job and declared filename capability.");
+        string? selectedFilenameParameter = ReadSelectedFilenameParameter(entry, native.RootElement, raw, appends[0]);
+        Require(entry.Parameters.Count == rules.Length + (filenameParameter is null ? 0 : 1) + (selectedFilenameParameter is null ? 0 : 1),
+            "Python native parameter inventory differs from the original create job and declared filename capabilities.");
         foreach (NativeTemplateValidationRule rule in rules)
         {
             TemplateParameterDefinition? parameter = entry.Parameters.SingleOrDefault(item => item.CanonicalName == rule.CanonicalName);
@@ -206,6 +207,7 @@ internal sealed class PythonTemplateSourceReader
             "function_app.py", "function_app.py", helperIdentity, Text(helper, "configurationSha256"), helperSource, "function_body.py")
         {
             CreateFileNameParameter = filenameParameter,
+            SelectedAppendFileNameParameter = selectedFilenameParameter,
         };
         NativeTemplateLegacyContract contract = new(new(entry.Identity, ManifestPath, Hash(manifest)), package, expectedDefault, functionName, null, rules);
         cancellationToken.ThrowIfCancellationRequested();
@@ -233,6 +235,30 @@ internal sealed class PythonTemplateSourceReader
         Require(parameter is { DataType: "string", DefaultValue: "function_app.py", IsRequired: false, IsHidden: false }
             && parameter.LongName == "app-file-name" && parameter.Choices.Count == 0,
             "Python filename metadata must retain its canonical source input, public alias and default.");
+        return canonical;
+    }
+
+    private static string? ReadSelectedFilenameParameter(TemplateCatalogEntry entry, JsonElement configuration, NewTemplate raw, V2Job append)
+    {
+        V2Input[] inputs = [.. (append.Inputs ?? []).Where(input => input.AssignTo == "$(SELECTED_FILEPATH)")];
+        JsonElement symbols = Property(configuration, "symbols");
+        if (inputs.Length != 1 || inputs[0].ParamId is not { } canonical || !symbols.TryGetProperty(canonical, out JsonElement symbol))
+        {
+            return null;
+        }
+        V2Action[] actions = [.. (raw.Actions ?? []).Where(action => action.Type == "AppendToFile"
+            && (append.Actions ?? []).Contains(action.Name!))];
+        Require(actions is [{ FilePath: "$(SELECTED_FILEPATH)", CreateIfNotExists: false, ContinueOnError: false }]
+            && inputs[0].DefaultValue == "function_app.py",
+            "Python selected-file parameters require the original existing-file append action and unchanged default.");
+        RequireKeys(symbol, ["type", "datatype", "defaultValue", "description", "isRequired"]);
+        Require(Text(symbol, "type") == "parameter" && Text(symbol, "datatype") == "string"
+            && Text(symbol, "defaultValue") == "function_app.py" && Property(symbol, "isRequired").ValueKind == JsonValueKind.False,
+            "Python selected-file metadata must declare only an optional existing-app selector, not a rename or content substitution.");
+        TemplateParameterDefinition? parameter = entry.Parameters.SingleOrDefault(parameter => parameter.CanonicalName == canonical);
+        Require(parameter is { DataType: "string", DefaultValue: "function_app.py", IsRequired: false, IsHidden: false }
+            && parameter.LongName == "app-selected-file-name" && parameter.Choices.Count == 0,
+            "Python selected-file metadata must retain its canonical append input, public alias and default.");
         return canonical;
     }
 

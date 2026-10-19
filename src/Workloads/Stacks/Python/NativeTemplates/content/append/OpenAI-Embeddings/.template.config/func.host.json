@@ -4,6 +4,9 @@
     "app-fileName": {
       "longName": "app-file-name"
     },
+    "app-selectedFileName": {
+      "longName": "app-selected-file-name"
+    },
     "embedding-model-name": {
       "longName": "embedding-model-name"
     },

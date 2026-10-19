@@ -5,6 +5,7 @@ using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Templates.Python.Shared;
+using Microsoft.Win32.SafeHandles;
 
 namespace Azure.Functions.Cli.Templates.Python;
 
@@ -13,7 +14,8 @@ namespace Azure.Functions.Cli.Templates.Python;
 /// </summary>
 internal sealed class PythonAppendCapability(IFileSystem files, PythonTemplateSourceReader sources,
     IPythonTemplateAppendExecutor executor, ResolvedTemplate selected, WorkingDirectory output,
-    PythonAppendTargetGuard? targetGuard = null) : INativeTemplateEffectCapability
+    PythonAppendTargetGuard? targetGuard = null, PythonAppendTargetSelection? selection = null,
+    IFileIdentityReader? identities = null) : INativeTemplateEffectCapability
 {
     private readonly IFileSystem _files = files ?? throw new ArgumentNullException(nameof(files));
     private readonly PythonTemplateSourceReader _sources = sources ?? throw new ArgumentNullException(nameof(sources));
@@ -32,7 +34,20 @@ internal sealed class PythonAppendCapability(IFileSystem files, PythonTemplateSo
         try
         {
             PythonTemplateSource source = await _sources.ReadAsync(_selected, cancellationToken);
-            if (source.Binding.InternalExpansionOnly || source.Binding.Append is not { } mapping || plan.Effects.Count != 1
+            if (source.Binding.InternalExpansionOnly || source.Binding.Append is not { } originalMapping)
+            {
+                return ["Only the exact source-qualified Python app append is supported."];
+            }
+            NativeItemAppendMapping mapping = selection?.Bind(originalMapping) ?? originalMapping;
+            if (selection is { IsAlternate: true })
+            {
+                string canonical = Path.Combine(_output.Info.FullName, originalMapping.CreateTargetFileName);
+                if (!_files.FileExists(canonical) || _files.DirectoryExists(canonical))
+                {
+                    return ["The canonical Python app required for selected-file append changed. Nothing was appended."];
+                }
+            }
+            if (plan.Effects.Count != 1
                 || plan.Effects[0] is not TemplateAppendFileEffect append || append.Source != mapping.HelperSource
                 || append.Content is null || string.IsNullOrWhiteSpace(append.Content)
                 || !SamePath(append.TargetPath, Path.Combine(_output.Info.FullName, mapping.AppendTargetFileName)))
@@ -52,7 +67,10 @@ internal sealed class PythonAppendCapability(IFileSystem files, PythonTemplateSo
             {
                 return [pathDiagnostic];
             }
-
+            if (selection is { IsAlternate: true } && SelectedIdentityDiagnostic(append.TargetPath, null, cancellationToken) is { } identityDiagnostic)
+            {
+                return [identityDiagnostic];
+            }
             string actual = await _files.ComputeSha256Async(append.TargetPath, cancellationToken);
             pathDiagnostic = _targetGuard.GetDiagnostic(_output.Info.FullName, append.TargetPath);
             if (pathDiagnostic is not null)
@@ -106,10 +124,27 @@ internal sealed class PythonAppendCapability(IFileSystem files, PythonTemplateSo
         var append = (TemplateAppendFileEffect)effect;
         try
         {
-            await _executor.AppendAsync(append.TargetPath, append.Content, append.ExpectedTargetSha256, cancellationToken);
+            if (selection is { IsAlternate: true })
+            {
+                await _executor.AppendSelectedAsync(append.TargetPath, append.Content, append.ExpectedTargetSha256, handle =>
+                {
+                    if (SelectedIdentityDiagnostic(append.TargetPath, handle, cancellationToken) is { } diagnostic)
+                    {
+                        throw new InvalidOperationException(diagnostic);
+                    }
+                }, cancellationToken);
+            }
+            else
+            {
+                await _executor.AppendAsync(append.TargetPath, append.Content, append.ExpectedTargetSha256, cancellationToken);
+            }
             return new(true, []);
         }
         catch (InvalidOperationException exception)
+        {
+            return new(false, [exception.Message]);
+        }
+        catch (InvalidDataException exception)
         {
             return new(false, [exception.Message]);
         }
@@ -121,6 +156,29 @@ internal sealed class PythonAppendCapability(IFileSystem files, PythonTemplateSo
         {
             return new(false, [exception.Message], TargetMayHaveChanged: true);
         }
+    }
+
+    private string? SelectedIdentityDiagnostic(string target, SafeFileHandle? heldTarget, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (identities is null || selection?.ExpectedIdentity is not { } expected)
+        {
+            return "Selected-file append has no captured filesystem identity. Nothing was appended.";
+        }
+        string? pathDiagnostic = _targetGuard.GetDiagnostic(_output.Info.FullName, target);
+        if (pathDiagnostic is not null) return pathDiagnostic;
+        string canonicalPath = Path.Combine(_output.Info.FullName, selection.CanonicalFileName);
+        pathDiagnostic = _targetGuard.GetDiagnostic(_output.Info.FullName, canonicalPath);
+        if (pathDiagnostic is not null) return pathDiagnostic;
+        FileIdentity actual = heldTarget is null ? identities.Read(target) : identities.Read(heldTarget);
+        FileIdentity currentPath = identities.Read(target);
+        FileIdentity canonical = identities.Read(canonicalPath);
+        cancellationToken.ThrowIfCancellationRequested();
+        return !actual.IsRegular || actual.LinkCount != 1 || !expected.Identifies(actual)
+            || !currentPath.IsRegular || currentPath.LinkCount != 1 || !expected.Identifies(currentPath)
+            || !canonical.IsRegular || actual.Identifies(canonical)
+            ? "The selected Python app changed identity or has another hard-link alias. Nothing was appended."
+            : null;
     }
 
     private static bool SamePath(string left, string right) => string.Equals(Path.GetFullPath(left), Path.GetFullPath(right),

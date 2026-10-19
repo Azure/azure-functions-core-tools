@@ -29,9 +29,11 @@ internal static class FirstPartyNativeWorkflowRegistration
         services.AddScoped<INativeProjectWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
         services.AddScoped<PythonTemplateSourceReader>();
         services.AddScoped<PythonItemCompatibility>();
+        services.AddSingleton<IFileIdentityReader, PlatformFileIdentityReader>();
         services.AddScoped<PythonShared.IPythonTemplateAppendExecutor, PythonShared.PythonTemplateAppendExecutor>();
         services.AddScoped(provider => new PythonSelectedItemEffects(provider.GetRequiredService<IFileSystem>(),
-            provider.GetRequiredService<PythonTemplateSourceReader>(), provider.GetRequiredService<PythonShared.IPythonTemplateAppendExecutor>(), confirmed: true));
+            provider.GetRequiredService<PythonTemplateSourceReader>(), provider.GetRequiredService<PythonShared.IPythonTemplateAppendExecutor>(),
+            confirmed: true, provider.GetRequiredService<IFileIdentityReader>()));
         services.AddScoped<INativeItemWorkflowProvider, PythonItemWorkflowProvider>();
         services.AddScoped<INativeProjectWorkflowProvider, PythonProjectWorkflowProvider>();
         services.AddSingleton<DotNetShared.IDotnetPathResolver, DotNetShared.DotnetPathResolver>();

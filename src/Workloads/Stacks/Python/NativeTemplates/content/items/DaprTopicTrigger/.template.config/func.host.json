@@ -3,6 +3,9 @@
   "symbolInfo": {
     "app-fileName": {
       "longName": "app-file-name"
+    },
+    "app-selectedFileName": {
+      "longName": "app-selected-file-name"
     }
   }
 }

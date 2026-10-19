@@ -69,6 +69,13 @@
     "DurableFunctionsOrchestration-Python"
   ],
   "symbols": {
+    "app-selectedFileName": {
+      "datatype": "string",
+      "defaultValue": "function_app.py",
+      "description": "File Name",
+      "isRequired": false,
+      "type": "parameter"
+    },
     "FunctionIdentifier": {
       "replaces": "__FUNCTION_NAME__",
       "type": "derived",

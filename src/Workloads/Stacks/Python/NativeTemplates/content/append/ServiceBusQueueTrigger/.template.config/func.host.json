@@ -4,6 +4,9 @@
     "app-fileName": {
       "longName": "app-file-name"
     },
+    "app-selectedFileName": {
+      "longName": "app-selected-file-name"
+    },
     "serviceBusTrigger-connection": {
       "longName": "service-bus-trigger-connection"
     },

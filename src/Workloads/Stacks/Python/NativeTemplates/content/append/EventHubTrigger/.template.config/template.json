@@ -80,6 +80,13 @@
       "isRequired": false,
       "type": "parameter"
     },
+    "app-selectedFileName": {
+      "datatype": "string",
+      "defaultValue": "function_app.py",
+      "description": "File Name",
+      "isRequired": false,
+      "type": "parameter"
+    },
     "eventhubTrigger-connection": {
       "datatype": "string",
       "defaultValue": "EventHubConnectionString",

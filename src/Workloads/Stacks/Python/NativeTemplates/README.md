@@ -126,6 +126,51 @@ arbitrary filename extensions or other file-option behavior, change the separate
 the Python worker/SDK. No script-file environment setting, app import, pip,
 worker, SDK or host execution is added.
 
+### Qualified existing-app selection
+
+`--app-selected-file-name <existing_app.py>` is a distinct native parameter,
+authored from the original append job's `$(SELECTED_FILEPATH)` input. It selects
+an existing app, not a create filename or Blueprint operation. Its default is
+`function_app.py`; an omitted default does not select append over the ordinary
+no-app, custom `.py`, or extensionless create routes.
+
+The selected-file adapter binds one existing project-local `.py` basename using
+ASCII letters, digits, underscores or hyphens to its qualified mapping and target
+digest for that invocation. Both the canonical app and the selected app must be
+regular files. The native helper still supplies the original snippet. Preview
+and the typed append executor validate the same bound target, source, path,
+name/collision and digest. Only that selected file is appended; the canonical
+app and unrelated files are retained. Failed or stale selection never falls
+back to canonical append or ordinary creation, and `--force` cannot bypass
+collision or target checks.
+
+Alternate targets must have exactly one hard link. A per-invocation filesystem
+identity is checked during qualification, on the executor's actual held write
+handle, and immediately before append along with the current pathname and link
+count. This refuses aliases to the canonical app, another protected file or an
+outside file, even when distinct legitimate app files have identical content.
+The injected reader uses public Windows file-information, Linux `statx`, and
+macOS `fgetattrlist` contracts. Missing APIs or required returned fields refuse
+the operation rather than falling back to hashes, pathname equality or a private
+runtime stat layout. This does not promise an atomic cross-process namespace
+transaction or change the existing canonical append link policy.
+Unix pathname qualification queries metadata without a blocking content open:
+Linux uses an `O_PATH` descriptor and macOS uses pathname attributes. A FIFO or
+other nonregular selected target is refused before digest or snippet reads.
+The selected writer also validates its held target before hashing.
+
+The source reader accepts this capability only when its native symbol, explicit
+host alias and original existing-file action agree. Older packages without the
+declaration keep the original canonical behavior and do not gain a synthetic
+alias. No parser override, content replacement, generic path resolver, module
+import or worker entrypoint policy is introduced. Subdirectories, other filename
+domains, absent-canonical selection and Blueprint semantics remain unqualified,
+not accepted historical compatibility losses.
+The source-linked executor keeps its original canonical append signature.
+The added selected-file member has an explicit unsupported default for older
+implementations; it never silently invokes the canonical writer without the
+required held-target validation.
+
 The native item create sources preserve each original `function_app.py`.
 `snippets/<stem>/function_body.py` preserves the matching append payload,
 with the same name replacement and all remaining parameter tokens. Packing

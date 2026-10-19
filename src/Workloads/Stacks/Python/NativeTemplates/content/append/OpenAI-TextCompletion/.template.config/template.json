@@ -76,6 +76,13 @@
       "isRequired": false,
       "type": "parameter"
     },
+    "app-selectedFileName": {
+      "datatype": "string",
+      "defaultValue": "function_app.py",
+      "description": "File Name",
+      "isRequired": false,
+      "type": "parameter"
+    },
     "chat-model-name": {
       "datatype": "string",
       "defaultValue": "gpt-3.5-turbo",

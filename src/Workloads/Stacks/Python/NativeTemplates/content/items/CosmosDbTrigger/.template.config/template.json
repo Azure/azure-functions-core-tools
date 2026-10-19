@@ -75,6 +75,13 @@
       "isRequired": false,
       "type": "parameter"
     },
+    "app-selectedFileName": {
+      "datatype": "string",
+      "defaultValue": "function_app.py",
+      "description": "File Name",
+      "isRequired": false,
+      "type": "parameter"
+    },
     "cosmosDbTrigger-connection": {
       "datatype": "string",
       "defaultValue": "CosmosDbConnectionString",

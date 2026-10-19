@@ -12,6 +12,8 @@ internal sealed record NativeItemAppendMapping(TemplatePackageInfo Package, stri
     string HelperIdentity, string HelperConfigurationSha256, TemplateEffectSource HelperSource, string ExpectedHelperOutput)
 {
     public string? CreateFileNameParameter { get; init; }
+
+    public string? SelectedAppendFileNameParameter { get; init; }
 }
 
 internal sealed record NativeSelectedItemBinding(
@@ -107,7 +109,16 @@ internal sealed class NativeSelectedItemAppendSupport(IFileSystem fileSystem, IN
             return Failure("The existing create target selects append, but the original append target is absent; nothing was generated.");
         }
 
-        string expectedTargetSha256 = await _fileSystem.ComputeSha256Async(target, cancellationToken);
+        string expectedTargetSha256;
+        try
+        {
+            expectedTargetSha256 = await _fileSystem.ComputeSha256Async(target, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Failure($"Cannot read the existing append target: {exception.Message} Verify file access, then retry. Nothing was appended.");
+        }
         TemplateResolutionResult resolution = await templater.ResolveGroupAsync(mapping.HelperIdentity, TemplateType.Item, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (resolution.Status != TemplateResolutionStatus.Success || resolution.Group is not { Count: 1 } group)

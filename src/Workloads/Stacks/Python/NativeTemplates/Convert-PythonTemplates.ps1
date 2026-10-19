@@ -236,6 +236,26 @@ foreach ($record in $records.Values) {
         }
         $symbolInfo[$filenameInput.paramId] = @{ longName = 'app-file-name' }
     }
+    $selectedInputs = @($appendJob[0].inputs | Where-Object assignTo -ceq '$(SELECTED_FILEPATH)')
+    if ($selectedInputs.Count -ne 1 -or $selectedInputs[0].defaultValue -cne 'function_app.py' `
+        -or $appendAction[0].filePath -cne '$(SELECTED_FILEPATH)' -or $appendAction[0].createIfNotExists -ne $false `
+        -or $appendAction[0].continueOnError -ne $false) {
+        throw "Template '$id' requires one original selected-existing-file input and append action."
+    }
+    $selectedInput = $selectedInputs[0]
+    $selectedPrompt = $promptsById[$selectedInput.paramId]
+    if ($null -eq $selectedPrompt -or $selectedPrompt.FileExtension -cne '.py' -or $selectedPrompt.resource -cne 'Existingfile') {
+        throw "Template '$id' requires the original existing Python file prompt."
+    }
+    $description = $selectedPrompt.label
+    if ($description.StartsWith('$') -and $resources.ContainsKey($description.Substring(1))) {
+        $description = $resources[$description.Substring(1)]
+    }
+    $symbols[$selectedInput.paramId] = [ordered]@{
+        type = 'parameter'; datatype = 'string'; defaultValue = 'function_app.py'
+        description = $description; isRequired = $false
+    }
+    $symbolInfo[$selectedInput.paramId] = @{ longName = 'app-selected-file-name' }
     foreach ($candidate in @('function_app.py', 'function_app.py.py')) {
         if ($candidate -ne $createTarget -and (Test-Path (Join-Path $path $candidate))) {
             throw "Template '$id' retains a stale generated target '$candidate'; review and remove that exact owned file before regeneration."

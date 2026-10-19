@@ -3,6 +3,7 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 #if FUNC_PYTHON_TEMPLATE_HELPERS
 namespace Azure.Functions.Cli.Templates.Python.Shared;
@@ -15,7 +16,18 @@ namespace Azure.Functions.Cli.Workloads.Python;
 /// </summary>
 internal sealed class PythonTemplateAppendExecutor : IPythonTemplateAppendExecutor
 {
-    public async Task AppendAsync(string absoluteTargetPath, string generatedSnippet, string expectedTargetSha256, CancellationToken cancellationToken)
+    public Task AppendAsync(string absoluteTargetPath, string generatedSnippet, string expectedTargetSha256, CancellationToken cancellationToken)
+        => AppendCoreAsync(absoluteTargetPath, generatedSnippet, expectedTargetSha256, null, cancellationToken);
+
+    public Task AppendSelectedAsync(string absoluteTargetPath, string generatedSnippet, string expectedTargetSha256,
+        Action<SafeFileHandle> validateHeldTarget, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(validateHeldTarget);
+        return AppendCoreAsync(absoluteTargetPath, generatedSnippet, expectedTargetSha256, validateHeldTarget, cancellationToken);
+    }
+
+    private static async Task AppendCoreAsync(string absoluteTargetPath, string generatedSnippet, string expectedTargetSha256,
+        Action<SafeFileHandle>? validateHeldTarget, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(absoluteTargetPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(generatedSnippet);
@@ -33,6 +45,7 @@ internal sealed class PythonTemplateAppendExecutor : IPythonTemplateAppendExecut
         cancellationToken.ThrowIfCancellationRequested();
         await using FileStream stream = new(absoluteTargetPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read,
             bufferSize: 4096, useAsync: true);
+        validateHeldTarget?.Invoke(stream.SafeFileHandle);
         byte[] digest = await SHA256.HashDataAsync(stream, cancellationToken);
         if (!string.Equals(Convert.ToHexString(digest), expectedTargetSha256, StringComparison.OrdinalIgnoreCase))
         {
@@ -56,6 +69,8 @@ internal sealed class PythonTemplateAppendExecutor : IPythonTemplateAppendExecut
         }
 
         byte[] content = Encoding.UTF8.GetBytes(needsSeparator ? Environment.NewLine + generatedSnippet : generatedSnippet);
+        cancellationToken.ThrowIfCancellationRequested();
+        validateHeldTarget?.Invoke(stream.SafeFileHandle);
         cancellationToken.ThrowIfCancellationRequested();
         stream.Seek(0, SeekOrigin.End);
         await stream.WriteAsync(content, cancellationToken);
