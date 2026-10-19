@@ -488,7 +488,7 @@ EOF
         then
             return 1
         fi
-        chmod +x "${INSTALL_DIR}/func5" || return 1
+        chmod 0755 "${INSTALL_DIR}/func5" || return 1
         write_installation_metadata || return 1
     }
 

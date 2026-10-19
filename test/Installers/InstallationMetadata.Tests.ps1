@@ -74,6 +74,13 @@ function Assert-Metadata {
         'An installation metadata backup file was left behind.'
 }
 
+function Get-UnixMode {
+    param([Parameter(Mandatory)] [string] $Path)
+
+    $unixPath = ConvertTo-BashPath $Path
+    return (& $bashCommand -c 'stat -c "%a" "$1" 2>/dev/null || stat -f "%Lp" "$1"' -- $unixPath).Trim()
+}
+
 function Get-RecoveryBackupDirectories {
     return @(
         Get-ChildItem -LiteralPath $installerTempRoot -Directory -Recurse -Filter 'publication-backup' -Force `
@@ -96,7 +103,8 @@ function Invoke-PowerShellInstaller {
         [switch] $FailWrapperChmod,
         [switch] $FailRollback,
         [switch] $LockMetadata,
-        [switch] $LockWrapper
+        [switch] $LockWrapper,
+        [switch] $RestrictiveUmask
     )
 
     $runnerPath = Join-Path $testRoot 'invoke-install.ps1'
@@ -202,7 +210,11 @@ try {
         $env:TEMP = $installerTempRoot
         $env:TMP = $installerTempRoot
         $env:TMPDIR = $installerTempRoot
-        $output = & pwsh -NoLogo -NoProfile -File $runnerPath
+        if ($RestrictiveUmask) {
+            $output = & $bashCommand -c 'umask 0077; exec pwsh -NoLogo -NoProfile -File "$1"' -- (ConvertTo-BashPath $runnerPath)
+        } else {
+            $output = & pwsh -NoLogo -NoProfile -File $runnerPath
+        }
         $exitCode = $LASTEXITCODE
         $output | ForEach-Object { Write-Host $_ }
         return $exitCode
@@ -234,6 +246,7 @@ function Invoke-BashInstaller {
         [switch] $FailMetadataPublish,
         [switch] $FailRollback,
         [switch] $FailWrapperPublish,
+        [switch] $RestrictiveUmask,
         [ValidateSet('Linux', 'Darwin')] [string] $OperatingSystem = 'Linux'
     )
 
@@ -271,7 +284,11 @@ function Invoke-BashInstaller {
         }
 
         $fakeBinUnixPath = ConvertTo-BashPath $FakeBinPath
-        $output = & $bashCommand -c 'PATH="$1:$PATH"; shift; exec bash "$@"' -- $fakeBinUnixPath @arguments
+        if ($RestrictiveUmask) {
+            $output = & $bashCommand -c 'PATH="$1:$PATH"; shift; umask 0077; exec bash "$@"' -- $fakeBinUnixPath @arguments
+        } else {
+            $output = & $bashCommand -c 'PATH="$1:$PATH"; shift; exec bash "$@"' -- $fakeBinUnixPath @arguments
+        }
         $exitCode = $LASTEXITCODE
         $output | ForEach-Object { Write-Host $_ }
         return $exitCode
@@ -334,6 +351,15 @@ try {
     Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force) -eq 0) `
         'install.ps1 failed during an upgrade.'
     Assert-Metadata -InstallPath $powerShellInstall
+
+    if (-not $isWindowsHost) {
+        chmod 0755 (Join-Path $powerShellInstall 'func5')
+        Assert-True ($LASTEXITCODE -eq 0) 'Could not prepare the PowerShell wrapper mode for a restrictive-umask upgrade.'
+        Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force `
+            -RestrictiveUmask) -eq 0) 'install.ps1 failed during a restrictive-umask upgrade.'
+        Assert-True ((Get-UnixMode -Path (Join-Path $powerShellInstall 'func5')) -eq '755') `
+            'install.ps1 did not preserve shared wrapper permissions during a restrictive-umask upgrade.'
+    }
 
     Assert-True ((Invoke-PowerShellInstaller -ArchivePath $powerShellArchive -InstallPath $powerShellInstall -Force -FailDownload) -ne 0) `
         'install.ps1 unexpectedly succeeded during a failed upgrade.'
@@ -566,8 +592,7 @@ exec /usr/bin/env PATH=/usr/bin:/bin cp "$@"
         'install.sh failed to install a valid payload.'
     Assert-True (Test-Path -LiteralPath (Join-Path $bashInstall 'func') -PathType Leaf) 'install.sh did not install func.'
     Assert-Metadata -InstallPath $bashInstall
-    $metadataPath = ConvertTo-BashPath (Join-Path $bashInstall 'func.installation.json')
-    $metadataMode = (& $bashCommand -c 'stat -c "%a" "$1" 2>/dev/null || stat -f "%Lp" "$1"' -- $metadataPath).Trim()
+    $metadataMode = Get-UnixMode -Path (Join-Path $bashInstall 'func.installation.json')
     Assert-True ($metadataMode -eq '644') "install.sh wrote metadata with mode $metadataMode instead of 644."
 
     $macInstall = Join-Path $testRoot 'custom-macos-install'
@@ -581,6 +606,15 @@ exec /usr/bin/env PATH=/usr/bin:/bin cp "$@"
     Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashInstall -HomePath $bashHome -FakeBinPath $fakeBin -Force) -eq 0) `
         'install.sh failed during an upgrade.'
     Assert-Metadata -InstallPath $bashInstall
+
+    if (-not $isWindowsHost) {
+        chmod 0755 (Join-Path $bashInstall 'func5')
+        Assert-True ($LASTEXITCODE -eq 0) 'Could not prepare the Bash wrapper mode for a restrictive-umask upgrade.'
+        Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashInstall -HomePath $bashHome `
+            -FakeBinPath $fakeBin -Force -RestrictiveUmask) -eq 0) 'install.sh failed during a restrictive-umask upgrade.'
+        Assert-True ((Get-UnixMode -Path (Join-Path $bashInstall 'func5')) -eq '755') `
+            'install.sh did not preserve shared wrapper permissions during a restrictive-umask upgrade.'
+    }
 
     Assert-True ((Invoke-BashInstaller -ArchivePath $bashArchive -InstallPath $bashInstall -HomePath $bashHome -FakeBinPath $fakeBin -Force -FailDownload) -ne 0) `
         'install.sh unexpectedly succeeded during a failed upgrade.'

@@ -510,7 +510,7 @@ try {
                 $wrapperPath = Join-Path $InstallPath 'func5'
                 $body = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func`" `"`$@`"`n"
                 [System.IO.File]::WriteAllText($wrapperPath, $body)
-                chmod +x $wrapperPath
+                chmod 0755 $wrapperPath
                 if ($LASTEXITCODE -ne 0) { throw "Failed to make $wrapperPath executable (chmod exit $LASTEXITCODE)." }
             }
 
