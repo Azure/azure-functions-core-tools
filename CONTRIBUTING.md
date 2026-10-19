@@ -122,4 +122,53 @@ launches that target directly, without the test assembly's runtime configuration
 The empty-inventory test also exercises the normal host-platform product output. Its path comes from the resolved CLI project reference through
 test assembly metadata; no artifact download, dependency copying, global CLI installation, or separate publish is required.
 Explicit-target diagnostics include the executable SHA-256, available file-version metadata, and a deterministic fingerprint of the provisioned
-directory's relative paths and file hashes. These identify the tested inputs; they do not establish release trust or perform Preview 3 differential qualification.
+directory's relative paths and file hashes. These identify the tested inputs; a directory fingerprint is not release authentication.
+Explicit apphosts use their own runtime/dependency context and a private `DOTNET_BUNDLE_EXTRACT_BASE_DIR` under the test's `process-state` directory.
+
+##### Optional Preview 3 paired replay (Windows x64)
+
+The empty-inventory contract can also qualify the current product candidate against the independently released **5.0.0-preview.3** baseline
+(tag `v5.0.0-preview.3`, RID `win-x64`). This is a bounded real-process check for #5353, not a general differential or cross-platform qualification framework.
+
+Provision `func-win-x64.zip` locally before running the test. Its version-pinned distribution provenance is:
+
+```text
+https://cdn.functions.azure.com/public/cli/v5/5.0.0-preview.3/func-win-x64.zip
+```
+
+The required archive SHA-256 is:
+
+```text
+06fdd97d0e17fff6b7da1e2d2701a01e9fac21f63c6c007cfb79004ec3b5a73b
+```
+
+**The test never downloads this archive.** Only this empty-inventory scenario reads `FUNC_CLI_TEST_PREVIEW3_ARCHIVE`.
+The value must be an absolute path to an existing, caller-supplied archive. The test verifies the fixed digest before extraction or execution,
+requires a Windows x64 OS and test process, and accepts only the release ZIP's single, nonempty root-level `func.exe`.
+Links, directories, nested apphosts, duplicate entries, extra files, and paths that could escape extraction storage are rejected before any entry is written.
+The exact apphost is extracted into fresh test-owned storage under `process-state`, never installed globally or selected through PATH.
+
+From an already-restored checkout, build and run the ordinary focused check in PowerShell:
+
+```powershell
+dotnet build .\test\Func.Tests\Func.Tests.csproj --no-restore
+dotnet test .\test\Func.Tests\Func.Tests.csproj --no-build --no-restore `
+  --filter "FullyQualifiedName~WorkloadProgramSmokeTests.WorkloadListJson_EmptyIsolatedHome_EmitsEmptyArray"
+```
+
+Without the setting, only the existing default test-context control and current-product apphost executions run; that is **not** Preview 3 paired qualification.
+To opt in, supply the pre-provisioned archive and repeat the same contract:
+
+```powershell
+$env:FUNC_CLI_TEST_PREVIEW3_ARCHIVE = 'C:\preprovisioned\func-win-x64.zip'
+dotnet test .\test\Func.Tests\Func.Tests.csproj --no-build --no-restore `
+  --filter "FullyQualifiedName~WorkloadProgramSmokeTests.WorkloadListJson_EmptyIsolatedHome_EmitsEmptyArray" `
+  --logger "console;verbosity=detailed"
+```
+
+The setting adds a separately reported Preview 3 baseline execution, with its release identity, archive path, expected and verified archive hashes,
+and the existing executable/layout/process diagnostics. The actual baseline/candidate pair is **Preview 3 apphost versus current-product apphost**;
+the default test context remains a control, not a released baseline. Each execution has independent writable homes and project input, with the same
+sanitized environment policy, unused endpoints, version-cache policy, 60-second execution limit, and empty-inventory assertions.
+The check compares the semantic contract, not stdout bytes. A supplied invalid archive, unsupported platform, extraction/layout failure, apphost launch
+failure, timeout, or behavioral failure fails the test; there is no silent skip or substitution with another CLI.

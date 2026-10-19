@@ -2,7 +2,9 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Globalization;
+using System.IO.Compression;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Azure.Functions.Cli.Common;
@@ -16,11 +18,31 @@ namespace Azure.Functions.Cli.Tests.Commands.Workload;
 
 public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
 {
+    private const string Preview3ArchiveSetting = "FUNC_CLI_TEST_PREVIEW3_ARCHIVE";
+    private const string Preview3ArchiveSha256 = "06fdd97d0e17fff6b7da1e2d2701a01e9fac21f63c6c007cfb79004ec3b5a73b";
+
+    public static TheoryData<bool, string?> EmptyInventoryTargets
+    {
+        get
+        {
+            TheoryData<bool, string?> targets = new()
+            {
+                { false, null },
+                { true, null },
+            };
+            if (Environment.GetEnvironmentVariable(Preview3ArchiveSetting) is { } archivePath)
+            {
+                targets.Add(true, archivePath);
+            }
+
+            return targets;
+        }
+    }
+
     [Theory]
     [Trait("Category", "Integration")]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task WorkloadListJson_EmptyIsolatedHome_EmitsEmptyArray(bool explicitTarget)
+    [MemberData(nameof(EmptyInventoryTargets), DisableDiscoveryEnumeration = true)]
+    public async Task WorkloadListJson_EmptyIsolatedHome_EmitsEmptyArray(bool explicitTarget, string? preview3Archive)
     {
         string directory = Path.Combine(Path.GetTempPath(), $"func-workload-smoke-{Guid.NewGuid():N}");
         CliConfigurationPathsOptions paths = new(Path.Combine(directory, "home"));
@@ -28,15 +50,26 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
         string project = Path.Combine(directory, "project");
         string source = Path.Combine(project, "source.txt");
         const string SourceContent = "Project source must remain unchanged.";
-        using CancellationTokenSource cancellation = new(CliProcessTestRunner.ExecutionTimeout);
         RecordingOutput diagnostics = new(output);
         CliProcessTestRunner runner = new(diagnostics);
         List<(string Path, byte[] Bytes, DateTime Timestamp)> targetSnapshots = [];
         string? artifactDirectory = null;
         string[]? artifactInventory = null;
 
+        diagnostics.WriteLine("CLI target role: {0}", preview3Archive is not null
+            ? "Preview 3 baseline"
+            : explicitTarget ? "Current product candidate" : "Default test context (control)");
+
         try
         {
+            string? preview3Executable = null;
+            if (preview3Archive is not null)
+            {
+                using CancellationTokenSource intake = new(CliProcessTestRunner.ExecutionTimeout);
+                preview3Executable = await PreparePreview3Async(preview3Archive, directory, diagnostics, intake.Token);
+            }
+
+            using CancellationTokenSource cancellation = new(CliProcessTestRunner.ExecutionTimeout);
             Directory.CreateDirectory(paths.Home);
             Directory.CreateDirectory(workloads.Home);
             Directory.CreateDirectory(project);
@@ -53,18 +86,29 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
             CliProcessTestRunner.CliResult result;
             if (explicitTarget)
             {
-                string productAssembly = typeof(CliProcessTestRunner).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
-                    .Single(attribute => attribute.Key == "CliProductAssemblyPath").Value
-                    ?? throw new InvalidOperationException("The test build did not record the CLI product output.");
-                string executable = Path.ChangeExtension(productAssembly, OperatingSystem.IsWindows() ? ".exe" : null);
+                string executable;
+                string[] targetFiles;
+                if (preview3Executable is not null)
+                {
+                    executable = preview3Executable;
+                    targetFiles = [executable];
+                }
+                else
+                {
+                    string productAssembly = typeof(CliProcessTestRunner).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                        .Single(attribute => attribute.Key == "CliProductAssemblyPath").Value
+                        ?? throw new InvalidOperationException("The test build did not record the CLI product output.");
+                    executable = Path.ChangeExtension(productAssembly, OperatingSystem.IsWindows() ? ".exe" : null);
+                    targetFiles =
+                    [
+                        executable, productAssembly, Path.ChangeExtension(productAssembly, ".runtimeconfig.json"),
+                        Path.ChangeExtension(productAssembly, ".deps.json"),
+                    ];
+                }
+
                 artifactDirectory = Path.GetDirectoryName(executable)
                     ?? throw new InvalidOperationException("The CLI product output has no containing directory.");
                 artifactInventory = Directory.GetFileSystemEntries(artifactDirectory, "*", SearchOption.AllDirectories);
-                string[] targetFiles =
-                [
-                    executable, productAssembly, Path.ChangeExtension(productAssembly, ".runtimeconfig.json"),
-                    Path.ChangeExtension(productAssembly, ".deps.json"),
-                ];
                 foreach (string file in targetFiles)
                 {
                     targetSnapshots.Add((file, await File.ReadAllBytesAsync(file, cancellation.Token), File.GetLastWriteTimeUtc(file)));
@@ -77,6 +121,8 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
                 diagnostics.Lines.Should().Contain($"CLI executable SHA-256: {Convert.ToHexString(SHA256.HashData(targetSnapshots[0].Bytes))}");
                 diagnostics.Lines.Should().Contain(
                     $"Command: func workload list --json; host: {executable}; working directory: {project}");
+                diagnostics.Lines.Should().Contain(
+                    $"CLI bundle extraction root: {Path.Combine(directory, CliProcessTestRunner.StateDirectoryName, "dotnet-bundle")}");
                 diagnostics.Lines.Should().ContainSingle(line => line.StartsWith("CLI artifact directory: ", StringComparison.Ordinal))
                     .Which.Should().Contain(artifactDirectory).And.MatchRegex("SHA-256: [0-9A-F]{64}$");
                 diagnostics.Lines.Should().NotContain(line => line.StartsWith("CLI assembly: ", StringComparison.Ordinal)
@@ -86,6 +132,7 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
             {
                 result = await runner.RunAsync(
                     directory, paths.Home, workloads.Home, project, ["workload", "list", "--json"], cancellation.Token);
+                diagnostics.Lines.Should().NotContain(line => line.StartsWith("CLI bundle extraction root: ", StringComparison.Ordinal));
             }
 
             result.ExitCode.Should().Be(0);
@@ -154,6 +201,145 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
             }
 
             Directory.Exists(directory).Should().BeFalse("invalid explicit targets must not fall back to the default CLI");
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("relative")]
+    [InlineData("missing")]
+    [InlineData("digest")]
+    [InlineData("whitespace")]
+    public async Task PreparePreview3Async_InvalidArchive_FailsBeforeCreatingProcessState(string invalidInput)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-preview3-intake-{Guid.NewGuid():N}");
+        string executionDirectory = Path.Combine(directory, "execution");
+        string archivePath = invalidInput switch
+        {
+            "relative" => "func-win-x64.zip",
+            "whitespace" => " ",
+            _ => Path.Combine(directory, "func-win-x64.zip"),
+        };
+        RecordingOutput diagnostics = new(output);
+
+        try
+        {
+            Directory.CreateDirectory(directory);
+            if (invalidInput == "digest")
+            {
+                await File.WriteAllTextAsync(archivePath, "Unqualified archive input.", CancellationToken.None);
+            }
+
+            Func<Task> act = () => PreparePreview3Async(archivePath, executionDirectory, diagnostics, CancellationToken.None);
+            switch (invalidInput)
+            {
+                case "relative":
+                case "whitespace":
+                    (await act.Should().ThrowExactlyAsync<ArgumentException>()).Which.ParamName.Should().Be("archivePath");
+                    break;
+                case "missing":
+                    (await act.Should().ThrowExactlyAsync<FileNotFoundException>()).Which.FileName.Should().Be(archivePath);
+                    break;
+                case "digest":
+                    (await act.Should().ThrowExactlyAsync<InvalidDataException>()).Which.Message.Should().Contain("SHA-256 mismatch");
+                    diagnostics.Lines.Should().NotContain(line => line.StartsWith("Preview 3 verified archive SHA-256: ", StringComparison.Ordinal));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(invalidInput));
+            }
+
+            Directory.Exists(executionDirectory).Should().BeFalse("invalid archives must not create execution state or select another CLI");
+            diagnostics.Lines.Should().NotContain(line => line.StartsWith("Command: ", StringComparison.Ordinal)
+                || line.StartsWith("CLI explicit executable: ", StringComparison.Ordinal)
+                || line.StartsWith("CLI assembly: ", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("func.exe", null, 0)]
+    [InlineData(null, null, 0)]
+    [InlineData("func.dll", null, 0)]
+    [InlineData("../escaped.exe", null, 0)]
+    [InlineData("/func.exe", null, 0)]
+    [InlineData(@"C:\func.exe", null, 0)]
+    [InlineData("nested/func.exe", null, 0)]
+    [InlineData("func.exe", "func.exe", 0)]
+    [InlineData("func.exe", "unexpected.dll", 0)]
+    [InlineData("func.exe", null, 0xA000 << 16)]
+    [InlineData("func.exe", null, (int)FileAttributes.ReparsePoint)]
+    [InlineData("func.exe", null, (int)FileAttributes.Directory)]
+    public async Task ExtractPreview3ExecutableAsync_ArchiveLayout_IsEnforced(string? entryName, string? additionalEntry, int attributes)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-preview3-layout-{Guid.NewGuid():N}");
+        string extractionDirectory = Path.Combine(directory, "extracted");
+        byte[] payload = "Inert apphost fixture; never execute."u8.ToArray();
+        using MemoryStream contents = new();
+        using (ZipArchive archive = new(contents, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            string?[] names = [entryName, additionalEntry];
+            foreach (string? name in names)
+            {
+                if (name is not null)
+                {
+                    ZipArchiveEntry entry = archive.CreateEntry(name);
+                    entry.ExternalAttributes = attributes;
+                    await using Stream content = entry.Open();
+                    await content.WriteAsync(payload, CancellationToken.None);
+                }
+            }
+        }
+
+        contents.Position = 0;
+        try
+        {
+            if (entryName == "func.exe" && additionalEntry is null && attributes == 0)
+            {
+                string executable = await ExtractPreview3ExecutableAsync(contents, extractionDirectory, CancellationToken.None);
+                executable.Should().Be(Path.Combine(extractionDirectory, "func.exe"));
+                (await File.ReadAllBytesAsync(executable, CancellationToken.None)).Should().Equal(payload);
+                Directory.EnumerateFileSystemEntries(directory, "*", SearchOption.AllDirectories)
+                    .Should().BeEquivalentTo([extractionDirectory, executable]);
+            }
+            else
+            {
+                Func<Task> act = () => ExtractPreview3ExecutableAsync(contents, extractionDirectory, CancellationToken.None);
+                await act.Should().ThrowExactlyAsync<InvalidDataException>();
+                Directory.Exists(directory).Should().BeFalse("archive layout must be validated before writing any entry");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExtractPreview3ExecutableAsync_InvalidZip_FailsBeforeExtraction()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-preview3-invalid-zip-{Guid.NewGuid():N}");
+        using MemoryStream contents = new("Not a ZIP archive."u8.ToArray());
+
+        try
+        {
+            Func<Task> act = () => ExtractPreview3ExecutableAsync(contents, directory, CancellationToken.None);
+            await act.Should().ThrowExactlyAsync<InvalidDataException>();
+            Directory.Exists(directory).Should().BeFalse();
         }
         finally
         {
@@ -269,6 +455,77 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
                 Directory.Delete(directory, recursive: true);
             }
         }
+    }
+
+    private async Task<string> PreparePreview3Async(
+        string archivePath, string directory, ITestOutputHelper diagnostics, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(archivePath);
+        if (!Path.IsPathFullyQualified(archivePath))
+        {
+            throw new ArgumentException($"{Preview3ArchiveSetting} must name an absolute local archive path.", nameof(archivePath));
+        }
+
+        archivePath = Path.GetFullPath(archivePath);
+        diagnostics.WriteLine("Preview 3 baseline release: 5.0.0-preview.3; tag: v5.0.0-preview.3; RID: win-x64");
+        diagnostics.WriteLine("Preview 3 supplied archive: {0}", archivePath);
+        diagnostics.WriteLine("Preview 3 expected archive SHA-256: {0}", Preview3ArchiveSha256);
+        if (!File.Exists(archivePath))
+        {
+            throw new FileNotFoundException($"The requested Preview 3 archive '{archivePath}' does not exist.", archivePath);
+        }
+
+        await using FileStream archive = new(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        string hash = Convert.ToHexString(await SHA256.HashDataAsync(archive, cancellationToken));
+        diagnostics.WriteLine("Preview 3 supplied archive SHA-256: {0}", hash);
+        if (!string.Equals(hash, Preview3ArchiveSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException($"Preview 3 archive SHA-256 mismatch: expected {Preview3ArchiveSha256}; actual {hash}.");
+        }
+
+        diagnostics.WriteLine("Preview 3 verified archive SHA-256: {0}", hash);
+        if (!OperatingSystem.IsWindows()
+            || RuntimeInformation.OSArchitecture != Architecture.X64
+            || RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            throw new PlatformNotSupportedException("Preview 3 paired replay requires Windows x64 and an x64 test process.");
+        }
+
+        archive.Position = 0;
+        return await ExtractPreview3ExecutableAsync(
+            archive, Path.Combine(directory, CliProcessTestRunner.StateDirectoryName, "preview3"), cancellationToken);
+    }
+
+    private async Task<string> ExtractPreview3ExecutableAsync(Stream archiveStream, string extractionDirectory, CancellationToken cancellationToken)
+    {
+        using ZipArchive archive = new(archiveStream, ZipArchiveMode.Read, leaveOpen: true);
+        if (archive.Entries.Count != 1 || archive.Entries[0].FullName != "func.exe")
+        {
+            throw new InvalidDataException("The Preview 3 win-x64 ZIP must contain only a root-level func.exe.");
+        }
+
+        ZipArchiveEntry entry = archive.Entries[0];
+        int unixFileType = (entry.ExternalAttributes >> 16) & 0xF000;
+        if (entry.Length == 0
+            || (unixFileType != 0 && unixFileType != 0x8000)
+            || ((FileAttributes)entry.ExternalAttributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+        {
+            throw new InvalidDataException("The Preview 3 apphost must be a nonempty regular file, not a link or directory.");
+        }
+
+        extractionDirectory = Path.GetFullPath(extractionDirectory);
+        if (Path.Exists(extractionDirectory))
+        {
+            throw new IOException($"Preview 3 extraction storage must be fresh: '{extractionDirectory}'.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        Directory.CreateDirectory(extractionDirectory);
+        string executable = Path.Combine(extractionDirectory, "func.exe");
+        await using FileStream extracted = new(executable, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        await using Stream content = entry.Open();
+        await content.CopyToAsync(extracted, cancellationToken);
+        return executable;
     }
 
     private sealed class RecordingOutput(ITestOutputHelper output) : ITestOutputHelper

@@ -115,6 +115,14 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
             startInfo.Environment[key] = isolatedPath;
         }
 
+        if (executablePath is not null)
+        {
+            string bundleRoot = Path.Combine(directory, StateDirectoryName, "dotnet-bundle");
+            Directory.CreateDirectory(bundleRoot);
+            startInfo.Environment["DOTNET_BUNDLE_EXTRACT_BASE_DIR"] = bundleRoot;
+            _output.WriteLine("CLI bundle extraction root: {0}", bundleRoot);
+        }
+
         startInfo.Environment[Abstractions.Common.Constants.FuncHomeEnvironmentVariable] = home;
         startInfo.Environment[Constants.WorkloadsHomeEnvironmentVariable] = workloadsHome;
         startInfo.Environment[Constants.WorkloadsSourceEnvironmentVariable] = UnusedSource;
@@ -207,6 +215,7 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
 
         var version = FileVersionInfo.GetVersionInfo(executablePath);
         _output.WriteLine("Executable product version (file metadata): {0}", version.ProductVersion ?? "<unavailable>");
+        _output.WriteLine("Executable file version (file metadata): {0}", version.FileVersion ?? "<unavailable>");
 
         string artifactDirectory = Path.GetDirectoryName(executablePath)
             ?? throw new InvalidOperationException("The explicit CLI executable has no containing directory.");
