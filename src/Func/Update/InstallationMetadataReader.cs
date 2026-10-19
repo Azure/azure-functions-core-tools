@@ -29,7 +29,7 @@ internal sealed class InstallationMetadataReader(
         if (source is null)
         {
             throw new FileNotFoundException(
-                $"Could not determine the installation method because metadata '{metadataPath}' was not found. " +
+                $"Could not determine the update policy because metadata '{metadataPath}' was not found. " +
                 $"See {Constants.DocsUrl} for installation options.",
                 metadataPath);
         }
@@ -70,10 +70,9 @@ internal sealed class InstallationMetadataReader(
                 ex);
         }
 
-        ValidateInstallMethod(document.InstallMethod, metadataPath);
         InstallationUpdatePolicy updatePolicy = ParseUpdatePolicy(document.UpdatePolicy, metadataPath);
 
-        return new InstallationMetadata(document.InstallMethod, updatePolicy);
+        return new InstallationMetadata(updatePolicy);
     }
 
     private static int? ReadSchemaVersion(JsonElement root)
@@ -112,15 +111,6 @@ internal sealed class InstallationMetadataReader(
         }
 
         return Path.Combine(baseDirectory, MetadataFileName);
-    }
-
-    private static void ValidateInstallMethod(string value, string metadataPath)
-    {
-        if (string.IsNullOrWhiteSpace(value) || !string.Equals(value, value.Trim(), StringComparison.Ordinal))
-        {
-            throw new InvalidInstallationMetadataException(
-                $"Installation metadata '{metadataPath}' contains an invalid installMethod.");
-        }
     }
 
     private static InstallationUpdatePolicy ParseUpdatePolicy(string value, string metadataPath) => value switch

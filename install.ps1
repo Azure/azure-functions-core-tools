@@ -57,6 +57,8 @@ $Script:HeadRequestTimeoutSec = 60
 $Script:DefaultInstallDir = Join-Path $HOME '.azure-functions'
 $Script:DownloadBaseUrl = 'https://cdn.functions.azure.com'
 $Script:VersionManifestUrl = "$Script:DownloadBaseUrl/public/cli/v5/version.json"
+$Script:InstallationMetadataFile = 'func.installation.json'
+$Script:InstallationMetadataJson = '{"schemaVersion":1,"updatePolicy":"in-place"}'
 
 # True when invoked as a file (pwsh -File ... or .\install.ps1), false when piped
 # into iex. We use this so a piped 'exit' doesn't kill the user's pwsh session.
@@ -84,6 +86,59 @@ function Write-Message {
         'Success' { if ($hasWriteHost) { Write-Host $Message -ForegroundColor Green } else { Write-Output "SUCCESS: $Message" } }
         'Warning' { Write-Warning $Message }
         'Error'   { Write-Error $Message }
+    }
+}
+
+function Write-InstallationMetadata {
+    param([Parameter(Mandatory)] [string] $InstallPath)
+
+    $metadataPath = Join-Path $InstallPath $Script:InstallationMetadataFile
+    $tempPath = Join-Path $InstallPath ".$Script:InstallationMetadataFile.tmp.$([Guid]::NewGuid().ToString('N'))"
+    $backupPath = Join-Path $InstallPath ".$Script:InstallationMetadataFile.backup.$([Guid]::NewGuid().ToString('N'))"
+    $metadataCommitted = $false
+
+    try {
+        $metadataItem = Get-Item -LiteralPath $metadataPath -Force -ErrorAction SilentlyContinue
+        if ($metadataItem -and
+            ($metadataItem.LinkType -or
+            ($metadataItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint))) {
+            throw "Cannot write installation metadata because $metadataPath is a link or reparse point."
+        }
+        if ($metadataItem -and $metadataItem.PSIsContainer) {
+            throw "Cannot write installation metadata because $metadataPath is a directory."
+        }
+
+        $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($tempPath, "$Script:InstallationMetadataJson`n", $utf8WithoutBom)
+        if ($os -ne 'win') {
+            chmod 0644 $tempPath
+            if ($LASTEXITCODE -ne 0) { throw "Failed to set installation metadata permissions (chmod exit $LASTEXITCODE)." }
+        }
+
+        if ([System.IO.File]::Exists($metadataPath)) {
+            [System.IO.File]::Replace($tempPath, $metadataPath, $backupPath)
+        } else {
+            [System.IO.File]::Move($tempPath, $metadataPath)
+        }
+        $metadataCommitted = $true
+    } finally {
+        if ([System.IO.File]::Exists($tempPath)) {
+            try {
+                [System.IO.File]::Delete($tempPath)
+            } catch {
+                # Temporary-file cleanup must not mask the publication result.
+            }
+        }
+        if ([System.IO.File]::Exists($backupPath)) {
+            try {
+                [System.IO.File]::Delete($backupPath)
+            } catch {
+                # Once metadata is committed, backup cleanup cannot roll the transaction back.
+                if (-not $metadataCommitted) {
+                    Write-Message "Could not remove the installation metadata backup at $backupPath." -Level Warning
+                }
+            }
+        }
     }
 }
 
@@ -329,8 +384,14 @@ if ((Test-Path $funcPath) -and -not $Force) {
 
 # --- Download and extract ---
 
-$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "func-cli-install-$(Get-Random)"
-New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "func-cli-install-$([Guid]::NewGuid().ToString('N'))"
+if ($os -eq 'win') {
+    New-Item -ItemType Directory -Path $tempDir | Out-Null
+} else {
+    & /bin/mkdir -m 0700 $tempDir
+    if ($LASTEXITCODE -ne 0) { throw "Failed to create the temporary installation directory (mkdir exit $LASTEXITCODE)." }
+}
+$retainTempDir = [bool] $KeepArchive
 
 try {
     $downloadPath = Join-Path $tempDir $assetName
@@ -338,38 +399,161 @@ try {
     if ($PSCmdlet.ShouldProcess($InstallPath, "Download $assetName and install func CLI")) {
         Write-Message "Downloading $assetName..."
         Invoke-SecureWebRequest -Uri $downloadUrl -OutFile $downloadPath -TimeoutSec $Script:ArchiveDownloadTimeoutSec | Out-Null
-        New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
+        $payloadPath = Join-Path $tempDir 'payload'
+        New-Item -ItemType Directory -Path $payloadPath | Out-Null
 
         if ($os -eq 'win') {
-            Expand-Archive -Path $downloadPath -DestinationPath $InstallPath -Force
+            Expand-Archive -Path $downloadPath -DestinationPath $payloadPath -Force
         } else {
-            tar -xzf $downloadPath -C $InstallPath
+            tar --no-same-owner -xzf $downloadPath -C $payloadPath
             if ($LASTEXITCODE -ne 0) { throw "Failed to extract $assetName (tar exit $LASTEXITCODE)." }
         }
-        if ($os -eq 'osx') {
-            xattr -d com.apple.quarantine (Join-Path $InstallPath 'func') 2>$null
+
+        $payloadFuncPath = Join-Path $payloadPath $funcExe
+        if (-not (Test-Path -LiteralPath $payloadFuncPath -PathType Leaf)) {
+            throw "The downloaded archive does not contain the func CLI."
+        }
+        if (Test-Path -LiteralPath (Join-Path $payloadPath $Script:InstallationMetadataFile)) {
+            throw "The downloaded archive must not contain installation metadata."
         }
 
-        # Drop func5 wrappers so v5 can be invoked side-by-side with a v4 'func' on PATH.
-        if ($os -eq 'win') {
-            # cmd.exe / PowerShell wrapper
-            $cmdWrapperPath = Join-Path $InstallPath 'func5.cmd'
-            @('@echo off', '"%~dp0\func.exe" %*') -join "`r`n" |
-                Set-Content -Path $cmdWrapperPath -Encoding Ascii -NoNewline
+        if ($os -ne 'win') {
+            $payloadFunc = Get-Item -LiteralPath $payloadFuncPath -Force
+            if ($payloadFunc.LinkType) {
+                throw "The downloaded archive does not contain a regular func CLI executable."
+            }
 
-            # Extensionless wrapper for Git Bash / MSYS2 shells
-            $bashWrapperPath = Join-Path $InstallPath 'func5'
-            $bashBody = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func.exe`" `"`$@`"`n"
-            [System.IO.File]::WriteAllText($bashWrapperPath, $bashBody)
-        } else {
-            $wrapperPath = Join-Path $InstallPath 'func5'
-            $body = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func`" `"`$@`"`n"
-            [System.IO.File]::WriteAllText($wrapperPath, $body)
-            chmod +x $wrapperPath
+            & /usr/bin/env test -x $payloadFuncPath
+            if ($LASTEXITCODE -ne 0) {
+                throw "The downloaded archive does not contain an executable func CLI."
+            }
+        }
+
+        New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
+        $publicationBackupPath = Join-Path $tempDir 'publication-backup'
+        New-Item -ItemType Directory -Path $publicationBackupPath | Out-Null
+        $publicationNames = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        Get-ChildItem -LiteralPath $payloadPath -Force | ForEach-Object {
+            [void] $publicationNames.Add($_.Name)
+        }
+        [void] $publicationNames.Add('func5')
+        if ($os -eq 'win') {
+            [void] $publicationNames.Add('func5.cmd')
+        }
+
+        Get-ChildItem -LiteralPath $payloadPath -Force -Recurse | ForEach-Object {
+            $relativePath = $_.FullName.Substring($payloadPath.Length).TrimStart(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar)
+            $destinationPath = Join-Path $InstallPath $relativePath
+            $destinationItem = Get-Item -LiteralPath $destinationPath -Force -ErrorAction SilentlyContinue
+            if ($destinationItem -and
+                ($destinationItem.LinkType -or
+                ($destinationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint))) {
+                throw "Cannot install because $destinationPath is a link or reparse point."
+            }
+        }
+
+        $backedUpNames = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($name in $publicationNames) {
+            $destinationPath = Join-Path $InstallPath $name
+            $destinationItem = Get-Item -LiteralPath $destinationPath -Force -ErrorAction SilentlyContinue
+            if ($destinationItem -and
+                ($destinationItem.LinkType -or
+                ($destinationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint))) {
+                throw "Cannot install because $destinationPath is a link or reparse point."
+            }
+            if ($destinationItem) {
+                if ($os -eq 'win') {
+                    Copy-Item -LiteralPath $destinationPath -Destination $publicationBackupPath -Recurse -Force
+                } else {
+                    & /bin/cp -pR $destinationPath $publicationBackupPath
+                    if ($LASTEXITCODE -ne 0) { throw "Failed to back up $destinationPath (cp exit $LASTEXITCODE)." }
+                }
+                [void] $backedUpNames.Add($name)
+            }
+        }
+
+        try {
+            foreach ($name in $publicationNames) {
+                $destinationPath = Join-Path $InstallPath $name
+                if (Get-Item -LiteralPath $destinationPath -Force -ErrorAction SilentlyContinue) {
+                    Remove-Item -LiteralPath $destinationPath -Recurse -Force
+                }
+            }
+
+            if ($os -eq 'win') {
+                Get-ChildItem -LiteralPath $payloadPath -Force | Copy-Item -Destination $InstallPath -Recurse -Force
+            } else {
+                & /bin/cp -pR (Join-Path $payloadPath '.') $InstallPath
+                if ($LASTEXITCODE -ne 0) { throw "Failed to publish the func CLI payload (cp exit $LASTEXITCODE)." }
+            }
+
+            if ($os -eq 'osx') {
+                xattr -d com.apple.quarantine (Join-Path $InstallPath 'func') 2>$null
+            }
+
+            # Drop func5 wrappers so v5 can be invoked side-by-side with a v4 'func' on PATH.
+            if ($os -eq 'win') {
+                # cmd.exe / PowerShell wrapper
+                $cmdWrapperPath = Join-Path $InstallPath 'func5.cmd'
+                @('@echo off', '"%~dp0\func.exe" %*') -join "`r`n" |
+                    Set-Content -Path $cmdWrapperPath -Encoding Ascii -NoNewline
+
+                # Extensionless wrapper for Git Bash / MSYS2 shells
+                $bashWrapperPath = Join-Path $InstallPath 'func5'
+                $bashBody = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func.exe`" `"`$@`"`n"
+                [System.IO.File]::WriteAllText($bashWrapperPath, $bashBody)
+            } else {
+                $wrapperPath = Join-Path $InstallPath 'func5'
+                $body = "#!/usr/bin/env bash`nexec `"`$(dirname `"`$0`")/func`" `"`$@`"`n"
+                [System.IO.File]::WriteAllText($wrapperPath, $body)
+                chmod 0755 $wrapperPath
+                if ($LASTEXITCODE -ne 0) { throw "Failed to make $wrapperPath executable (chmod exit $LASTEXITCODE)." }
+            }
+
+            Write-InstallationMetadata -InstallPath $InstallPath
+        } catch {
+            $originalError = $_
+            $rollbackFailed = $false
+            foreach ($name in $publicationNames) {
+                $destinationPath = Join-Path $InstallPath $name
+                if (Test-Path -LiteralPath $destinationPath) {
+                    try {
+                        Remove-Item -LiteralPath $destinationPath -Recurse -Force
+                    } catch {
+                        $rollbackFailed = $true
+                    }
+                }
+            }
+            foreach ($name in $backedUpNames) {
+                $backupPath = Join-Path $publicationBackupPath $name
+                try {
+                    if ($os -eq 'win') {
+                        Copy-Item -LiteralPath $backupPath -Destination $InstallPath -Recurse -Force
+                    } else {
+                        & /bin/cp -pR $backupPath $InstallPath
+                        if ($LASTEXITCODE -ne 0) { throw "Failed to restore $name (cp exit $LASTEXITCODE)." }
+                    }
+                } catch {
+                    $rollbackFailed = $true
+                }
+            }
+            if ($rollbackFailed) {
+                $retainTempDir = $true
+                throw [System.InvalidOperationException]::new(
+                    "Installation failed and the previous installation could not be fully restored. " +
+                    "Recovery files are available at '$publicationBackupPath'. " +
+                    "Original error: $($originalError.Exception.Message)",
+                    $originalError.Exception)
+            }
+            throw $originalError
         }
     }
 } finally {
-    if (-not $KeepArchive) {
+    if (-not $retainTempDir) {
         Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     } else {
         Write-Message "Keeping temp dir: $tempDir"

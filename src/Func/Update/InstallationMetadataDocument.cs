@@ -11,10 +11,6 @@ internal sealed class InstallationMetadataDocument
     [JsonRequired]
     public int SchemaVersion { get; init; }
 
-    [JsonPropertyName("installMethod")]
-    [JsonRequired]
-    public string InstallMethod { get; init; } = string.Empty;
-
     [JsonPropertyName("updatePolicy")]
     [JsonRequired]
     public string UpdatePolicy { get; init; } = string.Empty;
