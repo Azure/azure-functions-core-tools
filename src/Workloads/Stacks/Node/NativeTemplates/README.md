@@ -291,6 +291,10 @@ Nested `invocation.changes` paths identify the actual authored destinations.
 This is an intentional internal result-semantics change; property names are
 unchanged.
 
+### Shared item-name aliases
+
+`func new --trigger-function-name <Name>` is an operative alias of `--name` and `-n` on the shared item command. It changes the native filename and generated function name, including JavaScript and TypeScript Timer registrations. This intentionally fixes the old advertised spelling that was accepted without changing the name. Omitted names still use the authored default. Supplying the name more than once, including mixed spellings, follows the existing single-value rejection rules. No legacy precedence or ignored-option behavior is introduced.
+
 ### Name-scoped Node Dapr helpers
 
 Newly authored JavaScript Dapr Publish items register the requested primary
@@ -320,6 +324,8 @@ primary names to 121. Preview and creation reject longer names before writes,
 with a shorter-name instruction; names are never truncated or hashed.
 The reserved primary name `host` is also rejected case-insensitively before
 writes for these affected items.
+
+These are intentional compatibility changes from the fixed sample helper names `DaprTopicTriggerNodeV4` and `InvokeOutputBinding` and the unprefixed Service route `invoke/{appId}/{methodName}`. Existing projects are not migrated or rewritten by this change. Other function-name restrictions, parameter behavior, SDK registration and backend qualification remain separate.
 
 Older native archives containing the fixed helper IDs or fixed service route,
 and the earlier underscore-derived encoding without primary/helper separation,
