@@ -384,8 +384,13 @@ if ((Test-Path $funcPath) -and -not $Force) {
 
 # --- Download and extract ---
 
-$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "func-cli-install-$(Get-Random)"
-New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "func-cli-install-$([Guid]::NewGuid().ToString('N'))"
+if ($os -eq 'win') {
+    New-Item -ItemType Directory -Path $tempDir | Out-Null
+} else {
+    & /bin/mkdir -m 0700 $tempDir
+    if ($LASTEXITCODE -ne 0) { throw "Failed to create the temporary installation directory (mkdir exit $LASTEXITCODE)." }
+}
 $retainTempDir = [bool] $KeepArchive
 
 try {
@@ -400,7 +405,7 @@ try {
         if ($os -eq 'win') {
             Expand-Archive -Path $downloadPath -DestinationPath $payloadPath -Force
         } else {
-            tar -xzf $downloadPath -C $payloadPath
+            tar --no-same-owner -xzf $downloadPath -C $payloadPath
             if ($LASTEXITCODE -ne 0) { throw "Failed to extract $assetName (tar exit $LASTEXITCODE)." }
         }
 
@@ -472,6 +477,13 @@ try {
         }
 
         try {
+            foreach ($name in $publicationNames) {
+                $destinationPath = Join-Path $InstallPath $name
+                if (Get-Item -LiteralPath $destinationPath -Force -ErrorAction SilentlyContinue) {
+                    Remove-Item -LiteralPath $destinationPath -Recurse -Force
+                }
+            }
+
             if ($os -eq 'win') {
                 Get-ChildItem -LiteralPath $payloadPath -Force | Copy-Item -Destination $InstallPath -Recurse -Force
             } else {

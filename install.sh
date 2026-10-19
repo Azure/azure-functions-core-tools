@@ -424,7 +424,7 @@ else
     secure_curl "$DOWNLOAD_URL" "${TEMP_DIR}/${ASSET_NAME}"
     PAYLOAD_DIR="${TEMP_DIR}/payload"
     mkdir -p "$PAYLOAD_DIR"
-    tar -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$PAYLOAD_DIR"
+    tar --no-same-owner -xzf "${TEMP_DIR}/${ASSET_NAME}" -C "$PAYLOAD_DIR"
 
     if [[ -L "${PAYLOAD_DIR}/func" || ! -f "${PAYLOAD_DIR}/func" || ! -x "${PAYLOAD_DIR}/func" ]]; then
         say_error "The downloaded archive does not contain an executable func CLI."
@@ -469,6 +469,11 @@ else
     done
 
     publish_installation() {
+        local publication_name
+        for publication_name in "${PUBLICATION_NAMES[@]}"; do
+            rm -rf -- "${INSTALL_DIR:?}/${publication_name}" || return 1
+        done
+
         cp -pR "${PAYLOAD_DIR}/." "$INSTALL_DIR/" || return 1
 
         if [[ "$OS" == "osx" ]]; then
