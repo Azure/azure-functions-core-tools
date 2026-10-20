@@ -1,6 +1,6 @@
 {
   "$schema": "https://aka.ms/func-profiles/v1/schema.json",
-  "generatedAt": "2026-05-23T00:00:00Z",
+  "generatedAt": "2026-10-12T00:00:00Z",
   "profiles": {
     "flex": {
       "sku": "flex-consumption",
@@ -16,7 +16,7 @@
           "version": "[3.13.0]"
         },
         "python": {
-          "version": "[4.43.0]"
+          "version": "[4.46.2]"
         },
         "go": {
           "version": "[1.0.0]"
@@ -46,7 +46,7 @@
           "version": "[3.13.0]"
         },
         "python": {
-          "version": "[4.43.0]"
+          "version": "[4.46.2]"
         }
       },
       "supportedRuntimes": [
@@ -116,7 +116,7 @@
           "version": "[3.13.0]"
         },
         "python": {
-          "version": "[4.43.0]"
+          "version": "[4.46.2]"
         }
       },
       "supportedRuntimes": [
