@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Diagnostics;
-using System.Text.Json;
 using System.Text;
 using Azure.Functions.Cli.Templates.Node;
 using Azure.Functions.Cli.Templates;
@@ -36,15 +34,6 @@ public sealed partial class BundledNodeTemplateTests
                 cancellationToken: CancellationToken.None);
             created.Status.Should().Be(CreationResultStatus.Success, created.ErrorMessage);
         }
-        using var captured = JsonDocument.Parse(await EvaluateDaprRegistrationsAsync(
-            Path.Combine(target, "Foo.js"), Path.Combine(target, secondName + ".js")));
-        string suffix = firstIdentity.StartsWith("DaprService", StringComparison.Ordinal) ? "-Invoke" : "-Topic";
-        string?[] expected = secondIdentity.StartsWith("Dapr", StringComparison.Ordinal)
-            ? ["Foo", "Foo" + suffix, secondName, secondName + suffix] : ["Foo", "Foo" + suffix, secondName];
-        string?[] names = [.. captured.RootElement.EnumerateArray().Select(item => item.GetProperty("name").GetString())];
-
-        names.Should().Equal(expected);
-        names.Distinct(StringComparer.OrdinalIgnoreCase).Should().HaveCount(names.Length);
         Directory.GetFiles(target).Select(Path.GetFileName).Should().BeEquivalentTo("Foo.js", secondName + ".js");
     }
 
@@ -103,30 +92,14 @@ public sealed partial class BundledNodeTemplateTests
             created.CreationEffects!.FileChanges.Select(change => change.TargetRelativePath).Should()
                 .Equal(preview.CreationEffects!.FileChanges.Select(change => change.TargetRelativePath));
         }
-        using var captured = JsonDocument.Parse(await EvaluateDaprRegistrationsAsync(
-            Path.Combine(target, "FirstMixedName.js"), Path.Combine(target, "SecondMixedName.js")));
-        var registrations = captured.RootElement.EnumerateArray().ToArray();
-        registrations.Select(item => item.GetProperty("name").GetString()).Should()
-            .Equal("FirstMixedName", "FirstMixedName" + suffix, "SecondMixedName", "SecondMixedName" + suffix);
         if (suffix == "-Invoke")
         {
             foreach (string name in new[] { "FirstMixedName", "SecondMixedName" })
             {
-                var helper = registrations.Single(item => item.GetProperty("name").GetString() == name + suffix);
-                helper.GetProperty("options").GetProperty("route").GetString().Should().Be(name + "/invoke/{appId}/{methodName}");
-                var output = helper.GetProperty("options").GetProperty("return");
-                output.GetProperty("appId").GetString().Should().Be("{appId}");
-                output.GetProperty("methodName").GetString().Should().Be("{methodName}");
                 string source = File.ReadAllText(Path.Combine(target, name + ".js"));
                 source.Should().Contain("--method " + name + " ", "/api/" + name + "/invoke/functionapp/" + name + "'");
                 source.Should().NotContain("{yourFunctionName}", "InvokeOutputBinding", "funcNodeItem");
             }
-        }
-        else
-        {
-            registrations.Where(item => item.GetProperty("kind").GetString() == "generic").Should().OnlyContain(
-                item => item.GetProperty("options").GetProperty("trigger").GetProperty("topic").GetString() == "A"
-                    && item.GetProperty("options").GetProperty("trigger").GetProperty("pubsubname").GetString() == "pubsub");
         }
         File.ReadAllText(sentinel).Should().Be("// preserve user source\n");
         Directory.GetFiles(target).Select(Path.GetFileName).Should().BeEquivalentTo("user.js", "FirstMixedName.js", "SecondMixedName.js");
@@ -293,38 +266,4 @@ public sealed partial class BundledNodeTemplateTests
         missingFailure.Should().Throw<ArgumentNullException>();
     }
 
-    private static async Task<string> EvaluateDaprRegistrationsAsync(params string[] paths)
-    {
-        ProcessStartInfo start = new("node") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-        start.ArgumentList.Add("-e");
-        start.ArgumentList.Add("""
-            const fs = require('fs'), vm = require('vm'), registrations = [];
-            const app = Object.fromEntries(['generic','http','timer'].map(kind =>
-              [kind, (name, options) => registrations.push({kind, name, options})]));
-            for (const path of process.argv.slice(1)) {
-              vm.runInNewContext(fs.readFileSync(path, 'utf8'), {
-                require: () => ({app, output:{generic: options=>options}, trigger:{generic: options=>options}})
-              }, {filename:path});
-            }
-            process.stdout.write(JSON.stringify(registrations));
-            """);
-        foreach (string path in paths) start.ArgumentList.Add(path);
-        using var process = Process.Start(start)!;
-        Task<string> stdout = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        Task<string> stderr = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        try
-        {
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
-            }
-        }
-        process.ExitCode.Should().Be(0, await stderr);
-        return await stdout;
-    }
 }

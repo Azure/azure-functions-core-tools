@@ -69,15 +69,6 @@ public sealed partial class BundledNodeTemplateTests
                 + "\nconst decoy = {\n    connection: '',\n};\n";
         }
         File.WriteAllText(catalog, templates.ToJsonString());
-        if (change.StartsWith("queue", StringComparison.Ordinal) || change == "timerTemplateLiteral")
-        {
-            string kind = change.StartsWith("queue", StringComparison.Ordinal) ? "QueueTrigger" : "TimerTrigger";
-            string validSource = templates.Single(template => template!["id"]!.GetValue<string>() == kind + "-JavaScript")!
-                ["files"]!["function.js"]!.GetValue<string>();
-            string validPath = Path.Combine(_root, "valid-decoy.js");
-            File.WriteAllText(validPath, validSource);
-            (await EvaluateNodePropertyAsync(validPath)).Should().Be(change == "timerTemplateLiteral" ? "\"0 */9 * * * *\"" : "\"changed\"");
-        }
         string items = Path.Combine(_root, "converted-items");
         string provenance = Path.Combine(_root, "converted-provenance");
         string native = Path.GetFullPath(Path.Combine(owned, "..", "..", "..", "..", "Stacks", "Node", "NativeTemplates"));
@@ -105,12 +96,6 @@ public sealed partial class BundledNodeTemplateTests
         }
         string errors = await stderr;
         (await stdout).Should().BeEmpty();
-        if (!succeeds && process.ExitCode == 0 && (change.StartsWith("queue", StringComparison.Ordinal) || change == "timerTemplateLiteral"))
-        {
-            string kind = change.StartsWith("queue", StringComparison.Ordinal) ? "QueueTrigger" : "TimerTrigger";
-            string generated = Path.Combine(items, kind + "-JavaScript", "funcNodeItem.js");
-            (await EvaluateNodePropertyAsync(generated)).Should().Be(change == "timerTemplateLiteral" ? "\"0 */9 * * * *\"" : "\"changed\"");
-        }
         process.ExitCode.Should().Be(succeeds ? 0 : 1, errors);
         if (succeeds)
         {
@@ -126,39 +111,6 @@ public sealed partial class BundledNodeTemplateTests
             errors.Should().Contain(change == "changedAssignment" ? "property association"
                 : change == "changedSourceDefault" ? "default association" : "declaration");
         }
-    }
-
-    private static async Task<string> EvaluateNodePropertyAsync(string path)
-    {
-        ProcessStartInfo start = new("node") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-        start.ArgumentList.Add("-e");
-        start.ArgumentList.Add("""
-            const fs = require('fs'), vm = require('vm');
-            let value;
-            const capture = (_, options) => value = options.connection ?? options.schedule;
-            vm.runInNewContext(fs.readFileSync(process.argv[1], 'utf8'), {
-              require: () => ({app: {storageQueue: capture, timer: capture}})
-            });
-            process.stdout.write(JSON.stringify(value));
-            """);
-        start.ArgumentList.Add(path);
-        using var process = Process.Start(start)!;
-        Task<string> stdout = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        Task<string> stderr = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        try
-        {
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
-            }
-        }
-        process.ExitCode.Should().Be(0, await stderr);
-        return await stdout;
     }
 
     [Theory]

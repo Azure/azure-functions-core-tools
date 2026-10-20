@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "status": "EXPLICIT_USER_APPROVED_VM_ASSERTION_DEFERRAL_NOT_A_TEST_RESULT",
+  "decision": "Approve the narrow VM deferral and npm-only Node setup (Recommended)",
+  "preDeferralLocalCommit": "84526cceba24e8108b3bcc6180310387d4bbcc3f",
+  "preDeferralTree": "cf9edc619e9ac90df06630d4d305d1867a0ce707",
+  "historicalScopeProposalSha256": "33dde7e0cf575462c51c3ccf78b9d324e5b33d5ea48768d0f49862463fcce2e2",
+  "archiveMeaning": "These are complete byte-preserved pre-deferral source files, including portable context and other tests. Only the twelve named VM assertion variants and the two process helpers are deferred. All twenty-three portable mixed journeys remain compiled. The archives are not compiled, skipped tests, golden replacements or newly passing evidence.",
+  "sourceArchives": [
+    {
+      "path": "BundledNodeConverterTests.cs.proposed",
+      "originalPath": "test/Func.Tests/Templates/BundledNodeConverterTests.cs",
+      "originalGitBlob": "ca3f7a6666f7371f639b701ef2f33465367539f2",
+      "bytes": 14966,
+      "sha256": "b8dd99a42324a99e2e31b4b5710c024f8a5c676b24c33cbea54abf075daa1d3f",
+      "deferredHelper": "EvaluateNodePropertyAsync"
+    },
+    {
+      "path": "BundledNodeSourceQualifierTests.cs.proposed",
+      "originalPath": "test/Func.Tests/Templates/BundledNodeSourceQualifierTests.cs",
+      "originalGitBlob": "65d35103f87d4c5852d7ae8315c9da00fcd971b3",
+      "bytes": 23836,
+      "sha256": "694d3d6b6196e65e5b5a7db2830c138f9a731bc302c38d1e8f089a7a4deb18db",
+      "deferredHelper": "Shared EvaluateNodePropertyAsync from the converter source archive"
+    },
+    {
+      "path": "BundledNodeDaprHelperTests.cs.proposed",
+      "originalPath": "test/Func.Tests/Templates/BundledNodeDaprHelperTests.cs",
+      "originalGitBlob": "9ef3f38dd8971f672f434bef7899fd7c08f7e5f2",
+      "bytes": 19841,
+      "sha256": "bb6e55ff349a5bc6cc560b2fef7cd311cde1bba6383153adafc1d9147a45501f",
+      "deferredHelper": "EvaluateDaprRegistrationsAsync"
+    }
+  ],
+  "deferredVariants": [
+    {
+      "method": "Converter_ChangedSource_AssociatesOnlyReviewedDeclarationsOrFailsClosed",
+      "input": {"change": "queueBlockComment", "succeeds": false, "sourceLanguage": null},
+      "expectedVmJson": "\"changed\"",
+      "deferredAssertion": "Execute valid-decoy.js and capture the operative storageQueue connection despite a matching block-comment property."
+    },
+    {
+      "method": "Converter_ChangedSource_AssociatesOnlyReviewedDeclarationsOrFailsClosed",
+      "input": {"change": "timerTemplateLiteral", "succeeds": false, "sourceLanguage": null},
+      "expectedVmJson": "\"0 */9 * * * *\"",
+      "deferredAssertion": "Execute valid-decoy.js and capture the operative timer schedule despite a matching property in a template literal."
+    },
+    {
+      "method": "Converter_ChangedSource_AssociatesOnlyReviewedDeclarationsOrFailsClosed",
+      "input": {"change": "queueUnrelatedObject", "succeeds": false, "sourceLanguage": null},
+      "expectedVmJson": "\"changed\"",
+      "deferredAssertion": "Execute valid-decoy.js and capture the operative connection despite a matching unrelated object property."
+    },
+    {
+      "method": "SourceQualifier_ValidJavaScriptDecoy_CannotAuthorizeAnUnrelatedOperativeProperty",
+      "input": {"decoy": "queueBlockComment"},
+      "expectedVmJson": "\"changed\"",
+      "deferredAssertion": "Independently evaluate valid-native-decoy.js before asserting source qualification refusal."
+    },
+    {
+      "method": "SourceQualifier_ValidJavaScriptDecoy_CannotAuthorizeAnUnrelatedOperativeProperty",
+      "input": {"decoy": "timerTemplateLiteral"},
+      "expectedVmJson": "\"0 */9 * * * *\"",
+      "deferredAssertion": "Independently evaluate the authored native timer value before asserting source qualification refusal."
+    },
+    {
+      "method": "SourceQualifier_ValidJavaScriptDecoy_CannotAuthorizeAnUnrelatedOperativeProperty",
+      "input": {"decoy": "queueUnrelatedObject"},
+      "expectedVmJson": "\"changed\"",
+      "deferredAssertion": "Independently evaluate the authored native queue value before asserting source qualification refusal."
+    },
+    {
+      "method": "DaprHelpers_CliReachableCrossRoleNames_DoNotOverlapPrimaryAndHelperDomains",
+      "input": ["DaprServiceInvocationTrigger-JavaScript", "Azure.Functions.Node.Http.JavaScript", "Foo_Invoke"],
+      "expectedRegistrationNames": ["Foo", "Foo-Invoke", "Foo_Invoke"],
+      "deferredAssertion": "Exact evaluated registration sequence and case-insensitive uniqueness."
+    },
+    {
+      "method": "DaprHelpers_CliReachableCrossRoleNames_DoNotOverlapPrimaryAndHelperDomains",
+      "input": ["DaprServiceInvocationTrigger-JavaScript", "DaprServiceInvocationTrigger-JavaScript", "Foo_Invoke"],
+      "expectedRegistrationNames": ["Foo", "Foo-Invoke", "Foo_Invoke", "Foo_Invoke-Invoke"],
+      "deferredAssertion": "Exact evaluated registration sequence and case-insensitive uniqueness."
+    },
+    {
+      "method": "DaprHelpers_CliReachableCrossRoleNames_DoNotOverlapPrimaryAndHelperDomains",
+      "input": ["DaprPublishOutputBinding-JavaScript", "Azure.Functions.Node.Http.JavaScript", "Foo_Topic"],
+      "expectedRegistrationNames": ["Foo", "Foo-Topic", "Foo_Topic"],
+      "deferredAssertion": "Exact evaluated registration sequence and case-insensitive uniqueness."
+    },
+    {
+      "method": "DaprHelpers_CliReachableCrossRoleNames_DoNotOverlapPrimaryAndHelperDomains",
+      "input": ["DaprPublishOutputBinding-JavaScript", "DaprPublishOutputBinding-JavaScript", "Foo_Topic"],
+      "expectedRegistrationNames": ["Foo", "Foo-Topic", "Foo_Topic", "Foo_Topic-Topic"],
+      "deferredAssertion": "Exact evaluated registration sequence and case-insensitive uniqueness."
+    },
+    {
+      "method": "DaprHelpers_ActualNativeBackend_TwoDifferentNamesHaveDistinctAssociatedRegistrationsAndRoutes",
+      "input": ["DaprPublishOutputBinding-JavaScript", "-Topic"],
+      "expectedRegistrationNames": ["FirstMixedName", "FirstMixedName-Topic", "SecondMixedName", "SecondMixedName-Topic"],
+      "expectedGenericTrigger": {"topic": "A", "pubsubname": "pubsub"},
+      "deferredAssertion": "Exact evaluated registration sequence and generic trigger option values."
+    },
+    {
+      "method": "DaprHelpers_ActualNativeBackend_TwoDifferentNamesHaveDistinctAssociatedRegistrationsAndRoutes",
+      "input": ["DaprServiceInvocationTrigger-JavaScript", "-Invoke"],
+      "expectedRegistrationNames": ["FirstMixedName", "FirstMixedName-Invoke", "SecondMixedName", "SecondMixedName-Invoke"],
+      "expectedHelperRoutes": ["FirstMixedName/invoke/{appId}/{methodName}", "SecondMixedName/invoke/{appId}/{methodName}"],
+      "expectedReturn": {"appId": "{appId}", "methodName": "{methodName}"},
+      "deferredAssertion": "Exact evaluated registration sequence and service helper route/output properties."
+    }
+  ],
+  "unexpectedConverterSuccess": {
+    "variants": ["queueBlockComment", "timerTemplateLiteral", "queueUnrelatedObject"],
+    "archivedCondition": "!succeeds && process.ExitCode == 0",
+    "deferredWitness": "Evaluate emitted converted-items/<kind>-JavaScript/funcNodeItem.js and assert the same changed effective value before expecting converter failure.",
+    "stillRequired": "The active converter test still expects exit1 and the declaration diagnostic for these same inputs. Unexpected exit0 remains a failure. The emitted operative value is no longer independently executed."
+  },
+  "retainedPortableJourneys": {
+    "converter": 14,
+    "sourceQualifierDecoys": 3,
+    "daprCrossRoleNativeGeneration": 4,
+    "daprAssociatedNativeGeneration": 2,
+    "total": 23,
+    "assertions": "All converter input transformations/process exits/refusals/association diagnostics and successful source checks, qualifier source mutation/refusal, real native generation statuses/dry-run/preview-create parity/topology/sentinel/rendered-source checks and unrelated Dapr controls remain compiled."
+  },
+  "acceptedAssuranceLoss": "Blocking CI no longer executes JavaScript to prove decoy validity/effective values or Dapr registration/name/route/output semantics. Portable assertions are narrower and are not an equivalent runtime replacement. No availability skip, fallback, source parser substitute or new passing result is introduced.",
+  "reactivation": "Reintroducing these VM assertions is a separate testing improvement with explicit execution prerequisites and scope. These full snapshots contain historical portable context and are not ready-to-add duplicate test classes.",
+  "history": "The previous local25case pass, reviews,84526/cf9e source and already deferred29language cases remain historical and are not relabeled to the new source."
+}

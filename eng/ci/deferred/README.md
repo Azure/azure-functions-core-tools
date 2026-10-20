@@ -32,3 +32,19 @@ requirements remain unchanged. Any tools genuinely needed by retained runtime
 or E2E cases remain prerequisites of those independent cases. The deferred
 parser/compiler checks neither replace nor qualify SDK, worker, Host or backend
 execution.
+
+## Separately approved Node VM assertion deferral
+
+The user also approved deferring only the 12 migration-added Node VM assertion
+variants. `node-vm/inventory.json` identifies every variant, expected effective
+value, registration sequence and route/output property, including the
+unexpected-converter-success witness. Three complete pre-deferral test files
+are preserved byte-for-byte as noncompiled `.cs.proposed` snapshots there.
+Their portable context is historical context, not a deferral of all 23 mixed
+test journeys. All 23 remain active.
+
+Blocking CI no longer dynamically evaluates JavaScript decoy validity,
+effective values or Dapr registrations/routes. This is an explicit accepted
+assurance loss, not a claim that filenames, source strings or converter refusal
+are equivalent to executing JavaScript. No missing-runtime skip or automatic
+fallback is used. The previous Node-enabled pass remains historical.

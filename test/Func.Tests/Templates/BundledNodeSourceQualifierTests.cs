@@ -336,11 +336,6 @@ public sealed partial class BundledNodeTemplateTests
         }
         source.Template.Files["function.js"] = raw + suffix;
         source = source with { Content = Encoding.UTF8.GetBytes(native + nativeSuffix) };
-        string valid = Path.Combine(_root, "valid-native-decoy.js");
-        File.WriteAllText(valid, Encoding.UTF8.GetString(source.Content.Span)
-            .Replace("__FUNC_NODE_queueTrigger-name__", "requested-queue", StringComparison.Ordinal));
-        (await EvaluateNodePropertyAsync(valid)).Should().Be(kind == "QueueTrigger" ? "\"changed\"" : "\"0 */9 * * * *\"");
-
         Action qualify = () => NodeItemSourceQualifier.Validate(source, "JavaScript");
 
         qualify.Should().Throw<InvalidDataException>();
