@@ -1,17 +1,11 @@
-## 5.0.0-preview.3
+## 5.0.0-preview.4
 
 # Azure Functions CLI 5.0.0
 
 #### Changes
 
-- `func init` now adopts an existing project's language (writes `stack.language` to `.func/config.json`) using the runtime project resolver. (#5300)
-- `func init` heals a `.func/config.json` that has `stack.runtime` but no `stack.language` on a multi-language stack, instead of refusing with "pass --force". Other top-level keys (profiles, etc.) are preserved. (#5300)
-- Clarified the `func new` "missing language" hint to mention both scaffolding and adopting an existing project. (#5300)
-- Fix `func start` failing to resolve installed prerelease worker workloads against built-in profile ranges (e.g. `node [3.13.0]` now accepts `3.13.0-preview.1`). (#5286)
-- Fix `func new` printing the "Cannot determine language" error three times when `stack.language` is missing from `.func/config.json`. (#5306)
-- Remove `python` from `supportedRuntimes` and `workers` in `windows-consumption` and `windows-dedicated` built-in profiles, and remove `go` workers from non-Flex profiles, to match Azure production support. `func start` now rejects unsupported stacks before worker resolution or installation with a user-facing error (exit code 1). (#5293)
-- When no installed stack workload matches the project, the error now includes specific `func workload install` guidance for the matching stack. (#5508)
-- Workload manifests now support a "rid-pointer" kind that maps runtime identifiers to platform-specific implementation packages, enabling per-OS/arch workload resolution. (#5516)
-- When managed Azurite is already running on the expected ports, `func start` now identifies the owning process and classifies it by data directory — reusing it if it matches, or failing with clear PID/directory guidance if it serves a different store. (#5264)
-- Managed Azurite now detects HTTP 500 responses paired with the Azurite-Blob header and surfaces a live warning with data-directory reset guidance, repeated in the end-of-run summary. (#5263)
-- `func workload install <path>.nupkg` now gives a clear "file does not exist" error when the package file is missing, instead of falling through to catalog resolution with a confusing failure. (#5497)
+- Add the public `IProjectStack` Abstractions contract and an installed stack metadata catalog without changing existing `func init` scaffolding. The .NET, Node.js, Python, Go, Java, and PowerShell 1.0.0-preview.2 stack binaries require Azure Functions CLI 5.0.0-preview.4 or later; older CLIs lack this contract and cannot safely load those binaries.  (#5707)
+- Enable metadata-gated `func update` for installations that explicitly support in-place updates. Updates default to the latest stable release; use `--prerelease` for previews, `--version` for a specific version (including an explicit downgrade), and `--yes` to skip confirmation. Externally managed installations receive installer/package-manager guidance without contacting the update feed; missing or invalid installation metadata produces reinstall guidance. Update invocations skip first-run setup and version advisories. (#5702)
+- Add installer-authored installation metadata and validation for installation channel and update policy. Standalone installers publish metadata atomically and restore payloads and wrappers when publication fails. (#5700, #5701)
+- Reject extension bundles that are incompatible with the selected profile in `func new`. (#5580)
+- Remove Go worker references from non-Flex built-in profiles and Python worker references from Windows built-in profiles. Reject unsupported stacks before worker resolution or installation; upstream host and worker versions are unchanged. (#5507)
