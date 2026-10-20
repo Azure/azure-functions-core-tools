@@ -77,8 +77,8 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
             await File.WriteAllTextAsync(source, SourceContent, cancellation.Token);
             DateTime sourceTimestamp = File.GetLastWriteTimeUtc(source);
 
-            // A fresh, non-newer cache prevents the global advisory without suppressing product behavior.
-            string cachedVersion = AssemblyCliVersionProvider.Instance.Version.Split('-')[0];
+            // Keep the cache at Preview 3's numeric version so newer candidates cannot trigger its update advisory.
+            string cachedVersion = "5.0.0";
             Version.TryParse(cachedVersion, out _).Should().BeTrue();
             await File.WriteAllTextAsync(paths.VersionCachePath, cachedVersion, cancellation.Token);
             DateTime cacheTimestamp = File.GetLastWriteTimeUtc(paths.VersionCachePath);
