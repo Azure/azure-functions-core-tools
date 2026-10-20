@@ -30,6 +30,6 @@ None.
 
 - Reworks `NewCommand`, `NewCommandRunner`, command argument preparation, template option hydration, language filtering, and template selection.
 - Depends on the `template-engine-integration` change for command-scoped `Templater`, `TemplateType.Item` resolution, projected parameter metadata, immutable template groups, and `ResolvedTemplate.InvokeAsync`.
-- Changes the positional argument while preserving the existing plain/JSON `--output` rendering option.
+- Changes the positional argument while preserving the existing plain/JSON `--format` rendering option.
 - Uses TemplateEngine's native dry-run support and creation-effects model.
 - Does not define or change `func init` project-template behavior.

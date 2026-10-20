@@ -41,7 +41,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         Description = "List available templates for this project instead of scaffolding.",
     };
 
-    public Option<string?> OutputOption { get; } = new("--output")
+    public Option<string?> FormatOption { get; } = new("--format")
     {
         Description = "Output mode (plain | json). Defaults to plain.",
     };
@@ -69,7 +69,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         Options.Add(ForceOption);
         Options.Add(NonInteractiveOption);
         Options.Add(ListOption);
-        Options.Add(OutputOption);
+        Options.Add(FormatOption);
 
         // Tolerate unrecognised options so ExecuteAsync can re-interpret
         // them as per-template prompt values (e.g. `--auth-level anonymous`
@@ -94,7 +94,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
 
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
         string? requestedTemplate = parseResult.GetValue(TemplateOption);
-        bool jsonOutput = string.Equals(parseResult.GetValue(OutputOption), "json", StringComparison.OrdinalIgnoreCase);
+        bool jsonOutput = string.Equals(parseResult.GetValue(FormatOption), "json", StringComparison.OrdinalIgnoreCase);
 
         // Collect per-template prompt overrides. Two sources, in priority order:
         //   1. Options the pre-parse step in Program.Main attached to this
