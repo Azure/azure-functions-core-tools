@@ -43,6 +43,9 @@ public class HostProcessStartInfoFactoryTests : IDisposable
             {
                 ["CUSTOM_ENV"] = "custom-value",
                 [HostProcessStartInfoFactory.ScriptRootEnvironmentVariable] = "stale-value",
+                [HostProcessStartInfoFactory.AzureFunctionsEnvironmentVariable] = "stale-value",
+                [HostProcessStartInfoFactory.WebsiteHostnameEnvironmentVariable] = "stale-value",
+                [HostProcessStartInfoFactory.HostingLifetimeLogLevelEnvironmentVariable] = "stale-value",
             });
 
         HostProcessLaunchInfo launchInfo = factory.Create(context);
@@ -63,6 +66,11 @@ public class HostProcessStartInfoFactoryTests : IDisposable
         launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.WebsiteHostnameEnvironmentVariable].Should().Be("localhost:7071");
         launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.AspNetCoreSuppressStatusMessagesEnvironmentVariable].Should().Be("true");
         launchInfo.StartInfo.Environment[HostProcessStartInfoFactory.HostingLifetimeLogLevelEnvironmentVariable].Should().Be("None");
+        HostProcessStartInfoFactory.GuaranteesEnvironmentVariableOverride(HostProcessStartInfoFactory.ScriptRootEnvironmentVariable).Should().BeTrue();
+        HostProcessStartInfoFactory.GuaranteesEnvironmentVariableOverride(HostProcessStartInfoFactory.AzureFunctionsEnvironmentVariable).Should().BeTrue();
+        HostProcessStartInfoFactory.GuaranteesEnvironmentVariableOverride(HostProcessStartInfoFactory.WebsiteHostnameEnvironmentVariable).Should().BeTrue();
+        HostProcessStartInfoFactory.GuaranteesEnvironmentVariableOverride(HostProcessStartInfoFactory.HostingLifetimeLogLevelEnvironmentVariable).Should().BeTrue();
+        HostProcessStartInfoFactory.GuaranteesEnvironmentVariableOverride(HostProcessStartInfoFactory.AspNetCoreSuppressStatusMessagesEnvironmentVariable).Should().BeFalse();
     }
 
     [Fact]
