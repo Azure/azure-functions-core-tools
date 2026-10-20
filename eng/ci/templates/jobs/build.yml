@@ -85,7 +85,17 @@ jobs:
       inputs:
         command: test
         projects: ${{ parameters.projects }}
-        arguments: -c ${{ parameters.configuration }} --no-build ${{ parameters.build_args }}
+        arguments: -c ${{ parameters.configuration }} --no-build --logger trx --results-directory "$(Agent.TempDirectory)/func-test-results" ${{ parameters.build_args }} -- RunConfiguration.TreatNoTestsAsError=true
+        publishTestResults: false
+
+    - task: PublishTestResults@2
+      displayName: Publish unit test results
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: VSTest
+        testResultsFiles: $(Agent.TempDirectory)/func-test-results/**/*.trx
+        failTaskOnFailedTests: true
+        failTaskOnMissingResultsFile: true
 
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       # Only sign the intermediate DLLs if we are packing.

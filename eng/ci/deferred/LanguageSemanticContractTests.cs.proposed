@@ -1,0 +1,239 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Diagnostics;
+using System.Text.Json;
+
+namespace Azure.Functions.Cli.Tests.Templates;
+
+public sealed class LanguageSemanticContractTests : IDisposable
+{
+    private readonly string _root = Directory.CreateTempSubdirectory("func-language-contract-").FullName;
+    private readonly LanguageTestProcess _process = new();
+
+    [Theory]
+    [Trait("Category", "LanguageSemantics")]
+    [Trait("Toolchain", "Python")]
+    [InlineData("\u2160reeting", "Ireeting")]
+    [InlineData("\u217fodule", "module")]
+    [InlineData("\u2118Greeting", "\u2118Greeting")]
+    [InlineData("\u212eGreeting", "\u212eGreeting")]
+    [InlineData("\u1885Greeting", "\u1885Greeting")]
+    [InlineData("\u1886Greeting", "\u1886Greeting")]
+    [InlineData("a\u00b7b", "a\u00b7b")]
+    [InlineData("a\u0387b", "a\u00b7b")]
+    [InlineData("a\u1369b", "a\u1369b")]
+    [InlineData("a\u1371b", "a\u1371b")]
+    [InlineData("a\u19dab", "a\u19dab")]
+    [InlineData("a\u0301b", "\u00e1b")]
+    [InlineData("a\u093eb", "a\u093eb")]
+    [InlineData("a\u203fb", "a\u203fb")]
+    [InlineData("\U0001d4a2reeting", "Greeting")]
+    [InlineData("\uff27reeting", "Greeting")]
+    [InlineData("a\uff3fb", "a_b")]
+    public async Task PythonParser_IdentifierOracle_ReportsActualNormalizedAstName(string identifier, string expected)
+    {
+        var result = await _process.RunAsync("python", ["-I", "-c", """
+            import ast, json, sys
+            assert sys.version_info[:2] == (3, 13), "Python 3.13 is required for the Unicode 15.1 oracle"
+            name = sys.argv[1]
+            tree = ast.parse("@app.route(route='old')\ndef " + name + "(req):\n    pass\n")
+            print(json.dumps({"identifier": name.isidentifier(), "name": tree.body[0].name}))
+            """, identifier], _root, CancellationToken.None);
+
+        result.ExitCode.Should().Be(0, result.Error);
+        using var json = JsonDocument.Parse(result.Output);
+        json.RootElement.GetProperty("identifier").GetBoolean().Should().BeTrue();
+        json.RootElement.GetProperty("name").GetString().Should().Be(expected);
+    }
+
+    [Theory]
+    [Trait("Category", "LanguageSemantics")]
+    [Trait("Toolchain", "Python")]
+    [InlineData("a\u200cb", true)]
+    [InlineData("a\u20ddb", false)]
+    [InlineData("\u309bGreeting", false)]
+    [InlineData("\u309cGreeting", false)]
+    [InlineData("\u037aGreeting", false)]
+    [InlineData("\ufdfaGreeting", false)]
+    public async Task PythonParser_ScalarBoundary_ReportsActualInterpreterAcceptance(string identifier, bool accepted)
+    {
+        var result = await _process.RunAsync("python", ["-I", "-c", """
+            import ast, json, sys
+            assert sys.version_info[:2] == (3, 13), "Python 3.13 is required"
+            try:
+                ast.parse("def " + sys.argv[1] + "(req):\n    pass\n")
+                accepted = True
+            except SyntaxError:
+                accepted = False
+            print(json.dumps({"accepted": accepted, "identifier": sys.argv[1].isidentifier()}))
+            """, identifier], _root, CancellationToken.None);
+
+        result.ExitCode.Should().Be(0, result.Error);
+        using var json = JsonDocument.Parse(result.Output);
+        json.RootElement.GetProperty("accepted").GetBoolean().Should().Be(accepted);
+        json.RootElement.GetProperty("identifier").GetBoolean().Should().Be(accepted);
+    }
+
+    [Theory]
+    [Trait("Category", "LanguageSemantics")]
+    [Trait("Toolchain", "Go")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GoParser_ActualNativeProject_AcceptsSourceAndRejectsSyntaxDamage(bool malformed)
+    {
+        string project = await BundledRemainingProjectTemplateTests.ExportProjectSmokeFixtureAsync(
+            "Go", Path.Combine(_root, "project"), CancellationToken.None);
+        string file = Path.Combine(project, "main.go");
+        if (malformed) File.AppendAllText(file, "\nfunc Broken( {\n");
+
+        var version = await _process.RunAsync("go", ["version"], _root, CancellationToken.None);
+        version.ExitCode.Should().Be(0, version.Error);
+        string actualVersion = version.Output.Split(' ', StringSplitOptions.RemoveEmptyEntries)[2].Replace("go", string.Empty, StringComparison.Ordinal);
+        Version.Parse(actualVersion).Should().BeGreaterThanOrEqualTo(new Version(1, 24));
+        var result = await _process.RunAsync("gofmt", ["-e", file], project, CancellationToken.None);
+
+        if (malformed)
+        {
+            result.ExitCode.Should().NotBe(0);
+            result.Error.Should().NotBeNullOrWhiteSpace();
+        }
+        else
+        {
+            result.ExitCode.Should().Be(0, result.Error);
+            result.Output.Should().Contain("sdk.FunctionApp()", "worker.Start(app)");
+        }
+    }
+
+    [Theory]
+    [Trait("Category", "LanguageSemantics")]
+    [Trait("Toolchain", "Java")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task JavaParser_ActualNativeProject_AcceptsSourceAndRejectsSyntaxDamage(bool malformed)
+    {
+        string project = await BundledRemainingProjectTemplateTests.ExportProjectSmokeFixtureAsync(
+            "Java", Path.Combine(_root, "project"), CancellationToken.None);
+        string file = Path.Combine(project, "src", "main", "java", "com", "function", "Function.java");
+        if (malformed) File.AppendAllText(file, "\nclass Broken {\n");
+        string driver = Path.Combine(_root, "ParseSource.java");
+        File.WriteAllText(driver, """
+            import java.nio.charset.StandardCharsets;
+            import java.util.List;
+            import javax.tools.*;
+            import com.sun.source.util.JavacTask;
+            class ParseSource {
+                public static void main(String[] args) throws Exception {
+                    var compiler = ToolProvider.getSystemJavaCompiler();
+                    if (compiler == null) throw new IllegalStateException("A JDK with compiler is required");
+                    var diagnostics = new DiagnosticCollector<JavaFileObject>();
+                    try (var files = compiler.getStandardFileManager(diagnostics, null, StandardCharsets.UTF_8)) {
+                        var task = (JavacTask) compiler.getTask(null, files, diagnostics,
+                            List.of("--release", "21", "-proc:none"), null, files.getJavaFileObjects(args[0]));
+                        for (var unit : task.parse()) {
+                            if (unit.getTypeDecls().isEmpty()) throw new IllegalStateException("No Java types parsed");
+                        }
+                        for (var diagnostic : diagnostics.getDiagnostics()) {
+                            if (diagnostic.getKind() == Diagnostic.Kind.ERROR) {
+                                System.err.println(diagnostic);
+                                System.exit(1);
+                            }
+                        }
+                        System.out.println("parsed-java-21");
+                    }
+                }
+            }
+            """);
+
+        var result = await _process.RunAsync("java", [driver, file], project, CancellationToken.None);
+
+        if (malformed)
+        {
+            result.ExitCode.Should().NotBe(0);
+            result.Error.Should().Contain("error");
+        }
+        else
+        {
+            result.ExitCode.Should().Be(0, result.Error);
+            result.Output.Trim().Should().Be("parsed-java-21");
+        }
+    }
+
+    [Theory]
+    [Trait("Category", "LanguageSemantics")]
+    [Trait("Toolchain", "PowerShell")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PowerShellParser_ActualNativeProfile_AcceptsSourceAndRejectsSyntaxDamage(bool malformed)
+    {
+        string project = await BundledRemainingProjectTemplateTests.ExportProjectSmokeFixtureAsync(
+            "PowerShell", Path.Combine(_root, "project"), CancellationToken.None);
+        string file = Path.Combine(project, "profile.ps1");
+        if (malformed) File.AppendAllText(file, "\nfunction Broken {\n");
+        string driver = Path.Combine(_root, "parse-source.ps1");
+        File.WriteAllText(driver, """
+            param([Parameter(Mandatory)][string]$Path)
+            $ErrorActionPreference = 'Stop'
+            if ($PSVersionTable.PSVersion.Major -ne 7 -or $PSVersionTable.PSVersion.Minor -notin @(4, 6)) {
+                throw 'PowerShell 7.4 or 7.6 is required.'
+            }
+            $tokens = $null
+            $errors = $null
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+                [Console]::Error.WriteLine(($errors.Message -join "`n"))
+                exit 1
+            }
+            if ($ast.EndBlock.Statements.Count -eq 0) { throw 'No profile statements parsed.' }
+            'parsed-profile'
+            """);
+
+        var result = await _process.RunAsync("pwsh", ["-NoProfile", "-NonInteractive", "-File", driver, "-Path", file],
+            project, CancellationToken.None);
+
+        if (malformed)
+        {
+            result.ExitCode.Should().NotBe(0);
+            result.Error.Should().Contain("Missing");
+        }
+        else
+        {
+            result.ExitCode.Should().Be(0, result.Error);
+            result.Output.Trim().Should().Be("parsed-profile");
+        }
+    }
+
+    public void Dispose() => Directory.Delete(_root, recursive: true);
+}
+
+internal sealed class LanguageTestProcess
+{
+    public async Task<(int ExitCode, string Output, string Error)> RunAsync(
+        string executable, IReadOnlyList<string> arguments, string directory, CancellationToken cancellationToken)
+    {
+        ProcessStartInfo start = new(executable)
+        {
+            WorkingDirectory = directory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        foreach (string argument in arguments) start.ArgumentList.Add(argument);
+        using var process = Process.Start(start)!;
+        Task<string> output = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        Task<string> error = process.StandardError.ReadToEndAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromMinutes(2), cancellationToken);
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+            }
+        }
+        return (process.ExitCode, await output, await error);
+    }
+}

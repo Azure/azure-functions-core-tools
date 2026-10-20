@@ -45,6 +45,7 @@ public sealed partial class BundledNodeTemplateTests
 
         names.Should().Equal(expected);
         names.Distinct(StringComparer.OrdinalIgnoreCase).Should().HaveCount(names.Length);
+        Directory.GetFiles(target).Select(Path.GetFileName).Should().BeEquivalentTo("Foo.js", secondName + ".js");
     }
 
     [Theory]
@@ -128,6 +129,7 @@ public sealed partial class BundledNodeTemplateTests
                     && item.GetProperty("options").GetProperty("trigger").GetProperty("pubsubname").GetString() == "pubsub");
         }
         File.ReadAllText(sentinel).Should().Be("// preserve user source\n");
+        Directory.GetFiles(target).Select(Path.GetFileName).Should().BeEquivalentTo("user.js", "FirstMixedName.js", "SecondMixedName.js");
     }
 
     [Theory]

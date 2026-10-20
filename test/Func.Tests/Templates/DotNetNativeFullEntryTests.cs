@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Azure.Functions.Cli.Configuration;
@@ -10,13 +11,15 @@ using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Xunit.Abstractions;
 using Shared = Azure.Functions.Cli.Templates.DotNet.Shared;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
-public sealed class DotNetNativeFullEntryTests : IDisposable
+public sealed class DotNetNativeFullEntryTests(ITestOutputHelper output) : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("func-dotnet-full-entry-").FullName;
+    private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
 
     public void Dispose()
     {
@@ -70,6 +73,7 @@ public sealed class DotNetNativeFullEntryTests : IDisposable
         int initExit = await entry.ExecuteAsync(["init", target, "-s", "dotnet", "-l", alias],
             initialized, workloads, configuration, timeout.Token, versionCheck: _ => Task.FromResult<string?>(null));
 
+        _output.WriteLine("init output:\n{0}", initialized.AllOutput);
         initExit.Should().Be(0, initialized.AllOutput);
         initialized.AllOutput.Should().NotContain("INPUT:").And.NotContain("SELECT:");
         using var cliConfiguration = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, ".func", "config.json")));
@@ -87,6 +91,7 @@ public sealed class DotNetNativeFullEntryTests : IDisposable
                 return Task.FromResult<string?>("9999.0.0");
             });
 
+        _output.WriteLine("new output:\n{0}", created.AllOutput);
         itemExit.Should().Be(0, created.AllOutput);
         advisoryCalls.Should().Be(0);
         created.AllOutput.Should().NotContain("INPUT:").And.NotContain("SELECT:").And.NotContain("9999.0.0");
@@ -103,6 +108,7 @@ public sealed class DotNetNativeFullEntryTests : IDisposable
         arguments.GetProperty("namespace").GetString().Should().Be(alias);
         File.ReadAllText(Path.Combine(target, "Greeting" + sourceExtension)).Should().Contain("namespace " + alias, "Greeting");
         Shared.DotnetCliRunner runner = new(new Shared.DotnetPathResolver());
+        await RunCapturedAsync(runner, ["--info"], target, timeout.Token);
         StringBuilder evaluated = new();
         await runner.RunStreamingAsync(["msbuild", project, "-nologo", "-getProperty:TargetFramework", "-getItem:Compile"], target,
             line => evaluated.AppendLine(line), null, timeout.Token);
@@ -115,8 +121,78 @@ public sealed class DotNetNativeFullEntryTests : IDisposable
         {
             compile.Should().Equal("Greeting.fs", "Program.fs");
         }
-        await runner.RunAsync(["build", project, "--no-restore", "-m:1", "-v:minimal", "-p:NuGetAudit=false"], target, timeout.Token);
+        await AssertAuditPropertiesAsync(runner, project, target, timeout.Token);
+        string config = Path.Combine(_root, "NuGet.Config");
+        _output.WriteLine("copied NuGet.Config SHA256: {0}", Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(config))));
+        await RunCapturedAsync(runner,
+            ["restore", project, "--configfile", config, "--force-evaluate", "-v:normal",
+                "-p:NuGetAudit=true", "-p:NuGetAuditMode=all", "-p:NuGetAuditLevel=moderate", "-p:TreatWarningsAsErrors=true"],
+            target, timeout.Token);
+        CaptureRestoreGraph(project);
+        await RunCapturedAsync(runner,
+            ["build", project, "--no-restore", "-m:1", "-v:normal",
+                "-p:NuGetAudit=true", "-p:NuGetAuditMode=all", "-p:NuGetAuditLevel=moderate", "-p:TreatWarningsAsErrors=true"],
+            target, timeout.Token);
+        string child = Directory.GetFiles(Path.Combine(target, "obj"), "WorkerExtensions.csproj", SearchOption.AllDirectories)
+            .Should().ContainSingle().Subject;
+        await AssertAuditPropertiesAsync(runner, child, Path.GetDirectoryName(child)!, timeout.Token);
+        CaptureRestoreGraph(child);
         using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "bin", "Debug", "net10.0", "functions.metadata")));
         metadata.RootElement.EnumerateArray().Select(function => function.GetProperty("name").GetString()).Should().Contain("Greeting");
+    }
+
+    private async Task AssertAuditPropertiesAsync(Shared.DotnetCliRunner runner, string project, string directory, CancellationToken cancellationToken)
+    {
+        string properties = await RunCapturedAsync(runner,
+            ["msbuild", project, "-nologo",
+                "-getProperty:NuGetAudit,NuGetAuditMode,NuGetAuditLevel,TreatWarningsAsErrors,NETCoreSdkVersion,MSBuildSDKsPath,MSBuildProjectFullPath,RestoreSources,NuGetPackageRoot",
+                "-p:NuGetAudit=true", "-p:NuGetAuditMode=all", "-p:NuGetAuditLevel=moderate", "-p:TreatWarningsAsErrors=true"],
+            directory, cancellationToken);
+        using var evaluated = JsonDocument.Parse(properties);
+        JsonElement values = evaluated.RootElement.GetProperty("Properties");
+        values.GetProperty("NuGetAudit").GetString().Should().Be("true");
+        values.GetProperty("NuGetAuditMode").GetString().Should().Be("all");
+        values.GetProperty("NuGetAuditLevel").GetString().Should().Be("moderate");
+        values.GetProperty("TreatWarningsAsErrors").GetString().Should().Be("true");
+    }
+
+    private void CaptureRestoreGraph(string project)
+    {
+        string assets = Path.Combine(Path.GetDirectoryName(project)!, "obj", "project.assets.json");
+        using var document = JsonDocument.Parse(File.ReadAllText(assets));
+        JsonElement restore = document.RootElement.GetProperty("project").GetProperty("restore");
+        JsonElement audit = restore.GetProperty("restoreAuditProperties");
+        _output.WriteLine("restore graph: {0}", JsonSerializer.Serialize(new
+        {
+            project,
+            assets,
+            sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assets))),
+            sources = restore.GetProperty("sources"),
+            configFilePaths = restore.GetProperty("configFilePaths"),
+            audit,
+            warningProperties = restore.GetProperty("warningProperties"),
+            packages = document.RootElement.GetProperty("libraries").EnumerateObject().Select(library => library.Name).ToArray(),
+            logs = document.RootElement.TryGetProperty("logs", out var logs) ? logs : (JsonElement?)null,
+        }));
+        audit.GetProperty("enableAudit").GetString().Should().Be("true");
+        audit.GetProperty("auditMode").GetString().Should().Be("all");
+        audit.GetProperty("auditLevel").GetString().Should().Be("moderate");
+        restore.GetProperty("warningProperties").GetProperty("allWarningsAsErrors").GetBoolean().Should().BeTrue();
+        string graph = Path.Combine(Path.GetDirectoryName(assets)!, Path.GetFileName(project) + ".nuget.dgspec.json");
+        File.Exists(graph).Should().BeTrue();
+        _output.WriteLine("dependency graph SHA256: {0}", Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(graph))));
+    }
+
+    private async Task<string> RunCapturedAsync(
+        Shared.DotnetCliRunner runner, IReadOnlyList<string> arguments, string directory, CancellationToken cancellationToken)
+    {
+        StringBuilder captured = new();
+        _output.WriteLine("command: dotnet {0}\nworking directory: {1}", string.Join(' ', arguments), directory);
+        await runner.RunStreamingAsync(arguments, directory, line =>
+        {
+            captured.AppendLine(line);
+            _output.WriteLine("stdout: {0}", line);
+        }, line => _output.WriteLine("stderr: {0}", line), cancellationToken);
+        return captured.ToString();
     }
 }
