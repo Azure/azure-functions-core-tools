@@ -122,6 +122,7 @@ internal static class CliHostFactory
         builder.Services.AddSingleton<IConfigureOptions<HostStartupOptions>, HostStartupOptionsSetup>();
 
         builder.Services.AddCliHttpDefaults();
+        builder.Services.AddCliUpdate();
         builder.Services.AddBuiltInCommands();
         builder.Services.AddFirstRunExperience();
         builder.Services.AddQuickstartScaffolder();

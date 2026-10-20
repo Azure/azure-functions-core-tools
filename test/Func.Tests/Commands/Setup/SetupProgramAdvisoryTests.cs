@@ -6,6 +6,7 @@ using System.Text.Json;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting.FirstRun;
+using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
 using Xunit.Abstractions;
@@ -193,6 +194,88 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             result.StandardOutput.Contains(CachedVersion, StringComparison.Ordinal).Should().Be(advisory);
             File.Exists(Path.Combine(paths.Home, FileFirstRunStateStore.MarkerFileName)).Should().BeFalse();
             File.Exists(workloads.WorkloadRegistryPath).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task Program_Update_SuppressesAdvisoryAndDefersInvalidCdnOverrideUntilAfterMetadata()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-update-startup-{Guid.NewGuid():N}");
+        CliConfigurationPathsOptions paths = new(Path.Combine(directory, "home"));
+        WorkloadPathsOptions workloads = new(Path.Combine(directory, "workload-home"));
+        string project = Path.Combine(directory, "project");
+        using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(60));
+        CliProcessTestRunner runner = new(output);
+
+        try
+        {
+            Directory.CreateDirectory(paths.Home);
+            Directory.CreateDirectory(project);
+            await File.WriteAllTextAsync(paths.VersionCachePath, CachedVersion, cancellation.Token);
+
+            CliProcessTestRunner.CliResult result = await runner.RunAsync(
+                directory,
+                paths.Home,
+                workloads.Home,
+                project,
+                ["update", "--yes"],
+                cancellation.Token,
+                new Dictionary<string, string>
+                {
+                    [UpdateRegistration.CdnBaseUrlEnvironmentVariable] = "not-a-url",
+                });
+
+            output.WriteLine("stdout: {0}{1}stderr: {2}", result.StandardOutput, Environment.NewLine, result.StandardError);
+            result.ExitCode.Should().Be(1);
+            result.StandardOutput.Should().NotContain(CachedVersion).And.NotContain("A newer version");
+            result.StandardError.Should()
+                .Contain("could not verify how this installation is managed")
+                .And.NotContain(UpdateRegistration.CdnBaseUrlEnvironmentVariable);
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [Trait("Category", "Integration")]
+    [InlineData("--help")]
+    [InlineData("--version")]
+    public async Task Program_InvalidUpdateCdnOverride_DoesNotBreakInspectionCommands(string argument)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-update-config-{Guid.NewGuid():N}");
+        CliConfigurationPathsOptions paths = new(Path.Combine(directory, "home"));
+        WorkloadPathsOptions workloads = new(Path.Combine(directory, "workload-home"));
+        string project = Path.Combine(directory, "project");
+        using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(60));
+        CliProcessTestRunner runner = new(output);
+
+        try
+        {
+            Directory.CreateDirectory(paths.Home);
+            Directory.CreateDirectory(project);
+
+            CliProcessTestRunner.CliResult result = await runner.RunAsync(
+                directory,
+                paths.Home,
+                workloads.Home,
+                project,
+                [argument],
+                cancellation.Token,
+                new Dictionary<string, string>
+                {
+                    [UpdateRegistration.CdnBaseUrlEnvironmentVariable] = "not-a-url",
+                });
+
+            output.WriteLine("stdout: {0}{1}stderr: {2}", result.StandardOutput, Environment.NewLine, result.StandardError);
+            result.ExitCode.Should().Be(0);
+            result.StandardError.Should().NotContain(UpdateRegistration.CdnBaseUrlEnvironmentVariable);
         }
         finally
         {

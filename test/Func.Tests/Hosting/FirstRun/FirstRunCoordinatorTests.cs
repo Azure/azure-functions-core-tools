@@ -53,6 +53,7 @@ public sealed class FirstRunCoordinatorTests
 
     [Theory]
     [InlineData("setup")]
+    [InlineData("update")]
     [InlineData("version")]
     [InlineData("workload")]
     [InlineData("workload install")]
@@ -68,6 +69,21 @@ public sealed class FirstRunCoordinatorTests
 
         result.Should().BeNull();
         _interaction.ConfirmCalls.Should().Be(0);
+        await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
+    }
+
+    [Theory]
+    [InlineData("update")]
+    [InlineData("update --yes")]
+    public async Task SkipsAndDoesNotMark_ForUpdateInvocations(string invocation)
+    {
+        FirstRunCoordinator coordinator = CreateCoordinator();
+
+        int? result = await coordinator.EnsureFirstRunPromptedAsync("update", Parse(invocation), CancellationToken.None);
+
+        result.Should().BeNull();
+        _interaction.ConfirmCalls.Should().Be(0);
+        await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);
         await _stateStore.DidNotReceiveWithAnyArgs().MarkCompleteAsync(default);
     }
 
