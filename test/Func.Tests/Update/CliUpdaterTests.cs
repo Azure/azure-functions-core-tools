@@ -470,9 +470,11 @@ public sealed class CliUpdaterTests
         {
             BaseAddress = new Uri("https://cdn.functions.azure.com/"),
         };
+        IHttpClientFactory httpClientFactory = Substitute.For<IHttpClientFactory>();
+        httpClientFactory.CreateClient(UpdateRegistration.HttpClientName).Returns(client);
 
         CliUpdater updater = new(
-            client,
+            httpClientFactory,
             fileSystem,
             Options.Create(environment),
             processRunner,

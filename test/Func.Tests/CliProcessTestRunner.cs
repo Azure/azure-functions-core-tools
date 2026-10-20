@@ -24,8 +24,14 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
     private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
 
     internal Task<CliResult> RunAsync(
-        string directory, string home, string workloadsHome, string project, IReadOnlyList<string> args, CancellationToken cancellationToken)
-        => RunCoreAsync(directory, home, workloadsHome, project, args, executablePath: null, cancellationToken);
+        string directory,
+        string home,
+        string workloadsHome,
+        string project,
+        IReadOnlyList<string> args,
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? environmentOverrides = null)
+        => RunCoreAsync(directory, home, workloadsHome, project, args, executablePath: null, cancellationToken, environmentOverrides);
 
     internal Task<CliResult> RunExecutableAsync(
         string executablePath, string directory, string home, string workloadsHome, string project,
@@ -42,12 +48,14 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
             throw new FileNotFoundException($"The explicit CLI executable '{executablePath}' does not exist.", executablePath);
         }
 
-        return RunCoreAsync(directory, home, workloadsHome, project, args, executablePath, cancellationToken);
+        return RunCoreAsync(directory, home, workloadsHome, project, args, executablePath, cancellationToken, environmentOverrides: null);
     }
 
     private async Task<CliResult> RunCoreAsync(
         string directory, string home, string workloadsHome, string project, IReadOnlyList<string> args,
-        string? executablePath, CancellationToken cancellationToken)
+        string? executablePath,
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? environmentOverrides)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentException.ThrowIfNullOrWhiteSpace(home);
@@ -131,6 +139,13 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
         startInfo.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
         startInfo.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1";
         startInfo.Environment["NO_COLOR"] = "1";
+        if (environmentOverrides is not null)
+        {
+            foreach ((string key, string value) in environmentOverrides)
+            {
+                startInfo.Environment[key] = value;
+            }
+        }
 
         _output.WriteLine("Command: func {0}; host: {1}; working directory: {2}", string.Join(" ", args), startInfo.FileName, project);
         _output.WriteLine("Isolated root: {0}; CLI home: {1}; workload home: {2}", directory, home, workloadsHome);

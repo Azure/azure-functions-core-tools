@@ -30,9 +30,7 @@ internal sealed class UpdateCommand : FuncCliCommand, IBuiltInCommand
         IInstallationMetadataReader installationMetadataReader,
         ICliVersionProvider versionProvider,
         IInteractionService interaction)
-        : base(
-            "update",
-            "Update Azure Functions CLI. Defaults to the latest stable release; "
+        : base("update", "Update Azure Functions CLI. Defaults to the latest stable release; "
             + "use '--prerelease' for previews or '--version' for a specific version.")
     {
         _releaseFeed = releaseFeed ?? throw new ArgumentNullException(nameof(releaseFeed));
@@ -141,23 +139,9 @@ internal sealed class UpdateCommand : FuncCliCommand, IBuiltInCommand
         {
             return await _installationMetadataReader.ReadAsync(cancellationToken);
         }
-        catch (FileNotFoundException ex)
-        {
-            throw CreateInstallationMetadataException(ex);
-        }
-        catch (InvalidInstallationMetadataException ex)
-        {
-            throw CreateInstallationMetadataException(ex);
-        }
-        catch (IOException ex)
-        {
-            throw CreateInstallationMetadataException(ex);
-        }
-        catch (InvalidOperationException ex)
-        {
-            throw CreateInstallationMetadataException(ex);
-        }
-        catch (UnauthorizedAccessException ex)
+        catch (Exception ex) when (
+            ex is IOException or InvalidInstallationMetadataException
+                or InvalidOperationException or UnauthorizedAccessException)
         {
             throw CreateInstallationMetadataException(ex);
         }

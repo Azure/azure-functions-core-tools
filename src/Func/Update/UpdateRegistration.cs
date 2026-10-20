@@ -27,7 +27,19 @@ internal static class UpdateRegistration
                 string? overrideUrl = environment.Get(CdnBaseUrlEnvironmentVariable);
                 if (!string.IsNullOrWhiteSpace(overrideUrl))
                 {
-                    options.BaseUrl = overrideUrl;
+                    if (!Uri.TryCreate(overrideUrl, UriKind.Absolute, out Uri? parsed)
+                        || (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
+                    {
+                        throw new InvalidOperationException(
+                            $"Environment variable '{CdnBaseUrlEnvironmentVariable}' must be an absolute HTTP(S) URL. Got: '{overrideUrl}'.");
+                    }
+
+                    if (!parsed.AbsolutePath.EndsWith('/'))
+                    {
+                        parsed = new Uri(parsed.GetLeftPart(UriPartial.Path) + "/" + parsed.Query + parsed.Fragment);
+                    }
+
+                    options.BaseUrl = parsed.AbsoluteUri;
                 }
             });
 
@@ -39,29 +51,11 @@ internal static class UpdateRegistration
                 client.Timeout = options.HttpTimeout;
             });
 
-        services.AddSingleton<IReleaseFeed>(serviceProvider =>
-        {
-            HttpClient client = serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(HttpClientName);
-            return new CdnReleaseFeed(
-                client,
-                serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CdnReleaseFeed>>());
-        });
-
-        services.AddSingleton<ICliUpdater>(serviceProvider =>
-        {
-            HttpClient client = serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(HttpClientName);
-            return new CliUpdater(
-                client,
-                serviceProvider.GetRequiredService<IFileSystem>(),
-                serviceProvider.GetRequiredService<IOptions<CliEnvironmentOptions>>(),
-                serviceProvider.GetRequiredService<IProcessRunner>(),
-                serviceProvider.GetRequiredService<IUpdateLockProvider>(),
-                serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CliUpdater>>());
-        });
-
         services.TryAddSingleton<IFileSystem, PhysicalFileSystem>();
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<IUpdateLockProvider, FileUpdateLockProvider>();
+        services.AddSingleton<IReleaseFeed, CdnReleaseFeed>();
+        services.AddSingleton<ICliUpdater, CliUpdater>();
 
         return services;
     }

@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.Update;
 
 /// <inheritdoc cref="ICliUpdater" />
 internal sealed partial class CliUpdater(
-    HttpClient httpClient,
+    IHttpClientFactory httpClientFactory,
     IFileSystem fileSystem,
     IOptions<CliEnvironmentOptions> environmentOptions,
     IProcessRunner processRunner,
@@ -20,7 +20,7 @@ internal sealed partial class CliUpdater(
 {
     private const string OldFileSuffix = ".old";
 
-    private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly CliEnvironmentOptions _environment = (environmentOptions ?? throw new ArgumentNullException(nameof(environmentOptions))).Value;
     private readonly IProcessRunner _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
@@ -180,7 +180,8 @@ internal sealed partial class CliUpdater(
     {
         try
         {
-            using HttpResponseMessage response = await _httpClient.GetAsync(
+            using HttpClient httpClient = _httpClientFactory.CreateClient(UpdateRegistration.HttpClientName);
+            using HttpResponseMessage response = await httpClient.GetAsync(
                 release.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
