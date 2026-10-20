@@ -92,6 +92,15 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     {
         ArgumentNullException.ThrowIfNull(parseResult);
 
+        if (parseResult.UnmatchedTokens.Any(token =>
+            string.Equals(token, "--output", StringComparison.Ordinal)
+            || token.StartsWith("--output=", StringComparison.Ordinal)))
+        {
+            throw new GracefulException(
+                "The '--output' rendering option is no longer supported. Use '--format' instead.",
+                isUserError: true);
+        }
+
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
         string? requestedTemplate = parseResult.GetValue(TemplateOption);
         bool jsonOutput = string.Equals(parseResult.GetValue(FormatOption), "json", StringComparison.OrdinalIgnoreCase);

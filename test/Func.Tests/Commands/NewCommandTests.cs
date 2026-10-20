@@ -4,6 +4,7 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using NSubstitute;
 
@@ -65,6 +66,24 @@ public class NewCommandTests
         result.Errors.Should().Contain(error =>
             error.Message.Contains("Unrecognized", StringComparison.Ordinal)
             && error.Message.Contains("--output", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("--output", "json")]
+    [InlineData("--output=json")]
+    public async Task NewCommand_RemovedOutputOptionWithExplicitPath_RejectsBeforeDispatch(params string[] args)
+    {
+        var command = new NewCommand(_runner, _templateOptions);
+        ParseResult result = command.Parse([".", "--list", .. args]);
+
+        GracefulException exception = (await FluentActions
+            .Awaiting(() => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        exception.Message.Should().Contain("--output");
+        exception.Message.Should().Contain("--format");
+        await _runner.DidNotReceiveWithAnyArgs().ListAsync(default!, default);
+        await _runner.DidNotReceiveWithAnyArgs().ExecuteAsync(default!, default);
     }
 
     [Fact]
