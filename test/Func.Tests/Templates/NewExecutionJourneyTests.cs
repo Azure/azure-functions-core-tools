@@ -1250,8 +1250,8 @@ public sealed class NewExecutionJourneyTests : IDisposable
                 }
 
                 offered?.Add(choices);
+                choices.Should().ContainSingle(choice => choice == "Func.Consumer.[[red]]styled[[/]]");
                 int index = Array.IndexOf(choices, "Func.Consumer.[[red]]styled[[/]]");
-                index.Should().BeGreaterThanOrEqualTo(0);
                 for (int i = 0; i < index; i++)
                 {
                     stderr.Enqueue(ConsoleKey.DownArrow);
