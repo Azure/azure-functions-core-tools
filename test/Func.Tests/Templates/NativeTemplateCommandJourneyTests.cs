@@ -420,6 +420,43 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task ProjectPreparation_PartialNativeInstallation_DoesNotStartPreparationOrInventConfiguration()
+    {
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        List<string> committed = [];
+        var files = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterMove = path =>
+            {
+                committed.Add(path);
+                cancellation.Cancel();
+            },
+        };
+        var preparation = Substitute.For<INativeProjectPreparation>();
+        preparation.PreviewAsync(Arg.Any<NativeProjectPreparationContext>(), Arg.Any<CancellationToken>())
+            .Returns(new NativeProjectPreparationPreview(true, [new(NativeProjectPreparationOperation.NodeNpmInstall, false)], []));
+        using var harness = CreateHarness(preparation: preparation, fileSystem: files);
+        var parsed = harness.Adapter.ParseInitInvocation(harness.CreateInit(), [Project],
+            new("controlled-project", NonInteractive: true, JsonOutput: true));
+
+        int exit = await parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
+
+        exit.Should().Be(1);
+        harness.InitResult!.Invocation!.Status.Should().Be(TemplateInvocationStatus.Failed);
+        harness.InitResult.Invocation.HasCommittedOutput.Should().BeTrue();
+        harness.InitResult.Invocation.ConfiguredProjects.Should().BeEmpty();
+        harness.InitResult.Invocation.Changes.Select(change => Path.GetFullPath(Path.Combine(Project, change.Path)))
+            .Should().Equal(Project, committed.Should().ContainSingle().Subject);
+        harness.InitResult.Invocation.Changes.Should().OnlyContain(change => change.Kind == TemplateFileChangeKind.Create);
+        File.Exists(committed[0]).Should().BeTrue();
+        File.Exists(Path.Combine(Project, ".func", "config.json")).Should().BeFalse();
+        harness.InitResult.Preparation!.Completion.Should().BeNull();
+        await preparation.DidNotReceive().CompleteAsync(Arg.Any<NativeProjectPreparationContext>(),
+            Arg.Any<NativeProjectPreparationPreview>(), Arg.Any<CancellationToken>());
+    }
+
     [Theory]
     [InlineData(false, false, false)]
     [InlineData(false, true, false)]
