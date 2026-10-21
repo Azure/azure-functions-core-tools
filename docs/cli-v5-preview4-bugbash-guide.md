@@ -1,20 +1,22 @@
 # Azure Functions CLI v5 Preview 4 Bug Bash
 
 Start with one [end-to-end flow](#end-to-end-flows), then explore commands and
-the [Preview 4 focus areas](#preview-4-special-focus). This is a local, two-hour
-bug bash, not a production-readiness checklist.
+the [Preview 4 areas to watch](#preview-4-areas-to-pay-extra-attention-to).
+Test the documented flows and explore beyond them too. This is a local,
+two-hour bug bash, not a certification checklist.
 
 ## Quick Reference
 
 - CLI docs: https://aka.ms/func-cli
-- File an issue: https://aka.ms/func-cli/file-an-issue
+- File a CLI v5 bug: https://github.com/Azure/azure-functions-core-tools/issues/new?template=04-v5-bug-report.yml
 - Bug-bash version: `5.0.0-preview.4`
 
 ## Required bug-bash environment
 
-Set all three variables **before setup, workload, or project commands**.
+**Set these variables in every terminal used for the bug bash.**
+Do this before setup, workload, or project commands.
 
-**Bash / zsh**
+### Bash / zsh
 
 ```bash
 export FUNC_CLI_WORKLOADS_SOURCE="https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json"
@@ -22,7 +24,7 @@ export FUNC_CLI_QUICKSTART_MANIFEST_URL="https://raw.githubusercontent.com/Azure
 export FUNC_CLI_WORKLOADS_PRERELEASE="true"
 ```
 
-**PowerShell**
+### PowerShell
 
 ```powershell
 $env:FUNC_CLI_WORKLOADS_SOURCE = "https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json"
@@ -30,9 +32,8 @@ $env:FUNC_CLI_QUICKSTART_MANIFEST_URL = "https://raw.githubusercontent.com/Azure
 $env:FUNC_CLI_WORKLOADS_PRERELEASE = "true"
 ```
 
-These settings apply to the current terminal. Set them again in a new terminal.
-The Preview 4 installers do **not** implement `-BugBash` / `BUGBASH=true` or set
-these values automatically. Keep the manual values handy for troubleshooting.
+These variables apply to the current shell/session. Set them again after opening
+a new terminal. The Preview 4 installers do **not** set them; configure them manually.
 
 ## Prerequisites
 
@@ -42,7 +43,7 @@ Install only the tools for the stack you plan to test:
 | --- | --- |
 | Node.js | A supported Node.js LTS release and npm. |
 | Python | A Python 3 version supported by your worker, with `venv` and pip. |
-| .NET isolated | .NET 10 SDK; the default project targets `net10.0`. |
+| .NET isolated | .NET 10 SDK. |
 | Go, exploratory | Go 1.24+ and the assigned Flex-compatible worker/packages. |
 
 Use PowerShell 7+ on Windows, or Bash on Linux/macOS, for installation. You do
@@ -96,14 +97,89 @@ func5 --verbose
 cd -- "$BUGBASH_ROOT"
 ```
 
-Stop unless the directly addressed binary reports exactly `5.0.0-preview.4`.
+**Stop if the installed version is not exactly `5.0.0-preview.4`.**
 Keep this terminal for testing. `func --version` / `func --verbose` are equivalent
 checks only when `func` points to this install; your normal `func` may remain v4.
 
 Installer targets are Windows x64 / ARM64, Linux glibc x64 / ARM64, and macOS
-Intel / Apple silicon. The existing check verified Windows x64 archive availability;
-other builds were not rechecked. Skip a platform whose required build is unavailable.
+Intel / Apple silicon. Skip a platform whose required Preview 4 build is unavailable.
 Do not treat Alpine/musl or every platform/stack combination as supported.
+
+## End-to-end flows
+
+Use a fresh project directory per flow, under your bug-bash root. Setup installs
+the selected stack and its dependencies. If anything needed is unavailable,
+skip only that flow; do not substitute another CLI version.
+
+For Node.js, Python, and .NET, choose the HTTP trigger when `new` prompts and use
+anonymous authentication for this local test. You can inspect choices first with
+`func5 new "PROJECT_DIRECTORY" --list`. From a second terminal, invoke the URL
+printed by the host, then return to the first terminal and press Ctrl+C.
+Use `curl.exe` instead of `curl` on Windows.
+
+### Node.js
+
+```text
+func5 setup --features node --non-interactive
+func5 init node-app --stack node --language JavaScript
+func5 new node-app --name hello
+func5 run node-app --output plain
+```
+
+Invoke: `curl http://localhost:7071/api/hello`
+
+Check the JavaScript layout and npm dependencies. Repeat in a sibling directory
+with `--language TypeScript`; check compilation, invocation, and clean shutdown.
+
+### Python
+
+```text
+func5 setup --features python --non-interactive
+func5 init python-app --stack python
+func5 new python-app --name hello
+func5 run python-app --output plain
+```
+
+Invoke: `curl http://localhost:7071/api/hello`
+
+Start without an unrelated virtual environment active. Run creates/reuses the
+project's `.venv` and installs `requirements.txt`; check dependency errors and
+virtual-environment reuse. Python is unavailable on Windows ARM64 and is rejected
+by Windows target profiles; neither restriction excludes local Windows x64 testing.
+
+### .NET isolated
+
+```text
+func5 setup --features dotnet --non-interactive
+func5 init dotnet-app --stack dotnet --language "C#"
+func5 new dotnet-app --name Hello
+func5 run dotnet-app --output plain
+```
+
+Invoke: `curl http://localhost:7071/api/Hello`
+
+The default project targets `net10.0`. Check restore/build, the isolated-worker
+project, and local invocation.
+F# init is a separate variation; the .NET quickstart provider supports C# only.
+Do not test .NET in-process setup as a supported flow.
+
+### Go
+
+**Exploratory, Flex only.** Use the assigned compatible Go worker/packages.
+Skip this flow if they are unavailable.
+
+```text
+func5 setup --features go --profile flex --non-interactive
+func5 init go-app --stack go
+func5 profile set flex go-app
+func5 run go-app --profile flex --output plain
+```
+
+Go init already creates an anonymous HTTP `hello` function in `main.go`; it does
+not need a `func new` step. Do not assume a Go new/quickstart template provider.
+Run uses Go 1.24+, runs `go mod tidy`, and builds your app before launching it.
+Invoke `curl http://localhost:7071/api/hello`, then stop with Ctrl+C.
+Check module/build errors, your response, and that the child app exits too.
 
 ## Commands to exercise
 
@@ -203,7 +279,7 @@ verify the result and restore Preview 4 before returning to the other tests.
 | `func5 update --version 5.0.0-preview.4` | Exact target selection; an already-current install is a successful no-op. |
 | `func5 update --version 5.0.0-preview.4 --yes` | Skip confirmation, not installation checks. |
 
-- Script installs write `func.installation.json` beside the binary with
+- **Updates are metadata-gated.** Script installs write `func.installation.json` with
   `schemaVersion: 1` and `updatePolicy: "in-place"`, permitting in-place update.
 - An externally managed install with policy `"external"` should exit successfully
   with installer/package-manager guidance, without resolving an update or changing files.
@@ -283,82 +359,7 @@ JSON mode should emit one JSON event per line. Redirect stdout and stderr separa
 on Bash, try `func5 setup --features node --non-interactive </dev/null >setup.log 2>setup.err`.
 Check prompt behavior with stdin redirected too, not only stdout.
 
-## End-to-end flows
-
-Use a fresh project directory per flow, under your bug-bash root. Setup installs
-the selected stack and its dependencies. If anything needed is unavailable,
-skip only that flow; do not substitute another CLI version.
-
-For Node.js, Python, and .NET, choose the HTTP trigger when `new` prompts and use
-anonymous authentication for this local test. You can inspect choices first with
-`func5 new "PROJECT_DIRECTORY" --list`. From a second terminal, invoke the URL
-printed by the host, then return to the first terminal and press Ctrl+C.
-Use `curl.exe` instead of `curl` on Windows.
-
-### Node.js
-
-```text
-func5 setup --features node --non-interactive
-func5 init node-app --stack node --language JavaScript
-func5 new node-app --name hello
-func5 run node-app --output plain
-```
-
-Invoke: `curl http://localhost:7071/api/hello`
-
-Check the JavaScript layout and npm dependencies. Repeat in a sibling directory
-with `--language TypeScript`; check compilation, invocation, and clean shutdown.
-
-### Python
-
-```text
-func5 setup --features python --non-interactive
-func5 init python-app --stack python
-func5 new python-app --name hello
-func5 run python-app --output plain
-```
-
-Invoke: `curl http://localhost:7071/api/hello`
-
-Start without an unrelated virtual environment active. Run creates/reuses the
-project's `.venv` and installs `requirements.txt`; check dependency errors and
-virtual-environment reuse. Python is unavailable on Windows ARM64 and is rejected
-by Windows target profiles; neither restriction excludes local Windows x64 testing.
-
-### .NET isolated
-
-```text
-func5 setup --features dotnet --non-interactive
-func5 init dotnet-app --stack dotnet --language "C#"
-func5 new dotnet-app --name Hello
-func5 run dotnet-app --output plain
-```
-
-Invoke: `curl http://localhost:7071/api/Hello`
-
-Check restore/build, the isolated-worker project, and local invocation.
-F# init is a separate variation; the .NET quickstart provider supports C# only.
-Do not test .NET in-process setup as a supported flow.
-
-### Go
-
-**Exploratory, Flex only.** Use the assigned compatible Go worker/packages.
-Skip this flow if they are unavailable. Go remains exploratory.
-
-```text
-func5 setup --features go --profile flex --non-interactive
-func5 init go-app --stack go
-func5 profile set flex go-app
-func5 run go-app --profile flex --output plain
-```
-
-Go init already creates an anonymous HTTP `hello` function in `main.go`; it does
-not need a `func new` step. Do not assume a Go new/quickstart template provider.
-Run uses Go 1.24+, runs `go mod tidy`, and builds your app before launching it.
-Invoke `curl http://localhost:7071/api/hello`, then stop with Ctrl+C.
-Check module/build errors, your response, and that the child app exits too.
-
-## Preview 4 special focus
+## Preview 4 areas to pay extra attention to
 
 - **Install/upgrade:** repeat the pinned installer with `-Force` / `--force` on
   a separate earlier-v5 test install (Preview 3 is a useful baseline). Check the
@@ -369,8 +370,9 @@ Check module/build errors, your response, and that the child app exits too.
   and replacement of an old `0700` wrapper. Check argument forwarding too.
 - **Setup:** test explicit stacks, empty/configured projects, multiple profiles,
   noninteractive input, NDJSON checks, optional skips, cancellation, and partial failures.
-- **Workloads/update:** compare inventories across lifecycle operations; test
-  update metadata/confirmation and an assigned real replacement, not only a no-op.
+- **Workloads:** compare inventories across lifecycle operations; preserve unrelated packages.
+- **CLI update:** test [metadata gating](#update), confirmation, and an assigned real
+  replacement, not only a no-op.
 - **Profiles/bundles:** reject unsupported runtime/profile pairs before worker
   acquisition. With assigned incompatible-bundle fixtures, `new --list` stays
   available, but creation fails without writing generated files.
@@ -386,22 +388,21 @@ Check module/build errors, your response, and that the child app exits too.
 ## Known issues and limitations
 
 - This preview is not production-ready or at v4 feature parity. Test locally only.
-- Other platform builds may be skipped when unavailable; Windows x64 availability
-  does not prove every platform/stack works.
-- npm testing is unavailable unless the exact published package is supplied.
-  The tagged build disables npm packaging; npm does not provide a `func5` coexistence guarantee.
-- Java and PowerShell language flows are exploratory, manually provisioned tests
-  only. Package existence is not complete setup/template support.
+- Each platform scenario requires its Preview 4 build; skip it if unavailable.
+- npm testing is unavailable unless the exact Preview 4 package is supplied.
+  Do not assume it provides a `func5` coexistence command.
+- Java and PowerShell are not complete supported customer journeys; limit them to
+  assigned, manually provisioned exploratory tests.
+- Go is exploratory and Flex only; it needs Go 1.24+ and compatible worker/packages.
 - Setup can skip optional dependencies. General prerelease selection does not
   opt into every preview bundle/template channel. Record what was actually selected.
-- Existing init/new/quickstart providers are the target, not a new template-first lifecycle.
-  Published update replacement/recovery still needs testing.
+- Update replacement/recovery is under test, not a proven guarantee.
 
 ## Reporting bugs
 
-File bugs, confusing behavior, bad errors, missing docs, usability problems, and
-naming problems at https://aka.ms/func-cli/file-an-issue. Use the `v5` label and
-`bug`, `enhancement`, or `documentation` as appropriate.
+[File a CLI v5 bug](https://github.com/Azure/azure-functions-core-tools/issues/new?template=04-v5-bug-report.yml)
+for bugs, confusing behavior, bad errors, papercuts, missing documentation,
+naming issues, or unexpected behavior.
 
 Include:
 
@@ -410,11 +411,10 @@ Include:
 - Expected result, actual result, exit code, and a minimal repro.
 - Relevant logs/stack trace; workload versions, profile, and template ID when involved.
 
-Redact secrets and customer information. Record PASS only for behavior you observed,
-FAIL for unexpected behavior, or SKIP with the missing prerequisite.
-Tell the coordinator about blocked inputs; do not report missing optional evidence
-as a product defect. If comparing an earlier preview, distinguish a new regression
-from a known limitation or intentional change.
+Redact secrets and customer information. If you're unsure whether something is a
+bug, file it anyway. Duplicates are easier to close than missing feedback.
+Tell the coordinator about unavailable prerequisites. When comparing previews,
+say whether the behavior is new.
 
 ## Cleanup
 
@@ -429,10 +429,10 @@ from a known limitation or intentional change.
 
 ## Troubleshooting
 
-### Workload resolves from nuget.org
+### Workload/package resolves incorrectly or cannot be found
 
 If an alias resolves to the wrong package or reports a missing `FuncCliWorkload`
-package type, set both workload variables again in the terminal running the CLI:
+package type, or a package cannot be found, check both workload variables:
 
 ```bash
 export FUNC_CLI_WORKLOADS_SOURCE="https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json"
@@ -446,7 +446,7 @@ $env:FUNC_CLI_WORKLOADS_PRERELEASE = "true"
 
 Remove a conflicting `--source` override, or point it to this exact feed, and retry.
 
-### Quickstart templates missing
+### Quickstart templates are missing
 
 Set the dev manifest URL in the same terminal:
 
@@ -463,13 +463,3 @@ directory inside your test `FUNC_CLI_HOME` to a uniquely named backup.
 For these examples that is `cli-home\quickstart` on Windows or `cli-home/quickstart`
 on Linux/macOS, under your test root. Retry `func5 quickstart list`.
 Do not reset workload state or delete the shared/default CLI home.
-
-## Maintainer notes
-
-The existing checks list stack workloads at `1.0.0-preview.2` and Host at
-`4.1048.200-preview.3`; components are versioned independently. Record actual
-selections with `workload list --all-versions --json`.
-The [earlier release/package receipts](https://github.com/Azure/azure-functions-core-tools/blob/96f0876b8aa3d2f52296d6de54929d2f2daee90c/docs/cli-v5-preview4-bugbash-guide.md#release-receipt)
-and [specialist installer-failure fixtures](https://github.com/Azure/azure-functions-core-tools/blob/96f0876b8aa3d2f52296d6de54929d2f2daee90c/docs/cli-v5-preview4-bugbash-guide.md#controlled-publicationrecovery-cases-p1-05)
-remain available for assigned maintainer checks; ordinary participants do not need them.
-This documentation refactor does not execute or certify any installer, CLI, or stack flow.
