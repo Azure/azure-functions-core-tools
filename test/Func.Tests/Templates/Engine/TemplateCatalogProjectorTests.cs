@@ -202,6 +202,45 @@ public sealed class TemplateCatalogProjectorTests
         entry.IsHidden.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("""{"symbols":{"Port":{"type":"parameter","datatype":"integer"}}}""", null)]
+    [InlineData("""{"symbols":{"Port":{"defaultValue":"0"}}}""", "0")]
+    public void Project_MountedConfiguration_ProjectsDefaultWithoutChangingHostAliases(string content, string? expectedDefault)
+    {
+        ITemplateParameter parameter = Substitute.For<ITemplateParameter>();
+        parameter.Name.Returns("Port");
+        parameter.Type.Returns("parameter");
+        parameter.DataType.Returns("integer");
+        parameter.DefaultValue.Returns("0");
+        parameter.Precedence.Returns(new TemplateParameterPrecedence(PrecedenceDefinition.Optional));
+        TemplateConfigurationSnapshot configuration = new(content, "fingerprint", TemplateType.Item, [parameter])
+        {
+            HostConfigPlace = HostConfigPlace,
+            HostData = """{"symbolInfo":{"Port":{"longName":"http-port","shortName":"p"}}}""",
+        };
+
+        var entry = TemplateCatalogProjector.Project(Template(), package: null, configuration);
+
+        var projected = entry.Parameters.Should().ContainSingle().Subject;
+        projected.DefaultValue.Should().Be(expectedDefault);
+        projected.LongName.Should().Be("http-port");
+        projected.ShortName.Should().Be("p");
+        entry.MetadataDiagnostic.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("{invalid")]
+    [InlineData("[]")]
+    public void Project_InvalidMountedConfiguration_ReportsDiagnostic(string content)
+    {
+        TemplateConfigurationSnapshot configuration = new(content, "fingerprint", TemplateType.Item, []);
+
+        var entry = TemplateCatalogProjector.Project(Template(), package: null, configuration);
+
+        entry.MetadataDiagnostic.Should().NotBeNullOrEmpty();
+        entry.Parameters.Should().BeEmpty();
+    }
+
     [Fact]
     public void Project_TemplateWithoutItemOrProjectType_Throws()
     {
