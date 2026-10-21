@@ -5,12 +5,13 @@ using Azure.Functions.Cli.Common.Processes;
 using Azure.Functions.Cli.Common;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Semver;
 
 namespace Azure.Functions.Cli.Update;
 
 /// <inheritdoc cref="ICliUpdater" />
 internal sealed partial class CliUpdater(
-    HttpClient httpClient,
+    IHttpClientFactory httpClientFactory,
     IFileSystem fileSystem,
     IOptions<CliEnvironmentOptions> environmentOptions,
     IProcessRunner processRunner,
@@ -19,7 +20,7 @@ internal sealed partial class CliUpdater(
 {
     private const string OldFileSuffix = ".old";
 
-    private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly CliEnvironmentOptions _environment = (environmentOptions ?? throw new ArgumentNullException(nameof(environmentOptions))).Value;
     private readonly IProcessRunner _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
@@ -179,7 +180,8 @@ internal sealed partial class CliUpdater(
     {
         try
         {
-            using HttpResponseMessage response = await _httpClient.GetAsync(
+            using HttpClient httpClient = _httpClientFactory.CreateClient(UpdateRegistration.HttpClientName);
+            using HttpResponseMessage response = await httpClient.GetAsync(
                 release.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -233,16 +235,14 @@ internal sealed partial class CliUpdater(
 
     private async Task VerifyAsync(Release release, string installDir, CancellationToken cancellationToken)
     {
-        string expectedVersion = release.Version.ToString();
-
         ProcessOutcome outcome = await _processRunner.RunAsync(
             new ProcessRunRequest(_environment.ProcessPath, ["--version"], installDir, TimeSpan.FromSeconds(30)),
             cancellationToken);
 
-        if (outcome.ExitCode is not 0 || !VersionOutputMatches(outcome.StandardOutput, expectedVersion))
+        if (outcome.ExitCode is not 0 || !VersionOutputMatches(outcome.StandardOutput, release.Version))
         {
             throw new GracefulException(
-                $"Verification failed after installing func {expectedVersion}. " +
+                $"Verification failed after installing func {release.Version}. " +
                 $"The binary reported: '{outcome.StandardOutput.Trim()}'.",
                 isUserError: true);
         }
@@ -259,13 +259,12 @@ internal sealed partial class CliUpdater(
         return processPath;
     }
 
-    private static bool VersionOutputMatches(string output, string expectedVersion)
+    private static bool VersionOutputMatches(string output, SemVersion expectedVersion)
     {
-        // Check each line for an exact match to avoid false positives where one
-        // version string is a substring of another (e.g. "5.1.0" inside "15.1.0").
         foreach (string line in output.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
         {
-            if (line.Equals(expectedVersion, StringComparison.Ordinal))
+            if (SemVersion.TryParse(line, SemVersionStyles.Strict, out SemVersion? reportedVersion) &&
+                SemVersion.PrecedenceComparer.Compare(reportedVersion, expectedVersion) == 0)
             {
                 return true;
             }

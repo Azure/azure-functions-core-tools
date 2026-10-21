@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Common;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.PhysicalFileSystem;
 using Microsoft.TemplateEngine.Edge;
 
 using OrchestratorComponents = Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components;
@@ -12,8 +13,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <summary>
 /// Template engine host that exposes one command's <see cref="TemplateEngineContext"/> as host parameters.
 /// </summary>
-internal class FuncTemplateEngineHost(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot? snapshot = null)
-    : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), CreateComponents(context, snapshot))
+internal class FuncTemplateEngineHost : DefaultTemplateEngineHost, ITemplateEngineHost
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
@@ -25,7 +25,18 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context, TemplateCon
 
     private const string WorkingDirectoryParameter = "WorkingDirectory";
 
-    private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));
+    private readonly TemplateEngineContext _context;
+
+    public FuncTemplateEngineHost(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot? snapshot = null)
+        : base(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), CreateComponents(context, snapshot))
+    {
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+        InvocationFileSystem = new(FileSystem);
+    }
+
+    internal TemplateInvocationFileSystem InvocationFileSystem { get; }
+
+    IPhysicalFileSystem ITemplateEngineHost.FileSystem => InvocationFileSystem;
 
     public override bool TryGetHostParamDefault(string paramName, out string? value)
     {

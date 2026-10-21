@@ -18,6 +18,30 @@ public sealed class PhysicalFileSystemTests : IDisposable
     }
 
     [Fact]
+    public async Task OpenReadIfExists_ExistingFile_ReturnsReadableStream()
+    {
+        Directory.CreateDirectory(_root);
+        string path = Path.Combine(_root, "metadata.json");
+        byte[] expected = [1, 2, 3];
+        await File.WriteAllBytesAsync(path, expected, CancellationToken.None);
+
+        await using Stream? stream = new PhysicalFileSystem().OpenReadIfExists(path);
+
+        stream.Should().NotBeNull();
+        using MemoryStream actual = new();
+        await stream!.CopyToAsync(actual, CancellationToken.None);
+        actual.ToArray().Should().Equal(expected);
+    }
+
+    [Fact]
+    public void OpenReadIfExists_MissingFile_ReturnsNull()
+    {
+        Stream? stream = new PhysicalFileSystem().OpenReadIfExists(Path.Combine(_root, "missing.json"));
+
+        stream.Should().BeNull();
+    }
+
+    [Fact]
     public async Task CreateAllTextAsync_AbsentDestination_CreatesCompleteFileWithoutTemporaryFiles()
     {
         PhysicalFileSystem fileSystem = new();
