@@ -2,28 +2,57 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Templates.Acquisition;
 
-internal sealed record BasicCompanionManifest(string Revision, IReadOnlyList<BasicStackMapping> Stacks, IReadOnlyList<BasicTemplateArtifact> Artifacts);
+internal sealed record BasicCompanionManifest(string Revision, IReadOnlyList<BasicStackMapping> Stacks, IReadOnlyList<BasicTemplateArtifact> Artifacts)
+{
+    public int SchemaVersion { get; init; } = 1;
+}
 
 internal sealed record BasicStackMapping(string PackageId, VersionRange Versions, IReadOnlyList<string> Sources,
-    IReadOnlyList<BasicCompanionRequirement> Companions);
+    IReadOnlyList<BasicCompanionRequirement> Companions)
+{
+    public NativeTemplateAssociationPolicy? NativePolicy { get; init; }
+}
 
-internal sealed record BasicCompanionRequirement(string PackageId, VersionRange Versions);
+internal sealed record BasicCompanionRequirement(string PackageId, VersionRange Versions)
+{
+    public IReadOnlyList<NativeTemplateContentRole> RequiredRoles { get; init; } = [];
+}
+
+internal sealed record NativeTemplateAssociationPolicy(string HostIdentifier, VersionRange EngineHostVersions, IReadOnlyList<BundleChannel> Channels);
+
+internal sealed record NativeTemplateAssociationContext(WorkloadEntry SelectedStack, string HostIdentifier,
+    NuGetVersion EngineHostVersion, BundleChannel? Channel, IReadOnlyList<NativeTemplateContentRole> RequiredRoles);
+
+internal enum NativeTemplateContentRole
+{
+    Function,
+    AdditionalProject,
+}
 
 internal sealed record BasicTemplateArtifact(string PackageId, NuGetVersion Version, string Source, string Sha256,
-    string ContentRevision, IReadOnlyList<BasicTemplateDefinition> Templates);
+    string ContentRevision, IReadOnlyList<BasicTemplateDefinition> Templates)
+{
+    public IReadOnlyList<NativeTemplateContentDeclaration> ContentRoles { get; init; } = [];
+}
+
+internal sealed record NativeTemplateContentDeclaration(string Identity, NativeTemplateContentRole Role);
 
 internal sealed record BasicTemplateDefinition(string Path, string Identity, string Type);
-
 internal sealed record BasicCompanionPlan(string PackageId, VersionRange Versions, IReadOnlyList<BasicTemplateArtifact> Candidates);
 
 internal sealed record BasicAcquisitionPlan(string Revision, string Source, IReadOnlyList<BasicCompanionPlan> Companions);
 
 internal sealed record BasicAcquisitionRequest(string StackPackageId, NuGetVersion StackVersion, WorkingDirectory Directory,
-    string? Source = null, bool Check = false, bool Offline = false, bool IncludePrerelease = false);
+    string? Source = null, bool Check = false, bool Offline = false, bool IncludePrerelease = false)
+{
+    public NativeTemplateAssociationContext? NativeContext { get; init; }
+}
 
 internal enum BasicAcquisitionStatus
 {
@@ -42,6 +71,8 @@ internal enum BasicAcquisitionFailure
     InvalidMapping,
     SourceConflict,
     RangeConflict,
+    HostConflict,
+    ChannelConflict,
     OwnershipUnavailable,
     InstalledConflict,
     PayloadUnavailable,

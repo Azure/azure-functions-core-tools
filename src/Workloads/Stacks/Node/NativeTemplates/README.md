@@ -148,9 +148,10 @@ are explicitly refused before destructive effects; an ownership/removal policy
 is future work. Undeclared legacy workloads retain their prior behavior.
 
 Release coordination must ship the supporting CLI before these stack artifacts.
-This base uses the existing initializer metadata adapter. The separately
-published `IProjectStack` migration must be integrated later without duplicating
-it here; independent template feeds/releases are not prerequisites.
+This layer consumes the published `IProjectStack` metadata surface without
+duplicating it. Independent catalog releases are not prerequisites for local
+bundled registration. Required external acquisition has its own qualification
+inputs described below.
 
 ## Hybrid delivery boundary
 
@@ -168,10 +169,20 @@ engine compatibility and qualified release artifact integrity. Profiles may
 narrow those requirements, not grant trust. Package prefixes, equal versions
 and stack self-declarations are not association authority.
 
+The explicitly composed native setup path uses schema version 2 of the existing
+acquisition records. It validates actual selected-stack ownership, source,
+compatible ranges, FUNC host version and channel before acquiring external
+archives. Protected native provenance and exact-version pins support verified
+reuse without treating a bundled package as external readiness. This composition
+is not enabled by the default CLI host.
+
 Concrete publisher-qualified external records and artifacts are not yet
 available. Fixture package evidence cannot replace them or establish production
-acquisition. Shared packaging and Node catalog production remain separate
-prerequisites. Public command activation and runtime qualification are unchanged.
+acquisition. The owned Node project fixture exercises separately acquired native
+project content through staged preview/create and canonical configuration, not
+an independently published production catalog. Shared packaging and Node catalog
+production remain separate prerequisites. Public command activation and runtime
+qualification are unchanged.
 
 ## Exercising the staged journey
 

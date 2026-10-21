@@ -169,6 +169,35 @@ internal sealed class BasicAcquisitionFixture : IDisposable
         Ownership.OtherEntries[$"{id}/1.0.0/{hash}"] = new(Source, null);
     }
 
+    public void AddNativeArtifact(BasicTemplateArtifact artifact, string archive)
+    {
+        _archives[Key(artifact.PackageId, artifact.Version.ToNormalizedString())] = archive;
+        var definitions = new JsonArray();
+        foreach (var definition in artifact.Templates)
+        {
+            var role = artifact.ContentRoles.Single(content => content.Identity == definition.Identity).Role;
+            definitions.Add(new JsonObject
+            {
+                ["path"] = definition.Path,
+                ["identity"] = definition.Identity,
+                ["type"] = definition.Type,
+                ["contentRole"] = role == NativeTemplateContentRole.Function ? "function" : "additional-project",
+            });
+        }
+        var root = JsonNode.Parse(Catalog.Json)!;
+        root["artifacts"]!.AsArray().Add(new JsonObject
+        {
+            ["packageId"] = artifact.PackageId,
+            ["version"] = artifact.Version.ToNormalizedString(),
+            ["source"] = artifact.Source,
+            ["sha256"] = artifact.Sha256,
+            ["contentRevision"] = artifact.ContentRevision,
+            ["basicOnly"] = false,
+            ["templates"] = definitions,
+        });
+        Catalog.Json = root.ToJsonString();
+    }
+
     public void Dispose() => Directory.Delete(Root, recursive: true);
 
     private string ReadFixtureJson()

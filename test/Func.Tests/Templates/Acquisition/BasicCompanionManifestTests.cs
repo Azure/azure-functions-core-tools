@@ -26,7 +26,7 @@ public sealed class BasicCompanionManifestTests
     [Theory]
     [InlineData("null")]
     [InlineData("{}")]
-    [InlineData("{\"schemaVersion\":2,\"revision\":\"x\",\"stacks\":[],\"artifacts\":[]}")]
+    [InlineData("{\"schemaVersion\":3,\"revision\":\"x\",\"stacks\":[],\"artifacts\":[]}")]
     [InlineData("{\"schemaVersion\":1,\"revision\":\"x\",\"revision\":\"y\",\"stacks\":[],\"artifacts\":[]}")]
     [InlineData("{\"schemaVersion\":1,\"revision\":\"x\",\"stacks\":[],\"artifacts\":[],\"publishing\":true}")]
     [InlineData("{\"schemaVersion\":1,\"revision\":\" \",\"stacks\":[],\"artifacts\":[]}")]

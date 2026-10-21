@@ -18,7 +18,38 @@ internal sealed class BasicAcquisitionPlanner
         ArgumentException.ThrowIfNullOrWhiteSpace(request.StackPackageId);
         ArgumentNullException.ThrowIfNull(request.StackVersion);
         ArgumentNullException.ThrowIfNull(request.Directory);
+        if (manifest.SchemaVersion is not (1 or 2))
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.InvalidMapping, "The acquisition authority uses an unsupported schema.");
+        }
+        NativeTemplateAssociationContext? native = request.NativeContext;
+        if ((manifest.SchemaVersion == 2) != (native is not null))
+        {
+            throw Missing("Required external native content needs an explicit qualified native association and selected stack context. Legacy basic mappings cannot satisfy it.");
+        }
+        if (native is not null)
+        {
+            ArgumentNullException.ThrowIfNull(native.SelectedStack);
+            ArgumentNullException.ThrowIfNull(native.EngineHostVersion);
+            ArgumentNullException.ThrowIfNull(native.RequiredRoles);
+            if (native.RequiredRoles.Count == 0 || native.RequiredRoles.Any(role => !Enum.IsDefined(role)))
+            {
+                throw new ArgumentException("A native request requires recognized external content roles.", nameof(request));
+            }
+            string selectedId = native.SelectedStack.LogicalPackage?.PackageId ?? native.SelectedStack.PackageId;
+            string selectedVersion = native.SelectedStack.LogicalPackage?.PackageVersion ?? native.SelectedStack.PackageVersion;
+            if (!string.Equals(selectedId, request.StackPackageId, StringComparison.OrdinalIgnoreCase)
+                || !NuGetVersion.TryParse(selectedVersion, out NuGetVersion? version) || version != request.StackVersion)
+            {
+                throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
+                    "The requested native association does not match the selected stack identity and version. Select the stack again.");
+            }
+        }
         string effectiveSource = BasicCompanionManifestReader.Source(source);
+        if (native is not null)
+        {
+            ValidateNativeOrigin(native.SelectedStack, effectiveSource);
+        }
         if (manifest.Stacks.Count == 0)
         {
             throw Missing("No publisher-qualified basic companion mappings are bundled. Continue using the current setup/init experience.");
@@ -27,10 +58,23 @@ internal sealed class BasicAcquisitionPlanner
         BasicStackMapping? requested = FindMapping(manifest, request.StackPackageId, request.StackVersion);
         if (requested is null)
         {
+            if (native is not null)
+            {
+                throw Missing($"No publisher-qualified native association covers selected stack '{request.StackPackageId}' {request.StackVersion}. Bundled basic readiness does not satisfy required external templates.");
+            }
             return null;
+        }
+        if (native is not null)
+        {
+            ValidateNativePolicy(requested, native);
+            if (native.RequiredRoles.Any(role => !requested.Companions.Any(companion => companion.RequiredRoles.Contains(role))))
+            {
+                throw Missing("The qualified association does not supply every required external content role. Bundled basic templates cannot discharge that dependency.");
+            }
         }
 
         List<BasicStackMapping> requirements = [requested];
+        List<(BasicStackMapping Mapping, WorkloadEntry Entry)> retained = [];
         foreach (WorkloadEntry entry in installed)
         {
             // Keep unselected and side-by-side rows: a failed companion install does not erase the retained stack's requirements.
@@ -49,6 +93,7 @@ internal sealed class BasicAcquisitionPlanner
             BasicStackMapping mapping = FindMapping(manifest, id, version)
                 ?? throw Missing($"Installed stack '{id}' is not covered by the bundled mapping.");
             requirements.Add(mapping);
+            retained.Add((mapping, entry));
         }
 
         Dictionary<string, VersionRange> ranges = new(StringComparer.OrdinalIgnoreCase);
@@ -68,20 +113,37 @@ internal sealed class BasicAcquisitionPlanner
         List<BasicCompanionPlan> companions = [];
         foreach (BasicCompanionRequirement companion in requested.Companions)
         {
-            foreach (BasicStackMapping mapping in requirements.Where(mapping =>
-                mapping.Companions.Any(c => string.Equals(c.PackageId, companion.PackageId, StringComparison.OrdinalIgnoreCase))))
+            BasicStackMapping[] contributors = [.. requirements.Where(mapping =>
+                mapping.Companions.Any(c => string.Equals(c.PackageId, companion.PackageId, StringComparison.OrdinalIgnoreCase)))];
+            foreach (BasicStackMapping mapping in contributors)
             {
                 if (!mapping.Sources.Contains(effectiveSource, StringComparer.Ordinal))
                 {
                     throw new BasicAcquisitionException(BasicAcquisitionFailure.SourceConflict,
                         $"Selected source '{effectiveSource}' is not approved for stack '{mapping.PackageId}'. Allowed: {string.Join(", ", mapping.Sources)}.");
                 }
+                if (native is not null)
+                {
+                    ValidateNativePolicy(mapping, native);
+                    foreach ((_, WorkloadEntry entry) in retained.Where(requirement => ReferenceEquals(requirement.Mapping, mapping)))
+                    {
+                        ValidateNativeOrigin(entry, effectiveSource);
+                    }
+                }
             }
 
+            NativeTemplateContentRole[] roles = [.. contributors
+                .SelectMany(mapping => mapping.Companions)
+                .Where(requirement => string.Equals(requirement.PackageId, companion.PackageId, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(requirement => requirement.RequiredRoles)
+                .Distinct()];
             BasicTemplateArtifact[] candidates = [.. manifest.Artifacts.Where(artifact =>
                 string.Equals(artifact.PackageId, companion.PackageId, StringComparison.OrdinalIgnoreCase)
                 && artifact.Source == effectiveSource
                 && (!artifact.Version.IsPrerelease || request.IncludePrerelease)
+                && (native is null || ((native.Channel is null || BundleHelpers.MatchesChannel(artifact.Version, native.Channel.Value))
+                    && contributors.All(mapping => mapping.NativePolicy!.Channels.Any(channel => BundleHelpers.MatchesChannel(artifact.Version, channel)))
+                    && roles.All(role => artifact.ContentRoles.Any(content => content.Role == role))))
                 && ranges[companion.PackageId].Satisfies(artifact.Version))
                 .OrderByDescending(artifact => artifact.Version)];
             if (candidates.Length == 0)
@@ -93,6 +155,47 @@ internal sealed class BasicAcquisitionPlanner
         }
 
         return new(manifest.Revision, effectiveSource, companions.AsReadOnly());
+    }
+
+    private static void ValidateNativeOrigin(WorkloadEntry entry, string effectiveSource)
+    {
+        string installedSource = entry.LogicalPackage?.Source ?? entry.Source;
+        string origin;
+        try
+        {
+            origin = BasicCompanionManifestReader.Source(installedSource);
+        }
+        catch (BasicAcquisitionException exception)
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.SourceConflict,
+                $"Stack '{entry.PackageId}' has no qualified catalog source binding. Local paths and unknown origins are not template feed authority.", exception);
+        }
+        if (origin != effectiveSource)
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.SourceConflict,
+                $"The native source conflicts with retained stack '{entry.PackageId}' catalog origin. No source switch or fallback is authorized.");
+        }
+    }
+
+    private static void ValidateNativePolicy(BasicStackMapping mapping, NativeTemplateAssociationContext context)
+    {
+        NativeTemplateAssociationPolicy policy = mapping.NativePolicy
+            ?? throw Missing($"Stack '{mapping.PackageId}' has no qualified native host and channel association.");
+        if (policy.EngineHostVersions is null || policy.Channels is null || policy.Channels.Count == 0)
+        {
+            throw Missing($"Stack '{mapping.PackageId}' has incomplete native host or channel qualification.");
+        }
+        if (policy.HostIdentifier != "func" || context.HostIdentifier != policy.HostIdentifier
+            || !policy.EngineHostVersions.Satisfies(context.EngineHostVersion))
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.HostConflict,
+                $"The native association for '{mapping.PackageId}' does not support the actual FUNC host '{context.HostIdentifier}' {context.EngineHostVersion}.");
+        }
+        if (context.Channel is { } channel && !policy.Channels.Contains(channel))
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.ChannelConflict,
+                $"The selected channel is not qualified for stack '{mapping.PackageId}'. No alternate channel was selected.");
+        }
     }
 
     private static BasicStackMapping? FindMapping(BasicCompanionManifest manifest, string id, NuGetVersion version)
