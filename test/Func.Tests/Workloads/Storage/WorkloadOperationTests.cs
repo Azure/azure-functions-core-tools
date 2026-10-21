@@ -18,6 +18,78 @@ namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 public sealed class WorkloadOperationTests
 {
     [Fact]
+    public async Task Fixture_RidImplementation_UsesDeclaredPayloadRootBeforePreparingReuse()
+    {
+        using var fixture = new BasicAcquisitionFixture();
+        await fixture.SeedStackAsync("Fixture.StackA", "1.0.0");
+        var entry = (await fixture.Store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
+        string directory = fixture.Paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        var declared = new WorkloadMetadataReader().Read(directory);
+        entry.RuntimeIdentifier.Should().Be("test-rid");
+        declared.RuntimeIdentifier.Should().Be(entry.RuntimeIdentifier);
+        declared.Kind.Should().Be(WorkloadKind.Content);
+        Directory.Exists(Path.Combine(directory, "tools", "test-rid")).Should().BeTrue();
+        Directory.Exists(Path.Combine(directory, "tools", "any")).Should().BeFalse();
+        string registry = File.ReadAllText(fixture.Paths.WorkloadRegistryPath);
+        var deployment = new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(),
+            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem());
+
+        var prepared = await deployment.PrepareReuseAsync(entry, CancellationToken.None);
+
+        prepared.Hashes.Keys.Should().Contain(Path.Combine("tools", "test-rid", "fixture.txt"));
+        File.ReadAllText(fixture.Paths.WorkloadRegistryPath).Should().Be(registry);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UninstallAsync_PayloadDeletionFails_RetainsDirtyIntentAndRemainingPayload(bool throwOnDelete)
+    {
+        using var fixture = new BasicAcquisitionFixture();
+        await fixture.SeedStackAsync("Fixture.StackA", "1.0.0");
+        var entry = (await fixture.Store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
+        string directory = fixture.Paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        var fileSystem = Substitute.For<IFileSystem>();
+        fileSystem.DirectoryExists(directory).Returns(_ => Directory.Exists(directory));
+        if (throwOnDelete)
+        {
+            fileSystem.When(fs => fs.DeleteDirectory(directory)).Do(_ => throw new IOException("Owned payload deletion failure."));
+        }
+        var coordinator = new FileWorkloadOperationCoordinator(fixture.Paths);
+        var deployment = new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), coordinator, fileSystem);
+
+        Func<Task> uninstall = () => deployment.UninstallAsync("Fixture.StackA", "1.0.0", WorkloadOwnershipKind.Logical);
+
+        await uninstall.Should().ThrowAsync<IOException>();
+        fileSystem.Received(1).DeleteDirectory(directory);
+        Directory.Exists(directory).Should().BeTrue();
+        (await fixture.Store.GetWorkloadsAsync()).Should().BeEmpty();
+        Func<Task> nextWriter = async () =>
+        {
+            using var operation = await coordinator.AcquireAsync(CancellationToken.None);
+        };
+        await nextWriter.Should().ThrowAsync<WorkloadRecoveryRequiredException>();
+    }
+
+    [Fact]
+    public async Task UninstallAsync_UnknownOwnership_RejectsBeforeRegistryOrPayloadMutation()
+    {
+        using var fixture = new BasicAcquisitionFixture();
+        await fixture.SeedStackAsync("Fixture.StackA", "1.0.0");
+        string registry = File.ReadAllText(fixture.Paths.WorkloadRegistryPath);
+        var deployment = new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(),
+            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem());
+
+        Func<Task> uninstall = () => deployment.UninstallAsync("fixture.stacka.test-rid", "1.0.0", (WorkloadOwnershipKind)42);
+
+        await uninstall.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        File.ReadAllText(fixture.Paths.WorkloadRegistryPath).Should().Be(registry);
+        Directory.Exists(fixture.Paths.GetInstallDirectory("fixture.stacka.test-rid", "1.0.0")).Should().BeTrue();
+        File.Exists(Path.Combine(fixture.Paths.Home, FileWorkloadOperationCoordinator.ControlDirectoryName,
+            FileWorkloadOperationCoordinator.IntentFileName)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task StoreFailureAfterActualRegistryPersistence_PreservesPayloadInsteadOfGuessingRollback()
     {
         using var fixture = new BasicAcquisitionFixture();
@@ -57,7 +129,7 @@ public sealed class WorkloadOperationTests
 
         await commit.Should().ThrowAsync<IOException>().WithMessage("*intent completion*");
         var row = (await fixture.Store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
-        File.ReadAllText(Path.Combine(fixture.Paths.GetInstallDirectory(row.PackageId, row.PackageVersion), "tools", "any", "fixture.txt"))
+        File.ReadAllText(Path.Combine(fixture.Paths.GetInstallDirectory(row.PackageId, row.PackageVersion), "tools", "test-rid", "fixture.txt"))
             .Should().Be("Installation fixture, not an activated stack implementation.");
         owner.IsDirty.Should().BeTrue();
         File.Exists(Path.Combine(fixture.Paths.Home, FileWorkloadOperationCoordinator.ControlDirectoryName,
@@ -95,7 +167,7 @@ public sealed class WorkloadOperationTests
             File.Copy(archive, replacement);
         }
         using (var zip = System.IO.Compression.ZipFile.Open(replacement, System.IO.Compression.ZipArchiveMode.Update))
-        using (var text = new StreamWriter(zip.CreateEntry("tools/any/replacement.txt").Open()))
+        using (var text = new StreamWriter(zip.CreateEntry("tools/test-rid/replacement.txt").Open()))
         {
             text.Write("a different participating writer's actual payload");
         }
@@ -122,7 +194,7 @@ public sealed class WorkloadOperationTests
         WorkloadPackageInspector inspector = new(new WorkloadMetadataReader(), new(runtime));
         var inspected = await inspector.InspectAsync(archive, CancellationToken.None);
         using (var zip = System.IO.Compression.ZipFile.Open(archive, System.IO.Compression.ZipArchiveMode.Update))
-        using (var writer = new StreamWriter(zip.CreateEntry("tools/any/changed.txt").Open()))
+        using (var writer = new StreamWriter(zip.CreateEntry("tools/test-rid/changed.txt").Open()))
         {
             writer.Write("different selected bytes");
         }
@@ -203,7 +275,7 @@ public sealed class WorkloadOperationTests
             BasicAcquisitionFixture.Source, false, true, false, null, CancellationToken.None);
         if (change == "bytes")
         {
-            await File.WriteAllTextAsync(Path.Combine(prepared.Deployment!.StagingPath, "tools", "any", "fixture.txt"), "changed private payload");
+            await File.WriteAllTextAsync(Path.Combine(prepared.Deployment!.StagingPath, "tools", "test-rid", "fixture.txt"), "changed private payload");
         }
         else
         {

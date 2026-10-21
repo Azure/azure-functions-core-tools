@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using NuGet.Versioning;
@@ -13,6 +15,78 @@ public sealed class TemplateMountedSchemaTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "func-mounted-schema-" + Guid.NewGuid().ToString("N"));
 
     private string Hive => Path.Combine(_root, "hive");
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("0", null)]
+    [InlineData("7123", null)]
+    [InlineData(null, "0")]
+    [InlineData(null, "7124")]
+    public async Task InvokeAsync_IntegerPort_PreservesOmissionAndExplicitOrAuthoredDefaults(string? explicitPort, string? authoredDefault)
+    {
+        string package = Path.Combine(_root, "port-template");
+        string configurationDirectory = Path.Combine(package, ".template.config");
+        Directory.CreateDirectory(configurationDirectory);
+        JsonNode configuration = JsonNode.Parse("""
+            {
+              "identity":"Func.Tests.MountedPort","name":"Port default control","shortName":"func-tests-mounted-port",
+              "tags":{"type":"item"},
+              "symbols":{
+                "FunctionsHttpPort":{"type":"parameter","datatype":"integer"},
+                "GeneratedPort":{"type":"generated","generator":"port","parameters":{"low":7000,"high":7300}},
+                "SelectedPort":{"type":"generated","generator":"coalesce",
+                  "parameters":{"sourceVariableName":"FunctionsHttpPort","fallbackVariableName":"GeneratedPort"},"replaces":"PORT_VALUE"}
+              }
+            }
+            """)!;
+        if (authoredDefault is not null)
+        {
+            configuration["symbols"]!["FunctionsHttpPort"]!["defaultValue"] = authoredDefault;
+        }
+        File.WriteAllText(Path.Combine(configurationDirectory, "template.json"), configuration.ToJsonString());
+        File.WriteAllText(Path.Combine(package, "launchSettings.json"), """{"commandLineArgs":"--port PORT_VALUE"}""");
+        await TemplateFixtures.InstallAsync(package, Hive);
+
+        for (int flow = 0; flow < 2; flow++)
+        {
+            using Templater templater = CreateTemplater();
+            var selected = (await templater.ResolveGroupAsync("Func.Tests.MountedPort", TemplateType.Item, CancellationToken.None)).Group![0];
+            var definition = selected.Parameters.Should().ContainSingle().Subject;
+            var values = selected.Parameters.Where(parameter => parameter.DefaultValue is not null)
+                .ToDictionary(parameter => parameter.CanonicalName, parameter => parameter.DefaultValue, StringComparer.Ordinal);
+            if (explicitPort is not null)
+            {
+                values["FunctionsHttpPort"] = explicitPort;
+            }
+            var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "port-output-" + flow));
+            var request = new TemplateInvocationRequest(output, values, "Port");
+
+            var preview = await selected.InvokeAsync(request with { DryRun = true }, CancellationToken.None);
+            Directory.Exists(output.Info.FullName).Should().BeFalse();
+            var created = await selected.InvokeAsync(request, CancellationToken.None);
+
+            preview.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
+            created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
+            using var launch = JsonDocument.Parse(File.ReadAllText(Path.Combine(output.Info.FullName, "launchSettings.json")));
+            string arguments = launch.RootElement.GetProperty("commandLineArgs").GetString()!;
+            if ((explicitPort ?? authoredDefault) is { } expected)
+            {
+                arguments.Should().Be("--port " + expected);
+                values.Should().Contain("FunctionsHttpPort", expected);
+                if (authoredDefault is not null)
+                {
+                    definition.DefaultValue.Should().Be(authoredDefault);
+                }
+            }
+            else
+            {
+                int port = int.Parse(arguments["--port ".Length..], System.Globalization.CultureInfo.InvariantCulture);
+                port.Should().BeInRange(7000, 7300);
+                definition.DefaultValue.Should().BeNull();
+                values.Should().NotContainKey("FunctionsHttpPort");
+            }
+        }
+    }
 
     [Theory]
     [InlineData(false)]
@@ -192,7 +266,7 @@ public sealed class TemplateMountedSchemaTests : IDisposable
         {
             var session = new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive,
                 new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]));
-            using Templater flow = new(session);
+            using Templater flow = TemplateFixtures.CreateTemplater(session);
             var selected = (await flow.ResolveGroupAsync("Func.Tests.Journey", TemplateType.Item, CancellationToken.None)).Group![0];
             selected.Parameters.Should().ContainSingle().Which.CanonicalName.Should().Be("Greeting");
             selected.Parameters[0].DefaultValue.Should().Be("hello");
@@ -311,6 +385,6 @@ public sealed class TemplateMountedSchemaTests : IDisposable
     }
 
     private Templater CreateTemplater()
-        => new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive,
+        => TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive,
             new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)])));
 }

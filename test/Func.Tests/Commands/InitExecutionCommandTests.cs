@@ -158,7 +158,7 @@ public sealed class InitExecutionCommandTests
         var status = Enum.Parse<TemplateInvocationStatus>(statusName);
         InitExecutionResult result = new(kind, kind == "created")
         {
-            Invocation = new(status, []),
+            Invocation = new(status, []) { HasCommittedOutput = preserveResult },
         };
         _runner.ExecuteAsync(Arg.Any<InitExecutionRequest>(), _availability, Arg.Any<CancellationToken>()).Returns(_ =>
         {
@@ -193,7 +193,10 @@ public sealed class InitExecutionCommandTests
         _runner.ExecuteAsync(Arg.Any<InitExecutionRequest>(), _availability, Arg.Any<CancellationToken>()).Returns(_ =>
         {
             cancellation.Cancel();
-            return new InitExecutionResult(kind, kind == "created") { Invocation = new(Enum.Parse<TemplateInvocationStatus>(statusName), []) };
+            return new InitExecutionResult(kind, kind == "created")
+            {
+                Invocation = new(Enum.Parse<TemplateInvocationStatus>(statusName), []) { HasCommittedOutput = true },
+            };
         });
 
         Func<Task> act = () => CreateCommand().ParseInvocation(["--dry-run", "--output", "json"])
@@ -218,6 +221,47 @@ public sealed class InitExecutionCommandTests
 
         await act.Should().ThrowAsync<OperationCanceledException>();
         _interaction.AllOutput.Should().NotContain("JSON:").And.NotContain("SUCCESS:");
+    }
+
+    [Theory]
+    [InlineData("created", "Success", false, false)]
+    [InlineData("partialInitialization", "ConfigurationFailure", false, false)]
+    [InlineData("invocationFailed", "Failed", true, true)]
+    [InlineData("invocationFailed", "EngineFailure", true, true)]
+    [InlineData("previewed", "Success", true, false)]
+    [InlineData("created", "Failed", true, false)]
+    public async Task Invoke_ActualCommitMarkerAndResultKind_ControlLateCancellation(
+        string kind, string statusName, bool committed, bool preserve)
+    {
+        using CancellationTokenSource cancellation = new();
+        var result = new InitExecutionResult(kind, kind == "created")
+        {
+            Invocation = new(Enum.Parse<TemplateInvocationStatus>(statusName), []) { HasCommittedOutput = committed },
+        };
+        _runner.ExecuteAsync(Arg.Any<InitExecutionRequest>(), _availability, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return result;
+        });
+        int? exit = null;
+
+        var failure = await Record.ExceptionAsync(async () => exit = await CreateCommand().ParseInvocation(["--output", "json"])
+            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token));
+
+        if (preserve)
+        {
+            failure.Should().BeNull();
+            exit.Should().Be(1);
+            _interaction.Lines.Count(line => line.StartsWith("JSON: ", StringComparison.Ordinal)).Should().Be(1);
+        }
+        else
+        {
+            failure.Should().BeAssignableTo<OperationCanceledException>();
+            exit.Should().BeNull();
+            _interaction.AllOutput.Should().NotContain("JSON:");
+        }
+
+        _interaction.AllOutput.Should().NotContain("SUCCESS:");
     }
 
     [Fact]

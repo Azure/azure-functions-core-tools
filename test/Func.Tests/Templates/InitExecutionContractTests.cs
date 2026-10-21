@@ -269,11 +269,11 @@ public sealed class InitExecutionContractTests
         TestInteractionService interaction = new();
         var result = InitExecutionResult.Reject("invocationFailed", "Native creation failed.") with
         {
-            Preview = new(TemplateInvocationStatus.Success, [new("host.json", "Create")])
+            Preview = new(TemplateInvocationStatus.Success, [new("host.json", TemplateFileChangeKind.Create)])
             {
                 ProjectConfigurations = [new(Path.Combine(Path.GetTempPath(), "consumer-project", "host.json"), "node", "JavaScript")],
             },
-            Invocation = new(TemplateInvocationStatus.Failed, [new("host.json", "Create")])
+            Invocation = new(TemplateInvocationStatus.Failed, [new("host.json", TemplateFileChangeKind.Create)])
             {
                 ProjectConfigurations = [new(Path.Combine(Path.GetTempPath(), "consumer-project", "host.json"), "node", "JavaScript")],
             },
@@ -307,8 +307,8 @@ public sealed class InitExecutionContractTests
     {
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
-        TemplateFileChange host = new("host.json", "Create");
-        TemplateFileChange config = new(".func/config.json", "Create");
+        TemplateFileChange host = new("host.json", TemplateFileChangeKind.Create);
+        TemplateFileChange config = new(".func/config.json", TemplateFileChangeKind.Create);
         var result = InitExecutionResult.Reject("invocationFailed", "Existing user configuration was preserved.") with
         {
             Preview = new(TemplateInvocationStatus.Success, [host, config]),
@@ -352,11 +352,11 @@ public sealed class InitExecutionContractTests
         TemplateInvocationStatus status = Enum.Parse<TemplateInvocationStatus>(statusName);
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
-        TemplateFileChange effect = new("host.json", "Create");
+        TemplateFileChange effect = new("host.json", TemplateFileChangeKind.Create);
         InitExecutionResult result = new("control", status == TemplateInvocationStatus.Success)
         {
             Preview = new(TemplateInvocationStatus.Success, [effect]),
-            Invocation = new(status, [effect]),
+            Invocation = new(status, [effect]) { HasCommittedOutput = completedCount > 0 },
         };
 
         int exit = new InitExecutionRenderer(new SpectreInteractionService(new DefaultTheme(), stdout, stderr)).Render(result, jsonOutput: true);
@@ -401,6 +401,34 @@ public sealed class InitExecutionContractTests
         typeof(InitExecutionCommand).GetInterfaces().Should().NotContain(typeof(IBuiltInCommand));
     }
 
+    [Theory]
+    [InlineData("Success", false, 0)]
+    [InlineData("ConfigurationFailure", false, 0)]
+    [InlineData("Failed", true, 1)]
+    [InlineData("EngineFailure", true, 1)]
+    [InlineData("FileConflict", true, 1)]
+    [InlineData("TemplateChanged", true, 1)]
+    public void Render_CompletedEffectsUseRealCommitMarker_NotStatusShape(string statusName, bool committed, int count)
+    {
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        InitExecutionResult result = new("invocationFailed", false)
+        {
+            Invocation = new(Enum.Parse<TemplateInvocationStatus>(statusName), [new("host.json", TemplateFileChangeKind.Create)])
+            {
+                HasCommittedOutput = committed,
+            },
+        };
+
+        int exit = new InitExecutionRenderer(new SpectreInteractionService(new DefaultTheme(), stdout, stderr))
+            .Render(result, jsonOutput: true);
+
+        exit.Should().Be(1);
+        using var document = JsonDocument.Parse(stdout.Output);
+        document.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
+        document.RootElement.GetProperty("invocation").GetProperty("completedChanges").GetArrayLength().Should().Be(count);
+    }
+
     [Fact]
     public void ResolvedTemplate_ProjectDiagnosticWithoutOtherRestrictions_CannotBecomeInvocable()
     {
@@ -410,8 +438,7 @@ public sealed class InitExecutionContractTests
             ProjectConfigurationDiagnostic = "Invalid project declaration.",
         };
 
-        Action act = () => _ = new ResolvedTemplate(entry,
-            (_, _) => Task.FromResult(new TemplateInvocationResult(TemplateInvocationStatus.Success, [])));
+        Action act = () => _ = new ResolvedTemplate(entry, Substitute.For<ISelectedTemplateInvoker>());
 
         act.Should().Throw<ArgumentException>().WithParameterName("entry");
     }

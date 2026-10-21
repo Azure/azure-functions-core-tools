@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.IO.Compression;
-using System.Text.Json.Nodes;
 using System.Xml.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
@@ -28,6 +27,10 @@ internal static class TemplateFixtures
     public const string InvalidHostTemplateIdentity = "Func.Tests.InvalidHost";
     public const string DotnetHostOnlyTemplateIdentity = "Func.Tests.DotnetHostOnly";
     public const string HiddenTemplateIdentity = "Func.Tests.Hidden";
+
+    public static Templater CreateTemplater(
+        TemplateEngineSession session, IFileSystem? fileSystem = null, TemplateProjectSupport? projectSupport = null)
+        => new(session, new(session, fileSystem ?? new PhysicalFileSystem(), projectSupport));
 
     /// <summary>
     /// Writes a folder package with one item template, one basic project template, and two templates without an item
@@ -238,18 +241,24 @@ internal static class TemplateFixtures
 
     public static string WriteRunnableNodeProjectPackage(string parentDirectory)
     {
-      string package = WriteProjectJourneyPackage(parentDirectory);
+      string package = Path.Combine(parentDirectory, "runnable-node-templates");
       string project = Path.Combine(package, "project");
-      string configurationPath = Path.Combine(project, ".template.config", "template.json");
-      JsonNode configuration = JsonNode.Parse(File.ReadAllText(configurationPath))!;
-      configuration["identity"] = "Func.Tests.RunnableNodeProject";
-      configuration["shortName"] = "func-tests-runnable-node";
-      configuration["tags"]!["language"] = "JavaScript";
-      configuration["constraints"]!["stack"] = JsonNode.Parse("""{"type":"func-workload","args":"node"}""");
-      configuration["postActions"]![0]!["args"]!["stack"] = "node";
-      configuration["postActions"]![0]!["args"]!["language"] = "js";
-      File.WriteAllText(configurationPath, configuration.ToJsonString());
-      File.Delete(Path.Combine(project, "FuncProject.txt"));
+      WriteTemplate(project,
+        """
+        {
+          "identity":"Func.Tests.RunnableNodeProject","name":"Project journey","shortName":"func-tests-runnable-node",
+          "tags":{"type":"project","language":"JavaScript"},"sourceName":"FuncProject",
+          "constraints":{
+            "host":{"type":"host","args":[{"hostname":"func"}]},
+            "stack":{"type":"func-workload","args":"node"}
+          },
+          "primaryOutputs":[{"path":"host.json"}],
+          "symbols":{"Greeting":{"type":"parameter","datatype":"string","defaultValue":"hello","replaces":"GREETING"}},
+          "postActions":[{"actionId":"00e33184-ffc7-43ef-bec0-b1684df8ad56",
+          "args":{"primaryOutputIndex":"0","stack":"node","language":"js"}}]
+        }
+        """,
+        ("host.json", "{\"version\":\"2.0\"}"));
       File.WriteAllText(Path.Combine(project, "package.json"), """{"name":"funcproject","version":"1.0.0","private":true}""");
       File.WriteAllText(Path.Combine(project, "local.settings.json"),
         """{"IsEncrypted":false,"Values":{"AzureWebJobsStorage":"UseDevelopmentStorage=true","FUNCTIONS_WORKER_RUNTIME":"node"}}""");

@@ -110,7 +110,8 @@ internal sealed class BasicAcquisitionFixture : IDisposable
 
     public async Task<IReadOnlyList<TemplateCatalogEntry>> ReadTemplatesAsync()
     {
-        using var templater = new Templater(await Templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(Root)), CancellationToken.None));
+        using var templater = await new TemplaterFactory(Templates, _fileSystem)
+            .CreateAsync(new(WorkingDirectory.FromExplicit(Root)), CancellationToken.None);
         return await templater.ListAsync(TemplateType.Item, CancellationToken.None);
     }
 
@@ -218,7 +219,7 @@ internal sealed class BasicAcquisitionFixture : IDisposable
             WriteEntry(zip, $"{physical}.nuspec", Nuspec(physical, version, WorkloadPackageTypes.RuntimeIdentifierPackage, "kind:content rid:test-rid"));
             WriteEntry(zip, "workload.json",
                 $$"""{"$schema":"{{WorkloadManifestSchema.PackageManifestV1Schema}}","kind":"content","runtimeIdentifier":"test-rid"}""");
-            WriteEntry(zip, "tools/any/fixture.txt", "Installation fixture, not an activated stack implementation.");
+            WriteEntry(zip, "tools/test-rid/fixture.txt", "Installation fixture, not an activated stack implementation.");
         }
 
         _archives[Key(id, version)] = pointer;

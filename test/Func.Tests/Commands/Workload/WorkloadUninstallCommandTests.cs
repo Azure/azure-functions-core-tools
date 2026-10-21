@@ -17,6 +17,63 @@ public class WorkloadUninstallCommandTests
     private readonly IWorkloadInstaller _installer = Substitute.For<IWorkloadInstaller>();
     private readonly IWorkloadStore _store = Substitute.For<IWorkloadStore>();
 
+    [Theory]
+    [InlineData(false, "plan")]
+    [InlineData(true, "plan")]
+    [InlineData(false, "dirty")]
+    [InlineData(true, "dirty")]
+    [InlineData(false, "backend")]
+    [InlineData(true, "backend")]
+    [InlineData(false, "bug")]
+    [InlineData(true, "bug")]
+    [InlineData(false, "cancel")]
+    [InlineData(true, "cancel")]
+    public async Task Uninstall_OperationFailure_TranslatesOnlyKnownUserFailures(bool logical, string failure)
+    {
+        Exception expected = failure switch
+        {
+            "plan" => new WorkloadPlanChangedException(),
+            "dirty" => new WorkloadRecoveryRequiredException("fixture.intent"),
+            "backend" => new WorkloadLockNotSupportedException(),
+            "bug" => new InvalidOperationException("Owned unexpected implementation failure."),
+            _ => new OperationCanceledException(),
+        };
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new WorkloadEntry
+            {
+                PackageId = "fixture.physical", PackageVersion = "1.0.0", IsImplicitlyInstalled = logical,
+                LogicalPackage = logical ? new() { PackageId = "fixture.logical", PackageVersion = "1.0.0" } : null,
+            },
+        ]);
+        if (logical)
+        {
+            _installer.UninstallAsync("fixture.logical", "1.0.0", WorkloadOwnershipKind.Logical, Arg.Any<CancellationToken>())
+                .Returns<Task<bool>>(_ => throw expected);
+        }
+        else
+        {
+            _installer.UninstallAsync("fixture.physical", "1.0.0", Arg.Any<CancellationToken>())
+                .Returns<Task<bool>>(_ => throw expected);
+        }
+        var command = NewCommand();
+
+        Func<Task> invoke = () => InvokeAsync(command, logical ? "fixture.logical" : "fixture.physical");
+
+        if (failure is "bug" or "cancel")
+        {
+            (await invoke.Should().ThrowAsync<Exception>()).Which.Should().BeSameAs(expected);
+        }
+        else
+        {
+            var actual = (await invoke.Should().ThrowAsync<GracefulException>()).Which;
+            actual.InnerException.Should().BeSameAs(expected);
+            actual.Message.Should().Be(expected.Message);
+            actual.IsUserError.Should().BeTrue();
+        }
+        _interaction.Lines.Should().NotContain(line => line.StartsWith("SUCCESS:", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Uninstall_NoVersionsInstalled_WarnsAndSucceeds()
     {
