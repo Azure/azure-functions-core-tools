@@ -64,6 +64,10 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
         if (result.Kind == "listed")
         {
             _interaction.WriteSectionHeader("Installed item templates");
+            if (result.Templates.Count == 0)
+            {
+                _interaction.WriteHint("No installed item templates match. Run 'func new --list' without filters to inspect available items.");
+            }
         }
         else if (result.Kind == "previewed")
         {

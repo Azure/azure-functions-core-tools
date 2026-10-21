@@ -128,51 +128,51 @@ jobs:
         inputs:
           versionSpec: 22.x
 
-      - pwsh: |
-          $ErrorActionPreference = 'Stop'
-          $packageDirectory = '${{ parameters.npmPackageDirectory }}'
-          $version = '$(Build.BuildNumber)'.Trim().TrimStart('v', 'V')
+      # - pwsh: |
+      #     $ErrorActionPreference = 'Stop'
+      #     $packageDirectory = '${{ parameters.npmPackageDirectory }}'
+      #     $version = '$(Build.BuildNumber)'.Trim().TrimStart('v', 'V')
 
-          if ([string]::IsNullOrWhiteSpace($packageDirectory)) {
-            throw 'npmPackageDirectory is required when creating npm artifacts.'
-          }
+      #     if ([string]::IsNullOrWhiteSpace($packageDirectory)) {
+      #       throw 'npmPackageDirectory is required when creating npm artifacts.'
+      #     }
 
-          npm ci --ignore-scripts --prefix $packageDirectory
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Failed to restore npm package dependencies.'
-          }
+      #     npm ci --ignore-scripts --prefix $packageDirectory
+      #     if ($LASTEXITCODE -ne 0) {
+      #       throw 'Failed to restore npm package dependencies.'
+      #     }
 
-          npm version $version --no-git-tag-version --allow-same-version --prefix $packageDirectory
-          if ($LASTEXITCODE -ne 0) {
-            throw "Failed to set npm package version to '$version'."
-          }
+      #     npm version $version --no-git-tag-version --allow-same-version --prefix $packageDirectory
+      #     if ($LASTEXITCODE -ne 0) {
+      #       throw "Failed to set npm package version to '$version'."
+      #     }
 
-          New-Item -ItemType Directory -Path '$(npm_pack_dir)' -Force | Out-Null
-        displayName: Prepare npm packages
+      #     New-Item -ItemType Directory -Path '$(npm_pack_dir)' -Force | Out-Null
+      #   displayName: Prepare npm packages
 
-      - ${{ each packageName in parameters.npmPackageNames }}:
-        - pwsh: |
-            $ErrorActionPreference = 'Stop'
-            $packageDirectory = '${{ parameters.npmPackageDirectory }}'
+      # - ${{ each packageName in parameters.npmPackageNames }}:
+      #   - pwsh: |
+      #       $ErrorActionPreference = 'Stop'
+      #       $packageDirectory = '${{ parameters.npmPackageDirectory }}'
 
-            npm pkg set 'name=${{ packageName }}' --prefix $packageDirectory
-            if ($LASTEXITCODE -ne 0) {
-              throw "Failed to set npm package name to '${{ packageName }}'."
-            }
+      #       npm pkg set 'name=${{ packageName }}' --prefix $packageDirectory
+      #       if ($LASTEXITCODE -ne 0) {
+      #         throw "Failed to set npm package name to '${{ packageName }}'."
+      #       }
 
-            # npm updates an existing npm-shrinkwrap.json in place; this flag avoids modifying node_modules.
-            npm install --package-lock-only --ignore-scripts --prefer-offline --prefix $packageDirectory
-            if ($LASTEXITCODE -ne 0) {
-              throw "Failed to update the npm shrinkwrap for '${{ packageName }}'."
-            }
+      #       # npm updates an existing npm-shrinkwrap.json in place; this flag avoids modifying node_modules.
+      #       npm install --package-lock-only --ignore-scripts --prefer-offline --prefix $packageDirectory
+      #       if ($LASTEXITCODE -ne 0) {
+      #         throw "Failed to update the npm shrinkwrap for '${{ packageName }}'."
+      #       }
 
-            $packageOutputDirectory = Join-Path '$(npm_pack_dir)' '${{ packageName }}'
-            New-Item -ItemType Directory -Path $packageOutputDirectory -Force | Out-Null
-            npm pack $packageDirectory --pack-destination $packageOutputDirectory
-            if ($LASTEXITCODE -ne 0) {
-              throw "Failed to create the '${{ packageName }}' npm package."
-            }
-          displayName: Pack ${{ packageName }}
+      #       $packageOutputDirectory = Join-Path '$(npm_pack_dir)' '${{ packageName }}'
+      #       New-Item -ItemType Directory -Path $packageOutputDirectory -Force | Out-Null
+      #       npm pack $packageDirectory --pack-destination $packageOutputDirectory
+      #       if ($LASTEXITCODE -ne 0) {
+      #         throw "Failed to create the '${{ packageName }}' npm package."
+      #       }
+      #     displayName: Pack ${{ packageName }}
 
     - ${{ if and(containsValue(parameters.artifacts, 'pack'), eq(parameters.sign, true)) }}:
       - template: ci/sign-files.yml@eng

@@ -87,6 +87,14 @@ directory or applies content. Native item post-actions remain unsupported;
 the consumer does not manufacture post-action or applied-output information
 absent from the current runtime result.
 
+Listing and dry-run requests require a clean installed store. A pending recovery
+journal is refused before native bootstrap, without restoring the live hive or
+changing its journal and backup. Ordinary creation keeps the store's existing
+recovery behavior. Admission markers and private caches are not a promise of zero
+filesystem activity. `--force` with dry-run still previews without applying
+changes. Listing rejects creation-only `--name` and `--force` options and gives
+guidance when no installed items match.
+
 `NewExecutionCommandTests` and `NewExecutionJourneyTests` exercise binding and
 the real journey through a private installed native folder package, the Node
 workload's actual factory/initializer registrations, scoped configuration/profile

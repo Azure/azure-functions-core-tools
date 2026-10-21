@@ -6,7 +6,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 internal interface ITemplateStore
 {
     public Task<TemplateEngineSession> OpenReadAsync(TemplateEngineContext context, CancellationToken cancellationToken,
-        TemplateConstraintEvaluationSnapshot? snapshot = null, TemplateProjectSupport? projectSupport = null,
+        TemplateConstraintEvaluationSnapshot? snapshot = null,
         Action<TemplateStoreWaitReason>? waiting = null);
 
     public Task<TemplateStoreWriteSession> OpenWriteAsync(TemplateEngineContext context, CancellationToken cancellationToken,
