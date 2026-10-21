@@ -20,6 +20,7 @@ internal interface IWorkloadInstaller
 
     /// <summary>
     /// Revalidates an installed stack and verifies or repairs its locally declared templates without catalog acquisition.
+    /// Check-only validation refuses pending native recovery without restoring retained state.
     /// </summary>
     /// <exception cref="Discovery.InvalidWorkloadException">Declared assets or native ownership are invalid, or check-only finds missing templates.</exception>
     /// <exception cref="BundledTemplateRegistrationException">The retained stack's template registration failed after protected recovery.</exception>

@@ -112,6 +112,11 @@ reuse does not re-download stack or template payloads. Unknown native ownership,
 package/template identity collisions, conflicting source/bytes or versions are
 visible conflicts. User-installed templates are never adopted or replaced.
 Setup check-only verifies actual native registration without repairing it.
+Check-only preparation, final validation and no-op updates require a clean native
+store. A pending recovery journal produces an actionable workload error without
+restoring the snapshot, deleting the journal or changing retained packages and
+receipts. Ordinary install and explicit repair retain the owning store's normal
+recovery behavior.
 Workload and setup boundaries emit the retained-stack/retry cancellation
 warning to stderr, then propagate cancellation so the public process retains
 exit code 130. Incoming undeclared archives cannot complete a retained bundled
@@ -146,6 +151,27 @@ Release coordination must ship the supporting CLI before these stack artifacts.
 This base uses the existing initializer metadata adapter. The separately
 published `IProjectStack` migration must be integrated later without duplicating
 it here; independent template feeds/releases are not prerequisites.
+
+## Hybrid delivery boundary
+
+The intended distribution model keeps basic starters and language variants in
+the stack workload. Function and additional project templates belong to
+independently released native catalogs acquired compatibly by setup. The current
+artifact still includes HTTP items until the Node catalog owner supplies the
+producer separation. This README describes those current bytes, not completed
+hybrid acquisition.
+
+The shared installer and setup foundation must keep bundled readiness separate
+from required external readiness. CLI release owned association records must
+identify compatible stack and native packages, approved source and channel,
+engine compatibility and qualified release artifact integrity. Profiles may
+narrow those requirements, not grant trust. Package prefixes, equal versions
+and stack self-declarations are not association authority.
+
+Concrete publisher-qualified external records and artifacts are not yet
+available. Fixture package evidence cannot replace them or establish production
+acquisition. Shared packaging and Node catalog production remain separate
+prerequisites. Public command activation and runtime qualification are unchanged.
 
 ## Exercising the staged journey
 
