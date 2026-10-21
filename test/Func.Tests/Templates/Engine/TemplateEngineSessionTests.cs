@@ -306,6 +306,46 @@ public sealed class TemplateEngineSessionTests : IDisposable
     }
 
     [Fact]
+    public void ReadProjectConfiguration_MutableStackMetadata_DoesNotChangeCapturedDeclarations()
+    {
+        List<string> languages = ["Python"];
+        List<string> pythonAliases = ["py"];
+        Dictionary<string, IReadOnlyList<string>> aliases = new(StringComparer.Ordinal) { ["Python"] = pythonAliases };
+        var stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns("python");
+        stack.DisplayName.Returns("Python");
+        stack.SupportedLanguages.Returns(languages);
+        stack.SupportedLanguageAliases.Returns(aliases);
+        TemplateProjectConfigurationPlanner planner = new(new([stack]));
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var configuration = File.ReadAllText(Path.Combine(package, "project", ".template.config", "template.json"));
+        stack.Stack.Returns("changed-stack");
+        languages[0] = "ChangedLanguage";
+        pythonAliases[0] = "changed-alias";
+        aliases["Python"] = ["replacement-alias"];
+        aliases["ChangedLanguage"] = ["new-alias"];
+
+        var declaration = planner.Read(configuration).Should().ContainSingle().Subject;
+
+        declaration.Stack.Should().Be("python");
+        declaration.Language.Should().Be("Python");
+        Action readChangedAlias = () => planner.Read(configuration.Replace("\"py\"", "\"changed-alias\"", StringComparison.Ordinal));
+        readChangedAlias.Should().Throw<InvalidTemplateMetadataException>()
+            .WithMessage("Configuration language must identify exactly one supported stack language.");
+    }
+
+    [Fact]
+    public void CreateProjectPlans_NullDirectoryOutputs_Throws()
+    {
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+        var effects = Substitute.For<ICreationEffects>();
+
+        Action create = () => planner.CreatePlans("{}", effects, _root, null!);
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName("directoryOutputs");
+    }
+
+    [Fact]
     public async Task WriteProjectConfigurationAsync_NullPlan_ThrowsWithoutFileSystemCalls()
     {
         var fileSystem = Substitute.For<IFileSystem>();

@@ -19,11 +19,7 @@ internal sealed record TemplateProjectConfigurationDeclaration(int PrimaryOutput
 internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackCatalog stackCatalog)
 {
     internal const string ConfigurationActionId = "00e33184-ffc7-43ef-bec0-b1684df8ad56";
-    private readonly IReadOnlyList<StackDefinition> _stacks = Array.AsReadOnly<StackDefinition>(
-        [.. (stackCatalog ?? throw new ArgumentNullException(nameof(stackCatalog))).Stacks.Select(stack => new StackDefinition(stack.Stack,
-            Array.AsReadOnly<string>([.. stack.SupportedLanguages]),
-            stack.SupportedLanguageAliases.ToDictionary(pair => pair.Key,
-                pair => (IReadOnlyList<string>)Array.AsReadOnly<string>([.. pair.Value]), StringComparer.Ordinal)))]);
+    private readonly IReadOnlyList<StackDefinition> _stacks = SnapshotStacks(stackCatalog);
     private readonly StringComparer _pathComparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     /// <summary>
@@ -59,21 +55,23 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
     /// <summary>
     /// Binds each declaration to one generated primary output and independently discovered host root.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Configuration, effects or the output directory is null.</exception>
+    /// <exception cref="ArgumentNullException">Configuration, effects, the output directory or directory outputs is null.</exception>
     /// <exception cref="ArgumentException">Configuration or the output directory is blank or contains an invalid path.</exception>
     /// <exception cref="InvalidTemplateMetadataException">Metadata, generated roots or configuration destinations are not qualified.</exception>
     public IReadOnlyList<TemplateProjectConfigurationPlan> CreatePlans(
-        string configuration, ICreationEffects effects, string outputDirectory)
+        string configuration, ICreationEffects effects, string outputDirectory, IReadOnlySet<string> directoryOutputs)
     {
         ArgumentNullException.ThrowIfNull(effects);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        ArgumentNullException.ThrowIfNull(directoryOutputs);
         IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = Read(configuration);
         string[] primaryOutputs =
             [.. effects.CreationResult.PrimaryOutputs.Select(output => Path.GetFullPath(Path.Combine(outputDirectory, output.Path)))];
         string[] changedOutputs =
             [.. effects.FileChanges.Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
         string[] generatedOutputs = [.. effects.FileChanges.Where(change =>
-            change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite)
+            (change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite)
+            && !directoryOutputs.Contains(change.TargetRelativePath))
             .Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
         Require(!changedOutputs.Any(path => string.Equals(Path.GetFileName(path), "config.json", StringComparison.OrdinalIgnoreCase)
             && string.Equals(Path.GetFileName(Path.GetDirectoryName(path)), ".func", StringComparison.OrdinalIgnoreCase)),
@@ -97,6 +95,16 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         Require(plans.All(plan => !changedOutputs.Any(path => IsWithin(path, plan.ConfigurationPath) || IsWithin(plan.ConfigurationPath, path))),
             "Template file effects collide with mandatory project configuration or its directory ancestors.");
         return plans.AsReadOnly();
+    }
+
+    private static IReadOnlyList<StackDefinition> SnapshotStacks(InstalledProjectStackCatalog stackCatalog)
+    {
+        ArgumentNullException.ThrowIfNull(stackCatalog);
+        return Array.AsReadOnly<StackDefinition>(
+            [.. stackCatalog.Stacks.Select(stack => new StackDefinition(stack.Stack,
+                Array.AsReadOnly<string>([.. stack.SupportedLanguages]),
+                stack.SupportedLanguageAliases.ToDictionary(pair => pair.Key,
+                    pair => (IReadOnlyList<string>)Array.AsReadOnly<string>([.. pair.Value]), StringComparer.Ordinal)))]);
     }
 
     private static void ValidateTopology(JsonElement root)

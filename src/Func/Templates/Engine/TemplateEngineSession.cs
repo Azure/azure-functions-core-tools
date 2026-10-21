@@ -226,7 +226,6 @@ internal class TemplateEngineSession : IDisposable
             return new(TemplateInvocationStatus.InvalidTemplate, [], topologyFailure);
         }
 
-        using var document = JsonDocument.Parse(configuration.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
         TemplateProjectSupport? projectSupport = configuration.Type == TemplateType.Project ? _projectSupport : null;
         if (projectSupport is not null)
         {
@@ -239,10 +238,14 @@ internal class TemplateEngineSession : IDisposable
                 return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
             }
         }
-        else if (document.RootElement.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
-            && property.Value.ValueKind != JsonValueKind.Null && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
+        else
         {
-            return new(TemplateInvocationStatus.Failed, [], "Item post-actions require a qualified dispatcher and are not supported by this invocation path.");
+            using var document = JsonDocument.Parse(configuration.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            if (document.RootElement.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
+                && property.Value.ValueKind != JsonValueKind.Null && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
+            {
+                return new(TemplateInvocationStatus.Failed, [], "Item post-actions require a qualified dispatcher and are not supported by this invocation path.");
+            }
         }
 
         Dictionary<string, string?> parameters = new(request.Parameters, StringComparer.Ordinal);
@@ -274,7 +277,7 @@ internal class TemplateEngineSession : IDisposable
                     return new(TemplateInvocationStatus.InvalidTemplate, [], "Project preview did not produce a configuration plan.");
                 }
 
-                configurationPlans = projectSupport.Planner.CreatePlans(configuration.Content, preview.CreationEffects, output);
+                configurationPlans = projectSupport.Planner.CreatePlans(configuration.Content, preview.CreationEffects, output, directoryOutputs);
                 if (configurationPlans.Any(projectSupport.Writer.ConfigurationExists))
                 {
                     return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic);
