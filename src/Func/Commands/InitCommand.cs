@@ -629,7 +629,14 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         string json = ProjectConfigurationJson.Create(stack, language);
-        await _fileSystem.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
+        if (force)
+        {
+            await _fileSystem.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
+        }
+        else
+        {
+            await _fileSystem.CreateAllTextAsync(path, json + Environment.NewLine, cancellationToken);
+        }
     }
 
     /// <summary>

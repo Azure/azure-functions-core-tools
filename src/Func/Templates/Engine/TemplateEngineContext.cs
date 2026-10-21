@@ -31,6 +31,8 @@ internal sealed record TemplateEngineContext
     public TemplateEngineProjectContext? Project { get; }
 
     public TemplateEngineBundleContext? Bundle { get; }
+
+    public bool RequireCleanStore { get; init; }
 }
 
 /// <summary>

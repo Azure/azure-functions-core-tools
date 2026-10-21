@@ -101,16 +101,7 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
 
         foreach (UninstallCandidate candidate in toRemove)
         {
-            bool removed = candidate.Ownership == WorkloadOwnershipKind.Logical
-                ? await _installer.UninstallAsync(
-                    candidate.OwnerPackageId,
-                    candidate.OwnerPackageVersion,
-                    WorkloadOwnershipKind.Logical,
-                    cancellationToken: cancellationToken)
-                : await _installer.UninstallAsync(
-                    candidate.OwnerPackageId,
-                    candidate.OwnerPackageVersion,
-                    cancellationToken: cancellationToken);
+            bool removed = await UninstallAsync(candidate, cancellationToken);
             if (removed)
             {
                 _interaction.WriteSuccess(
@@ -119,6 +110,29 @@ internal sealed class WorkloadUninstallCommand : FuncCliCommand
         }
 
         return 0;
+    }
+
+    private async Task<bool> UninstallAsync(UninstallCandidate candidate, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return candidate.Ownership == WorkloadOwnershipKind.Logical
+                ? await _installer.UninstallAsync(candidate.OwnerPackageId, candidate.OwnerPackageVersion,
+                    WorkloadOwnershipKind.Logical, cancellationToken)
+                : await _installer.UninstallAsync(candidate.OwnerPackageId, candidate.OwnerPackageVersion, cancellationToken);
+        }
+        catch (WorkloadPlanChangedException exception)
+        {
+            throw new GracefulException(exception.Message, exception, isUserError: true);
+        }
+        catch (WorkloadRecoveryRequiredException exception)
+        {
+            throw new GracefulException(exception.Message, exception, isUserError: true);
+        }
+        catch (WorkloadLockNotSupportedException exception)
+        {
+            throw new GracefulException(exception.Message, exception, isUserError: true);
+        }
     }
 
     private static IReadOnlyList<UninstallCandidate> ResolveCandidates(
