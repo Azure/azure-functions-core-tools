@@ -448,8 +448,10 @@ template work uses its existing recovery journal.
 Prepared workload reuse also requires installed metadata, the declared portable
 or RID payload root and any entry-point assembly to match the registry before
 hashes become verification evidence. A stable hash of a damaged installation is
-not readiness. Failed payload deletion retains the dirty intent, including when
-the filesystem reports success but the directory remains. Uninstall presents
+not readiness. Entry-point lookup preserves the loader's install-root-relative
+path first, then its legacy `tools/any` fallback. This checks existence, not
+assembly activation or type loadability. Failed payload deletion retains the dirty
+intent, including when the filesystem reports success but the directory remains. Uninstall presents
 known coordination failures as user errors while preserving their causes.
 Unexpected implementation errors and cancellation are not converted to success.
 

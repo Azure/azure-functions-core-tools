@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Tests.Templates.Acquisition;
 using Azure.Functions.Cli.Workloads;
@@ -17,6 +18,100 @@ namespace Azure.Functions.Cli.Tests.Workloads.Storage;
 
 public sealed class WorkloadOperationTests
 {
+    [Theory]
+    [InlineData("legacy")]
+    [InlineData("missing")]
+    [InlineData("root")]
+    [InlineData("prefixed")]
+    [InlineData("subdirectory")]
+    [InlineData("root-precedence")]
+    public async Task PrepareFromCatalogAsync_RetainedRuntimeAssemblyLayout_PreservesLoaderPathCompatibility(string layout)
+    {
+        using var fixture = new BasicAcquisitionFixture();
+        string assemblyPath = layout switch
+        {
+            "prefixed" => "tools/any/Fixture.dll",
+            "subdirectory" => "lib/Fixture.dll",
+            _ => "Fixture.dll",
+        };
+        var entryPoint = new EntryPointSpec { AssemblyPath = assemblyPath, Type = "Fixture.Runtime" };
+        var entry = new WorkloadEntry
+        {
+            PackageId = "fixture.stacka", PackageVersion = "1.0.0", Kind = WorkloadKind.Workload,
+            Source = BasicAcquisitionFixture.Source, EntryPoint = entryPoint,
+        };
+        string directory = fixture.Paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        Directory.CreateDirectory(Path.Combine(directory, "tools", "any"));
+        var metadata = new WorkloadMetadata
+        {
+            Schema = WorkloadManifestSchema.PackageManifestV1Schema,
+            Kind = WorkloadKind.Workload, EntryPoint = entryPoint,
+        };
+        File.WriteAllText(Path.Combine(directory, "workload.json"), JsonSerializer.Serialize(metadata, WorkloadJsonContext.Default.WorkloadMetadata));
+        string primary = Path.GetFullPath(Path.Combine(directory, assemblyPath));
+        string fallback = Path.GetFullPath(Path.Combine(directory, "tools", "any", assemblyPath));
+        if (layout is not ("legacy" or "missing"))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(primary)!);
+            File.WriteAllText(primary, "Owned root-relative assembly bytes, not activated.");
+        }
+        if (layout is "legacy" or "root-precedence")
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(fallback)!);
+            File.WriteAllText(fallback, "Owned legacy assembly bytes, not activated.");
+        }
+        await fixture.Store.SaveWorkloadAsync(entry);
+        string registry = File.ReadAllText(fixture.Paths.WorkloadRegistryPath);
+        var before = Directory.GetFiles(directory, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllText);
+        var fileSystem = Substitute.For<IFileSystem>();
+        PhysicalFileSystem physical = new();
+        fileSystem.DirectoryExists(Arg.Any<string>()).Returns(call => physical.DirectoryExists(call.Arg<string>()));
+        fileSystem.FileExists(Arg.Any<string>()).Returns(call => physical.FileExists(call.Arg<string>()));
+        fileSystem.GetFiles(Arg.Any<string>()).Returns(call => physical.GetFiles(call.Arg<string>()));
+        fileSystem.ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => physical.ComputeSha256Async(call.Arg<string>(), call.Arg<CancellationToken>()));
+        var coordinator = new FileWorkloadOperationCoordinator(fixture.Paths);
+        var runtime = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
+        runtime.Current.Returns("test-rid");
+        WorkloadRidPackageSelector selector = new(runtime);
+        WorkloadPackageInspector inspector = new(new WorkloadMetadataReader(), selector);
+        WorkloadDeploymentService deployment = new(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), coordinator, fileSystem);
+        WorkloadInstaller installer = new(new WorkloadPackageSource(fixture.WorkloadCatalog, inspector, Options.Create(new WorkloadCatalogOptions())),
+            inspector, selector, deployment, coordinator, fixture.Store, fileSystem);
+
+        Func<Task<PreparedWorkloadInstall>> prepare = () => installer.PrepareFromCatalogAsync("Fixture.StackA", NuGetVersion.Parse("1.0.0"),
+            BasicAcquisitionFixture.Source, false, true, false, null, CancellationToken.None);
+
+        if (layout == "missing")
+        {
+            await prepare.Should().ThrowAsync<InvalidWorkloadException>().WithMessage("*damaged or conflicts*");
+        }
+        else
+        {
+            using var prepared = await prepare();
+            using var operation = await coordinator.AcquireAsync(CancellationToken.None);
+            var result = await installer.CommitPreparedAsync(operation, prepared, null, CancellationToken.None);
+            result.AlreadyInstalled.Should().BeTrue();
+            result.Entry.Should().BeEquivalentTo(entry);
+            prepared.Reuse!.Hashes.Keys.Should().BeEquivalentTo(before.Keys.Select(path => Path.GetRelativePath(directory, path)));
+        }
+        fileSystem.Received(1).FileExists(Arg.Is<string>(path => Path.GetFullPath(path) == primary));
+        if (layout == "legacy")
+        {
+            fileSystem.Received(1).FileExists(Arg.Is<string>(path => Path.GetFullPath(path) == fallback));
+        }
+        else if (layout != "missing")
+        {
+            fileSystem.DidNotReceive().FileExists(Arg.Is<string>(path => Path.GetFullPath(path) == fallback));
+        }
+        File.ReadAllText(fixture.Paths.WorkloadRegistryPath).Should().Be(registry);
+        Directory.GetFiles(directory, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllText)
+            .Should().BeEquivalentTo(before);
+        fixture.Downloads.Should().BeEmpty();
+        File.Exists(Path.Combine(fixture.Paths.Home, FileWorkloadOperationCoordinator.ControlDirectoryName,
+            FileWorkloadOperationCoordinator.IntentFileName)).Should().BeFalse();
+    }
+
     [Fact]
     public async Task Fixture_RidImplementation_UsesDeclaredPayloadRootBeforePreparingReuse()
     {
