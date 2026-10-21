@@ -55,7 +55,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
             file: Path.Combine("TOKEN", "Created.txt"));
         using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
         var sequence = RegisterSequenceMacro(session);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -115,7 +115,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         await InstallOutputTemplateAsync(symbols, sources, Path.Combine("TOKEN", "Created.txt"));
         using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
         var sequence = RegisterSequenceMacro(session);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -144,7 +144,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         cached.TagsCollection["type"].Should().Be("item");
         var configuration = Path.Combine(package, "item", ".template.config", "template.json");
         File.WriteAllText(configuration, File.ReadAllText(configuration).Replace("""{ "type": "item" }""", tags, StringComparison.Ordinal));
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
 
         var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
         var exact = await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None);
@@ -172,7 +172,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         await TemplateFixtures.GetInstalledTemplateAsync(Hive, TemplateFixtures.ItemTemplateIdentity);
         var configuration = Path.Combine(package, "item", ".template.config", "template.json");
         File.WriteAllText(configuration, File.ReadAllText(configuration).Replace("\"item\"", $"\"{type}\"", StringComparison.Ordinal));
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -191,7 +191,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         await TemplateFixtures.GetInstalledTemplateAsync(Hive, TemplateFixtures.ProjectTemplateIdentity);
         var configuration = Path.Combine(package, "project", ".template.config", "template.json");
         File.WriteAllText(configuration, File.ReadAllText(configuration).Replace("\"project\"", "\"item\"", StringComparison.Ordinal));
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
 
         var project = await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
         var item = await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Item, CancellationToken.None);
@@ -223,7 +223,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
     public async Task InvokeAsync_NonParameterOutputTopology_FailsBeforeNativeWrites(string symbols, string? sources)
     {
         await InstallOutputTemplateAsync(symbols, sources);
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -252,7 +252,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         Directory.CreateDirectory(output.Info.FullName);
         Directory.CreateDirectory(outside);
         Directory.CreateSymbolicLink(Path.Combine(output.Info.FullName, "1"), outside);
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created", Force: true), CancellationToken.None);
@@ -272,7 +272,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         await InstallOutputTemplateAsync(
             $$$"""{"{{{parameter}}}":{"type":"parameter","fileRename":"TOKEN"}}""",
             guids: """["a29e03ad-a64c-48d1-9f46-6be4895361b8"]""");
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -297,7 +297,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
             }
             """,
             """[{"condition":"\"Entropy\" != \"\"","modifiers":[{"condition":"!Include","exclude":["TOKEN.txt"]}]}]""");
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
         var parameters = new Dictionary<string, string?> { ["Path"] = "Chosen", ["Include"] = include.ToString() };
@@ -335,7 +335,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
             }
             """,
             sources: """[{"condition":"Entropy-D == \"Stable\""}]""");
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
         var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>(), "Created", DryRun: true);
@@ -375,7 +375,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         File.WriteAllText(Path.Combine(configurationDirectory, "func.host.json"),
             """{"symbolInfo":{"Entropy == 1":{"longName":"unused"}}}""");
         await TemplateFixtures.InstallAsync(package, Hive);
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -404,7 +404,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
             """;
         string condition = (useForm ? "Entropy-D{-VALUE-FORMS-}identity" : "Entropy-D") + " == \"Chosen\"";
         await InstallOutputTemplateAsync(symbols, JsonSerializer.Serialize(new[] { new { condition } }));
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
         var values = new Dictionary<string, string?> { ["Entropy-D"] = "Chosen" };
@@ -430,7 +430,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
             forms: """{"identity == 0":{"identifier":"identity"}}""");
         using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
         var sequence = RegisterSequenceMacro(session);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -451,7 +451,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
     public async Task InvokeAsync_NativeNameSelection_PreservesOrdinaryTemplates(string? name, bool preferDefaultName, string expected)
     {
         await InstallOutputTemplateAsync("{}", file: "ItemFunction.txt", preferDefaultName: preferDefaultName);
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 

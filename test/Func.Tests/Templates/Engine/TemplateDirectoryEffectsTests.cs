@@ -25,7 +25,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
     {
         await InstallAsync(placeholder, useDefault);
         using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
         var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>(), "Created", DryRun: true);
@@ -89,7 +89,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
                 }
             },
         };
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), CancellationToken.None);
@@ -104,7 +104,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
     {
         await InstallAsync("-.-", includeDirectory: false);
         using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "regular-output"));
 
@@ -128,7 +128,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
         {
             AfterCreation = cancellation.Cancel,
         };
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "cancel-output"));
 
@@ -150,7 +150,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
         {
             ChangeCreatedEffectPaths = true,
         };
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "changed-effects-output"));
 
@@ -173,7 +173,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
         string outside = Directory.CreateDirectory(Path.Combine(_root, "linked-target")).FullName;
         Directory.CreateSymbolicLink(Path.Combine(output.Info.FullName, "src"), outside);
         using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), CancellationToken.None);
@@ -199,7 +199,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
                 Directory.CreateSymbolicLink(target, outside);
             },
         };
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), CancellationToken.None);

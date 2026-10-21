@@ -20,7 +20,8 @@ internal sealed class TemplaterFactory(CliConfigurationPathsOptions configuratio
         ArgumentNullException.ThrowIfNull(context);
 
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new Templater(new TemplateEngineSession(context, settingsLocation));
+        TemplateEngineSession session = new(context, settingsLocation);
+        return new Templater(session, new(session));
     }
 
     public Templater Create(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot)
@@ -28,6 +29,7 @@ internal sealed class TemplaterFactory(CliConfigurationPathsOptions configuratio
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(snapshot);
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new Templater(new TemplateEngineSession(context, settingsLocation, snapshot));
+        TemplateEngineSession session = new(context, settingsLocation, snapshot);
+        return new Templater(session, new(session));
     }
 }

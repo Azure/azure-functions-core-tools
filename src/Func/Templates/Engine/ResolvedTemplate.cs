@@ -8,12 +8,12 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </summary>
 internal sealed class ResolvedTemplate
 {
-    private readonly Func<TemplateInvocationRequest, CancellationToken, Task<TemplateInvocationResult>> _invoke;
+    private readonly ISelectedTemplateInvoker _invoker;
 
-    internal ResolvedTemplate(TemplateCatalogEntry entry, Func<TemplateInvocationRequest, CancellationToken, Task<TemplateInvocationResult>> invoke)
+    internal ResolvedTemplate(TemplateCatalogEntry entry, ISelectedTemplateInvoker invoker)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        _invoke = invoke ?? throw new ArgumentNullException(nameof(invoke));
+        _invoker = invoker ?? throw new ArgumentNullException(nameof(invoker));
         if (entry.ConstraintEvaluation.Status != TemplateConstraintEvaluationStatus.Eligible || entry.MetadataDiagnostic is not null)
         {
             throw new ArgumentException("Only a validated eligible template can be resolved.", nameof(entry));
@@ -38,6 +38,6 @@ internal sealed class ResolvedTemplate
         }
 
         request = request with { Parameters = new Dictionary<string, string?>(request.Parameters, StringComparer.Ordinal) };
-        return _invoke(request, cancellationToken);
+        return _invoker.InvokeAsync(request, cancellationToken);
     }
 }

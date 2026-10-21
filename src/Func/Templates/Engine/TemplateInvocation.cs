@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Azure.Functions.Cli.Common;
 using Microsoft.TemplateEngine.Abstractions;
@@ -83,6 +84,13 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
 /// <param name="Parameters">Native definitions loaded from the mounted configuration.</param>
 internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters)
 {
+    public string Content { get; } = Content ?? throw new ArgumentNullException(nameof(Content));
+
+    /// <summary>
+    /// Owns the parsed host view independently of any disposable parsing document.
+    /// </summary>
+    public JsonElement Root { get; } = ParseRoot(Content);
+
     /// <summary>
     /// Identifies the selected or fallback mounted host file, or null when neither exists.
     /// </summary>
@@ -92,4 +100,19 @@ internal sealed record TemplateConfigurationSnapshot(string Content, string Fing
     /// Captures host metadata separately from the template.json fingerprint.
     /// </summary>
     public string? HostData { get; init; }
+
+    internal static JsonElement ParseRoot(string content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        try
+        {
+            using var document = JsonDocument.Parse(content,
+                new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            return document.RootElement.Clone();
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidTemplateMetadataException("template.json is not valid JSON.", exception);
+        }
+    }
 }

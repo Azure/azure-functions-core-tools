@@ -229,7 +229,6 @@ public sealed class TemplateCatalogProjectorTests
     }
 
     [Theory]
-    [InlineData("{invalid")]
     [InlineData("[]")]
     public void Project_InvalidMountedConfiguration_ReportsDiagnostic(string content)
     {

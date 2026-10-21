@@ -27,7 +27,23 @@ internal static class TemplateParameterProjector
     {
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentNullException.ThrowIfNull(metadata);
+        return ProjectDefinitions(parameters, metadata, configuration is null ? null : ReadParametersWithoutDefaults(configuration));
+    }
 
+    /// <summary>
+    /// Projects parameters using the captured host view without reparsing template.json.
+    /// </summary>
+    public static IReadOnlyList<TemplateParameterDefinition> Project(
+        IEnumerable<ITemplateParameter> parameters, FuncHostTemplateMetadata metadata, JsonElement configuration)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentNullException.ThrowIfNull(metadata);
+        return ProjectDefinitions(parameters, metadata, ReadParametersWithoutDefaults(configuration));
+    }
+
+    private static IReadOnlyList<TemplateParameterDefinition> ProjectDefinitions(
+        IEnumerable<ITemplateParameter> parameters, FuncHostTemplateMetadata metadata, IReadOnlySet<string>? parametersWithoutDefaults)
+    {
         ITemplateParameter[] userParameters = [.. parameters.Where(IsUserParameter)];
 
         HashSet<string> canonicalNames = [.. userParameters.Select(parameter => parameter.Name)];
@@ -39,7 +55,6 @@ internal static class TemplateParameterProjector
                 + "which must name parameters users set as options. Commands set 'name' through --name.");
         }
 
-        IReadOnlySet<string>? parametersWithoutDefaults = configuration is null ? null : ReadParametersWithoutDefaults(configuration);
         TemplateParameterDefinition[] definitions = [.. userParameters.Select(parameter => Project(parameter, metadata, parametersWithoutDefaults))];
         EnsureUnique(definitions, definition => definition.LongName, "long name");
         EnsureUnique(definitions, definition => definition.ShortName, "short name");
@@ -96,30 +111,35 @@ internal static class TemplateParameterProjector
         {
             using var document = JsonDocument.Parse(configuration,
                 new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                throw new InvalidTemplateMetadataException("Template configuration must contain a JSON object.");
-            }
-
-            // Additional configuration files can supply defaults absent from the primary declaration.
-            if (document.RootElement.EnumerateObject().Any(property => property.Name.Equals("additionalConfigFiles", StringComparison.OrdinalIgnoreCase)))
-            {
-                return null;
-            }
-
-            // Engine-synthesized scalar defaults must not become user input and override generated fallbacks.
-            return document.RootElement.EnumerateObject()
-                .Where(property => property.Name.Equals("symbols", StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.Object)
-                .SelectMany(property => property.Value.EnumerateObject())
-                .Where(symbol => symbol.Value.ValueKind == JsonValueKind.Object && symbol.Value.EnumerateObject()
-                    .All(property => !property.Name.Equals("defaultValue", StringComparison.OrdinalIgnoreCase) || property.Value.ValueKind == JsonValueKind.Null))
-                .Select(symbol => symbol.Name)
-                .ToHashSet(StringComparer.Ordinal);
+            return ReadParametersWithoutDefaults(document.RootElement);
         }
         catch (JsonException exception)
         {
             throw new InvalidTemplateMetadataException("Template configuration is not valid JSON.", exception);
         }
+    }
+
+    private static IReadOnlySet<string>? ReadParametersWithoutDefaults(JsonElement configuration)
+    {
+        if (configuration.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidTemplateMetadataException("Template configuration must contain a JSON object.");
+        }
+
+        // Additional configuration files can supply defaults absent from the primary declaration.
+        if (configuration.EnumerateObject().Any(property => property.Name.Equals("additionalConfigFiles", StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        // Engine-synthesized scalar defaults must not become user input and override generated fallbacks.
+        return configuration.EnumerateObject()
+            .Where(property => property.Name.Equals("symbols", StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.Object)
+            .SelectMany(property => property.Value.EnumerateObject())
+            .Where(symbol => symbol.Value.ValueKind == JsonValueKind.Object && symbol.Value.EnumerateObject()
+                .All(property => !property.Name.Equals("defaultValue", StringComparison.OrdinalIgnoreCase) || property.Value.ValueKind == JsonValueKind.Null))
+            .Select(symbol => symbol.Name)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     // The parser adds the dashes, and ':' and '=' separate an option from its value.
