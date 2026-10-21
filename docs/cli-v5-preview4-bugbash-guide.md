@@ -10,26 +10,23 @@ October 20, 2026. It is a preview, not production-ready or at v4 feature parity.
 | CLI version / tag | `5.0.0-preview.4` / [v5.0.0-preview.4][preview4-release] |
 | Final tagged source | `9db15d8fadb49cb602a58c38ac0dd5a100585fcf` |
 | Release preparation | [#5739][release-pr] merged as `d691ad70ce9718c2dd3ad40b7326964529f75aa4`; the tag includes its child [#5740][npm-build-pr]. |
-| Installer / CLI artifact | Served installer scripts are identified by SHA-256 below. The approved native CLI location is an execution prerequisite; see the **Bug-bash CLI artifact** field in [Release receipt](#release-receipt). |
+| Installer / CLI artifact | The public `win-x64` Preview 4 native ZIP is available. Use the explicit version pin and hash-verified installer in [Installation](#installation); see **Bug-bash CLI artifact** in [Release receipt](#release-receipt). |
 | Required workload source | https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json |
 | Qualification | **SOURCE RELEASE COMPLETE; PUBLISHED-ARTIFACT QUALIFICATION NOT ESTABLISHED.** Source/build checks are not final-artifact qualification. |
 
 ## Preview 4 CLI build
 
-**The documentation is ready for human review.** Preview 4 workload packages are
-available. The approved native Preview 4 CLI artifact location has not yet been
-established.
+**The documentation is ready for human review.** The public `win-x64` Preview 4
+native archive and workload packages are available. Use the explicitly pinned
+[installation instructions](#installation) and verify the directly addressed
+binary reports exactly `5.0.0-preview.4` before starting native CLI scenarios.
+Do not substitute Preview 3, another release, or an arbitrary local/development
+CLI build.
 
-**Before tomorrow's bug bash:** complete the single **Bug-bash CLI artifact**
-field in [Release receipt](#release-receipt) with the release owner's approved
-location. Do not substitute Preview 3, another release, or an arbitrary
-local/development build.
-
-Until an approved Preview 4 CLI artifact is identified and its directly addressed
-binary reports `5.0.0-preview.4`, scenarios requiring the native CLI are
-**BLOCKED**. This execution prerequisite does not block documentation publication
-or review. Public distribution scenarios retain their separate path-readiness
-gates.
+The live preview manifest now selects Preview 4, but keep the explicit version
+pin because that manifest is mutable. Other RID cases remain **BLOCKED** pending
+their own archive-availability and installed-version checks. HTTP availability
+is not an executed installation or final-artifact qualification result.
 
 If a scenario's required artifact, package, runtime, or fixture is unavailable,
 mark that scenario/subcase **BLOCKED**. Missing optional build, hash, signing, or
@@ -37,23 +34,18 @@ qualification evidence is **MISSING ARTIFACT EVIDENCE**, not proof of a defect.
 
 ## Quick start
 
-1. **OBTAIN:** use the approved Preview 4 CLI artifact/build location in the
-   **Bug-bash CLI artifact** field of [Release receipt](#release-receipt).
-   If the placeholder remains, stop and record dependent scenarios **BLOCKED**;
-   do not choose another build.
-2. **INSTALL/USE:** use only that artifact in a new test-owned installation
-   directory, following the release owner's instructions.
-   [Installation](#installation) distinguishes product use from public installer
-   tests, which remain gated by their own distribution paths.
-3. **VERIFY:** directly address the installed native CLI and confirm it reports
+1. **INSTALL:** follow [Installation](#installation) with the hash-verified public
+   installer, explicit `5.0.0-preview.4` pin, and a new test-owned directory.
+   The receipt verifies `win-x64`; other RIDs need their own availability check.
+2. **VERIFY:** directly address the installed native CLI and confirm it reports
    exactly `5.0.0-preview.4`; use its full path or verify `func5` resolution before using the wrapper.
-4. **CONFIGURE:** set the [required workload source](#required-workload-source)
+3. **CONFIGURE:** set the [required workload source](#required-workload-source)
    before setup or any workload/project command.
-5. **ISOLATE:** use the new CLI/workload state homes in the installation example,
+4. **ISOLATE:** use the new CLI/workload state homes in the installation example,
    not your working v4/v5 state. Follow [Setup](#setup) for the assigned stack.
-6. **TEST:** run the assigned [P0 and P1 scenarios](#core-bug-bash-scenarios);
+5. **TEST:** run the assigned [P0 and P1 scenarios](#core-bug-bash-scenarios);
    run P2 only within the stated exploratory scope.
-7. **REPORT:** record **PASS / FAIL / BLOCKED** per scenario/subcase using
+6. **REPORT:** record **PASS / FAIL / BLOCKED** per scenario/subcase using
    [Result reporting](#result-reporting), including exact byte and input identities.
 
 ## Testing rules
@@ -84,13 +76,11 @@ qualification evidence is **MISSING ARTIFACT EVIDENCE**, not proof of a defect.
 
 ## Installation
 
-For native product scenarios, use the approved artifact recorded in
+For native product scenarios, use the version-pinned public artifact recorded in
 [Release receipt](#release-receipt). Set test-owned CLI/workload state homes as
-shown below and verify the directly addressed binary before setup. An approved
-artifact can enable product testing without making every public distribution
-path ready.
+shown below and verify the directly addressed binary before setup. The `win-x64`
+archive is available; this does not qualify every public distribution path.
 
-The public installer examples below test distribution separately.
 The [release page][preview4-release] advertises
 `https://aka.ms/func-cli/install.ps1` and `https://aka.ms/func-cli/install.sh`.
 The examples download the script into a test-owned file and verify the observed
@@ -99,12 +89,11 @@ The aliases currently resolve to mutable `vnext` files; stop on a hash mismatch
 and request a reconciled receipt. A CLI version pin does not pin installer bytes.
 Source-pinned scripts alone do not prove which bytes an alias served.
 
-**Public installer scenarios remain BLOCKED until their Preview 4 archive paths
-are ready.** An approved bug-bash artifact alone does not clear this gate.
-Only then execute these examples with the version pin shown; the preserved live
-manifest observation selects Preview 3 for unpinned prerelease installation.
-Manifest-selected Preview 4 installation remains separately **BLOCKED** until
-that channel selects Preview 4.
+**Explicitly pinned `win-x64` installation is READY to test.** The live preview
+manifest now selects `5.0.0-preview.4`; use the explicit pin anyway rather than
+depend on mutable selection. Both installers bypass manifest selection when an
+explicit version is supplied. Bash/Unix and other RID examples retain their own
+archive-availability gate; those native archives were not rechecked here.
 
 The examples below have not been executed as part of this documentation revision.
 
@@ -439,18 +428,20 @@ download, installation, recovery, or cross-platform E2E execution.
 
 ## Core bug-bash scenarios
 
-**Product scenarios:** all native-CLI-dependent rows/subcases are **BLOCKED**
-until the approved artifact in [Release receipt](#release-receipt) is supplied
-and directly verified as `5.0.0-preview.4`. After that, workload, setup, project,
-local lifecycle, and update metadata/selection scenarios can run with their
-assigned inputs. Published workload availability is not negated by incomplete
-native CLI distribution; unavailable fixtures block only dependent subcases.
+**Product scenarios:** the missing-artifact blocker is resolved for `win-x64`.
+After installing the receipted artifact and directly verifying
+`5.0.0-preview.4`, workload, setup, project, local lifecycle, and update
+metadata/selection scenarios can run with their assigned inputs. Unavailable
+fixtures block only dependent subcases; other RIDs still need their own archive
+and installed-version checks.
 
-**Public distribution scenarios:** CDN clean install, public installer archive
-retrieval, manifest-selected installation, forced upgrade/update subcases needing
-unavailable Preview 4 CDN bytes, and npm distribution remain **BLOCKED** until
-their respective public paths/receipts are ready. Supplying the approved native
-bug-bash artifact does not by itself qualify those paths.
+**Public distribution scenarios:** pinned `win-x64` clean install, archive
+retrieval, and forced Preview 4 upgrade are actionable with their required
+fixtures. The preview manifest now selects Preview 4, so manifest-selection
+testing is no longer blocked by stale selection. Other RID paths and npm remain
+**BLOCKED** pending their own receipts. Update replacement/E2E still requires
+its approved targets, manifests, metadata, and observation fixtures; HTTP
+availability does not establish qualification.
 
 Run actionable assigned rows after installation, feed configuration, and setup.
 Use the common evidence fields in [Result reporting](#result-reporting); Capture
@@ -461,10 +452,10 @@ platform/subcase.
 
 | ID | Area | Prerequisites | Steps | Expected result | Capture |
 | --- | --- | --- | --- | --- | --- |
-| P0-01 | Clean install | Empty test-owned install path; matching served-script hash and accessible Preview 4 public RID archive. Public archive access remains BLOCKED. | Install Preview 4 using the pinned clean-install instructions; directly verify the binary, then wrapper and metadata. | CLI reports `5.0.0-preview.4`; correct RID, wrapper/marker, and successful permission modes; no false success. | Installer/archive hashes, native/wrapper paths, metadata bytes/modes. |
-| P0-02 | Preview 3 upgrade | Approved Preview 3 install and recorded baseline state; accessible pinned Preview 4 public archive (currently BLOCKED). | Upgrade that installation to pinned Preview 4 with force; compare native/wrapper versions and workload inventory. | Preview 4 replaces Preview 3; wrapper/marker match the released contract; unrelated workload state is preserved. | Before/after files, versions, metadata, modes, inventory. |
-| P0-03 | Unix wrapper modes | Disposable Bash and PowerShell-on-Unix installs; their Preview 4 public archive paths must be ready. | Run all five Appendix C cases, including forced replacement under `umask 077`, missing wrapper, and prior `0700` mode. | Wrapper is `0755`, resolves the adjacent executable, and forwards arguments correctly. | Effective umask, wrapper/native/parent modes, native versus wrapper output. |
-| P0-04 | v4/v5 coexistence | Working v4 command resolution recorded before install; the Preview 4 public archive path must be ready. | Install v5, refresh PATH/session, inspect all resolution candidates, and run both versions. | Expected v4 remains `func`; receipted v5 is `func5`; no displaced default or stale wrapper. | Both binary identities, command paths, persisted versus inherited PATH. |
+| P0-01 | Clean install | Empty test-owned install path; matching served-script hash and accessible Preview 4 public RID archive. `win-x64` access is verified; other RIDs remain BLOCKED pending their checks. | Install Preview 4 using the pinned clean-install instructions; directly verify the binary, then wrapper and metadata. | CLI reports `5.0.0-preview.4`; correct RID, wrapper/marker, and successful permission modes; no false success. | Installer/archive hashes, native/wrapper paths, metadata bytes/modes. |
+| P0-02 | Preview 3 upgrade | Approved Preview 3 install and recorded baseline state; pinned Preview 4 public archive (`win-x64` available; other RIDs require checks). | Upgrade that installation to pinned Preview 4 with force; compare native/wrapper versions and workload inventory. | Preview 4 replaces Preview 3; wrapper/marker match the released contract; unrelated workload state is preserved. | Before/after files, versions, metadata, modes, inventory. |
+| P0-03 | Unix wrapper modes | Disposable Bash and PowerShell-on-Unix installs. BLOCKED pending availability checks for the assigned Unix Preview 4 archive; `win-x64` evidence does not clear this gate. | Run all five Appendix C cases, including forced replacement under `umask 077`, missing wrapper, and prior `0700` mode. | Wrapper is `0755`, resolves the adjacent executable, and forwards arguments correctly. | Effective umask, wrapper/native/parent modes, native versus wrapper output. |
+| P0-04 | v4/v5 coexistence | Working v4 command resolution recorded before install; pinned Preview 4 public archive (`win-x64` available; other RIDs require checks). | Install v5, refresh PATH/session, inspect all resolution candidates, and run both versions. | Expected v4 remains `func`; receipted v5 is `func5`; no displaced default or stale wrapper. | Both binary identities, command paths, persisted versus inherited PATH. |
 | P0-05 | Host acquisition | Empty workload home; approved Host pointer/implementation and runnable fixture prerequisites. | Install the pinned Host; inspect JSON inventory; add approved stack/worker/bundle prerequisites without changing Host; run `func5 start "<PROJECT>" --output plain`. | Correct logical/physical RID/version/source and `tools/<rid>` layout; Host launches the fixture. | Package identities, payload layout, startup output. |
 | P0-06 | Setup automation | Explicit-feature, configured-runtime, empty-project, missing-dependency, and multi-profile fixtures. | Run setup noninteractively; separately exercise `--yes`, `--check --output json`, cancellation, and partial failure. | No picker/hang in automation; correct defaults; one physical line per NDJSON event; no check-mode completion marker, trailing advisories, or false completion. | JSON records, marker/config snapshots, optional skips, per-profile outcomes. |
 | P0-07 | Force-cleanup safety | Populated disposable projects with sentinels; approved template/catalog IDs. | Run `func5 init "<PROJECT>" --stack node --language JavaScript --force` and `func5 quickstart "<QUICKSTART_PROJECT>" --stack node --language JavaScript --template "<QUICKSTART_ID>" --force`; accept, decline, cancel, and separately remove stdin. | Available-input confirmation defaults No; decline/cancel preserves sentinels; explicit force authorizes cleanup when input is unavailable. | Sentinel/config snapshots and confirmation/cancellation evidence. |
@@ -496,14 +487,12 @@ as an unchanged baseline for another operation.
 
 ## Known issues / expected limitations
 
-- All six installer-selected Preview 4 archive URLs returned HTTP 404 in the
-  preserved receipt. Public script installation remains **BLOCKED** until its
-  required path is ready; other native product scenarios need the approved
-  bug-bash artifact, not every public path.
-- The preserved live CDN manifest selected `5.0.0-preview.3` for preview and had
-  no stable entry. This is a channel observation, not a Preview 4 identity;
-  manifest-selected Preview 4 installation remains **BLOCKED** until that
-  selection changes. Use the explicit version pin for pinned installer scenarios.
+- Only `win-x64` native archive availability was rechecked in this publication
+  follow-up. Other RIDs remain **BLOCKED** pending their own availability checks;
+  their earlier 404 observations are historical, not current availability claims.
+- The live preview manifest now selects `5.0.0-preview.4` and has no stable entry.
+  Keep the explicit version pin and directly verify the installed binary.
+  Manifest selection is not an executed installation result.
 - Metadata-gated update is released. Published-artifact update E2E is not
   independently established; an already-current no-op does not qualify replacement.
 - npm pack tasks are disabled in the tagged source; neither npm publication nor
@@ -567,11 +556,12 @@ is not automatically a Preview 4 regression.
 
 ## Release receipt
 
-This preserved receipt was reconciled against the published tag/release, source receipt,
-served installer bytes, live CDN endpoints/manifest, and the required workload
-feed on **October 21, 2026 UTC**. No artifact probes were repeated for this
-documentation publication. A source-declared version, registration entry, archive
-name, or HTTP header is not cryptographic final-artifact provenance.
+The completed release/source/workload receipt below is preserved. A bounded
+publication recheck on **October 21, 2026, 04:34-04:36 UTC** covered only the live
+preview manifest, the `win-x64` native archive, and both served installer scripts.
+No other RID, workload, npm, or release inspection was repeated. A source-declared
+version, archive name, or HTTP header is not cryptographic source-to-byte
+provenance or executed-installation evidence.
 
 | Field | Verified value or explicit gap |
 | --- | --- |
@@ -585,34 +575,31 @@ name, or HTTP header is not cryptographic final-artifact provenance.
 | Release-preparation validation | #5739 reports Windows restore/clean/Release CI build with 0 warnings/errors and 2,668 CLI tests passed, 0 failed/skipped; PublicRelease version evaluates to `5.0.0-preview.4`. PR check `coretools.public` build `310928` succeeded; this is not a final release artifact receipt. See Appendix B. |
 | Installer source identity | Final-source [PowerShell][powershell-source] Git blob `a7fbeba6f0f336fb678d427314622287aceb3a14`; [Bash][bash-source] Git blob `818d71fa3d536a30968b3731d8d37fcd615567ba`. Downloaded served scripts matched these blob identities; their separate SHA-256 hashes are below. |
 | Published installer entry points | Both release-advertised aliases returned HTTP 200 and resolved to the mutable `vnext` URLs below. The received scripts were hashed, not executed. Testers must verify their saved script against the receipt before running it. |
-| Bug-bash CLI artifact | **TODO before bug bash: add approved Preview 4 artifact/build location** |
-| CLI archive hashes / signing / build association | **MISSING ARTIFACT EVIDENCE; non-blocking once the approved artifact is identified and runtime-verified.** No downloaded Preview 4 archive hash, signing/notarization result, or final build association was established. An empty GitHub release asset list does not prove CDN absence. |
-| Live channel manifest | [CDN version manifest][cdn-version] returned HTTP 200 with `{"stable":null,"preview":"5.0.0-preview.3"}`. Unpinned prerelease installation is not a Preview 4 path at this observation. |
+| Bug-bash CLI artifact | **AVAILABLE: `5.0.0-preview.4`, `win-x64`.** Use the [PowerShell installer](https://aka.ms/func-cli/install.ps1) with `-Version 5.0.0-preview.4`; it resolves to the [version-pinned native ZIP][archive-win-x64]. See [Installation](#installation) for the exact commands. Tester must verify directly addressed `func --version` = `5.0.0-preview.4`. |
+| CLI archive hashes / signing / build association | **MISSING FULL-ARTIFACT EVIDENCE; non-blocking after native version verification.** Server-supplied `win-x64` Content-MD5 is recorded below, not independently verified. No complete-archive SHA-256, signing/notarization result, or final build association was established. |
+| Live channel manifest | Rechecked at `2026-10-21T04:34:46Z`: [CDN version manifest][cdn-version] returned HTTP 200 with `{"stable":null,"preview":"5.0.0-preview.4"}`. Preview selection now matches the intended version; keep the explicit pin because the manifest is mutable. |
 | Required installation source for workloads | https://pkgs.dev.azure.com/azfunc/public/_packaging/pre-release/nuget/v3/index.json |
 | Published stack versions | The feed lists `Azure.Functions.Cli.Workloads.DotNet`, `.Node`, `.Python`, `.Go`, `.Java`, and `.PowerShell`, each at `1.0.0-preview.2`, agreeing with all six source versions. Exact .NET registration is listed and published `2026-10-20T21:48:46Z`. Their tagged source requires CLI `5.0.0-preview.4` or later for `IProjectStack`; metadata alone does not qualify published-binary compatibility or complete Java/PowerShell flows. |
 | Published Host identity | Logical `Azure.Functions.Cli.Workloads.Host` and each `.win-x64`, `.win-arm64`, `.linux-x64`, `.linux-arm64`, `.osx-x64`, `.osx-arm64` implementation list `4.1048.200-preview.3`. The logical registration is listed and published `2026-09-29T22:12:02Z`; Host is versioned independently of the CLI. |
 | Workload/package byte receipt | IDs/versions and publication metadata are verified below; package bytes/hashes, source-to-package linkage, and complete stack/Host/worker/bundle/template pairings remain **MISSING ARTIFACT EVIDENCE**. Registration metadata does not prove downloadable payload identity or compatibility. |
 | Profiles / templates / catalogs / fixtures | Exact assigned runtime/profile/catalog and update target/manifest/no-feed observation fixtures remain scenario-specific prerequisites. A missing input makes only its dependent subcase **BLOCKED**, not the whole guide. |
-| Platform/RID/channel data | Installer source selects the six RIDs below; all six Preview 4 CLI endpoints were unavailable. Host metadata lists all six; Python worker metadata lists five, excluding Windows arm64. The required feed is the pre-release feed, not a guarantee of every component's preview selection or a qualified platform/stack pairing. |
+| Platform/RID/channel data | Installer source selects the six RIDs below; `win-x64` archive availability and Preview 4 manifest selection are now verified. The other five native paths were not rechecked. Host metadata lists all six; Python worker metadata lists five, excluding Windows arm64. The required feed does not guarantee every component's preview selection or a qualified platform/stack pairing. |
 | Known issues accepted for release | No release-owner acceptance receipt was established; this is a recommended-evidence gap, not a reason to prevent all testing. The limitations above remain guidance boundaries, not an acceptance list. |
 | Qualification status | **PUBLISHED-ARTIFACT QUALIFICATION NOT ESTABLISHED.** Final-artifact install/update/local-lifecycle and cross-platform results were not supplied by the inspected evidence. The bug bash is intended to collect results, not inherit a fabricated qualification claim. |
 
-### Tomorrow-morning release check
+### Tester preflight
 
-Before starting native CLI scenarios:
-
-1. Obtain the approved Preview 4 CLI artifact/build location from the release owner.
-2. Record its build/run/artifact identity.
-3. Confirm that the artifact is intended for Preview 4.
-4. Verify the directly addressed native binary reports exactly `5.0.0-preview.4`.
-5. Replace the **Bug-bash CLI artifact** receipt field with the approved location
-   and identity.
-6. Proceed with native CLI scenarios only after these checks pass; public
-   distribution subcases retain their own readiness gates.
+1. Use the receipted installer hash, explicit version pin, verified RID archive,
+   and new test-owned installation/state paths.
+2. Verify the directly addressed native binary reports exactly `5.0.0-preview.4`.
+   Stop on a mismatch and record dependent scenarios **BLOCKED**.
+3. Run assigned scenarios only with their required fixtures and record actual
+   **PASS / FAIL / BLOCKED** results; HTTP availability is not a prior PASS.
 
 ### Observed served-script identities
 
-These are received-file hashes, not claims that the scripts or CLI were executed.
+Both aliases were rechecked at 04:34 UTC; their received-file hashes are unchanged.
+These hashes are not claims that the scripts or CLI were executed.
 The clean-install examples verify these exact bytes; a later alias change requires
 reconciliation rather than silently accepting another script.
 
@@ -623,17 +610,24 @@ reconciliation rather than silently accepting another script.
 
 ### Installer-selected Preview 4 archive access
 
-These are the exact version-pinned destinations selected by the observed scripts.
-An unavailable URL is not a hash/signing receipt or proof of global nonpublication.
+These are the exact version-pinned destinations selected by the current scripts.
+Only `win-x64` was rechecked at 04:34-04:36 UTC. Earlier 404 observations for the
+other RIDs are historical; those cases remain **BLOCKED** pending RID-specific
+availability and installed-version checks, not a claim of current nonpublication.
 
 | Developer platform | RID | Exact archive URL | Observed access |
 | --- | --- | --- | --- |
-| Windows x64 | `win-x64` | [func-win-x64.zip][archive-win-x64] | HEAD 404; ranged GET 404 |
-| Windows arm64 | `win-arm64` | [func-win-arm64.zip][archive-win-arm64] | HEAD 404; ranged GET 404 |
-| Linux glibc x64 | `linux-x64` | [func-linux-x64.tar.gz][archive-linux-x64] | HEAD 404; ranged GET 404 |
-| Linux glibc arm64 | `linux-arm64` | [func-linux-arm64.tar.gz][archive-linux-arm64] | HEAD 404; ranged GET 404 |
-| macOS x64 | `osx-x64` | [func-osx-x64.tar.gz][archive-osx-x64] | HEAD 404; ranged GET 404 |
-| macOS arm64 | `osx-arm64` | [func-osx-arm64.tar.gz][archive-osx-arm64] | HEAD 404; ranged GET 404 |
+| Windows x64 | `win-x64` | [func-win-x64.zip][archive-win-x64] | **AVAILABLE**; HEAD 200; GET 206, `bytes 0-3/37528124`; ZIP, 37,528,124 bytes. |
+| Windows arm64 | `win-arm64` | [func-win-arm64.zip][archive-win-arm64] | **NOT RECHECKED / BLOCKED**; historical HEAD/ranged GET 404. |
+| Linux glibc x64 | `linux-x64` | [func-linux-x64.tar.gz][archive-linux-x64] | **NOT RECHECKED / BLOCKED**; historical HEAD/ranged GET 404. |
+| Linux glibc arm64 | `linux-arm64` | [func-linux-arm64.tar.gz][archive-linux-arm64] | **NOT RECHECKED / BLOCKED**; historical HEAD/ranged GET 404. |
+| macOS x64 | `osx-x64` | [func-osx-x64.tar.gz][archive-osx-x64] | **NOT RECHECKED / BLOCKED**; historical HEAD/ranged GET 404. |
+| macOS arm64 | `osx-arm64` | [func-osx-arm64.tar.gz][archive-osx-arm64] | **NOT RECHECKED / BLOCKED**; historical HEAD/ranged GET 404. |
+
+The `win-x64` response starts with ZIP signature `504B0304`. Its server-supplied
+`Content-MD5` is `Y1HsN5aUaTjUOZ9r6SKHyQ==` (base64; not independently verified),
+and Last-Modified is `2026-10-21T04:27:27Z`. Only headers and four archive bytes
+were read; no complete archive was downloaded, extracted, installed, or executed.
 
 ### Published workload/package metadata
 
@@ -663,8 +657,8 @@ publication of otherwise usable instructions.
 | --- | --- | --- |
 | Release version, tag/source, and native `--version` check | **BUG-BASH REQUIRED** | The tester must identify `5.0.0-preview.4` by its directly addressed executable rather than infer it from a tag or command exit. |
 | Resolved installer URL and served/executed-script identity | **BUG-BASH REQUIRED for public script scenarios** | The receipt supplies observed URLs/hashes and the tester must verify the saved script before executing it. |
-| Approved Preview 4 CLI artifact location and identity | **BUG-BASH REQUIRED for native CLI execution** | The release owner must supply the approved artifact and the tester must verify its native version; the missing location does not block documentation publication or review. |
-| Public installation path / manifest readiness | **BUG-BASH REQUIRED for dependent distribution scenarios** | An approved bug-bash artifact does not establish that the public archive, manifest selection, forced upgrade, or npm path is ready. |
+| Approved Preview 4 CLI artifact location and identity | **BUG-BASH REQUIRED for native CLI execution** | The official `win-x64` path is established above; the tester must verify its native version. Other RIDs require their own availability checks. |
+| Public installation path / manifest readiness | **BUG-BASH REQUIRED for dependent distribution scenarios** | The `win-x64` archive and preview selection are established above; other RID/npm paths require their own receipts. Availability is not E2E qualification. |
 | Artifact-producing build/run and source association | **NON-BLOCKING ENGINEERING EVIDENCE** | This strengthens provenance but is not necessary to exercise an accessible, explicitly pinned and runtime-verified preview. |
 | CLI archive hashes and signing/notarization results | **RECOMMENDED EVIDENCE** | These strengthen byte/platform assurance but their absence alone does not block this isolated preview bug bash or establish a signing PASS. |
 | Workload source and selected logical/physical package IDs/versions | **BUG-BASH REQUIRED** | Reproducible workload testing requires the exact feed and available package versions rather than CLI-version inference. |
@@ -678,10 +672,9 @@ publication of otherwise usable instructions.
 ### Minimum safe tester receipt
 
 1. **Release:** `5.0.0-preview.4`, associated with the final source/tag above.
-2. **Artifact:** the approved location and build/artifact identity in the
-   **Bug-bash CLI artifact** field. Public script scenarios additionally require
-   a hash-verified release-advertised script, explicit version pin, and an
-   accessible public archive for the assigned RID.
+2. **Artifact:** the version-pinned installer/native archive identity in the
+   **Bug-bash CLI artifact** field. Verify the assigned RID's availability and use
+   the hash-verified release-advertised script and explicit version pin.
 3. **Runtime identity:** directly addressed native `func --version` must report
    exactly `5.0.0-preview.4` before wrapper/workload scenarios; this is tester
    verification, not cryptographic provenance or an already-observed result.
@@ -690,22 +683,20 @@ publication of otherwise usable instructions.
 5. **Isolation and scope:** record OS/architecture/shell, use new test-owned
    state, and mark every unavailable scenario prerequisite BLOCKED.
 
-The documentation is ready for review: version, installer instructions/identity,
-required feed, package publication metadata, RID scope, and the blocked-result
-model are established. The single approved-artifact receipt field remains an
-execution prerequisite, not a guide-publication blocker. Native CLI scenarios
-stay **BLOCKED** until that field is completed and the version check passes;
-public distribution subcases also need their own paths ready. No installer, CLI,
-package payload, or product scenario was executed here.
+The documentation is ready for review, including the official `win-x64`
+installation path. Native product scenarios on that RID can run after tester
+installation/version verification and their assigned fixture checks. Other RID
+and npm cases retain their own receipt gates. No installer, CLI, workload package
+payload, or product scenario was executed here.
 
 ## Remaining release-receipt gaps
 
-- **NATIVE CLI EXECUTION ONLY:** complete the approved artifact field in
-  [Release receipt](#release-receipt) and verify `5.0.0-preview.4` before dependent
-  scenarios run. This does not block documentation publication or review.
-- **PUBLIC DISTRIBUTION:** the six observed installer-selected URLs returned
-  404 and the observed preview manifest selected Preview 3. Dependent public
-  install/upgrade/channel subcases remain **BLOCKED** until their paths are ready.
+- **TESTER EXECUTION GATE:** install the receipted artifact in test-owned state
+  and verify the directly addressed binary reports `5.0.0-preview.4` before
+  native CLI scenarios; this check was not executed for the documentation.
+- **OTHER RIDS:** the five native archive paths not rechecked here remain
+  **BLOCKED** pending their own availability and installed-version checks.
+  The `win-x64` path and Preview 4 manifest selection are established.
 - **NON-BLOCKING:** the final artifact-producing build/run and exact
   source-to-artifact association remain missing engineering evidence.
 - **NON-BLOCKING:** CLI archive SHA-256 and signing/notarization receipts remain
@@ -720,11 +711,11 @@ package payload, or product scenario was executed here.
   and cross-platform local lifecycle results, remains unestablished.
 - **NON-BLOCKING:** the exact npm receipt remains missing; P2-01 stays BLOCKED.
 
-Publish and review #5737 with the artifact prerequisite explicit. Do not present
-publication as permission to run blocked native CLI or public distribution
-scenarios, or as final-artifact qualification. Missing optional engineering
-evidence alone must not hold the guide. Do not trigger a build/release, publish
-packages, alter artifacts, or change authentication to fill any gap.
+The artifact-location prerequisite is resolved for `win-x64`; #5737 is ready for
+human review. Availability is not final-artifact qualification or permission to
+run cases with missing inputs. Missing optional engineering evidence alone must
+not hold the guide. Do not trigger a build/release, publish packages, alter
+artifacts, or change authentication to fill any gap.
 
 ## Appendix A - Changes since Preview 3
 
@@ -806,9 +797,9 @@ build/test run affected release notes only.
 The release PR explicitly says published-artifact E2E, actual update
 downloads/installation, and cross-platform execution were not performed in that
 preparation transaction. The later tagged #5740 packaging change is not covered
-by that claim. The inspected tag has no returned GitHub check runs, statuses, or
-Actions runs, and the release has no GitHub assets; none of those observations
-proves that an external release pipeline or CDN artifact does not exist.
+by that claim. The earlier receipt found no check runs, statuses, or Actions runs
+for the inspected tag, and no uploaded GitHub release assets. Those historical
+observations do not prove that an external release pipeline or CDN artifact does not exist.
 
 [Update command tests][update-tests] cover metadata authorization, external and
 invalid states, flags, confirmation/unavailable input, no-op/downgrade behavior,
