@@ -3,6 +3,9 @@
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
+/// <summary>
+/// Binds an eligible selected template to invocation within its owning templater's live session.
+/// </summary>
 internal sealed class ResolvedTemplate
 {
     private readonly Func<TemplateInvocationRequest, CancellationToken, Task<TemplateInvocationResult>> _invoke;

@@ -8,6 +8,9 @@ using Microsoft.TemplateEngine.Abstractions.Constraints;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
+/// <summary>
+/// Creates host constraints bound to one command's captured workload and bundle context.
+/// </summary>
 internal sealed class FuncTemplateConstraintFactory(string type, FuncTemplateConstraintEvaluator evaluator, TemplateConstraintEvaluationSnapshot snapshot, TemplateEngineBundleContext? bundle = null) : ITemplateConstraintFactory
 {
     private readonly FuncTemplateConstraintEvaluator _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
@@ -15,6 +18,9 @@ internal sealed class FuncTemplateConstraintFactory(string type, FuncTemplateCon
 
     public string Type { get; } = type is "func-workload" or "func-bundle" ? type : throw new ArgumentException("Unsupported func constraint type.", nameof(type));
 
+    /// <summary>
+    /// Provides a stable func-owned registration identity so the engine can resolve each constraint component.
+    /// </summary>
     public Guid Id => Type == "func-workload"
         ? new("d10ef758-4363-4359-a749-2a241ff892fd")
         : new("1349d42c-b8b8-4611-ac8a-1426cc0bc169");

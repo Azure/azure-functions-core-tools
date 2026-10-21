@@ -237,6 +237,24 @@ public sealed class TemplaterTests : IDisposable
         File.ReadAllText(target).Should().Be("Conflict content");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task InvokeAsync_UnknownNativeChangeKind_FailsLoudlyAtTheNativeBoundary(bool preview)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        var session = new UnknownChangeKindSession(new(WorkingDirectory.FromExplicit(_root)), _hive, preview);
+        using Templater templater = new(session);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "unknown-kind-output"));
+
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Unknown"), CancellationToken.None);
+
+        await action.Should().ThrowAsync<ArgumentOutOfRangeException>().WithParameterName("kind");
+        session.LiveCreationCalls.Should().Be(preview ? 0 : 1);
+        File.Exists(Path.Combine(output.Info.FullName, "Unknown.txt")).Should().Be(!preview);
+    }
+
     [Fact]
     public async Task InvokeAsync_UnsupportedPostAction_FailsWithoutWrites()
     {
@@ -716,7 +734,7 @@ public sealed class TemplaterTests : IDisposable
         else
         {
             var change = result.Changes.Should().ContainSingle().Subject;
-            change.Kind.Should().Be("Create");
+            change.Kind.Should().Be(TemplateFileChangeKind.Create);
             Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path)).Should().Be(Path.Combine(output.Info.FullName, "Created.txt"));
         }
     }
@@ -1035,6 +1053,35 @@ public sealed class TemplaterTests : IDisposable
 
     private Templater CreateTemplater(TemplateConstraintEvaluationSnapshot? snapshot = null)
         => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
+
+    private sealed class UnknownChangeKindSession(TemplateEngineContext context, string hive, bool failPreview) : TemplateEngineSession(context, hive)
+    {
+        public int LiveCreationCalls { get; private set; }
+
+        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
+        {
+            if (!dryRun)
+            {
+                LiveCreationCalls++;
+            }
+
+            var result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+            if (dryRun != failPreview)
+            {
+                return result;
+            }
+
+            var change = Substitute.For<IFileChange>();
+            change.TargetRelativePath.Returns(result.CreationEffects!.FileChanges.Single().TargetRelativePath);
+            change.ChangeKind.Returns((ChangeKind)999);
+            var effects = Substitute.For<ICreationEffects>();
+            effects.FileChanges.Returns([change]);
+            var unknown = Substitute.For<ITemplateCreationResult>();
+            unknown.Status.Returns(result.Status);
+            unknown.CreationEffects.Returns(effects);
+            return unknown;
+        }
+    }
 
     private sealed class FailingEngineSession(TemplateEngineContext context, string hive, CreationResultStatus nativeStatus, bool failCreation = false) : TemplateEngineSession(context, hive)
     {
