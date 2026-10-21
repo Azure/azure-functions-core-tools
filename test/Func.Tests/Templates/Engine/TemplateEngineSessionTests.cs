@@ -6,7 +6,9 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using NuGet.Versioning;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -54,6 +56,55 @@ public sealed class TemplateEngineSessionTests : IDisposable
 
             resolved.Should().BeTrue($"{Instance.GetType().Name} should be resolvable as {Type.Name}");
         }
+    }
+
+    [Theory]
+    [InlineData("func-workload", "d10ef758-4363-4359-a749-2a241ff892fd")]
+    [InlineData("func-bundle", "1349d42c-b8b8-4611-ac8a-1426cc0bc169")]
+    public void Constructor_ConstraintComponentIds_AreStableDistinctAndTypeSpecific(string type, string expected)
+    {
+        var first = FuncTemplateComponents.Create(new([])).Select(component => component.Instance).OfType<ITemplateConstraintFactory>().ToArray();
+        var second = FuncTemplateComponents.Create(new([])).Select(component => component.Instance).OfType<ITemplateConstraintFactory>().ToArray();
+
+        first.Select(factory => factory.Id).Should().OnlyHaveUniqueItems();
+        first.Single(factory => factory.Type == type).Id.Should().Be(Guid.Parse(expected));
+        second.Single(factory => factory.Type == type).Id.Should().Be(Guid.Parse(expected));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadPackageTypesAsync_MissingOrInvalidArchive_PreservesMetadataFailureAndCause(bool invalid)
+    {
+        using TemplateEngineSession session = new(CommandContext("metadata"), Hive);
+        string archive = Path.Combine(_root, "invalid.nupkg");
+        if (invalid)
+        {
+            Directory.CreateDirectory(_root);
+            File.WriteAllText(archive, "not a zip archive");
+        }
+        IManagedTemplatePackage package = Substitute.For<IManagedTemplatePackage>();
+        package.MountPointUri.Returns(archive);
+
+        Func<Task> action = () => session.ReadPackageTypesAsync(package, CancellationToken.None);
+
+        var failure = await action.Should().ThrowAsync<InvalidTemplateMetadataException>();
+        failure.Which.Message.Should().Be(invalid
+            ? "Installed package host metadata is invalid."
+            : "Installed package host metadata could not be read.");
+        failure.Which.InnerException.Should().BeOfType(invalid ? typeof(InvalidDataException) : typeof(FileNotFoundException));
+    }
+
+    [Fact]
+    public async Task ReadPackageTypesAsync_PreCanceledToken_PropagatesCancellation()
+    {
+        using TemplateEngineSession session = new(CommandContext("canceled-metadata"), Hive);
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        Func<Task> action = () => session.ReadPackageTypesAsync(null, cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]

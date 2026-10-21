@@ -47,7 +47,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
         preview.Status.Should().Be(TemplateInvocationStatus.Success);
         created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
         created.Changes.Should().BeEquivalentTo(preview.Changes);
-        created.Changes.Should().Contain(change => change.Path == directory.TargetRelativePath && change.Kind == "Create");
+        created.Changes.Should().Contain(change => change.Path == directory.TargetRelativePath && change.Kind == TemplateFileChangeKind.Create);
         if (!useDefault)
         {
             File.ReadAllText(Path.Combine(output.Info.FullName, "_._")).Should().Be("ordinary file with an overridden default name");

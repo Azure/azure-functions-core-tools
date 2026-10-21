@@ -130,23 +130,11 @@ internal class TemplateEngineSession : IDisposable
             IEnumerable<NuGet.Packaging.Core.PackageType> types = await reader.GetPackageTypesAsync(cancellationToken);
             return Array.AsReadOnly<string>([.. types.Select(type => type.Name)]);
         }
-        catch (IOException exception)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             throw new InvalidTemplateMetadataException("Installed package host metadata could not be read.", exception);
         }
-        catch (UnauthorizedAccessException exception)
-        {
-            throw new InvalidTemplateMetadataException("Installed package host metadata could not be read.", exception);
-        }
-        catch (InvalidDataException exception)
-        {
-            throw new InvalidTemplateMetadataException("Installed package host metadata is invalid.", exception);
-        }
-        catch (PackagingException exception)
-        {
-            throw new InvalidTemplateMetadataException("Installed package host metadata is invalid.", exception);
-        }
-        catch (XmlException exception)
+        catch (Exception exception) when (exception is InvalidDataException or PackagingException or XmlException)
         {
             throw new InvalidTemplateMetadataException("Installed package host metadata is invalid.", exception);
         }
@@ -228,7 +216,7 @@ internal class TemplateEngineSession : IDisposable
         }
 
         IReadOnlyList<TemplateFileChange> changes = Array.AsReadOnly<TemplateFileChange>(
-            [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+            [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind))]);
         using var configurationStream = new MemoryStream(Encoding.UTF8.GetBytes(configuration.Content));
         string? placeholder = TemplateConfigModel.FromStream(configurationStream).PlaceholderFilename;
         IReadOnlyList<string> placeholderFilenames = string.IsNullOrWhiteSpace(placeholder) ? ["-.-", "_._"] : [placeholder];
@@ -236,7 +224,7 @@ internal class TemplateEngineSession : IDisposable
         HashSet<string> directoryOutputs = new((preview.CreationEffects?.FileChanges ?? []).OfType<IFileChange2>()
             .Where(change => placeholderFilenames.Contains(Path.GetFileName(change.SourceRelativePath), StringComparer.Ordinal))
             .Select(change => change.TargetRelativePath), StringComparer.Ordinal);
-        bool requiresForce = !request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal));
+        bool requiresForce = !request.Force && changes.Any(change => change.Kind != TemplateFileChangeKind.Create);
         if (!request.DryRun && requiresForce)
         {
             return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.");
@@ -280,7 +268,7 @@ internal class TemplateEngineSession : IDisposable
         }
 
         IReadOnlyList<TemplateFileChange> written = Array.AsReadOnly<TemplateFileChange>(
-            [.. created.CreationEffects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
+            [.. created.CreationEffects.FileChanges.Select(change => TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind))]);
         if (!written.Select(change => change.Path).Order(StringComparer.Ordinal).SequenceEqual(changes.Select(change => change.Path).Order(StringComparer.Ordinal), StringComparer.Ordinal)
             || ValidateOutputPaths(output, changes) is not null
             || written.Any(change => !HasExpectedOutputKind(output, change, directoryOutputs)))
@@ -410,7 +398,7 @@ internal class TemplateEngineSession : IDisposable
         string path = Path.Combine(output, change.Path);
         bool file = _settings.Host.FileSystem.FileExists(path);
         bool directory = _settings.Host.FileSystem.DirectoryExists(path);
-        if (string.Equals(change.Kind, "Delete", StringComparison.Ordinal))
+        if (change.Kind == TemplateFileChangeKind.Delete)
         {
             return !file && !directory;
         }
