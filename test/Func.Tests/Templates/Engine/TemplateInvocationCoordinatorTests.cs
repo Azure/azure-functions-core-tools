@@ -14,13 +14,14 @@ public sealed class TemplateInvocationCoordinatorTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task InvokeAsync_ValidSource_PreservesPhaseOrderAndDryRunBoundary(bool dryRun)
+    public async Task InvokeAsync_ValidSource_CapturesOnceBeforeRealWriteAdmission(bool dryRun)
     {
         var engine = Substitute.For<ITemplateInvocationEngine>();
         var template = Substitute.For<ITemplateInfo>();
         TemplateConfigurationSnapshot snapshot = new(
             """{"identity":"test","name":"test","shortName":"test","tags":{"type":"item"}}""", "fingerprint", TemplateType.Item, []);
         var request = new TemplateInvocationRequest(WorkingDirectory.FromExplicit(Path.GetTempPath()), new Dictionary<string, string?>(), DryRun: dryRun);
+        engine.FileSystem.DirectoryExists(Path.GetFullPath(Path.Combine(request.OutputDirectory.Info.FullName, "."))).Returns(true);
         List<string> phases = [];
         engine.When(value => value.ThrowIfDisposed()).Do(_ => phases.Add("alive"));
         engine.ReadConfigurationAsync(template, Arg.Any<CancellationToken>()).Returns(_ =>
@@ -28,31 +29,28 @@ public sealed class TemplateInvocationCoordinatorTests
             phases.Add("read");
             return snapshot;
         });
-        engine.GetPopulatedParameters(template, snapshot, request).Returns(_ =>
-        {
-            phases.Add("parameters");
-            return new Dictionary<string, object>();
-        });
         var effects = Substitute.For<ICreationEffects>();
         effects.FileChanges.Returns([]);
         var native = Substitute.For<ITemplateCreationResult>();
         native.Status.Returns(CreationResultStatus.Success);
         native.CreationEffects.Returns(effects);
-        engine.InstantiateAsync(template, request, Arg.Any<InputDataSet>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(call =>
+        var creation = Substitute.For<ICreationResult>();
+        creation.PostActions.Returns([]);
+        native.CreationResult.Returns(creation);
+        engine.RenderImageAsync(template, request, Arg.Any<InputDataSet>(), Arg.Any<TemplateOutputImage>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
-            phases.Add(call.ArgAt<bool>(3) ? "preview" : "create");
+            phases.Add("render");
             return native;
         });
-        var coordinator = new TemplateInvocationCoordinator(engine);
+        var coordinator = new TemplateInvocationCoordinator(engine, new PhysicalFileSystem());
         using CancellationTokenSource cancellation = new();
 
         var result = await coordinator.InvokeAsync(template, snapshot, request, cancellation.Token);
 
         result.Status.Should().Be(TemplateInvocationStatus.Success);
-        phases.Should().Equal(dryRun ? ["alive", "read", "parameters", "preview"] : ["alive", "read", "parameters", "preview", "read", "create"]);
-        await engine.Received(dryRun ? 1 : 2).ReadConfigurationAsync(template, cancellation.Token);
-        await engine.Received(1).InstantiateAsync(template, request, Arg.Any<InputDataSet>(), true, cancellation.Token);
-        await engine.Received(dryRun ? 0 : 1).InstantiateAsync(template, request, Arg.Any<InputDataSet>(), false, cancellation.Token);
+        phases.Should().Equal(dryRun ? ["alive", "read", "render", "read"] : ["alive", "read", "render", "read", "read"]);
+        await engine.Received(dryRun ? 2 : 3).ReadConfigurationAsync(template, cancellation.Token);
+        await engine.Received(1).RenderImageAsync(template, request, Arg.Any<InputDataSet>(), Arg.Any<TemplateOutputImage>(), cancellation.Token);
     }
 
     [Fact]
@@ -62,14 +60,13 @@ public sealed class TemplateInvocationCoordinatorTests
         var template = Substitute.For<ITemplateInfo>();
         TemplateConfigurationSnapshot selected = new("{}", "selected", TemplateType.Item, []);
         engine.ReadConfigurationAsync(template, Arg.Any<CancellationToken>()).Returns(new TemplateConfigurationSnapshot("{}", "changed", TemplateType.Item, []));
-        var coordinator = new TemplateInvocationCoordinator(engine);
+        var coordinator = new TemplateInvocationCoordinator(engine, new PhysicalFileSystem());
         var request = new TemplateInvocationRequest(WorkingDirectory.FromExplicit(Path.GetTempPath()), new Dictionary<string, string?>());
 
         var result = await coordinator.InvokeAsync(template, selected, request, CancellationToken.None);
 
         result.Status.Should().Be(TemplateInvocationStatus.TemplateChanged);
-        engine.DidNotReceiveWithAnyArgs().GetPopulatedParameters(default!, default!, default!);
-        await engine.DidNotReceiveWithAnyArgs().InstantiateAsync(default!, default!, default!, default, default);
+        await engine.DidNotReceiveWithAnyArgs().RenderImageAsync(default!, default!, default!, default!, default);
     }
 
     [Fact]
@@ -77,7 +74,7 @@ public sealed class TemplateInvocationCoordinatorTests
     {
         var engine = Substitute.For<ITemplateInvocationEngine>();
         engine.When(value => value.ThrowIfDisposed()).Do(_ => throw new ObjectDisposedException("session"));
-        var coordinator = new TemplateInvocationCoordinator(engine);
+        var coordinator = new TemplateInvocationCoordinator(engine, new PhysicalFileSystem());
         var request = new TemplateInvocationRequest(WorkingDirectory.FromExplicit(Path.GetTempPath()), new Dictionary<string, string?>());
 
         Func<Task> invoke = () => coordinator.InvokeAsync(Substitute.For<ITemplateInfo>(), new("{}", "hash", TemplateType.Item, []), request, CancellationToken.None);
@@ -89,9 +86,17 @@ public sealed class TemplateInvocationCoordinatorTests
     [Fact]
     public void Constructor_NullEngine_Throws()
     {
-        Action create = () => _ = new TemplateInvocationCoordinator(null!);
+        Action create = () => _ = new TemplateInvocationCoordinator(null!, new PhysicalFileSystem());
 
         create.Should().Throw<ArgumentNullException>().WithParameterName("engine");
+    }
+
+    [Fact]
+    public void Constructor_NullFileSystem_Throws()
+    {
+        Action create = () => _ = new TemplateInvocationCoordinator(Substitute.For<ITemplateInvocationEngine>(), null!);
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
     }
 
     [Theory]
@@ -103,7 +108,7 @@ public sealed class TemplateInvocationCoordinatorTests
     public async Task InvokeAsync_NullArgument_ThrowsBeforeEngineOperations(string parameterName)
     {
         var engine = Substitute.For<ITemplateInvocationEngine>();
-        var coordinator = new TemplateInvocationCoordinator(engine);
+        var coordinator = new TemplateInvocationCoordinator(engine, new PhysicalFileSystem());
         var template = Substitute.For<ITemplateInfo>();
         TemplateConfigurationSnapshot configuration = new("{}", "hash", TemplateType.Item, []);
         var request = new TemplateInvocationRequest(
@@ -124,7 +129,7 @@ public sealed class TemplateInvocationCoordinatorTests
     {
         var engine = Substitute.For<ITemplateInvocationEngine>();
         engine.When(value => value.ThrowIfDisposed()).Do(_ => throw new ObjectDisposedException("session"));
-        var invoker = new SelectedTemplateInvoker(Substitute.For<ITemplateInfo>(), new("{}", "hash", TemplateType.Item, []), new(engine));
+        var invoker = new SelectedTemplateInvoker(Substitute.For<ITemplateInfo>(), new("{}", "hash", TemplateType.Item, []), new(engine, new PhysicalFileSystem()));
         var request = new TemplateInvocationRequest(WorkingDirectory.FromExplicit(Path.GetTempPath()), new Dictionary<string, string?>());
 
         Func<Task> invoke = () => invoker.InvokeAsync(request, CancellationToken.None);
@@ -141,7 +146,7 @@ public sealed class TemplateInvocationCoordinatorTests
     {
         Action create = () => _ = new SelectedTemplateInvoker(missing == 0 ? null! : Substitute.For<ITemplateInfo>(),
             missing == 1 ? null! : new("{}", "hash", TemplateType.Item, []),
-            missing == 2 ? null! : new(Substitute.For<ITemplateInvocationEngine>()));
+            missing == 2 ? null! : new(Substitute.For<ITemplateInvocationEngine>(), new PhysicalFileSystem()));
 
         create.Should().Throw<ArgumentNullException>().WithParameterName(parameterName);
     }

@@ -73,7 +73,13 @@ internal sealed record TemplateFileChange(string Path, TemplateFileChangeKind Ki
 /// <summary>
 /// Reports an invocation outcome with its native changes and any user-facing diagnostic.
 /// </summary>
-internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status, IReadOnlyList<TemplateFileChange> Changes, string? Diagnostic = null);
+internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status, IReadOnlyList<TemplateFileChange> Changes, string? Diagnostic = null)
+{
+    /// <summary>
+    /// Distinguishes completed real output from a preview or a conflict plan without changing the serialized result.
+    /// </summary>
+    internal bool HasCommittedOutput { get; init; }
+}
 
 /// <summary>
 /// Captures mounted configuration and parameter definitions for selection and later source revalidation.

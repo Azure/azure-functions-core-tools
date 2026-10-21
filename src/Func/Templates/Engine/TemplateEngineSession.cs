@@ -28,6 +28,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
+    private readonly FuncTemplateEngineHost _host;
     private readonly TemplatePackageManager _packageManager;
     private readonly TemplateConstraintManager _constraintManager;
     private readonly TemplateCreator _creator;
@@ -39,7 +40,8 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
 
         Context = context;
-        _settings = new(new FuncTemplateEngineHost(context, snapshot), settingsLocation: settingsLocation);
+        _host = new(context, snapshot);
+        _settings = new(_host, settingsLocation: settingsLocation);
         _packageManager = new(_settings);
         _constraintManager = new(_settings);
         _creator = new(_settings);
@@ -185,66 +187,46 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
         return new(status, diagnostics.AsReadOnly());
     }
 
-    IReadOnlyDictionary<string, object> ITemplateInvocationEngine.GetPopulatedParameters(
-        ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request)
+    IPhysicalFileSystem ITemplateInvocationEngine.FileSystem
     {
-        if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
+        get
         {
-            throw new InvalidOperationException($"Selected template '{template.Identity}' has no registered generator.");
+            ThrowIfDisposed();
+            return _host.FileSystem;
         }
-
-        string? name = !string.IsNullOrEmpty(request.Name) ? request.Name
-            : template.PreferDefaultName || string.IsNullOrEmpty(request.OutputDirectory.Info.Name) ? template.DefaultName
-            : request.OutputDirectory.Info.Name;
-        Dictionary<string, object> values = new(StringComparer.Ordinal);
-        foreach (ITemplateParameter parameter in configuration.Parameters)
-        {
-            if (parameter.Precedence.PrecedenceDefinition is PrecedenceDefinition.Disabled or PrecedenceDefinition.ConditionalyDisabled)
-            {
-                continue;
-            }
-
-            string? value = null;
-            if (!parameter.IsName)
-            {
-                _settings.Host.TryGetHostParamDefault(parameter.Name, out value);
-                if (value is null && !parameter.Precedence.CanBeRequired)
-                {
-                    value = parameter.DefaultValue;
-                }
-            }
-
-            object? converted = parameter.IsName ? name : null;
-            if (request.Parameters.TryGetValue(parameter.Name, out string? supplied))
-            {
-                value = supplied ?? parameter.DefaultIfOptionWithoutValue;
-            }
-
-            if (value is not null)
-            {
-                converted = generator.ConvertParameterValueToType(_settings, parameter, value, out bool error);
-                if (error)
-                {
-                    continue;
-                }
-            }
-
-            if (converted is not null)
-            {
-                values[parameter.Name] = converted;
-            }
-        }
-
-        return values;
     }
-
-    IPhysicalFileSystem ITemplateInvocationEngine.FileSystem => Settings.Host.FileSystem;
 
     public void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
-    Task<ITemplateCreationResult> ITemplateInvocationEngine.InstantiateAsync(
-        ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
-        => InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+    async Task<ITemplateCreationResult> ITemplateInvocationEngine.RenderImageAsync(
+        ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, TemplateOutputImage image, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.OutputDirectory);
+        ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentNullException.ThrowIfNull(image);
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!image.IsBoundTo(_host.FileSystem, request.OutputDirectory.Info.FullName))
+        {
+            throw new ArgumentException("The output image must use this session's filesystem and requested output directory.", nameof(image));
+        }
+        _host.InvocationFileSystem.BeginCapture(image);
+        try
+        {
+            ITemplateCreationResult result = await InstantiateAsync(template, request, parameters, false, cancellationToken);
+            if (result.Status == CreationResultStatus.Success)
+            {
+                image.Seal();
+            }
+            return result;
+        }
+        finally
+        {
+            _host.InvocationFileSystem.EndCapture(image);
+        }
+    }
 
     protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         => _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName, parameters,
