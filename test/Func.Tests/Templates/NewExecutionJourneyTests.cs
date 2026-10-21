@@ -831,10 +831,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         await InstallAsync();
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
-        EnqueueStyledChoice(stderr);
-        stderr.Enqueue(ConsoleKey.X, 'x');
-        stderr.Enqueue(ConsoleKey.Enter);
-        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+        var harness = CreateHarness(LiteralChoiceInteraction(stdout, stderr));
         var before = Snapshot();
 
         int exit = await harness.InvokeAsync(["prompt", "--path", Target, "--dry-run"]);
@@ -842,6 +839,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         exit.Should().Be(0);
         stderr.Output.Should().Contain("Func.Consumer.[bad]").And.Contain("Func.Consumer.[red]styled[/]");
         harness.Result!.SelectedTemplate!.Identity.Should().Be("Func.Consumer.[red]styled[/]");
+        harness.Result.ArgumentResults.Single().ValuesByCanonicalName.Should().Contain("Value", "x");
         Snapshot().Should().BeEquivalentTo(before);
         Directory.Exists(Target).Should().BeFalse();
     }
@@ -856,28 +854,8 @@ public sealed class NewExecutionJourneyTests : IDisposable
         await InstallAsync();
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
-        EnqueueStyledChoice(stderr);
-        stderr.Enqueue(ConsoleKey.X, 'x');
-        stderr.Enqueue(ConsoleKey.Enter);
-        var spectre = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
-        var interaction = Substitute.For<IInteractionService>();
-        interaction.IsInteractive.Returns(true);
         List<string[]> offered = [];
-        interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                string[] choices = [.. call.ArgAt<IEnumerable<string>>(1).Order(StringComparer.Ordinal)];
-                if (styledFirst)
-                {
-                    Array.Reverse(choices);
-                }
-
-                offered.Add(choices);
-                return spectre.PromptForSelectionAsync(call.ArgAt<string>(0), choices, call.ArgAt<CancellationToken>(2));
-            });
-        interaction.PromptForInputAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(call => spectre.PromptForInputAsync(call.ArgAt<string>(0), call.ArgAt<string?>(1), call.ArgAt<CancellationToken>(2)));
-        var harness = CreateHarness(interaction);
+        var harness = CreateHarness(LiteralChoiceInteraction(stdout, stderr, styledFirst, offered));
         var before = Snapshot();
 
         int exit = await harness.InvokeAsync(["prompt", "--path", Target, "--dry-run"]);
@@ -887,6 +865,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         actualChoices.Should().Equal(styledFirst
             ? ["Func.Consumer.[[red]]styled[[/]]", "Func.Consumer.[[bad]]"]
             : ["Func.Consumer.[[bad]]", "Func.Consumer.[[red]]styled[[/]]"]);
+        stderr.Reads.Should().Be(styledFirst ? 3 : 4);
         stderr.Output.Should().Contain("Func.Consumer.[bad]").And.Contain("Func.Consumer.[red]styled[/]");
         harness.Result!.Kind.Should().Be("previewed");
         harness.Result.SelectedTemplate!.Identity.Should().Be("Func.Consumer.[red]styled[/]");
@@ -1251,15 +1230,48 @@ public sealed class NewExecutionJourneyTests : IDisposable
         return interaction;
     }
 
-    private static void EnqueueStyledChoice(BufferedConsole console)
+    private static IInteractionService LiteralChoiceInteraction(
+        BufferedConsole stdout, BufferedConsole stderr, bool? styledFirst = null, List<string[]>? offered = null)
     {
-        console.Enqueue(ConsoleKey.S, 's');
-        console.Enqueue(ConsoleKey.T, 't');
-        console.Enqueue(ConsoleKey.Y, 'y');
-        console.Enqueue(ConsoleKey.L, 'l');
-        console.Enqueue(ConsoleKey.E, 'e');
-        console.Enqueue(ConsoleKey.D, 'd');
-        console.Enqueue(ConsoleKey.Enter);
+        var spectre = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+        var interaction = Substitute.For<IInteractionService>();
+        interaction.IsInteractive.Returns(spectre.IsInteractive);
+        interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                string[] choices = [.. call.ArgAt<IEnumerable<string>>(1)];
+                if (styledFirst is not null)
+                {
+                    Array.Sort(choices, StringComparer.Ordinal);
+                    if (styledFirst.Value)
+                    {
+                        Array.Reverse(choices);
+                    }
+                }
+
+                offered?.Add(choices);
+                int index = Array.IndexOf(choices, "Func.Consumer.[[red]]styled[[/]]");
+                index.Should().BeGreaterThanOrEqualTo(0);
+                for (int i = 0; i < index; i++)
+                {
+                    stderr.Enqueue(ConsoleKey.DownArrow);
+                }
+
+                stderr.Enqueue(ConsoleKey.Enter);
+                return spectre.PromptForSelectionAsync(call.ArgAt<string>(0), choices, call.ArgAt<CancellationToken>(2));
+            });
+        interaction.PromptForInputAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                stderr.Enqueue(ConsoleKey.X, 'x');
+                stderr.Enqueue(ConsoleKey.Enter);
+                return spectre.PromptForInputAsync(call.ArgAt<string>(0), call.ArgAt<string?>(1), call.ArgAt<CancellationToken>(2));
+            });
+        interaction.When(service => service.WriteSectionHeader(Arg.Any<string>()))
+            .Do(call => spectre.WriteSectionHeader(call.Arg<string>()));
+        interaction.When(service => service.WriteLine(Arg.Any<Action<InlineLine>>()))
+            .Do(call => spectre.WriteLine(call.Arg<Action<InlineLine>>()));
+        return interaction;
     }
 
     private async Task InstallAsync()
