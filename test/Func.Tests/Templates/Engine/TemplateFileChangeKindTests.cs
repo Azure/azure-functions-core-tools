@@ -61,10 +61,12 @@ public sealed class TemplateFileChangeKindTests
         string json = JsonSerializer.Serialize(change);
         string camelCase = JsonSerializer.Serialize(change, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
         string result = JsonSerializer.Serialize(new TemplateInvocationResult(TemplateInvocationStatus.Success, [change]));
+        string committed = JsonSerializer.Serialize(new TemplateInvocationResult(TemplateInvocationStatus.Success, [change]) { HasCommittedOutput = true });
 
         json.Should().Be("{\"Path\":\"result.txt\",\"Kind\":\"" + kind + "\"}");
         camelCase.Should().Be("{\"path\":\"result.txt\",\"kind\":\"" + kind + "\"}");
         result.Should().Be("{\"Status\":0,\"Changes\":[{\"Path\":\"result.txt\",\"Kind\":\"" + kind + "\"}],\"Diagnostic\":null}");
+        committed.Should().Be(result);
         change.ToString().Should().Be("TemplateFileChange { Path = result.txt, Kind = " + kind + " }");
     }
 

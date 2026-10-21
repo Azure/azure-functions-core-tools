@@ -243,16 +243,16 @@ public sealed class TemplaterTests : IDisposable
     public async Task InvokeAsync_UnknownNativeChangeKind_FailsLoudlyAtTheNativeBoundary(bool preview)
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
-        var session = new UnknownChangeKindSession(new(WorkingDirectory.FromExplicit(_root)), _hive, preview);
+        var session = new UnknownChangeKindSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
         using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "unknown-kind-output"));
 
-        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Unknown"), CancellationToken.None);
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Unknown", DryRun: preview), CancellationToken.None);
 
         await action.Should().ThrowAsync<ArgumentOutOfRangeException>().WithParameterName("kind");
-        session.LiveCreationCalls.Should().Be(preview ? 0 : 1);
-        File.Exists(Path.Combine(output.Info.FullName, "Unknown.txt")).Should().Be(!preview);
+        session.NativeRenderCalls.Should().Be(1, "both preview and apply capture a private native render");
+        File.Exists(Path.Combine(output.Info.FullName, "Unknown.txt")).Should().BeFalse();
     }
 
     [Fact]
@@ -716,7 +716,7 @@ public sealed class TemplaterTests : IDisposable
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
         using CancellationTokenSource cancellation = new();
-        var session = new CancelingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation, cancelPreview, nativeStatus);
+        var session = new CancelingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation, nativeStatus);
         using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "engine-canceled-output"));
@@ -730,11 +730,11 @@ public sealed class TemplaterTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task InvokeAsync_NativePreviewCompletesAfterCancellation_DoesNotCreateFiles(bool dryRun)
+    public async Task InvokeAsync_PrivateNativeCaptureCompletesAfterCancellation_DoesNotCreateFiles(bool dryRun)
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
         using CancellationTokenSource cancellation = new();
-        using Templater templater = TemplateFixtures.CreateTemplater(new CancelingAfterNativeSuccessSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation, true));
+        using Templater templater = TemplateFixtures.CreateTemplater(new CancelingAfterNativeSuccessSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canceled-native-preview"));
 
@@ -761,10 +761,27 @@ public sealed class TemplaterTests : IDisposable
 
         await TemplateFixtures.InstallAsync(package, _hive);
         using CancellationTokenSource cancellation = new();
-        var session = new CancelingAfterNativeSuccessSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation);
-        using Templater templater = TemplateFixtures.CreateTemplater(session);
-        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "completed-native-output"));
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        var fileSystem = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterCreateDirectory = path =>
+            {
+                if (noOutputs && string.Equals(path, output.Info.FullName, StringComparison.Ordinal))
+                {
+                    cancellation.Cancel();
+                }
+            },
+            AfterMove = _ =>
+            {
+                if (!noOutputs)
+                {
+                    cancellation.Cancel();
+                }
+            },
+        };
+        using Templater templater = TemplateFixtures.CreateTemplater(session, fileSystem);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         TemplateInvocationResult? result = null;
 
         Func<Task> action = async () => result = await selected.InvokeAsync(
@@ -1105,7 +1122,7 @@ public sealed class TemplaterTests : IDisposable
     {
         using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
         using TemplateEngineSession other = new(new(WorkingDirectory.FromExplicit(_root)), Path.Combine(_root, "other-hive"));
-        Action create = () => _ = new Templater(session, new(other));
+        Action create = () => _ = new Templater(session, new(other, new PhysicalFileSystem()));
 
         create.Should().Throw<ArgumentException>().WithParameterName("invocation");
     }
@@ -1128,23 +1145,18 @@ public sealed class TemplaterTests : IDisposable
     private Templater CreateTemplater(TemplateConstraintEvaluationSnapshot? snapshot = null)
         => TemplateFixtures.CreateTemplater(new(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
 
-    private sealed class UnknownChangeKindSession(TemplateEngineContext context, string hive, bool failPreview) : TemplateEngineSession(context, hive)
+    private sealed class UnknownChangeKindSession(TemplateEngineContext context, string hive) : TemplateEngineSession(context, hive)
     {
-        public int LiveCreationCalls { get; private set; }
+        public int NativeRenderCalls { get; private set; }
 
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             if (!dryRun)
             {
-                LiveCreationCalls++;
+                NativeRenderCalls++;
             }
 
             var result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
-            if (dryRun != failPreview)
-            {
-                return result;
-            }
-
             var change = Substitute.For<IFileChange>();
             change.TargetRelativePath.Returns(result.CreationEffects!.FileChanges.Single().TargetRelativePath);
             change.ChangeKind.Returns((ChangeKind)999);
@@ -1153,6 +1165,7 @@ public sealed class TemplaterTests : IDisposable
             var unknown = Substitute.For<ITemplateCreationResult>();
             unknown.Status.Returns(result.Status);
             unknown.CreationEffects.Returns(effects);
+            unknown.CreationResult.Returns(result.CreationResult);
             return unknown;
         }
     }
@@ -1172,28 +1185,23 @@ public sealed class TemplaterTests : IDisposable
         }
     }
 
-    private sealed class CancelingEngineSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, bool cancelPreview, CreationResultStatus nativeStatus) : TemplateEngineSession(context, hive)
+    private sealed class CancelingEngineSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, CreationResultStatus nativeStatus) : TemplateEngineSession(context, hive)
     {
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
-            if (dryRun == cancelPreview)
-            {
-                await cancellation.CancelAsync();
-                var result = Substitute.For<ITemplateCreationResult>();
-                result.Status.Returns(nativeStatus);
-                return result;
-            }
-
-            return await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+            await cancellation.CancelAsync();
+            var result = Substitute.For<ITemplateCreationResult>();
+            result.Status.Returns(nativeStatus);
+            return result;
         }
     }
 
-    private sealed class CancelingAfterNativeSuccessSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, bool cancelPreview = false) : TemplateEngineSession(context, hive)
+    private sealed class CancelingAfterNativeSuccessSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation) : TemplateEngineSession(context, hive)
     {
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             ITemplateCreationResult result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
-            if (dryRun == cancelPreview && result.Status == CreationResultStatus.Success)
+            if (result.Status == CreationResultStatus.Success)
             {
                 await cancellation.CancelAsync();
             }

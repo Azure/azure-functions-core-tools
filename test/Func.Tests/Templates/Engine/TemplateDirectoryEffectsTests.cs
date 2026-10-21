@@ -34,10 +34,8 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
         Directory.Exists(output.Info.FullName).Should().BeFalse();
         var created = await selected.InvokeAsync(request with { DryRun = false }, CancellationToken.None);
 
-        var directory = session.PreviewChanges.OfType<IFileChange2>().Should().ContainSingle(change =>
+        var directory = session.NativeEffectChanges.OfType<IFileChange2>().Should().ContainSingle(change =>
             change.SourceRelativePath.EndsWith("/" + placeholder, StringComparison.Ordinal)).Subject;
-        session.CreatedChanges.Select(change => change.TargetRelativePath).Should()
-            .BeEquivalentTo(session.PreviewChanges.Select(change => change.TargetRelativePath));
         File.Exists(Path.Combine(output.Info.FullName, directory.TargetRelativePath)).Should().BeFalse();
         Directory.Exists(Path.Combine(output.Info.FullName, directory.TargetRelativePath)).Should().BeTrue();
         File.ReadAllText(Path.Combine(output.Info.FullName, "Created.txt")).Should().Be("CONTENT");
@@ -66,37 +64,44 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
     {
         await InstallAsync("-.-");
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
-        using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive)
+        using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
+        string expected = Path.Combine(output.Info.FullName, directory ? Path.Combine("src", "functions") : "Empty.txt");
+        void CorruptRealEntry(string target)
         {
-            AfterCreation = () =>
+            if (!string.Equals(target, expected, StringComparison.Ordinal))
             {
-                string target = Path.Combine(output.Info.FullName, directory ? Path.Combine("src", "functions") : "Empty.txt");
-                if (directory)
+                return;
+            }
+            if (directory)
+            {
+                Directory.Delete(target);
+                if (replace)
                 {
-                    Directory.Delete(target);
-                    if (replace)
-                    {
-                        File.WriteAllText(target, "not a directory");
-                    }
+                    File.WriteAllText(target, "not a directory");
                 }
-                else
+            }
+            else
+            {
+                File.Delete(target);
+                if (replace)
                 {
-                    File.Delete(target);
-                    if (replace)
-                    {
-                        Directory.CreateDirectory(target);
-                    }
+                    Directory.CreateDirectory(target);
                 }
-            },
+            }
+        }
+        var fileSystem = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterCreateDirectory = directory ? CorruptRealEntry : null,
+            AfterMove = directory ? null : CorruptRealEntry,
         };
-        using Templater templater = TemplateFixtures.CreateTemplater(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, fileSystem);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), CancellationToken.None);
 
         result.Status.Should().Be(TemplateInvocationStatus.EngineFailure);
-        result.Changes.Should().BeEmpty();
-        result.Diagnostic.Should().Be("Template creation did not produce the validated output paths.");
+        result.Changes.Should().NotBeEmpty("completed real writes are retained even when a later output-kind check fails");
+        result.Diagnostic.Should().Be("Template installation did not retain the captured output paths and kinds.");
     }
 
     [Fact]
@@ -124,26 +129,34 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
     {
         await InstallAsync(placeholder, useDefault);
         using CancellationTokenSource cancellation = new();
-        using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive)
+        using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
+        int moved = 0;
+        var fileSystem = new RecordingCommitFileSystem(new PhysicalFileSystem())
         {
-            AfterCreation = cancellation.Cancel,
+            AfterMove = _ =>
+            {
+                if (++moved == (useDefault ? 2 : 3))
+                {
+                    cancellation.Cancel();
+                }
+            },
         };
-        using Templater templater = TemplateFixtures.CreateTemplater(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, fileSystem);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "cancel-output"));
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), cancellation.Token);
 
         cancellation.IsCancellationRequested.Should().BeTrue();
-        session.LiveCreationCalls.Should().Be(1);
+        session.NativeRenderCalls.Should().Be(1);
         Directory.Exists(Path.Combine(output.Info.FullName, "src", "functions")).Should().BeTrue();
         File.ReadAllBytes(Path.Combine(output.Info.FullName, "Empty.txt")).Should().BeEmpty();
         result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
-        result.Changes.Select(change => change.Path).Should().BeEquivalentTo(session.CreatedChanges.Select(change => change.TargetRelativePath));
+        result.Changes.Select(change => change.Path).Should().BeEquivalentTo(session.NativeEffectChanges.Select(change => change.TargetRelativePath));
     }
 
     [Fact]
-    public async Task InvokeAsync_CreationEffectsDifferFromNativePreview_DoesNotReportSuccess()
+    public async Task InvokeAsync_PrepassPathsDifferFromActualImage_ReportsOnlyRealCapturedOutputs()
     {
         await InstallAsync("-.-");
         using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive)
@@ -156,11 +169,12 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), CancellationToken.None);
 
-        session.LiveCreationCalls.Should().Be(1);
+        session.NativeRenderCalls.Should().Be(1);
         Directory.Exists(Path.Combine(output.Info.FullName, "src", "functions")).Should().BeTrue();
         File.ReadAllText(Path.Combine(output.Info.FullName, "Created.txt")).Should().Be("CONTENT");
-        result.Status.Should().Be(TemplateInvocationStatus.EngineFailure);
-        result.Changes.Should().BeEmpty();
+        result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
+        result.Changes.Should().Contain(change => change.Path.EndsWith("Created.txt", StringComparison.Ordinal));
+        result.Changes.Should().NotContain(change => change.Path == "Unplanned.txt");
         File.Exists(Path.Combine(output.Info.FullName, "Unplanned.txt")).Should().BeFalse();
     }
 
@@ -180,7 +194,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
 
         result.Status.Should().Be(TemplateInvocationStatus.Failed);
         result.Diagnostic.Should().Contain("symbolic link or reparse point");
-        session.LiveCreationCalls.Should().Be(0);
+        session.NativeRenderCalls.Should().Be(1, "the private native render reaches the write guard without installing real output");
         Directory.GetFileSystemEntries(outside).Should().BeEmpty();
     }
 
@@ -190,22 +204,27 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
         await InstallAsync("-.-");
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
         string outside = Directory.CreateDirectory(Path.Combine(_root, "outside")).FullName;
-        using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive)
+        using RecordingSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
+        string target = Path.Combine(output.Info.FullName, "src", "functions");
+        var fileSystem = new RecordingCommitFileSystem(new PhysicalFileSystem())
         {
-            AfterCreation = () =>
+            AfterCreateDirectory = path =>
             {
-                string target = Path.Combine(output.Info.FullName, "src", "functions");
+                if (!string.Equals(path, target, StringComparison.Ordinal))
+                {
+                    return;
+                }
                 Directory.Delete(target);
                 Directory.CreateSymbolicLink(target, outside);
             },
         };
-        using Templater templater = TemplateFixtures.CreateTemplater(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, fileSystem);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Directories", TemplateType.Item, CancellationToken.None)).Group![0];
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), CancellationToken.None);
 
         result.Status.Should().Be(TemplateInvocationStatus.EngineFailure);
-        result.Changes.Should().BeEmpty();
+        result.Changes.Should().NotBeEmpty("the ledger retains entries installed before the final linked-kind check");
         Directory.GetFileSystemEntries(outside).Should().BeEmpty();
     }
 
@@ -241,29 +260,31 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
 
     private sealed class RecordingSession(TemplateEngineContext context, string hive) : TemplateEngineSession(context, hive)
     {
-        public IReadOnlyList<IFileChange> PreviewChanges { get; private set; } = [];
-
-        public IReadOnlyList<IFileChange> CreatedChanges { get; private set; } = [];
-
-        public Action? AfterCreation { get; init; }
+        public IReadOnlyList<IFileChange> NativeEffectChanges { get; private set; } = [];
 
         public bool ChangeCreatedEffectPaths { get; init; }
 
-        public int LiveCreationCalls { get; private set; }
+        public int NativeRenderCalls { get; private set; }
 
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
             InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
+            if (!dryRun)
+            {
+                NativeRenderCalls++;
+            }
             var native = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+            if (native.Status != CreationResultStatus.Success)
+            {
+                return native;
+            }
+            NativeEffectChanges = [.. native.CreationEffects!.FileChanges];
             if (dryRun)
             {
-                PreviewChanges = [.. native.CreationEffects!.FileChanges];
+                return native;
             }
             else
             {
-                LiveCreationCalls++;
-                CreatedChanges = [.. native.CreationEffects!.FileChanges];
-                AfterCreation?.Invoke();
                 if (ChangeCreatedEffectPaths)
                 {
                     var change = Substitute.For<IFileChange>();
@@ -275,6 +296,7 @@ public sealed class TemplateDirectoryEffectsTests : IDisposable
                     var result = Substitute.For<ITemplateCreationResult>();
                     result.Status.Returns(native.Status);
                     result.CreationEffects.Returns(effects);
+                    result.CreationResult.Returns(native.CreationResult);
                     return result;
                 }
             }
