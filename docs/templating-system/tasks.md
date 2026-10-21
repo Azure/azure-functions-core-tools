@@ -10,15 +10,15 @@
 - [x] 2.1 Create and strictly validate the `template-engine-constraints` change covering func-specific bundle, stack, and related compatibility constraints.
 - [ ] 2.2 Create and strictly validate the `template-engine-post-actions` change covering supported actions, execution policy, dry-run behavior, cancellation, and diagnostics.
 - [ ] 2.3 Create and strictly validate the `template-engine-bind-sources` change covering MSBuild, npm, and other project-ecosystem value sources.
-- [ ] 2.4 Create and strictly validate the `func-new-search` change covering NuGet feed scanning, `FuncTemplate` discovery manifests, CDN publication, and CLI search.
+- [ ] 2.4 Create and strictly validate `func-new-search` for the initial curated manifest adapter, verified package references, metadata/cache compatibility, read-only CLI discovery, and explicit guided acquisition; track broader feed scanning/catalog work separately rather than as a curated GA prerequisite.
 - [x] 2.5 Create and strictly validate the `azure-samples-template-pipeline` change covering repository conventions, validation, package generation, and seamless release automation.
 - [x] 2.6 Create and strictly validate the `func-init-quickstarts` change covering first-class Azure-Samples quickstart discovery, selection, acquisition, and invocation.
 
 ## 3. Cross-Change Coordination
 
-- [ ] 3.1 Reconcile the ten focused changes so every detailed requirement has one authoritative owner.
+- [ ] 3.1 Reconcile every listed focused change, including companion acquisition, so each detailed requirement has one authoritative owner.
 - [ ] 3.2 Add explicit dependency references wherever a focused change consumes a contract owned by another change.
 - [ ] 3.3 Resolve conflicting terminology, context models, result shapes, and lifecycle assumptions across all focused designs.
 - [ ] 3.4 Update the umbrella inventory after any focused change is renamed, split, added, or removed.
-- [ ] 3.5 Strictly validate all ten focused changes and this umbrella change before declaring the templating system fully specified.
-- [ ] 3.6 Assign companion-template acquisition to a focused change and update `func-init-execution` and `template-package-install` with the result.
+- [ ] 3.5 Strictly validate every listed focused change and this umbrella change, and resolve open companion acquisition contracts before declaring the templating system fully specified.
+- [ ] 3.6 Review the `template-companion-acquisition` proposal and settle its mapping, ownership, and upgrade decisions before implementing it in setup and stack installation.
