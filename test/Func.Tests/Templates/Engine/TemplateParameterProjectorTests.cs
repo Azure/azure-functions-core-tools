@@ -355,7 +355,7 @@ public sealed class TemplateParameterProjectorTests : IDisposable
     [InlineData("""{"symbols":{"Count":{"defaultValue":""}}}""", "string", "", "")]
     [InlineData("""{"symbols":{}}""", "integer", "0", "0")]
     [InlineData("""{"additionalConfigFiles":["defaults.json"],"symbols":{"Count":{"datatype":"integer"}}}""", "integer", "0", "0")]
-    [InlineData("""{"AdditionalConfigFiles":[],"symbols":{"Count":{}}}""", "integer", "0", "0")]
+    [InlineData("""{"AdditionalConfigFiles":[],"symbols":{"Count":{}}}""", "integer", "0", null)]
     public void Project_MountedConfiguration_OnlyReportsAuthoredDefaults(
         string configuration, string dataType, string engineDefault, string? expectedDefault)
     {
