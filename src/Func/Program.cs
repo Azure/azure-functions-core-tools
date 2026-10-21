@@ -94,13 +94,14 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         // Disable POSIX bundling so single-dash typos like `-name` surface as unrecognized options.
         var parserConfiguration = new ParserConfiguration { EnablePosixBundling = false };
         commandParseResult = rootCommand.Parse(normalizedArgs, parserConfiguration);
-        allowAdvisories = !SetupCommand.ShouldSuppressAdvisories(commandParseResult);
+        commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
+        allowAdvisories = !string.Equals(commandName, "update", StringComparison.OrdinalIgnoreCase)
+            && !SetupCommand.ShouldSuppressAdvisories(commandParseResult);
         if (allowAdvisories)
         {
             versionCheckTask = VersionChecker.CheckForUpdateAsync(cts.Token);
         }
 
-        commandName = CommandNameResolver.ResolveCommandName(commandParseResult, rootCommand);
         activity?.SetCommandName(commandName);
 
         IFirstRunCoordinator firstRunCoordinator = host.Services.GetRequiredService<IFirstRunCoordinator>();

@@ -35,7 +35,7 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
         await TemplateFixtures.InstallAsync(package, Hive);
         RecordingFileSystem fileSystem = new();
         using RecordingProjectSession session = CreateSession(fileSystem);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, fileSystem.Installer, session.Support);
         var selected = (await templater.ResolveGroupAsync(
             TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "directory-host-output"));
@@ -46,7 +46,7 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
         session.Preview!.FileChanges.Should().Contain(change =>
             Path.GetFileName(change.TargetRelativePath) == "package.json" && change.ChangeKind == ChangeKind.Create);
         result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate,
-            $"a directory cannot establish a host root; actual live calls {session.CreationCalls}, " +
+            $"a directory cannot establish a host root; actual installed files {fileSystem.NativeCommits}, " +
             $"host directory {Directory.Exists(Path.Combine(output.Info.FullName, "host.json"))}, " +
             $"configuration file {File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json"))}");
         result.Diagnostic.Should().Be("Project creation must produce an active host.json root.");
@@ -71,7 +71,7 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
         await TemplateFixtures.InstallAsync(package, Hive);
         RecordingFileSystem fileSystem = new();
         using RecordingProjectSession session = CreateSession(fileSystem);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, fileSystem.Installer, session.Support);
         var selected = (await templater.ResolveGroupAsync(
             TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "directory-anchor-output"));
@@ -82,7 +82,7 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
         session.Preview!.FileChanges.Should().Contain(change =>
             Path.GetFileName(change.TargetRelativePath) == "host.json" && change.ChangeKind == ChangeKind.Create);
         result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate,
-            $"a configuration anchor must be a generated file; actual live calls {session.CreationCalls}, " +
+            $"a configuration anchor must be a generated file; actual installed files {fileSystem.NativeCommits}, " +
             $"host file {File.Exists(Path.Combine(output.Info.FullName, "host.json"))}, " +
             $"anchor directory {Directory.Exists(Path.Combine(output.Info.FullName, "package.json"))}");
         result.Diagnostic.Should().Be("Configuration references must bind to one resolved, generated primary output.");
@@ -103,7 +103,7 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
         await TemplateFixtures.InstallAsync(package, Hive);
         RecordingFileSystem fileSystem = new();
         using RecordingProjectSession session = CreateSession(fileSystem);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, fileSystem.Installer, session.Support);
         var selected = (await templater.ResolveGroupAsync(
             TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "valid-file-output"));
@@ -114,7 +114,8 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
 
         first.Status.Should().Be(TemplateInvocationStatus.Success);
         repeated.Should().BeEquivalentTo(first);
-        session.CreationCalls.Should().Be(0);
+        session.RenderCalls.Should().Be(2);
+        fileSystem.NativeCommits.Should().Be(0);
         fileSystem.ConfigurationCommits.Should().Be(0);
         Directory.Exists(output.Info.FullName).Should().BeFalse();
 
@@ -122,7 +123,8 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
 
         created.Status.Should().Be(TemplateInvocationStatus.Success);
         created.ConfiguredProjects.Should().Equal(output.Info.FullName);
-        session.CreationCalls.Should().Be(1);
+        session.RenderCalls.Should().Be(3);
+        fileSystem.NativeCommits.Should().Be(anchor is "host.json" ? 2 : 3);
         fileSystem.ConfigurationCommits.Should().Be(1);
         File.ReadAllText(Path.Combine(output.Info.FullName, "host.json")).Should().Be("{\"version\":\"2.0\"}");
         File.Exists(Path.Combine(output.Info.FullName, anchor)).Should().BeTrue();
@@ -183,7 +185,8 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
     private static void AssertNoCreation(
         RecordingProjectSession session, RecordingFileSystem fileSystem, TemplateInvocationResult result, WorkingDirectory output)
     {
-        session.CreationCalls.Should().Be(0);
+        session.RenderCalls.Should().Be(1);
+        fileSystem.NativeCommits.Should().Be(0);
         fileSystem.ConfigurationCommits.Should().Be(0);
         result.Changes.Should().BeEmpty();
         result.ConfiguredProjects.Should().BeEmpty();
@@ -191,25 +194,21 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
     }
 
     private sealed class RecordingProjectSession(TemplateEngineContext context, string hive, TemplateProjectSupport support)
-        : TemplateEngineSession(context, hive, projectSupport: support)
+        : TemplateEngineSession(context, hive)
     {
+        public TemplateProjectSupport Support { get; } = support;
+
         public ICreationEffects? Preview { get; private set; }
 
-        public int CreationCalls { get; private set; }
+        public int RenderCalls { get; private set; }
 
         protected override async Task<ITemplateCreationResult> InstantiateAsync(
             ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
-            if (!dryRun)
-            {
-                CreationCalls++;
-            }
-
+            dryRun.Should().BeFalse("native rendering occurs only in the private output image");
+            RenderCalls++;
             var result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
-            if (dryRun)
-            {
-                Preview = result.CreationEffects;
-            }
+            Preview = result.CreationEffects;
 
             return result;
         }
@@ -217,6 +216,15 @@ public sealed class TemplateProjectOutputKindTests : IDisposable
 
     private sealed class RecordingFileSystem : PhysicalFileSystem
     {
+        public RecordingFileSystem()
+        {
+            Installer = new RecordingCommitFileSystem(new PhysicalFileSystem()) { AfterMove = _ => NativeCommits++ };
+        }
+
+        public IFileSystem Installer { get; }
+
+        public int NativeCommits { get; private set; }
+
         public int ConfigurationCommits { get; private set; }
 
         public override void MoveFile(string sourcePath, string destinationPath, bool overwrite = false)

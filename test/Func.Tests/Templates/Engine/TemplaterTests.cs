@@ -1,13 +1,14 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Common;
 using Microsoft.Extensions.Configuration;
-using System.Text.Json.Nodes;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Template;
@@ -120,7 +121,7 @@ public sealed class TemplaterTests : IDisposable
         created.Changes.Select(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path))).Should().BeEquivalentTo(
             Path.Combine(output.Info.FullName, "host.json"), Path.Combine(output.Info.FullName, "Project.txt"),
             Path.Combine(output.Info.FullName, ".func", "config.json"));
-        created.Changes.Should().OnlyContain(change => change.Kind == "Create");
+        created.Changes.Should().OnlyContain(change => change.Kind == TemplateFileChangeKind.Create);
         File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
         File.ReadAllText(Path.Combine(output.Info.FullName, "Project.txt")).Should().Be("Project welcome");
         var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(output.Info.FullName, ".func", "config.json")).Build();
@@ -189,9 +190,9 @@ public sealed class TemplaterTests : IDisposable
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
         var fileSystem = Substitute.For<IFileSystem>();
-        var session = new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, CreationResultStatus.CreateFailed,
-            failCreation: true, projectSupport: new(CreateProjectPlanner(), new(fileSystem)));
-        using Templater templater = new(session);
+        var session = new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, CreationResultStatus.CreateFailed);
+        using Templater templater = TemplateFixtures.CreateTemplater(session,
+            projectSupport: new(CreateProjectPlanner(), new(fileSystem)));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project-native-failure-output"));
 
@@ -200,9 +201,7 @@ public sealed class TemplaterTests : IDisposable
         result.Status.Should().Be(TemplateInvocationStatus.EngineFailure);
         result.Changes.Should().BeEmpty();
         result.ConfiguredProjects.Should().BeEmpty();
-        fileSystem.Received(1).FileExists(Path.Combine(output.Info.FullName, ".func", "config.json"));
-        fileSystem.Received(1).DirectoryExists(Path.Combine(output.Info.FullName, ".func", "config.json"));
-        fileSystem.ReceivedCalls().Should().HaveCount(2);
+        fileSystem.ReceivedCalls().Should().BeEmpty("native image capture failed before project planning");
         await fileSystem.DidNotReceive().CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
@@ -478,6 +477,7 @@ public sealed class TemplaterTests : IDisposable
 
         result.Status.Should().Be(TemplateInvocationStatus.ConfigurationFailure);
         fileSystem.CommitFailure.Should().NotBeNull();
+        result.HasCommittedOutput.Should().BeTrue();
         result.Diagnostic.Should().Be($"Mandatory project configuration failed. Generated files were preserved: {fileSystem.CommitFailure!.Message}");
         result.ConfiguredProjects.Should().BeEmpty();
         result.Changes.Select(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path))).Should().BeEquivalentTo(
@@ -488,31 +488,168 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
-    public async Task ProjectJourney_NullPreviewEffects_ReturnsInvalidTemplateWithoutCreation()
+    public async Task ProjectJourney_NullCapturedEffects_ReturnsEngineFailureWithoutInstallation()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
         var session = new ControlledProjectSession(new(WorkingDirectory.FromExplicit(_root)), _hive,
             new(CreateProjectPlanner(), new(new PhysicalFileSystem()))) { OmitPreviewEffects = true };
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, projectSupport: session.Support);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "missing-preview-effects"));
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
 
-        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
-        result.Diagnostic.Should().Be("Project preview did not produce a configuration plan.");
+        result.Status.Should().Be(TemplateInvocationStatus.EngineFailure);
+        result.Diagnostic.Should().Be("The template engine did not report its creation result and effects.");
         result.Changes.Should().BeEmpty();
-        session.CreationCalls.Should().Be(0);
+        session.RenderCalls.Should().Be(1);
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
 
-    [Fact]
-    public async Task ProjectJourney_DeletedHostEffect_ReturnsInvalidTemplateWithoutCreation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectJourney_ReportedHostOmitted_AdmitsCapturedFileWithoutRerender(bool dryRun)
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
         var session = new ControlledProjectSession(new(WorkingDirectory.FromExplicit(_root)), _hive,
+            new(CreateProjectPlanner(), new(new PhysicalFileSystem()))) { OmitReportedHost = true };
+        List<string> installed = [];
+        var installer = new RecordingCommitFileSystem(new PhysicalFileSystem()) { AfterMove = installed.Add };
+        using Templater templater = TemplateFixtures.CreateTemplater(session, installer, session.Support);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "captured-host-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Project", DryRun: dryRun), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Success);
+        session.RenderCalls.Should().Be(1);
+        result.Changes.Should().Contain(change => Path.GetFileName(change.Path) == "host.json")
+            .And.Contain(change => change.Path.EndsWith("config.json", StringComparison.Ordinal));
+        result.HasCommittedOutput.Should().Be(!dryRun);
+        installed.Should().HaveCount(dryRun ? 0 : 2);
+        File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().Be(!dryRun);
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().Be(!dryRun);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectJourney_CanceledDuringNativeInstall_PreservesOnlyInstalledFilesWithoutConfiguration(bool afterLastFile)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
+        using CancellationTokenSource cancellation = new();
+        List<string> moved = [];
+        var installer = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterMove = path =>
+            {
+                moved.Add(path);
+                if (moved.Count == (afterLastFile ? 2 : 1))
+                {
+                    cancellation.Cancel();
+                }
+            },
+        };
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, installer,
+            new(CreateProjectPlanner(), new(new PhysicalFileSystem())));
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Directory.CreateDirectory(Path.Combine(_root, "canceled-install-output")).FullName);
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Project"), cancellation.Token);
+
+        result.Status.Should().Be(afterLastFile ? TemplateInvocationStatus.ConfigurationFailure : TemplateInvocationStatus.Failed);
+        result.HasCommittedOutput.Should().BeTrue();
+        result.ConfiguredProjects.Should().BeEmpty();
+        result.Changes.Select(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path))).Should().BeEquivalentTo(moved);
+        Directory.GetFiles(output.Info.FullName).Should().BeEquivalentTo(moved);
+        Directory.Exists(Path.Combine(output.Info.FullName, ".func")).Should().BeFalse();
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(result));
+        json.RootElement.TryGetProperty("HasCommittedOutput", out _).Should().BeFalse();
+        json.RootElement.GetProperty("ConfiguredProjects").GetArrayLength().Should().Be(0);
+        json.RootElement.GetProperty("Changes").GetArrayLength().Should().Be(moved.Count);
+        json.RootElement.GetProperty("Changes").EnumerateArray().Should()
+            .OnlyContain(change => change.GetProperty("Kind").GetString() == "Create");
+    }
+
+    [Fact]
+    public async Task ProjectJourney_SourceChangesAfterNativeInstallation_PreservesFilesWithoutConfiguration()
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        await TemplateFixtures.InstallAsync(package, _hive);
+        string configuration = Path.Combine(package, "project", ".template.config", "template.json");
+        int moved = 0;
+        var installer = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterMove = _ =>
+            {
+                if (++moved == 2)
+                {
+                    File.AppendAllText(configuration, " ");
+                }
+            },
+        };
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, installer,
+            new(CreateProjectPlanner(), new(new PhysicalFileSystem())));
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "changed-after-install-output"));
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Project"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.TemplateChanged);
+        result.HasCommittedOutput.Should().BeTrue();
+        result.ConfiguredProjects.Should().BeEmpty();
+        result.Changes.Should().HaveCount(2).And.OnlyContain(change => File.Exists(Path.Combine(output.Info.FullName, change.Path)));
+        File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectJourney_ExistingCapturedDirectoryChangesKind_StopsBeforeConfiguration()
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        Directory.CreateDirectory(Path.Combine(package, "project", "empty"));
+        File.WriteAllText(Path.Combine(package, "project", "empty", "-.-"), "");
+        await TemplateFixtures.InstallAsync(package, _hive);
+        var output = WorkingDirectory.FromExplicit(Directory.CreateDirectory(Path.Combine(_root, "changed-directory-output")).FullName);
+        string retained = Directory.CreateDirectory(Path.Combine(output.Info.FullName, "empty")).FullName;
+        int moved = 0;
+        var installer = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterMove = _ =>
+            {
+                if (++moved == 2)
+                {
+                    Directory.Delete(retained);
+                    File.WriteAllText(retained, "changed kind");
+                }
+            },
+        };
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, installer,
+            new(CreateProjectPlanner(), new(new PhysicalFileSystem())));
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Project"), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.EngineFailure);
+        result.HasCommittedOutput.Should().BeTrue();
+        result.Changes.Should().HaveCount(2).And.NotContain(change => change.Path == "empty");
+        result.ConfiguredProjects.Should().BeEmpty();
+        File.ReadAllText(retained).Should().Be("changed kind");
+        Directory.Exists(Path.Combine(output.Info.FullName, ".func")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectJourney_AbsentCapturedHostWithDeletionEffect_ReturnsInvalidTemplateWithoutInstallation()
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        await TemplateFixtures.InstallAsync(package, _hive);
+        File.Delete(Path.Combine(package, "project", "host.json"));
+        var session = new ControlledProjectSession(new(WorkingDirectory.FromExplicit(_root)), _hive,
             new(CreateProjectPlanner(), new(new PhysicalFileSystem()))) { DeleteHostEffect = true };
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, projectSupport: session.Support);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "deleted-host-effect"));
 
@@ -521,7 +658,7 @@ public sealed class TemplaterTests : IDisposable
         result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
         result.Diagnostic.Should().Be("Declared host.json outputs must correspond to generated files.");
         result.Changes.Should().BeEmpty();
-        session.CreationCalls.Should().Be(0);
+        session.RenderCalls.Should().Be(1);
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
 
@@ -530,12 +667,13 @@ public sealed class TemplaterTests : IDisposable
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "finalization-ancestor-file"));
-        var session = new ControlledProjectSession(new(WorkingDirectory.FromExplicit(_root)), _hive,
-            new(CreateProjectPlanner(), new(new PhysicalFileSystem())))
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        var installer = new RecordingCommitFileSystem(new PhysicalFileSystem())
         {
-            AfterCreation = () => File.WriteAllText(Path.Combine(output.Info.FullName, ".func"), "user-owned"),
+            AfterMove = _ => File.WriteAllText(Path.Combine(output.Info.FullName, ".func"), "user-owned"),
         };
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session, installer,
+            new(CreateProjectPlanner(), new(new PhysicalFileSystem())));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
@@ -564,8 +702,8 @@ public sealed class TemplaterTests : IDisposable
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Item"), CancellationToken.None);
 
-        result.Status.Should().Be(TemplateInvocationStatus.Failed);
-        result.Diagnostic.Should().Be("A template output directory ancestor is an existing file. Choose an output directory without file collisions.");
+        result.Status.Should().Be(TemplateInvocationStatus.FileConflict);
+        result.Diagnostic.Should().Be("A file occupies native output directory 'nested'.");
         result.Changes.Should().BeEmpty();
         File.ReadAllText(Path.Combine(output.Info.FullName, "nested")).Should().Be("user-owned");
         Directory.GetFiles(output.Info.FullName).Should().Equal(Path.Combine(output.Info.FullName, "nested"));
@@ -626,7 +764,7 @@ public sealed class TemplaterTests : IDisposable
         result.Changes.Select(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path))).Should().BeEquivalentTo(
             Path.Combine(output.Info.FullName, "host.json"), Path.Combine(output.Info.FullName, "Project.txt"),
             Path.Combine(output.Info.FullName, ".func", "config.json"));
-        result.Changes.Should().OnlyContain(change => change.Kind == "Create");
+        result.Changes.Should().OnlyContain(change => change.Kind == TemplateFileChangeKind.Create);
         var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(output.Info.FullName, ".func", "config.json")).Build();
         StackOptions options = new();
         new StackOptionsSetup(configuration).Configure(options);
@@ -676,10 +814,13 @@ public sealed class TemplaterTests : IDisposable
         var firstConfiguration = Path.Combine(output.Info.FullName, ".func", "config.json");
         var secondConfiguration = Path.Combine(output.Info.FullName, "second", ".func", "config.json");
 
-        Func<Task> invoke = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Project"), cancellation.Token);
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Project"), cancellation.Token);
 
-        var exception = (await invoke.Should().ThrowAsync<OperationCanceledException>()).Which;
-        exception.CancellationToken.Should().Be(cancellation.Token);
+        result.Status.Should().Be(TemplateInvocationStatus.ConfigurationFailure);
+        result.HasCommittedOutput.Should().BeTrue();
+        result.ConfiguredProjects.Should().Equal(output.Info.FullName);
+        result.Changes.Should().Contain(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path)) == firstConfiguration)
+            .And.NotContain(change => Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path)) == secondConfiguration);
         fileSystem.CommittedConfigurations.Should().Equal(firstConfiguration);
         File.Exists(firstConfiguration).Should().BeTrue();
         File.Exists(secondConfiguration).Should().BeFalse();
@@ -689,7 +830,7 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
-    public async Task ProjectJourney_ConfigurationCanceledBeforePhysicalWrite_PropagatesCancellationWithoutConfiguration()
+    public async Task ProjectJourney_ConfigurationCanceledBeforePhysicalWrite_ReportsCommittedNativeOutputWithoutConfiguration()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
         using CancellationTokenSource cancellation = new();
@@ -704,16 +845,19 @@ public sealed class TemplaterTests : IDisposable
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canceled-config-output"));
 
-        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>()), cancellation.Token);
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), cancellation.Token);
 
-        await action.Should().ThrowAsync<OperationCanceledException>();
+        result.Status.Should().Be(TemplateInvocationStatus.ConfigurationFailure);
+        result.HasCommittedOutput.Should().BeTrue();
+        result.ConfiguredProjects.Should().BeEmpty();
+        result.Changes.Should().NotContain(change => change.Path.EndsWith("config.json", StringComparison.Ordinal));
         File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
         File.Exists(Path.Combine(output.Info.FullName, ".func", "config.json")).Should().BeFalse();
         Directory.Exists(Path.Combine(output.Info.FullName, ".func")).Should().BeFalse();
     }
 
     [Fact]
-    public async Task ProjectJourney_ConfigurationFaultsAfterCancellation_PropagatesCancellation()
+    public async Task ProjectJourney_ConfigurationFaultsAfterCancellation_PreservesCommittedNativeOutput()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), _hive);
         using CancellationTokenSource cancellation = new();
@@ -728,9 +872,12 @@ public sealed class TemplaterTests : IDisposable
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canceled-fault-config-output"));
 
-        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>()), cancellation.Token);
+        var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), cancellation.Token);
 
-        await action.Should().ThrowAsync<OperationCanceledException>();
+        result.Status.Should().Be(TemplateInvocationStatus.ConfigurationFailure);
+        result.HasCommittedOutput.Should().BeTrue();
+        result.ConfiguredProjects.Should().BeEmpty();
+        result.Changes.Should().NotContain(change => change.Path.EndsWith("config.json", StringComparison.Ordinal));
         File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeTrue();
     }
 
@@ -755,6 +902,7 @@ public sealed class TemplaterTests : IDisposable
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>()), CancellationToken.None);
 
         result.Status.Should().Be(failSecond ? TemplateInvocationStatus.ConfigurationFailure : TemplateInvocationStatus.Success);
+        result.HasCommittedOutput.Should().BeTrue();
         IReadOnlyList<string> expectedProjects = failSecond ? [output.Info.FullName] : [output.Info.FullName, Path.Combine(output.Info.FullName, "second")];
         result.ConfiguredProjects.Should().Equal(expectedProjects);
         result.Changes.Where(change => change.Path.EndsWith("config.json", StringComparison.Ordinal))
@@ -919,6 +1067,79 @@ public sealed class TemplaterTests : IDisposable
         File.ReadAllText(target).Should().Be("Conflict content");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task InvokeAsync_UnknownNativeChangeKind_FailsLoudlyAtTheNativeBoundary(bool preview)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        var session = new UnknownChangeKindSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "unknown-kind-output"));
+
+        Func<Task> action = () => selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Unknown", DryRun: preview), CancellationToken.None);
+
+        await action.Should().ThrowAsync<ArgumentOutOfRangeException>().WithParameterName("kind");
+        session.NativeRenderCalls.Should().Be(1, "both preview and apply capture a private native render");
+        File.Exists(Path.Combine(output.Info.FullName, "Unknown.txt")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_OmittedName_PreservesLogicalOutputNameAndRealTargetConflict()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "LogicalApp"));
+        Directory.CreateDirectory(output.Info.FullName);
+        string target = Path.Combine(output.Info.FullName, "LogicalApp.txt");
+        File.WriteAllText(target, "original");
+        var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>());
+
+        var preview = await selected.InvokeAsync(request with { DryRun = true }, CancellationToken.None);
+        var refused = await selected.InvokeAsync(request, CancellationToken.None);
+
+        preview.Status.Should().Be(TemplateInvocationStatus.Success);
+        preview.Changes.Should().ContainSingle().Which.Path.Should().EndWith("LogicalApp.txt");
+        preview.Diagnostic.Should().Contain("requires explicit");
+        refused.Status.Should().Be(TemplateInvocationStatus.FileConflict);
+        File.ReadAllText(target).Should().Be("original");
+
+        var forced = await selected.InvokeAsync(request with { Force = true }, CancellationToken.None);
+
+        forced.Status.Should().Be(TemplateInvocationStatus.Success);
+        File.ReadAllText(target).Should().Be("LogicalApp content");
+        Directory.GetFiles(output.Info.FullName).Should().Equal(target);
+    }
+
+    [Fact]
+    public async Task NativeEngine_DifferentPhysicalOutput_ChangesFallbackNameAndHidesRealTargetConflict()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        var template = (await session.PackageManager.GetTemplatesAsync(CancellationToken.None))
+            .Single(template => template.Identity == TemplateFixtures.ItemTemplateIdentity);
+        string logicalOutput = Path.Combine(_root, "LogicalApp");
+        Directory.CreateDirectory(logicalOutput);
+        string target = Path.Combine(logicalOutput, "LogicalApp.txt");
+        File.WriteAllText(target, "original");
+        string physicalOutput = Path.Combine(_root, "PrivateStage");
+        TemplateCreator creator = new(session.Settings);
+
+        var preview = await creator.InstantiateAsync(template, null, "PrivateStage", physicalOutput,
+            new Dictionary<string, string?>(), dryRun: true, cancellationToken: CancellationToken.None);
+        var created = await creator.InstantiateAsync(template, null, "PrivateStage", physicalOutput,
+            new Dictionary<string, string?>(), cancellationToken: CancellationToken.None);
+
+        preview.Status.Should().Be(CreationResultStatus.Success);
+        preview.CreationEffects!.FileChanges.Should().ContainSingle().Which.ChangeKind.Should().Be(ChangeKind.Create);
+        created.Status.Should().Be(CreationResultStatus.Success);
+        File.ReadAllText(Path.Combine(physicalOutput, "PrivateStage.txt")).Should().Be("PrivateStage content");
+        File.ReadAllText(target).Should().Be("original");
+        File.Exists(Path.Combine(physicalOutput, "LogicalApp.txt")).Should().BeFalse();
+    }
+
     [Fact]
     public async Task InvokeAsync_UnsupportedPostAction_FailsWithoutWrites()
     {
@@ -1040,7 +1261,7 @@ public sealed class TemplaterTests : IDisposable
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
         var session = new DenyingConfigurationSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "denied-config-output"));
         session.DeniedRead = deniedRead;
@@ -1080,7 +1301,7 @@ public sealed class TemplaterTests : IDisposable
         File.Move(Path.Combine(item, "ItemFunction.txt"), Path.Combine(item, "link", "ItemFunction.txt"));
         await TemplateFixtures.InstallAsync(package, _hive);
         var session = new DenyingConfigurationSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "late-linked-output"));
         var outside = Path.Combine(_root, "late-outside-output");
@@ -1192,7 +1413,7 @@ public sealed class TemplaterTests : IDisposable
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteJourneyPackage(_root), _hive);
         var session = new DenyingConfigurationSession(new(WorkingDirectory.FromExplicit(_root)), _hive) { DeniedIdentity = "Func.Tests.Journey", DeniedWithIo = ioFailure };
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
 
         var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
 
@@ -1249,7 +1470,7 @@ public sealed class TemplaterTests : IDisposable
         var package = TemplateFixtures.WriteSharedJourneyPackage(_root, shared: false, packageTypeVersion: malformed ? "invalid-version" : null, multiple: true);
         await TemplateFixtures.InstallAsync(package, _hive);
         var session = new CountingPackageSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
 
         var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
 
@@ -1261,7 +1482,7 @@ public sealed class TemplaterTests : IDisposable
         }
 
         var freshSession = new CountingPackageSession(new(WorkingDirectory.FromExplicit(_root)), _hive);
-        using Templater fresh = new(freshSession);
+        using Templater fresh = TemplateFixtures.CreateTemplater(freshSession);
         await fresh.ListAsync(TemplateType.Item, CancellationToken.None);
         freshSession.PackageReads.Should().Be(1);
     }
@@ -1325,8 +1546,8 @@ public sealed class TemplaterTests : IDisposable
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
         using CancellationTokenSource cancellation = new();
-        var session = new CancelingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation, cancelPreview, nativeStatus);
-        using Templater templater = new(session);
+        var session = new CancelingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation, nativeStatus);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "engine-canceled-output"));
 
@@ -1339,11 +1560,11 @@ public sealed class TemplaterTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task InvokeAsync_NativePreviewCompletesAfterCancellation_DoesNotCreateFiles(bool dryRun)
+    public async Task InvokeAsync_PrivateNativeCaptureCompletesAfterCancellation_DoesNotCreateFiles(bool dryRun)
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
         using CancellationTokenSource cancellation = new();
-        using Templater templater = new(new CancelingAfterNativeSuccessSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation, true));
+        using Templater templater = TemplateFixtures.CreateTemplater(new CancelingAfterNativeSuccessSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canceled-native-preview"));
 
@@ -1370,10 +1591,27 @@ public sealed class TemplaterTests : IDisposable
 
         await TemplateFixtures.InstallAsync(package, _hive);
         using CancellationTokenSource cancellation = new();
-        var session = new CancelingAfterNativeSuccessSession(new(WorkingDirectory.FromExplicit(_root)), _hive, cancellation);
-        using Templater templater = new(session);
-        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "completed-native-output"));
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        var fileSystem = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterCreateDirectory = path =>
+            {
+                if (noOutputs && string.Equals(path, output.Info.FullName, StringComparison.Ordinal))
+                {
+                    cancellation.Cancel();
+                }
+            },
+            AfterMove = _ =>
+            {
+                if (!noOutputs)
+                {
+                    cancellation.Cancel();
+                }
+            },
+        };
+        using Templater templater = TemplateFixtures.CreateTemplater(session, fileSystem);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         TemplateInvocationResult? result = null;
 
         Func<Task> action = async () => result = await selected.InvokeAsync(
@@ -1398,7 +1636,7 @@ public sealed class TemplaterTests : IDisposable
         else
         {
             var change = result.Changes.Should().ContainSingle().Subject;
-            change.Kind.Should().Be("Create");
+            change.Kind.Should().Be(TemplateFileChangeKind.Create);
             Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path)).Should().Be(Path.Combine(output.Info.FullName, "Created.txt"));
         }
     }
@@ -1431,7 +1669,7 @@ public sealed class TemplaterTests : IDisposable
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
         var session = new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, nativeStatus);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "native-failure-output"));
 
@@ -1468,7 +1706,7 @@ public sealed class TemplaterTests : IDisposable
     public async Task InvokeAsync_NativeCancelledStatus_PropagatesCancellation()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
-        using Templater templater = new(new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, CreationResultStatus.Cancelled));
+        using Templater templater = TemplateFixtures.CreateTemplater(new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, CreationResultStatus.Cancelled));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "native-cancelled-output"));
 
@@ -1503,7 +1741,7 @@ public sealed class TemplaterTests : IDisposable
     public async Task InvokeAsync_CreationFailureAfterSuccessfulPreview_PreservesCategory(CreationResultStatus nativeStatus)
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
-        using Templater templater = new(new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, nativeStatus, true));
+        using Templater templater = TemplateFixtures.CreateTemplater(new FailingEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, nativeStatus, true));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "creation-failure-output"));
         var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>(), "Failure");
@@ -1568,7 +1806,7 @@ public sealed class TemplaterTests : IDisposable
         string package = TemplateFixtures.WriteConstraintPackage(_root, """{"stack":{"type":"func-workload","args":"node"}}""");
         await TemplateFixtures.InstallAsync(package, _hive);
         var snapshot = new TemplateConstraintEvaluationSnapshot([new("node-package", NuGetVersion.Parse("1.0"), ["node"], usable)]);
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
 
         var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
 
@@ -1695,9 +1933,28 @@ public sealed class TemplaterTests : IDisposable
     [Fact]
     public void Constructor_NullSession_Throws()
     {
-        Action act = () => _ = new Templater(null!);
+        Action act = () => _ = new Templater(null!, null!);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("session");
+    }
+
+    [Fact]
+    public void Constructor_NullInvocationCoordinator_Throws()
+    {
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        Action create = () => _ = new Templater(session, null!);
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName("invocation");
+    }
+
+    [Fact]
+    public void Constructor_CoordinatorFromAnotherSession_Throws()
+    {
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), _hive);
+        using TemplateEngineSession other = new(new(WorkingDirectory.FromExplicit(_root)), Path.Combine(_root, "other-hive"));
+        Action create = () => _ = new Templater(session, new(other, new PhysicalFileSystem()));
+
+        create.Should().Throw<ArgumentException>().WithParameterName("invocation");
     }
 
     private async Task<IReadOnlyList<TemplateCatalogEntry>> ListMetadataTemplatesAsync()
@@ -1716,13 +1973,13 @@ public sealed class TemplaterTests : IDisposable
         => entries.Should().ContainSingle(candidate => candidate.Identity == identity).Subject;
 
     private Templater CreateTemplater(TemplateConstraintEvaluationSnapshot? snapshot = null)
-        => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
+        => TemplateFixtures.CreateTemplater(new(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, snapshot));
 
     private Templater CreateProjectTemplater(IFileSystem? fileSystem = null, string aliasKey = "Python")
     {
         TemplateProjectConfigurationWriter writer = new(fileSystem ?? new PhysicalFileSystem());
-        return new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), _hive,
-            projectSupport: new(CreateProjectPlanner(aliasKey), writer)));
+        return TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), _hive),
+            projectSupport: new(CreateProjectPlanner(aliasKey), writer));
     }
 
     private string WriteTwoRootProjectPackage()
@@ -1769,26 +2026,23 @@ public sealed class TemplaterTests : IDisposable
     }
 
     private sealed class ControlledProjectSession(TemplateEngineContext context, string hive, TemplateProjectSupport support)
-        : TemplateEngineSession(context, hive, projectSupport: support)
+        : TemplateEngineSession(context, hive)
     {
+        public TemplateProjectSupport Support { get; } = support;
+
         public bool OmitPreviewEffects { get; init; }
 
         public bool DeleteHostEffect { get; init; }
 
-        public Action? AfterCreation { get; init; }
+        public bool OmitReportedHost { get; init; }
 
-        public int CreationCalls { get; private set; }
+        public int RenderCalls { get; private set; }
 
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
             InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
+            RenderCalls++;
             var native = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
-            if (!dryRun)
-            {
-                CreationCalls++;
-                AfterCreation?.Invoke();
-                return native;
-            }
 
             if (OmitPreviewEffects)
             {
@@ -1809,16 +2063,51 @@ public sealed class TemplaterTests : IDisposable
                 var deleted = Substitute.For<ITemplateCreationResult>();
                 deleted.Status.Returns(CreationResultStatus.Success);
                 deleted.CreationEffects.Returns(effects);
+                deleted.CreationResult.Returns(native.CreationResult);
                 return deleted;
+            }
+
+            if (OmitReportedHost)
+            {
+                var effects = Substitute.For<ICreationEffects>();
+                effects.FileChanges.Returns([.. native.CreationEffects!.FileChanges.Where(change => Path.GetFileName(change.TargetRelativePath) != "host.json")]);
+                var reported = Substitute.For<ITemplateCreationResult>();
+                reported.Status.Returns(native.Status);
+                reported.CreationEffects.Returns(effects);
+                reported.CreationResult.Returns(native.CreationResult);
+                return reported;
             }
 
             return native;
         }
     }
 
-    private sealed class FailingEngineSession(TemplateEngineContext context, string hive, CreationResultStatus nativeStatus,
-        bool failCreation = false, TemplateProjectSupport? projectSupport = null)
-        : TemplateEngineSession(context, hive, projectSupport: projectSupport)
+    private sealed class UnknownChangeKindSession(TemplateEngineContext context, string hive) : TemplateEngineSession(context, hive)
+    {
+        public int NativeRenderCalls { get; private set; }
+
+        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
+        {
+            if (!dryRun)
+            {
+                NativeRenderCalls++;
+            }
+
+            var result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+            var change = Substitute.For<IFileChange>();
+            change.TargetRelativePath.Returns(result.CreationEffects!.FileChanges.Single().TargetRelativePath);
+            change.ChangeKind.Returns((ChangeKind)999);
+            var effects = Substitute.For<ICreationEffects>();
+            effects.FileChanges.Returns([change]);
+            var unknown = Substitute.For<ITemplateCreationResult>();
+            unknown.Status.Returns(result.Status);
+            unknown.CreationEffects.Returns(effects);
+            unknown.CreationResult.Returns(result.CreationResult);
+            return unknown;
+        }
+    }
+
+    private sealed class FailingEngineSession(TemplateEngineContext context, string hive, CreationResultStatus nativeStatus, bool failCreation = false) : TemplateEngineSession(context, hive)
     {
         protected override Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
@@ -1833,28 +2122,23 @@ public sealed class TemplaterTests : IDisposable
         }
     }
 
-    private sealed class CancelingEngineSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, bool cancelPreview, CreationResultStatus nativeStatus) : TemplateEngineSession(context, hive)
+    private sealed class CancelingEngineSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, CreationResultStatus nativeStatus) : TemplateEngineSession(context, hive)
     {
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
-            if (dryRun == cancelPreview)
-            {
-                await cancellation.CancelAsync();
-                var result = Substitute.For<ITemplateCreationResult>();
-                result.Status.Returns(nativeStatus);
-                return result;
-            }
-
-            return await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+            await cancellation.CancelAsync();
+            var result = Substitute.For<ITemplateCreationResult>();
+            result.Status.Returns(nativeStatus);
+            return result;
         }
     }
 
-    private sealed class CancelingAfterNativeSuccessSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation, bool cancelPreview = false) : TemplateEngineSession(context, hive)
+    private sealed class CancelingAfterNativeSuccessSession(TemplateEngineContext context, string hive, CancellationTokenSource cancellation) : TemplateEngineSession(context, hive)
     {
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             ITemplateCreationResult result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
-            if (dryRun == cancelPreview && result.Status == CreationResultStatus.Success)
+            if (result.Status == CreationResultStatus.Success)
             {
                 await cancellation.CancelAsync();
             }

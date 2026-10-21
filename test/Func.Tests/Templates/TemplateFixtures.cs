@@ -28,6 +28,10 @@ internal static class TemplateFixtures
     public const string DotnetHostOnlyTemplateIdentity = "Func.Tests.DotnetHostOnly";
     public const string HiddenTemplateIdentity = "Func.Tests.Hidden";
 
+    public static Templater CreateTemplater(
+        TemplateEngineSession session, IFileSystem? fileSystem = null, TemplateProjectSupport? projectSupport = null)
+        => new(session, new(session, fileSystem ?? new PhysicalFileSystem(), projectSupport));
+
     /// <summary>
     /// Writes a folder package with one item template, one basic project template, and two templates without an item
     /// or project type, and returns its path.

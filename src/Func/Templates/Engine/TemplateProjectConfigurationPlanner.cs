@@ -55,24 +55,26 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
     /// <summary>
     /// Binds each declaration to one generated primary output and independently discovered host root.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Configuration, effects, the output directory or directory outputs is null.</exception>
+    /// <exception cref="ArgumentNullException">Configuration, creation result, changes, output directory or directory outputs is null.</exception>
     /// <exception cref="ArgumentException">Configuration or the output directory is blank or contains an invalid path.</exception>
     /// <exception cref="InvalidTemplateMetadataException">Metadata, generated roots or configuration destinations are not qualified.</exception>
     public IReadOnlyList<TemplateProjectConfigurationPlan> CreatePlans(
-        string configuration, ICreationEffects effects, string outputDirectory, IReadOnlySet<string> directoryOutputs)
+        string configuration, ICreationResult creation, string outputDirectory,
+        IReadOnlyList<TemplateFileChange> changes, IReadOnlySet<string> directoryOutputs)
     {
-        ArgumentNullException.ThrowIfNull(effects);
+        ArgumentNullException.ThrowIfNull(creation);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        ArgumentNullException.ThrowIfNull(changes);
         ArgumentNullException.ThrowIfNull(directoryOutputs);
         IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = Read(configuration);
         string[] primaryOutputs =
-            [.. effects.CreationResult.PrimaryOutputs.Select(output => Path.GetFullPath(Path.Combine(outputDirectory, output.Path)))];
+            [.. creation.PrimaryOutputs.Select(output => Path.GetFullPath(Path.Combine(outputDirectory, output.Path)))];
         string[] changedOutputs =
-            [.. effects.FileChanges.Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
-        string[] generatedOutputs = [.. effects.FileChanges.Where(change =>
-            (change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite)
-            && !directoryOutputs.Contains(change.TargetRelativePath))
-            .Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
+            [.. changes.Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.Path)))];
+        string[] generatedOutputs = [.. changes.Where(change =>
+            (change.Kind is TemplateFileChangeKind.Create or TemplateFileChangeKind.Change or TemplateFileChangeKind.Overwrite)
+            && !directoryOutputs.Contains(Path.GetFullPath(Path.Combine(outputDirectory, change.Path))))
+            .Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.Path)))];
         Require(!changedOutputs.Any(path => string.Equals(Path.GetFileName(path), "config.json", StringComparison.OrdinalIgnoreCase)
             && string.Equals(Path.GetFileName(Path.GetDirectoryName(path)), ".func", StringComparison.OrdinalIgnoreCase)),
             "Template content must not write CLI-owned project configuration.");
