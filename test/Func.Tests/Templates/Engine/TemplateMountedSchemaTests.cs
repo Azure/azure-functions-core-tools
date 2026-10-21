@@ -17,14 +17,19 @@ public sealed class TemplateMountedSchemaTests : IDisposable
     private string Hive => Path.Combine(_root, "hive");
 
     [Theory]
-    [InlineData(null, null, false)]
-    [InlineData("0", null, false)]
-    [InlineData("7123", null, false)]
-    [InlineData(null, "0", false)]
-    [InlineData(null, "7124", false)]
-    [InlineData(null, null, true)]
-    public async Task InvokeAsync_IntegerPort_PreservesOmissionAndExplicitOrAuthoredDefaults(
-        string? explicitPort, string? authoredDefault, bool includeEmptyAdditionalConfigFiles)
+    [InlineData(null, null)]
+    [InlineData("0", null)]
+    [InlineData("7123", null)]
+    [InlineData(null, "0")]
+    [InlineData(null, "7124")]
+    public Task InvokeAsync_IntegerPort_PreservesOmissionAndExplicitOrAuthoredDefaults(string? explicitPort, string? authoredDefault)
+        => InvokeIntegerPortAsync(explicitPort, authoredDefault, includeEmptyAdditionalConfigFiles: false);
+
+    [Fact]
+    public Task InvokeAsync_IntegerPort_EmptyAdditionalConfigFiles_PreservesGeneratedFallback()
+        => InvokeIntegerPortAsync(null, null, includeEmptyAdditionalConfigFiles: true);
+
+    private async Task InvokeIntegerPortAsync(string? explicitPort, string? authoredDefault, bool includeEmptyAdditionalConfigFiles)
     {
         string package = Path.Combine(_root, "port-template");
         string configurationDirectory = Path.Combine(package, ".template.config");
