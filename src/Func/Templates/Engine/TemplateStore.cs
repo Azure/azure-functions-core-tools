@@ -41,6 +41,11 @@ internal sealed class TemplateStore(CliConfigurationPathsOptions paths, IFileSys
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 recoveryNeeded = _fileSystem.FileExists(Journal);
+                if (recoveryNeeded && context.RequireCleanStore)
+                {
+                    throw new TemplateStoreRecoveryRequiredException();
+                }
+
                 if (!recoveryNeeded)
                 {
                     settings = _fileSystem.CreateTempDirectory(ControlDirectory);

@@ -51,6 +51,14 @@ internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEng
             await _store.SnapshotAsync(cancellationToken);
             State = TemplateStoreTransactionState.RecoveryRequired;
             TemplateEngineSession? engine = null;
+            List<Exception> failures = [];
+            bool RecordFailure(Exception failure)
+            {
+                failures.Add(failure);
+                // A false filter observes the failure without replacing its propagation or stack.
+                return false;
+            }
+
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -67,20 +75,42 @@ internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEng
                 _store.Commit();
                 State = TemplateStoreTransactionState.Committed;
             }
+            catch (Exception failure) when (RecordFailure(failure))
+            {
+                throw;
+            }
             finally
             {
                 try
                 {
                     engine?.Dispose();
                 }
+                catch (Exception failure) when (RecordFailure(failure))
+                {
+                    throw;
+                }
                 finally
                 {
-                    if (State == TemplateStoreTransactionState.RecoveryRequired)
+                    try
                     {
-                        await _store.RecoverAsync(CancellationToken.None);
-                        State = TemplateStoreTransactionState.Restored;
-                        using TemplateEngineSession recovered = await _store.CreateRecoveryEngineAsync(_context);
-                        RecoverySessionRecreated = true;
+                        if (State == TemplateStoreTransactionState.RecoveryRequired)
+                        {
+                            await _store.RecoverAsync(CancellationToken.None);
+                            State = TemplateStoreTransactionState.Restored;
+                            using TemplateEngineSession recovered = await _store.CreateRecoveryEngineAsync(_context);
+                            RecoverySessionRecreated = true;
+                        }
+                    }
+                    catch (Exception failure) when (RecordFailure(failure))
+                    {
+                        throw;
+                    }
+                    finally
+                    {
+                        if (failures.Count > 1)
+                        {
+                            throw new AggregateException("The template-store operation encountered multiple failures.", failures);
+                        }
                     }
                 }
             }

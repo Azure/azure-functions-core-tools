@@ -609,13 +609,106 @@ public sealed class TemplateStoreTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadOnlyAdmission_PendingJournal_RefusesBeforeRecoveryOrNativeBootstrap(bool corrupt)
+    {
+        var store = Store();
+        await InstallAsync(store);
+        var physical = new PhysicalFileSystem();
+        physical.CopyDirectory(store.Hive, store.Backup);
+        File.WriteAllText(Path.Combine(store.Hive, "uncommitted.txt"), "Do not recover during preview.");
+        File.WriteAllText(store.Journal, corrupt ? "corrupt" : "present");
+        var beforeHive = Bytes(store.Hive);
+        var beforeBackup = Bytes(store.Backup);
+        var beforeJournal = File.ReadAllBytes(store.Journal);
+        var storeLock = Substitute.For<ITemplateStoreLock>();
+        storeLock.AcquireAsync(Arg.Any<string>(), Arg.Any<TemplateStoreAccess>(), Arg.Any<CancellationToken>(),
+            Arg.Any<Action<TemplateStoreWaitReason>?>()).Returns(call => new FileTemplateStoreLock().AcquireAsync(
+                call.Arg<string>(), call.Arg<TemplateStoreAccess>(), call.Arg<CancellationToken>(),
+                call.Arg<Action<TemplateStoreWaitReason>?>()));
+        var loggerFactory = Substitute.For<ILoggerFactory>();
+        var protectedStore = new TemplateStore(new(_root), physical, storeLock, loggerFactory);
+        var factory = new TemplaterFactory(protectedStore, physical);
+        Func<Task> preview = async () =>
+        {
+            using var unexpected = await factory.CreateAsync(Context() with { RequireCleanStore = true }, CancellationToken.None);
+        };
+
+        await preview.Should().ThrowAsync<TemplateStoreRecoveryRequiredException>().WithMessage("*requires recovery*");
+
+        Bytes(store.Hive).Should().BeEquivalentTo(beforeHive);
+        Bytes(store.Backup).Should().BeEquivalentTo(beforeBackup);
+        File.ReadAllBytes(store.Journal).Should().Equal(beforeJournal);
+        loggerFactory.DidNotReceive().CreateLogger(Arg.Any<string>());
+        await storeLock.DidNotReceive().AcquireAsync(Arg.Any<string>(), TemplateStoreAccess.Write,
+            Arg.Any<CancellationToken>(), Arg.Any<Action<TemplateStoreWaitReason>?>());
+        if (corrupt)
+        {
+            Func<Task> recover = () => Store().OpenWriteAsync(Context(), CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+            await recover.Should().ThrowAsync<InvalidDataException>();
+            Bytes(store.Hive).Should().BeEquivalentTo(beforeHive);
+            File.ReadAllBytes(store.Journal).Should().Equal(beforeJournal);
+        }
+        else
+        {
+            using var writer = await Store().OpenWriteAsync(Context(), CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+            Bytes(store.Hive).Should().BeEquivalentTo(beforeBackup);
+            File.Exists(store.Journal).Should().BeFalse();
+        }
+    }
+
     [Fact]
-    public async Task RestoreFailure_RemainsVisibleAndNextOwnerRetriesBeforeReading()
+    public async Task ReadOnlyAdmission_CleanStore_PreservesLiveBytesAndRetainsSharedLease()
+    {
+        var store = Store();
+        await InstallAsync(store);
+        var before = Bytes(store.Hive);
+        var factory = new TemplaterFactory(store, new PhysicalFileSystem());
+        using var templater = await factory.CreateAsync(Context() with { RequireCleanStore = true }, CancellationToken.None);
+        (await templater.ListAsync(TemplateType.Item, CancellationToken.None)).Should().NotBeEmpty();
+        var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellation = new CancellationTokenSource();
+        var writer = store.OpenWriteAsync(Context(), cancellation.Token, _ => waiting.TrySetResult());
+        await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        writer.IsCompleted.Should().BeFalse();
+        Bytes(store.Hive).Should().BeEquivalentTo(before);
+        File.Exists(store.Journal).Should().BeFalse();
+        templater.Dispose();
+        using var admitted = await writer.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Theory]
+    [InlineData("mutation")]
+    [InlineData("validation")]
+    [InlineData("cache")]
+    [InlineData("cancellation")]
+    [InlineData("disposal")]
+    public async Task RestoreFailure_RemainsVisibleAndNextOwnerRetriesBeforeReading(string phase)
     {
         var store = Store();
         await InstallAsync(store);
         var before = Bytes(store.Hive);
         var physical = new PhysicalFileSystem();
+        using var cancellation = new CancellationTokenSource();
+        Exception primaryFailure = phase switch
+        {
+            "validation" => new InvalidOperationException("Validation failed."),
+            "cancellation" => new OperationCanceledException("Mutation canceled.", cancellation.Token),
+            _ => new IOException("Mutation failed."),
+        };
+        var restoreFailure = new IOException("Injected snapshot restore I/O failure.");
+        var disposalFailure = new InvalidOperationException("Native provider disposal failed.");
+        var factory = Substitute.For<ITemplatePackageProviderFactory>();
+        var provider = Substitute.For<ITemplatePackageProvider, IDisposable>();
+        factory.Id.Returns(Guid.NewGuid());
+        factory.CreateProvider(Arg.Any<IEngineEnvironmentSettings>()).Returns(provider);
+        provider.Factory.Returns(factory);
+        provider.GetAllTemplatePackagesAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<ITemplatePackage>>([]));
+        ((IDisposable)provider).When(disposable => disposable.Dispose()).Do(_ => throw disposalFailure);
         var fileSystem = Substitute.For<IFileSystem>();
         fileSystem.DirectoryExists(Arg.Any<string>()).Returns(call => physical.DirectoryExists(call.Arg<string>()));
         fileSystem.FileExists(Arg.Any<string>()).Returns(call => physical.FileExists(call.Arg<string>()));
@@ -628,22 +721,169 @@ public sealed class TemplateStoreTests : IDisposable
             .Returns(call => physical.WriteAllTextAsync(call.ArgAt<string>(0), call.ArgAt<string>(1), call.Arg<CancellationToken>()));
         fileSystem.CopyDirectoryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(call =>
             call.ArgAt<string>(0) == store.Backup
-                ? throw new IOException("Injected snapshot restore I/O failure.")
+                ? throw restoreFailure
                 : physical.CopyDirectoryAsync(call.ArgAt<string>(0), call.ArgAt<string>(1), call.Arg<CancellationToken>()));
         var failingStore = new TemplateStore(new(_root), fileSystem, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
         using var transaction = await failingStore.OpenWriteAsync(Context(), CancellationToken.None);
-        Func<Task> operation = () => transaction.ExecuteAsync((_, _) => throw new IOException("Mutation failed."),
-            ValidateTemplatesAsync, CancellationToken.None);
+        TemplateEngineSession? stale = null;
+        Func<Task> operation = () => transaction.ExecuteAsync(async (engine, token) =>
+        {
+            stale = engine;
+            File.WriteAllText(Path.Combine(store.Hive, "uncommitted.txt"), "mutation");
+            if (phase == "cache")
+            {
+                Directory.CreateDirectory(Path.Combine(engine.Settings.Paths.HostVersionSettingsDir, "templatecache.json"));
+            }
+            else if (phase == "cancellation")
+            {
+                await cancellation.CancelAsync();
+                throw primaryFailure;
+            }
+            else if (phase == "disposal")
+            {
+                engine.Settings.Components.AddComponent(typeof(ITemplatePackageProviderFactory), factory);
+                await engine.PackageManager.GetTemplatesAsync(token);
+                throw primaryFailure;
+            }
+            else if (phase == "mutation")
+            {
+                throw primaryFailure;
+            }
+        }, (_, _) => phase == "validation" ? throw primaryFailure : Task.CompletedTask, cancellation.Token);
 
-        await operation.Should().ThrowAsync<IOException>().WithMessage("*restore I/O failure*");
+        var failure = (await operation.Should().ThrowAsync<AggregateException>()).Which;
+
+        failure.InnerExceptions.Should().HaveCount(phase == "disposal" ? 3 : 2);
+        failure.InnerExceptions[^1].Should().BeSameAs(restoreFailure);
+        if (phase == "cache")
+        {
+            failure.InnerExceptions[0].Should().BeOfType<IOException>().Which.Message.Should().Contain("cache rebuilding failed");
+            failure.InnerExceptions[0].StackTrace.Should().Contain(nameof(TemplateEngineSession.RebuildCacheAsync));
+        }
+        else
+        {
+            failure.InnerExceptions[0].Should().BeSameAs(primaryFailure);
+            primaryFailure.StackTrace.Should().Contain(nameof(RestoreFailure_RemainsVisibleAndNextOwnerRetriesBeforeReading));
+        }
+
+        restoreFailure.StackTrace.Should().Contain(nameof(RestoreFailure_RemainsVisibleAndNextOwnerRetriesBeforeReading));
+        if (phase == "disposal")
+        {
+            failure.InnerExceptions[1].Should().BeSameAs(disposalFailure);
+            disposalFailure.StackTrace.Should().Contain(nameof(RestoreFailure_RemainsVisibleAndNextOwnerRetriesBeforeReading));
+            ((IDisposable)provider).Received(1).Dispose();
+        }
+        if (phase == "cancellation")
+        {
+            ((OperationCanceledException)failure.InnerExceptions[0]).CancellationToken.Should().Be(cancellation.Token);
+        }
 
         transaction.State.Should().Be(TemplateStoreTransactionState.RecoveryRequired);
         transaction.RecoverySessionRecreated.Should().BeFalse();
         File.Exists(store.Journal).Should().BeTrue();
+        Action access = () => _ = stale!.Settings;
+        access.Should().Throw<ObjectDisposedException>();
         transaction.Dispose();
         using var reader = await store.OpenReadAsync(Context(), CancellationToken.None);
         Bytes(store.Hive).Should().BeEquivalentTo(before);
         File.Exists(store.Journal).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SingleFailure_AfterSuccessfulRecovery_PreservesOriginalException(bool canceled)
+    {
+        var store = Store();
+        await InstallAsync(store);
+        var before = Bytes(store.Hive);
+        using var cancellation = new CancellationTokenSource();
+        Exception primaryFailure = canceled
+            ? new OperationCanceledException("Mutation canceled.", cancellation.Token)
+            : new InvalidOperationException("Mutation failed.");
+        using var transaction = await store.OpenWriteAsync(Context(), cancellation.Token);
+        Func<Task> operation = () => transaction.ExecuteAsync(async (_, _) =>
+        {
+            File.WriteAllText(Path.Combine(store.Hive, "uncommitted.txt"), "mutation");
+            if (canceled)
+            {
+                await cancellation.CancelAsync();
+            }
+
+            throw primaryFailure;
+        }, ValidateTemplatesAsync, cancellation.Token);
+
+        if (canceled)
+        {
+            var failure = (await operation.Should().ThrowAsync<OperationCanceledException>()).Which;
+            failure.Should().BeSameAs(primaryFailure);
+            failure.CancellationToken.Should().Be(cancellation.Token);
+        }
+        else
+        {
+            (await operation.Should().ThrowAsync<InvalidOperationException>()).Which.Should().BeSameAs(primaryFailure);
+        }
+
+        primaryFailure.StackTrace.Should().Contain(nameof(SingleFailure_AfterSuccessfulRecovery_PreservesOriginalException));
+        transaction.State.Should().Be(TemplateStoreTransactionState.Restored);
+        transaction.RecoverySessionRecreated.Should().BeTrue();
+        Bytes(store.Hive).Should().BeEquivalentTo(before);
+        File.Exists(store.Journal).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RecoverySessionFailure_PreservesPrimaryAndRestoredState(bool canceled)
+    {
+        var store = Store();
+        await InstallAsync(store);
+        var before = Bytes(store.Hive);
+        using var cancellation = new CancellationTokenSource();
+        Exception primaryFailure = canceled
+            ? new OperationCanceledException("Mutation canceled.", cancellation.Token)
+            : new IOException("Mutation failed.");
+        var recreationFailure = new InvalidOperationException("Recovery engine recreation failed.");
+        var recovering = false;
+        var loggerFactory = Substitute.For<ILoggerFactory>();
+        loggerFactory.CreateLogger(Arg.Any<string>())
+            .Returns(_ => recovering ? throw recreationFailure : NullLogger.Instance);
+        var failingStore = new TemplateStore(new(_root), new PhysicalFileSystem(), new FileTemplateStoreLock(), loggerFactory);
+        using var transaction = await failingStore.OpenWriteAsync(Context(), cancellation.Token);
+        TemplateEngineSession? stale = null;
+        Func<Task> operation = () => transaction.ExecuteAsync(async (engine, _) =>
+        {
+            stale = engine;
+            File.WriteAllText(Path.Combine(store.Hive, "uncommitted.txt"), "mutation");
+            recovering = true;
+            if (canceled)
+            {
+                await cancellation.CancelAsync();
+            }
+
+            throw primaryFailure;
+        }, ValidateTemplatesAsync, cancellation.Token);
+
+        var failure = (await operation.Should().ThrowAsync<AggregateException>()).Which;
+
+        failure.InnerExceptions.Should().Equal(primaryFailure, recreationFailure);
+        primaryFailure.StackTrace.Should().Contain(nameof(RecoverySessionFailure_PreservesPrimaryAndRestoredState));
+        recreationFailure.StackTrace.Should().Contain(nameof(RecoverySessionFailure_PreservesPrimaryAndRestoredState));
+        transaction.State.Should().Be(TemplateStoreTransactionState.Restored);
+        transaction.RecoverySessionRecreated.Should().BeFalse();
+        Bytes(store.Hive).Should().BeEquivalentTo(before);
+        File.Exists(store.Journal).Should().BeFalse();
+        Action access = () => _ = stale!.Settings;
+        access.Should().Throw<ObjectDisposedException>();
+        if (canceled)
+        {
+            ((OperationCanceledException)failure.InnerExceptions[0]).CancellationToken.Should().Be(cancellation.Token);
+        }
+
+        transaction.Dispose();
+        using var reader = await store.OpenReadAsync(Context(), CancellationToken.None);
+        using var templater = TemplateFixtures.CreateTemplater(reader);
+        (await templater.ListAsync(TemplateType.Item, CancellationToken.None)).Should().NotBeEmpty();
     }
 
     [Theory]
