@@ -21,11 +21,7 @@ internal sealed record TemplateProjectConfigurationDeclaration(int PrimaryOutput
 internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackCatalog stackCatalog)
 {
     internal const string ConfigurationActionId = "00e33184-ffc7-43ef-bec0-b1684df8ad56";
-    private readonly IReadOnlyList<StackDefinition> _stacks = Array.AsReadOnly<StackDefinition>(
-        [.. (stackCatalog ?? throw new ArgumentNullException(nameof(stackCatalog))).Stacks.Select(stack => new StackDefinition(stack.Stack,
-            Array.AsReadOnly<string>([.. stack.SupportedLanguages]),
-            stack.SupportedLanguageAliases.ToDictionary(pair => pair.Key,
-                pair => (IReadOnlyList<string>)Array.AsReadOnly<string>([.. pair.Value]), StringComparer.Ordinal)))]);
+    private readonly IReadOnlyList<StackDefinition> _stacks = SnapshotStacks(stackCatalog);
     private readonly StringComparer _pathComparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     /// <summary>
@@ -61,27 +57,21 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
     /// <summary>
     /// Binds each declaration to one generated primary output and independently discovered host root.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Configuration, effects or the output directory is null.</exception>
+    /// <exception cref="ArgumentNullException">Configuration, creation result, changes, output directory or directory outputs is null.</exception>
     /// <exception cref="ArgumentException">Configuration or the output directory is blank or contains an invalid path.</exception>
     /// <exception cref="InvalidTemplateMetadataException">Metadata, generated roots or configuration destinations are not qualified.</exception>
     public IReadOnlyList<TemplateProjectConfigurationPlan> CreatePlans(
-        string configuration, ICreationEffects effects, string outputDirectory)
+        string configuration, ICreationResult creation, string outputDirectory,
+        IReadOnlyList<TemplateFileChange> changes, IReadOnlySet<string> directoryOutputs)
     {
-        ArgumentNullException.ThrowIfNull(effects);
+        ArgumentNullException.ThrowIfNull(creation);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
-        IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = Read(configuration);
-        return CreatePlans(effects, outputDirectory, declarations, nativeDotNetLayout: false);
+        ArgumentNullException.ThrowIfNull(changes);
+        ArgumentNullException.ThrowIfNull(directoryOutputs);
+        return CreatePlans(Read(configuration), creation, outputDirectory, changes, directoryOutputs, nativeDotNetLayout: false);
     }
 
-    /// <summary>
-    /// Qualifies only the selected upstream .NET project's static ignore rename and single renamed project output.
-    /// This layout contract does not approve native dependency actions.
-    /// </summary>
-    /// <exception cref="ArgumentNullException">The qualification is null.</exception>
-    /// <exception cref="ArgumentException">Configuration is blank.</exception>
-    /// <exception cref="InvalidTemplateMetadataException">The selected bytes or layout are not qualified.</exception>
-    public IReadOnlyList<TemplateProjectConfigurationDeclaration> ReadDotNetLayout(
-        string configuration, DotNetProjectLayoutQualification qualification)
+    public IReadOnlyList<TemplateProjectConfigurationDeclaration> ReadDotNetLayout(string configuration, DotNetProjectLayoutQualification qualification)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(configuration);
         ArgumentNullException.ThrowIfNull(qualification);
@@ -95,8 +85,7 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
             JsonElement root = document.RootElement;
             Require(root.ValueKind == JsonValueKind.Object, "Project template configuration must be an object.");
             RejectDuplicates(root);
-            Require(root.TryGetProperty("identity", out JsonElement identity)
-                && ReadString(identity, "identity") == qualification.TemplateIdentity,
+            Require(root.TryGetProperty("identity", out JsonElement identity) && ReadString(identity, "identity") == qualification.TemplateIdentity,
                 "The selected .NET project identity does not match its layout qualification.");
             ValidateTopology(root, allowDotNetIgnoreRename: true);
             ValidateSymbols(root);
@@ -120,8 +109,7 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
             string declaredLanguage = ReadString(tags.GetProperty("language"), "language");
             Require(declaredLanguage is "C#" or "F#", "The qualified .NET layout supports only C# and F#.");
             (string stack, string canonicalLanguage) = ResolveStackLanguage("dotnet", declaredLanguage);
-            Require(root.TryGetProperty("sourceName", out JsonElement sourceName)
-                && ReadString(sourceName, "sourceName") == "Company.FunctionApp",
+            Require(root.TryGetProperty("sourceName", out JsonElement sourceName) && ReadString(sourceName, "sourceName") == "Company.FunctionApp",
                 "Only the observed upstream .NET project sourceName is qualified.");
             string sourceOutput = "Company.FunctionApp" + (canonicalLanguage == "F#" ? ".fsproj" : ".csproj");
             Require(root.TryGetProperty("primaryOutputs", out JsonElement outputs) && outputs.ValueKind == JsonValueKind.Array
@@ -138,41 +126,43 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         }
     }
 
-    /// <summary>
-    /// Binds the qualified project source to the actual native preview output and mandatory CLI configuration root.
-    /// </summary>
-    /// <exception cref="ArgumentNullException">Effects, parameters or qualification is null.</exception>
-    /// <exception cref="ArgumentException">Configuration or output directory is blank.</exception>
-    /// <exception cref="InvalidTemplateMetadataException">The invocation, native mapping or output root is unqualified.</exception>
-    public IReadOnlyList<TemplateProjectConfigurationPlan> CreateDotNetPlans(
-        string configuration, ICreationEffects effects, string outputDirectory, DotNetProjectLayoutQualification qualification,
-        IReadOnlyDictionary<string, string?> parameters)
+    public IReadOnlyList<TemplateProjectConfigurationPlan> CreateDotNetPlans(string configuration, ICreationResult creation, string outputDirectory,
+        IReadOnlyList<TemplateFileChange> changes, IReadOnlySet<string> directoryOutputs, DotNetProjectLayoutQualification qualification,
+        IReadOnlyDictionary<string, string?> parameters, ICreationEffects mapping)
     {
-        ArgumentNullException.ThrowIfNull(effects);
-        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
         ArgumentNullException.ThrowIfNull(parameters);
-        if (!Path.IsPathFullyQualified(outputDirectory))
-        {
-            throw new ArgumentException("The qualified .NET layout requires an absolute invocation root.", nameof(outputDirectory));
-        }
-
+        ArgumentNullException.ThrowIfNull(mapping);
         IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = ReadDotNetLayout(configuration, qualification);
         Require(parameters.TryGetValue("Framework", out string? framework) && framework == "net10.0",
             "Qualified .NET project creation requires an explicit Framework value of net10.0.");
-        return CreatePlans(effects, outputDirectory, declarations, nativeDotNetLayout: true);
+        IReadOnlyList<TemplateProjectConfigurationPlan> plans = CreatePlans(declarations, creation, outputDirectory, changes, directoryOutputs, nativeDotNetLayout: true);
+        Require(HasNativeMapping(mapping, declarations[0].Path, plans[0].PrimaryOutput, outputDirectory)
+            && HasNativeMapping(mapping, "_gitignore", Path.Combine(outputDirectory, ".gitignore"), outputDirectory),
+            "The native capture must map the selected project source and static ignore rename to their generated outputs.");
+        return plans;
     }
 
-    private IReadOnlyList<TemplateProjectConfigurationPlan> CreatePlans(ICreationEffects effects, string outputDirectory,
-        IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations, bool nativeDotNetLayout)
+    private static bool HasNativeMapping(ICreationEffects effects, string source, string target, string outputDirectory)
+        => effects.FileChanges.OfType<IFileChange2>().Count(change =>
+            (change.SourceRelativePath == source || change.SourceRelativePath == "./" + source)
+            && Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)) == target
+            && change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite) == 1;
+
+    private IReadOnlyList<TemplateProjectConfigurationPlan> CreatePlans(IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations,
+        ICreationResult creation, string outputDirectory, IReadOnlyList<TemplateFileChange> changes, IReadOnlySet<string> directoryOutputs, bool nativeDotNetLayout)
     {
-        outputDirectory = Path.GetFullPath(outputDirectory);
+        ArgumentNullException.ThrowIfNull(creation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        ArgumentNullException.ThrowIfNull(changes);
+        ArgumentNullException.ThrowIfNull(directoryOutputs);
         string[] primaryOutputs =
-            [.. effects.CreationResult.PrimaryOutputs.Select(output => Path.GetFullPath(Path.Combine(outputDirectory, output.Path)))];
+            [.. creation.PrimaryOutputs.Select(output => Path.GetFullPath(Path.Combine(outputDirectory, output.Path)))];
         string[] changedOutputs =
-            [.. effects.FileChanges.Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
-        string[] generatedOutputs = [.. effects.FileChanges.Where(change =>
-            change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite)
-            .Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
+            [.. changes.Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.Path)))];
+        string[] generatedOutputs = [.. changes.Where(change =>
+            (change.Kind is TemplateFileChangeKind.Create or TemplateFileChangeKind.Change or TemplateFileChangeKind.Overwrite)
+            && !directoryOutputs.Contains(Path.GetFullPath(Path.Combine(outputDirectory, change.Path))))
+            .Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.Path)))];
         Require(!changedOutputs.Any(path => string.Equals(Path.GetFileName(path), "config.json", StringComparison.OrdinalIgnoreCase)
             && string.Equals(Path.GetFileName(Path.GetDirectoryName(path)), ".func", StringComparison.OrdinalIgnoreCase)),
             "Template content must not write CLI-owned project configuration.");
@@ -183,22 +173,18 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         Require(roots.Length > 0, "Project creation must produce an active host.json root.");
         if (nativeDotNetLayout)
         {
-            Require(effects.CreationResult.PrimaryOutputs.All(output => !Path.IsPathRooted(output.Path)
+            Require(creation.PrimaryOutputs.All(output => !Path.IsPathRooted(output.Path)
                 && !output.Path.Split('/', '\\').Any(segment => segment == ".."))
                 && primaryOutputs.Length == 1 && _pathComparer.Equals(Path.GetDirectoryName(primaryOutputs[0]), outputDirectory)
                 && Path.GetExtension(primaryOutputs[0]) == Path.GetExtension(declarations[0].Path)
                 && generatedOutputs.Contains(primaryOutputs[0], _pathComparer),
-                "The qualified .NET primary output must resolve to one generated project file directly inside the invocation root.");
+                "The qualified .NET primary output must resolve to one captured project file directly inside the invocation root.");
             Require(changedOutputs.All(path => IsWithin(outputDirectory, path))
                 && roots.Length == 1 && _pathComparer.Equals(roots[0], outputDirectory),
-                "The qualified .NET layout must remain inside one invocation root with one generated host.json.");
+                "The qualified .NET layout must remain inside one invocation root with one captured host.json.");
             Require(generatedOutputs.Count(path => Path.GetExtension(path) is ".csproj" or ".fsproj") == 1,
                 "The qualified .NET layout must generate exactly one project file.");
-            Require(HasNativeMapping(effects, declarations[0].Path, primaryOutputs[0], outputDirectory)
-                && HasNativeMapping(effects, "_gitignore", Path.Combine(outputDirectory, ".gitignore"), outputDirectory),
-                "The native preview must map the selected project source and static ignore rename to their generated outputs.");
         }
-
         List<TemplateProjectConfigurationPlan> plans = [];
         foreach (TemplateProjectConfigurationDeclaration declaration in declarations)
         {
@@ -216,11 +202,15 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         return plans.AsReadOnly();
     }
 
-    private static bool HasNativeMapping(ICreationEffects effects, string source, string target, string outputDirectory)
-        => effects.FileChanges.OfType<IFileChange2>().Count(change =>
-            (change.SourceRelativePath == source || change.SourceRelativePath == "./" + source)
-            && Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)) == target
-            && change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite) == 1;
+    private static IReadOnlyList<StackDefinition> SnapshotStacks(InstalledProjectStackCatalog stackCatalog)
+    {
+        ArgumentNullException.ThrowIfNull(stackCatalog);
+        return Array.AsReadOnly<StackDefinition>(
+            [.. stackCatalog.Stacks.Select(stack => new StackDefinition(stack.Stack,
+                Array.AsReadOnly<string>([.. stack.SupportedLanguages]),
+                stack.SupportedLanguageAliases.ToDictionary(pair => pair.Key,
+                    pair => (IReadOnlyList<string>)Array.AsReadOnly<string>([.. pair.Value]), StringComparer.Ordinal)))]);
+    }
 
     private static void ValidateTopology(JsonElement root, bool allowDotNetIgnoreRename = false)
     {
@@ -237,7 +227,6 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
                     "Only the observed static _gitignore to .gitignore source rename is qualified for .NET projects.");
                 continue;
             }
-
             Require(!root.EnumerateObject().Any(candidate => string.Equals(candidate.Name, property, StringComparison.OrdinalIgnoreCase)),
                 $"Project topology property '{property}' is not qualified for this creation path.");
         }

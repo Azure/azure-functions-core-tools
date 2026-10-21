@@ -5,7 +5,9 @@ using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.PhysicalFileSystem;
 using Microsoft.TemplateEngine.Edge.Template;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -25,7 +27,7 @@ public sealed class NativeTemplatePreparationCaptureTests : IDisposable
         var request = new TemplateInvocationRequest(WorkingDirectory.FromExplicit(Target),
             new Dictionary<string, string?> { ["Value"] = "Canonical" }, "Named", DryRun: true);
 
-        var prepared = await selected.CaptureNativePreparationAsync(request, new PhysicalFileSystem(), expandFiles: true, CancellationToken.None);
+        var prepared = await selected.CaptureNativePreparationAsync(request, expandFiles: true, CancellationToken.None);
 
         prepared.Failure.Should().BeNull();
         prepared.Snapshot!.Source.TemplateIdentity.Should().Be(selected.Entry.Identity);
@@ -50,7 +52,7 @@ public sealed class NativeTemplatePreparationCaptureTests : IDisposable
         var selected = (await templater.ResolveGroupAsync("Controlled.Preparation", TemplateType.Item)).Group![0];
 
         var prepared = await selected.CaptureNativePreparationAsync(new(WorkingDirectory.FromExplicit(Target),
-            new Dictionary<string, string?>()), new PhysicalFileSystem(), expandFiles: false, CancellationToken.None);
+            new Dictionary<string, string?>()), expandFiles: false, CancellationToken.None);
 
         prepared.Failure.Should().BeNull();
         prepared.Snapshot!.ExpandedFiles.Should().BeEmpty();
@@ -81,7 +83,7 @@ public sealed class NativeTemplatePreparationCaptureTests : IDisposable
 
         var prepared = await selected.CaptureNativePreparationAsync(new(WorkingDirectory.FromExplicit(Target),
             invalid == "parameters" ? new Dictionary<string, string?> { ["Unknown"] = "value" } : [],
-            invalid == "name" ? null : "Named"), new PhysicalFileSystem(), expandFiles: true, CancellationToken.None);
+            invalid == "name" ? null : "Named"), expandFiles: true, CancellationToken.None);
 
         prepared.Snapshot.Should().BeNull();
         prepared.Failure.Should().NotBeNull();
@@ -104,10 +106,46 @@ public sealed class NativeTemplatePreparationCaptureTests : IDisposable
         await cancellation.CancelAsync();
 
         Func<Task> act = () => selected.CaptureNativePreparationAsync(new(WorkingDirectory.FromExplicit(Target),
-            new Dictionary<string, string?>(), "Named"), new PhysicalFileSystem(), expandFiles: true, cancellation.Token);
+            new Dictionary<string, string?>(), "Named"), expandFiles: true, cancellation.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Snapshot_CopiesNativeActionsOutputsMappingsAndBytes()
+    {
+        Dictionary<string, string> arguments = new() { ["files"] = "0" };
+        var action = Substitute.For<IPostAction>();
+        action.ActionId.Returns(Guid.Parse("84c0da21-51c8-4541-9940-6ca19af04ee6"));
+        action.Args.Returns(arguments);
+        var path = Substitute.For<ICreationPath>();
+        path.Path.Returns("Named.fs");
+        var creation = Substitute.For<ICreationResult>();
+        creation.PrimaryOutputs.Returns([path]);
+        creation.PostActions.Returns([action]);
+        var mapping = Substitute.For<IFileChange2>();
+        mapping.SourceRelativePath.Returns("Item.fs");
+        mapping.TargetRelativePath.Returns("Named.fs");
+        mapping.ChangeKind.Returns(ChangeKind.Create);
+        var effects = Substitute.For<ICreationEffects>();
+        effects.FileChanges.Returns([mapping]);
+        effects.CreationResult.Returns(creation);
+        byte[] bytes = [1, 2, 3];
+        Dictionary<string, ReadOnlyMemory<byte>> files = new() { ["Named.fs"] = bytes };
+        NativeTemplatePreparationSnapshot snapshot = new(new("Selected", "config", new('A', 64)), effects, files);
+
+        bytes[0] = 99;
+        files.Clear();
+        arguments["files"] = "changed";
+        path.Path.Returns("Changed.fs");
+        mapping.TargetRelativePath.Returns("Changed.fs");
+        creation.PostActions.Returns([]);
+
+        snapshot.ExpandedFiles["Named.fs"].ToArray().Should().Equal(1, 2, 3);
+        snapshot.Effects.FileChanges.Should().ContainSingle().Which.TargetRelativePath.Should().Be("Named.fs");
+        snapshot.Effects.CreationResult.PrimaryOutputs.Should().ContainSingle().Which.Path.Should().Be("Named.fs");
+        snapshot.Effects.CreationResult.PostActions.Should().ContainSingle().Which.Args["files"].Should().Be("0");
     }
 
     [Theory]
@@ -117,21 +155,20 @@ public sealed class NativeTemplatePreparationCaptureTests : IDisposable
     [InlineData("changed-source")]
     public async Task Capture_UnexpectedPrivateExpansion_RefusesDetachedSnapshot(string invalid)
     {
-        using var templater = await OpenAsync((directory, _) =>
+        using var templater = await OpenAsync((fileSystem, directory, _) =>
         {
-            if (invalid == "extra-file") File.WriteAllText(Path.Combine(directory, "unexpected.txt"), "not-previewed");
-            if (invalid == "extra-directory") Directory.CreateDirectory(Path.Combine(directory, "unexpected"));
+            if (invalid == "extra-file") fileSystem.WriteAllText(Path.Combine(directory, "unexpected.txt"), "not-previewed");
+            if (invalid == "extra-directory") fileSystem.CreateDirectory(Path.Combine(directory, "unexpected"));
             if (invalid == "wrong-kind")
             {
-                File.Delete(Path.Combine(directory, "Named.fs"));
-                Directory.CreateDirectory(Path.Combine(directory, "Named.fs"));
+                fileSystem.CreateDirectory(Path.Combine(directory, "Named.fs"));
             }
             if (invalid == "changed-source") File.AppendAllText(Configuration, Environment.NewLine);
         });
         var selected = (await templater.ResolveGroupAsync("Controlled.Preparation", TemplateType.Item)).Group![0];
 
         var prepared = await selected.CaptureNativePreparationAsync(new(WorkingDirectory.FromExplicit(Target),
-            new Dictionary<string, string?>(), "Named"), new PhysicalFileSystem(), expandFiles: true, CancellationToken.None);
+            new Dictionary<string, string?>(), "Named"), expandFiles: true, CancellationToken.None);
 
         prepared.Snapshot.Should().BeNull();
         prepared.Failure.Should().NotBeNull();
@@ -146,7 +183,7 @@ public sealed class NativeTemplatePreparationCaptureTests : IDisposable
         }
     }
 
-    private async Task<Templater> OpenAsync(Action<string, CancellationToken>? afterExpansion = null)
+    private async Task<Templater> OpenAsync(Action<IPhysicalFileSystem, string, CancellationToken>? afterExpansion = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Configuration)!);
         File.WriteAllText(Configuration, """
@@ -161,17 +198,17 @@ public sealed class NativeTemplatePreparationCaptureTests : IDisposable
         string hive = Path.Combine(_root, "hive");
         await TemplateFixtures.InstallAsync(Package, hive, CancellationToken.None);
         var directory = WorkingDirectory.FromExplicit(Target);
-        return new(new CaptureSession(new(directory, new(directory, "dotnet", "F#")), hive, afterExpansion));
+        return TemplateFixtures.CreateTemplater(new CaptureSession(new(directory, new(directory, "dotnet", "F#")), hive, afterExpansion));
     }
 
-    private sealed class CaptureSession(TemplateEngineContext context, string hive, Action<string, CancellationToken>? afterExpansion)
+    private sealed class CaptureSession(TemplateEngineContext context, string hive, Action<IPhysicalFileSystem, string, CancellationToken>? afterExpansion)
         : TemplateEngineSession(context, hive)
     {
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
             InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             var result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
-            if (!dryRun) afterExpansion?.Invoke(request.OutputDirectory.Info.FullName, cancellationToken);
+            if (!dryRun) afterExpansion?.Invoke(Settings.Host.FileSystem, request.OutputDirectory.Info.FullName, cancellationToken);
             return result;
         }
     }

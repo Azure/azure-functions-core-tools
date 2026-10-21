@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Tests.Common;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
@@ -1364,8 +1365,16 @@ public class InitCommandTests
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>()).Returns(original);
             Exception failure = denied ? new UnauthorizedAccessException("denied") : new IOException("write failed");
-            fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
-                .Returns(Task.FromException(failure));
+            if (heal)
+            {
+                fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(Task.FromException(failure));
+            }
+            else
+            {
+                fileSystem.CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(Task.FromException(failure));
+            }
             var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
             var command = CreateCommand([initializer], fileSystem);
 
@@ -1381,7 +1390,16 @@ public class InitCommandTests
             if (heal) File.ReadAllText(configPath).Should().Be(original);
             else File.Exists(configPath).Should().BeFalse();
             _interaction.Lines.Should().BeEmpty();
-            await fileSystem.Received(1).WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+            if (heal)
+            {
+                await fileSystem.Received(1).WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            }
+            else
+            {
+                await fileSystem.Received(1).CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            }
         }
         finally
         {
@@ -1405,14 +1423,23 @@ public class InitCommandTests
             if (heal) File.WriteAllText(configPath, original);
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>()).Returns(original);
-            fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(call =>
+            Task CancelWriteAsync(CancellationToken forwarded)
             {
-                var forwarded = call.Arg<CancellationToken>();
                 forwarded.CanBeCanceled.Should().BeTrue();
                 cancellation.Cancel();
                 forwarded.IsCancellationRequested.Should().BeTrue();
                 return Task.FromCanceled(forwarded);
-            });
+            }
+            if (heal)
+            {
+                fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(call => CancelWriteAsync(call.Arg<CancellationToken>()));
+            }
+            else
+            {
+                fileSystem.CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(call => CancelWriteAsync(call.Arg<CancellationToken>()));
+            }
             var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
             var command = CreateCommand([initializer], fileSystem);
 
@@ -1448,14 +1475,25 @@ public class InitCommandTests
             if (heal) File.WriteAllText(configPath, original);
             var fileSystem = Substitute.For<IFileSystem>();
             fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>()).Returns(original);
-            fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async call =>
+            async Task CommitAndCancelAsync(string contents, CancellationToken forwarded)
             {
-                var forwarded = call.Arg<CancellationToken>();
                 forwarded.CanBeCanceled.Should().BeTrue();
-                await new PhysicalFileSystem().WriteAllTextAsync(configPath, call.ArgAt<string>(1), forwarded);
+                PhysicalFileSystem physical = new();
+                if (heal) await physical.WriteAllTextAsync(configPath, contents, forwarded);
+                else await physical.CreateAllTextAsync(configPath, contents, forwarded);
                 cancellation.Cancel();
                 forwarded.IsCancellationRequested.Should().BeTrue();
-            });
+            }
+            if (heal)
+            {
+                fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(call => CommitAndCancelAsync(call.ArgAt<string>(1), call.Arg<CancellationToken>()));
+            }
+            else
+            {
+                fileSystem.CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(call => CommitAndCancelAsync(call.ArgAt<string>(1), call.Arg<CancellationToken>()));
+            }
             var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
             var command = CreateCommand([initializer], fileSystem);
 
@@ -1472,7 +1510,16 @@ public class InitCommandTests
             Directory.GetFiles(Path.Combine(directory, ".func"), "config.json.tmp.*").Should().BeEmpty();
             initializer.WasInvoked.Should().BeFalse();
             _interaction.Lines.Should().BeEmpty();
-            await fileSystem.Received(1).WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+            if (heal)
+            {
+                await fileSystem.Received(1).WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            }
+            else
+            {
+                await fileSystem.Received(1).CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            }
         }
         finally
         {
@@ -1508,6 +1555,7 @@ public class InitCommandTests
                 .Should().ThrowAsync<OperationCanceledException>();
 
             await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
             initializer.WasInvoked.Should().BeFalse();
             if (heal) File.ReadAllText(configPath).Should().Be(original);
             else File.Exists(configPath).Should().BeFalse();
@@ -1528,7 +1576,7 @@ public class InitCommandTests
         {
             var fileSystem = Substitute.For<IFileSystem>();
             var failure = new IOException("write failed");
-            fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            fileSystem.CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromException(failure));
             var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
             var command = CreateCommand([initializer], fileSystem);
@@ -1567,8 +1615,71 @@ public class InitCommandTests
 
             exception.Which.InnerException.Should().BeOfType<InvalidOperationException>();
             await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
             initializer.WasInvoked.Should().BeFalse();
             _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task InitCommand_ConfigAppearsAtAtomicCommit_RespectsForce(bool adopt, bool force)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string hostPath = Path.Combine(directory, "host.json");
+            if (adopt) File.WriteAllText(hostPath, "{\"version\":\"2.0\",\"keep\":true}");
+            byte[] sentinel = [0, 1, 255, 42];
+            var fileSystem = new CommitBoundaryFileSystem(destination => File.WriteAllBytes(destination, sentinel));
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            File.Exists(configPath).Should().BeFalse();
+            List<string> arguments = [directory, "--stack", "node", "--language", "javascript"];
+            if (force) arguments.Add("--force");
+            int? exitCode = null;
+
+            var failure = await Record.ExceptionAsync(async () => exitCode = await command.Parse([.. arguments])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }));
+
+            fileSystem.CommitCalls.Should().Be(1);
+            Directory.GetFiles(Path.GetDirectoryName(configPath)!).Should().Equal(configPath);
+            if (force)
+            {
+                failure.Should().BeNull();
+                exitCode.Should().Be(0);
+                initializer.WasInvoked.Should().BeTrue();
+                AssertConfigJsonHasShape(directory, expectedStack: "node", expectedLanguage: "javascript");
+            }
+            else
+            {
+                File.ReadAllBytes(configPath).Should().Equal(sentinel);
+                var graceful = failure.Should().BeOfType<GracefulException>().Subject;
+                graceful.InnerException.Should().BeSameAs(fileSystem.CommitFailure);
+                graceful.InnerException.Should().BeAssignableTo<IOException>();
+                graceful.IsUserError.Should().BeTrue();
+                exitCode.Should().BeNull();
+                initializer.WasInvoked.Should().BeFalse();
+                _interaction.Lines.Should().BeEmpty();
+                if (adopt) File.ReadAllText(hostPath).Should().Be("{\"version\":\"2.0\",\"keep\":true}");
+
+                int repeated = await command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                    .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+                repeated.Should().Be(1);
+                fileSystem.CommitCalls.Should().Be(1);
+                File.ReadAllBytes(configPath).Should().Equal(sentinel);
+                initializer.WasInvoked.Should().BeFalse();
+            }
         }
         finally
         {
@@ -1666,7 +1777,7 @@ public class InitCommandTests
             File.WriteAllText(Path.Combine(directory, "host.json"), "{}");
             var fileSystem = Substitute.For<IFileSystem>();
             var failure = new NotSupportedException("unexpected writer defect");
-            fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            fileSystem.CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromException(failure));
             var initializer = new FakeProjectInitializer("node");
             var command = CreateCommand([initializer], fileSystem);

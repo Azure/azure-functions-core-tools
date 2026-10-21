@@ -53,9 +53,9 @@ internal sealed class NewExecutionRunner(
             return NewExecutionResult.Reject("invalidName", "Supply a nonempty --name.");
         }
 
-        if (request.List && (request.RawTemplateTokens.Count > 0 || request.DryRun))
+        if (request.List && (request.RawTemplateTokens.Count > 0 || request.DryRun || request.Force || request.Name is not null))
         {
-            return NewExecutionResult.Reject("invalidListArguments", "Use --list without template arguments or --dry-run.");
+            return NewExecutionResult.Reject("invalidListArguments", "Use --list without template arguments, --name, --force or --dry-run.");
         }
 
         bool canPrompt = !request.NonInteractive && _interaction.IsInteractive;
@@ -67,11 +67,12 @@ internal sealed class NewExecutionRunner(
         }
 
         TemplateEngineContext context = resolved.Context ?? throw new InvalidOperationException("Context resolution returned no outcome.");
+        context = context with { RequireCleanStore = request.DryRun || request.List };
         using Templater templater = await _factory.CreateAsync(context, availability, cancellationToken,
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
         NewExecutionResult result = await ExecuteAsync(templater, request, canPrompt, cancellationToken);
-        if (request.DryRun || !result.HasCompletedCreation)
+        if (request.DryRun || !result.HasReturnedCreationResult)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -292,10 +293,22 @@ internal sealed class NewExecutionRunner(
             };
         }
 
-        TemplateInvocationResult? effectInvocation = selectedEffects is not null && effectBinding is not null
-            ? await selectedEffects.InvokeAsync(templater, selected, effectBinding, invocationRequest, cancellationToken) : null;
-        cancellationToken.ThrowIfCancellationRequested();
-        TemplateInvocationResult invocation = effectInvocation ?? await selected.InvokeAsync(invocationRequest, cancellationToken);
+        TemplateInvocationResult invocation;
+        try
+        {
+            TemplateInvocationResult? effectInvocation = selectedEffects is not null && effectBinding is not null
+                ? await selectedEffects.InvokeAsync(templater, selected, effectBinding, invocationRequest, cancellationToken) : null;
+            if (effectInvocation is null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            invocation = effectInvocation ?? await selected.InvokeAsync(invocationRequest, cancellationToken);
+        }
+        catch (OperationCanceledException exception) when (exception.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey] is string)
+        {
+            _interaction.WriteWarning((string)exception.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey]!);
+            throw;
+        }
         bool success = invocation.Status == TemplateInvocationStatus.Success;
 
         NewExecutionResult result = new(success ? request.DryRun ? "previewed" : "created" : "invocationFailed", success)
@@ -306,7 +319,7 @@ internal sealed class NewExecutionRunner(
             ItemName = itemName,
             Diagnostics = invocation.Diagnostic is null ? [] : [invocation.Diagnostic],
         };
-        if (request.DryRun || !result.HasCompletedCreation)
+        if (request.DryRun || !result.HasReturnedCreationResult)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }

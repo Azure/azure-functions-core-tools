@@ -11,9 +11,10 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// Command-scoped entry point to the template engine. Create it through <see cref="ITemplaterFactory"/> and dispose
 /// it when the command is finished with templates.
 /// </summary>
-internal sealed class Templater(TemplateEngineSession session) : IDisposable
+internal sealed class Templater(TemplateEngineSession session, TemplateInvocationCoordinator invocation) : IDisposable
 {
     private readonly TemplateEngineSession _session = session ?? throw new ArgumentNullException(nameof(session));
+    private readonly TemplateInvocationCoordinator _invocation = ValidateInvocation(session, invocation);
     private IReadOnlyList<Candidate>? _candidates;
     private IReadOnlyList<MalformedTypeDescriptor> _malformedTypes = [];
 
@@ -114,12 +115,8 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
                 continue;
             }
 
-            items.Add(new(candidate.Entry, (request, token) => _session.InvokeAsync(candidate.Template, candidate.Configuration!, request, token),
-                (path, token) => _session.ReadPackageFileAsync(candidate.Template, path, token), candidate.Configuration!.Fingerprint,
-                token => _session.ValidateSelectedConfigurationAsync(candidate.Template, candidate.Configuration!, token),
-                $"{candidate.Template.MountPointUri}::{candidate.Template.ConfigPlace}",
-                (request, files, expand, token) => _session.CaptureNativePreparationAsync(
-                    candidate.Template, candidate.Configuration!, request, files, expand, token)));
+            items.Add(new(candidate.Entry, new SelectedTemplateInvoker(candidate.Template, candidate.Configuration!, _invocation),
+                candidate.Configuration!.Fingerprint, $"{candidate.Template.MountPointUri}::{candidate.Template.ConfigPlace}"));
         }
 
         TemplateGroup group = new(items.AsReadOnly(), diagnostics.AsReadOnly());
@@ -150,18 +147,13 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
             try
             {
                 TemplateConfigurationSnapshot configuration = await _session.ReadConfigurationAsync(template, cancellationToken);
-                entry = Freeze(TemplateCatalogProjector.Project(template, package, configuration));
-                entry = entry with
-                {
-                    DefaultName = configuration.DefaultName,
-                    DeclaredInternalRole = TemplateCatalogProjector.ReadInternalRole(configuration.Content),
-                };
                 if (configuration.Type is null || configuration.Type != entry.Type)
                 {
                     candidates.Add(FailedCandidate(template, entry, "Current mounted template type is missing, unrecognized, or differs from its cached descriptor. Correct the type and refresh the installed template before rerunning selection."));
                     continue;
                 }
 
+                entry = Freeze(TemplateCatalogProjector.Project(template, package, configuration));
                 if (!packageMetadata.TryGetValue(template.MountPointUri, out Task<IReadOnlyCollection<string>>? metadata))
                 {
                     metadata = _session.ReadPackageTypesAsync(package, cancellationToken);
@@ -169,13 +161,13 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
                 }
 
                 IReadOnlyCollection<string> packageTypes = await metadata;
-                TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Content, cancellationToken, packageTypes);
-                if (entry.Type == TemplateType.Project && _session.ProjectTemplatesEnabled)
+                TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Root, cancellationToken, packageTypes);
+                if (entry.Type == TemplateType.Project && _invocation.ProjectTemplatesEnabled)
                 {
                     try
                     {
-                        await _session.QualifyProjectConfigurationAsync(template, entry, configuration, cancellationToken);
-                        entry = entry with { ProjectConfigurations = _session.ValidateProjectConfiguration(configuration.Content) };
+                        await _invocation.QualifyProjectConfigurationAsync(template, entry, configuration, cancellationToken);
+                        entry = entry with { ProjectConfigurations = _invocation.ValidateProjectConfiguration(configuration.Content) };
                     }
                     catch (InvalidTemplateMetadataException exception)
                     {
@@ -214,6 +206,14 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
     }
 
     public void Dispose() => _session.Dispose();
+
+    private static TemplateInvocationCoordinator ValidateInvocation(TemplateEngineSession session, TemplateInvocationCoordinator invocation)
+    {
+        ArgumentNullException.ThrowIfNull(invocation);
+        return invocation.IsBoundTo(session)
+            ? invocation
+            : throw new ArgumentException("The invocation coordinator must use this template flow's session.", nameof(invocation));
+    }
 
     private static TemplateCatalogEntry Freeze(TemplateCatalogEntry entry) => entry with
     {

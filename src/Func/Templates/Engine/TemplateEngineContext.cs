@@ -37,6 +37,8 @@ internal sealed record TemplateEngineContext
 
     public WorkingDirectory CommandDirectory { get; }
 
+    public bool RequireCleanStore { get; init; }
+
     public TemplateEngineProjectContext? Project { get; }
 
     public TemplateEngineBundleContext? Bundle { get; }

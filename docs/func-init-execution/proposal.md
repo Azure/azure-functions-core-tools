@@ -86,8 +86,10 @@ interactive language selection. Runtime-only single-language configs retain the
 public initialized-state refusal. The public command's behavior is unchanged.
 The only shared extraction is pure create/merge JSON serialization from its
 existing persistence helpers; public init retains its I/O order, optional fields,
-error causes and cancellation checks. Both paths still use `IFileSystem`'s
-atomic file writer. Repair merges the latest readable input, preserves profiles
+error causes and cancellation checks. Adoption uses `IFileSystem`'s atomic
+create-only writer, so configuration appearing at the final commit is preserved
+and reported as a failure. Repair retains the atomic overwrite-capable writer.
+Repair merges the latest readable input, preserves profiles
 and unknown keys, and refuses if it disappeared, became invalid, changed runtime
 ownership or acquired a language while input was being resolved.
 
@@ -99,8 +101,15 @@ after a committed write preserves that file but renders no success. These checks
 do not promise a transaction across concurrent external edits or output writes.
 
 On the empty-target path, the directory becomes both command directory and
-prospective project root before opening one protected project flow; stack,
-language, bundle and existing-project profile defaults remain unavailable.
+prospective project root before opening one protected project flow;
+stack, language, bundle and existing-project profile defaults remain unavailable.
+Dry-run requests a clean store. A pending recovery journal, whether valid or
+corrupt, is refused under shared admission before exclusive recovery or native
+bootstrap. Live hive, journal and snapshot bytes remain unchanged. Ordinary
+creation retains the store's existing recovery path. Private caches and lock
+control activity are not a promise of zero filesystem activity. Even a forced
+preview remains refused by this bounded stage; no public force-cleanup policy
+is imported.
 
 Project catalog entries carry the existing planner's unconditional declarations
 from that flow's configuration snapshot. Whole-template filters use their
@@ -131,9 +140,18 @@ configured roots come only from the actual invocation. Dry-run and post-preview
 target refusal never imply completed effects. This keeps preview output truthful
 when the runtime reports only confirmed effects after creation or partial
 finalization.
+The internal configuration-plan projection is omitted from direct native-result
+JSON, preserving that existing serialization shape. INIT renders the plans
+explicitly through its `plannedConfigurations` property.
 Pre-create native refusals may still carry planned `Changes`; those are never
-rendered as completed. Completed effects are exposed only for successful native
-creation or partial configuration finalization, with the native result unchanged.
+rendered as completed. Completed effects use the current native producer's real-output commit marker,
+not a success-shaped private render or a nonempty preview. An installation
+failure after a real output move retains its confirmed effects and nonzero
+result even if cancellation arrives afterward. Cancellation during configuration
+after native files were installed similarly returns partial initialization,
+including only configurations already committed. Neither case reports success
+or rolls back generated files. Cancellation before real output still propagates.
+The native result remains unchanged.
 Every result after successful plan computation retains that ordered planned
 metadata, including subsequent conflict or revalidation failures; a result
 before planning has no synthetic plan. Project configuration diagnostics remain
@@ -171,9 +189,9 @@ until the workflow needs them. The catalog resolves once before support or an
 engine environment is requested, so conflicting definitions still return the
 structured `duplicateStacks` failure without creating files.
 Adoption and repair resolve that same catalog once but never request paired
-project-template support. Their deliberate configuration create/merge path
-continues to use the legacy atomic overwrite-capable writer, not the native
-fresh-project create-only writer. Shared catalog conflicts are rejected before
+project-template support. Adoption uses the atomic create-only writer, while
+repair retains the atomic overwrite-capable merge writer. Shared catalog
+conflicts are rejected before
 adoption or repair; formerly local ambiguity diagnostics use `duplicateStacks`
 for the existing shared ownership conflict contract.
 
@@ -203,7 +221,7 @@ guard/name/topology algorithms. This stage does not clear the remaining
 provider-held review gate, and its controlled fixtures do not establish general
 type, path, concurrent-store or platform safety. The additive
 declaration/result projection hunks in `Templater.GetCandidatesAsync`,
-`TemplateEngineSession.ValidateProjectConfiguration` / project result initializers,
+`TemplateInvocationCoordinator.ValidateProjectConfiguration` / project result initializers,
 `TemplateCatalogEntry` and `TemplateInvocationResult` are explicit future
 composition conflict surfaces; snapshot shape, mounted-type authorization,
 read-snapshot validation, effect/path guards and native invocation order are

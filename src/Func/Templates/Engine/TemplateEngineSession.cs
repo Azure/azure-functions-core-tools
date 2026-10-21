@@ -1,21 +1,18 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Collections.ObjectModel;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Xml;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Components;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.Mount;
-using Microsoft.TemplateEngine.Abstractions.Parameters;
+using Microsoft.TemplateEngine.Abstractions.PhysicalFileSystem;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 using Microsoft.TemplateEngine.Edge.Template;
-using Microsoft.TemplateEngine.Orchestrator.RunnableProjects.ConfigModel;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 
@@ -29,84 +26,34 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// session instead of building a new environment. Once disposed, the session refuses further use rather than
 /// letting callers create a replacement environment without the command context.
 /// </remarks>
-internal class TemplateEngineSession : IDisposable
+internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
+    private readonly FuncTemplateEngineHost _host;
     private readonly TemplatePackageManager _packageManager;
     private readonly TemplateConstraintManager _constraintManager;
     private readonly TemplateCreator _creator;
-    private readonly TemplateProjectSupport? _projectSupport;
     private readonly IDisposable? _ownership;
     private readonly TemplateStoreEngineDiagnostics? _diagnostics;
-    private NativeMsBuildBindingSnapshot? _msBuildBindings;
-    private readonly Dictionary<string, DotNetProjectLayoutQualification> _projectLayouts = new(StringComparer.Ordinal);
     private bool _disposed;
 
     public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null,
-        TemplateProjectSupport? projectSupport = null,
         IDisposable? ownership = null, TemplateStoreEngineDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
+
         Context = context;
-        _projectSupport = projectSupport;
         _ownership = ownership;
         _diagnostics = diagnostics;
-        _settings = new(new FuncTemplateEngineHost(context, snapshot, diagnostics), settingsLocation: settingsLocation);
+        _host = new(context, snapshot, diagnostics);
+        _settings = new(_host, settingsLocation: settingsLocation);
         _packageManager = new(_settings);
         _constraintManager = new(_settings);
         _creator = new(_settings);
     }
 
     public TemplateEngineContext Context { get; }
-
-    public bool ProjectTemplatesEnabled => _projectSupport is not null;
-
-    public IReadOnlyList<TemplateProjectConfigurationDeclaration> ValidateProjectConfiguration(string configuration)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_projectSupport is null)
-        {
-            throw new InvalidTemplateMetadataException("Mandatory project configuration is not enabled in this template flow.");
-        }
-
-        return ProjectSupport(configuration)?.DotNetLayout is { } layout
-            ? _projectSupport.Planner.ReadDotNetLayout(configuration, layout)
-            : _projectSupport.Planner.Read(configuration);
-    }
-
-    internal async Task QualifyProjectConfigurationAsync(ITemplateInfo template, TemplateCatalogEntry entry,
-        TemplateConfigurationSnapshot configuration, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(template);
-        ArgumentNullException.ThrowIfNull(entry);
-        ArgumentNullException.ThrowIfNull(configuration);
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (_projectSupport?.QualifyLayoutAsync is not { } qualify)
-        {
-            return;
-        }
-
-        NativeProjectTemplateSource source = new(entry, configuration, $"{template.MountPointUri}::{template.ConfigPlace}",
-            (path, token) => ReadPackageFileAsync(template, path, token));
-        DotNetProjectLayoutQualification? layout = await qualify(source, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (layout is not null)
-        {
-            if (layout.TemplateIdentity != entry.Identity
-                || !string.Equals(layout.ConfigurationFingerprint, configuration.Fingerprint, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidTemplateMetadataException("Project layout qualification does not match the exact mounted candidate.");
-            }
-
-            _projectLayouts[configuration.Content] = layout;
-        }
-    }
-
-    private TemplateProjectSupport? ProjectSupport(string configuration) => _projectSupport is { } support
-        && _projectLayouts.TryGetValue(configuration, out DotNetProjectLayoutQualification? layout)
-        ? support with { DotNetLayout = layout } : _projectSupport;
 
     public IEngineEnvironmentSettings Settings
     {
@@ -184,13 +131,13 @@ internal class TemplateEngineSession : IDisposable
 
         return new(configuration, fingerprint, TemplateCatalogProjector.GetTemplateType(loaded), Array.AsReadOnly<ITemplateParameter>([.. loaded.ParameterDefinitions]))
         {
-            DefaultName = string.IsNullOrEmpty(loaded.DefaultName) ? null : loaded.DefaultName,
+            DefaultName = loaded.DefaultName,
             HostConfigPlace = hostFile?.FullPath,
             HostData = hostData,
         };
     }
 
-    internal async Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken)
+    public async Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
@@ -199,7 +146,7 @@ internal class TemplateEngineSession : IDisposable
             throw new ArgumentException("Supply an exact package-relative source path without traversal.", nameof(relativePath));
         }
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
         if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
         {
@@ -227,162 +174,43 @@ internal class TemplateEngineSession : IDisposable
         return content.ToArray();
     }
 
-    internal async Task<NativeTemplatePreparationResult> CaptureNativePreparationAsync(ITemplateInfo template,
-        TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request, Common.IFileSystem fileSystem,
-        bool expandFiles, CancellationToken cancellationToken)
+    public void ApplyBindings(NativeMsBuildBindingSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ThrowIfDisposed();
+        _settings.Components.AddComponent(typeof(IBindSymbolSource), new NativeMsBuildBindingSnapshotSource(snapshot));
+    }
+
+    public async Task<TemplateEffectSource> CaptureMappedSourceAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(template);
-        ArgumentNullException.ThrowIfNull(configuration);
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(fileSystem);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+        string relative = NativeTemplateSourceSnapshot.Normalize(relativePath.Replace('\\', '/'));
+        if (Path.IsPathRooted(relative) || relative.Split('/').Any(part => part is "" or "." or ".."))
+        {
+            throw new InvalidTemplateMetadataException("The native source mapping is not an exact template-relative regular file.");
+        }
+        ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
-        TemplateInvocationResult? invalid = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
-        if (invalid is not null)
+        if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
         {
-            return new(null, invalid);
+            throw new InvalidTemplateMetadataException("The selected template has no registered generator.");
         }
-
-        invalid = await ValidateSourceSnapshotAsync(template, configuration, request.SourceSnapshot, cancellationToken);
-        if (invalid is not null)
+        ITemplate? loaded = await generator.LoadTemplateAsync(_settings, template, null, cancellationToken);
+        using var lifetime = loaded as IDisposable;
+        if (loaded?.Configuration is not IFile configuration || loaded.TemplateSourceRoot is not { } root)
         {
-            return new(null, invalid);
+            throw new InvalidTemplateMetadataException("The selected template has no mounted native source root.");
         }
-
-        string? diagnostic = QualifyMsBuildBindings(template, configuration, request)
-            ?? TemplateOutputPathValidator.GetDiagnostic(configuration.Content, GetPopulatedParameters(template, configuration, request), Context);
-        if (diagnostic is not null)
+        string mounted = root.FullPath.TrimEnd('/', '\\') + "/" + relative;
+        string mountRoot = configuration.MountPoint.Root.FullPath.TrimEnd('/', '\\') + "/";
+        if (!mounted.StartsWith(mountRoot, StringComparison.Ordinal))
         {
-            return Failed(diagnostic);
+            throw new InvalidTemplateMetadataException("The native source mapping is outside the selected package.");
         }
-
-        ITemplateCreationResult preview = await InstantiateAsync(template, request, CreateInputData(configuration.Parameters, request.Parameters), true, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (preview.Status != CreationResultStatus.Success || preview.CreationEffects is null)
-        {
-            return Failed(preview.ErrorMessage ?? "Native preparation did not report evaluated creation effects.");
-        }
-
-        ICreationEffects effects = preview.CreationEffects;
-        using var sourceConfiguration = new MemoryStream(Encoding.UTF8.GetBytes(configuration.Content));
-        string? sourcePlaceholder = TemplateConfigModel.FromStream(sourceConfiguration).PlaceholderFilename;
-        IReadOnlyList<string> sourcePlaceholders = string.IsNullOrWhiteSpace(sourcePlaceholder) ? ["-.-", "_._"] : [sourcePlaceholder];
-        if (request.SourceSnapshot is { } snapshot && (!MatchesOutputSources(snapshot, effects.FileChanges)
-            || effects.FileChanges.OfType<IFileChange2>().Any(change => sourcePlaceholders.Contains(Path.GetFileName(change.SourceRelativePath), StringComparer.Ordinal))))
-        {
-            return Failed("Native preparation does not match the qualified regular-file sources.");
-        }
-
-        TemplateFileChange[] changes = [.. effects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))];
-        diagnostic = ValidateOutputPaths(request.OutputDirectory.Info.FullName, changes);
-        if (diagnostic is not null)
-        {
-            return Failed(diagnostic);
-        }
-
-        Dictionary<string, ReadOnlyMemory<byte>> expanded = new(StringComparer.Ordinal);
-        if (expandFiles)
-        {
-            if (string.IsNullOrWhiteSpace(request.Name) || effects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create))
-            {
-                return Failed("Private native expansion requires an explicit effective name and create-only native outputs.");
-            }
-
-            using Common.TempDirectory temporary = fileSystem.CreateTempDirectory();
-            var output = Common.WorkingDirectory.FromExplicit(temporary.Path);
-            TemplateInvocationRequest expansionRequest = request with { OutputDirectory = output, EffectSupport = null, MsBuildBindings = null };
-            diagnostic = ValidateOutputPaths(output.Info.FullName, changes);
-            if (diagnostic is not null)
-            {
-                return Failed(diagnostic);
-            }
-
-            // Native instantiation reports post-actions but does not dispatch them.
-            invalid = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken)
-                ?? await ValidateSourceSnapshotAsync(template, configuration, request.SourceSnapshot, cancellationToken);
-            if (invalid is not null)
-            {
-                return new(null, invalid);
-            }
-
-            ITemplateCreationResult created = await InstantiateAsync(template, expansionRequest, CreateInputData(configuration.Parameters, expansionRequest.Parameters), false, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            using var configurationStream = new MemoryStream(Encoding.UTF8.GetBytes(configuration.Content));
-            string? placeholder = TemplateConfigModel.FromStream(configurationStream).PlaceholderFilename;
-            IReadOnlyList<string> placeholders = string.IsNullOrWhiteSpace(placeholder) ? ["-.-", "_._"] : [placeholder];
-            HashSet<string> directories = new(effects.FileChanges.OfType<IFileChange2>()
-                .Where(change => placeholders.Contains(Path.GetFileName(change.SourceRelativePath), StringComparer.Ordinal))
-                .Select(change => change.TargetRelativePath), StringComparer.Ordinal);
-            if (created.Status != CreationResultStatus.Success || created.CreationEffects is null
-                || !created.CreationEffects.FileChanges.Select(change => change.TargetRelativePath).Order(StringComparer.Ordinal)
-                    .SequenceEqual(effects.FileChanges.Select(change => change.TargetRelativePath).Order(StringComparer.Ordinal), StringComparer.Ordinal)
-                || created.CreationEffects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create)
-                || (request.SourceSnapshot is { } expandedSources && !MatchesOutputSources(expandedSources, created.CreationEffects.FileChanges))
-                || ValidateOutputPaths(output.Info.FullName, changes) is not null
-                || changes.Any(change => !HasExpectedOutputKind(output.Info.FullName, change, directories)))
-            {
-                return Failed("Private native expansion did not produce the exact previewed source output paths.");
-            }
-
-            foreach (IFileChange change in created.CreationEffects.FileChanges)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string path = Path.GetFullPath(Path.Combine(output.Info.FullName, change.TargetRelativePath));
-                if (fileSystem.FileExists(path))
-                {
-                    using Stream stream = _settings.Host.FileSystem.OpenRead(path);
-                    using MemoryStream content = new();
-                    await stream.CopyToAsync(content, cancellationToken);
-                    expanded.Add(change.TargetRelativePath, content.ToArray());
-                }
-                else if (!fileSystem.DirectoryExists(path))
-                {
-                    return Failed("Private native expansion contains a missing or unsupported output kind.");
-                }
-            }
-
-            StringComparer comparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-            string[] expectedFiles = [.. expanded.Keys.Select(path => Path.GetFullPath(Path.Combine(output.Info.FullName, path))).Order(comparer)];
-            if (!fileSystem.GetFiles(output.Info.FullName).Select(Path.GetFullPath).Order(comparer).SequenceEqual(expectedFiles, comparer))
-            {
-                return Failed("Private native expansion produced unexpected source files.");
-            }
-
-            HashSet<string> allowed = new(comparer);
-            foreach (TemplateFileChange change in changes)
-            {
-                for (string? path = Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path));
-                    path is not null && !comparer.Equals(path, output.Info.FullName); path = Path.GetDirectoryName(path))
-                {
-                    allowed.Add(path);
-                }
-            }
-
-            Queue<string> inspect = new([output.Info.FullName]);
-            while (inspect.TryDequeue(out string? directory))
-            {
-                foreach (string entry in fileSystem.GetFileSystemEntries(directory))
-                {
-                    if (!allowed.Contains(Path.GetFullPath(entry)))
-                    {
-                        return Failed("Private native expansion produced unexpected source entries.");
-                    }
-
-                    if (fileSystem.DirectoryExists(entry))
-                    {
-                        inspect.Enqueue(entry);
-                    }
-                }
-            }
-        }
-
-        invalid = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        return invalid is null ? new(new(new(template.Identity, $"{template.MountPointUri}::{template.ConfigPlace}", configuration.Fingerprint),
-            effects, new ReadOnlyDictionary<string, ReadOnlyMemory<byte>>(expanded)), null) : new(null, invalid);
-
-        static NativeTemplatePreparationResult Failed(string message) =>
-            new(null, new(TemplateInvocationStatus.InvalidTemplate, [], message));
+        string packagePath = mounted[mountRoot.Length..];
+        ReadOnlyMemory<byte> bytes = await ReadPackageFileAsync(template, packagePath, cancellationToken);
+        return new(template.Identity, packagePath, Convert.ToHexString(SHA256.HashData(bytes.Span)));
     }
 
     public virtual async Task<IReadOnlyCollection<string>> ReadPackageTypesAsync(ITemplatePackage? package, CancellationToken cancellationToken)
@@ -401,36 +229,31 @@ internal class TemplateEngineSession : IDisposable
             IEnumerable<NuGet.Packaging.Core.PackageType> types = await reader.GetPackageTypesAsync(cancellationToken);
             return Array.AsReadOnly<string>([.. types.Select(type => type.Name)]);
         }
-        catch (IOException exception)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             throw new InvalidTemplateMetadataException("Installed package host metadata could not be read.", exception);
         }
-        catch (UnauthorizedAccessException exception)
-        {
-            throw new InvalidTemplateMetadataException("Installed package host metadata could not be read.", exception);
-        }
-        catch (InvalidDataException exception)
-        {
-            throw new InvalidTemplateMetadataException("Installed package host metadata is invalid.", exception);
-        }
-        catch (PackagingException exception)
-        {
-            throw new InvalidTemplateMetadataException("Installed package host metadata is invalid.", exception);
-        }
-        catch (XmlException exception)
+        catch (Exception exception) when (exception is InvalidDataException or PackagingException or XmlException)
         {
             throw new InvalidTemplateMetadataException("Installed package host metadata is invalid.", exception);
         }
     }
 
-    public async Task<TemplateConstraintEvaluation> EvaluateConstraintsAsync(string configuration, CancellationToken cancellationToken, IReadOnlyCollection<string>? packageTypes = null)
+    public Task<TemplateConstraintEvaluation> EvaluateConstraintsAsync(string configuration, CancellationToken cancellationToken, IReadOnlyCollection<string>? packageTypes = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        return EvaluateConstraintsAsync(TemplateConfigurationSnapshot.ParseRoot(configuration), cancellationToken, packageTypes);
+    }
+
+    public async Task<TemplateConstraintEvaluation> EvaluateConstraintsAsync(
+        JsonElement configuration, CancellationToken cancellationToken, IReadOnlyCollection<string>? packageTypes = null)
+    {
+        ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<TemplateConstraintDeclaration> declarations = TemplateConstraintDeclarationReader.Read(configuration, packageTypes);
-        using var document = JsonDocument.Parse(configuration, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
-        if (document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.EnumerateObject().Any(property =>
+        if (configuration.ValueKind == JsonValueKind.Object && configuration.EnumerateObject().Any(property =>
             string.Equals(property.Name, "additionalConfigFiles", StringComparison.OrdinalIgnoreCase)
             && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
         {
@@ -463,650 +286,50 @@ internal class TemplateEngineSession : IDisposable
         return new(status, diagnostics.AsReadOnly());
     }
 
-    public async Task<TemplateInvocationResult> InvokeAsync(ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request, CancellationToken cancellationToken)
+    IPhysicalFileSystem ITemplateInvocationEngine.FileSystem
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _host.FileSystem;
+        }
+    }
+
+    public void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+
+    async Task<ITemplateCreationResult> ITemplateInvocationEngine.RenderImageAsync(
+        ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, TemplateOutputImage image, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(template);
-        ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(request);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(request.OutputDirectory);
+        ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentNullException.ThrowIfNull(image);
+        ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
-        TemplateInvocationResult? configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
-        if (configurationFailure is not null)
+        if (!image.IsBoundTo(_host.FileSystem, request.OutputDirectory.Info.FullName))
         {
-            return configurationFailure;
+            throw new ArgumentException("The output image must use this session's filesystem and requested output directory.", nameof(image));
         }
-
-        TemplateInvocationResult? sourceFailure = await ValidateSourceSnapshotAsync(template, configuration, request.SourceSnapshot, cancellationToken);
-        if (sourceFailure is not null)
-        {
-            return sourceFailure;
-        }
-
-        string? bindingFailure = QualifyMsBuildBindings(template, configuration, request);
-        if (bindingFailure is not null)
-        {
-            return new(TemplateInvocationStatus.InvalidArguments, [], bindingFailure);
-        }
-
-        if (request.EffectSupport?.FSharpRepair is not null
-            && (configuration.Type != TemplateType.Item
-                || !template.TagsCollection.TryGetValue("language", out string? language) || language != "F#"
-                || !string.Equals(Context.Project?.Stack, "dotnet", StringComparison.OrdinalIgnoreCase)
-                || Context.Project?.Language != "F#"
-                || request.MsBuildBindings?.TargetFramework != "net10.0"
-                || Path.GetExtension(request.EffectSupport.ExactProjectPath) != ".fsproj"))
-        {
-            return new(TemplateInvocationStatus.InvalidArguments, [],
-                "F# compile repair requires the selected F# item, an exact evaluated net10.0 .fsproj snapshot and its controlled dependency capability.");
-        }
-
-        string? topologyFailure = TemplateOutputPathValidator.GetDiagnostic(configuration.Content, GetPopulatedParameters(template, configuration, request), Context);
-        if (topologyFailure is not null)
-        {
-            return new(TemplateInvocationStatus.InvalidTemplate, [], topologyFailure);
-        }
-
-        using var document = JsonDocument.Parse(configuration.Content, new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
-        TemplateProjectSupport? projectSupport = configuration.Type == TemplateType.Project ? ProjectSupport(configuration.Content) : null;
-        bool qualifiedDotNetProject = projectSupport?.DotNetLayout is not null;
-        if (projectSupport is not null)
-        {
-            try
-            {
-                ValidateProjectConfiguration(configuration.Content);
-            }
-            catch (InvalidTemplateMetadataException exception)
-            {
-                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
-            }
-
-            if (qualifiedDotNetProject && request.EffectSupport is null)
-            {
-                return new(TemplateInvocationStatus.EffectFailure, [], "Qualified .NET project creation requires an explicit controlled dependency capability.");
-            }
-        }
-        else if ((configuration.Type != TemplateType.Item || request.EffectSupport is null)
-            && document.RootElement.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
-            && property.Value.ValueKind != JsonValueKind.Null && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
-        {
-            return new(TemplateInvocationStatus.Failed, [], "Item post-actions require a qualified dispatcher and are not supported by this invocation path.");
-        }
-
-        Dictionary<string, string?> parameters = new(request.Parameters, StringComparer.Ordinal);
-        string output = request.OutputDirectory.Info.FullName;
-        ITemplateCreationResult preview = await InstantiateAsync(template, request, CreateInputData(configuration.Parameters, parameters), true, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (preview.Status != CreationResultStatus.Success)
-        {
-            return new(MapCreationStatus(preview.Status, cancellationToken), [], preview.ErrorMessage ?? preview.Status.ToString());
-        }
-
-        IReadOnlyList<TemplateFileChange> templateChanges = Array.AsReadOnly<TemplateFileChange>(
-            [.. (preview.CreationEffects?.FileChanges ?? []).Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
-        using var configurationStream = new MemoryStream(Encoding.UTF8.GetBytes(configuration.Content));
-        string? placeholder = TemplateConfigModel.FromStream(configurationStream).PlaceholderFilename;
-        IReadOnlyList<string> placeholderFilenames = string.IsNullOrWhiteSpace(placeholder) ? ["-.-", "_._"] : [placeholder];
-        // Native placeholder source files represent directory effects, including when the directory is empty.
-        HashSet<string> directoryOutputs = new((preview.CreationEffects?.FileChanges ?? []).OfType<IFileChange2>()
-            .Where(change => placeholderFilenames.Contains(Path.GetFileName(change.SourceRelativePath), StringComparer.Ordinal))
-            .Select(change => change.TargetRelativePath), StringComparer.Ordinal);
-        if (request.SourceSnapshot is { } sourceSnapshot
-            && (directoryOutputs.Count > 0 || !MatchesOutputSources(sourceSnapshot, preview.CreationEffects?.FileChanges ?? [])))
-        {
-            return new(TemplateInvocationStatus.InvalidTemplate, [], "Owned source qualification requires exactly the selected regular-file sources, not placeholder directories or extra outputs.");
-        }
-
-        IReadOnlyList<TemplateFileChange> changes = templateChanges;
-        NativeTemplateEffectResult? effectPreview = null;
-        IReadOnlyList<TemplateProjectConfigurationPlan> configurationPlans = [];
-        if (projectSupport is not null)
-        {
-            try
-            {
-                if (preview.CreationEffects is null)
-                {
-                    return new(TemplateInvocationStatus.InvalidTemplate, [], "Project preview did not produce a configuration plan.");
-                }
-
-                configurationPlans = projectSupport.DotNetLayout is { } layout
-                    ? projectSupport.Planner.CreateDotNetPlans(configuration.Content, preview.CreationEffects, output, layout, parameters)
-                    : projectSupport.Planner.CreatePlans(configuration.Content, preview.CreationEffects, output);
-                if (configurationPlans.Any(projectSupport.Writer.ConfigurationExists))
-                {
-                    return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic)
-                    {
-                        ProjectConfigurations = configurationPlans,
-                    };
-                }
-
-                changes = Array.AsReadOnly<TemplateFileChange>([.. changes,
-                    .. configurationPlans.Select(plan => new TemplateFileChange(Path.GetRelativePath(output, plan.ConfigurationPath), "Create"))]);
-            }
-            catch (InvalidTemplateMetadataException exception)
-            {
-                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message)
-                {
-                    ProjectConfigurations = configurationPlans,
-                };
-            }
-        }
-
-        if ((configuration.Type == TemplateType.Item || qualifiedDotNetProject) && request.EffectSupport is { } effectSupport)
-        {
-            ArgumentNullException.ThrowIfNull(effectSupport.ProjectDirectory);
-            ArgumentNullException.ThrowIfNull(effectSupport.Capability);
-            if (preview.CreationEffects is null)
-            {
-                return new(TemplateInvocationStatus.EffectFailure, [], "Native preview did not report evaluated creation effects.");
-            }
-
-            if (qualifiedDotNetProject)
-            {
-                StringComparer comparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-                if (!Path.IsPathFullyQualified(effectSupport.ExactProjectPath)
-                    || !comparer.Equals(Path.GetFullPath(effectSupport.ExactProjectPath), configurationPlans.Single().PrimaryOutput)
-                    || !comparer.Equals(Path.TrimEndingDirectorySeparator(effectSupport.ProjectDirectory.Info.FullName),
-                        Path.TrimEndingDirectorySeparator(output)))
-                {
-                    return new(TemplateInvocationStatus.EffectFailure, [],
-                        "Qualified .NET dependency effects must target the native-generated project in the exact invocation root.")
-                    {
-                        ProjectConfigurations = configurationPlans,
-                    };
-                }
-            }
-
-            TemplateEffectSource selectedSource = new(template.Identity, $"{template.MountPointUri}::{template.ConfigPlace}", configuration.Fingerprint);
-            NativeTemplateEffectPlanner planner = new();
-            NativeTemplateEffectPlanningResult planned = effectSupport.FSharpRepair is { } repair
-                ? planner.PlanFSharpItemDependencies(effectSupport.ProjectDirectory, selectedSource, preview.CreationEffects,
-                    request.OutputDirectory, effectSupport.ExactProjectPath, repair)
-                : planner.PlanDependencies(effectSupport.ProjectDirectory, selectedSource, preview.CreationEffects.CreationResult,
-                    qualifiedDotNetProject ? configurationPlans.Single().PrimaryOutput : effectSupport.ExactProjectPath);
-            if (planned.Plan is null)
-            {
-                return new(TemplateInvocationStatus.EffectFailure, [], string.Join(" ", planned.Diagnostics));
-            }
-
-            effectPreview = await new NativeTemplateEffectWorkflow().ExecuteAsync(planned.Plan,
-                effectSupport.Capability, dryRun: true, confirmed: false, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!effectPreview.Succeeded)
-            {
-                return new(TemplateInvocationStatus.EffectFailure, [], string.Join(" ", effectPreview.Diagnostics)) { Effects = effectPreview };
-            }
-
-            if (!request.DryRun && !effectSupport.Confirmed)
-            {
-                return new(TemplateInvocationStatus.EffectFailure, [], "The controlled effect plan was not confirmed; no native files or effects were applied.")
-                {
-                    Effects = effectPreview with { Kind = "declined", Succeeded = false },
-                };
-            }
-        }
-
-        bool requiresForce = !request.Force && changes.Any(change => !string.Equals(change.Kind, "Create", StringComparison.Ordinal));
-        if (!request.DryRun && requiresForce)
-        {
-            return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.")
-            {
-                ProjectConfigurations = configurationPlans,
-                Effects = effectPreview,
-            };
-        }
-
-        string? outputFailure = ValidateOutputPaths(output, changes);
-        if (outputFailure is not null)
-        {
-            return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
-        }
-
-        if (request.DryRun)
-        {
-            return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null)
-            {
-                ProjectConfigurations = configurationPlans,
-                Effects = effectPreview,
-            };
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
-        if (configurationFailure is not null)
-        {
-            return configurationFailure with { ProjectConfigurations = configurationPlans };
-        }
-
-        sourceFailure = await ValidateSourceSnapshotAsync(template, configuration, request.SourceSnapshot, cancellationToken);
-        if (sourceFailure is not null)
-        {
-            return sourceFailure with { ProjectConfigurations = configurationPlans };
-        }
-
-        outputFailure = ValidateOutputPaths(output, changes);
-        if (outputFailure is not null)
-        {
-            return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
-        }
-
-        ITemplateCreationResult created = await InstantiateAsync(template, request, CreateInputData(configuration.Parameters, parameters), false, cancellationToken);
-        if (created.Status != CreationResultStatus.Success)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return new(MapCreationStatus(created.Status, cancellationToken), [], created.ErrorMessage ?? created.Status.ToString())
-            {
-                ProjectConfigurations = configurationPlans,
-            };
-        }
-
-        // Native success may already have committed files; preserve its effects even if cancellation arrives afterward.
-        if (created.CreationEffects is null)
-        {
-            return new(TemplateInvocationStatus.EngineFailure, [], "The template engine did not report creation effects.")
-            {
-                ProjectConfigurations = configurationPlans,
-            };
-        }
-
-        IReadOnlyList<TemplateFileChange> written = Array.AsReadOnly<TemplateFileChange>(
-            [.. created.CreationEffects.FileChanges.Select(change => new TemplateFileChange(change.TargetRelativePath, change.ChangeKind.ToString()))]);
-        if (!written.Select(change => change.Path).Order(StringComparer.Ordinal).SequenceEqual(templateChanges.Select(change => change.Path).Order(StringComparer.Ordinal), StringComparer.Ordinal)
-            || ValidateOutputPaths(output, templateChanges) is not null
-            || (request.SourceSnapshot is { } writtenSources && !MatchesOutputSources(writtenSources, created.CreationEffects.FileChanges))
-            || written.Any(change => !HasExpectedOutputKind(output, change, directoryOutputs)))
-        {
-            return new(TemplateInvocationStatus.EngineFailure, [], "Template creation did not produce the validated output paths.")
-            {
-                ProjectConfigurations = configurationPlans,
-            };
-        }
-
-        if (projectSupport is null)
-        {
-            if (effectPreview is not null && request.EffectSupport is { } effects)
-            {
-                NativeTemplateEffectResult applied = await new NativeTemplateEffectWorkflow().ExecuteAsync(
-                    effectPreview.Plan, effects.Capability, dryRun: false, confirmed: effects.Confirmed, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-                return new(applied.Succeeded ? TemplateInvocationStatus.Success : TemplateInvocationStatus.EffectFailure, written,
-                    applied.Succeeded ? null : "Native template files were generated, but controlled effects did not complete. "
-                        + string.Join(" ", applied.Diagnostics))
-                {
-                    Effects = applied,
-                };
-            }
-
-            return new(TemplateInvocationStatus.Success, written);
-        }
-
-        List<TemplateFileChange> completedChanges = [.. written];
-        List<string> configuredProjects = [];
-        foreach (TemplateProjectConfigurationPlan plan in configurationPlans)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            outputFailure = ValidateOutputPaths(output, changes);
-            if (outputFailure is not null)
-            {
-                return new(TemplateInvocationStatus.ConfigurationFailure, completedChanges.AsReadOnly(), outputFailure)
-                {
-                    ProjectConfigurations = configurationPlans,
-                    ConfiguredProjects = configuredProjects.AsReadOnly(),
-                };
-            }
-
-            try
-            {
-                await projectSupport.Writer.WriteAsync(plan, cancellationToken);
-            }
-            catch (IOException exception)
-            {
-                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
-            }
-            catch (UnauthorizedAccessException exception)
-            {
-                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
-            }
-            catch (InvalidOperationException exception)
-            {
-                return ConfigurationFailure(exception, completedChanges.AsReadOnly(), configuredProjects, cancellationToken) with { ProjectConfigurations = configurationPlans };
-            }
-
-            configuredProjects.Add(plan.Root);
-            completedChanges.Add(new(Path.GetRelativePath(output, plan.ConfigurationPath), "Create"));
-        }
-
-        if (qualifiedDotNetProject && effectPreview is not null && request.EffectSupport is { } projectEffects)
-        {
-            outputFailure = ValidateOutputPaths(output, changes);
-            if (outputFailure is not null || written.Any(change => !HasExpectedOutputKind(output, change, directoryOutputs)))
-            {
-                string diagnostic = outputFailure ?? "Native project outputs changed before dependency execution.";
-                return new(TemplateInvocationStatus.EffectFailure, completedChanges.AsReadOnly(), diagnostic)
-                {
-                    ProjectConfigurations = configurationPlans,
-                    ConfiguredProjects = configuredProjects.AsReadOnly(),
-                    Effects = effectPreview with { Kind = "preflightFailed", Succeeded = false, Diagnostics = [diagnostic] },
-                };
-            }
-
-            NativeTemplateEffectResult applied = await new NativeTemplateEffectWorkflow().ExecuteAsync(
-                effectPreview.Plan, projectEffects.Capability, dryRun: false, confirmed: projectEffects.Confirmed, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            return new(applied.Succeeded ? TemplateInvocationStatus.Success : TemplateInvocationStatus.EffectFailure,
-                completedChanges.AsReadOnly(), applied.Succeeded ? null
-                    : "Native project files and CLI configuration were generated, but controlled dependencies did not complete. "
-                        + string.Join(" ", applied.Diagnostics))
-            {
-                ProjectConfigurations = configurationPlans,
-                ConfiguredProjects = configuredProjects.AsReadOnly(),
-                Effects = applied,
-            };
-        }
-
-        return new(TemplateInvocationStatus.Success, completedChanges.AsReadOnly())
-        {
-            ProjectConfigurations = configurationPlans,
-            ConfiguredProjects = configuredProjects.AsReadOnly(),
-        };
-    }
-
-    private static TemplateInvocationResult ConfigurationFailure(Exception exception, IReadOnlyList<TemplateFileChange> changes,
-        List<string> configuredProjects, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return new(TemplateInvocationStatus.ConfigurationFailure, changes, $"Mandatory project configuration failed. Generated files were preserved: {exception.Message}")
-        {
-            ConfiguredProjects = configuredProjects.AsReadOnly(),
-        };
-    }
-
-    private string? QualifyMsBuildBindings(ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request)
-    {
-        if (request.MsBuildBindings is not { } snapshot)
-        {
-            if (_msBuildBindings is not null)
-            {
-                return "This controlled session requires its exact explicit MSBuild snapshot on every invocation.";
-            }
-
-            if (configuration.Type == TemplateType.Item && request.EffectSupport is not null)
-            {
-                using var document = JsonDocument.Parse(configuration.Content,
-                    new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
-                if (document.RootElement.TryGetProperty("symbols", out JsonElement symbols) && symbols.ValueKind == JsonValueKind.Object
-                    && symbols.EnumerateObject().Any(symbol => symbol.Value.ValueKind == JsonValueKind.Object
-                        && symbol.Value.TryGetProperty("binding", out JsonElement binding) && binding.ValueKind == JsonValueKind.String
-                        && binding.GetString()!.StartsWith("msbuild:", StringComparison.OrdinalIgnoreCase)))
-                {
-                    return "Controlled item effects require an explicit evaluated MSBuild snapshot; template framework defaults are not a project binding.";
-                }
-            }
-
-            return null;
-        }
-
-        NativeTemplateInvocationEffects? effects = request.EffectSupport;
-        if (configuration.Type != TemplateType.Item || !string.Equals(Context.Project?.Stack, "dotnet", StringComparison.OrdinalIgnoreCase)
-            || effects is null || effects.ProjectDirectory is null
-            || snapshot.TemplateIdentity != template.Identity
-            || snapshot.SourceIdentity != $"{template.MountPointUri}::{template.ConfigPlace}"
-            || !string.Equals(snapshot.SourceFingerprint, configuration.Fingerprint, StringComparison.OrdinalIgnoreCase)
-            || !Path.IsPathFullyQualified(effects.ExactProjectPath)
-            || !SamePath(snapshot.ProjectFilePath, effects.ExactProjectPath)
-            || Context.Project is null || !SamePath(Context.Project.RootDirectory.Info.FullName, effects.ProjectDirectory.Info.FullName))
-        {
-            return "The MSBuild snapshot does not match the exact selected item, mounted configuration, project or controlled effects boundary.";
-        }
-
-        string relative = Path.GetRelativePath(Context.Project.RootDirectory.Info.FullName, snapshot.ProjectFilePath);
-        if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-        {
-            return "The evaluated MSBuild project is outside the selected Functions project.";
-        }
-
-        if (_msBuildBindings is not null)
-        {
-            return _msBuildBindings == snapshot ? null : "A controlled native session cannot replace its immutable MSBuild snapshot.";
-        }
-
-        _settings.Components.AddComponent(typeof(IBindSymbolSource), new NativeMsBuildBindingSnapshotSource(snapshot));
-        _msBuildBindings = snapshot;
-        return null;
-    }
-
-    private static bool SamePath(string left, string right) => string.Equals(Path.GetFullPath(left), Path.GetFullPath(right),
-        Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-
-    internal async Task<TemplateInvocationResult?> ValidateSelectedConfigurationAsync(ITemplateInfo template, TemplateConfigurationSnapshot configuration, CancellationToken cancellationToken)
-    {
-        TemplateConfigurationSnapshot current;
+        _host.InvocationFileSystem.BeginCapture(image);
         try
         {
-            current = await ReadConfigurationAsync(template, cancellationToken);
-        }
-        catch (InvalidTemplateMetadataException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is invalid. Rerun selection: {exception.Message}");
-        }
-        catch (IOException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return new(TemplateInvocationStatus.Failed, [], $"Selected template configuration is unreadable. Rerun selection: {exception.Message}");
-        }
-
-        if (!string.Equals(current.Fingerprint, configuration.Fingerprint, StringComparison.Ordinal)
-            || !string.Equals(current.HostConfigPlace, configuration.HostConfigPlace, StringComparison.Ordinal)
-            || !string.Equals(current.HostData, configuration.HostData, StringComparison.Ordinal))
-        {
-            return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed. Rerun selection.");
-        }
-
-        bool qualified = current.Type == TemplateType.Item || (current.Type == TemplateType.Project && ProjectTemplatesEnabled);
-        return qualified && current.Type == configuration.Type
-            ? null
-            : new(TemplateInvocationStatus.InvalidTemplate, [], ProjectTemplatesEnabled
-                ? "Current mounted template type is not qualified for this invocation flow. Correct its type and rerun selection."
-                : "Current mounted template type is not a qualified item template. Correct its type and rerun selection.");
-    }
-
-    private Dictionary<string, object> GetPopulatedParameters(ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request)
-    {
-        if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
-        {
-            throw new InvalidOperationException($"Selected template '{template.Identity}' has no registered generator.");
-        }
-
-        string? name = !string.IsNullOrEmpty(request.Name) ? request.Name
-            : template.PreferDefaultName || string.IsNullOrEmpty(request.OutputDirectory.Info.Name) ? template.DefaultName
-            : request.OutputDirectory.Info.Name;
-        Dictionary<string, object> values = new(StringComparer.Ordinal);
-        foreach (ITemplateParameter parameter in configuration.Parameters)
-        {
-            if (parameter.Precedence.PrecedenceDefinition is PrecedenceDefinition.Disabled or PrecedenceDefinition.ConditionalyDisabled)
+            ITemplateCreationResult result = await InstantiateAsync(template, request, parameters, false, cancellationToken);
+            if (result.Status == CreationResultStatus.Success)
             {
-                continue;
+                image.Seal();
             }
-
-            string? value = null;
-            if (!parameter.IsName)
-            {
-                _settings.Host.TryGetHostParamDefault(parameter.Name, out value);
-                if (value is null && !parameter.Precedence.CanBeRequired)
-                {
-                    value = parameter.DefaultValue;
-                }
-            }
-
-            object? converted = parameter.IsName ? name : null;
-            if (request.Parameters.TryGetValue(parameter.Name, out string? supplied))
-            {
-                value = supplied ?? parameter.DefaultIfOptionWithoutValue;
-            }
-
-            if (value is not null)
-            {
-                converted = generator.ConvertParameterValueToType(_settings, parameter, value, out bool error);
-                if (error)
-                {
-                    continue;
-                }
-            }
-
-            if (converted is not null)
-            {
-                values[parameter.Name] = converted;
-            }
+            return result;
         }
-
-        return values;
-    }
-
-    private static TemplateInvocationStatus MapCreationStatus(CreationResultStatus status, CancellationToken cancellationToken)
-        => status switch
+        finally
         {
-            CreationResultStatus.Success => TemplateInvocationStatus.Success,
-            CreationResultStatus.InvalidParamValues => TemplateInvocationStatus.InvalidArguments,
-            CreationResultStatus.MissingMandatoryParam => TemplateInvocationStatus.MissingRequiredParameters,
-            CreationResultStatus.DestructiveChangesDetected => TemplateInvocationStatus.FileConflict,
-            CreationResultStatus.NotFound => TemplateInvocationStatus.TemplateUnavailable,
-            CreationResultStatus.TemplateIssueDetected or CreationResultStatus.CondtionsEvaluationMismatch => TemplateInvocationStatus.InvalidTemplate,
-            CreationResultStatus.Cancelled => throw new OperationCanceledException(cancellationToken),
-            _ => TemplateInvocationStatus.EngineFailure,
-        };
-
-    private static InputDataSet CreateInputData(IReadOnlyList<ITemplateParameter> definitions, IReadOnlyDictionary<string, string?> parameters)
-    {
-        List<InputParameterData> input = [];
-        foreach (ITemplateParameter definition in definitions)
-        {
-            bool supplied = parameters.TryGetValue(definition.Name, out string? value);
-            input.Add(new(definition, value, supplied ? DataSource.User : DataSource.NoSource,
-                supplied ? InputDataStateUtil.GetInputDataState(value) : InputDataState.Unset));
+            _host.InvocationFileSystem.EndCapture(image);
         }
-
-        return new(new ParameterDefinitionSet(definitions), input);
     }
 
     protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         => _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName, parameters,
             forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
-
-    private bool HasExpectedOutputKind(string output, TemplateFileChange change, HashSet<string> directoryOutputs)
-    {
-        string path = Path.Combine(output, change.Path);
-        bool file = _settings.Host.FileSystem.FileExists(path);
-        bool directory = _settings.Host.FileSystem.DirectoryExists(path);
-        if (string.Equals(change.Kind, "Delete", StringComparison.Ordinal))
-        {
-            return !file && !directory;
-        }
-
-        return directoryOutputs.Contains(change.Path) ? directory && !file : file && !directory;
-    }
-
-    private async Task<TemplateInvocationResult?> ValidateSourceSnapshotAsync(ITemplateInfo template, TemplateConfigurationSnapshot configuration,
-        NativeTemplateSourceSnapshot? snapshot, CancellationToken cancellationToken)
-    {
-        if (snapshot is null)
-        {
-            return null;
-        }
-
-        if (configuration.Type != TemplateType.Item || snapshot.TemplateIdentity != template.Identity
-            || !string.Equals(snapshot.ConfigurationSha256, configuration.Fingerprint, StringComparison.OrdinalIgnoreCase))
-        {
-            return new(TemplateInvocationStatus.InvalidTemplate, [], "Source qualification is not bound to the exact selected item configuration.");
-        }
-
-        foreach (TemplateEffectSource pin in snapshot.Sources)
-        {
-            ReadOnlyMemory<byte> source;
-            try
-            {
-                source = await ReadPackageFileAsync(template, pin.Identity, cancellationToken);
-            }
-            catch (FileNotFoundException exception)
-            {
-                return new(TemplateInvocationStatus.TemplateChanged, [], exception.Message);
-            }
-
-            if (!string.Equals(Convert.ToHexString(SHA256.HashData(source.Span)), pin.Sha256, StringComparison.OrdinalIgnoreCase))
-            {
-                return new(TemplateInvocationStatus.TemplateChanged, [], "A selected package source changed. Rerun selection.");
-            }
-        }
-
-        return null;
-    }
-
-    private static bool MatchesOutputSources(NativeTemplateSourceSnapshot snapshot, IEnumerable<IFileChange> changes)
-    {
-        IFileChange[] files = [.. changes];
-        return files.Length == snapshot.Outputs.Count
-            && files.All(change => change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite
-                && change is IFileChange2 source && snapshot.Outputs.Count(expected =>
-                NativeTemplateSourceSnapshot.Normalize(expected.SourceRelativePath) == NativeTemplateSourceSnapshot.Normalize(source.SourceRelativePath)) == 1)
-            && files.OfType<IFileChange2>().Select(file => NativeTemplateSourceSnapshot.Normalize(file.SourceRelativePath)).Distinct(StringComparer.Ordinal).Count() == files.Length
-            && files.Select(file => file.TargetRelativePath).Distinct(StringComparer.Ordinal).Count() == files.Length;
-    }
-
-    private string? ValidateOutputPaths(string output, IReadOnlyList<TemplateFileChange> changes)
-    {
-        string boundary = output;
-        foreach (TemplateFileChange change in changes)
-        {
-            string? path = Path.GetFullPath(Path.Combine(output, change.Path));
-            string target = path;
-            string relative = Path.GetRelativePath(output, path);
-            if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            {
-                return "Template output escapes the requested output directory.";
-            }
-
-            // The requested output directory is the boundary; linked parents do not redirect individual template paths.
-            while (path is not null && !string.Equals(Path.TrimEndingDirectorySeparator(path), Path.TrimEndingDirectorySeparator(boundary), StringComparison.Ordinal))
-            {
-                try
-                {
-                    FileAttributes attributes = _settings.Host.FileSystem.GetFileAttributes(path);
-                    if ((attributes & FileAttributes.ReparsePoint) != 0)
-                    {
-                        return "Template output uses a symbolic link or reparse point. Choose an unlinked output directory.";
-                    }
-
-                    if (!string.Equals(path, target, StringComparison.Ordinal) && (attributes & FileAttributes.Directory) == 0)
-                    {
-                        return "A template output directory ancestor is an existing file. Choose an output directory without file collisions.";
-                    }
-                }
-                catch (FileNotFoundException)
-                {
-                    path = Path.GetDirectoryName(path);
-                    continue;
-                }
-                catch (DirectoryNotFoundException)
-                {
-                    path = Path.GetDirectoryName(path);
-                    continue;
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return "Template output path cannot be checked safely.";
-                }
-                catch (IOException)
-                {
-                    return "Template output path cannot be checked safely.";
-                }
-
-                path = Path.GetDirectoryName(path);
-            }
-        }
-
-        return null;
-    }
 
     public void Dispose()
     {

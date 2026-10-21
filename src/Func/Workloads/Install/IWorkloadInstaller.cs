@@ -20,6 +20,7 @@ internal interface IWorkloadInstaller
 
     /// <summary>
     /// Revalidates an installed stack and verifies or repairs its locally declared templates without catalog acquisition.
+    /// Check-only validation refuses pending native recovery without restoring retained state.
     /// </summary>
     /// <exception cref="Discovery.InvalidWorkloadException">Declared assets or native ownership are invalid, or check-only finds missing templates.</exception>
     /// <exception cref="BundledTemplateRegistrationException">The retained stack's template registration failed after protected recovery.</exception>
@@ -133,8 +134,17 @@ internal interface IWorkloadInstaller
     /// (<paramref name="packageId"/>, <paramref name="version"/>). Returns
     /// <c>true</c> when an entry was removed, <c>false</c> when none existed.
     /// </summary>
+    /// <exception cref="WorkloadPlanChangedException">Installed state no longer matches the removal operation.</exception>
+    /// <exception cref="WorkloadRecoveryRequiredException">An interrupted operation requires reconciliation before mutation.</exception>
+    /// <exception cref="WorkloadLockNotSupportedException">The workload home cannot protect exclusive ownership.</exception>
     public Task<bool> UninstallAsync(string packageId, string version, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Removes the specified owner, deleting the physical payload only when its final owner is removed.
+    /// </summary>
+    /// <exception cref="WorkloadPlanChangedException">Installed state no longer matches the removal operation.</exception>
+    /// <exception cref="WorkloadRecoveryRequiredException">An interrupted operation requires reconciliation before mutation.</exception>
+    /// <exception cref="WorkloadLockNotSupportedException">The workload home cannot protect exclusive ownership.</exception>
     public Task<bool> UninstallAsync(string packageId, string version,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default);
 

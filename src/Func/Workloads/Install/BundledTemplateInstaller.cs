@@ -19,7 +19,8 @@ namespace Azure.Functions.Cli.Workloads.Install;
 
 internal interface IBundledTemplateInstaller
 {
-    public Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin, CancellationToken cancellationToken);
+    public Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin,
+        CancellationToken cancellationToken, bool checkOnly = false);
     /// <summary>
     /// Checks every native owner before admitting the workload, retaining native protection through registration and recovery.
     /// </summary>
@@ -64,7 +65,8 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly CliConfigurationPathsOptions _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
-    public async Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin, CancellationToken cancellationToken)
+    public async Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin,
+        CancellationToken cancellationToken, bool checkOnly = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentNullException.ThrowIfNull(origin);
@@ -134,7 +136,7 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
                 assets.Add((archive, artifact));
             }
 
-            TemplateEngineContext context = Context(staging.Path);
+            TemplateEngineContext context = Context(staging.Path) with { RequireCleanStore = checkOnly };
             try
             {
                 using TemplateEngineSession preflight = new(context, Path.Combine(staging.Path, "hive"));
@@ -150,7 +152,7 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             }
 
             // Check incumbent ownership before stack admission, and again inside the exclusive native transaction.
-            using (TemplateEngineSession reader = await _store.OpenReadAsync(context, cancellationToken))
+            using (TemplateEngineSession reader = await OpenReadAsync(context, cancellationToken))
             {
                 foreach ((_, BasicTemplateArtifact artifact) in assets)
                 {
@@ -227,7 +229,7 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
     public async Task ValidateInstalledAsync(PreparedBundledTemplates prepared, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prepared);
-        using TemplateEngineSession session = await _store.OpenReadAsync(Context(_paths.Home), cancellationToken);
+        using TemplateEngineSession session = await OpenReadAsync(Context(_paths.Home) with { RequireCleanStore = true }, cancellationToken);
         foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
         {
             if (!await CheckIncumbentAsync(session, prepared.Origin, artifact, cancellationToken))
@@ -333,6 +335,18 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
     }
 
     private string OwnerPath(string id) => Path.Combine(_paths.Home, "templates", ".bundled-owners", id.ToLowerInvariant() + ".json");
+
+    private async Task<TemplateEngineSession> OpenReadAsync(TemplateEngineContext context, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _store.OpenReadAsync(context, cancellationToken);
+        }
+        catch (TemplateStoreRecoveryRequiredException exception)
+        {
+            throw new InvalidWorkloadException($"Bundled templates cannot be checked. {exception.Message}", exception);
+        }
+    }
 
     private static TemplateEngineContext Context(string directory) => new(WorkingDirectory.FromExplicit(directory));
 

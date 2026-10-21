@@ -4,12 +4,12 @@
 #:project ../../test/Func.Tests/Func.Tests.csproj
 #:property PublishAot=false
 
-using Azure.Functions.Cli.Tests.Templates.Engine;
+using Azure.Functions.Cli.Tests.Templates;
 
 if (args.Length != 1)
 {
     throw new ArgumentException("Supply an empty directory for the generated smoke fixture.");
 }
 
-string output = await TemplaterTests.ExportNodeSmokeProjectAsync(Path.GetFullPath(args[0]), CancellationToken.None);
+string output = await NodeProjectFixture.ExportAsync(Path.GetFullPath(args[0]), CancellationToken.None);
 Console.WriteLine(output);

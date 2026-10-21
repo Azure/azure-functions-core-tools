@@ -3,6 +3,7 @@
 
 using System.IO.Compression;
 using System.Security.Cryptography;
+using Azure.Functions.Cli.Commands;
 using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
@@ -56,7 +57,9 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
         created!.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
         File.ReadAllText(Target).Should().Be("# user-owned\n\nChosenName|CanonicalValue|python");
         capability.Executions.Should().Be(1);
-        created.Changes.Should().Equal(new TemplateFileChange("function_app.py", "Append"));
+        created.Changes.Should().BeEmpty();
+        created.HasCommittedOutput.Should().BeFalse();
+        created.Effects!.CompletedEffects.Should().ContainSingle().Which.Should().BeOfType<TemplateAppendFileEffect>();
     }
 
     [Theory]
@@ -95,6 +98,64 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
             new Dictionary<string, string?> { ["Value"] = "Original" }, "Named"), CancellationToken.None);
         native.Status.Should().Be(TemplateInvocationStatus.Success, native.Diagnostic);
         File.ReadAllText(Target).Should().Be("full:Named|Original");
+    }
+
+    [Theory]
+    [InlineData("success")]
+    [InlineData("noop")]
+    [InlineData("failure")]
+    [InlineData("throw")]
+    public async Task Adapter_ActualAppendThenCancellation_PreservesReturnedOutcomeOrOriginalUnknownStateException(string outcome)
+    {
+        using var templater = await OpenAsync();
+        var selected = (await templater.ResolveGroupAsync(UserIdentity, TemplateType.Item)).Group![0];
+        var helper = (await templater.ResolveGroupAsync(HelperIdentity, TemplateType.Item)).Group![0];
+        Directory.CreateDirectory(Output);
+        File.WriteAllText(Target, "user-owned");
+        using CancellationTokenSource cancellation = new();
+        var original = new OperationCanceledException("append state unknown", cancellation.Token);
+        var capability = new AppendCapability(_fileSystem)
+        {
+            SkipWrite = outcome == "noop",
+            AfterExecution = () =>
+            {
+                cancellation.Cancel();
+                if (outcome == "throw") throw original;
+            },
+            Outcome = new(outcome != "failure", ["actual returned append diagnostic"], TargetMayHaveChanged: outcome == "failure"),
+        };
+        var support = Support(Mapping(selected, helper), capability);
+        var contexts = Substitute.For<INewExecutionContextResolver>();
+        contexts.ResolveAsync(Arg.Any<NewExecutionRequest>(), false, Arg.Any<CancellationToken>())
+            .Returns(new NewExecutionContextResult(Context, null));
+        var factory = Substitute.For<ITemplaterFactory>();
+        factory.CreateAsync(Arg.Any<TemplateEngineContext>(), Arg.Any<TemplateConstraintEvaluationSnapshot>(),
+            Arg.Any<CancellationToken>(), Arg.Any<Action<TemplateStoreWaitReason>?>()).Returns(templater);
+        TestInteractionService interaction = new();
+        TemplateArgumentParser parser = new();
+        NewExecutionRunner runner = new(contexts, factory, parser, interaction, new(parser, interaction));
+        NativeTemplateCommandAdapter adapter = new(Substitute.For<IInitExecutionRunner>(), runner, new(interaction), new(interaction), new([]),
+            selectedItemEffects: support);
+        NewCommand command = new(Substitute.For<INewCommandRunner>(), Substitute.For<INewCommandTemplateOptionProvider>());
+        var parsed = adapter.ParseNewInvocation(command, [Output, "-t", UserIdentity, "-n", "Named", "--non-interactive", "--output", "json"]);
+
+        if (outcome == "throw")
+        {
+            Func<Task> act = () => parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
+            var thrown = (await act.Should().ThrowAsync<OperationCanceledException>()).Which;
+            thrown.Should().BeSameAs(original);
+            thrown.CancellationToken.Should().Be(cancellation.Token);
+            interaction.AllOutput.Should().Contain("0 completed").And.Contain("outcome is unknown").And.NotContain("JSON:");
+        }
+        else
+        {
+            int exit = await parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
+            exit.Should().Be(outcome == "failure" ? 1 : 0);
+            interaction.AllOutput.Should().Contain("JSON:").And.Contain("actual returned append diagnostic")
+                .And.Contain("\"changes\":[]");
+        }
+        capability.Executions.Should().Be(1);
+        File.ReadAllText(Target).Should().Be(outcome == "noop" ? "user-owned" : "user-owned\nNamed|default|python");
     }
 
     [Theory]
@@ -335,7 +396,7 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
         return await OpenExistingAsync();
     }
 
-    private Task<Templater> OpenExistingAsync() => Task.FromResult(new Templater(new TemplateEngineSession(Context, Path.Combine(_root, "hive"))));
+    private Task<Templater> OpenExistingAsync() => Task.FromResult(TemplateFixtures.CreateTemplater(new TemplateEngineSession(Context, Path.Combine(_root, "hive"))));
 
     private void WriteTemplate(string folder, string identity, string output, string content, bool hidden)
     {
@@ -357,6 +418,12 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
         public int Executions { get; private set; }
 
         public Action? BeforeValidation { get; init; }
+
+        public Action? AfterExecution { get; init; }
+
+        public bool SkipWrite { get; init; }
+
+        public TemplateEffectExecutionResult? Outcome { get; init; }
 
         public async Task<IReadOnlyList<string>> ValidateAsync(NativeTemplateEffectPlan plan, CancellationToken cancellationToken)
         {
@@ -382,9 +449,13 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
                 return new(false, ["Target snapshot changed."]);
             }
 
-            await File.AppendAllTextAsync(append.TargetPath, append.Content, cancellationToken);
+            if (!SkipWrite)
+            {
+                await File.AppendAllTextAsync(append.TargetPath, append.Content, cancellationToken);
+            }
             Executions++;
-            return new(true, []);
+            AfterExecution?.Invoke();
+            return Outcome ?? new(true, []);
         }
     }
 }

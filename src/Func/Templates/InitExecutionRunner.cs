@@ -155,7 +155,10 @@ internal sealed class InitExecutionRunner(
             return await ConfigureExistingAsync(request, target, repair, catalog, requestedStack, requestedLanguage, cancellationToken);
         }
 
-        TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null));
+        TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null))
+        {
+            RequireCleanStore = request.DryRun,
+        };
         cancellationToken.ThrowIfCancellationRequested();
         TemplateProjectSupport support = _projectSupport();
         if (_workflows is not null)
@@ -293,7 +296,14 @@ internal sealed class InitExecutionRunner(
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await _fileSystem.WriteAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            if (repair)
+            {
+                await _fileSystem.WriteAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            }
+            else
+            {
+                await _fileSystem.CreateAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -493,6 +503,7 @@ internal sealed class InitExecutionRunner(
             };
         }
 
+        invocationRequest = invocationRequest with { RequireCapturedSources = projectPreparation is not null };
         TemplateInvocationResult preview = await selected.InvokeAsync(invocationRequest, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (preview.Status != TemplateInvocationStatus.Success)
@@ -556,7 +567,16 @@ internal sealed class InitExecutionRunner(
             };
         }
 
-        TemplateInvocationResult created = await selected.InvokeAsync(invocationRequest with { DryRun = false }, cancellationToken);
+        TemplateInvocationResult created;
+        try
+        {
+            created = await selected.InvokeAsync(invocationRequest with { DryRun = false, ExpectedPreparation = projectPreparation is null ? null : preview.Capture }, cancellationToken);
+        }
+        catch (OperationCanceledException exception) when (exception.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey] is string)
+        {
+            _interaction.WriteWarning((string)exception.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey]!);
+            throw;
+        }
         if (created.Status == TemplateInvocationStatus.Success && projectPreparation is { } completionSupport
             && preparation is not null && preparationContext is not null)
         {
@@ -568,14 +588,13 @@ internal sealed class InitExecutionRunner(
                 if (sourceChanged is null)
                 {
                     completed = await completionSupport.CompleteAsync(preparationContext, preparation.Preview, cancellationToken);
-                    cancellationToken.ThrowIfCancellationRequested();
                 }
                 else
                 {
                     completed = new(false, [sourceChanged.Diagnostic ?? "The selected project source changed before stack preparation."]);
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
                 _interaction.WriteWarning("Native project files and CLI configuration were created before stack preparation was canceled. "
                     + "No rollback was attempted; preparation may be incomplete.");
@@ -641,8 +660,11 @@ internal sealed class InitExecutionRunner(
     internal static bool HasConfirmedCreationResult(InitExecutionResult result, bool dryRun)
     {
         ArgumentNullException.ThrowIfNull(result);
-        return !dryRun && (result is { Kind: "created", Succeeded: true, Invocation.Status: TemplateInvocationStatus.Success }
-            or { Kind: "partialInitialization", Succeeded: false, Invocation.Status: TemplateInvocationStatus.ConfigurationFailure });
+        return !dryRun && result.Invocation is { HasCommittedOutput: true }
+            && (result is { Kind: "created", Succeeded: true, Invocation.Status: TemplateInvocationStatus.Success }
+                or { Kind: "partialInitialization", Succeeded: false, Invocation.Status: TemplateInvocationStatus.ConfigurationFailure }
+                or { Kind: "invocationFailed", Succeeded: false }
+                or { Kind: "partialPreparation", Succeeded: false, Invocation.Status: TemplateInvocationStatus.Success, Preparation.Completion: not null });
     }
 
     private const string PackageGuidance =
