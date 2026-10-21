@@ -48,23 +48,24 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
     }
 
     [Fact]
-    public async Task InvokeAsync_ReevaluatedGeneratedPath_IsRejectedBeforeNativeEvaluation()
+    public async Task InvokeAsync_ReevaluatedGeneratedPath_InstallsTheCapturedNativeOutput()
     {
         await InstallOutputTemplateAsync(
             """{"Path":{"type":"generated","generator":"sequence","fileRename":"TOKEN"}}""",
             file: Path.Combine("TOKEN", "Created.txt"));
         using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
         var sequence = RegisterSequenceMacro(session);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
         var created = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), CancellationToken.None);
 
-        created.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
-        sequence.Evaluations.Should().Be(0);
-        created.Changes.Should().BeEmpty();
-        Directory.Exists(output.Info.FullName).Should().BeFalse();
+        created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
+        sequence.Evaluations.Should().Be(2, "installation must not perform another native render");
+        created.Changes.Should().ContainSingle();
+        File.ReadAllText(Path.Combine(output.Info.FullName, "0", "Created.txt")).Should().Be("CONTENT");
+        AssertWrittenPaths(output, created);
     }
 
     [SymbolicLinkFact]
@@ -108,24 +109,24 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
     [InlineData(4, true, false)]
     [InlineData(8, true, true)]
     [InlineData(8, true, false)]
-    public async Task InvokeAsync_TransitiveValueFormCollision_IsRejectedRegardlessOfDeclarationOrder(int depth, bool deepestFirst, bool rename)
+    public async Task InvokeAsync_TransitiveValueFormCollision_ReportsActualOutputRegardlessOfDeclarationOrder(int depth, bool deepestFirst, bool rename)
     {
         var (symbols, pathParameter) = AliasChainSymbols(depth, deepestFirst, rename);
         var sources = rename ? null : JsonSerializer.Serialize(new[] { new { condition = pathParameter + " == 0" } });
         await InstallOutputTemplateAsync(symbols, sources, Path.Combine("TOKEN", "Created.txt"));
         using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
         var sequence = RegisterSequenceMacro(session);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created", Force: true), CancellationToken.None);
 
-        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
-        result.Diagnostic.Should().Contain("output paths");
-        sequence.Evaluations.Should().Be(0);
-        result.Changes.Should().BeEmpty();
-        Directory.Exists(output.Info.FullName).Should().BeFalse();
+        result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
+        sequence.Evaluations.Should().Be(2);
+        result.Changes.Should().ContainSingle();
+        AssertWrittenPaths(output, result);
+        File.ReadAllText(Path.Combine(output.Info.FullName, result.Changes[0].Path)).Should().Be("CONTENT");
     }
 
     [Theory]
@@ -144,7 +145,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         cached.TagsCollection["type"].Should().Be("item");
         var configuration = Path.Combine(package, "item", ".template.config", "template.json");
         File.WriteAllText(configuration, File.ReadAllText(configuration).Replace("""{ "type": "item" }""", tags, StringComparison.Ordinal));
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
 
         var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
         var exact = await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None);
@@ -172,7 +173,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         await TemplateFixtures.GetInstalledTemplateAsync(Hive, TemplateFixtures.ItemTemplateIdentity);
         var configuration = Path.Combine(package, "item", ".template.config", "template.json");
         File.WriteAllText(configuration, File.ReadAllText(configuration).Replace("\"item\"", $"\"{type}\"", StringComparison.Ordinal));
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -191,7 +192,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         await TemplateFixtures.GetInstalledTemplateAsync(Hive, TemplateFixtures.ProjectTemplateIdentity);
         var configuration = Path.Combine(package, "project", ".template.config", "template.json");
         File.WriteAllText(configuration, File.ReadAllText(configuration).Replace("\"project\"", "\"item\"", StringComparison.Ordinal));
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
 
         var project = await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
         var item = await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Item, CancellationToken.None);
@@ -203,42 +204,50 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
     }
 
     [Theory]
-    [InlineData("""{"Path":{"type":"generated","generator":"guid","fileRename":"TOKEN"}}""", null)]
-    [InlineData("""{"Path":{"type":"generated","generator":"random","parameters":{"low":1,"high":2},"fileRename":"TOKEN"}}""", null)]
-    [InlineData("""{"Entropy":{"type":"generated","generator":"guid"},"Path":{"type":"derived","valueSource":"Entropy","valueTransform":"identity","fileRename":"TOKEN"}}""", null)]
-    [InlineData("""{"Path":{"type":"bind","binding":"host:WorkingDirectory","fileRename":"TOKEN"}}""", null)]
+    [InlineData("""{"Path":{"type":"generated","generator":"guid","fileRename":"TOKEN"}}""", null, true)]
+    [InlineData("""{"Path":{"type":"generated","generator":"random","parameters":{"low":1,"high":2},"fileRename":"TOKEN"}}""", null, true)]
+    [InlineData("""{"Entropy":{"type":"generated","generator":"guid"},"Path":{"type":"derived","valueSource":"Entropy","valueTransform":"identity","fileRename":"TOKEN"}}""", null, true)]
+    [InlineData("""{"Path":{"type":"bind","binding":"host:WorkingDirectory","fileRename":"TOKEN"}}""", null, false)]
     [InlineData("""{"Entropy":{"type":"generated","generator":"random","parameters":{"low":1,"high":2}},"Choose":{"type":"computed","value":"Entropy == 1"}}""",
-        """[{"modifiers":[{"condition":"Choose","rename":{"TOKEN":"chosen"}}]}]""")]
+        """[{"modifiers":[{"condition":"Choose","rename":{"TOKEN":"chosen"}}]}]""", true)]
     [InlineData("""{"Entropy":{"type":"generated","generator":"random","parameters":{"low":1,"high":2}}}""",
-        """[{"condition":"Entropy == 1"}]""")]
+        """[{"condition":"Entropy == 1"}]""", true)]
     [InlineData("""{"Entropy":{"type":"generated","generator":"random","parameters":{"low":1,"high":2}}}""",
-        """[{"condition":"true || (Entropy == 1)"}]""")]
-    [InlineData("""{"Entropy":{"type":"generated","generator":"guid"},"Entropy-D":{"type":"parameter","fileRename":"TOKEN"}}""", null)]
-    [InlineData("""{"Entropy":{"type":"generated","generator":"guid","parameters":{"format":""}},"Entropy-D":{"type":"parameter","fileRename":"TOKEN"}}""", null)]
-    [InlineData("""{"Entropy":{"type":"generated","generator":"guid","parameters":{"format":null}},"Entropy-D":{"type":"parameter","fileRename":"TOKEN"}}""", null)]
-    [InlineData("""{"Path":{"type":"parameter","fileRename":"TOKEN"},"Path{-VALUE-FORMS-}identity":{"type":"generated","generator":"guid"}}""", null)]
+        """[{"condition":"true || (Entropy == 1)"}]""", true)]
+    [InlineData("""{"Entropy":{"type":"generated","generator":"guid"},"Entropy-D":{"type":"parameter","fileRename":"TOKEN"}}""", null, true)]
+    [InlineData("""{"Entropy":{"type":"generated","generator":"guid","parameters":{"format":""}},"Entropy-D":{"type":"parameter","fileRename":"TOKEN"}}""", null, true)]
+    [InlineData("""{"Entropy":{"type":"generated","generator":"guid","parameters":{"format":null}},"Entropy-D":{"type":"parameter","fileRename":"TOKEN"}}""", null, true)]
+    [InlineData("""{"Path":{"type":"parameter","fileRename":"TOKEN"},"Path{-VALUE-FORMS-}identity":{"type":"generated","generator":"guid"}}""", null, true)]
     [InlineData("""{"Entropy":{"type":"generated","generator":"guid"}}""",
-        """[{"modifiers":[{"condition":"Entropy-uc-D != \"\"","rename":{"TOKEN":"chosen"}}]}]""")]
-    [InlineData("""{"name":{"type":"generated","generator":"guid"}}""", null)]
-    public async Task InvokeAsync_NonParameterOutputTopology_FailsBeforeNativeWrites(string symbols, string? sources)
+        """[{"modifiers":[{"condition":"Entropy-uc-D != \"\"","rename":{"TOKEN":"chosen"}}]}]""", true)]
+    [InlineData("""{"name":{"type":"generated","generator":"guid"}}""", null, true)]
+    public async Task InvokeAsync_NonParameterOutputTopology_UsesCapturedPathsWithoutPredictingNames(string symbols, string? sources, bool succeeds)
     {
         await InstallOutputTemplateAsync(symbols, sources);
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
         var preview = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created", DryRun: true), CancellationToken.None);
+        Directory.Exists(output.Info.FullName).Should().BeFalse("private preview must not install output");
         var created = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created", Force: true), CancellationToken.None);
 
-        TemplateInvocationResult[] results = [preview, created];
-        foreach (var result in results)
+        if (succeeds)
         {
-            result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
-            result.Diagnostic.Should().Contain("output paths");
-            result.Changes.Should().BeEmpty();
+            preview.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
+            created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
+            created.Changes.Should().ContainSingle();
+            AssertWrittenPaths(output, created);
+            File.ReadAllText(Path.Combine(output.Info.FullName, created.Changes[0].Path)).Should().Be("CONTENT");
         }
-
-        Directory.Exists(output.Info.FullName).Should().BeFalse();
+        else
+        {
+            preview.Status.Should().Be(TemplateInvocationStatus.Failed);
+            created.Status.Should().Be(TemplateInvocationStatus.Failed);
+            created.Diagnostic.Should().Contain("output");
+            created.Changes.Should().BeEmpty();
+            Directory.Exists(output.Info.FullName).Should().BeFalse();
+        }
     }
 
     [SymbolicLinkFact]
@@ -252,12 +261,13 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         Directory.CreateDirectory(output.Info.FullName);
         Directory.CreateDirectory(outside);
         Directory.CreateSymbolicLink(Path.Combine(output.Info.FullName, "1"), outside);
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created", Force: true), CancellationToken.None);
 
-        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
+        result.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Diagnostic.Should().Contain("symbolic link or reparse point");
         result.Changes.Should().BeEmpty();
         Directory.EnumerateFileSystemEntries(outside).Should().BeEmpty();
         Directory.EnumerateFiles(output.Info.FullName, "*", SearchOption.AllDirectories).Should().BeEmpty();
@@ -267,20 +277,21 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
     [InlineData("guid0")]
     [InlineData("guid0-D")]
     [InlineData("guid0-lc-d")]
-    public async Task InvokeAsync_ImplicitGuidOverwritesPathParameter_FailsWithoutWrites(string parameter)
+    public async Task InvokeAsync_ImplicitGuidOverwritesPathParameter_ReportsOnlyCapturedFiles(string parameter)
     {
         await InstallOutputTemplateAsync(
             $$$"""{"{{{parameter}}}":{"type":"parameter","fileRename":"TOKEN"}}""",
             guids: """["a29e03ad-a64c-48d1-9f46-6be4895361b8"]""");
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), CancellationToken.None);
 
-        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
-        result.Changes.Should().BeEmpty();
-        Directory.Exists(output.Info.FullName).Should().BeFalse();
+        result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
+        result.Changes.Should().ContainSingle();
+        AssertWrittenPaths(output, result);
+        File.ReadAllText(Path.Combine(output.Info.FullName, result.Changes[0].Path)).Should().Be("CONTENT");
     }
 
     [Theory]
@@ -297,7 +308,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
             }
             """,
             """[{"condition":"\"Entropy\" != \"\"","modifiers":[{"condition":"!Include","exclude":["TOKEN.txt"]}]}]""");
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
         var parameters = new Dictionary<string, string?> { ["Path"] = "Chosen", ["Include"] = include.ToString() };
@@ -335,7 +346,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
             }
             """,
             sources: """[{"condition":"Entropy-D == \"Stable\""}]""");
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
         var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>(), "Created", DryRun: true);
@@ -356,7 +367,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
     [InlineData("""{"type":"parameter","datatype":"string"}""", true)]
     [InlineData("""{"type":"parameter","datatype":"string","defaultValue":"Stable","isEnabled":false}""", false)]
     [InlineData("""{"type":"parameter","datatype":"string","defaultValue":"Stable","isEnabled":"false"}""", false)]
-    public async Task InvokeAsync_UnsetOptionalParameter_DoesNotHideNonParameterSourceCondition(string parameter, bool suppliedNull)
+    public async Task InvokeAsync_UnsetOptionalParameter_UsesNativeValidationAndActualSourceOutputs(string parameter, bool suppliedNull)
     {
         var package = TemplateFixtures.WriteBasicPackage(_root);
         var configurationDirectory = Path.Combine(package, "item", ".template.config");
@@ -375,7 +386,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         File.WriteAllText(Path.Combine(configurationDirectory, "func.host.json"),
             """{"symbolInfo":{"Entropy == 1":{"longName":"unused"}}}""");
         await TemplateFixtures.InstallAsync(package, Hive);
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -387,8 +398,17 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
 
         var result = await selected.InvokeAsync(new(output, parameters, "Created"), CancellationToken.None);
 
-        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
-        Directory.Exists(output.Info.FullName).Should().BeFalse();
+        if (suppliedNull)
+        {
+            result.Status.Should().Be(TemplateInvocationStatus.InvalidArguments);
+            Directory.Exists(output.Info.FullName).Should().BeFalse();
+        }
+        else
+        {
+            result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
+            AssertWrittenPaths(output, result);
+            result.Changes.Should().OnlyContain(change => change.Path.EndsWith("Created.txt", StringComparison.Ordinal));
+        }
     }
 
     [Theory]
@@ -404,7 +424,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
             """;
         string condition = (useForm ? "Entropy-D{-VALUE-FORMS-}identity" : "Entropy-D") + " == \"Chosen\"";
         await InstallOutputTemplateAsync(symbols, JsonSerializer.Serialize(new[] { new { condition } }));
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
         var values = new Dictionary<string, string?> { ["Entropy-D"] = "Chosen" };
@@ -417,7 +437,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
     }
 
     [Fact]
-    public async Task InvokeAsync_ExplicitUnsetName_DoesNotHideNonParameterSourceCondition()
+    public async Task InvokeAsync_ExplicitUnsetName_UsesNativeFormsAndReportsActualOutputs()
     {
         await InstallOutputTemplateAsync(
             """
@@ -430,16 +450,17 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
             forms: """{"identity == 0":{"identifier":"identity"}}""");
         using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
         var sequence = RegisterSequenceMacro(session);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), "Created"), CancellationToken.None);
 
-        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
-        sequence.Evaluations.Should().Be(0);
-        result.Changes.Should().BeEmpty();
-        Directory.Exists(output.Info.FullName).Should().BeFalse();
+        result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
+        sequence.Evaluations.Should().Be(2);
+        result.Changes.Should().ContainSingle();
+        AssertWrittenPaths(output, result);
+        File.ReadAllText(Path.Combine(output.Info.FullName, result.Changes[0].Path)).Should().Be("CONTENT");
     }
 
     [Theory]
@@ -451,7 +472,7 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
     public async Task InvokeAsync_NativeNameSelection_PreservesOrdinaryTemplates(string? name, bool preferDefaultName, string expected)
     {
         await InstallOutputTemplateAsync("{}", file: "ItemFunction.txt", preferDefaultName: preferDefaultName);
-        using Templater templater = new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive));
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Output", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
 
@@ -460,14 +481,6 @@ public sealed class TemplateInvocationBoundaryTests : IDisposable
         result.Status.Should().Be(TemplateInvocationStatus.Success);
         File.ReadAllText(Path.Combine(output.Info.FullName, expected + ".txt")).Should().Be("CONTENT");
         AssertWrittenPaths(output, result);
-    }
-
-    [Fact]
-    public void OutputPathValidator_NullConfiguration_Throws()
-    {
-        Action action = () => TemplateOutputPathValidator.GetDiagnostic(null!);
-
-        action.Should().Throw<ArgumentNullException>().WithParameterName("configuration");
     }
 
     public void Dispose()

@@ -73,6 +73,36 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     }
 
     [Fact]
+    public async Task Parse_InstalledAuthoredDefault_SeparatesExplicitOriginWithoutChangingNativeOutput()
+    {
+        await InstallAsync();
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "provenance"));
+        using var templater = CreateTemplater(output);
+        var selected = (await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        string[] raw = ["--greeting", "same content", "-p:f", "true"];
+        var before = SnapshotProject();
+
+        var omitted = Parse(selected, raw);
+        var explicitValue = Parse(selected, [.. raw, "--param:AuthLevel=anonymous"]);
+
+        explicitValue.ValuesByCanonicalName.Should().BeEquivalentTo(omitted.ValuesByCanonicalName);
+        omitted.ExplicitParameterNames.Should().BeEquivalentTo("Greeting", "Feature");
+        explicitValue.ExplicitParameterNames.Should().BeEquivalentTo("Greeting", "Feature", "AuthLevel");
+        var omittedPreview = await selected.InvokeAsync(new(output, omitted.ValuesByCanonicalName, "Origin", DryRun: true), CancellationToken.None);
+        var explicitPreview = await selected.InvokeAsync(new(output, explicitValue.ValuesByCanonicalName, "Origin", DryRun: true), CancellationToken.None);
+        omittedPreview.Status.Should().Be(TemplateInvocationStatus.Success);
+        explicitPreview.Status.Should().Be(TemplateInvocationStatus.Success);
+        explicitPreview.Changes.Should().BeEquivalentTo(omittedPreview.Changes);
+        SnapshotProject().Should().BeEquivalentTo(before);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+
+        var created = await selected.InvokeAsync(new(output, explicitValue.ValuesByCanonicalName, "Origin"), CancellationToken.None);
+
+        created.Status.Should().Be(TemplateInvocationStatus.Success);
+        File.ReadAllText(Path.Combine(output.Info.FullName, "Origin.txt")).Should().StartWith("Origin|same content|anonymous|True|");
+    }
+
+    [Fact]
     public async Task Parse_MissingVisibleRequired_RemainsSelectableAndCompletionIsAuthoritative()
     {
         await InstallAsync();
@@ -261,7 +291,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
             new(WorkingDirectory.FromExplicit(Path.Combine(_root, "project")), "node", "JavaScript"),
             bundleVersion is null ? null : new("Microsoft.Azure.Functions.ExtensionBundle", bundleVersion));
         TemplateConstraintEvaluationSnapshot snapshot = new([new("node-package", NuGetVersion.Parse("1.0.0"), ["node"], usable)]);
-        return new TemplaterFactory(new CliConfigurationPathsOptions(Path.Combine(_root, "home"))).Create(context, snapshot);
+        return new TemplaterFactory(new CliConfigurationPathsOptions(Path.Combine(_root, "home")), new PhysicalFileSystem()).Create(context, snapshot);
     }
 
     private Dictionary<string, string> SnapshotProject()

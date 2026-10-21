@@ -5,6 +5,7 @@ using System.Net;
 using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Update;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using Semver;
 
 namespace Azure.Functions.Cli.Tests.Update;
@@ -218,6 +219,8 @@ public sealed class CdnReleaseChecksumTests
             return sidecarResponse(request);
         });
         var client = new HttpClient(handler) { BaseAddress = new Uri("https://cdn.functions.azure.com/") };
-        return new CdnReleaseFeed(client, NullLogger<CdnReleaseFeed>.Instance);
+        IHttpClientFactory httpClientFactory = Substitute.For<IHttpClientFactory>();
+        httpClientFactory.CreateClient(UpdateRegistration.HttpClientName).Returns(client);
+        return new CdnReleaseFeed(httpClientFactory, NullLogger<CdnReleaseFeed>.Instance);
     }
 }
