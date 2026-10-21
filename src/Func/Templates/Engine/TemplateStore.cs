@@ -27,7 +27,7 @@ internal sealed class TemplateStore(CliConfigurationPathsOptions paths, IFileSys
     internal string Journal => Path.Combine(ControlDirectory, "recovery.ready");
 
     public async Task<TemplateEngineSession> OpenReadAsync(TemplateEngineContext context, CancellationToken cancellationToken,
-        TemplateConstraintEvaluationSnapshot? snapshot = null, TemplateProjectSupport? projectSupport = null,
+        TemplateConstraintEvaluationSnapshot? snapshot = null,
         Action<TemplateStoreWaitReason>? waiting = null)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -50,7 +50,7 @@ internal sealed class TemplateStore(CliConfigurationPathsOptions paths, IFileSys
                     }
 
                     cancellationToken.ThrowIfCancellationRequested();
-                    TemplateEngineSession session = new(context, settings.Value.Path, snapshot, projectSupport,
+                    TemplateEngineSession session = new(context, settings.Value.Path, snapshot,
                         new ReadOwnership(settings.Value, lease), new TemplateStoreEngineDiagnostics(_loggerFactory));
                     transferred = true;
                     if (cancellationToken.IsCancellationRequested)

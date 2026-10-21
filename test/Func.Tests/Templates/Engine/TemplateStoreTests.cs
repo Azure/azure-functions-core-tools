@@ -35,8 +35,8 @@ public sealed class TemplateStoreTests : IDisposable
         var package = WriteNuGetPackage();
         await TemplateFixtures.InstallAsync(package, store.Hive);
         var before = Bytes(store.Hive);
-        using var first = new Templater(await store.OpenReadAsync(Context(), CancellationToken.None));
-        using var second = new Templater(await Store().OpenReadAsync(Context(), CancellationToken.None));
+        using var first = TemplateFixtures.CreateTemplater(await store.OpenReadAsync(Context(), CancellationToken.None));
+        using var second = TemplateFixtures.CreateTemplater(await Store().OpenReadAsync(Context(), CancellationToken.None));
 
         var catalogs = await Task.WhenAll(first.ListAsync(TemplateType.Item, CancellationToken.None),
             second.ListAsync(TemplateType.Item, CancellationToken.None));
@@ -51,7 +51,7 @@ public sealed class TemplateStoreTests : IDisposable
     {
         var store = Store();
         await InstallAsync(store);
-        var reader = new Templater(await store.OpenReadAsync(Context(), CancellationToken.None));
+        var reader = TemplateFixtures.CreateTemplater(await store.OpenReadAsync(Context(), CancellationToken.None));
         var selected = (await reader.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var waiting = new TaskCompletionSource<TemplateStoreWaitReason>(TaskCreationOptions.RunContinuationsAsynchronously);
         var pending = Store().OpenWriteAsync(Context(), CancellationToken.None, reason => waiting.TrySetResult(reason));
@@ -82,7 +82,7 @@ public sealed class TemplateStoreTests : IDisposable
         using var transaction = await store.OpenWriteAsync(Context(), CancellationToken.None);
         Func<Task> replace = () => transaction.ExecuteAsync(async (session, token) =>
         {
-            var templater = new Templater(session);
+            var templater = TemplateFixtures.CreateTemplater(session);
             selected = (await templater.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, token)).Group![0];
             var provider = session.PackageManager.GetBuiltInManagedProvider(InstallationScope.Global);
             var installed = (await session.PackageManager.GetManagedTemplatePackagesAsync(false, token)).Single();
@@ -102,7 +102,7 @@ public sealed class TemplateStoreTests : IDisposable
             CancellationToken.None);
         await stale.Should().ThrowAsync<ObjectDisposedException>();
         transaction.Dispose();
-        using var recovered = new Templater(await store.OpenReadAsync(Context(), CancellationToken.None));
+        using var recovered = TemplateFixtures.CreateTemplater(await store.OpenReadAsync(Context(), CancellationToken.None));
         (await recovered.ListAsync(TemplateType.Item, CancellationToken.None)).Should().ContainSingle();
     }
 
@@ -129,7 +129,7 @@ public sealed class TemplateStoreTests : IDisposable
 
         Directory.GetFiles(store.Hive, "templatecache.json", SearchOption.AllDirectories).Should().ContainSingle();
         File.Exists(store.Journal).Should().BeFalse();
-        using var reader = new Templater(await store.OpenReadAsync(Context(), CancellationToken.None));
+        using var reader = TemplateFixtures.CreateTemplater(await store.OpenReadAsync(Context(), CancellationToken.None));
         var selected = (await reader.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
         var result = await selected.InvokeAsync(new(output, new Dictionary<string, string?>(), Name: "Created"), CancellationToken.None);
@@ -163,7 +163,7 @@ public sealed class TemplateStoreTests : IDisposable
 
         Directory.GetFiles(Path.Combine(store.Hive, "packages"), "*.nupkg").Should().ContainSingle()
             .Which.Should().EndWith("Func.Tests.Store.2.0.0.nupkg");
-        using var reader = new Templater(await store.OpenReadAsync(Context(), CancellationToken.None));
+        using var reader = TemplateFixtures.CreateTemplater(await store.OpenReadAsync(Context(), CancellationToken.None));
         var selected = (await reader.ResolveGroupAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "nuget-output"));
 
@@ -429,12 +429,12 @@ public sealed class TemplateStoreTests : IDisposable
         using var cancellation = new CancellationTokenSource();
         Action<TemplateStoreWaitReason> waiting = _ => { };
         using var engine = new TemplateEngineSession(context, Path.Combine(_root, "isolated"));
-        boundary.OpenReadAsync(context, cancellation.Token, snapshot, null, waiting).Returns(engine);
-        var factory = new TemplaterFactory(boundary);
+        boundary.OpenReadAsync(context, cancellation.Token, snapshot, waiting).Returns(engine);
+        var factory = new TemplaterFactory(boundary, new PhysicalFileSystem());
 
         using var flow = await factory.CreateAsync(context, snapshot, cancellation.Token, waiting);
 
-        await boundary.Received(1).OpenReadAsync(context, cancellation.Token, snapshot, null, waiting);
+        await boundary.Received(1).OpenReadAsync(context, cancellation.Token, snapshot, waiting);
     }
 
     [Fact]
@@ -739,7 +739,7 @@ public sealed class TemplateStoreTests : IDisposable
         await InstallAsync(store);
         using var session = await store.OpenReadAsync(Context(), CancellationToken.None);
         Directory.CreateDirectory(Path.Combine(session.Settings.Paths.HostVersionSettingsDir, "templatecache.json"));
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         Func<Task> list = () => templater.ListAsync(TemplateType.Item, CancellationToken.None);
 
         await list.Should().ThrowAsync<IOException>().WithMessage("*cache rebuilding failed*");

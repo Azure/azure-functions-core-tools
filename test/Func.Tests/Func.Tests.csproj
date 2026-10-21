@@ -12,6 +12,14 @@
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <Target Name="RecordCliProductOutput" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="ResolveProjectReferences">
+    <ItemGroup>
+      <_CliProductAssembly Include="@(_ResolvedProjectReferencePaths)" Condition="'%(_ResolvedProjectReferencePaths.Filename)' == 'func'" />
+      <AssemblyMetadata Include="CliProductAssemblyPath" Value="%(_CliProductAssembly.FullPath)" />
+    </ItemGroup>
+    <Error Condition="'@(_CliProductAssembly)' == ''" Text="Could not resolve the normal CLI product output for process tests." />
+  </Target>
+
   <ItemGroup>
     <EmbeddedResource Include="Update/Fixtures/version.json" LogicalName="Azure.Functions.Cli.Tests.Update.Fixtures.version.json" />
   </ItemGroup>

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Frozen;
 using Azure.Functions.Cli.Templates.Engine;
 
 namespace Azure.Functions.Cli.Templates;
@@ -16,6 +17,8 @@ internal sealed record TemplateCandidateParseResult(
     IReadOnlyList<string> DefinitionDiagnostics,
     IReadOnlyList<TemplateArgumentParameter> MissingRequiredParameters)
 {
+    public IReadOnlySet<string> ExplicitParameterNames { get; init; } = FrozenSet<string>.Empty;
+
     public bool IsArgumentCompatible => InvalidInputDiagnostics.Count == 0 && DefinitionDiagnostics.Count == 0;
 
     /// <summary>

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Frozen;
 using System.Collections.ObjectModel;
 using System.CommandLine;
 using System.CommandLine.Parsing;
@@ -32,6 +33,7 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
         List<string> definitions = [];
         List<TemplateArgumentParameter> parameters = AssignAliases(request, definitions);
         Dictionary<string, string?> values = new(StringComparer.Ordinal);
+        HashSet<string> explicitNames = new(StringComparer.Ordinal);
         List<TemplateArgumentParameter> missing = [];
         if (definitions.Count > 0)
         {
@@ -143,6 +145,7 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
             bool hasCompleted = request.CompletedValuesByCanonicalName?.ContainsKey(canonicalName) == true;
             if (supplied is not null)
             {
+                explicitNames.Add(canonicalName);
                 if (hasCompleted)
                 {
                     AddInvalid($"A completed value for '{canonicalName}' cannot replace explicit input for '{parameter.LongAlias}'.", aliasSources[option.Name]);
@@ -205,7 +208,10 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
         {
             cancellationToken.ThrowIfCancellationRequested();
             return new(request.TemplateIdentity, new ReadOnlyDictionary<string, string?>(values), parameters.AsReadOnly(),
-                invalid.AsReadOnly(), definitions.AsReadOnly(), missing.AsReadOnly());
+                invalid.AsReadOnly(), definitions.AsReadOnly(), missing.AsReadOnly())
+            {
+                ExplicitParameterNames = explicitNames.ToFrozenSet(StringComparer.Ordinal),
+            };
         }
 
         void AddInvalid(string message, IEnumerable<int>? indices = null)
@@ -260,9 +266,7 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
 
             provenance.Add((sourceIndex, TokenType.Argument));
             // Unknown option-like tokens otherwise become string values. Literal dash-prefixed values use inline syntax.
-            if (token.StartsWith('-') && !long.TryParse(token, out _)
-                && !double.TryParse(token, NumberStyles.Float, CultureInfo.CurrentCulture, out _)
-                && !double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            if (IsOptionLikeToken(token))
             {
                 AddInvalid($"Unrecognized template option '{token}'. Use an effective template alias, or inline syntax for a dash-prefixed literal value.", [sourceIndex]);
             }
@@ -357,6 +361,11 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
 
         bool IsReserved(string alias) => reserved.Contains(alias) || reserved.Contains(alias.TrimStart('-'));
     }
+
+    internal static bool IsOptionLikeToken(string token)
+        => token.StartsWith('-') && !long.TryParse(token, out _)
+            && !double.TryParse(token, NumberStyles.Float, CultureInfo.CurrentCulture, out _)
+            && !double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
 
     private static bool IsValidAliasName(string? name)
         => !string.IsNullOrEmpty(name) && !name.StartsWith('-')

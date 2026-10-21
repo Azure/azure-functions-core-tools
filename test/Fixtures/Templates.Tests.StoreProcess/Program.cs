@@ -53,7 +53,7 @@ internal sealed class Program
             {
                 using TemplateEngineSession engine = await store.OpenReadAsync(context, token,
                     waiting: reason => TestConsole.WriteLine($"WAITING:{reason}"));
-                using Templater templater = new(engine);
+                using Templater templater = new(engine, new(engine, new PhysicalFileSystem()));
                 IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, token);
                 TestConsole.WriteLine($"READY:{entries.Count}");
                 await TestConsole.In.ReadLineAsync(token);

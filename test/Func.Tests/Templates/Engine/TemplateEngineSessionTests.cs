@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Tests.Common;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Edge.Template;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using NSubstitute;
 using NuGet.Versioning;
 
@@ -59,6 +60,55 @@ public sealed class TemplateEngineSessionTests : IDisposable
 
             resolved.Should().BeTrue($"{Instance.GetType().Name} should be resolvable as {Type.Name}");
         }
+    }
+
+    [Theory]
+    [InlineData("func-workload", "d10ef758-4363-4359-a749-2a241ff892fd")]
+    [InlineData("func-bundle", "1349d42c-b8b8-4611-ac8a-1426cc0bc169")]
+    public void Constructor_ConstraintComponentIds_AreStableDistinctAndTypeSpecific(string type, string expected)
+    {
+        var first = FuncTemplateComponents.Create(new([])).Select(component => component.Instance).OfType<ITemplateConstraintFactory>().ToArray();
+        var second = FuncTemplateComponents.Create(new([])).Select(component => component.Instance).OfType<ITemplateConstraintFactory>().ToArray();
+
+        first.Select(factory => factory.Id).Should().OnlyHaveUniqueItems();
+        first.Single(factory => factory.Type == type).Id.Should().Be(Guid.Parse(expected));
+        second.Single(factory => factory.Type == type).Id.Should().Be(Guid.Parse(expected));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadPackageTypesAsync_MissingOrInvalidArchive_PreservesMetadataFailureAndCause(bool invalid)
+    {
+        using TemplateEngineSession session = new(CommandContext("metadata"), Hive);
+        string archive = Path.Combine(_root, "invalid.nupkg");
+        if (invalid)
+        {
+            Directory.CreateDirectory(_root);
+            File.WriteAllText(archive, "not a zip archive");
+        }
+        IManagedTemplatePackage package = Substitute.For<IManagedTemplatePackage>();
+        package.MountPointUri.Returns(archive);
+
+        Func<Task> action = () => session.ReadPackageTypesAsync(package, CancellationToken.None);
+
+        var failure = await action.Should().ThrowAsync<InvalidTemplateMetadataException>();
+        failure.Which.Message.Should().Be(invalid
+            ? "Installed package host metadata is invalid."
+            : "Installed package host metadata could not be read.");
+        failure.Which.InnerException.Should().BeOfType(invalid ? typeof(InvalidDataException) : typeof(FileNotFoundException));
+    }
+
+    [Fact]
+    public async Task ReadPackageTypesAsync_PreCanceledToken_PropagatesCancellation()
+    {
+        using TemplateEngineSession session = new(CommandContext("canceled-metadata"), Hive);
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        Func<Task> action = () => session.ReadPackageTypesAsync(null, cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -303,6 +353,59 @@ public sealed class TemplateEngineSessionTests : IDisposable
         Action construct = () => new TemplateProjectConfigurationPlanner(null!);
 
         construct.Should().Throw<ArgumentNullException>().WithParameterName("stackCatalog");
+    }
+
+    [Fact]
+    public void ReadProjectConfiguration_MutableStackMetadata_DoesNotChangeCapturedDeclarations()
+    {
+        List<string> languages = ["Python"];
+        List<string> pythonAliases = ["py"];
+        Dictionary<string, IReadOnlyList<string>> aliases = new(StringComparer.Ordinal) { ["Python"] = pythonAliases };
+        var stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns("python");
+        stack.DisplayName.Returns("Python");
+        stack.SupportedLanguages.Returns(languages);
+        stack.SupportedLanguageAliases.Returns(aliases);
+        TemplateProjectConfigurationPlanner planner = new(new([stack]));
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var configuration = File.ReadAllText(Path.Combine(package, "project", ".template.config", "template.json"));
+        stack.Stack.Returns("changed-stack");
+        languages[0] = "ChangedLanguage";
+        pythonAliases[0] = "changed-alias";
+        aliases["Python"] = ["replacement-alias"];
+        aliases["ChangedLanguage"] = ["new-alias"];
+
+        var declaration = planner.Read(configuration).Should().ContainSingle().Subject;
+
+        declaration.Stack.Should().Be("python");
+        declaration.Language.Should().Be("Python");
+        Action readChangedAlias = () => planner.Read(configuration.Replace("\"py\"", "\"changed-alias\"", StringComparison.Ordinal));
+        readChangedAlias.Should().Throw<InvalidTemplateMetadataException>()
+            .WithMessage("Configuration language must identify exactly one supported stack language.");
+    }
+
+    [Fact]
+    public void CreateProjectPlans_NullDirectoryOutputs_Throws()
+    {
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+        var effects = Substitute.For<ICreationEffects>();
+
+        Action create = () => planner.CreatePlans("{}", effects.CreationResult, _root, [], null!);
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName("directoryOutputs");
+    }
+
+    [Theory]
+    [InlineData("creation")]
+    [InlineData("changes")]
+    public void CreateProjectPlans_NullCapturedInput_Throws(string argument)
+    {
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+
+        Action create = () => planner.CreatePlans("{}", argument == "creation" ? null! : Substitute.For<ICreationResult>(),
+            _root, argument == "changes" ? null! : [], new HashSet<string>(StringComparer.Ordinal));
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName(argument);
     }
 
     [Fact]
