@@ -289,6 +289,8 @@ task matches:
   `build-workloads` skill.
 - **Setting up a ready-to-use local v5 CLI build (binary + workloads feed + `f5` alias snippet)** →
   `setup-local-cli` skill.
+- **Joining or running the Azure Functions CLI v5 bug bash (preview setup, test scenarios, evidence, and issue reporting)** →
+  `func-v5-bug-bash` skill.
 - **Reviewing a design** → `dotnet-design-pattern-review` skill.
 
 ## Build & Test Commands
@@ -344,6 +346,9 @@ via symlinks under `.claude/skills/`. Available skills:
 - `setup-local-cli` — publish func for the host RID + refresh the local workloads
   feed, then print a paste-ready `f5` alias / env-var snippet for hand
   testing.
+- `func-v5-bug-bash` — install and configure the published v5 preview, guide
+  bug-bash scenarios, collect reviewable evidence, and prepare or submit
+  confirmed reports.
 - `dotnet-design-pattern-review` — design pattern review checklist.
 
 The **Design Principles**, **CLI Conventions**, and **.NET / C# Practices**
