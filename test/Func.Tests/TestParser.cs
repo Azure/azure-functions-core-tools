@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -131,6 +132,11 @@ internal static class TestParser
         services.AddSingleton(Substitute.For<IQuickstartManifestService>());
         services.AddSingleton(Substitute.For<IQuickstartScaffolder>());
         services.AddSingleton(Substitute.For<IQuickstartProviderResolver>());
+
+        // Update: stub network, installation metadata, and updater boundaries.
+        services.AddSingleton(Substitute.For<IReleaseFeed>());
+        services.AddSingleton(Substitute.For<ICliUpdater>());
+        services.AddSingleton(Substitute.For<IInstallationMetadataReader>());
 
         return services;
     }

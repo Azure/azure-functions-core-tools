@@ -14,6 +14,7 @@ using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Tests.Common;
 using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads.Node;
@@ -489,7 +490,14 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         var before = Snapshot();
         var fileSystem = FileSystem();
         Exception failure = denied ? new UnauthorizedAccessException("controlled write failure") : new IOException("controlled write failure");
-        fileSystem.WriteAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(failure));
+        if (repair)
+        {
+            fileSystem.WriteAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(failure));
+        }
+        else
+        {
+            fileSystem.CreateAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(failure));
+        }
         using BufferedConsole stdout = new(false, false, noColor: true);
         using BufferedConsole stderr = new(false, false, noColor: true);
         var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr), fileSystem);
@@ -502,7 +510,16 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         json.RootElement.GetProperty("configuration").GetProperty("written").GetBoolean().Should().BeFalse();
         json.RootElement.GetProperty("diagnostics")[0].GetString().Should().Contain("controlled write failure");
         Snapshot().Should().BeEquivalentTo(before);
-        await fileSystem.Received(1).WriteAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>());
+        if (repair)
+        {
+            await fileSystem.Received(1).WriteAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>());
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+        }
+        else
+        {
+            await fileSystem.Received(1).CreateAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>());
+            await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+        }
         _factory.ReceivedCalls().Should().BeEmpty();
     }
 
@@ -525,14 +542,22 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         using BufferedConsole stdout = new(false, false, noColor: true);
         using BufferedConsole stderr = new(false, false, noColor: true);
         var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr), fileSystem);
-        fileSystem.WriteAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async call =>
+        async Task WriteAsync(NSubstitute.Core.CallInfo call)
         {
             var token = call.ArgAt<CancellationToken>(2);
             token.Should().Be(harness.CommandToken);
             token.CanBeCanceled.Should().BeTrue();
             if (afterCommit)
             {
-                await new PhysicalFileSystem().WriteAllTextAsync(Config, call.ArgAt<string>(1), token);
+                var physical = new PhysicalFileSystem();
+                if (repair)
+                {
+                    await physical.WriteAllTextAsync(Config, call.ArgAt<string>(1), token);
+                }
+                else
+                {
+                    await physical.CreateAllTextAsync(Config, call.ArgAt<string>(1), token);
+                }
             }
 
             cancellation.Cancel();
@@ -541,7 +566,16 @@ public sealed class InitExecutionAdoptionTests : IDisposable
             {
                 token.ThrowIfCancellationRequested();
             }
-        });
+        }
+
+        if (repair)
+        {
+            fileSystem.WriteAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(WriteAsync);
+        }
+        else
+        {
+            fileSystem.CreateAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(WriteAsync);
+        }
         Func<Task> act = () => harness.InvokeAsync([Target, "--output", "json"], cancellation.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
@@ -560,7 +594,38 @@ public sealed class InitExecutionAdoptionTests : IDisposable
             Snapshot().Should().BeEquivalentTo(before);
         }
 
-        await fileSystem.Received(1).WriteAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>());
+        if (repair)
+        {
+            await fileSystem.Received(1).WriteAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>());
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+        }
+        else
+        {
+            await fileSystem.Received(1).CreateAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>());
+            await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+        }
+        _factory.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Command_AdoptionConfigurationAppearsAtCommit_PreservesUserBytesAndReportsFailure()
+    {
+        WriteProject();
+        byte[] sentinel = [0, 1, 255, 42];
+        var fileSystem = new CommitBoundaryFileSystem(destination => File.WriteAllBytes(destination, sentinel));
+        using BufferedConsole stdout = new(false, false, noColor: true);
+        using BufferedConsole stderr = new(false, false, noColor: true);
+        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr), fileSystem);
+
+        int exit = await harness.InvokeAsync([Target, "--output", "json"]);
+
+        exit.Should().Be(1);
+        using var json = JsonDocument.Parse(stdout.Output);
+        json.RootElement.GetProperty("kind").GetString().Should().Be("configurationFailed");
+        json.RootElement.GetProperty("configuration").GetProperty("written").GetBoolean().Should().BeFalse();
+        File.ReadAllBytes(Config).Should().Equal(sentinel);
+        Directory.GetFiles(Path.GetDirectoryName(Config)!).Should().Equal(Config);
+        File.ReadAllText(Path.Combine(Target, "user.txt")).Should().Be("user content must not change");
         _factory.ReceivedCalls().Should().BeEmpty();
     }
 
@@ -702,7 +767,7 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         WriteProject();
         var fileSystem = FileSystem();
         var failure = new NotSupportedException("controlled unexpected defect");
-        fileSystem.WriteAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(failure));
+        fileSystem.CreateAllTextAsync(Config, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(failure));
         var harness = CreateHarness(new TestInteractionService(), fileSystem);
 
         Func<Task> act = () => harness.InvokeAsync([Target]);
@@ -784,7 +849,7 @@ public sealed class InitExecutionAdoptionTests : IDisposable
         fileSystem.FileExists(Path.Combine(Target, "host.json")).Returns(true);
         fileSystem.GetFileSystemEntries(Target).Returns([Path.Combine(Target, "host.json")]);
         string? written = null;
-        fileSystem.WriteAllTextAsync(Config, Arg.Do<string>(json => written = json), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        fileSystem.CreateAllTextAsync(Config, Arg.Do<string>(json => written = json), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
         var harness = CreateHarness(new TestInteractionService(), fileSystem);
 
         int exit = await harness.InvokeAsync([Target, "--stack", "node", "--language", "js"]);
@@ -1156,6 +1221,8 @@ public sealed class InitExecutionAdoptionTests : IDisposable
             .Returns(call => physical.ReadAllTextIfExistsAsync(call.ArgAt<string>(0), call.ArgAt<CancellationToken>(1)));
         fileSystem.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => physical.WriteAllTextAsync(call.ArgAt<string>(0), call.ArgAt<string>(1), call.ArgAt<CancellationToken>(2)));
+        fileSystem.CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => physical.CreateAllTextAsync(call.ArgAt<string>(0), call.ArgAt<string>(1), call.ArgAt<CancellationToken>(2)));
         return fileSystem;
     }
 

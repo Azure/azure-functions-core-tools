@@ -332,6 +332,8 @@ public sealed class ProfileCommandTests : IDisposable
             return Task.FromResult(contents);
         }
 
+        public Stream? OpenReadIfExists(string path) => throw new NotImplementedException();
+
         public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

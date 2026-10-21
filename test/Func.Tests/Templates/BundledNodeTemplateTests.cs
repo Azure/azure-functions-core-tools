@@ -147,7 +147,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         packages.Should().ContainSingle();
         File.Exists(packages[0].MountPointUri).Should().BeTrue();
         packages[0].MountPointUri.Should().StartWith(Path.Combine(Home, "templates"));
-        using var templater = new Templater(session);
+        using var templater = new Templater(session, new(session, _files));
         (await templater.ListAsync(TemplateType.Project)).Select(template => template.Identity).Should()
             .BeEquivalentTo("Azure.Functions.Node.Basic.JavaScript", "Azure.Functions.Node.Basic.TypeScript");
         _source.ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name.Contains("Download", StringComparison.Ordinal));
@@ -539,6 +539,8 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         var bundled = (await _workloads.GetWorkloadsAsync()).Single();
         var ridEntry = new WorkloadEntry { PackageId = bundled.PackageId, PackageVersion = bundled.PackageVersion, EntryPoint = bundled.EntryPoint,
             Source = bundled.Source, RuntimeIdentifier = "win-x64", BundledTemplatesDeclared = true };
+        string directory = _paths.GetInstallDirectory(ridEntry.PackageId, ridEntry.PackageVersion);
+        _files.CopyDirectory(Path.Combine(directory, "tools", "any"), Path.Combine(directory, "tools", "win-x64"));
         await _workloads.SaveWorkloadAsync(ridEntry);
         var coordinator = new FileWorkloadOperationCoordinator(_paths);
         var metadata = Substitute.For<IWorkloadMetadataReader>();
@@ -691,6 +693,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         await _workloads.SaveWorkloadAsync(cached);
         string cachedDirectory = _paths.GetInstallDirectory(cached.PackageId, cached.PackageVersion);
         _files.CopyDirectory(_paths.GetInstallDirectory(bundled.Entry.PackageId, bundled.Entry.PackageVersion), cachedDirectory);
+        _files.CopyDirectory(Path.Combine(cachedDirectory, "tools", "any"), Path.Combine(cachedDirectory, "tools", "win-x64"));
         File.Delete(Path.Combine(cachedDirectory, "bundled-templates.json"));
         File.Delete(Path.Combine(cachedDirectory, ".bundled-template-origin.json"));
         var coordinator = new FileWorkloadOperationCoordinator(_paths);

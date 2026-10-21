@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Profiles;
+using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Commands.Setup;
 
@@ -153,14 +154,30 @@ internal sealed class SetupRunner(
         SetupDependencyPlan plan = await _dependencyPlanBuilder.BuildDependencyPlanAsync(options.WorkingDirectory, featurePlan, profileScope, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         int failures = 0;
+        Dictionary<string, WorkloadEntry> selectedStacks = new(StringComparer.OrdinalIgnoreCase);
+        bool nativePlan = plan.Dependencies.Any(dependency => dependency.TemplateDelivery == SetupTemplateDelivery.ExternalNative);
 
-        foreach (SetupDependency dependency in plan.Dependencies)
+        foreach (SetupDependency plannedDependency in plan.Dependencies)
         {
+            SetupDependency dependency = plannedDependency;
+            if (dependency.TemplateDelivery == SetupTemplateDelivery.ExternalNative
+                && selectedStacks.TryGetValue(dependency.Name, out WorkloadEntry? selectedStack))
+            {
+                dependency = dependency with { SelectedStack = selectedStack };
+            }
             cancellationToken.ThrowIfCancellationRequested();
             renderer.DependencyDetected(profileScope, dependency);
             cancellationToken.ThrowIfCancellationRequested();
             SetupDependencyResult result = await _dependencyInstaller.EnsureDependencyAsync(options, dependency, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
+            if (!nativePlan || (result.NativeAcquisition is null && result.InstalledWorkload is null))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            if (dependency.Kind == SetupDependencyKind.Stack && result.InstalledWorkload is { } installedStack
+                && result.Status is SetupDependencyStatus.Satisfied or SetupDependencyStatus.Installed or SetupDependencyStatus.SatisfiedFallback)
+            {
+                selectedStacks[dependency.Name] = installedStack;
+            }
             renderer.DependencyResult(profileScope, dependency, result);
             cancellationToken.ThrowIfCancellationRequested();
 

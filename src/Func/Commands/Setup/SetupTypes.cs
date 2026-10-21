@@ -1,10 +1,13 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json.Serialization;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Commands.Setup;
@@ -37,6 +40,15 @@ internal sealed record SetupDependency(
     bool Optional = false,
     BundleChannel? Channel = null)
 {
+    [JsonIgnore]
+    public SetupTemplateDelivery TemplateDelivery { get; init; }
+
+    [JsonIgnore]
+    public WorkloadEntry? SelectedStack { get; init; }
+
+    [JsonIgnore]
+    public IReadOnlyList<NativeTemplateContentRole> RequiredNativeRoles { get; init; } = [];
+
     private const string WorkerPackagePrefix = "Azure.Functions.Cli.Workloads.Workers.";
     private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
     private const string TemplatesPackagePrefix = "Azure.Functions.Cli.Workloads.Templates.";
@@ -132,6 +144,17 @@ internal sealed record SetupDependency(
     public static bool SupportsTemplates(string stack)
         => !string.IsNullOrWhiteSpace(stack) && _templates.Contains(stack.Trim());
 
+    public static SetupDependency NativeTemplates(string stack, BundleChannel? channel)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        return new(SetupDependencyKind.Templates, stack, $"{stack} native templates", string.Empty,
+            VersionRange: null, RangeText: null, ResolvedPackageId: null, Channel: channel)
+        {
+            TemplateDelivery = SetupTemplateDelivery.ExternalNative,
+            RequiredNativeRoles = [NativeTemplateContentRole.Function],
+        };
+    }
+
     private static string StackPackageSuffix(string stack)
         => stack.Trim().ToLowerInvariant() switch
         {
@@ -158,6 +181,12 @@ internal enum SetupDependencyKind
     ExtensionBundle,
 }
 
+internal enum SetupTemplateDelivery
+{
+    LegacyWorkload,
+    ExternalNative,
+}
+
 internal enum SetupDependencyStatus
 {
     Satisfied,
@@ -175,6 +204,12 @@ internal sealed record SetupDependencyResult(
     string Message,
     string? Warning = null)
 {
+    [JsonIgnore]
+    public WorkloadEntry? InstalledWorkload { get; init; }
+
+    [JsonIgnore]
+    public BasicAcquisitionResult? NativeAcquisition { get; init; }
+
     public static SetupDependencyResult Satisfied(SetupDependency dependency, string packageId, string version, string message)
         => new(dependency, SetupDependencyStatus.Satisfied, packageId, version, message);
 
@@ -191,7 +226,8 @@ internal sealed record SetupDependencyResult(
         => new(
             dependency,
             SetupDependencyStatus.Failed,
-            dependency.Kind == SetupDependencyKind.Runtime ? null : dependency.PackageId,
+            dependency.Kind == SetupDependencyKind.Runtime || dependency.TemplateDelivery == SetupTemplateDelivery.ExternalNative
+                ? null : dependency.PackageId,
             Version: null,
             message);
 }

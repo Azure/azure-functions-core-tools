@@ -30,7 +30,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     public async Task<WorkloadInstallResult> EnsureInstalledAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool checkOnly = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        using PreparedWorkloadReuse prepared = await _deploymentService.PrepareReuseAsync(entry, cancellationToken);
+        using PreparedWorkloadReuse prepared = await _deploymentService.PrepareReuseAsync(entry, cancellationToken, checkOnly);
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
         if (checkOnly)
         {
@@ -388,7 +388,9 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
             throw new InvalidWorkloadException("The requested source conflicts with the installed bundled stack's validated origin. Use its original source to verify or repair it.");
         }
 
-        using PreparedWorkloadReuse? prepared = bundled ? await _deploymentService.PrepareReuseAsync(expected, cancellationToken) : null;
+        using PreparedWorkloadReuse? prepared = bundled
+            ? await _deploymentService.PrepareReuseAsync(expected, cancellationToken, checkOnly: true)
+            : null;
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
         await RevalidateTargetAsync(operation, packageId, targetInstalledVersion, ownership, expected, cancellationToken);
         if (prepared is not null)

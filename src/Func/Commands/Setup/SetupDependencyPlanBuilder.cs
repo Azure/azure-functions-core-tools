@@ -23,9 +23,10 @@ internal interface ISetupDependencyPlanBuilder
 }
 
 internal sealed class SetupDependencyPlanBuilder(
-    IHostJsonBundleSectionReader hostJsonBundleSectionReader) : ISetupDependencyPlanBuilder
+    IHostJsonBundleSectionReader hostJsonBundleSectionReader, NativeTemplateSetupSupport? nativeTemplates = null) : ISetupDependencyPlanBuilder
 {
     private readonly IHostJsonBundleSectionReader _hostJsonBundleSectionReader = hostJsonBundleSectionReader ?? throw new ArgumentNullException(nameof(hostJsonBundleSectionReader));
+    private readonly NativeTemplateSetupSupport? _nativeTemplates = nativeTemplates;
 
     public async Task<SetupDependencyPlan> BuildDependencyPlanAsync(
         DirectoryInfo workingDirectory,
@@ -76,7 +77,9 @@ internal sealed class SetupDependencyPlanBuilder(
                 // Script stacks ship per-channel templates that track the bundle
                 // channel; dotnet templates don't use bundles, so they stay channel-less.
                 BundleChannel? templatesChannel = SetupRuntimes.IsDotNetRuntime(runtimeFeature.Name) ? null : bundleChannel;
-                dependencies.Add(SetupDependency.Templates(runtimeFeature.Name, templatesChannel));
+                dependencies.Add(_nativeTemplates is null
+                    ? SetupDependency.Templates(runtimeFeature.Name, templatesChannel)
+                    : SetupDependency.NativeTemplates(runtimeFeature.Name, templatesChannel));
             }
         }
 
