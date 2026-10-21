@@ -59,6 +59,13 @@ The target must be absent or empty. Existing content, adoption, repair and
 deletion. Public init retains those behaviors. The directory becomes both command
 directory and prospective project root before opening one protected project flow;
 stack, language, bundle and existing-project profile defaults remain unavailable.
+Dry-run requests a clean store. A pending recovery journal, whether valid or
+corrupt, is refused under shared admission before exclusive recovery or native
+bootstrap. Live hive, journal and snapshot bytes remain unchanged. Ordinary
+creation retains the store's existing recovery path. Private caches and lock
+control activity are not a promise of zero filesystem activity. Even a forced
+preview remains refused by this bounded stage; no public force-cleanup policy
+is imported.
 
 Project catalog entries carry the existing planner's unconditional declarations
 from that flow's configuration snapshot. Whole-template filters use their
@@ -89,9 +96,18 @@ configured roots come only from the actual invocation. Dry-run and post-preview
 target refusal never imply completed effects. This keeps preview output truthful
 when the runtime reports only confirmed effects after creation or partial
 finalization.
+The internal configuration-plan projection is omitted from direct native-result
+JSON, preserving that existing serialization shape. INIT renders the plans
+explicitly through its `plannedConfigurations` property.
 Pre-create native refusals may still carry planned `Changes`; those are never
-rendered as completed. Completed effects are exposed only for successful native
-creation or partial configuration finalization, with the native result unchanged.
+rendered as completed. Completed effects use the current native producer's real-output commit marker,
+not a success-shaped private render or a nonempty preview. An installation
+failure after a real output move retains its confirmed effects and nonzero
+result even if cancellation arrives afterward. Cancellation during configuration
+after native files were installed similarly returns partial initialization,
+including only configurations already committed. Neither case reports success
+or rolls back generated files. Cancellation before real output still propagates.
+The native result remains unchanged.
 Every result after successful plan computation retains that ordered planned
 metadata, including subsequent conflict or revalidation failures; a result
 before planning has no synthetic plan. Project configuration diagnostics remain
@@ -146,7 +162,7 @@ guard/name/topology algorithms. This stage does not clear the remaining
 provider-held review gate, and its controlled fixtures do not establish general
 type, path, concurrent-store or platform safety. The additive
 declaration/result projection hunks in `Templater.GetCandidatesAsync`,
-`TemplateEngineSession.ValidateProjectConfiguration` / project result initializers,
+`TemplateInvocationCoordinator.ValidateProjectConfiguration` / project result initializers,
 `TemplateCatalogEntry` and `TemplateInvocationResult` are explicit future
 composition conflict surfaces; snapshot shape, mounted-type authorization,
 read-snapshot validation, effect/path guards and native invocation order are

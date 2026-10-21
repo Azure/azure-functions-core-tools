@@ -102,7 +102,10 @@ internal sealed class InitExecutionRunner(
                     .SelectMany(stack => stack.SupportedLanguages).Distinct(StringComparer.OrdinalIgnoreCase))}.");
         }
 
-        TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null));
+        TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null))
+        {
+            RequireCleanStore = request.DryRun,
+        };
         cancellationToken.ThrowIfCancellationRequested();
         TemplateProjectSupport support = _projectSupport();
         cancellationToken.ThrowIfCancellationRequested();
@@ -351,8 +354,10 @@ internal sealed class InitExecutionRunner(
     internal static bool HasConfirmedCreationResult(InitExecutionResult result, bool dryRun)
     {
         ArgumentNullException.ThrowIfNull(result);
-        return !dryRun && (result is { Kind: "created", Succeeded: true, Invocation.Status: TemplateInvocationStatus.Success }
-            or { Kind: "partialInitialization", Succeeded: false, Invocation.Status: TemplateInvocationStatus.ConfigurationFailure });
+        return !dryRun && result.Invocation is { HasCommittedOutput: true }
+            && (result is { Kind: "created", Succeeded: true, Invocation.Status: TemplateInvocationStatus.Success }
+                or { Kind: "partialInitialization", Succeeded: false, Invocation.Status: TemplateInvocationStatus.ConfigurationFailure }
+                or { Kind: "invocationFailed", Succeeded: false });
     }
 
     private const string PackageGuidance =

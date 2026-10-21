@@ -646,7 +646,14 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
-        await _fileSystem.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
+        if (force)
+        {
+            await _fileSystem.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
+        }
+        else
+        {
+            await _fileSystem.CreateAllTextAsync(path, json + Environment.NewLine, cancellationToken);
+        }
     }
 
     /// <summary>
