@@ -831,8 +831,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         await InstallAsync();
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
-        stderr.Enqueue(ConsoleKey.DownArrow);
-        stderr.Enqueue(ConsoleKey.Enter);
+        EnqueueStyledChoice(stderr);
         stderr.Enqueue(ConsoleKey.X, 'x');
         stderr.Enqueue(ConsoleKey.Enter);
         var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
@@ -843,6 +842,55 @@ public sealed class NewExecutionJourneyTests : IDisposable
         exit.Should().Be(0);
         stderr.Output.Should().Contain("Func.Consumer.[bad]").And.Contain("Func.Consumer.[red]styled[/]");
         harness.Result!.SelectedTemplate!.Identity.Should().Be("Func.Consumer.[red]styled[/]");
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_FamilyLabels_EitherOfferedOrder_SelectsExactRawIdentity(bool styledFirst)
+    {
+        WritePromptTemplate("string", identity: "Func.Consumer.[bad]");
+        WritePromptTemplate("string", identity: "Func.Consumer.[red]styled[/]", folder: "prompt-other");
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        EnqueueStyledChoice(stderr);
+        stderr.Enqueue(ConsoleKey.X, 'x');
+        stderr.Enqueue(ConsoleKey.Enter);
+        var spectre = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+        var interaction = Substitute.For<IInteractionService>();
+        interaction.IsInteractive.Returns(true);
+        List<string[]> offered = [];
+        interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                string[] choices = [.. call.ArgAt<IEnumerable<string>>(1).Order(StringComparer.Ordinal)];
+                if (styledFirst)
+                {
+                    Array.Reverse(choices);
+                }
+
+                offered.Add(choices);
+                return spectre.PromptForSelectionAsync(call.ArgAt<string>(0), choices, call.ArgAt<CancellationToken>(2));
+            });
+        interaction.PromptForInputAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(call => spectre.PromptForInputAsync(call.ArgAt<string>(0), call.ArgAt<string?>(1), call.ArgAt<CancellationToken>(2)));
+        var harness = CreateHarness(interaction);
+        var before = Snapshot();
+
+        int exit = await harness.InvokeAsync(["prompt", "--path", Target, "--dry-run"]);
+
+        exit.Should().Be(0);
+        string[] actualChoices = offered.Should().ContainSingle().Subject;
+        actualChoices.Should().Equal(styledFirst
+            ? ["Func.Consumer.[[red]]styled[[/]]", "Func.Consumer.[[bad]]"]
+            : ["Func.Consumer.[[bad]]", "Func.Consumer.[[red]]styled[[/]]"]);
+        stderr.Output.Should().Contain("Func.Consumer.[bad]").And.Contain("Func.Consumer.[red]styled[/]");
+        harness.Result!.Kind.Should().Be("previewed");
+        harness.Result.SelectedTemplate!.Identity.Should().Be("Func.Consumer.[red]styled[/]");
+        harness.Result.ArgumentResults.Single().ValuesByCanonicalName.Should().Contain("Value", "x");
         Snapshot().Should().BeEquivalentTo(before);
         Directory.Exists(Target).Should().BeFalse();
     }
@@ -1201,6 +1249,17 @@ public sealed class NewExecutionJourneyTests : IDisposable
         interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.ArgAt<IEnumerable<string>>(1).First());
         return interaction;
+    }
+
+    private static void EnqueueStyledChoice(BufferedConsole console)
+    {
+        console.Enqueue(ConsoleKey.S, 's');
+        console.Enqueue(ConsoleKey.T, 't');
+        console.Enqueue(ConsoleKey.Y, 'y');
+        console.Enqueue(ConsoleKey.L, 'l');
+        console.Enqueue(ConsoleKey.E, 'e');
+        console.Enqueue(ConsoleKey.D, 'd');
+        console.Enqueue(ConsoleKey.Enter);
     }
 
     private async Task InstallAsync()
