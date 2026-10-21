@@ -158,8 +158,8 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
 
     private static IReadOnlyList<TemplateFileChange> GetCompletedChanges(TemplateInvocationResult? invocation)
     {
-        // Pre-create conflicts can carry preview changes without writing them.
-        return invocation is { Status: TemplateInvocationStatus.Success or TemplateInvocationStatus.ConfigurationFailure }
+        // Preview and pre-create conflicts may report paths without committing them.
+        return invocation is { HasCommittedOutput: true }
             ? invocation.Changes
             : [];
     }

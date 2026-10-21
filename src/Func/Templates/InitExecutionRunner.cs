@@ -152,7 +152,10 @@ internal sealed class InitExecutionRunner(
             return await ConfigureExistingAsync(request, target, repair, catalog, requestedStack, requestedLanguage, cancellationToken);
         }
 
-        TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null));
+        TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null))
+        {
+            RequireCleanStore = request.DryRun,
+        };
         cancellationToken.ThrowIfCancellationRequested();
         TemplateProjectSupport support = _projectSupport();
         cancellationToken.ThrowIfCancellationRequested();
@@ -286,7 +289,14 @@ internal sealed class InitExecutionRunner(
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await _fileSystem.WriteAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            if (repair)
+            {
+                await _fileSystem.WriteAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            }
+            else
+            {
+                await _fileSystem.CreateAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -528,8 +538,10 @@ internal sealed class InitExecutionRunner(
     internal static bool HasConfirmedCreationResult(InitExecutionResult result, bool dryRun)
     {
         ArgumentNullException.ThrowIfNull(result);
-        return !dryRun && (result is { Kind: "created", Succeeded: true, Invocation.Status: TemplateInvocationStatus.Success }
-            or { Kind: "partialInitialization", Succeeded: false, Invocation.Status: TemplateInvocationStatus.ConfigurationFailure });
+        return !dryRun && result.Invocation is { HasCommittedOutput: true }
+            && (result is { Kind: "created", Succeeded: true, Invocation.Status: TemplateInvocationStatus.Success }
+                or { Kind: "partialInitialization", Succeeded: false, Invocation.Status: TemplateInvocationStatus.ConfigurationFailure }
+                or { Kind: "invocationFailed", Succeeded: false });
     }
 
     private const string PackageGuidance =

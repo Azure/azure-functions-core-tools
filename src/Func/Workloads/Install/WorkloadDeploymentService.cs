@@ -116,6 +116,26 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
     {
         ArgumentNullException.ThrowIfNull(entry);
         string directory = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        WorkloadMetadata metadata;
+        try
+        {
+            metadata = _metadataReader.Read(directory);
+        }
+        catch (Exception exception) when (exception is InvalidWorkloadException or DirectoryNotFoundException)
+        {
+            throw new InvalidWorkloadException($"The installed workload '{entry.PackageId}' {entry.PackageVersion} payload is damaged. " +
+                "Preserve the installation and explicitly repair it from its original source.", exception);
+        }
+        if (metadata.Kind != entry.Kind || metadata.RuntimeIdentifier != entry.RuntimeIdentifier
+            || metadata.EntryPoint?.AssemblyPath != entry.EntryPoint?.AssemblyPath || metadata.EntryPoint?.Type != entry.EntryPoint?.Type
+            || !_fileSystem.DirectoryExists(WorkloadPackageLayout.GetContentRoot(directory, metadata.RuntimeIdentifier))
+            || (metadata.EntryPoint is { } entryPoint
+                && !_fileSystem.FileExists(Path.GetFullPath(Path.Combine(directory, entryPoint.AssemblyPath)))
+                && !_fileSystem.FileExists(Path.GetFullPath(Path.Combine(directory, "tools", "any", entryPoint.AssemblyPath)))))
+        {
+            throw new InvalidWorkloadException($"The installed workload '{entry.PackageId}' {entry.PackageVersion} payload is damaged or conflicts with its registry entry. " +
+                "Preserve the installation and explicitly repair it from its original source.");
+        }
         Dictionary<string, string> hashes = new(StringComparer.Ordinal);
         foreach (string file in _fileSystem.GetFiles(directory))
         {
@@ -510,6 +530,10 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         ValidateOperation(operation);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        if (!Enum.IsDefined(ownership))
+        {
+            throw new ArgumentOutOfRangeException(nameof(ownership));
+        }
 
         string physicalPackageId = packageId;
         string physicalVersion = version;
@@ -984,17 +1008,17 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
     }
 
-    private static void DeleteInstallDirectory(string path)
+    private void DeleteInstallDirectory(string path)
     {
-        if (!Directory.Exists(path))
+        if (!_fileSystem.DirectoryExists(path))
         {
             return;
         }
 
-        Directory.Delete(path, recursive: true);
+        _fileSystem.DeleteDirectory(path);
 
         // Windows can report a successful delete while the directory lingers until the last handle closes.
-        if (Directory.Exists(path))
+        if (_fileSystem.DirectoryExists(path))
         {
             throw new IOException($"Failed to remove the existing install directory '{path}'.");
         }

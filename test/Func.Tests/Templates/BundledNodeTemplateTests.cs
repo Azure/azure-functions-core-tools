@@ -147,7 +147,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         packages.Should().ContainSingle();
         File.Exists(packages[0].MountPointUri).Should().BeTrue();
         packages[0].MountPointUri.Should().StartWith(Path.Combine(Home, "templates"));
-        using var templater = new Templater(session);
+        using var templater = new Templater(session, new(session, _files));
         (await templater.ListAsync(TemplateType.Project)).Select(template => template.Identity).Should()
             .BeEquivalentTo("Azure.Functions.Node.Basic.JavaScript", "Azure.Functions.Node.Basic.TypeScript");
         _source.ReceivedCalls().Should().NotContain(call => call.GetMethodInfo().Name.Contains("Download", StringComparison.Ordinal));

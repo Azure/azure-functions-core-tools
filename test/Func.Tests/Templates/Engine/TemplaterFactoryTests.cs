@@ -215,7 +215,7 @@ public sealed class TemplaterFactoryTests : IDisposable
                 path => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))));
         var store = new TemplateStore(new(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance);
         var context = new TemplateEngineContext(output, bundle: new("bundle", "4.35.0"));
-        using var templater = await new TemplaterFactory(store).CreateProjectAsync(context, new([]), ProjectSupport(), CancellationToken.None);
+        using var templater = await new TemplaterFactory(store, new PhysicalFileSystem()).CreateProjectAsync(context, new([]), ProjectSupport(), CancellationToken.None);
         var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
         using var cancellation = new CancellationTokenSource();
         var waiting = new TaskCompletionSource<TemplateStoreWaitReason>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -280,12 +280,12 @@ public sealed class TemplaterFactoryTests : IDisposable
         var support = ProjectSupport();
         using var cancellation = new CancellationTokenSource();
         Action<TemplateStoreWaitReason> waiting = _ => { };
-        using var engine = new TemplateEngineSession(context, Path.Combine(_root, "isolated"), availability, support);
-        store.OpenReadAsync(context, cancellation.Token, availability, support, waiting).Returns(engine);
+        using var engine = new TemplateEngineSession(context, Path.Combine(_root, "isolated"), availability);
+        store.OpenReadAsync(context, cancellation.Token, availability, waiting).Returns(engine);
 
-        using var templater = await new TemplaterFactory(store).CreateProjectAsync(context, availability, support, cancellation.Token, waiting);
+        using var templater = await new TemplaterFactory(store, new PhysicalFileSystem()).CreateProjectAsync(context, availability, support, cancellation.Token, waiting);
 
-        await store.Received(1).OpenReadAsync(context, cancellation.Token, availability, support, waiting);
+        await store.Received(1).OpenReadAsync(context, cancellation.Token, availability, waiting);
         templater.Context.Should().BeSameAs(context);
         templater.Context.Bundle.Should().BeSameAs(context.Bundle);
     }
@@ -309,14 +309,14 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Constructor_NullStore_Throws()
     {
-        Action act = () => _ = new TemplaterFactory(null!);
+        Action act = () => _ = new TemplaterFactory(null!, new PhysicalFileSystem());
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("store");
     }
 
     private TemplaterFactory Factory()
         => new(new TemplateStore(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(),
-            NullLoggerFactory.Instance));
+            NullLoggerFactory.Instance), new PhysicalFileSystem());
 
     private static TemplateProjectSupport ProjectSupport()
     {
@@ -326,6 +326,14 @@ public sealed class TemplaterFactoryTests : IDisposable
         stack.SupportedLanguages.Returns(["Python"]);
         stack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["python"] = ["py"] });
         return new(new(new([stack])), new(new PhysicalFileSystem()));
+    }
+
+    [Fact]
+    public void Constructor_NullFileSystem_Throws()
+    {
+        Action create = () => _ = new TemplaterFactory(Substitute.For<ITemplateStore>(), null!);
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
     }
 
     private async Task InstallFixturesUnderHomeAsync()
