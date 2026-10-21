@@ -22,7 +22,14 @@ public sealed class TemplateMountedSchemaTests : IDisposable
     [InlineData("7123", null)]
     [InlineData(null, "0")]
     [InlineData(null, "7124")]
-    public async Task InvokeAsync_IntegerPort_PreservesOmissionAndExplicitOrAuthoredDefaults(string? explicitPort, string? authoredDefault)
+    public Task InvokeAsync_IntegerPort_PreservesOmissionAndExplicitOrAuthoredDefaults(string? explicitPort, string? authoredDefault)
+        => InvokeIntegerPortAsync(explicitPort, authoredDefault, includeEmptyAdditionalConfigFiles: false);
+
+    [Fact]
+    public Task InvokeAsync_IntegerPort_EmptyAdditionalConfigFiles_PreservesGeneratedFallback()
+        => InvokeIntegerPortAsync(null, null, includeEmptyAdditionalConfigFiles: true);
+
+    private async Task InvokeIntegerPortAsync(string? explicitPort, string? authoredDefault, bool includeEmptyAdditionalConfigFiles)
     {
         string package = Path.Combine(_root, "port-template");
         string configurationDirectory = Path.Combine(package, ".template.config");
@@ -43,6 +50,10 @@ public sealed class TemplateMountedSchemaTests : IDisposable
         {
             configuration["symbols"]!["FunctionsHttpPort"]!["defaultValue"] = authoredDefault;
         }
+        if (includeEmptyAdditionalConfigFiles)
+        {
+            configuration["additionalConfigFiles"] = new JsonArray();
+        }
         File.WriteAllText(Path.Combine(configurationDirectory, "template.json"), configuration.ToJsonString());
         File.WriteAllText(Path.Combine(package, "launchSettings.json"), """{"commandLineArgs":"--port PORT_VALUE"}""");
         await TemplateFixtures.InstallAsync(package, Hive);
@@ -54,6 +65,11 @@ public sealed class TemplateMountedSchemaTests : IDisposable
             var definition = selected.Parameters.Should().ContainSingle().Subject;
             var values = selected.Parameters.Where(parameter => parameter.DefaultValue is not null)
                 .ToDictionary(parameter => parameter.CanonicalName, parameter => parameter.DefaultValue, StringComparer.Ordinal);
+            if (explicitPort is null && authoredDefault is null)
+            {
+                definition.DefaultValue.Should().BeNull();
+                values.Should().NotContainKey("FunctionsHttpPort");
+            }
             if (explicitPort is not null)
             {
                 values["FunctionsHttpPort"] = explicitPort;
