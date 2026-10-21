@@ -127,7 +127,10 @@ internal static class TemplateParameterProjector
         }
 
         // Additional configuration files can supply defaults absent from the primary declaration.
-        if (configuration.EnumerateObject().Any(property => property.Name.Equals("additionalConfigFiles", StringComparison.OrdinalIgnoreCase)))
+        if (configuration.EnumerateObject().Any(property =>
+            property.Name.Equals("additionalConfigFiles", StringComparison.OrdinalIgnoreCase)
+            && property.Value.ValueKind == JsonValueKind.Array
+            && property.Value.GetArrayLength() > 0))
         {
             return null;
         }
