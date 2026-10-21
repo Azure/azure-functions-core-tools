@@ -45,9 +45,9 @@ internal sealed class NewExecutionRunner(
             return NewExecutionResult.Reject("invalidName", "Supply a nonempty --name.");
         }
 
-        if (request.List && (request.RawTemplateTokens.Count > 0 || request.DryRun))
+        if (request.List && (request.RawTemplateTokens.Count > 0 || request.DryRun || request.Force || request.Name is not null))
         {
-            return NewExecutionResult.Reject("invalidListArguments", "Use --list without template arguments or --dry-run.");
+            return NewExecutionResult.Reject("invalidListArguments", "Use --list without template arguments, --name, --force or --dry-run.");
         }
 
         bool canPrompt = !request.NonInteractive && _interaction.IsInteractive;
@@ -59,6 +59,7 @@ internal sealed class NewExecutionRunner(
         }
 
         TemplateEngineContext context = resolved.Context ?? throw new InvalidOperationException("Context resolution returned no outcome.");
+        context = context with { RequireCleanStore = request.DryRun || request.List };
         using Templater templater = await _factory.CreateAsync(context, availability, cancellationToken,
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();

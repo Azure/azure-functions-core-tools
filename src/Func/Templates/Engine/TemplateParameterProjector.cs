@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Microsoft.TemplateEngine.Abstractions;
 
 namespace Azure.Functions.Cli.Templates.Engine;
@@ -16,15 +17,33 @@ internal static class TemplateParameterProjector
 
     /// <summary>
     /// Returns a definition for each parameter a user can supply, with the template's func host metadata applied.
+    /// Uses mounted declarations to distinguish authored defaults from engine fallbacks.
     /// </summary>
     /// <exception cref="InvalidTemplateMetadataException">
-    /// The metadata names a symbol users can't set, or an alias is invalid or shared by two parameters.
+    /// The metadata names a symbol users can't set, an alias is invalid or shared, or the configuration is invalid JSON.
     /// </exception>
-    public static IReadOnlyList<TemplateParameterDefinition> Project(IEnumerable<ITemplateParameter> parameters, FuncHostTemplateMetadata metadata)
+    public static IReadOnlyList<TemplateParameterDefinition> Project(
+        IEnumerable<ITemplateParameter> parameters, FuncHostTemplateMetadata metadata, string? configuration = null)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentNullException.ThrowIfNull(metadata);
+        return ProjectDefinitions(parameters, metadata, configuration is null ? null : ReadParametersWithoutDefaults(configuration));
+    }
 
+    /// <summary>
+    /// Projects parameters using the captured host view without reparsing template.json.
+    /// </summary>
+    public static IReadOnlyList<TemplateParameterDefinition> Project(
+        IEnumerable<ITemplateParameter> parameters, FuncHostTemplateMetadata metadata, JsonElement configuration)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentNullException.ThrowIfNull(metadata);
+        return ProjectDefinitions(parameters, metadata, ReadParametersWithoutDefaults(configuration));
+    }
+
+    private static IReadOnlyList<TemplateParameterDefinition> ProjectDefinitions(
+        IEnumerable<ITemplateParameter> parameters, FuncHostTemplateMetadata metadata, IReadOnlySet<string>? parametersWithoutDefaults)
+    {
         ITemplateParameter[] userParameters = [.. parameters.Where(IsUserParameter)];
 
         HashSet<string> canonicalNames = [.. userParameters.Select(parameter => parameter.Name)];
@@ -36,7 +55,7 @@ internal static class TemplateParameterProjector
                 + "which must name parameters users set as options. Commands set 'name' through --name.");
         }
 
-        TemplateParameterDefinition[] definitions = [.. userParameters.Select(parameter => Project(parameter, metadata))];
+        TemplateParameterDefinition[] definitions = [.. userParameters.Select(parameter => Project(parameter, metadata, parametersWithoutDefaults))];
         EnsureUnique(definitions, definition => definition.LongName, "long name");
         EnsureUnique(definitions, definition => definition.ShortName, "short name");
         return definitions;
@@ -49,7 +68,8 @@ internal static class TemplateParameterProjector
             && !string.Equals(parameter.Name, NameParameterName, StringComparison.Ordinal)
             && parameter.Precedence.PrecedenceDefinition != PrecedenceDefinition.Implicit;
 
-    private static TemplateParameterDefinition Project(ITemplateParameter parameter, FuncHostTemplateMetadata metadata)
+    private static TemplateParameterDefinition Project(
+        ITemplateParameter parameter, FuncHostTemplateMetadata metadata, IReadOnlySet<string>? parametersWithoutDefaults)
     {
         metadata.Symbols.TryGetValue(parameter.Name, out FuncHostSymbolMetadata? symbol);
 
@@ -79,10 +99,47 @@ internal static class TemplateParameterProjector
             NullIfEmpty(parameter.Description),
             dataType,
             choices,
-            parameter.DefaultValue,
+            parametersWithoutDefaults?.Contains(parameter.Name) == true ? null : parameter.DefaultValue,
             precedence == PrecedenceDefinition.Required,
             (symbol?.IsHidden ?? false) || precedence == PrecedenceDefinition.Disabled,
             symbol?.AlwaysShow ?? false);
+    }
+
+    private static IReadOnlySet<string>? ReadParametersWithoutDefaults(string configuration)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(configuration,
+                new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            return ReadParametersWithoutDefaults(document.RootElement);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidTemplateMetadataException("Template configuration is not valid JSON.", exception);
+        }
+    }
+
+    private static IReadOnlySet<string>? ReadParametersWithoutDefaults(JsonElement configuration)
+    {
+        if (configuration.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidTemplateMetadataException("Template configuration must contain a JSON object.");
+        }
+
+        // Additional configuration files can supply defaults absent from the primary declaration.
+        if (configuration.EnumerateObject().Any(property => property.Name.Equals("additionalConfigFiles", StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        // Engine-synthesized scalar defaults must not become user input and override generated fallbacks.
+        return configuration.EnumerateObject()
+            .Where(property => property.Name.Equals("symbols", StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.Object)
+            .SelectMany(property => property.Value.EnumerateObject())
+            .Where(symbol => symbol.Value.ValueKind == JsonValueKind.Object && symbol.Value.EnumerateObject()
+                .All(property => !property.Name.Equals("defaultValue", StringComparison.OrdinalIgnoreCase) || property.Value.ValueKind == JsonValueKind.Null))
+            .Select(symbol => symbol.Name)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     // The parser adds the dashes, and ':' and '=' separate an option from its value.

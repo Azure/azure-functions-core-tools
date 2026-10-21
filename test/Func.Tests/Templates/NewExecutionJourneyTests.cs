@@ -15,9 +15,11 @@ using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Console;
+using Azure.Functions.Cli.Tests.Templates.Engine;
 using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.TemplateEngine.Abstractions;
@@ -238,6 +240,8 @@ public sealed class NewExecutionJourneyTests : IDisposable
     [Theory]
     [InlineData("--list", "--unknown")]
     [InlineData("--list", "--dry-run")]
+    [InlineData("--list", "--force")]
+    [InlineData("--list", "--name", "Ignored")]
     public async Task Command_ListCannotHideUnparsedTail_StopsBeforeEngine(params string[] tokens)
     {
         await InstallAsync();
@@ -248,6 +252,115 @@ public sealed class NewExecutionJourneyTests : IDisposable
         exit.Should().Be(1);
         harness.Result!.Kind.Should().Be("invalidListArguments");
         harness.Factory.Contexts.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("list", false)]
+    [InlineData("list", true)]
+    [InlineData("preview", false)]
+    [InlineData("preview", true)]
+    [InlineData("forcePreview", false)]
+    [InlineData("forcePreview", true)]
+    public async Task Command_ReadOnlyPendingJournal_RefusesWithoutRecoveryOrBootstrap(string mode, bool corrupt)
+    {
+        await InstallAsync();
+        var files = new PhysicalFileSystem();
+        var storeLock = Substitute.For<ITemplateStoreLock>();
+        storeLock.AcquireAsync(Arg.Any<string>(), Arg.Any<TemplateStoreAccess>(), Arg.Any<CancellationToken>(),
+            Arg.Any<Action<TemplateStoreWaitReason>?>()).Returns(call => new FileTemplateStoreLock().AcquireAsync(
+                call.Arg<string>(), call.Arg<TemplateStoreAccess>(), call.Arg<CancellationToken>(),
+                call.Arg<Action<TemplateStoreWaitReason>?>()));
+        var loggers = Substitute.For<ILoggerFactory>();
+        var store = new TemplateStore(new(Home), files, storeLock, loggers);
+        files.CopyDirectory(store.Hive, store.Backup);
+        File.WriteAllText(Path.Combine(store.Hive, "uncommitted.txt"), "Retain until an owning lifecycle recovers.");
+        File.WriteAllText(store.Journal, corrupt ? "corrupt" : "present");
+        var hive = StoreBytes(store.Hive);
+        var backup = StoreBytes(store.Backup);
+        byte[] journal = File.ReadAllBytes(store.Journal);
+        var project = Snapshot();
+        var harness = CreateHarness(templateFactory: new TemplaterFactory(store, files));
+        string[] args = ReadOnlyArguments(mode);
+
+        Exception? failure = await Record.ExceptionAsync(() => harness.InvokeAsync(
+            [.. args, "--path", Target, "--output", "json"]));
+
+        StoreBytes(store.Hive).Should().BeEquivalentTo(hive);
+        StoreBytes(store.Backup).Should().BeEquivalentTo(backup);
+        File.ReadAllBytes(store.Journal).Should().Equal(journal);
+        Snapshot().Should().BeEquivalentTo(project);
+        Directory.Exists(Target).Should().BeFalse();
+        failure.Should().BeOfType<TemplateStoreRecoveryRequiredException>().Which.Message.Should().Contain("owning lifecycle");
+        harness.Factory.Contexts.Should().ContainSingle().Which.RequireCleanStore.Should().BeTrue();
+        harness.Factory.Templaters.Should().BeEmpty();
+        loggers.DidNotReceive().CreateLogger(Arg.Any<string>());
+        await storeLock.DidNotReceive().AcquireAsync(Arg.Any<string>(), TemplateStoreAccess.Write,
+            Arg.Any<CancellationToken>(), Arg.Any<Action<TemplateStoreWaitReason>?>());
+        _interaction.Lines.Should().NotContain(line => line.StartsWith("JSON:", StringComparison.Ordinal)
+            || line.StartsWith("SUCCESS:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("list")]
+    [InlineData("preview")]
+    [InlineData("forcePreview")]
+    public async Task Command_ReadOnlyCleanStore_PreservesLiveHiveAndProject(string mode)
+    {
+        await InstallAsync();
+        var beforeHive = StoreBytes(Path.Combine(Home, "templates"));
+        var beforeProject = Snapshot();
+        var harness = CreateHarness();
+
+        int exit = await harness.InvokeAsync([.. ReadOnlyArguments(mode), "--path", Target, "--output", "json"]);
+
+        exit.Should().Be(0);
+        harness.Result!.Context!.RequireCleanStore.Should().BeTrue();
+        harness.Result.Context.Project!.RootDirectory.Info.FullName.Should().Be(Project);
+        StoreBytes(Path.Combine(Home, "templates")).Should().BeEquivalentTo(beforeHive);
+        Snapshot().Should().BeEquivalentTo(beforeProject);
+        Directory.Exists(Target).Should().BeFalse();
+        harness.Factory.Templaters.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Command_CreatePendingJournal_RetainsOrdinaryRecovery()
+    {
+        await InstallAsync();
+        var files = new PhysicalFileSystem();
+        var store = new TemplateStore(new(Home), files, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        files.CopyDirectory(store.Hive, store.Backup);
+        var backup = StoreBytes(store.Backup);
+        string uncommitted = Path.Combine(store.Hive, "uncommitted.txt");
+        File.WriteAllText(uncommitted, "unfinished store mutation");
+        File.WriteAllText(store.Journal, "present");
+        var harness = CreateHarness();
+
+        int exit = await harness.InvokeAsync([Low, "--path", Target, "--name", "Recovered", "--greeting", "recovery"]);
+
+        exit.Should().Be(0);
+        harness.Result!.Context!.RequireCleanStore.Should().BeFalse();
+        harness.Result.Invocation!.Status.Should().Be(TemplateInvocationStatus.Success);
+        File.ReadAllText(Path.Combine(Target, "Recovered.txt")).Should().StartWith("Recovered|recovery|");
+        File.Exists(uncommitted).Should().BeFalse();
+        File.Exists(store.Journal).Should().BeFalse();
+        StoreBytes(store.Backup).Should().BeEquivalentTo(backup);
+    }
+
+    [Fact]
+    public async Task Command_EmptyList_RendersUsefulHintWithoutCreatingOutput()
+    {
+        await InstallAsync();
+        var harness = CreateHarness();
+        var before = Snapshot();
+
+        int exit = await harness.InvokeAsync(["missing", "--list", "--path", Target]);
+
+        exit.Should().Be(0);
+        harness.Result!.Kind.Should().Be("listed");
+        harness.Result.Templates.Should().BeEmpty();
+        _interaction.AllOutput.Should().Contain("No installed item templates match").And.Contain("func new --list");
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
     }
 
     [Theory]
@@ -387,13 +500,19 @@ public sealed class NewExecutionJourneyTests : IDisposable
         var preview = harness.Result!;
         int refusedExit = await harness.InvokeAsync(args);
         var refused = harness.Result!;
+        int forcedPreviewExit = await harness.InvokeAsync([.. args, "--dry-run", "--force"]);
+        var forcedPreview = harness.Result!;
 
         previewExit.Should().Be(0);
         preview.Kind.Should().Be("previewed");
-        preview.Invocation!.Changes.Should().Contain(change => change.Kind != "Create");
+        preview.Invocation!.Changes.Should().Contain(change => change.Kind != TemplateFileChangeKind.Create);
         preview.Invocation.Diagnostic.Should().Contain("force");
         refusedExit.Should().Be(1);
         refused.Invocation!.Status.Should().Be(TemplateInvocationStatus.FileConflict);
+        forcedPreviewExit.Should().Be(0);
+        forcedPreview.Kind.Should().Be("previewed");
+        forcedPreview.Context!.RequireCleanStore.Should().BeTrue();
+        forcedPreview.Invocation!.Changes.Should().Contain(change => change.Kind == TemplateFileChangeKind.Overwrite);
         Snapshot().Should().BeEquivalentTo(before);
         _interaction.AllOutput.Should().Contain("Re-run with --force");
 
@@ -833,7 +952,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
     {
         await InstallAsync();
         using CancellationTokenSource cancellation = new();
-        var native = new CancelAfterNativeReturnFactory(Path.Combine(Home, "templates"), cancellation);
+        var native = new CancelAfterNativeReturnFactory(Path.Combine(Home, "templates"), cancellation, noOutputs: noOutputs);
         var harness = CreateHarness(templateFactory: native);
         string reference = noOutputs ? "Func.Consumer.Empty" : Low;
         string[] values = noOutputs ? [] : ["--greeting", "completed"];
@@ -1062,7 +1181,8 @@ public sealed class NewExecutionJourneyTests : IDisposable
             new InstalledBundleScanner(installed), NullBundleResolveTelemetry.Instance, NullLogger<ExtensionBundleResolver>.Instance));
         services.AddTemplatesOrchestrator();
         var factory = new RecordingFactory(templateFactory ?? new TemplaterFactory(new TemplateStore(
-            new CliConfigurationPathsOptions(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance)));
+            new CliConfigurationPathsOptions(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance),
+            new PhysicalFileSystem()));
         services.AddSingleton<ITemplaterFactory>(factory);
         ServiceProvider provider = services.BuildServiceProvider();
         _providers.Add(provider);
@@ -1209,6 +1329,20 @@ public sealed class NewExecutionJourneyTests : IDisposable
     private Dictionary<string, string> Snapshot() => Directory.GetFiles(Project, "*", SearchOption.AllDirectories)
         .ToDictionary(path => Path.GetRelativePath(Project, path), File.ReadAllText);
 
+    private static Dictionary<string, byte[]> StoreBytes(string directory)
+        => Directory.Exists(directory)
+            ? Directory.GetFiles(directory, "*", SearchOption.AllDirectories)
+                .ToDictionary(path => Path.GetRelativePath(directory, path), File.ReadAllBytes)
+            : [];
+
+    private static string[] ReadOnlyArguments(string mode) => mode switch
+    {
+        "list" => ["--list"],
+        "preview" => [Low, "--greeting", "preview", "--dry-run"],
+        "forcePreview" => [Low, "--greeting", "preview", "--dry-run", "--force"],
+        _ => throw new ArgumentOutOfRangeException(nameof(mode)),
+    };
+
     private void AssertJsonKind(string expected)
     {
         string line = _interaction.Lines.Last(line => line.StartsWith("JSON: ", StringComparison.Ordinal));
@@ -1243,7 +1377,8 @@ public sealed class NewExecutionJourneyTests : IDisposable
     }
 
     private sealed class CancelAfterNativeReturnFactory(string hive, CancellationTokenSource cancellation,
-        bool cancelPreview = false, CreationResultStatus? unsuccessfulStatus = null, bool throwDuringCreate = false) : ITemplaterFactory
+        bool cancelPreview = false, CreationResultStatus? unsuccessfulStatus = null, bool throwDuringCreate = false,
+        bool noOutputs = false) : ITemplaterFactory
     {
         private CancelAfterNativeReturnSession? _session;
 
@@ -1257,7 +1392,24 @@ public sealed class NewExecutionJourneyTests : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             _session = new(context, hive, snapshot, cancellation, cancelPreview, unsuccessfulStatus, throwDuringCreate);
-            return Task.FromResult(new Templater(_session));
+            var files = new RecordingCommitFileSystem(new PhysicalFileSystem())
+            {
+                AfterCreateDirectory = path =>
+                {
+                    if (noOutputs && path == context.CommandDirectory.Info.FullName)
+                    {
+                        cancellation.Cancel();
+                    }
+                },
+                AfterMove = _ =>
+                {
+                    if (!noOutputs)
+                    {
+                        cancellation.Cancel();
+                    }
+                },
+            };
+            return Task.FromResult(TemplateFixtures.CreateTemplater(_session, files));
         }
 
         public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
@@ -1291,9 +1443,9 @@ public sealed class NewExecutionJourneyTests : IDisposable
                 result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
             }
 
-            if (dryRun == cancelPreview)
+            NativeResult = result;
+            if (cancelPreview || unsuccessfulStatus is not null)
             {
-                NativeResult = result;
                 await cancellation.CancelAsync();
             }
 

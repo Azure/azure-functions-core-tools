@@ -81,7 +81,9 @@ internal static class TemplateCatalogProjector
             metadata = configuration is null
                 ? FuncHostTemplateMetadataReader.Read(template)
                 : FuncHostTemplateMetadataReader.Read(configuration.HostConfigPlace, configuration.HostData);
-            parameters = TemplateParameterProjector.Project(configuration is null ? template.ParameterDefinitions : configuration.Parameters, metadata);
+            parameters = configuration is null
+                ? TemplateParameterProjector.Project(template.ParameterDefinitions, metadata)
+                : TemplateParameterProjector.Project(configuration.Parameters, metadata, configuration.Root);
         }
         catch (InvalidTemplateMetadataException ex)
         {

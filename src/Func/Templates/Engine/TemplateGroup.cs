@@ -5,6 +5,9 @@ using System.Collections;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
+/// <summary>
+/// Groups eligible selected templates while retaining diagnostics for unavailable candidates.
+/// </summary>
 internal sealed class TemplateGroup : IReadOnlyList<ResolvedTemplate>
 {
     private readonly IReadOnlyList<ResolvedTemplate> _items;
@@ -51,6 +54,9 @@ internal sealed class TemplateGroup : IReadOnlyList<ResolvedTemplate>
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
+/// <summary>
+/// Distinguishes selection failures from a successfully resolved template group.
+/// </summary>
 internal enum TemplateResolutionStatus
 {
     Success,
@@ -61,4 +67,7 @@ internal enum TemplateResolutionStatus
     InvalidTemplateType,
 }
 
+/// <summary>
+/// Reports template selection with its invocable group and unavailable-candidate diagnostics.
+/// </summary>
 internal sealed record TemplateResolutionResult(TemplateResolutionStatus Status, TemplateGroup? Group, IReadOnlyList<TemplateCatalogEntry> Diagnostics, string? Diagnostic = null);
