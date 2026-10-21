@@ -1347,6 +1347,46 @@ public class InitCommandTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitCommand_Heal_ConfigReadFails_PreservesProjectAndCause(bool denied)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            File.WriteAllText(configPath, """{"stack":{"runtime":"node"},"profiles":["custom"],"custom":{"keep":true}}""");
+            byte[] original = File.ReadAllBytes(configPath);
+            var fileSystem = Substitute.For<IFileSystem>();
+            Exception failure = denied ? new UnauthorizedAccessException("denied") : new IOException("read failed");
+            fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>())
+                .Returns(Task.FromException<string?>(failure));
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            exception.Which.InnerException.Should().BeSameAs(failure);
+            exception.Which.IsUserError.Should().BeTrue();
+            exception.Which.Message.Should().Contain(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
+                .And.Contain("re-run `func init`");
+            File.ReadAllBytes(configPath).Should().Equal(original);
+            await fileSystem.Received(1).ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>());
+            await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
@@ -1589,6 +1629,50 @@ public class InitCommandTests
             initializer.WasInvoked.Should().BeFalse();
             Directory.GetFileSystemEntries(directory).Should().BeEmpty();
             _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitCommand_Force_ConfigWriteFails_PreservesCauseWithoutScaffolding(bool denied)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            File.WriteAllText(configPath, """{"stack":{"runtime":"node"},"custom":"previous"}""");
+            File.WriteAllText(Path.Combine(directory, "previous.txt"), "previous source");
+            var fileSystem = Substitute.For<IFileSystem>();
+            Exception failure = denied ? new UnauthorizedAccessException("denied") : new IOException("write failed");
+            fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    Directory.GetFileSystemEntries(directory).Should().BeEmpty();
+                    return Task.FromException(failure);
+                });
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript", "--force"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            exception.Which.InnerException.Should().BeSameAs(failure);
+            exception.Which.IsUserError.Should().BeTrue();
+            exception.Which.Message.Should().Contain(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
+                .And.Contain("re-run `func init`");
+            await fileSystem.Received(1).WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            initializer.WasInvoked.Should().BeFalse();
+            Directory.GetFileSystemEntries(directory).Should().BeEmpty();
+            _interaction.Lines.Should().OnlyContain(line => line.StartsWith("WARNING:", StringComparison.Ordinal)
+                || line.StartsWith("CONFIRM:", StringComparison.Ordinal));
         }
         finally
         {
