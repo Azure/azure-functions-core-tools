@@ -75,7 +75,8 @@ public sealed class WorkloadOperationTests
         runtime.Current.Returns("test-rid");
         WorkloadRidPackageSelector selector = new(runtime);
         WorkloadPackageInspector inspector = new(new WorkloadMetadataReader(), selector);
-        WorkloadDeploymentService deployment = new(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), coordinator, fileSystem);
+        WorkloadDeploymentService deployment = new(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), coordinator, fileSystem,
+            Substitute.For<IBundledTemplateInstaller>());
         WorkloadInstaller installer = new(new WorkloadPackageSource(fixture.WorkloadCatalog, inspector, Options.Create(new WorkloadCatalogOptions())),
             inspector, selector, deployment, coordinator, fixture.Store, fileSystem);
 
@@ -127,7 +128,7 @@ public sealed class WorkloadOperationTests
         Directory.Exists(Path.Combine(directory, "tools", "any")).Should().BeFalse();
         string registry = File.ReadAllText(fixture.Paths.WorkloadRegistryPath);
         var deployment = new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(),
-            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem());
+            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem(), Substitute.For<IBundledTemplateInstaller>());
 
         var prepared = await deployment.PrepareReuseAsync(entry, CancellationToken.None);
 
@@ -151,7 +152,8 @@ public sealed class WorkloadOperationTests
             fileSystem.When(fs => fs.DeleteDirectory(directory)).Do(_ => throw new IOException("Owned payload deletion failure."));
         }
         var coordinator = new FileWorkloadOperationCoordinator(fixture.Paths);
-        var deployment = new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), coordinator, fileSystem);
+        var deployment = new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(), coordinator, fileSystem,
+            Substitute.For<IBundledTemplateInstaller>());
 
         Func<Task> uninstall = () => deployment.UninstallAsync("Fixture.StackA", "1.0.0", WorkloadOwnershipKind.Logical);
 
@@ -173,7 +175,7 @@ public sealed class WorkloadOperationTests
         await fixture.SeedStackAsync("Fixture.StackA", "1.0.0");
         string registry = File.ReadAllText(fixture.Paths.WorkloadRegistryPath);
         var deployment = new WorkloadDeploymentService(fixture.Paths, fixture.Store, new WorkloadMetadataReader(),
-            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem());
+            new FileWorkloadOperationCoordinator(fixture.Paths), new PhysicalFileSystem(), Substitute.For<IBundledTemplateInstaller>());
 
         Func<Task> uninstall = () => deployment.UninstallAsync("fixture.stacka.test-rid", "1.0.0", (WorkloadOwnershipKind)42);
 

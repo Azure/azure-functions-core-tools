@@ -59,7 +59,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         string manifestBefore = File.ReadAllText(manifest);
         string payloadBefore = File.ReadAllText(payload);
         var deployment = new WorkloadDeploymentService(_paths, _store, new WorkloadMetadataReader(),
-            new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem());
+            new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem(), Substitute.For<IBundledTemplateInstaller>());
 
         if (valid)
         {
@@ -111,7 +111,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         }
         var before = Directory.GetFiles(directory, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllText);
         var deployment = new WorkloadDeploymentService(_paths, _store, new WorkloadMetadataReader(),
-            new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem());
+            new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem(), Substitute.For<IBundledTemplateInstaller>());
 
         Func<Task> prepare = () => deployment.PrepareReuseAsync(entry, CancellationToken.None);
 
