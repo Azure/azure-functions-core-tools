@@ -362,6 +362,14 @@ before stack deployment without alternate-feed fallback. A local installed stack
 source path is not a companion feed. This repair path uses the ordinary approved
 HTTP(S) feed and does not define direct-local-stack acquisition policy.
 
+The user selected **stage first, then lease and revalidate**. Private stack and
+companion preparation finishes before workload admission. Under the shared
+workload operation the runner rereads installed rows, replans retained ranges,
+rechecks selected artifacts, source and ownership, and validates prepared bytes
+before any live stack effect. A changed plan returns a conflict instead of
+downloading another payload or prompting under the operation. The capability is
+held through companion commit or template recovery and disposal.
+
 Installed companion reuse requires actual native managed-package identity/version,
 archive validation, and lifecycle-owned source/pin evidence keyed to that exact
 artifact. The default unavailable ownership implementation fails closed; installed
@@ -388,9 +396,10 @@ and the actual cause/source diagnostics. Source argument handling is scoped to t
 source-provider call. Malformed nuspec XML/version data is classified as an invalid
 artifact at inspection, not a source conflict. Known stack feed HTTP/protocol
 failures and transport timeouts are classified around installation; caller
-cancellation stays distinct and unrelated argument errors escape. A successful
-stack row remains after companion failure, so a
-new process reconstructs its requirements before considering another stack. A
+cancellation stays distinct and unrelated argument errors escape. A companion
+transport or preflight failure before admission now leaves a fresh stack
+uninstalled. After verified stack commit, a later companion failure retains that
+stack so a new process reconstructs its requirements before considering another. A
 removed stack contributes none; reinstalling its mapped version restores the
 requirement. Cancellation stops further operations and the protected store owns
 active template recovery. Earlier successful packages are not uninstalled.
@@ -400,43 +409,42 @@ payload rather than querying feeds. A separately injected verified local provide
 can supply exact offline bytes without changing approval.
 
 Public command integration, publisher-qualified production rows, historical upgrade
-coverage, real lifecycle source/pin provenance, concurrent workload-acquisition
-serialization, complete lifecycle replacement/update/uninstall, and cross-platform
-qualification remain separate gates. The runner observes workload state but does
-not add a cross-store transaction or serialize another process changing workloads
-after planning. Curated registration/proof/grammar remains #5640/#5653/#5651; no
+coverage, real lifecycle source/pin provenance, complete lifecycle
+replacement/update/uninstall, and cross-platform qualification remain separate
+gates. Participating workload writers now share admission and authoritative
+revalidation, but this is not a cross-store transaction or a guarantee for
+nonparticipating processes. Curated registration/proof/grammar remains #5640/#5653/#5651; no
 curated preinstallation, general scanner or second sample registry is introduced.
 This increment is not M5 or production acquisition completion.
 
-### Unresolved shared workload mutation protocol
+### Participating workload mutation
 
-The single-writer fixture journey does not qualify concurrent workload state.
-`BasicAcquisitionRunner` reads an installed snapshot before planning;
-`WorkloadDeploymentService.InstallAsync` can later replace the physical directory
-and call `SaveWorkloadAsync` or move logical ownership. `WorkloadStore` reads,
-modifies and atomically renames the registry without a lease spanning that
-read-modify-write. Two writers can therefore publish stale aggregate state or add
-a disjoint retained requirement after acquisition has planned. Atomic file
-replacement prevents partial serialization, not lost updates or stale planning.
-The new composition inherits and exposes that risk. The template-hive lease does
-not protect workload directories or the workload registry.
+The existing coordination feature is relocated into this acquisition layer so
+its own source supplies the shared workload operation rather than depending on a
+later PR. Install, update, uninstall, reuse that attaches or moves ownership,
+prune selection/removal and all registry writers either acquire the operation or
+receive the same explicit capability. It is bound to the physical workload home
+and registry. Prune resolves current versions only after admission. Standalone
+registry writers hold admission through their read-modify-write, avoiding stale
+aggregate replacement by another participant.
 
-Before production activation or landing as a concurrent-safe acquisition feature,
-the workload/lifecycle owners must agree a cohesive protocol covering every local
-and catalog install, update, uninstall, explicit/logical ownership attach/remove/
-move, and direct registry save/remove/replace, including setup and this runner.
-No acquisition-private lock can establish safety while other mutators ignore it.
-Francisco's lifecycle/store review is required, coordinated with workload owners.
-The next protocol proposal must answer:
+Lock order is workload before template. Advisory readers and private preparation
+are disposed or completed before admission. The existing protected template
+transaction remains responsible for actual-content checks, commit and recovery.
+No second template lock, automatic package replacement or whole-machine rollback
+is introduced.
 
-1. Which authoritative workload lease or snapshot revision spans validation and
-   deployment, and how do every mutator and retained-row reader participate?
-2. What is the global order between workload ownership and template read/write
-   admission? Can slow payload acquisition happen before admission with a
-   mandatory recheck, without deadlock or accepting a changed requirement?
-3. What completed-state and recovery evidence survives cancellation/process death
-   after stack persistence or during companion commit, and which owner repairs it
-   without silently removing a working stack or publishing a stale registry?
+Workload mutation flushes a dirty intent before changing live directories or the
+registry and verifies persisted state before clearing it. A killed or failed
+writer with ambiguous state blocks subsequent mutation with recovery-required
+guidance. It does not automatically reconcile payloads or erase the intent.
+Completed stacks remain installed after later template failure; interrupted
+template work uses its existing recovery journal.
 
-These are unresolved landing/activation questions, not a locking implementation
-or a claim that `Completed` guarantees concurrent machine-wide consistency.
+This writer protocol does not cover old CLIs, nonparticipating inventory/runtime
+readers, hostile alias changes or unsupported locking backends. Ordinary workload
+verbs do not gain a new global companion-compatibility policy. Atomic registry
+rename is still byte-level replacement, not atomic payload-plus-registry rollback.
+The detailed participating contract and process qualification live in
+`proposed/workload-spec.md` section 6.8. Owner review and platform qualification
+remain distinct from implementing the own-source coordination boundary.

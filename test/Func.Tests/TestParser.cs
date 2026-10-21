@@ -104,6 +104,10 @@ internal static class TestParser
         emptyStore.GetWorkloadsAsync(Arg.Any<CancellationToken>())
             .Returns([]);
         services.AddSingleton(emptyStore);
+        IWorkloadOperationCoordinator coordinator = Substitute.For<IWorkloadOperationCoordinator>();
+        coordinator.AcquireAsync(Arg.Any<CancellationToken>())
+            .Returns(Substitute.For<IWorkloadOperation>());
+        services.AddSingleton(coordinator);
         services.AddSingleton(Substitute.For<IWorkloadLoader>());
 
         // Loaded workloads are registered individually as singletons at host

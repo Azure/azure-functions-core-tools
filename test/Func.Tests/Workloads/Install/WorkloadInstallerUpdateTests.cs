@@ -60,9 +60,8 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
         result.NoCandidateOnSource.Should().BeTrue();
         result.PreviousVersion.Should().Be("1.0.0");
         result.Entry.Should().BeSameAs(current);
-        await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
-        await _store.DidNotReceive().RemoveWorkloadAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().RemoveWorkloadAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -110,8 +109,7 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
         string newDir = _paths.GetInstallDirectory("test.workload", "1.1.0");
         Directory.Exists(newDir).Should().BeTrue();
         Directory.Exists(oldDir).Should().BeFalse("old install dir must be deleted after swap");
-        await _store.Received(1).MoveExplicitOwnershipAsync(
-            "test.workload",
+        await _store.Received(1).MoveExplicitOwnershipAsync(Arg.Any<IWorkloadOperation>(), "test.workload",
             "1.0.0",
             Arg.Is<WorkloadEntry>(entry =>
                 entry.PackageId == "test.workload"
@@ -142,8 +140,7 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
         await act.Should().ThrowExactlyAsync<IOException>();
         Directory.Exists(oldDir).Should().BeTrue("existing install must remain after staging failure");
         File.Exists(Path.Combine(oldDir, "marker.txt")).Should().BeTrue();
-        await _store.DidNotReceive().MoveExplicitOwnershipAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceive().MoveExplicitOwnershipAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

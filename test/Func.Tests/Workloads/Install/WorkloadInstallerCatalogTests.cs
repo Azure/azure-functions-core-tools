@@ -47,7 +47,7 @@ public sealed class WorkloadInstallerCatalogTests : WorkloadInstallerTestBase
         result.Entry.PackageId.Should().Be("test.workload");
         result.Entry.PackageVersion.Should().Be("1.0.0");
         Directory.Exists(_paths.GetInstallDirectory("test.workload", "1.0.0")).Should().BeTrue();
-        await _store.Received(1).SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
+        await _store.Received(1).SaveWorkloadAsync(Arg.Any<IWorkloadOperation>(), Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

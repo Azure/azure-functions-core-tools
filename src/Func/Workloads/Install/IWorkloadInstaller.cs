@@ -13,6 +13,13 @@ namespace Azure.Functions.Cli.Workloads.Install;
 /// </summary>
 internal interface IWorkloadInstaller
 {
+    public Task<PreparedWorkloadInstall> PrepareFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
+        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken);
+    public Task<WorkloadInstallResult> CommitPreparedAsync(IWorkloadOperation operation, PreparedWorkloadInstall prepared,
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken);
+    public Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
+        bool? includePrerelease, bool exact, bool force, WorkloadInstallExpectation expectation,
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken);
     /// <summary>
     /// Installs a workload from the <c>.nupkg</c> at <paramref name="nupkgPath"/>.
     /// The package is extracted into <see cref="IWorkloadPaths.GetInstallDirectory"/>
@@ -42,9 +49,8 @@ internal interface IWorkloadInstaller
 
     /// <summary>
     /// Resolves <paramref name="packageId"/> against the configured catalog,
-    /// downloads the matching <c>.nupkg</c> to a temp file, and routes it
-    /// through <see cref="InstallFromPackageAsync"/> so disk + registry
-    /// behaviour matches local installs exactly.
+    /// downloads the matching <c>.nupkg</c> to a temp file, and uses the same
+    /// private preparation and leased deployment pipeline as local installs.
     /// </summary>
     /// <param name="packageId">
     /// User-supplied package id or alias; case-insensitive. Treated as a
@@ -119,4 +125,10 @@ internal interface IWorkloadInstaller
 
     public Task<bool> UninstallAsync(string packageId, string version,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes the specified ownership under an operation that already protects the caller's authoritative selection.
+    /// </summary>
+    public Task<bool> UninstallAsync(IWorkloadOperation operation, string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken);
 }
