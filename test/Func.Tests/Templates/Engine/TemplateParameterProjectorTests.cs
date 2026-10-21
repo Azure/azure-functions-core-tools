@@ -384,6 +384,50 @@ public sealed class TemplateParameterProjectorTests : IDisposable
         act.Should().Throw<ArgumentNullException>().WithParameterName("parameters");
     }
 
+    [Theory]
+    [InlineData("""{"symbols":{"Count":{"type":"parameter","datatype":"integer"}}}""", "integer", "0", null)]
+    [InlineData("""{"symbols":{"Count":{"defaultValue":null}}}""", "integer", "0", null)]
+    [InlineData("""{"symbols":{"Count":{"defaultValue":"0"}}}""", "integer", "0", "0")]
+    [InlineData("""{"symbols":{"Count":{"defaultValue":"7123"}}}""", "integer", "7123", "7123")]
+    [InlineData("""{"Symbols":{"Count":{"DefaultValue":"0",},},}""", "integer", "0", "0")]
+    [InlineData("""{/* comment */"symbols":{"Count":{"type":"parameter","datatype":"bool"}}}""", "bool", "false", null)]
+    [InlineData("""{"symbols":{"Count":{"defaultValue":"false"}}}""", "bool", "false", "false")]
+    [InlineData("""{"symbols":{}}""", "integer", "0", "0")]
+    [InlineData("""{"additionalConfigFiles":["defaults.json"],"symbols":{"Count":{"datatype":"integer"}}}""", "integer", "0", "0")]
+    public void Project_MountedConfiguration_OnlyReportsAuthoredDefaults(
+        string configuration, string dataType, string engineDefault, string? expectedDefault)
+    {
+        var parameter = Parameter("Count", dataType: dataType, defaultValue: engineDefault);
+
+        var definitions = TemplateParameterProjector.Project([parameter], FuncHostTemplateMetadata.Empty, configuration);
+
+        definitions.Should().ContainSingle().Which.DefaultValue.Should().Be(expectedDefault);
+    }
+
+    [Fact]
+    public void Project_MountedParameterWithoutDefault_PreservesAdditionalLongAliases()
+    {
+        FuncHostTemplateMetadata metadata = Metadata(("Count", Symbol(shortName: "c") with { LongAliases = ["count-value"] }));
+
+        var definition = TemplateParameterProjector.Project([Parameter("Count", dataType: "integer", defaultValue: "0")],
+            metadata, """{"symbols":{"Count":{"type":"parameter","datatype":"integer"}}}""").Single();
+
+        definition.DefaultValue.Should().BeNull();
+        definition.LongName.Should().Be("Count");
+        definition.ShortName.Should().Be("c");
+        definition.LongAliases.Should().Equal("count-value");
+    }
+
+    [Theory]
+    [InlineData("{invalid")]
+    [InlineData("[]")]
+    public void Project_InvalidMountedConfiguration_Throws(string configuration)
+    {
+        Action act = () => TemplateParameterProjector.Project([Parameter("Count")], FuncHostTemplateMetadata.Empty, configuration);
+
+        act.Should().Throw<InvalidTemplateMetadataException>();
+    }
+
     [Fact]
     public void Project_NullMetadata_Throws()
     {

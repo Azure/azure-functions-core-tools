@@ -244,6 +244,52 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("0", null)]
+    [InlineData("7123", null)]
+    [InlineData(null, "0")]
+    [InlineData(null, "7124")]
+    public async Task Parse_IntegerPort_PreservesOmissionAndExplicitOrAuthoredDefaults(string? explicitPort, string? authoredDefault)
+    {
+        await InstallAsync(portDefault: authoredDefault);
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "port-output"));
+        using var templater = await CreateTemplaterAsync(output);
+        var selected = (await templater.ResolveGroupAsync("Func.Tests.Parser.Port", TemplateType.Item, CancellationToken.None)).Group![0];
+        string[] tokens = explicitPort is null ? [] : ["--FunctionsHttpPort", explicitPort];
+        if (explicitPort is null && authoredDefault is null)
+        {
+            var nativeOutput = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "native-port-output"));
+            var native = await selected.InvokeAsync(new(nativeOutput, new Dictionary<string, string?>(), "Port"), CancellationToken.None);
+            native.Status.Should().Be(TemplateInvocationStatus.Success);
+            using var nativeLaunch = JsonDocument.Parse(File.ReadAllText(Path.Combine(nativeOutput.Info.FullName, "launchSettings.json")));
+            string nativeArguments = nativeLaunch.RootElement.GetProperty("commandLineArgs").GetString()!;
+            int nativePort = int.Parse(nativeArguments["--port ".Length..], System.Globalization.CultureInfo.InvariantCulture);
+            nativePort.Should().BeInRange(7000, 7300);
+        }
+
+        var parsed = Parse(selected, tokens);
+        var created = await selected.InvokeAsync(new(output, parsed.ValuesByCanonicalName, "Port"), CancellationToken.None);
+
+        parsed.IsComplete.Should().BeTrue();
+        created.Status.Should().Be(TemplateInvocationStatus.Success);
+        using var launch = JsonDocument.Parse(File.ReadAllText(Path.Combine(output.Info.FullName, "launchSettings.json")));
+        string arguments = launch.RootElement.GetProperty("commandLineArgs").GetString()!;
+        if ((explicitPort ?? authoredDefault) is { } expected)
+        {
+            arguments.Should().Be("--port " + expected);
+            parsed.ValuesByCanonicalName.Should().Contain("FunctionsHttpPort", expected);
+        }
+        else
+        {
+            int port = int.Parse(arguments["--port ".Length..], System.Globalization.CultureInfo.InvariantCulture);
+            port.Should().BeInRange(7000, 7300);
+            parsed.ValuesByCanonicalName.Should().NotContainKey("FunctionsHttpPort");
+        }
+
+        parsed.ExplicitParameterNames.Contains("FunctionsHttpPort").Should().Be(explicitPort is not null);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))
@@ -271,17 +317,19 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         => Directory.GetFiles(Path.Combine(_root, "project"), "*", SearchOption.AllDirectories)
             .ToDictionary(path => Path.GetRelativePath(Path.Combine(_root, "project"), path), File.ReadAllText);
 
-    private async Task InstallAsync(string scalarType = "string", bool requireBundle = false)
+    private async Task InstallAsync(string scalarType = "string", bool requireBundle = false, string? portDefault = null)
     {
         string package = Path.Combine(_root, "package");
         string low = Path.Combine(package, "low", ".template.config");
         string high = Path.Combine(package, "high", ".template.config");
         string project = Path.Combine(package, "project", ".template.config");
         string scalar = Path.Combine(package, "scalar", ".template.config");
+        string port = Path.Combine(package, "port", ".template.config");
         Directory.CreateDirectory(low);
         Directory.CreateDirectory(high);
         Directory.CreateDirectory(project);
         Directory.CreateDirectory(scalar);
+        Directory.CreateDirectory(port);
         File.WriteAllText(Path.Combine(low, "template.json"), """
             {
               "identity":"Func.Tests.Parser.Low","groupIdentity":"Func.Tests.Parser.Group",
@@ -335,6 +383,24 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
             symbols = new { Scalar = new { type = "parameter", datatype = scalarType, isRequired = true, replaces = "VALUE" } },
         }));
         File.WriteAllText(Path.Combine(package, "scalar", "Scalar.txt"), "VALUE");
+        JsonNode portConfiguration = JsonNode.Parse("""
+            {
+              "identity":"Func.Tests.Parser.Port","name":"Port control","shortName":"func-tests-parser-port",
+              "tags":{"type":"item"},
+              "symbols":{
+                "FunctionsHttpPort":{"type":"parameter","datatype":"integer"},
+                "GeneratedPort":{"type":"generated","generator":"port","parameters":{"low":7000,"high":7300}},
+                "SelectedPort":{"type":"generated","generator":"coalesce",
+                  "parameters":{"sourceVariableName":"FunctionsHttpPort","fallbackVariableName":"GeneratedPort"},"replaces":"PORT_VALUE"}
+              }
+            }
+            """)!;
+        if (portDefault is not null)
+        {
+            portConfiguration["symbols"]!["FunctionsHttpPort"]!["defaultValue"] = portDefault;
+        }
+        File.WriteAllText(Path.Combine(port, "template.json"), portConfiguration.ToJsonString());
+        File.WriteAllText(Path.Combine(package, "port", "launchSettings.json"), """{"commandLineArgs":"--port PORT_VALUE"}""");
         Directory.CreateDirectory(Path.Combine(_root, "project"));
         File.WriteAllText(Path.Combine(_root, "project", "host.json"), JsonSerializer.Serialize(new
         {

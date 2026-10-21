@@ -61,16 +61,17 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
     /// <summary>
     /// Binds each declaration to one generated primary output and independently discovered host root.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Configuration, effects or the output directory is null.</exception>
+    /// <exception cref="ArgumentNullException">Configuration, effects, the output directory or directory outputs is null.</exception>
     /// <exception cref="ArgumentException">Configuration or the output directory is blank or contains an invalid path.</exception>
     /// <exception cref="InvalidTemplateMetadataException">Metadata, generated roots or configuration destinations are not qualified.</exception>
     public IReadOnlyList<TemplateProjectConfigurationPlan> CreatePlans(
-        string configuration, ICreationEffects effects, string outputDirectory)
+        string configuration, ICreationEffects effects, string outputDirectory, IReadOnlySet<string> directoryOutputs)
     {
         ArgumentNullException.ThrowIfNull(effects);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        ArgumentNullException.ThrowIfNull(directoryOutputs);
         IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = Read(configuration);
-        return CreatePlans(effects, outputDirectory, declarations, nativeDotNetLayout: false);
+        return CreatePlans(effects, outputDirectory, declarations, nativeDotNetLayout: false, directoryOutputs);
     }
 
     /// <summary>
@@ -141,16 +142,17 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
     /// <summary>
     /// Binds the qualified project source to the actual native preview output and mandatory CLI configuration root.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Effects, parameters or qualification is null.</exception>
+    /// <exception cref="ArgumentNullException">Effects, parameters, qualification or directory outputs is null.</exception>
     /// <exception cref="ArgumentException">Configuration or output directory is blank.</exception>
     /// <exception cref="InvalidTemplateMetadataException">The invocation, native mapping or output root is unqualified.</exception>
     public IReadOnlyList<TemplateProjectConfigurationPlan> CreateDotNetPlans(
         string configuration, ICreationEffects effects, string outputDirectory, DotNetProjectLayoutQualification qualification,
-        IReadOnlyDictionary<string, string?> parameters)
+        IReadOnlyDictionary<string, string?> parameters, IReadOnlySet<string> directoryOutputs)
     {
         ArgumentNullException.ThrowIfNull(effects);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
         ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentNullException.ThrowIfNull(directoryOutputs);
         if (!Path.IsPathFullyQualified(outputDirectory))
         {
             throw new ArgumentException("The qualified .NET layout requires an absolute invocation root.", nameof(outputDirectory));
@@ -159,11 +161,11 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = ReadDotNetLayout(configuration, qualification);
         Require(parameters.TryGetValue("Framework", out string? framework) && framework == "net10.0",
             "Qualified .NET project creation requires an explicit Framework value of net10.0.");
-        return CreatePlans(effects, outputDirectory, declarations, nativeDotNetLayout: true);
+        return CreatePlans(effects, outputDirectory, declarations, nativeDotNetLayout: true, directoryOutputs);
     }
 
     private IReadOnlyList<TemplateProjectConfigurationPlan> CreatePlans(ICreationEffects effects, string outputDirectory,
-        IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations, bool nativeDotNetLayout)
+        IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations, bool nativeDotNetLayout, IReadOnlySet<string> directoryOutputs)
     {
         outputDirectory = Path.GetFullPath(outputDirectory);
         string[] primaryOutputs =
@@ -171,7 +173,8 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         string[] changedOutputs =
             [.. effects.FileChanges.Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
         string[] generatedOutputs = [.. effects.FileChanges.Where(change =>
-            change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite)
+            (change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite)
+            && !directoryOutputs.Contains(change.TargetRelativePath))
             .Select(change => Path.GetFullPath(Path.Combine(outputDirectory, change.TargetRelativePath)))];
         Require(!changedOutputs.Any(path => string.Equals(Path.GetFileName(path), "config.json", StringComparison.OrdinalIgnoreCase)
             && string.Equals(Path.GetFileName(Path.GetDirectoryName(path)), ".func", StringComparison.OrdinalIgnoreCase)),

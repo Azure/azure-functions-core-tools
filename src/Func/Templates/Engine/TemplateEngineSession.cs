@@ -691,8 +691,8 @@ internal class TemplateEngineSession : IDisposable
                 }
 
                 configurationPlans = projectSupport.DotNetLayout is { } layout
-                    ? projectSupport.Planner.CreateDotNetPlans(configuration.Content, preview.CreationEffects, output, layout, parameters)
-                    : projectSupport.Planner.CreatePlans(configuration.Content, preview.CreationEffects, output);
+                    ? projectSupport.Planner.CreateDotNetPlans(configuration.Content, preview.CreationEffects, output, layout, parameters, directoryOutputs)
+                    : projectSupport.Planner.CreatePlans(configuration.Content, preview.CreationEffects, output, directoryOutputs);
                 if (!request.PreviewAfterDirectoryCleanup && configurationPlans.Any(projectSupport.Writer.ConfigurationExists))
                 {
                     return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic)

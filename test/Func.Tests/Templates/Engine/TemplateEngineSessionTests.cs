@@ -306,6 +306,17 @@ public sealed class TemplateEngineSessionTests : IDisposable
     }
 
     [Fact]
+    public void CreateProjectPlans_NullDirectoryOutputs_Throws()
+    {
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+        var effects = Substitute.For<ICreationEffects>();
+
+        Action create = () => planner.CreatePlans("{}", effects, _root, null!);
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName("directoryOutputs");
+    }
+
+    [Fact]
     public async Task WriteProjectConfigurationAsync_NullPlan_ThrowsWithoutFileSystemCalls()
     {
         var fileSystem = Substitute.For<IFileSystem>();

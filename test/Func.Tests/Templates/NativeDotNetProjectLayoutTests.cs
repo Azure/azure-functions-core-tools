@@ -36,7 +36,8 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         preview.Status.Should().Be(CreationResultStatus.Success);
 
         IReadOnlyList<TemplateProjectConfigurationPlan> plans = _planner.CreateDotNetPlans(
-            source.Configuration.Content, preview.CreationEffects!, source.Output, source.Qualification, parameters);
+            source.Configuration.Content, preview.CreationEffects!, source.Output, source.Qualification, parameters,
+            DirectoryOutputs(preview.CreationEffects!));
 
         TemplateProjectConfigurationPlan plan = plans.Should().ContainSingle().Subject;
         string nativeProject = preview.CreationEffects!.CreationResult.PrimaryOutputs.Should().ContainSingle().Subject.Path;
@@ -155,7 +156,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         ITemplateCreationResult preview = await source.PreviewAsync();
         Dictionary<string, string?> parameters = framework is null ? [] : new() { ["Framework"] = framework };
         Action action = () => _planner.CreateDotNetPlans(source.Configuration.Content, preview.CreationEffects!,
-            source.Output, source.Qualification, parameters);
+            source.Output, source.Qualification, parameters, DirectoryOutputs(preview.CreationEffects!));
 
         action.Should().Throw<InvalidTemplateMetadataException>().WithMessage("*explicit Framework*net10.0*");
         Directory.Exists(source.Output).Should().BeFalse();
@@ -192,7 +193,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
             _ => !change.TargetRelativePath.EndsWith(".gitignore", StringComparison.Ordinal),
         })]);
         Action action = () => _planner.CreateDotNetPlans(source.Configuration.Content, effects, source.Output,
-            source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" });
+            source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" }, DirectoryOutputs(effects));
 
         action.Should().Throw<InvalidTemplateMetadataException>();
         Directory.Exists(source.Output).Should().BeFalse();
@@ -216,7 +217,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         effects.CreationResult.Returns(result);
         effects.FileChanges.Returns(preview.CreationEffects.FileChanges);
         Action action = () => _planner.CreateDotNetPlans(source.Configuration.Content, effects, source.Output,
-            source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" });
+            source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" }, DirectoryOutputs(effects));
 
         action.Should().Throw<InvalidTemplateMetadataException>();
         Directory.Exists(source.Output).Should().BeFalse();
@@ -249,7 +250,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
             ? [.. preview.CreationEffects.FileChanges.Where(file => !file.TargetRelativePath.EndsWith(".csproj", StringComparison.Ordinal)), change]
             : [.. preview.CreationEffects.FileChanges, change]);
         Action action = () => _planner.CreateDotNetPlans(source.Configuration.Content, effects, source.Output,
-            source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" });
+            source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" }, DirectoryOutputs(effects));
 
         action.Should().Throw<InvalidTemplateMetadataException>();
         Directory.Exists(source.Output).Should().BeFalse();
@@ -261,7 +262,8 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         using NativeProject source = await OpenProjectAsync("FSharp");
         ITemplateCreationResult preview = await source.PreviewAsync();
         TemplateProjectConfigurationPlan plan = _planner.CreateDotNetPlans(source.Configuration.Content, preview.CreationEffects!,
-            source.Output, source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" }).Single();
+            source.Output, source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" },
+            DirectoryOutputs(preview.CreationEffects!)).Single();
         Directory.CreateDirectory(Path.GetDirectoryName(plan.ConfigurationPath)!);
         File.WriteAllText(plan.PrimaryOutput, "generated project");
         File.WriteAllText(plan.ConfigurationPath, "user owned");
@@ -292,9 +294,9 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         [
             () => _planner.ReadDotNetLayout(null!, new("Template", new string('a', 64))),
             () => _planner.ReadDotNetLayout("{}", null!),
-            () => _planner.CreateDotNetPlans("{}", null!, _root, new("Template", new string('a', 64)), new Dictionary<string, string?>()),
-            () => _planner.CreateDotNetPlans("{}", Substitute.For<ICreationEffects>(), "", new("Template", new string('a', 64)), new Dictionary<string, string?>()),
-            () => _planner.CreateDotNetPlans("{}", Substitute.For<ICreationEffects>(), _root, new("Template", new string('a', 64)), null!),
+            () => _planner.CreateDotNetPlans("{}", null!, _root, new("Template", new string('a', 64)), new Dictionary<string, string?>(), new HashSet<string>()),
+            () => _planner.CreateDotNetPlans("{}", Substitute.For<ICreationEffects>(), "", new("Template", new string('a', 64)), new Dictionary<string, string?>(), new HashSet<string>()),
+            () => _planner.CreateDotNetPlans("{}", Substitute.For<ICreationEffects>(), _root, new("Template", new string('a', 64)), null!, new HashSet<string>()),
         ];
 
         foreach (Action action in actions)
@@ -303,10 +305,48 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         }
     }
 
+    [Fact]
+    public void CreateDotNetPlans_NullDirectoryOutputs_Throws()
+    {
+        var effects = Substitute.For<ICreationEffects>();
+
+        Action action = () => _planner.CreateDotNetPlans("{}", effects, _root, new("Template", new string('a', 64)),
+            new Dictionary<string, string?>(), null!);
+
+        action.Should().Throw<ArgumentNullException>().WithParameterName("directoryOutputs");
+    }
+
+    [Theory]
+    [InlineData("CSharp", "host")]
+    [InlineData("CSharp", "project")]
+    [InlineData("FSharp", "host")]
+    [InlineData("FSharp", "project")]
+    public async Task QualifiedLayout_NativeDirectoryHostOrProject_RefusesBeforeCreation(string language, string directoryRole)
+    {
+        using NativeProject source = await OpenProjectAsync(language, directoryRole);
+        ITemplateCreationResult preview = await source.PreviewAsync();
+        preview.Status.Should().Be(CreationResultStatus.Success);
+        var directories = DirectoryOutputs(preview.CreationEffects!);
+        string target = directories.Should().ContainSingle().Subject;
+        (directoryRole == "host" ? Path.GetFileName(target) == "host.json" : Path.GetExtension(target) is ".csproj" or ".fsproj")
+            .Should().BeTrue();
+
+        Action action = () => _planner.CreateDotNetPlans(source.Configuration.Content, preview.CreationEffects!, source.Output,
+            source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" }, directories);
+
+        action.Should().Throw<InvalidTemplateMetadataException>();
+        Directory.Exists(source.Output).Should().BeFalse();
+    }
+
     private static DotNetProjectLayoutQualification Qualify(string identity, string content)
         => new(identity, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content))));
 
-    private async Task<NativeProject> OpenProjectAsync(string language)
+    private static HashSet<string> DirectoryOutputs(ICreationEffects effects)
+        => new(effects.FileChanges.OfType<IFileChange2>()
+            .Where(change => Path.GetFileName(change.SourceRelativePath) is "-.-" or "_._")
+            .Select(change => change.TargetRelativePath), StringComparer.Ordinal);
+
+    private async Task<NativeProject> OpenProjectAsync(string language, string? directoryRole = null)
     {
         string outerPath = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "bundled-dotnet-artifacts"), "*.nupkg").Single();
         string archive = Path.Combine(_root, "Azure.Functions.Templates.DotNet.nupkg");
@@ -315,8 +355,20 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
             outer.GetEntry("tools/any/templates/dotnet.nupkg")!.ExtractToFile(archive);
         }
 
+        string package = archive;
+        if (directoryRole is not null)
+        {
+            package = Path.Combine(_root, "candidate");
+            ZipFile.ExtractToDirectory(archive, package);
+            string entry = directoryRole == "host" ? "host.json" : "Company.FunctionApp" + (language == "FSharp" ? ".fsproj" : ".csproj");
+            string path = Path.Combine(package, "content", "ProjectTemplate-" + language, entry);
+            File.Delete(path);
+            Directory.CreateDirectory(path);
+            File.WriteAllText(Path.Combine(path, "-.-"), string.Empty);
+        }
+
         string hive = Path.Combine(_root, "hive");
-        await TemplateFixtures.InstallAsync(archive, hive);
+        await TemplateFixtures.InstallAsync(package, hive);
         TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), hive);
         ITemplateInfo template = (await session.PackageManager.GetTemplatesAsync(CancellationToken.None))
             .Single(template => template.Identity == $"Microsoft.AzureFunctions.ProjectTemplate.{language}.Isolated.3.x");

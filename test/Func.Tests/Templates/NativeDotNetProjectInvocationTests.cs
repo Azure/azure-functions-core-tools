@@ -23,6 +23,43 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("0")]
+    [InlineData("7123")]
+    public async Task QualifiedProject_ParsedCSharpHttpPort_PreservesNativeFallbackOrExplicitValue(string? explicitPort)
+    {
+        using ProjectCase source = await OpenProjectAsync("CSharp");
+        using Templater resolver = new(source.Session);
+        var selected = (await resolver.ResolveGroupAsync(source.Template.Identity, TemplateType.Project, CancellationToken.None)).Group![0];
+        string frameworkAlias = "--" + selected.Parameters.Single(parameter => parameter.CanonicalName == "Framework").LongName;
+        string[] tokens = explicitPort is null ? [frameworkAlias, "net10.0"] : [frameworkAlias, "net10.0", "--FunctionsHttpPort", explicitPort];
+        var parsed = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), tokens));
+        parsed.IsComplete.Should().BeTrue(string.Join(" ", parsed.InvalidInputDiagnostics.Select(diagnostic => diagnostic.Message)
+            .Concat(parsed.DefinitionDiagnostics)));
+
+        var result = await selected.InvokeAsync(source.Request() with { Parameters = parsed.ValuesByCanonicalName }, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
+        parsed.ValuesByCanonicalName.Should().Contain("Framework", "net10.0");
+        File.ReadAllText(source.Project).Should().Contain("<TargetFramework>net10.0</TargetFramework>");
+        using var launch = JsonDocument.Parse(File.ReadAllText(Path.Combine(source.Output, "Properties", "launchSettings.json")));
+        string arguments = launch.RootElement.GetProperty("profiles").GetProperty("Resolved.App").GetProperty("commandLineArgs").GetString()!;
+        if (explicitPort is not null)
+        {
+            arguments.Should().Be("--port " + explicitPort);
+            parsed.ValuesByCanonicalName.Should().Contain("FunctionsHttpPort", explicitPort);
+        }
+        else
+        {
+            int port = int.Parse(arguments["--port ".Length..], System.Globalization.CultureInfo.InvariantCulture);
+            port.Should().BeInRange(7000, 7300);
+            parsed.ValuesByCanonicalName.Should().NotContainKey("FunctionsHttpPort");
+        }
+        await _runner.Received(1).RunAsync(Arg.Is<IReadOnlyList<string>>(arguments => arguments[0] == "restore"),
+            source.Output, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
     [InlineData("CSharp", ".csproj", "C#", 1)]
     [InlineData("FSharp", ".fsproj", "F#", 3)]
     public async Task QualifiedProject_ActualNativePreviewAndCreation_FinalizesConfigurationAndExecutesTypedDependencies(
@@ -84,6 +121,26 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
 
         result.Status.Should().Be(TemplateInvocationStatus.EffectFailure, result.Diagnostic);
         Directory.Exists(source.Output).Should().BeFalse();
+        _runner.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("CSharp", "host")]
+    [InlineData("CSharp", "project")]
+    [InlineData("FSharp", "host")]
+    [InlineData("FSharp", "project")]
+    public async Task QualifiedProject_NativeDirectoryHostOrProject_RefusesBeforeCreationAndDependencies(string language, string directoryRole)
+    {
+        using ProjectCase source = await OpenProjectAsync(language, directoryRole: directoryRole);
+
+        TemplateInvocationResult result = await source.InvokeAsync();
+
+        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate, result.Diagnostic);
+        result.Changes.Should().BeEmpty();
+        result.ConfiguredProjects.Should().BeEmpty();
+        result.Effects.Should().BeNull();
+        Directory.Exists(source.Output).Should().BeFalse();
+        source.Capability.ValidationCalls.Should().Be(0);
         _runner.ReceivedCalls().Should().BeEmpty();
     }
 
@@ -315,7 +372,8 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
         _runner.ReceivedCalls().Should().BeEmpty();
     }
 
-    private async Task<ProjectCase> OpenProjectAsync(string language, Action<JsonObject>? mutate = null, IFileSystem? writerFiles = null)
+    private async Task<ProjectCase> OpenProjectAsync(
+        string language, Action<JsonObject>? mutate = null, IFileSystem? writerFiles = null, string? directoryRole = null)
     {
         string outerPath = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "bundled-dotnet-artifacts"), "*.nupkg").Single();
         string archive = Path.Combine(_root, "Azure.Functions.Templates.DotNet.nupkg");
@@ -325,14 +383,25 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
         }
 
         string package = archive;
-        if (mutate is not null)
+        if (mutate is not null || directoryRole is not null)
         {
             package = Path.Combine(_root, "candidate");
             ZipFile.ExtractToDirectory(archive, package);
             string config = Path.Combine(package, "content", "ProjectTemplate-" + language, ".template.config", "template.json");
-            JsonObject root = JsonNode.Parse(File.ReadAllText(config))!.AsObject();
-            mutate(root);
-            File.WriteAllText(config, root.ToJsonString());
+            if (mutate is not null)
+            {
+                JsonObject root = JsonNode.Parse(File.ReadAllText(config))!.AsObject();
+                mutate(root);
+                File.WriteAllText(config, root.ToJsonString());
+            }
+            if (directoryRole is not null)
+            {
+                string entry = directoryRole == "host" ? "host.json" : "Company.FunctionApp" + (language == "FSharp" ? ".fsproj" : ".csproj");
+                string path = Path.Combine(package, "content", "ProjectTemplate-" + language, entry);
+                File.Delete(path);
+                Directory.CreateDirectory(path);
+                File.WriteAllText(Path.Combine(path, "-.-"), string.Empty);
+            }
         }
 
         string hive = Path.Combine(_root, "hive");
