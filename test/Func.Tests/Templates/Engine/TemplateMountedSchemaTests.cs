@@ -266,7 +266,7 @@ public sealed class TemplateMountedSchemaTests : IDisposable
         {
             var session = new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive,
                 new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]));
-            using Templater flow = new(session);
+            using Templater flow = TemplateFixtures.CreateTemplater(session);
             var selected = (await flow.ResolveGroupAsync("Func.Tests.Journey", TemplateType.Item, CancellationToken.None)).Group![0];
             selected.Parameters.Should().ContainSingle().Which.CanonicalName.Should().Be("Greeting");
             selected.Parameters[0].DefaultValue.Should().Be("hello");
@@ -385,6 +385,6 @@ public sealed class TemplateMountedSchemaTests : IDisposable
     }
 
     private Templater CreateTemplater()
-        => new(new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), Hive,
+        => TemplateFixtures.CreateTemplater(new(new(WorkingDirectory.FromExplicit(_root)), Hive,
             new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)])));
 }

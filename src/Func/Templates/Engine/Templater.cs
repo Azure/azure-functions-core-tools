@@ -11,9 +11,10 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// Command-scoped entry point to the template engine. Create it through <see cref="ITemplaterFactory"/> and dispose
 /// it when the command is finished with templates.
 /// </summary>
-internal sealed class Templater(TemplateEngineSession session) : IDisposable
+internal sealed class Templater(TemplateEngineSession session, TemplateInvocationCoordinator invocation) : IDisposable
 {
     private readonly TemplateEngineSession _session = session ?? throw new ArgumentNullException(nameof(session));
+    private readonly TemplateInvocationCoordinator _invocation = ValidateInvocation(session, invocation);
     private IReadOnlyList<Candidate>? _candidates;
     private IReadOnlyList<MalformedTypeDescriptor> _malformedTypes = [];
 
@@ -114,7 +115,7 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
                 continue;
             }
 
-            items.Add(new(candidate.Entry, (request, token) => _session.InvokeAsync(candidate.Template, candidate.Configuration!, request, token)));
+            items.Add(new(candidate.Entry, new SelectedTemplateInvoker(candidate.Template, candidate.Configuration!, _invocation)));
         }
 
         TemplateGroup group = new(items.AsReadOnly(), diagnostics.AsReadOnly());
@@ -158,7 +159,7 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
                 }
 
                 IReadOnlyCollection<string> packageTypes = await metadata;
-                TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Content, cancellationToken, packageTypes);
+                TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Root, cancellationToken, packageTypes);
                 if (entry.Type == TemplateType.Project && evaluation.Status == TemplateConstraintEvaluationStatus.Eligible)
                 {
                     evaluation = new(TemplateConstraintEvaluationStatus.NotEvaluated,
@@ -187,6 +188,14 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
     }
 
     public void Dispose() => _session.Dispose();
+
+    private static TemplateInvocationCoordinator ValidateInvocation(TemplateEngineSession session, TemplateInvocationCoordinator invocation)
+    {
+        ArgumentNullException.ThrowIfNull(invocation);
+        return invocation.IsBoundTo(session)
+            ? invocation
+            : throw new ArgumentException("The invocation coordinator must use this template flow's session.", nameof(invocation));
+    }
 
     private static TemplateCatalogEntry Freeze(TemplateCatalogEntry entry) => entry with
     {

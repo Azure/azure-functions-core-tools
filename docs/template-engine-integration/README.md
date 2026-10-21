@@ -18,6 +18,13 @@ refreshing the shared hive. The selected snapshot also captures and compares fun
 host content separately, so alias edits after selection require rerunning selection
 without changing the raw template.json SHA used by source provenance.
 
+Resolved items hold an explicit invoker bound to the owning command session.
+The invocation coordinator owns admission, preview and creation ordering, while
+the session retains native environment and disposal ownership. A captured snapshot
+owns a cloned JSON view shared by host constraint, default and post-action checks.
+Fresh mounted reads still produce new snapshots for source revalidation. Native
+model parsing and the existing deterministic output-path guards remain separate.
+
 Mounted primary parameter declarations without an authored default remain unset
 in the projected command schema. This prevents an engine-synthesized scalar
 default such as integer zero from becoming explicit input and overriding a
