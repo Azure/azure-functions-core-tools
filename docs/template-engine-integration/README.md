@@ -18,6 +18,13 @@ refreshing the shared hive. The selected snapshot also captures and compares fun
 host content separately, so alias edits after selection require rerunning selection
 without changing the raw template.json SHA used by source provenance.
 
+Mounted primary parameter declarations without an authored default remain unset
+in the projected command schema. This prevents an engine-synthesized scalar
+default such as integer zero from becoming explicit input and overriding a
+native generated fallback. Authored defaults, including zero, false and empty
+strings, remain intact. Additional configuration and parameters not declared in
+the primary configuration retain the engine's merged defaults.
+
 The pinned TemplateEngine reevaluates symbols for preview, creation effects, and
 actual creation; its creation effects are not a frozen output plan. This item flow
 therefore supports parameter-driven file renames, `name`/`sourceName` renames,
