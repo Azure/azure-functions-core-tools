@@ -40,6 +40,9 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("BlobTrigger", "blob")]
         [InlineData("HttpTrigger", "http")]
         [InlineData("TimerTrigger", "timer")]
+        [InlineData("DaprPublishOutputBinding", null)]
+        [InlineData("DaprServiceInvocationTrigger", null)]
+        [InlineData("DaprTopicTrigger", null)]
         [InlineData("UnknownTrigger", null)]
         public void GetTemplateShortName_ReturnsExpectedShortName(string input, string expected)
         {
@@ -55,12 +58,15 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
-        [InlineData(WorkerRuntime.Dotnet, 20)]
-        [InlineData(WorkerRuntime.DotnetIsolated, 19)]
+        [InlineData(WorkerRuntime.Dotnet, 17)]
+        [InlineData(WorkerRuntime.DotnetIsolated, 16)]
         public void GetTemplates_ReturnsExpectedTemplates(WorkerRuntime runtime, int expectedCount)
         {
             var templates = DotnetHelpers.GetTemplates(runtime);
             Assert.Equal(expectedCount, templates.Count());
+            Assert.DoesNotContain(templates, template =>
+                template.Contains("Dapr", StringComparison.OrdinalIgnoreCase) ||
+                template.Contains("OpenAI", StringComparison.OrdinalIgnoreCase));
         }
 
         [Theory]
