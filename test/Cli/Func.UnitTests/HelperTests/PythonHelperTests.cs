@@ -44,6 +44,8 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [Theory]
         [InlineData("DOCKER|mcr.microsoft.com/azure-functions/python", 3, 9, true)]
         [InlineData("", 3, 7, false)]
+        [InlineData("", 3, 13, false)]
+        [InlineData("", 3, 14, true)]
         [InlineData("PYTHON|3.6", 3, 6, true)]
         [InlineData("PYTHON|3.6", 3, 7, false)]
         [InlineData("PYTHON|3.7", 3, 6, false)]
@@ -58,12 +60,29 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("Python|3.12", 3, 12, true)]
         [InlineData("Python|3.13", 3, 13, true)]
         [InlineData("Python|3.14", 3, 14, true)]
+        [InlineData("Python|3.15", 3, 15, true)]
         public void ShouldHaveMatchingLinuxFxVersion(string linuxFxVersion, int? major, int? minor, bool expectedResult)
         {
             bool result = PythonHelpers.IsLinuxFxVersionRuntimeVersionMatched(linuxFxVersion, major, minor);
             if (result != expectedResult)
             {
                 throw new Exception("Local version compatibility check failed (IsLocalVersionCompatibleWithLinuxFxVersion).");
+            }
+        }
+
+        [Theory]
+        [InlineData("", "", 3, 13, false)]
+        [InlineData("", "", 3, 14, true)]
+        [InlineData("python", "", 3, 14, true)]
+        [InlineData("", "3.14", 3, 14, true)]
+        [InlineData("python", "3.14", 3, 14, true)]
+        [InlineData("python", "3.14", 3, 13, false)]
+        public void ShouldHaveMatchingFlexPythonRuntimeVersion(string flexRuntime, string flexRuntimeVersion, int? major, int? minor, bool expectedResult)
+        {
+            bool result = PythonHelpers.IsFlexPythonRuntimeVersionMatched(flexRuntime, flexRuntimeVersion, major, minor);
+            if (result != expectedResult)
+            {
+                throw new Exception("Local version compatibility check failed (IsFlexPythonRuntimeVersionMatched).");
             }
         }
 
@@ -79,6 +98,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("3.12.0", false)]
         [InlineData("3.13.0", false)]
         [InlineData("3.14.0", false)]
+        [InlineData("3.15.0", false)]
         public void AssertPythonVersion(string pythonVersion, bool expectException)
         {
             WorkerLanguageVersionInfo worker = new WorkerLanguageVersionInfo(WorkerRuntime.Python, pythonVersion, "python");
@@ -98,6 +118,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData(3, 12)]
         [InlineData(3, 13)]
         [InlineData(3, 14)]
+        [InlineData(3, 15)]
         public void DockerfileNameShouldNotContainInvalidCharacters(int major, int minor)
         {
             // Verify the dockerfile name format matches what's used in ChoosePythonBuildEnvImage
@@ -123,11 +144,11 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             string[] pythons;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                pythons = new string[] { "python.exe", "python3.exe", "python310.exe", "python311.exe", "python312.exe", "python313.exe", "python314.exe", "py.exe" };
+                pythons = new string[] { "python.exe", "python3.exe", "python310.exe", "python311.exe", "python312.exe", "python313.exe", "python314.exe", "python315.exe", "py.exe" };
             }
             else
             {
-                pythons = new string[] { "python", "python3", "python310", "python311", "python312", "python313", "python314" };
+                pythons = new string[] { "python", "python3", "python310", "python311", "python312", "python313", "python314", "python315" };
             }
 
             string pythonExe = pythons.FirstOrDefault(p => CheckIfPythonExist(p));
