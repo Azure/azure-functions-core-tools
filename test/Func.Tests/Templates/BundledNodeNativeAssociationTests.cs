@@ -165,7 +165,9 @@ public sealed partial class BundledNodeTemplateTests
         var entry = await InstallAssociationStackAsync();
         using var external = new BasicAcquisitionFixture();
         var additional = AddNativeProjectFixture(external);
-        var (runner, request) = NativeAssociationRunner(external, entry, additionalProject: additional);
+        IBasicCompanionCatalog? selectedCatalog = null;
+        var (runner, request) = NativeAssociationRunner(external, entry, additionalProject: additional,
+            captureCatalog: catalog => selectedCatalog = catalog);
 
         var result = await runner.RunAsync(request, CancellationToken.None);
 
@@ -173,7 +175,8 @@ public sealed partial class BundledNodeTemplateTests
         result.Completed.Should().HaveCount(3);
         result.Completed[2].PackageId.Should().Be(additional.PackageId);
         result.Completed[2].Version.Should().Be("3.0.0");
-        using var provider = await CreateServicesAsync();
+        selectedCatalog.Should().NotBeNull();
+        using var provider = await CreateServicesAsync(nativeCatalog: selectedCatalog);
         using var scope = provider.CreateScope();
         var availability = new TemplateConstraintEvaluationSnapshot([new(entry.PackageId,
             NuGetVersion.Parse(entry.PackageVersion), entry.Aliases, true)]);
@@ -260,7 +263,8 @@ public sealed partial class BundledNodeTemplateTests
     private (BasicAcquisitionRunner Runner, BasicAcquisitionRequest Request) NativeAssociationRunner(
         BasicAcquisitionFixture external, WorkloadEntry entry, IBasicPackagePayloadSource? payload = null,
         BasicTemplateArtifact? additionalProject = null, IBasicCompanionCatalog? authority = null,
-        IPackageSourceProvider? sources = null, INativeTemplateOwnership? ownership = null)
+        IPackageSourceProvider? sources = null, INativeTemplateOwnership? ownership = null,
+        Action<IBasicCompanionCatalog>? captureCatalog = null)
     {
         string id = entry.LogicalPackage?.PackageId ?? entry.PackageId;
         string version = entry.LogicalPackage?.PackageVersion ?? entry.PackageVersion;
@@ -303,6 +307,7 @@ public sealed partial class BundledNodeTemplateTests
             }
         }
         var catalog = new FixtureCatalog(document.ToJsonString());
+        captureCatalog?.Invoke(authority ?? catalog);
         INativeTemplateOwnership owner = ownership ?? new NativeTemplateOwnership(_files, new(Home));
         var lifecycle = new BasicTemplateLifecycle(_templates, payload ?? external.Payload, new BasicArtifactInspector(_files), owner, _files);
         var coordinator = new FileWorkloadOperationCoordinator(_paths);

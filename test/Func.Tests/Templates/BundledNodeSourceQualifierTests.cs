@@ -163,4 +163,30 @@ public sealed partial class BundledNodeTemplateTests
         var selected = (await templater.ResolveGroupAsync("TimerTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
         return new(selected, FunctionArchive);
     }
+
+    [Theory]
+    [InlineData("unknown-value")]
+    [InlineData("undeclared-explicit")]
+    [InlineData("missing-explicit-value")]
+    public async Task SourceQualifier_FinalCanonicalProvenance_RefusesUndeclaredOrMissingValues(string corruption)
+    {
+        using var source = await ReadQualifiedSourceAsync();
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "canonical-refusal"));
+        var values = source.CanonicalParameters.ToDictionary(value => value.Id, value => value.DefaultValue, StringComparer.Ordinal);
+        HashSet<string> explicitNames = [];
+        if (corruption == "unknown-value") values["InvocationOutputIntent"] = "legacy";
+        else if (corruption == "undeclared-explicit") explicitNames.Add("timer-trigger-schedule");
+        else
+        {
+            explicitNames.Add("timerTrigger-schedule");
+            values.Remove("timerTrigger-schedule");
+        }
+
+        var qualified = await new NodeNativeTemplatePolicy().QualifyInvocationAsync(
+            new NodePolicyInvocationFixture(source, output, values, explicitNames), CancellationToken.None);
+
+        qualified.Succeeded.Should().BeFalse();
+        qualified.Diagnostics.Should().ContainSingle().Which.Should().Contain("canonical values and explicit input provenance");
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+    }
 }

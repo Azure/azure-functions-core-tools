@@ -8,35 +8,38 @@ using NuGet.Versioning;
 namespace Azure.Functions.Cli.Workloads.Node.Native;
 
 /// <summary>
-/// Qualifies the Node function source through its actual owning workload registration.
+/// Qualifies Node template sources through their actual owning workload registration.
 /// </summary>
 internal sealed class NodeNativeTemplatePolicy : NativeTemplatePolicy
 {
     private readonly NodeItemSource _items = new();
+    private readonly NodeProjectSource _projects = new();
 
     public override string Stack => "node";
 
     public override bool Handles(NativeTemplateSource selected)
     {
         ArgumentNullException.ThrowIfNull(selected);
-        return !selected.IsProject && selected.PackageId == NodeItemSource.PackageId
+        return (selected.IsProject || selected.PackageId == NodeItemSource.PackageId)
             && selected.Language is "JavaScript" or "TypeScript" && NuGetVersion.TryParse(selected.PackageVersion, out _);
     }
 
     public override NativeTemplatePolicyStages GetRequestedStages(NativeTemplateSource selected)
     {
         ArgumentNullException.ThrowIfNull(selected);
-        return NativeTemplatePolicyStages.Invocation | NativeTemplatePolicyStages.CapturedOutput;
+        return selected.IsProject ? NativeTemplatePolicyStages.Invocation
+            : NativeTemplatePolicyStages.Invocation | NativeTemplatePolicyStages.CapturedOutput;
     }
 
     public override async Task<NativeItemPolicyDescription> DescribeItemAsync(NativeTemplateSource selected, CancellationToken cancellationToken)
         => (await _items.ReadAsync(selected, cancellationToken)).Description;
 
-    public override Task<IReadOnlyList<string>> ValidateProjectAsync(NativeTemplateSource selected, CancellationToken cancellationToken)
+    public override async Task<IReadOnlyList<string>> ValidateProjectAsync(NativeTemplateSource selected, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selected);
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult<IReadOnlyList<string>>(["Node function policy cannot qualify a project template."]);
+        await _projects.ReadAsync(selected, cancellationToken);
+        return [];
     }
 
     public override async Task<NativeTemplateInvocationQualification> QualifyInvocationAsync(
@@ -44,7 +47,6 @@ internal sealed class NodeNativeTemplatePolicy : NativeTemplatePolicy
     {
         ArgumentNullException.ThrowIfNull(invocation);
         await invocation.RevalidateAsync(cancellationToken);
-        NodeQualifiedItem item = await _items.ReadAsync(invocation.Source, cancellationToken);
         HashSet<string> names = new(invocation.Source.CanonicalParameters.Select(parameter => parameter.Id), StringComparer.Ordinal);
         if (invocation.CanonicalValues.Keys.Any(key => !names.Contains(key))
             || invocation.ExplicitParameterNames.Any(key => !names.Contains(key) || !invocation.CanonicalValues.ContainsKey(key)))
@@ -52,6 +54,11 @@ internal sealed class NodeNativeTemplatePolicy : NativeTemplatePolicy
             return new(false, ["Node qualification requires final declared canonical values and explicit input provenance."],
                 new Dictionary<string, string?>(), []);
         }
+        if (invocation.Source.IsProject)
+        {
+            return new(true, [], new Dictionary<string, string?>(), await _projects.ReadAsync(invocation.Source, cancellationToken));
+        }
+        NodeQualifiedItem item = await _items.ReadAsync(invocation.Source, cancellationToken);
         return new(true, [], new Dictionary<string, string?>(), item.Sources);
     }
 

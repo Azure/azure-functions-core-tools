@@ -140,6 +140,13 @@ ownership, hash and output-installation safety generic. Registering the policy
 does not turn on native public commands or authorize missing production
 external acquisition data.
 
+`NodeProjectSource` also qualifies the selected canonical Node project's
+existing literal `host.json` configuration shape and package files. The generic
+CLI planner still verifies the actual root and mandatory configuration action.
+This path requests invocation qualification only, not a new owned-layout,
+dependency executor or npm completion callback. Other project shapes require
+additional owner support rather than a fallback or guessed execution policy.
+
 
 ## Template-owned item layout
 

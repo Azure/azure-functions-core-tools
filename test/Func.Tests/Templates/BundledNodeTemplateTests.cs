@@ -845,9 +845,17 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
                 {
                     text = reader.ReadToEnd();
                 }
-                text = corruption == "nestedType" ? text.Replace("FuncTemplate", "FuncCliWorkload", StringComparison.Ordinal)
-                    : corruption == "nestedHost" ? """{"symbolInfo":42}"""
-                    : text.Replace("\"args\": \"node\"", "\"args\": 42", StringComparison.Ordinal);
+                if (corruption == "nestedConstraints")
+                {
+                    JsonNode configuration = JsonNode.Parse(text)!;
+                    configuration["constraints"]!["stack"] = new JsonObject { ["type"] = "func-workload", ["args"] = 42 };
+                    text = configuration.ToJsonString();
+                }
+                else
+                {
+                    text = corruption == "nestedType" ? text.Replace("FuncTemplate", "FuncCliWorkload", StringComparison.Ordinal)
+                        : """{"symbolInfo":42}""";
+                }
                 content.Delete();
                 using var output = new StreamWriter(inner.CreateEntry(path).Open());
                 output.Write(text);
@@ -864,7 +872,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
             case "digest": asset["sha256"] = new string('0', 64); break;
             case "path": asset["path"] = "tools/../../outside.nupkg"; break;
             case "identity": asset["packageId"] = "Another.Package"; break;
-            case "type": asset["templates"]![0]!["type"] = "project"; break;
+            case "type": asset["templates"]![0]!["type"] = asset["templates"]![0]!["type"]!.GetValue<string>() == "project" ? "item" : "project"; break;
             case "inventory": asset["templates"]!.AsArray().RemoveAt(0); break;
             case "schema": root["schemaVersion"] = 2; break;
         }

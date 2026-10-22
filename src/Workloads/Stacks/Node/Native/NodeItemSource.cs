@@ -88,7 +88,7 @@ internal sealed class NodeItemSource
         {
             throw Invalid("The selected Node visibility differs from its owned host metadata.");
         }
-        string[] requiredBindings = [.. Property(bindings.RootElement, Text(original, "id")).EnumerateArray()
+        string[] requiredBindings = [.. Items(bindings.RootElement, Text(original, "id"))
             .Select(value => value.GetString() ?? throw Invalid("Node binding requirements must be strings."))];
         JsonElement constraints = Property(config, "constraints");
         if (requiredBindings.Length > 0 && (!Items(Property(constraints, "bindings"), "args")
@@ -103,7 +103,7 @@ internal sealed class NodeItemSource
             "The original Node item must declare one function name input.");
         string defaultName = Text(nameInput, "defaultValue");
         string displayName = Resolve(Text(original, "name"), resources.RootElement);
-        if (defaultName != selected.DefaultName || displayName != selected.DisplayName)
+        if (string.IsNullOrWhiteSpace(defaultName) || defaultName != selected.DefaultName || displayName != selected.DisplayName)
         {
             throw Invalid("The selected Node name and authored default differ from their original source.");
         }
@@ -234,6 +234,10 @@ internal sealed class NodeItemSource
 
     private static void RequireUniqueIds(JsonElement values)
     {
+        if (values.ValueKind != JsonValueKind.Array)
+        {
+            throw Invalid("The original Node template and prompt sources must be arrays.");
+        }
         string[] ids = [.. values.EnumerateArray().Select(value => Text(value, "id"))];
         if (ids.Any(string.IsNullOrWhiteSpace) || ids.Distinct(StringComparer.OrdinalIgnoreCase).Count() != ids.Length)
         {

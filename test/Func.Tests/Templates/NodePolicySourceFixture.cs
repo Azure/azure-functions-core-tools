@@ -122,7 +122,7 @@ internal sealed class NodePolicySourceFixture : NativeTemplateSource, IDisposabl
 }
 
 internal sealed class NodePolicyInvocationFixture(NativeTemplateSource source, WorkingDirectory output,
-    IReadOnlyDictionary<string, string?> values) : NativeTemplateInvocationContext
+    IReadOnlyDictionary<string, string?> values, IReadOnlySet<string>? explicitNames = null) : NativeTemplateInvocationContext
 {
     public override NativeTemplateSource Source => source;
     public override WorkingDirectory ProjectDirectory => output;
@@ -131,7 +131,7 @@ internal sealed class NodePolicyInvocationFixture(NativeTemplateSource source, W
     public override bool DryRun => false;
     public override bool Force => false;
     public override IReadOnlyDictionary<string, string?> CanonicalValues => values;
-    public override IReadOnlySet<string> ExplicitParameterNames { get; } = new HashSet<string>();
+    public override IReadOnlySet<string> ExplicitParameterNames { get; } = explicitNames ?? new HashSet<string>();
     public override NativeTemplateProjectBinding? ProjectBinding => null;
     public override Task RevalidateAsync(CancellationToken cancellationToken) => source.RevalidateAsync(cancellationToken);
 }
