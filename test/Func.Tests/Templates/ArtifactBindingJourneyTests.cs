@@ -643,13 +643,13 @@ public sealed partial class ArtifactBindingJourneyTests : IDisposable
     private InitExecutionRequest Request(bool dryRun = false) => new(DirectoryTarget, null, null, null, null,
         false, true, dryRun, false, [], new HashSet<string>(StringComparer.OrdinalIgnoreCase)) { ArtifactBinding = _selection };
 
-    private InitExecutionRunner Runner(bool scopes = true, IFileSystem? installation = null)
+    private InitExecutionRunner Runner(bool scopes = true, IFileSystem? installation = null, IBoundInitScopeFactory? scopeFactory = null)
     {
         TemplateArgumentParser arguments = new();
         return new(new TemplaterFactory(_templates, installation ?? _files), arguments, new(arguments, _interaction), _interaction, new(_interaction), new(_files),
             () => throw new InvalidOperationException("The original stack catalog must not serve bound init."),
             () => throw new InvalidOperationException("The original project support must not serve bound init."),
-            _files, Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>(), scopes ? _scopes : null);
+            _files, Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>(), scopes ? scopeFactory ?? _scopes : null);
     }
 
     private async Task SeedAsync(string? change = null, BundleChannel channel = BundleChannel.Stable, bool installTemplates = true)

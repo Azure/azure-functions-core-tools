@@ -1124,10 +1124,16 @@ public sealed partial class ArtifactBindingJourneyTests
             SelectionChoices.Add(options);
             WriteLine($"SELECT: {title} [{string.Join(", ", options)}]");
             SelectionMade?.Invoke();
+            if (selected == "bundled-js")
+            {
+                options.Should().Contain(option => option.Contains("Azure.Functions.Node.Basic.JavaScript", StringComparison.Ordinal),
+                    "the actual bundled Basic project must be selectable in the public default menu");
+            }
             return Task.FromResult(selected switch
             {
                 "first" => options[0],
                 "exact" => options.Single(option => option.Contains(Identity, StringComparison.Ordinal)),
+                "bundled-js" => options.Single(option => option.Contains("Azure.Functions.Node.Basic.JavaScript", StringComparison.Ordinal)),
                 _ => options.Single(option => option == selected),
             });
         }

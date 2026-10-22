@@ -10,7 +10,8 @@ internal sealed record BasicAcquisitionApproval(BasicAcquisitionPlan Plan, IRead
 {
     public BasicAcquisitionPlan Plan { get; } = Plan ?? throw new ArgumentNullException(nameof(Plan));
 
-    public IReadOnlyList<BasicTemplateArtifact> Artifacts { get; } = Artifacts ?? throw new ArgumentNullException(nameof(Artifacts));
+    public IReadOnlyList<BasicTemplateArtifact> Artifacts { get; } = BasicCompanionPlan.Freeze(
+        Artifacts ?? throw new ArgumentNullException(nameof(Artifacts)));
 
     public string? WorkloadInventory { get; init; }
 
@@ -18,6 +19,10 @@ internal sealed record BasicAcquisitionApproval(BasicAcquisitionPlan Plan, IRead
     {
         ArgumentNullException.ThrowIfNull(current);
         if (Plan.Revision != current.Revision || Plan.Source != current.Source
+            || Plan.Owner != current.Owner || Plan.HostIdentifier != current.HostIdentifier
+            || Plan.EngineHostVersion != current.EngineHostVersion || Plan.Channel != current.Channel
+            || !Plan.RequiredRoles.SequenceEqual(current.RequiredRoles)
+            || !Plan.OptionalChoices.SequenceEqual(current.OptionalChoices)
             || Plan.Companions.Count != current.Companions.Count
             || !Plan.Companions.Zip(current.Companions).All(pair =>
                 pair.First.PackageId == pair.Second.PackageId

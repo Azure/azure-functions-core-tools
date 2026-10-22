@@ -37,6 +37,7 @@ internal static class NativeTemplateSetupRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
         services.AddSingleton<NativeTemplateArtifactVerifier>();
+        services.AddSingleton<BundledBasicArtifactVerifier>();
         services.AddSingleton<IBasicArchiveInspector, BasicArtifactInspector>();
         services.AddSingleton<IBoundInitScopeFactory, BoundInitScopeFactory>();
         services.AddSingleton<Quickstart.QuickstartInstalledTemplates>();

@@ -62,10 +62,22 @@ internal sealed class BasicCompanionManifestReader
                     {
                         throw Invalid("Native association fields require schema version 2.");
                     }
+                    BasicCompanionKind kind = requirement.Kind.ValueKind switch
+                    {
+                        JsonValueKind.Undefined => BasicCompanionKind.Required,
+                        JsonValueKind.String when native => requirement.Kind.GetString() switch
+                        {
+                            "required" => BasicCompanionKind.Required,
+                            "optional" => BasicCompanionKind.Optional,
+                            _ => throw Invalid("A companion kind must be 'required' or 'optional'."),
+                        },
+                        _ => throw Invalid("Companion kind requires schema version 2 and a lowercase 'required' or 'optional' value."),
+                    };
 
                     companions.Add(new(PackageId(requirement.PackageId), Range(requirement.Versions))
                     {
                         RequiredRoles = Array.AsReadOnly(roles),
+                        Kind = kind,
                     });
                 }
 
@@ -296,6 +308,7 @@ internal sealed class BasicRequirementDocument
     public string? PackageId { get; init; }
     public string? Versions { get; init; }
     public List<string>? RequiredRoles { get; init; }
+    public JsonElement Kind { get; init; }
 }
 
 internal sealed class BasicArtifactDocument

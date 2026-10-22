@@ -61,8 +61,13 @@ internal sealed class InitExecutionRunner(
             ArgumentException.ThrowIfNullOrWhiteSpace(suppliedBinding.TemplateIdentity);
         }
         cancellationToken.ThrowIfCancellationRequested();
-        if (request.ArtifactBinding is { } binding && request.TemplateReference is not null
-            && !string.Equals(request.TemplateReference, binding.TemplateIdentity, StringComparison.Ordinal))
+        if (request.ArtifactBinding is not null && request.BundledBinding is not null)
+        {
+            return InitExecutionResult.Reject("bindingConflict", "External and bundled artifact capabilities cannot be combined.");
+        }
+        string? boundIdentity = request.ArtifactBinding?.TemplateIdentity ?? request.BundledBinding?.TemplateIdentity;
+        if (boundIdentity is not null && request.TemplateReference is not null
+            && !string.Equals(request.TemplateReference, boundIdentity, StringComparison.Ordinal))
         {
             return InitExecutionResult.Reject("bindingConflict", "The explicit template reference conflicts with the exact artifact binding. No fallback is permitted.");
         }
@@ -103,7 +108,7 @@ internal sealed class InitExecutionRunner(
             return InitExecutionResult.Reject("unsupportedTarget", target.Diagnostic!);
         }
 
-        bool refresh = request.ArtifactBinding is not null || request.RefreshCapabilities;
+        bool refresh = boundIdentity is not null || request.RefreshCapabilities;
         if (refresh && _boundScopes is null)
         {
             return InitExecutionResult.Reject("bindingUnavailable", "Exact artifact binding requires a fresh post-acquisition workload scope.");
@@ -133,7 +138,7 @@ internal sealed class InitExecutionRunner(
         }
 
         bool existing = target.State == InitExecutionTargetState.Adoptable || repair;
-        if (existing && (request.TemplateReference is not null || request.ArtifactBinding is not null))
+        if (existing && (request.TemplateReference is not null || boundIdentity is not null))
         {
             return InitExecutionResult.Reject("templateOnExistingProject",
                 "--template cannot be used during adoption or repair. Reinitialization requires --force, which is not qualified by this staged consumer; nothing was changed.");
@@ -175,7 +180,7 @@ internal sealed class InitExecutionRunner(
 
         TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null))
         {
-            RequireCleanStore = request.DryRun,
+            RequireCleanStore = request.DryRun || boundIdentity is not null,
         };
         cancellationToken.ThrowIfCancellationRequested();
         TemplateProjectSupport support = boundScope?.Support ?? _projectSupport();
@@ -183,7 +188,7 @@ internal sealed class InitExecutionRunner(
         using Templater templater = await _factory.CreateProjectAsync(context, boundScope?.Availability ?? availability, support, cancellationToken,
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
-        InitExecutionResult result = await ExecuteAsync(templater, request, Matches, boundScope?.Verifier, cancellationToken);
+        InitExecutionResult result = await ExecuteAsync(templater, request, Matches, boundScope, cancellationToken);
         if (!HasConfirmedCreationResult(result, request.DryRun))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -331,18 +336,20 @@ internal sealed class InitExecutionRunner(
     }
 
     private async Task<InitExecutionResult> ExecuteAsync(Templater templater, InitExecutionRequest request,
-        Func<string, string, bool> matches, Acquisition.NativeTemplateArtifactVerifier? verifier, CancellationToken cancellationToken)
+        Func<string, string, bool> matches, BoundInitScope? scope, CancellationToken cancellationToken)
     {
         bool canPrompt = !request.NonInteractive && _interaction.IsInteractive;
         List<TemplateGroup> groups = [];
         List<TemplateCandidateParseResult> parsed = [];
         List<TemplateCatalogEntry> considered = [];
-        if (request.ArtifactBinding is { } binding)
+        string? identity = request.ArtifactBinding?.TemplateIdentity ?? request.BundledBinding?.TemplateIdentity;
+        TemplateArtifactIdentity? artifact = request.ArtifactBinding?.Artifact ?? request.BundledBinding?.Artifact;
+        if (identity is not null)
         {
             IReadOnlyList<TemplateCatalogEntry> catalog = await templater.ListAsync(TemplateType.Project, cancellationToken);
-            TemplateCatalogEntry[] exact = [.. catalog.Where(entry => string.Equals(entry.Identity, binding.TemplateIdentity, StringComparison.Ordinal)
-                && entry.Package is { } package && string.Equals(package.Identifier, binding.Artifact.PackageId, StringComparison.OrdinalIgnoreCase)
-                && package.Version == binding.Artifact.Version)];
+            TemplateCatalogEntry[] exact = [.. catalog.Where(entry => string.Equals(entry.Identity, identity, StringComparison.Ordinal)
+                && entry.Package is { } package && string.Equals(package.Identifier, artifact!.PackageId, StringComparison.OrdinalIgnoreCase)
+                && package.Version == artifact.Version)];
             if (exact.Length != 1)
             {
                 return InitExecutionResult.Reject("bindingMismatch", "The full bound project identity is missing or ambiguous in this fresh session. No name fallback is permitted.");
@@ -356,7 +363,13 @@ internal sealed class InitExecutionRunner(
             }
             try
             {
-                TemplateResolutionResult resolution = await templater.BindProjectAsync(entry, binding, verifier!, cancellationToken);
+                if (request.BundledBinding is not null && scope?.BundledVerifier is null)
+                {
+                    return InitExecutionResult.Reject("bindingUnavailable", "Bundled binding requires the fresh bundled workload verifier.");
+                }
+                TemplateResolutionResult resolution = request.BundledBinding is { } bundled
+                    ? await templater.BindProjectAsync(entry, bundled, scope!.BundledVerifier!, cancellationToken)
+                    : await templater.BindProjectAsync(entry, request.ArtifactBinding!, scope!.Verifier, cancellationToken);
                 AddSelectable(resolution.Group!);
             }
             catch (Exception exception) when (exception is InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)

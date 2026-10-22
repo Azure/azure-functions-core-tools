@@ -143,6 +143,48 @@ template hive unchanged and must write the selected project's configuration.
 The fixture also checks workload writer admission after creation. Fixture
 authority is not production approval.
 
+### Selected acquisition and bundled Basic provenance
+
+Schema2 companions can declare `kind` as `required` or `optional`. Omission means
+`required`. Schema1 rejects the field even when explicitly null. Content roles
+remain independent. A required `additional-project` companion is still required,
+and an all-optional mapping is valid but cannot discharge an unselected mandatory
+role demand.
+
+An exact optional choice includes the full project identity, package, version,
+digest, source, physical and logical live owner, and channel. The request copies
+and freezes the choices. Qualification, installed external verification, and
+every acquisition replan use the same projection. All genuinely required
+companions remain, while only explicitly selected, independently qualified
+optional packages participate. Unselected retained optional entries do not impose
+ranges, roles, source or host constraints. A selected version is exact even when
+a newer qualified candidate exists. Choices are intent, not approval. Acquisition
+requires consent bound to the immutable projected plan, complete inventories,
+content revisions, roles, host, owner, choices and workload inventory.
+
+Bundled Basic content uses a separate capability, not an external native receipt
+or an `additional-project` relabeling. A fresh scope derives expected declarations
+and origin from the actual loaded runtime workload. Read-only validation checks
+the declared local archive bytes and complete path, identity and type inventory,
+the current physical and logical origin, unique installed native archive and
+bundled ownership. Selection and each protected invocation revalidate that proof.
+Missing, malformed, foreign or changed evidence refuses without repair or receipt
+creation. Valid bundled projects appear beside Basic, installed external projects,
+Browse and Cancel in the default menu.
+An independently qualified external project does not depend on unrelated bundled
+evidence. If external proof is unavailable, only complete independent bundled
+proof can authorize a bundled selection. A missing external receipt is not
+bundled authority, and unmatched projects retain their external diagnostic.
+
+Owned A1 to A2 installation remains **blocked** in this layer. Pinning a newer
+nomination is not an upgrade implementation. Existing version and ownership
+replacement guards remain unchanged. A separate dependent layer needs explicit
+before and after consent and a reviewed engine archive plus receipt transition
+inside the existing snapshot and recovery boundary. No production authority,
+feed publication, general force or legacy removal is enabled here.
+
+### Qualification limits
+
 This qualification is limited to Windows and the DA6B-based implementation.
 An earlier composed run failed while deleting a loaded Node workload DLL during
 fixture disposal, after its behavioral assertions completed. Narrow rechecks

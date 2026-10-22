@@ -25,14 +25,30 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
     internal async Task<TemplateResolutionResult> BindProjectAsync(TemplateCatalogEntry entry, NativeTemplateSelection selection,
         NativeTemplateArtifactVerifier verifier, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(selection);
         ArgumentNullException.ThrowIfNull(verifier);
+        return await BindProjectAsync(entry, selection.TemplateIdentity,
+            (template, token) => verifier.VerifyAsync(_session, template, selection, token), cancellationToken);
+    }
+
+    internal async Task<TemplateResolutionResult> BindProjectAsync(TemplateCatalogEntry entry, BundledBasicSelection selection,
+        BundledBasicArtifactVerifier verifier, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(selection);
+        ArgumentNullException.ThrowIfNull(verifier);
+        return await BindProjectAsync(entry, selection.TemplateIdentity,
+            (template, token) => verifier.VerifyAsync(_session, template, selection, token), cancellationToken);
+    }
+
+    private async Task<TemplateResolutionResult> BindProjectAsync(TemplateCatalogEntry entry, string identity,
+        Func<ITemplateInfo, CancellationToken, Task> verify, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
         using IDisposable operation = _session.EnterBoundOperation();
         IReadOnlyList<Candidate> candidates = await GetCandidatesAsync(cancellationToken);
         Candidate candidate = candidates.SingleOrDefault(candidate => ReferenceEquals(candidate.Entry, entry))
             ?? throw new ArgumentException("The selected entry must originate from this fresh template flow.", nameof(entry));
-        if (entry.Type != TemplateType.Project || entry.Identity != selection.TemplateIdentity)
+        if (entry.Type != TemplateType.Project || entry.Identity != identity)
         {
             throw new InvalidTemplateMetadataException("The bound selection is not the exact project template identity.");
         }
@@ -50,9 +66,9 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
         {
             try
             {
-                await verifier.VerifyAsync(_session, candidate.Template, selection, token);
+                await verify(candidate.Template, token);
             }
-            catch (BasicAcquisitionException exception)
+            catch (Exception exception) when (exception is BasicAcquisitionException or Workloads.Discovery.InvalidWorkloadException)
             {
                 throw new InvalidTemplateMetadataException($"Exact artifact binding failed: {exception.Message}", exception);
             }
@@ -60,7 +76,8 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
     }
 
     internal async Task<IReadOnlyList<InstalledTemplateArtifact>> ProjectArtifactsAsync(NativeTemplateArtifactVerifier verifier,
-        NativeTemplateOwnerIdentity owner, BundleChannel? channel, CancellationToken cancellationToken)
+        NativeTemplateOwnerIdentity owner, BundleChannel? channel, CancellationToken cancellationToken,
+        BundledBasicArtifactVerifier? bundledVerifier = null)
     {
         ArgumentNullException.ThrowIfNull(verifier);
         ArgumentNullException.ThrowIfNull(owner);
@@ -71,18 +88,37 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
         {
             try
             {
-                NativeTemplateSelection selection = await verifier.ProjectAsync(_session, candidate.Template, owner, channel, cancellationToken);
-                string? diagnostic = IsEligible(candidate) ? null
-                    : candidate.Entry.MetadataDiagnostic ?? candidate.Entry.ProjectConfigurationDiagnostic
-                        ?? string.Join(" ", candidate.Entry.ConstraintEvaluation.Diagnostics.Select(item => item.Message));
-                result.Add(new(candidate.Entry, selection, diagnostic));
+                BasicAcquisitionException externalFailure;
+                try
+                {
+                    NativeTemplateSelection selection = await verifier.ProjectAsync(_session, candidate.Template, owner, channel, cancellationToken);
+                    result.Add(new(candidate.Entry, selection, Diagnostic(candidate)));
+                    continue;
+                }
+                catch (BasicAcquisitionException exception)
+                {
+                    externalFailure = exception;
+                }
+                BundledBasicSelection? bundled = bundledVerifier is null ? null
+                    : await bundledVerifier.ProjectAsync(_session, candidate.Template, owner, cancellationToken);
+                if (bundled is not null)
+                {
+                    result.Add(new(candidate.Entry, null, Diagnostic(candidate)) { BundledSelection = bundled });
+                    continue;
+                }
+                result.Add(new(candidate.Entry, null, externalFailure.Message));
             }
-            catch (Exception exception) when (exception is BasicAcquisitionException or InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is BasicAcquisitionException or Workloads.Discovery.InvalidWorkloadException
+                or InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
             {
                 result.Add(new(candidate.Entry, null, exception.Message));
             }
         }
         return result.AsReadOnly();
+
+        static string? Diagnostic(Candidate candidate) => IsEligible(candidate) ? null
+            : candidate.Entry.MetadataDiagnostic ?? candidate.Entry.ProjectConfigurationDiagnostic
+                ?? string.Join(" ", candidate.Entry.ConstraintEvaluation.Diagnostics.Select(item => item.Message));
     }
 
     /// <summary>

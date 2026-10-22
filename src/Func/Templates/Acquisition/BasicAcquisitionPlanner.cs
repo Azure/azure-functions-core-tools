@@ -23,6 +23,10 @@ internal sealed class BasicAcquisitionPlanner
             throw new BasicAcquisitionException(BasicAcquisitionFailure.InvalidMapping, "The acquisition authority uses an unsupported schema.");
         }
         NativeTemplateAssociationContext? native = request.NativeContext;
+        if (request.OptionalChoices.Count > 0 && native is null)
+        {
+            throw Missing("Optional native choices require the actual selected stack context.");
+        }
         if ((manifest.SchemaVersion == 2) != (native is not null))
         {
             throw Missing("Required external native content needs an explicit qualified native association and selected stack context. Legacy basic mappings cannot satisfy it.");
@@ -64,6 +68,24 @@ internal sealed class BasicAcquisitionPlanner
             }
             return null;
         }
+        Dictionary<string, NativeTemplateSelection> choices = new(StringComparer.OrdinalIgnoreCase);
+        foreach (NativeTemplateSelection choice in request.OptionalChoices)
+        {
+            if (choice is null || choice.Artifact is null || choice.Owner != NativeTemplateOwnerIdentity.FromEntry(native!.SelectedStack)
+                || choice.Channel != native.Channel || choice.Source != effectiveSource
+                || !choices.TryAdd(choice.Artifact.PackageId, choice)
+                || !requested.Companions.Any(companion => companion.Kind == BasicCompanionKind.Optional
+                    && string.Equals(companion.PackageId, choice.Artifact.PackageId, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
+                    "An optional choice is duplicate, foreign or absent from the qualified selected-stack mapping. Select it again.");
+            }
+        }
+        requested = requested with
+        {
+            Companions = Array.AsReadOnly<BasicCompanionRequirement>([.. requested.Companions.Where(companion =>
+                companion.Kind == BasicCompanionKind.Required || choices.ContainsKey(companion.PackageId))]),
+        };
         if (native is not null)
         {
             ValidateNativePolicy(requested, native);
@@ -92,6 +114,11 @@ internal sealed class BasicAcquisitionPlanner
 
             BasicStackMapping mapping = FindMapping(manifest, id, version)
                 ?? throw Missing($"Installed stack '{id}' is not covered by the bundled mapping.");
+            mapping = mapping with
+            {
+                Companions = Array.AsReadOnly<BasicCompanionRequirement>([.. mapping.Companions.Where(companion =>
+                    companion.Kind == BasicCompanionKind.Required)]),
+            };
             requirements.Add(mapping);
             retained.Add((mapping, entry));
         }
@@ -113,6 +140,7 @@ internal sealed class BasicAcquisitionPlanner
         List<BasicCompanionPlan> companions = [];
         foreach (BasicCompanionRequirement companion in requested.Companions)
         {
+            choices.TryGetValue(companion.PackageId, out NativeTemplateSelection? choice);
             BasicStackMapping[] contributors = [.. requirements.Where(mapping =>
                 mapping.Companions.Any(c => string.Equals(c.PackageId, companion.PackageId, StringComparison.OrdinalIgnoreCase)))];
             foreach (BasicStackMapping mapping in contributors)
@@ -140,6 +168,11 @@ internal sealed class BasicAcquisitionPlanner
             BasicTemplateArtifact[] candidates = [.. manifest.Artifacts.Where(artifact =>
                 string.Equals(artifact.PackageId, companion.PackageId, StringComparison.OrdinalIgnoreCase)
                 && artifact.Source == effectiveSource
+                && (choice is null || (artifact.Version.ToNormalizedString() == choice.Artifact.Version
+                    && string.Equals(artifact.Sha256, choice.Artifact.Sha256, StringComparison.OrdinalIgnoreCase)
+                    && artifact.Templates.Any(template => template.Identity == choice.TemplateIdentity && template.Type == "project")
+                    && artifact.ContentRoles.Any(content => content.Identity == choice.TemplateIdentity
+                        && content.Role == NativeTemplateContentRole.AdditionalProject)))
                 && (!artifact.Version.IsPrerelease || request.IncludePrerelease)
                 && (native is null || ((native.Channel is null || BundleHelpers.MatchesChannel(artifact.Version, native.Channel.Value))
                     && contributors.All(mapping => mapping.NativePolicy!.Channels.Any(channel => BundleHelpers.MatchesChannel(artifact.Version, channel)))
@@ -154,8 +187,20 @@ internal sealed class BasicAcquisitionPlanner
             companions.Add(new(companion.PackageId, ranges[companion.PackageId], Array.AsReadOnly(candidates)));
         }
 
-        return new(manifest.Revision, effectiveSource, companions.AsReadOnly());
+        return new(manifest.Revision, effectiveSource, companions.AsReadOnly())
+        {
+            OptionalChoices = request.OptionalChoices,
+            Owner = native is null ? null : NativeTemplateOwnerIdentity.FromEntry(native.SelectedStack),
+            HostIdentifier = native?.HostIdentifier,
+            EngineHostVersion = native?.EngineHostVersion,
+            Channel = native?.Channel,
+            RequiredRoles = native?.RequiredRoles ?? [],
+        };
     }
+
+    internal static bool IsOptional(BasicCompanionManifest manifest, string stackId, NuGetVersion stackVersion, string packageId)
+        => FindMapping(manifest, stackId, stackVersion)?.Companions.Any(companion =>
+            companion.Kind == BasicCompanionKind.Optional && string.Equals(companion.PackageId, packageId, StringComparison.OrdinalIgnoreCase)) == true;
 
     private static void ValidateNativeOrigin(WorkloadEntry entry, string effectiveSource)
     {

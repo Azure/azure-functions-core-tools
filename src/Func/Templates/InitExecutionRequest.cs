@@ -22,6 +22,8 @@ internal sealed record InitExecutionRequest(
 {
     internal Acquisition.NativeTemplateSelection? ArtifactBinding { get; init; }
 
+    internal Acquisition.BundledBasicSelection? BundledBinding { get; init; }
+
     internal bool RefreshCapabilities { get; init; }
 
     internal bool ConfirmCreation { get; init; }

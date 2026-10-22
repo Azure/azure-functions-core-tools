@@ -9,4 +9,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 internal sealed record TemplateArtifactIdentity(string PackageId, string Version, string Sha256);
 
 internal sealed record InstalledTemplateArtifact(TemplateCatalogEntry Entry,
-    Acquisition.NativeTemplateSelection? Selection, string? Diagnostic);
+    Acquisition.NativeTemplateSelection? Selection, string? Diagnostic)
+{
+    public Acquisition.BundledBasicSelection? BundledSelection { get; init; }
+}
