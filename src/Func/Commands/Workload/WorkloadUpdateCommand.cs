@@ -61,6 +61,11 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
+    public Option<bool> AllowUntrustedOption { get; } = new("--allow-untrusted")
+    {
+        Description = "Bypass publisher trust verification for explicitly trusted development packages.",
+    };
+
     public WorkloadUpdateCommand(IInteractionService interaction, IWorkloadInstaller installer, IWorkloadStore store, IOptions<WorkloadCatalogOptions> catalogOptions)
         : base("update", "Update an installed workload in place.")
     {
@@ -79,6 +84,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         Options.Add(SourceOption);
         Options.Add(IncludePrereleaseOption);
         Options.Add(ExactOption);
+        Options.Add(AllowUntrustedOption);
 
         Validators.Add(result =>
         {
@@ -121,6 +127,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string? source = parseResult.GetValue(SourceOption);
         bool? includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
+        bool allowUntrusted = parseResult.GetValue(AllowUntrustedOption);
 
         if (EffectivePrerelease(includePrerelease))
         {
@@ -129,7 +136,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
         if (all)
         {
-            return await UpdateAllAsync(source, includePrerelease, allowMajor, cancellationToken);
+            return await UpdateAllAsync(source, includePrerelease, allowMajor, cancellationToken, allowUntrusted);
         }
 
         UpdateTarget target = await ResolveInstalledTargetAsync(identifier!, exact, cancellationToken);
@@ -140,7 +147,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             source,
             includePrerelease,
             allowMajor,
-            cancellationToken);
+            cancellationToken,
+            allowUntrusted);
     }
 
     private async Task<UpdateTarget> ResolveInstalledTargetAsync(string identifier, bool exact, CancellationToken cancellationToken)
@@ -188,7 +196,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string? source,
         bool? includePrerelease,
         bool allowMajor,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowUntrusted)
     {
         try
         {
@@ -201,7 +210,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                     includePrerelease,
                     allowMajor,
                     new WorkloadInstallProgressAdapter(ctx),
-                    ct),
+                    ct,
+                    allowUntrusted),
                 cancellationToken);
 
             RenderSingle(result);
@@ -225,7 +235,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         }
     }
 
-    private async Task<int> UpdateAllAsync(string? source, bool? includePrerelease, bool allowMajor, CancellationToken cancellationToken)
+    private async Task<int> UpdateAllAsync(string? source, bool? includePrerelease, bool allowMajor, CancellationToken cancellationToken, bool allowUntrusted)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         IReadOnlyList<UpdateTarget> targets = BuildUpdateAllTargets(installed);
@@ -250,7 +260,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                         includePrerelease,
                         allowMajor,
                         new WorkloadInstallProgressAdapter(ctx),
-                        ct),
+                        ct,
+                        allowUntrusted),
                     cancellationToken);
                 RenderSingle(result);
             }
@@ -321,7 +332,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         bool? includePrerelease,
         bool allowMajor,
         IProgress<WorkloadInstallProgress>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowUntrusted)
         => target.Ownership == WorkloadOwnershipKind.Logical
             ? _installer.UpdateAsync(
                 target.PackageId,
@@ -331,7 +343,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 allowMajor,
                 WorkloadOwnershipKind.Logical,
                 progress,
-                cancellationToken)
+                cancellationToken,
+                allowUntrusted)
             : _installer.UpdateAsync(
                 target.PackageId,
                 targetInstalledVersion,
@@ -339,7 +352,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 includePrerelease,
                 allowMajor,
                 progress,
-                cancellationToken);
+                cancellationToken,
+                allowUntrusted);
 
     private static GracefulException CreateAmbiguousInstalledAlias(string identifier, IReadOnlyList<string> packageIds)
         => new(

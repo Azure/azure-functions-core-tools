@@ -4,6 +4,7 @@
 
 #### Changes
 
+- Verify publisher trust and signed content before extracting newly acquired workload archives, including RID pointers and implementations. Explicit `workload install` / `update --allow-untrusted` supports unsigned development packages without bypassing workload format checks. Existing installed-content reuse and `FUNC_HOST_CONTENT_ROOT` remain unchanged. (#5430)
 - Add the public `IProjectStack` Abstractions contract and an installed stack metadata catalog without changing existing `func init` scaffolding. The .NET, Node.js, Python, Go, Java, and PowerShell 1.0.0-preview.2 stack binaries require Azure Functions CLI 5.0.0-preview.4 or later; older CLIs lack this contract and cannot safely load those binaries.  (#5707)
 - Enable metadata-gated `func update` for installations that explicitly support in-place updates. Updates default to the latest stable release; use `--prerelease` for previews, `--version` for a specific version (including an explicit downgrade), and `--yes` to skip confirmation. Externally managed installations receive installer/package-manager guidance without contacting the update feed; missing or invalid installation metadata produces reinstall guidance. Update invocations skip first-run setup and version advisories. (#5702)
 - Add installer-authored installation metadata and validation for installation channel and update policy. Standalone installers publish metadata atomically and restore payloads and wrappers when publication fails. (#5700, #5701)

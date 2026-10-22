@@ -20,6 +20,7 @@ internal static class WorkloadInstallRegistration
         services.AddSingleton<WorkloadRidPackageSelector>();
         services.AddSingleton<IWorkloadPackageInspector, WorkloadPackageInspector>();
         services.AddSingleton<IWorkloadPackageSource, WorkloadPackageSource>();
+        services.AddSingleton<IWorkloadPackageTrust, WorkloadPackageTrust>();
         services.AddSingleton<IWorkloadDeploymentService, WorkloadDeploymentService>();
         services.AddSingleton<IWorkloadInstaller, WorkloadInstaller>();
 
