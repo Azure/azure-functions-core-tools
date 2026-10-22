@@ -146,7 +146,10 @@ qualified installation proof, even if a receipt is retained. Test packages and
 fixture authorities demonstrate mechanics only, not production approval.
 An explicit preview or experimental association permits inspection of matching
 prerelease artifacts, while the existing planner still enforces the exact
-channel policy and artifact range.
+channel policy and artifact range. For an installed artifact with no asserted
+channel, prerelease admission is derived from that exact artifact version; the
+same qualified association and exact byte checks still apply. A null channel is
+not treated as stable.
 
 #### Internal catalog preparation
 

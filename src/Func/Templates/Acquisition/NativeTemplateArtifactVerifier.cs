@@ -110,9 +110,11 @@ internal sealed class NativeTemplateArtifactVerifier(IBasicCompanionCatalog cata
         {
             throw Unavailable("The selected workload owner has no valid version.");
         }
+        bool selectedArtifactIsPrerelease = NuGetVersion.TryParse(selection.Artifact.Version, out NuGetVersion? selectedArtifactVersion)
+            && selectedArtifactVersion.IsPrerelease;
         BasicAcquisitionRequest request = new(id, version, session.Context.CommandDirectory, selection.Source)
         {
-            IncludePrerelease = selection.Channel is not null,
+            IncludePrerelease = selectedArtifactIsPrerelease,
             NativeContext = new(owner, FuncTemplateEngineHost.Identifier, NuGetVersion.Parse(AssemblyCliVersionProvider.Instance.Version),
                 selection.Channel, [NativeTemplateContentRole.AdditionalProject]),
         };

@@ -112,6 +112,26 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
     }
 
     [Theory]
+    [InlineData(BundleChannel.Preview)]
+    [InlineData(BundleChannel.Experimental)]
+    public async Task BoundInit_ExactPrereleaseArtifactWithNullChannel_PreviewsAndCreates(BundleChannel channel)
+    {
+        await SeedAsync(channel: channel);
+        var request = Request() with { ArtifactBinding = _selection with { Channel = null } };
+
+        var preview = await Runner().ExecuteAsync(request with { DryRun = true }, new([]), CancellationToken.None);
+
+        preview.Kind.Should().Be("previewed");
+        preview.SelectedTemplate!.Package!.Version.Should().Be(_selection.Artifact.Version);
+        Directory.Exists(Target).Should().BeFalse();
+
+        var result = await Runner().ExecuteAsync(request, new([]), CancellationToken.None);
+
+        result.Kind.Should().Be("created");
+        File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact");
+    }
+
+    [Theory]
     [InlineData(BundleChannel.Stable)]
     [InlineData(BundleChannel.Preview)]
     public async Task BoundInit_ExperimentalArtifactWithWrongChannel_RefusesWithoutOutput(BundleChannel channel)
@@ -138,6 +158,21 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
         projection.Catalog.Entries.Should().BeEmpty();
         projection.Installed.Should().Contain(item => item.Entry.Identity == Identity
             && item.Selection != null && item.Selection.Channel == BundleChannel.Experimental);
+        catalog.Entries.Single().MetadataStatus.Should().Be(QuickstartPackageMetadataStatus.Unverified);
+    }
+
+    [Fact]
+    public async Task Projection_DefaultChannelQuery_ProjectsQualifiedExperimentalDuplicate()
+    {
+        await SeedAsync(channel: BundleChannel.Experimental);
+        QuickstartCatalog catalog = new([Remote()], new(QuickstartCatalogOrigin.LocalFile, null, null));
+
+        var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(catalog,
+            new(DirectoryTarget, _selection.Owner), CancellationToken.None);
+
+        projection.Catalog.Entries.Should().BeEmpty();
+        projection.Installed.Should().Contain(item => item.Entry.Identity == Identity
+            && item.Selection != null && item.Selection.Channel == null);
         catalog.Entries.Single().MetadataStatus.Should().Be(QuickstartPackageMetadataStatus.Unverified);
     }
 
