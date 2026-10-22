@@ -23,6 +23,7 @@ internal sealed class NativeTemplatePolicyCandidate(
     public string ConfigurationRelativePath { get; } = configurationRelativePath ?? throw new ArgumentNullException(nameof(configurationRelativePath));
     public NativeTemplateProjectAnchor? Project { get; private set; }
     public NativeTemplatePolicyStages Stages { get; private set; }
+    public bool RequiresPreparation { get; private set; }
 
     public WorkloadNativeTemplateSource CreateSource(NativeTemplatePolicyLifetime lifetime)
         => new(Entry, ConfigurationSha256, lifetime, _read, _revalidate, Admission);
@@ -49,6 +50,7 @@ internal sealed class NativeTemplatePolicyCandidate(
         }
         if (Entry.Type == TemplateType.Project)
         {
+            RequiresPreparation = policy.RequiresProjectPreparation(source);
             IReadOnlyList<string> diagnostics = await policy.ValidateProjectAsync(source, cancellationToken);
             RequireDiagnostics(diagnostics);
             if (requireProjectLayout || Stages.HasFlag(NativeTemplatePolicyStages.CapturedOutput))
@@ -68,7 +70,8 @@ internal sealed class NativeTemplatePolicyCandidate(
         WorkloadNativeTemplateSource source = CreateSource(lifetime);
         await source.RevalidateAsync(cancellationToken);
         NativeTemplatePolicy policy = Admission.Registration.Policy;
-        if (!policy.Handles(source) || policy.GetRequestedStages(source) != Stages)
+        if (!policy.Handles(source) || policy.GetRequestedStages(source) != Stages
+            || (Entry.Type == TemplateType.Project && policy.RequiresProjectPreparation(source) != RequiresPreparation))
         {
             throw new InvalidDataException("The selected source policy or required stages changed. Rerun selection.");
         }
@@ -142,7 +145,8 @@ internal sealed class NativeTemplatePolicySession(
         WorkloadNativeTemplateInvocation initial = new(source, _lifetime, _projectDirectory, request);
         bool needsBinding = request.MsBuildBindings is not null || _candidate.RequiresBinding;
         NativeTemplatePolicyStages stages = _candidate.Stages
-            | (needsBinding || Project is not null || request.OwnerExecutor is not null || request.EffectSupport is not null
+            | (needsBinding || Project is not null || _candidate.RequiresPreparation
+                || request.OwnerExecutor is not null || request.EffectSupport is not null
                 ? NativeTemplatePolicyStages.Invocation : NativeTemplatePolicyStages.None);
         NativeTemplateProjectBinding? binding = null;
         if (stages.HasFlag(NativeTemplatePolicyStages.Invocation))
@@ -225,7 +229,8 @@ internal sealed class NativeTemplatePolicySession(
         _captured = new(invocation, _lifetime, snapshot);
         bool requiresCompile = invocation.ProjectBinding is { } binding && Path.GetExtension(binding.ProjectPath) == ".fsproj"
             && _captured.Files.Any(file => Path.GetExtension(file.TargetRelativePath) == ".fs");
-        if (_candidate.Stages.HasFlag(NativeTemplatePolicyStages.CapturedOutput) || Project is not null || requiresCompile)
+        if (_candidate.Stages.HasFlag(NativeTemplatePolicyStages.CapturedOutput) || Project is not null
+            || _candidate.RequiresPreparation || requiresCompile)
         {
             NativeTemplateCaptureQualification result = await _candidate.Admission.Registration.Policy
                 .QualifyCapturedOutputAsync(_captured, cancellationToken)

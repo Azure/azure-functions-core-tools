@@ -201,9 +201,13 @@ Project layout declarations must exist before catalog eligibility, not first
 appear after rendering.
 
 The optional package, restore, compile and create-only methods qualify existing
-roles. They do not grant execution. Append is the only public execution
-transport; other roles require an exact private host-composed executor or fail
-before output installation. See the [native policy and lifetime limits](func-init-execution/stack-inventory.md#workload-owned-native-policy).
+roles. They do not grant execution. Their executors remain privately composed.
+Append and workload-owned project preparation have separate typed transports.
+Declare required preparation with `RequiresProjectPreparation` and return its
+workload implementation from `CreateProjectPreparation`. The host calls that
+exact loaded-owner capability through preview and successful creation. The
+workload owns language policy, skip decisions and execution, not Core. No public
+process or command-line port is exposed. See the [native policy and lifetime limits](func-init-execution/stack-inventory.md#workload-owned-native-policy).
 This does not enable the public native route or register production stack policies.
 A workload compiled against this boundary requires a host that contains it.
 

@@ -61,6 +61,16 @@ internal sealed partial class TemplateInvocationCoordinator(
             try
             {
                 request = (await policy.PrepareAsync(request, cancellationToken)) with { RequireCapturedSources = true };
+                if (request.PolicyCandidate is { RequiresPreparation: true } required)
+                {
+                    BoundNativeProjectPreparation preparationBinding = request.ProjectPreparationBinding
+                        ?? throw new InvalidDataException("This source requires its owner-bound project preparation journey. Use the controlled native init path.");
+                    preparationBinding.ValidateRequest(required, request);
+                }
+                else if (request.ProjectPreparationBinding is not null)
+                {
+                    throw new InvalidDataException("Project preparation was not declared by this selected source.");
+                }
                 configurationFailure = await ValidateGuardedSourcesAsync(template, configuration, request, cancellationToken);
                 if (configurationFailure is not null)
                 {
@@ -287,6 +297,16 @@ internal sealed partial class TemplateInvocationCoordinator(
         }
 
         bool requiresForce = !request.Force && changes.Any(change => change.Kind != TemplateFileChangeKind.Create);
+        NativeProjectPreparationCapture? preparationCapture;
+        try
+        {
+            preparationCapture = request.ProjectPreparationBinding?.Capture(request, capture, policy?.ProjectBinding,
+                _engine.Context.Project?.RootDirectory ?? request.OutputDirectory, configurationPlans, _engine.FileSystem);
+        }
+        catch (InvalidDataException exception)
+        {
+            return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+        }
         if (request.DryRun)
         {
             return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null)
@@ -294,6 +314,7 @@ internal sealed partial class TemplateInvocationCoordinator(
                 ProjectConfigurations = configurationPlans,
                 Effects = effectPreview,
                 Capture = capture,
+                ProjectPreparationCapture = preparationCapture,
             };
         }
         if (requiresForce)
@@ -311,7 +332,11 @@ internal sealed partial class TemplateInvocationCoordinator(
         }
 
         TemplateInvocationResult configured = project is null ? installed
-            : await ConfigureAsync(template, configuration, project, image, configurationPlans, installed, request, cancellationToken);
+            : await ConfigureAsync(template, configuration, project, image, configurationPlans, installed, request, cancellationToken, preparationCapture);
+        if (configured.Status == TemplateInvocationStatus.Success)
+        {
+            configured = configured with { ProjectPreparationCapture = preparationCapture };
+        }
         if (configured.Status != TemplateInvocationStatus.Success || effectPreview is null)
         {
             return configured with { Effects = effectPreview, Capture = capture };
@@ -393,7 +418,8 @@ internal sealed partial class TemplateInvocationCoordinator(
     private async Task<TemplateInvocationResult> ConfigureAsync(
         ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateProjectSupport project,
         TemplateOutputImage image, IReadOnlyList<TemplateProjectConfigurationPlan> plans,
-        TemplateInvocationResult installed, TemplateInvocationRequest request, CancellationToken cancellationToken)
+        TemplateInvocationResult installed, TemplateInvocationRequest request, CancellationToken cancellationToken,
+        NativeProjectPreparationCapture? preparationCapture = null)
     {
         List<TemplateFileChange> completed = [.. installed.Changes];
         List<string> configured = [];
@@ -417,6 +443,10 @@ internal sealed partial class TemplateInvocationCoordinator(
                 completed.Add(new(Path.GetRelativePath(image.Output, plan.ConfigurationPath), TemplateFileChangeKind.Create));
             }
 
+            if (preparationCapture is not null)
+            {
+                await preparationCapture.CaptureConfigurationAsync(cancellationToken);
+            }
             return Result(TemplateInvocationStatus.Success, null);
         }
         catch (OperationCanceledException) when (installed.HasCommittedOutput || configured.Count > 0)
@@ -433,6 +463,14 @@ internal sealed partial class TemplateInvocationCoordinator(
             return Failure(exception);
         }
         catch (InvalidOperationException exception)
+        {
+            return Failure(exception);
+        }
+        catch (InvalidDataException exception)
+        {
+            return Failure(exception);
+        }
+        catch (JsonException exception)
         {
             return Failure(exception);
         }

@@ -496,7 +496,14 @@ internal sealed class InitExecutionRunner(
         {
             invocationRequest = invocationRequest with { Name = request.WorkingDirectory.Info.Name };
         }
-        INativeProjectPreparation? projectPreparation = provider?.Preparation ?? (_workflows is null ? request.ProjectPreparation : null);
+        bool ownedPolicy = provider is WorkloadNativeTemplatePolicyAdapter;
+        if (ownedPolicy && request.ProjectPreparation is not null)
+        {
+            return InitExecutionResult.Reject("preparationUnavailable",
+                "An owned workload preparation cannot be replaced by a request capability.") with { SelectedTemplate = selected.Entry };
+        }
+        INativeProjectPreparation? projectPreparation = ownedPolicy
+            ? provider!.Preparation : provider?.Preparation ?? (_workflows is null ? request.ProjectPreparation : null);
         if (provider is not null)
         {
             NativeTemplateInvocationPreparation prepared = await provider.PrepareAsync(
@@ -521,6 +528,21 @@ internal sealed class InitExecutionRunner(
             };
         }
 
+        if (projectPreparation is WorkloadNativeProjectPreparation ownedPreparation)
+        {
+            try
+            {
+                invocationRequest = await ownedPreparation.BindInvocationAsync(invocationRequest, cancellationToken);
+            }
+            catch (InvalidDataException exception)
+            {
+                return InitExecutionResult.Reject("preparationUnavailable", exception.Message) with { SelectedTemplate = selected.Entry, ArgumentResults = [final] };
+            }
+            catch (NotSupportedException exception)
+            {
+                return InitExecutionResult.Reject("preparationUnavailable", exception.Message) with { SelectedTemplate = selected.Entry, ArgumentResults = [final] };
+            }
+        }
         invocationRequest = invocationRequest with { RequireCapturedSources = projectPreparation is not null };
         TemplateInvocationResult preview = await selected.InvokeAsync(invocationRequest, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -547,14 +569,16 @@ internal sealed class InitExecutionRunner(
             NativeProjectPreparationPreview planned = await preparationSupport.PreviewAsync(preparationContext, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             preparation = new(planned);
-            if (!planned.Succeeded || preview.ProjectConfigurations.Count != 1
-                || planned.Operations.Any(step => step.Operation switch
+            bool qualified = preview.ProjectConfigurations.Count == 1 && (preparationSupport is WorkloadNativeProjectPreparation owned
+                ? owned.OwnsPreview(preparationContext, planned)
+                : !planned.Operations.Any(step => step.Operation switch
                 {
                     NativeProjectPreparationOperation.NodeNpmInstall => !string.Equals(preview.ProjectConfigurations[0].Stack, "node", StringComparison.OrdinalIgnoreCase),
                     NativeProjectPreparationOperation.GoModTidy => !string.Equals(preview.ProjectConfigurations[0].Stack, "go", StringComparison.OrdinalIgnoreCase),
                     NativeProjectPreparationOperation.PowerShellManagedDependencies => !string.Equals(preview.ProjectConfigurations[0].Stack, "powershell", StringComparison.OrdinalIgnoreCase),
                     _ => true,
-                }))
+                }));
+            if (!planned.Succeeded || preview.ProjectConfigurations.Count != 1 || !qualified)
             {
                 return InitExecutionResult.Reject("preparationUnavailable",
                     ["Stack preparation is unsupported or does not match the selected project source.", .. planned.Diagnostics]) with
@@ -588,7 +612,12 @@ internal sealed class InitExecutionRunner(
         TemplateInvocationResult created;
         try
         {
-            created = await selected.InvokeAsync(invocationRequest with { DryRun = false, ExpectedPreparation = projectPreparation is null ? null : preview.Capture }, cancellationToken);
+            created = await selected.InvokeAsync(invocationRequest with
+            {
+                DryRun = false,
+                ExpectedPreparation = invocationRequest.ProjectPreparationBinding?.ExpectedCapture
+                    ?? (projectPreparation is null ? null : preview.Capture),
+            }, cancellationToken);
         }
         catch (OperationCanceledException exception) when (exception.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey] is string)
         {
@@ -605,7 +634,7 @@ internal sealed class InitExecutionRunner(
                 cancellationToken.ThrowIfCancellationRequested();
                 if (sourceChanged is null)
                 {
-                    completed = await completionSupport.CompleteAsync(preparationContext, preparation.Preview, cancellationToken);
+                    completed = await completionSupport.CompleteAsync(preparationContext with { Created = created }, preparation.Preview, cancellationToken);
                 }
                 else
                 {
