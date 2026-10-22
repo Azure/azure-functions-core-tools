@@ -123,6 +123,33 @@ approval. No held Node executor or ordinary post-action dispatcher is enabled.
 Later policy alignment must preserve dispatch and rebuild policy/factory services
 in the same fresh scope. The DA6B foundation remains the explicit baseline.
 
+### Bounded migration qualification
+
+The real workload/archive fixture exercises acquisition through a public
+`RootCommand`, followed by a second fresh public invocation that selects the
+installed exact identity for a different target. The repeat must not download or
+prepare another archive, must prompt only for creation, must leave the installed
+template hive unchanged and must write the selected project's configuration.
+The fixture also checks workload writer admission after creation. Fixture
+authority is not production approval.
+
+This qualification is limited to Windows and the DA6B-based implementation.
+An earlier composed run failed while deleting a loaded Node workload DLL during
+fixture disposal, after its behavioral assertions completed. Narrow rechecks
+have not reproduced it. Scope disposal requests collectible load-context
+unloading, but that alone does not establish when all runtime references are
+released. The cleanup failure's cause remains unproven, and passing rechecks
+do not resolve that qualification limit.
+
+Release readiness still requires independently producer-approved exact archive
+and schema2 association data, an actual production end-to-end run, alignment
+with the later `63b` policy/factory line, and cross-platform and hosted evidence.
+Legacy removal additionally requires replacement compatibility evidence and
+explicit removal approval. The explicit guided native-argument route is the
+bounded parameter capability delivered here, not full default-menu parameter
+editing or initializer/force parity. Keep the legacy routes until their
+replacement conditions are satisfied.
+
 ## Context
 
 See `proposal.md` for motivation and `specs/func-init-quickstarts/spec.md` for the behavior contract.
