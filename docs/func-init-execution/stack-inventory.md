@@ -218,7 +218,7 @@ passing only non-explicit canonical values as completions. Layout association
 uses the captured raw configuration fingerprint, not a hash reconstructed from
 decoded JSON, so an unchanged encoding BOM does not invalidate its source pin.
 
-Append remains the only public workload execution transport. Package, restore,
+Append remains a separate typed workload execution transport. Package, restore,
 compile and create-only methods qualify existing roles but do not execute them.
 Those roles require the exact existing host-composed internal executor and
 confirmation privately paired to the same owner and invocation, or refuse
@@ -232,6 +232,49 @@ defaults for old compiled builders and original eight-type policies on the new
 host. A workload using the new boundary still requires a host containing it.
 There is no reverse compatibility claim, all-stack policy migration, public
 activation or production publisher qualification.
+
+### Workload-owned project preparation
+
+`NativeTemplatePolicy.RequiresProjectPreparation` declares a required phase for
+the selected source. `CreateProjectPreparation` returns the workload's
+`INativeTemplateProjectPreparation` implementation. Both members are optional
+for old compiled policies. An unrequested phase defaults to false, while a
+required missing or unsupported capability refuses before output installation.
+An owned refusal cannot fall back to request preparation or another provider.
+
+The host binds the exact loaded capability to its runtime owner, selected source,
+command invocation and one frozen preview plan. Required invocation/capture
+guards apply even when the policy requests no stages. Each phase gets fresh
+lifetime-bound views over copied native bytes and final canonical values.
+The copies outlive disposal of the native output image, not its streams or
+delegates. Direct creation cannot omit a declared preparation phase.
+
+The owning workload plans skip behavior in `PreviewAsync` and executes its own
+helper in `CompleteAsync`. Core contains no language command selection,
+executable/argument port, npm executor or public process callback. The existing
+internal legacy preparation operations keep their compatibility guards and
+are not authority for this new owned path.
+
+Completion receives a host-issued `NativeTemplateCreatedProject` only after
+actual native and mandatory configuration success. It exposes the actual
+captured output, canonical configuration path and copied finalized configuration
+bytes. Revalidation checks the owner/source, current generated file kinds and
+bytes, unlinked target and unchanged configuration. This is not atomic against
+external changes and does not constrain subsequent workload helper mutations.
+Completion authorization is consumed once before the workload callback.
+The first configuration read must exactly match the successful writer's
+canonical byte receipt. Matching runtime/language alone cannot adopt a replaced
+configuration as CLI-created evidence.
+
+The typed workload result preserves diagnostics and `TargetMayHaveChanged`.
+Its `Succeeded` value is authoritative, not keywords in diagnostic strings.
+Returned success or failure is recorded before late cancellation. Failure is
+`partialPreparation` with retained project/configuration and nonzero exit.
+Thrown cancellation preserves the original exception and retained-output warning.
+Skipped preparation remains explicit and does not claim a process ran.
+No logical plan, skipped result or helper outcome creates a native physical
+commit marker. Production Node policy/helper qualification remains with its
+workload owner, and the public native route remains off.
 
 ### Bounded F# workflow repair
 

@@ -18,11 +18,13 @@ internal sealed class WorkloadNativeTemplatePolicyAdapter(
     private readonly IFileSystem _files = files ?? throw new ArgumentNullException(nameof(files));
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+    private readonly WorkloadNativeProjectPreparation? _preparation = candidate.RequiresPreparation
+        ? new(candidate, files) : null;
 
     public string Stack => _candidate.Admission.Registration.Policy.Stack;
     public INativeItemCompatibility Compatibility => this;
     public INativeSelectedItemEffects Effects => this;
-    public INativeProjectPreparation? Preparation => null;
+    public INativeProjectPreparation? Preparation => _preparation;
 
     public bool Handles(TemplateCatalogEntry entry)
         => entry.Identity == _candidate.Entry.Identity && entry.Package == _candidate.Entry.Package;
