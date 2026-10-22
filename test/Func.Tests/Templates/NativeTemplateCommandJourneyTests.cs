@@ -513,6 +513,99 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task NewPartialInstallation_CancellationAfterFirstFile_PreservesCommittedFailure(
+        bool stagedCommand, bool json, bool overwrite)
+    {
+        WriteTemplate("multi-item", """
+            {"identity":"Controlled.MultiItem","name":"Multi item","shortName":"multi-item",
+             "tags":{"type":"item","language":"JavaScript"}}
+            """, "{}", ("first.txt", "first native output"), ("second.txt", "second native output"));
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        List<string> committed = [];
+        var files = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterMove = path =>
+            {
+                if (Path.GetDirectoryName(path) == Target)
+                {
+                    committed.Add(path);
+                    cancellation.Cancel();
+                }
+            },
+        };
+        using var harness = CreateHarness(fileSystem: files);
+        await CreateProjectAsync(harness);
+        Directory.CreateDirectory(Target);
+        string configuration = File.ReadAllText(Path.Combine(Project, ".func", "config.json"));
+        string[] names = ["first.txt", "second.txt"];
+        if (overwrite)
+        {
+            foreach (string name in names)
+            {
+                File.WriteAllText(Path.Combine(Target, name), $"user-owned {name}");
+            }
+        }
+        int beforeOutput = _interaction.Lines.Count;
+        string[] options = ["--non-interactive", "--output", json ? "json" : "plain", .. overwrite ? new[] { "--force" } : []];
+        var parsed = stagedCommand
+            ? harness.CreateNewExecution().ParseInvocation(["Controlled.MultiItem", "--path", Target, .. options])
+            : harness.Adapter.ParseNewInvocation(harness.CreateNew(), [Target, "-t", "Controlled.MultiItem", .. options]);
+
+        int exit = await parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
+
+        exit.Should().Be(1);
+        cancellation.IsCancellationRequested.Should().BeTrue();
+        string installed = committed.Should().ContainSingle().Subject;
+        string installedName = Path.GetFileName(installed);
+        string untouchedName = names.Single(name => name != installedName);
+        File.ReadAllText(installed).Should().Be(installedName == "first.txt" ? "first native output" : "second native output");
+        if (overwrite)
+        {
+            File.ReadAllText(Path.Combine(Target, untouchedName)).Should().Be($"user-owned {untouchedName}");
+        }
+        else
+        {
+            File.Exists(Path.Combine(Target, untouchedName)).Should().BeFalse();
+        }
+        File.ReadAllText(Path.Combine(Project, ".func", "config.json")).Should().Be(configuration);
+        harness.NewResult!.Kind.Should().Be("invocationFailed");
+        harness.NewResult.Succeeded.Should().BeFalse();
+        var invocation = harness.NewResult.Invocation!;
+        invocation.Status.Should().Be(TemplateInvocationStatus.Failed);
+        invocation.HasCommittedOutput.Should().BeTrue();
+        invocation.Diagnostic.Should().Contain("canceled after");
+        var change = invocation.Changes.Should().ContainSingle().Subject;
+        change.Path.Should().Be(installedName);
+        change.Kind.Should().Be(overwrite ? TemplateFileChangeKind.Overwrite : TemplateFileChangeKind.Create);
+        AssertCommittedRendering(beforeOutput, "invocationFailed", json, succeeded: false);
+        if (json)
+        {
+            using var document = LastJson();
+            var rendered = document.RootElement.GetProperty("invocation");
+            rendered.GetProperty("status").GetString().Should().Be("Failed");
+            var renderedChange = rendered.GetProperty("changes").EnumerateArray().Should().ContainSingle().Subject;
+            renderedChange.GetProperty("path").GetString().Should().Be(installedName);
+            renderedChange.GetProperty("kind").GetString().Should().Be(change.Kind.ToString());
+        }
+        else
+        {
+            string[] output = [.. _interaction.Lines.Skip(beforeOutput)];
+            output.Should().Contain(line => line.Contains($"{change.Kind}: ", StringComparison.Ordinal)
+                && line.Contains(installedName, StringComparison.Ordinal));
+            output.Should().NotContain(line => line.Contains(untouchedName, StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
@@ -1133,6 +1226,9 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         public INewCommandRunner LegacyNew { get; } = Substitute.For<INewCommandRunner>();
 
         public NewCommand CreateNew() => new(LegacyNew, Substitute.For<INewCommandTemplateOptionProvider>());
+
+        public NewExecutionCommand CreateNewExecution() => new(items, provider.GetRequiredService<NewExecutionRenderer>(),
+            new([new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true)]));
 
         public InitCommand CreateInit() => new(interaction, new RecordingWorkloadHintRenderer(),
             provider.GetRequiredService<ILocalSettingsProvider>(), provider.GetRequiredService<IFunctionsProjectResolver>(),
