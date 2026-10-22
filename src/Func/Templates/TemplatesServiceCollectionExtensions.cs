@@ -47,6 +47,7 @@ internal static class TemplatesServiceCollectionExtensions
         services.AddSingleton<InitExecutionTargetInspector>();
         services.AddSingleton<TemplateProjectConfigurationPlanner>();
         services.AddSingleton<TemplateProjectConfigurationWriter>();
+        services.AddSingleton<TemplateProjectSupport>();
         services.AddSingleton<Func<InstalledProjectStackCatalog>>(provider => provider.GetRequiredService<InstalledProjectStackCatalog>);
         services.AddSingleton<Func<TemplateProjectSupport>>(provider => provider.GetRequiredService<TemplateProjectSupport>);
         services.AddSingleton<ITemplaterFactory, TemplaterFactory>();
