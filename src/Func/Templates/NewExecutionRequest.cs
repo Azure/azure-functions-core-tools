@@ -35,5 +35,8 @@ internal sealed record NewExecutionResult(string Kind, bool Succeeded)
 
     internal bool HasCompletedCreation => Kind == "created" && Succeeded && Invocation?.Status == TemplateInvocationStatus.Success;
 
+    internal bool HasCreationOutcome => HasCompletedCreation
+        || (Kind == "invocationFailed" && !Succeeded && Invocation?.HasCommittedOutput == true);
+
     public static NewExecutionResult Reject(string kind, params string[] diagnostics) => new(kind, false) { Diagnostics = diagnostics };
 }
