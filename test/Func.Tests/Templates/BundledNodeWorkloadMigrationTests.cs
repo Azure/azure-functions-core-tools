@@ -960,7 +960,7 @@ public sealed partial class BundledNodeTemplateTests
             string modified = Path.Combine(_root, "changed-update-destination.nupkg");
             File.Copy(incoming, modified);
             using (var zip = ZipFile.Open(modified, ZipArchiveMode.Update))
-            using (var writer = new StreamWriter(zip.CreateEntry("tools/any/changed-outer-payload.txt").Open()))
+            using (var writer = new StreamWriter(zip.CreateEntry($"tools/{logical.Entry.RuntimeIdentifier}/changed-outer-payload.txt").Open()))
             {
                 writer.Write("This is not the installed exact-origin artifact.");
             }
@@ -1190,13 +1190,40 @@ public sealed partial class BundledNodeTemplateTests
         string nuspecPath = nuspec.FullName;
         nuspec.Delete();
         using (var output = zip.CreateEntry(nuspecPath).Open()) document.Save(output);
+        const string originalPayload = "tools/any/";
+        string selectedPayload = $"tools/{runtimeIdentifier}/";
+        foreach (var entry in zip.Entries.Where(entry => entry.FullName.StartsWith(originalPayload, StringComparison.Ordinal)).ToArray())
+        {
+            string target = selectedPayload + entry.FullName[originalPayload.Length..];
+            using var bytes = new MemoryStream();
+            using (var input = entry.Open()) input.CopyTo(bytes);
+            entry.Delete();
+            bytes.Position = 0;
+            using var output = zip.CreateEntry(target).Open();
+            bytes.CopyTo(output);
+        }
         var manifestEntry = zip.GetEntry("workload.json")!;
         JsonNode manifest;
         using (var input = new StreamReader(manifestEntry.Open())) manifest = JsonNode.Parse(input.ReadToEnd())!;
         manifest["runtimeIdentifier"] = runtimeIdentifier;
+        manifest["entryPoint"]!["assemblyPath"] = manifest["entryPoint"]!["assemblyPath"]!.GetValue<string>()
+            .Replace(originalPayload, selectedPayload, StringComparison.Ordinal);
         manifestEntry.Delete();
-        using var writer = new StreamWriter(zip.CreateEntry("workload.json").Open());
-        writer.Write(manifest.ToJsonString());
+        using (var writer = new StreamWriter(zip.CreateEntry("workload.json").Open())) writer.Write(manifest.ToJsonString());
+        if (bundled)
+        {
+            var declaration = zip.GetEntry(BundledTemplateInstaller.ManifestName)!;
+            JsonNode templates;
+            using (var input = new StreamReader(declaration.Open())) templates = JsonNode.Parse(input.ReadToEnd())!;
+            foreach (var asset in templates["assets"]!.AsArray())
+            {
+                var definition = asset ?? throw new InvalidOperationException("The bundled fixture must declare template assets.");
+                definition["path"] = definition["path"]!.GetValue<string>().Replace(originalPayload, selectedPayload, StringComparison.Ordinal);
+            }
+            declaration.Delete();
+            using var writer = new StreamWriter(zip.CreateEntry(BundledTemplateInstaller.ManifestName).Open());
+            writer.Write(templates.ToJsonString());
+        }
         return path;
     }
 
@@ -1217,8 +1244,9 @@ public sealed partial class BundledNodeTemplateTests
     {
         string inner = Path.Combine(_root, $"user-{Guid.NewGuid():N}.nupkg");
         using var archive = new NuGet.Packaging.PackageArchiveReader(outerArchive);
+        var manifest = BundledTemplateInstaller.ReadManifest(Read(archive, BundledTemplateInstaller.ManifestName));
         using var output = File.Create(inner);
-        archive.GetStream("tools/any/templates/node-basic.nupkg").CopyTo(output);
+        archive.GetStream(manifest.Assets.Single().Path).CopyTo(output);
         return inner;
     }
 

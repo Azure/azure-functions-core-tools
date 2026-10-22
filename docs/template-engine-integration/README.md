@@ -71,6 +71,9 @@ Compatible older unqualified receipts remain readable without writes; only an
 explicit update migrates them under the protected writer/recovery protocol.
 Conflicting origins for the same native ID/version remain an explicit conflict,
 not a reason to reject every shared/sibling state.
+Workload policy admission uses that same exact-version ownership reader, retaining
+the original receipt bytes in its revalidation snapshot without migrating legacy
+receipts or selecting another installed version.
 Native registration and workload admission remain protected through rollback;
 in-process failure or cancellation restores both stores before releasing the
 native lease. This is not a power-loss or cross-store crash-atomicity guarantee.

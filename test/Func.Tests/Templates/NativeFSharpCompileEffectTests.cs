@@ -105,7 +105,7 @@ public sealed class NativeFSharpCompileEffectTests : IDisposable
             invalid == "project-digest" ? "missing-digest" : Digest("original project"),
             invalid switch
             {
-                "compile-order" => [Path.Combine(ProjectDirectory.Info.FullName, "NotProgram.fs")],
+                "compile-order" => [],
                 "duplicate-order" => [ProgramPath, ProgramPath],
                 "equivalent-order" => [Path.Combine(ProjectDirectory.Info.FullName, ".", "Program.fs"), ProgramPath],
                 _ => [ProgramPath],

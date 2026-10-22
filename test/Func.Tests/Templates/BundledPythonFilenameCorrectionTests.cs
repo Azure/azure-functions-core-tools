@@ -119,7 +119,14 @@ public sealed partial class BundledPythonTemplateTests
             var append = new TemplateInvocationRequest(output, parameters, "AddedFunction", DryRun: true);
             var appendPreview = await support.InvokeAsync(templater, selected, binding, append, CancellationToken.None);
             appendPreview!.Status.Should().Be(TemplateInvocationStatus.Success, appendPreview.Diagnostic);
-            appendPreview.Changes.Should().Equal(new TemplateFileChange("function_app.py", TemplateFileChangeKind.Append));
+            appendPreview.Changes.Should().BeEmpty();
+            appendPreview.HasCommittedOutput.Should().BeFalse();
+            appendPreview.Effects!.Kind.Should().Be("previewed");
+            var plannedAppend = appendPreview.Effects.Plan.Effects.Should().ContainSingle().Subject
+                .Should().BeOfType<TemplateAppendFileEffect>().Subject;
+            plannedAppend.TargetPath.Should().Be(app);
+            plannedAppend.Source.Should().Be(mapping.HelperSource);
+            appendPreview.Effects.CompletedEffects.Should().BeEmpty();
             File.ReadAllBytes(app).Should().Equal(before);
             capability.Executions.Should().Be(0);
 
@@ -127,6 +134,10 @@ public sealed partial class BundledPythonTemplateTests
 
             appended!.Status.Should().Be(TemplateInvocationStatus.Success, appended.Diagnostic);
             appended.Effects!.Kind.Should().Be("applied");
+            appended.Changes.Should().BeEmpty();
+            appended.HasCommittedOutput.Should().BeFalse();
+            appended.Effects.CompletedEffects.Should().ContainSingle().Which
+                .Should().BeOfType<TemplateAppendFileEffect>().Which.Should().Be(plannedAppend);
             capability.Executions.Should().Be(1);
             File.ReadAllBytes(app).Take(before.Length).Should().Equal(before);
             File.ReadAllText(app).Should().Contain("AddedFunction", "def user_helper():");

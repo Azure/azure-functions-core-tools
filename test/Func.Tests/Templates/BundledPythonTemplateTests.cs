@@ -448,13 +448,16 @@ public sealed partial class BundledPythonTemplateTests : IDisposable
                 snapshot.GetProperty("bundleVersion").GetString()!, root, null), cancellationToken);
     }
 
-    private Templater CreateTemplater(TemplateEngineBundleContext? bundle = null, bool usable = true, bool enableBindingConstraints = true)
+    private Templater CreateTemplater(TemplateEngineBundleContext? bundle = null, bool usable = true,
+        bool enableBindingConstraints = true, Action<string>? afterHelperCapture = null)
     {
         var directory = WorkingDirectory.FromExplicit(_root);
         var context = new TemplateEngineContext(directory, new(directory, "python", "Python"), bundle, enableBindingConstraints);
         var snapshot = new TemplateConstraintEvaluationSnapshot([new("python-stack", NuGetVersion.Parse("1.0.0"), ["python"], usable)]);
         TemplateProjectConfigurationPlanner planner = new(new([new PythonProjectStack()]));
-        return TemplateFixtures.CreateTemplater(new(context, Hive, snapshot),
+        TemplateEngineSession session = afterHelperCapture is null ? new TemplateEngineSession(context, Hive, snapshot)
+            : new PythonHelperCaptureSession(context, Hive, snapshot, afterHelperCapture);
+        return TemplateFixtures.CreateTemplater(session,
             projectSupport: new(planner, new TemplateProjectConfigurationWriter(new PhysicalFileSystem())));
     }
 

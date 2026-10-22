@@ -11,6 +11,8 @@ using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Templates.Python;
 using Azure.Functions.Cli.Templates.Python.Shared;
 using Azure.Functions.Cli.Tests.Templates.Engine;
+using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Edge.Template;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -196,42 +198,28 @@ public sealed partial class BundledPythonTemplateTests
     public async Task PythonProvider_TargetChangedOrCanceledAfterActualPrivateExpansion_DoesNotAppend(bool cancel)
     {
         await InstallAsync();
-        using var templater = CreateTemplater(await ReadBundleAsync("stable"));
-        var selected = (await templater.ResolveGroupAsync("HttpTrigger-Python", TemplateType.Item)).Group!.Single();
         var root = WorkingDirectory.FromExplicit(Path.Combine(_root, "production-changed"));
         Directory.CreateDirectory(root.Info.FullName);
         var app = Path.Combine(root.Info.FullName, "function_app.py");
         File.WriteAllText(app, "original user bytes");
-        PhysicalFileSystem physical = new();
-        var files = Substitute.For<IFileSystem>();
         using CancellationTokenSource cancellation = new();
-        files.FileExists(Arg.Any<string>()).Returns(call => physical.FileExists(call.Arg<string>()));
-        files.DirectoryExists(Arg.Any<string>()).Returns(call => physical.DirectoryExists(call.Arg<string>()));
-        files.ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(call => physical.ComputeSha256Async(call.Arg<string>(), call.Arg<CancellationToken>()));
-        files.CreateTempDirectory().Returns(_ => physical.CreateTempDirectory());
-        files.GetFileSystemEntries(Arg.Any<string>()).Returns(call => physical.GetFileSystemEntries(call.Arg<string>()));
         bool observedExpansion = false;
-        files.ReadAllTextIfExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async call =>
+        using var templater = CreateTemplater(await ReadBundleAsync("stable"), afterHelperCapture: content =>
         {
-            var path = call.Arg<string>();
-            var content = await physical.ReadAllTextIfExistsAsync(path, call.Arg<CancellationToken>());
-            if (Path.GetFileName(path) == "function_body.py")
+            content.Should().Contain("def Greeting(");
+            observedExpansion = true;
+            if (cancel)
             {
-                content.Should().Contain("def Greeting(");
-                observedExpansion = true;
-                if (cancel)
-                {
-                    cancellation.Cancel();
-                }
-                else
-                {
-                    File.WriteAllText(app, "new user bytes");
-                }
+                cancellation.Cancel();
             }
-            return content;
+            else
+            {
+                File.WriteAllText(app, "new user bytes");
+            }
         });
-        PythonSelectedItemEffects effects = new(files, new PythonTemplateSourceReader(), new PythonTemplateAppendExecutor(), confirmed: true);
+        var selected = (await templater.ResolveGroupAsync("HttpTrigger-Python", TemplateType.Item)).Group!.Single();
+        PythonSelectedItemEffects effects = new(
+            new PhysicalFileSystem(), new PythonTemplateSourceReader(), new PythonTemplateAppendExecutor(), confirmed: true);
         var binding = await effects.ResolveAsync(selected, cancellation.Token);
         var request = new TemplateInvocationRequest(root, new Dictionary<string, string?> { ["httpTrigger-authLevel"] = "ANONYMOUS" }, "Greeting");
 
@@ -356,6 +344,25 @@ public sealed partial class BundledPythonTemplateTests
             archive.GetEntry(path)?.Delete();
             using StreamWriter writer = new(archive.CreateEntry(path).Open());
             writer.Write(content);
+        }
+    }
+
+    private sealed class PythonHelperCaptureSession(TemplateEngineContext context, string hive,
+        TemplateConstraintEvaluationSnapshot snapshot, Action<string> afterHelperCapture) : TemplateEngineSession(context, hive, snapshot)
+    {
+        private readonly Action<string> _afterHelperCapture = afterHelperCapture ?? throw new ArgumentNullException(nameof(afterHelperCapture));
+
+        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
+            InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
+        {
+            var result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+            if (!dryRun && template.Identity == "Azure.Functions.Python.HttpTrigger.Append")
+            {
+                // Read before the engine closes its in-memory capture filesystem.
+                var content = Settings.Host.FileSystem.ReadAllText(Path.Combine(request.OutputDirectory.Info.FullName, "function_body.py"));
+                _afterHelperCapture(content);
+            }
+            return result;
         }
     }
 }

@@ -24,7 +24,8 @@ internal sealed class NativeTemplatePolicyAdmission(
     IEnumerable<WorkloadNativeTemplatePolicyRegistration> registrations, InstalledProjectStackCatalog stacks,
     IFileSystem files, CliConfigurationPathsOptions paths, INativeTemplateOwnership nativeOwnership,
     ICliVersionProvider hostVersion, IWorkloadStore? workloads = null, IWorkloadPaths? workloadPaths = null,
-    IWorkloadDeploymentService? deployment = null, IBasicCompanionCatalog? catalog = null, BasicAcquisitionPlanner? planner = null)
+    IWorkloadDeploymentService? deployment = null, IBasicCompanionCatalog? catalog = null, BasicAcquisitionPlanner? planner = null,
+    IBundledTemplateInstaller? bundledTemplates = null)
 {
     private readonly IReadOnlyList<WorkloadNativeTemplatePolicyRegistration> _registrations =
         Array.AsReadOnly<WorkloadNativeTemplatePolicyRegistration>([.. registrations ?? throw new ArgumentNullException(nameof(registrations))]);
@@ -38,6 +39,7 @@ internal sealed class NativeTemplatePolicyAdmission(
     private readonly IWorkloadDeploymentService? _deployment = deployment;
     private readonly IBasicCompanionCatalog? _catalog = catalog;
     private readonly BasicAcquisitionPlanner? _planner = planner;
+    private readonly IBundledTemplateInstaller? _bundledTemplates = bundledTemplates;
 
     public async Task<BoundNativeTemplatePolicy?> TryBindAsync(
         TemplateCatalogEntry entry, string mountPoint, CancellationToken cancellationToken, bool required = false)
@@ -51,7 +53,7 @@ internal sealed class NativeTemplatePolicyAdmission(
             return null;
         }
 
-        string? bundled = await _files.ReadAllTextIfExistsAsync(BundledOwnerPath(package.Identifier), cancellationToken);
+        BundledTemplateOwnerDocument? bundled = await ReadBundledOwnerAsync(package, cancellationToken);
         NativeTemplateOwnerReceipt? external = await _nativeOwnership.GetRetainedAsync(package.Identifier, cancellationToken);
         if (bundled is null && external is null)
         {
@@ -123,7 +125,7 @@ internal sealed class NativeTemplatePolicyAdmission(
                 && artifact.ContentRoles.Any(content => content.Identity == entry.Identity));
     }
 
-    private bool CanBelongToRuntime(WorkloadNativeTemplatePolicyRegistration registration, string? bundled)
+    private bool CanBelongToRuntime(WorkloadNativeTemplatePolicyRegistration registration, BundledTemplateOwnerDocument? bundled)
     {
         IProjectStack? stack = _stacks.FindStack(registration.Policy.Stack);
         if (stack is null || !ReferenceEquals(AssemblyLoadContext.GetLoadContext(stack.GetType().Assembly), registration.Owner.LoadContext)
@@ -138,18 +140,9 @@ internal sealed class NativeTemplatePolicyAdmission(
         return MatchesRuntimeOrigin(registration, bundled);
     }
 
-    private static bool MatchesRuntimeOrigin(WorkloadNativeTemplatePolicyRegistration registration, string bundled)
+    private static bool MatchesRuntimeOrigin(WorkloadNativeTemplatePolicyRegistration registration, BundledTemplateOwnerDocument bundled)
     {
-        BundledTemplateOwner receipt;
-        try
-        {
-            receipt = JsonSerializer.Deserialize(bundled, BundledTemplateJsonContext.Default.BundledTemplateOwner)
-                ?? throw Invalid("The selected native owner receipt is empty.");
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidDataException("The selected native owner receipt is malformed.", exception);
-        }
+        BundledTemplateOwner receipt = bundled.Owner;
         if (receipt.Origin is null || string.IsNullOrWhiteSpace(receipt.Origin.PackageId)
             || !NuGetVersion.TryParse(receipt.Origin.Version, out _))
         {
@@ -199,7 +192,7 @@ internal sealed class NativeTemplatePolicyAdmission(
                 throw Invalid("The selected source is not its captured native archive.");
             }
             string digest = await _files.ComputeSha256Async(archive, cancellationToken);
-            string? bundled = await _files.ReadAllTextIfExistsAsync(BundledOwnerPath(package.Identifier), cancellationToken);
+            BundledTemplateOwnerDocument? bundled = await ReadBundledOwnerAsync(package, cancellationToken);
             string provenance;
             if (bundled is not null)
             {
@@ -221,7 +214,7 @@ internal sealed class NativeTemplatePolicyAdmission(
     }
 
     private async Task<string> ValidateBundledAsync(WorkloadNativeTemplatePolicyRegistration registration,
-        TemplateCatalogEntry entry, string digest, string receiptJson, CancellationToken cancellationToken)
+        TemplateCatalogEntry entry, string digest, BundledTemplateOwnerDocument document, CancellationToken cancellationToken)
     {
         string root = registration.Owner.InstallDirectory;
         string originJson = await _files.ReadAllTextIfExistsAsync(Path.Combine(root, BundledTemplateInstaller.OriginName), cancellationToken)
@@ -234,8 +227,7 @@ internal sealed class NativeTemplatePolicyAdmission(
                 ?? throw Invalid("The runtime bundled-template origin is empty.");
             BundledTemplatesManifest manifest = JsonSerializer.Deserialize(manifestJson, BundledTemplateJsonContext.Default.BundledTemplatesManifest)
                 ?? throw Invalid("The runtime bundled-template declaration is empty.");
-            BundledTemplateOwner receipt = JsonSerializer.Deserialize(receiptJson, BundledTemplateJsonContext.Default.BundledTemplateOwner)
-                ?? throw Invalid("The selected template owner is empty.");
+            BundledTemplateOwner receipt = document.Owner;
             TemplatePackageInfo package = entry.Package!;
             if (manifest.SchemaVersion != 1 || manifest.Assets is null
                 || origin.PackageId != registration.Owner.PackageId || !SameVersion(origin.Version, registration.Owner.PackageVersion))
@@ -261,7 +253,7 @@ internal sealed class NativeTemplatePolicyAdmission(
             {
                 throw Invalid("The runtime's retained native archive differs from the selected source.");
             }
-            return originJson + manifestJson + receiptJson;
+            return originJson + manifestJson + document.Provenance;
         }
         catch (JsonException exception)
         {
@@ -319,8 +311,25 @@ internal sealed class NativeTemplatePolicyAdmission(
         return JsonSerializer.Serialize(new { receipt, manifest.Revision, artifact = matching[0] });
     }
 
-    private string BundledOwnerPath(string packageId)
-        => Path.Combine(_paths.Home, "templates", ".bundled-owners", packageId.ToLowerInvariant() + ".json");
+    private async Task<BundledTemplateOwnerDocument?> ReadBundledOwnerAsync(TemplatePackageInfo package, CancellationToken cancellationToken)
+    {
+        if (package.Version is not { } version || !NuGetVersion.TryParse(version, out _))
+        {
+            throw Invalid("The selected native package has no valid exact version. Rerun selection.");
+        }
+        if (_bundledTemplates is null)
+        {
+            throw Invalid("Native policy admission requires the bundled ownership reader. Repair the CLI composition.");
+        }
+        try
+        {
+            return await _bundledTemplates.ReadOwnerDocumentAsync(package.Identifier, version, cancellationToken);
+        }
+        catch (InvalidWorkloadException exception)
+        {
+            throw new InvalidDataException("The selected native bundled ownership is invalid. Preserve the installation and repair it.", exception);
+        }
+    }
 
     private static bool SameVersion(string? left, string? right)
         => NuGetVersion.TryParse(left, out NuGetVersion? first) && NuGetVersion.TryParse(right, out NuGetVersion? second) && first == second;

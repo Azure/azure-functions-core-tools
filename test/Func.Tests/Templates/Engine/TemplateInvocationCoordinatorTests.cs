@@ -18,6 +18,7 @@ public sealed class TemplateInvocationCoordinatorTests
     {
         var engine = Substitute.For<ITemplateInvocationEngine>();
         var template = Substitute.For<ITemplateInfo>();
+        engine.ValidatePinnedPackageAsync(template, Arg.Any<CancellationToken>()).Returns(Task.FromResult<string?>(null));
         TemplateConfigurationSnapshot snapshot = new(
             """{"identity":"test","name":"test","shortName":"test","tags":{"type":"item"}}""", "fingerprint", TemplateType.Item, []);
         var request = new TemplateInvocationRequest(WorkingDirectory.FromExplicit(Path.GetTempPath()), new Dictionary<string, string?>(), DryRun: dryRun);
@@ -48,7 +49,8 @@ public sealed class TemplateInvocationCoordinatorTests
         var result = await coordinator.InvokeAsync(template, snapshot, request, cancellation.Token);
 
         result.Status.Should().Be(TemplateInvocationStatus.Success);
-        phases.Should().Equal(dryRun ? ["alive", "read", "render", "read"] : ["alive", "read", "render", "read", "read"]);
+        phases[0].Should().Be("alive");
+        phases.Where(phase => phase != "alive").Should().Equal(dryRun ? ["read", "render", "read"] : ["read", "render", "read", "read"]);
         await engine.Received(dryRun ? 2 : 3).ReadConfigurationAsync(template, cancellation.Token);
         await engine.Received(1).RenderImageAsync(template, request, Arg.Any<InputDataSet>(), Arg.Any<TemplateOutputImage>(), cancellation.Token);
     }
@@ -58,6 +60,7 @@ public sealed class TemplateInvocationCoordinatorTests
     {
         var engine = Substitute.For<ITemplateInvocationEngine>();
         var template = Substitute.For<ITemplateInfo>();
+        engine.ValidatePinnedPackageAsync(template, Arg.Any<CancellationToken>()).Returns(Task.FromResult<string?>(null));
         TemplateConfigurationSnapshot selected = new("{}", "selected", TemplateType.Item, []);
         engine.ReadConfigurationAsync(template, Arg.Any<CancellationToken>()).Returns(new TemplateConfigurationSnapshot("{}", "changed", TemplateType.Item, []));
         var coordinator = new TemplateInvocationCoordinator(engine, new PhysicalFileSystem());

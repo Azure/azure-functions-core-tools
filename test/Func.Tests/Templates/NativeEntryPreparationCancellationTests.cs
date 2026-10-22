@@ -91,7 +91,7 @@ public sealed partial class BundledNodeTemplateTests
         {
             var thrown = failure.Should().BeOfType<OperationCanceledException>().Which;
             thrown.CancellationToken.Should().Be(cancellation.Token);
-            thrown.StackTrace.Should().Contain("ResolvedTemplate.ValidateConfigurationAsync");
+            thrown.StackTrace.Should().Contain("TemplateInvocationCoordinator.ValidateSelectedConfigurationAsync");
         }
 
         stdout.Output.Should().BeEmpty();

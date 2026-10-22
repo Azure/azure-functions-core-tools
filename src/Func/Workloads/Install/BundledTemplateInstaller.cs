@@ -28,6 +28,11 @@ internal interface IBundledTemplateInstaller
     /// <exception cref="InvalidWorkloadException">The package identity or its ownership receipts are invalid or conflicting.</exception>
     public Task<BundledTemplateOwner?> ReadOwnerAsync(string packageId, string version, CancellationToken cancellationToken);
     /// <summary>
+    /// Reads the same exact owner together with unchanged receipt bytes for source revalidation.
+    /// </summary>
+    /// <exception cref="InvalidWorkloadException">The package identity or its ownership receipts are invalid or conflicting.</exception>
+    public Task<BundledTemplateOwnerDocument?> ReadOwnerDocumentAsync(string packageId, string version, CancellationToken cancellationToken);
+    /// <summary>
     /// Checks every native owner before admitting the workload, retaining native protection through registration and recovery.
     /// Explicit updates may supply workload rollback to settle both stores before releasing native protection.
     /// </summary>
@@ -43,6 +48,7 @@ internal interface IBundledTemplateInstaller
 internal sealed record BundledTemplateOrigin(string PackageId, string Version, string Sha256, string Source,
     string? LogicalPackageId = null, string? LogicalVersion = null, string? LogicalSource = null);
 internal sealed record BundledTemplateOwner(BundledTemplateOrigin Origin, string PackageId, string Version, string Sha256);
+internal sealed record BundledTemplateOwnerDocument(BundledTemplateOwner Owner, string Provenance);
 internal sealed record BundledTemplateAsset(string Path, string PackageId, string Version, string Sha256, IReadOnlyList<BasicTemplateDefinition> Templates);
 internal sealed record BundledTemplatesManifest(int SchemaVersion, IReadOnlyList<BundledTemplateAsset> Assets);
 
@@ -479,6 +485,9 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
     }
 
     public async Task<BundledTemplateOwner?> ReadOwnerAsync(string packageId, string version, CancellationToken cancellationToken)
+        => (await ReadOwnerDocumentAsync(packageId, version, cancellationToken))?.Owner;
+
+    public async Task<BundledTemplateOwnerDocument?> ReadOwnerDocumentAsync(string packageId, string version, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
@@ -492,25 +501,28 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
         }
         cancellationToken.ThrowIfCancellationRequested();
         string normalized = parsed.ToNormalizedString();
-        BundledTemplateOwner? owner = await ReadOwnerFileAsync(OwnerPath(packageId, normalized), packageId, cancellationToken);
-        if (owner is not null && !SameVersion(owner.Version, normalized))
+        BundledTemplateOwnerDocument? owner = await ReadOwnerDocumentFileAsync(OwnerPath(packageId, normalized), packageId, cancellationToken);
+        if (owner is not null && !SameVersion(owner.Owner.Version, normalized))
         {
             throw Invalid($"Bundled ownership for '{packageId}' {version} conflicts with its version-qualified receipt.");
         }
 
-        BundledTemplateOwner? legacy = await ReadOwnerFileAsync(LegacyOwnerPath(packageId), packageId, cancellationToken);
-        if (legacy is not null && SameVersion(legacy.Version, normalized))
+        BundledTemplateOwnerDocument? legacy = await ReadOwnerDocumentFileAsync(LegacyOwnerPath(packageId), packageId, cancellationToken);
+        if (legacy is not null && SameVersion(legacy.Owner.Version, normalized))
         {
-            if (owner is not null && owner != legacy)
+            if (owner is not null && owner.Owner != legacy.Owner)
             {
                 throw Invalid($"Bundled ownership for '{packageId}' {version} has conflicting receipts. Preserve the installation and request explicit repair.");
             }
-            owner ??= legacy;
+            owner = owner is null ? legacy : owner with { Provenance = owner.Provenance + legacy.Provenance };
         }
         return owner;
     }
 
     private async Task<BundledTemplateOwner?> ReadOwnerFileAsync(string path, string id, CancellationToken cancellationToken)
+        => (await ReadOwnerDocumentFileAsync(path, id, cancellationToken))?.Owner;
+
+    private async Task<BundledTemplateOwnerDocument?> ReadOwnerDocumentFileAsync(string path, string id, CancellationToken cancellationToken)
     {
         string? json = await _fileSystem.ReadAllTextIfExistsAsync(path, cancellationToken);
         if (json is null)
@@ -529,7 +541,7 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             {
                 throw Invalid($"Bundled ownership for '{id}' is invalid. Preserve the installation and request explicit repair.");
             }
-            return owner;
+            return new(owner, json);
         }
         catch (JsonException exception)
         {

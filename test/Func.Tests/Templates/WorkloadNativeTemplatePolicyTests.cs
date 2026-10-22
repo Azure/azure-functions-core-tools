@@ -173,7 +173,7 @@ public sealed partial class BundledNodeTemplateTests
         var stack = provider.GetRequiredService<Azure.Functions.Cli.Projects.InstalledProjectStackCatalog>().FindStack("fixture")!;
         AssemblyLoadContext.GetLoadContext(stack.GetType().Assembly).Should().BeSameAs(registration.Owner.LoadContext);
         AssemblyLoadContext.GetLoadContext(registration.Policy.GetType().Assembly).Should().BeSameAs(registration.Owner.LoadContext);
-        File.Exists(Path.Combine(Home, "templates", ".bundled-owners", "fixture.policy.templates.json")).Should().BeTrue();
+        File.Exists(Path.Combine(Home, "templates", ".bundled-owners", "fixture.policy.templates", "2.0.0.json")).Should().BeTrue();
         var availability = new TemplateConstraintEvaluationSnapshot([new(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), entry.Aliases, true)]);
         ITemplaterFactory factory = scope.ServiceProvider.GetRequiredService<ITemplaterFactory>();
         using Templater templater = await factory.CreateProjectAsync(
@@ -559,7 +559,7 @@ public sealed partial class BundledNodeTemplateTests
         }
         if (changed == "native-owner")
         {
-            string path = Path.Combine(Home, "templates", ".bundled-owners", "fixture.policy.templates.json");
+            string path = Path.Combine(Home, "templates", ".bundled-owners", "fixture.policy.templates", "2.0.0.json");
             var receipt = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
             receipt["sha256"] = new string('A', 64);
             File.WriteAllText(path, receipt.ToJsonString());
@@ -732,9 +732,11 @@ public sealed partial class BundledNodeTemplateTests
                 services.AddSingleton<BasicAcquisitionPlanner>();
             }
             var coordinator = new FileWorkloadOperationCoordinator(_paths);
+            BundledTemplateInstaller bundled = new(_templates, _inspector, _files, new(Home));
+            services.AddSingleton<IBundledTemplateInstaller>(bundled);
             services.AddSingleton<IWorkloadDeploymentService>(new WorkloadDeploymentService(
                 _paths, _workloads, new WorkloadMetadataReader(), coordinator, _files,
-                new BundledTemplateInstaller(_templates, _inspector, _files, new(Home))));
+                bundled));
         }, validateScopes: true);
     }
 

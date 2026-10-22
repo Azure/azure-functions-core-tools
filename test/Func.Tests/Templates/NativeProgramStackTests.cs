@@ -121,7 +121,17 @@ public sealed class NativeProgramStackTests : IDisposable
         using var item = JsonDocument.Parse(created.StandardOutput);
         item.RootElement.GetProperty("kind").GetString().Should().Be("created");
         item.RootElement.GetProperty("selectedTemplate").GetProperty("identity").GetString().Should().NotBeNullOrWhiteSpace();
-        item.RootElement.GetProperty("invocation").GetProperty("changes").GetArrayLength().Should().BeGreaterThan(0);
+        JsonElement invocation = item.RootElement.GetProperty("invocation");
+        if (stack == "python")
+        {
+            invocation.GetProperty("changes").GetArrayLength().Should().Be(0);
+            invocation.GetProperty("effects").GetProperty("completed").EnumerateArray()
+                .Should().Contain(effect => effect.GetProperty("kind").GetString() == "TemplateAppendFileEffect");
+        }
+        else
+        {
+            invocation.GetProperty("changes").GetArrayLength().Should().BeGreaterThan(0);
+        }
         if (stack == "node")
         {
             string extension = language == "TypeScript" ? ".ts" : ".js";

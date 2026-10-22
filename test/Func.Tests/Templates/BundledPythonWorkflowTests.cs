@@ -168,7 +168,8 @@ public sealed partial class BundledPythonTemplateTests
         var result = await scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>().ExecuteItemAsync(request, CancellationToken.None);
 
         await availability.Received(1).CaptureAsync(Arg.Any<CancellationToken>());
-        await factory.Received(1).CreateAsync(templater.Context, Arg.Any<TemplateConstraintEvaluationSnapshot>(),
+        var expectedContext = templater.Context with { RequireCleanStore = request.DryRun || request.List };
+        await factory.Received(1).CreateAsync(expectedContext, Arg.Any<TemplateConstraintEvaluationSnapshot>(),
             Arg.Any<CancellationToken>(), Arg.Any<Action<TemplateStoreWaitReason>?>());
         return result;
     }

@@ -267,7 +267,7 @@ public sealed partial class BundledNodeTemplateTests
 
             result.Status.Should().NotBe(TemplateInvocationStatus.Success);
             session.AfterPreview.Should().BeNull();
-            session.CreationCalls.Should().Be(0);
+            session.CaptureCalls.Should().Be(1);
             Directory.GetFileSystemEntries(outside).Should().BeEmpty();
             File.Exists(Path.Combine(project, "LateLinked.js")).Should().BeFalse();
         }
@@ -324,21 +324,18 @@ public sealed partial class BundledNodeTemplateTests
         : TemplateEngineSession(context, hive, availability)
     {
         public Action? AfterPreview { get; set; }
-        public int CreationCalls { get; private set; }
+        public int CaptureCalls { get; private set; }
 
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
             InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             var result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
-            if (dryRun)
+            if (!dryRun)
             {
+                CaptureCalls++;
                 Action? action = AfterPreview;
                 AfterPreview = null;
                 action?.Invoke();
-            }
-            else
-            {
-                CreationCalls++;
             }
             return result;
         }

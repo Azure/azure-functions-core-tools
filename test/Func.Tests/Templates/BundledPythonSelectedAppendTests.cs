@@ -45,7 +45,13 @@ public sealed partial class BundledPythonTemplateTests
 
         preview!.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
         preview.Effects!.Kind.Should().Be("previewed");
-        preview.Changes.Should().Equal(new TemplateFileChange("function_app.py", TemplateFileChangeKind.Append));
+        preview.Changes.Should().BeEmpty();
+        preview.HasCommittedOutput.Should().BeFalse();
+        var plannedAppend = preview.Effects.Plan.Effects.Should().ContainSingle().Subject
+            .Should().BeOfType<TemplateAppendFileEffect>().Subject;
+        plannedAppend.TargetPath.Should().Be(app);
+        plannedAppend.Source.Should().Be(mapping.HelperSource);
+        preview.Effects.CompletedEffects.Should().BeEmpty();
         File.ReadAllText(app).Should().Be(original);
         capability.Executions.Should().Be(0);
 
@@ -53,6 +59,10 @@ public sealed partial class BundledPythonTemplateTests
 
         created!.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
         created.Effects!.Kind.Should().Be("applied");
+        created.Changes.Should().BeEmpty();
+        created.HasCommittedOutput.Should().BeFalse();
+        created.Effects.CompletedEffects.Should().ContainSingle().Which
+            .Should().BeOfType<TemplateAppendFileEffect>().Which.Should().Be(plannedAppend);
         capability.Executions.Should().Be(1);
         var legacy = Directory.CreateDirectory(Path.Combine(_root, "legacy"));
         File.WriteAllText(Path.Combine(legacy.FullName, "function_app.py"), original);
