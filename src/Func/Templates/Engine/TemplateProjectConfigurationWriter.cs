@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text;
 using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
@@ -15,6 +16,24 @@ internal sealed record TemplateProjectConfigurationPlan(string PrimaryOutput, st
     public string Root => Path.GetDirectoryName(PrimaryOutput)!;
 
     public string ConfigurationPath => CliConfigurationPathsOptions.GetProjectConfigPath(new(Root));
+}
+
+/// <summary>
+/// Retains the canonical bytes submitted by a successful create-only configuration write.
+/// </summary>
+internal sealed class TemplateProjectConfigurationWriteReceipt
+{
+    private readonly byte[] _content;
+
+    internal TemplateProjectConfigurationWriteReceipt(string configurationPath, ReadOnlyMemory<byte> content)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(configurationPath);
+        ConfigurationPath = configurationPath;
+        _content = content.ToArray();
+    }
+
+    public string ConfigurationPath { get; }
+    public ReadOnlyMemory<byte> Content => _content.ToArray();
 }
 
 /// <summary>
@@ -47,7 +66,7 @@ internal sealed class TemplateProjectConfigurationWriter(IFileSystem fileSystem)
     /// <exception cref="IOException">The destination became occupied during creation or the atomic write failed.</exception>
     /// <exception cref="UnauthorizedAccessException">The configuration destination cannot be written.</exception>
     /// <exception cref="OperationCanceledException">Cancellation was requested before configuration was committed.</exception>
-    public Task WriteAsync(TemplateProjectConfigurationPlan plan, CancellationToken cancellationToken)
+    public Task<TemplateProjectConfigurationWriteReceipt> WriteAsync(TemplateProjectConfigurationPlan plan, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentException.ThrowIfNullOrWhiteSpace(plan.PrimaryOutput);
@@ -76,6 +95,13 @@ internal sealed class TemplateProjectConfigurationWriter(IFileSystem fileSystem)
         };
         Dictionary<string, object> payload = new(StringComparer.Ordinal) { [CliConfigurationNames.StackSectionName] = stack };
         string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
-        return _fileSystem.CreateAllTextAsync(plan.ConfigurationPath, json, cancellationToken);
+        TemplateProjectConfigurationWriteReceipt receipt = new(plan.ConfigurationPath, Encoding.UTF8.GetBytes(json));
+        return WriteReceiptAsync();
+
+        async Task<TemplateProjectConfigurationWriteReceipt> WriteReceiptAsync()
+        {
+            await _fileSystem.CreateAllTextAsync(plan.ConfigurationPath, json, cancellationToken);
+            return receipt;
+        }
     }
 }

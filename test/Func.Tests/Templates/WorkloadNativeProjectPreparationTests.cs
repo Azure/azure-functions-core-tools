@@ -359,6 +359,75 @@ public sealed partial class BundledNodeTemplateTests
         _interaction.AllOutput.Should().NotContain("\"kind\":\"created\"");
     }
 
+    [Theory]
+    [InlineData("unchanged")]
+    [InlineData("extra-fields")]
+    [InlineData("formatting")]
+    public async Task LoadedPreparation_FirstConfigurationReceipt_RequiresActualWriterBytes(string mutation)
+    {
+        WorkloadEntry entry = await InstallPolicyFixtureAsync(preparation: true);
+        var files = new PreparationConfigurationSwapFiles(mutation);
+        using ServiceProvider provider = await CreatePolicyServicesAsync(configure: services => services.AddSingleton<IFileSystem>(files));
+        using IServiceScope scope = provider.CreateScope();
+        NativeTemplatePolicy policy = SetPreparationMode(scope, "preparation-none");
+        string target = Path.Combine(_root, "first-receipt-preparation");
+        var request = new InitExecutionRequest(WorkingDirectory.FromExplicit(target), "Fixture.Project", "Created",
+            null, null, false, true, false, true, [], new HashSet<string>());
+
+        InitExecutionResult result = await scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>()
+            .ExecuteAsync(request, Availability(entry), CancellationToken.None);
+        int exit = provider.GetRequiredService<InitExecutionRenderer>().Render(result, jsonOutput: true);
+
+        bool unchanged = mutation == "unchanged";
+        exit.Should().Be(unchanged ? 0 : 1, _interaction.AllOutput);
+        result.Kind.Should().Be(unchanged ? "created" : "partialInitialization");
+        result.Invocation!.HasCommittedOutput.Should().BeTrue();
+        result.Invocation.Status.Should().Be(unchanged ? TemplateInvocationStatus.Success : TemplateInvocationStatus.ConfigurationFailure);
+        result.Invocation.ConfiguredProjects.Should().Equal(target);
+        result.Invocation.Changes.Should().Contain(change => Path.GetFullPath(Path.Combine(target, change.Path))
+            == Path.Combine(target, ".func", "config.json") && change.Kind == TemplateFileChangeKind.Create);
+        File.ReadAllText(Path.Combine(target, "Created.proj")).Should().Be("Created|net10.0");
+        GetFixtureState<int>(policy, "PreparationCompletions").Should().Be(unchanged ? 1 : 0);
+        GetFixtureState<int>(policy, "PreparationExecutions").Should().Be(unchanged ? 1 : 0);
+        files.SubmittedBytes.Should().NotBeNull();
+        if (!unchanged)
+        {
+            File.ReadAllBytes(Path.Combine(target, ".func", "config.json")).Should().NotEqual(files.SubmittedBytes!);
+            result.Invocation.Diagnostic.Should().Contain("writer");
+            result.Preparation!.Completion.Should().BeNull();
+        }
+    }
+
+    [Fact]
+    public async Task LoadedPreparation_WriterReceipt_OwnsCanonicalBytesAndKeepsCreateOnlyContracts()
+    {
+        string target = Directory.CreateDirectory(Path.Combine(_root, "writer-receipt")).FullName;
+        string primary = Path.Combine(target, "Primary.proj");
+        File.WriteAllText(primary, "source");
+        TemplateProjectConfigurationPlan plan = new(primary, "fixture", "Fixture");
+        TemplateProjectConfigurationWriter writer = new(_files);
+        Action nullPlan = () => writer.WriteAsync(null!, CancellationToken.None);
+        nullPlan.Should().Throw<ArgumentNullException>().WithParameterName("plan");
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        Action canceled = () => writer.WriteAsync(plan, cancellation.Token);
+        canceled.Should().Throw<OperationCanceledException>();
+
+        TemplateProjectConfigurationWriteReceipt written = await writer.WriteAsync(plan, CancellationToken.None);
+
+        written.ConfigurationPath.Should().Be(plan.ConfigurationPath);
+        byte[] actual = File.ReadAllBytes(plan.ConfigurationPath);
+        written.Content.ToArray().Should().Equal(actual);
+        MemoryMarshal.TryGetArray(written.Content, out ArraySegment<byte> exposed).Should().BeTrue();
+        exposed.Array![exposed.Offset] ^= 1;
+        written.Content.ToArray().Should().Equal(actual);
+        Action occupied = () => writer.WriteAsync(plan, CancellationToken.None);
+        occupied.Should().Throw<InvalidOperationException>();
+        File.ReadAllBytes(plan.ConfigurationPath).Should().Equal(actual);
+        Action missingPath = () => new TemplateProjectConfigurationWriteReceipt(null!, actual);
+        missingPath.Should().Throw<ArgumentNullException>();
+    }
+
     private static NativeTemplatePolicy SetPreparationMode(IServiceScope scope, string mode)
     {
         NativeTemplatePolicy policy = scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicyRegistration>().Policy;
@@ -385,6 +454,32 @@ public sealed partial class BundledNodeTemplateTests
             if (config == configuration)
             {
                 cancellation.Cancel();
+            }
+        }
+    }
+
+    private sealed class PreparationConfigurationSwapFiles(string mutation) : PhysicalFileSystem
+    {
+        public byte[]? SubmittedBytes { get; private set; }
+
+        public override void MoveFile(string sourcePath, string destinationPath, bool overwrite = false)
+        {
+            base.MoveFile(sourcePath, destinationPath, overwrite);
+            if (Path.GetFileName(destinationPath) != "config.json" || Path.GetFileName(Path.GetDirectoryName(destinationPath)) != ".func")
+            {
+                return;
+            }
+            SubmittedBytes = File.ReadAllBytes(destinationPath);
+            if (mutation == "extra-fields")
+            {
+                var edited = System.Text.Json.Nodes.JsonNode.Parse(SubmittedBytes)!;
+                edited["profiles"] = System.Text.Json.Nodes.JsonNode.Parse("""["external"]""");
+                edited["custom"] = "changed after commit";
+                File.WriteAllText(destinationPath, edited.ToJsonString());
+            }
+            if (mutation == "formatting")
+            {
+                File.AppendAllText(destinationPath, "\n ");
             }
         }
     }

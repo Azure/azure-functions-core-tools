@@ -56,17 +56,26 @@ internal sealed class NativeProjectPreparationCapture
     public NativeTemplatePreparationSnapshot Snapshot { get; }
     public TemplateProjectConfigurationPlan Project { get; }
 
-    internal async Task CaptureConfigurationAsync(CancellationToken cancellationToken)
+    internal async Task CaptureConfigurationAsync(TemplateProjectConfigurationWriteReceipt written, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(written);
         if (_configuration is not null)
         {
             throw new InvalidOperationException("The mandatory configuration receipt is immutable once captured.");
+        }
+        if (!SamePath(written.ConfigurationPath, Project.ConfigurationPath))
+        {
+            throw new InvalidDataException("The writer's mandatory configuration receipt belongs to another project.");
         }
         RequireKind(Project.ConfigurationPath, directory: false);
         using Stream stream = _basis.OpenRead(Project.ConfigurationPath);
         using MemoryStream copied = new();
         await stream.CopyToAsync(copied, cancellationToken);
         byte[] bytes = copied.ToArray();
+        if (!bytes.AsSpan().SequenceEqual(written.Content.Span))
+        {
+            throw new InvalidDataException("Mandatory configuration differs from the writer's committed bytes. Created output was retained.");
+        }
         ValidateConfiguration(bytes);
         _configuration = bytes;
     }

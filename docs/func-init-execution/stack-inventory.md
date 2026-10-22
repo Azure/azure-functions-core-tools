@@ -262,6 +262,9 @@ bytes. Revalidation checks the owner/source, current generated file kinds and
 bytes, unlinked target and unchanged configuration. This is not atomic against
 external changes and does not constrain subsequent workload helper mutations.
 Completion authorization is consumed once before the workload callback.
+The first configuration read must exactly match the successful writer's
+canonical byte receipt. Matching runtime/language alone cannot adopt a replaced
+configuration as CLI-created evidence.
 
 The typed workload result preserves diagnostics and `TargetMayHaveChanged`.
 Its `Succeeded` value is authoritative, not keywords in diagnostic strings.

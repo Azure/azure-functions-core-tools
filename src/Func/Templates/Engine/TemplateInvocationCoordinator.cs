@@ -438,14 +438,13 @@ internal sealed partial class TemplateInvocationCoordinator(
                     return Result(TemplateInvocationStatus.ConfigurationFailure, diagnostic);
                 }
 
-                await project.Writer.WriteAsync(plan, cancellationToken);
+                TemplateProjectConfigurationWriteReceipt written = await project.Writer.WriteAsync(plan, cancellationToken);
                 configured.Add(plan.Root);
                 completed.Add(new(Path.GetRelativePath(image.Output, plan.ConfigurationPath), TemplateFileChangeKind.Create));
-            }
-
-            if (preparationCapture is not null)
-            {
-                await preparationCapture.CaptureConfigurationAsync(cancellationToken);
+                if (preparationCapture is not null)
+                {
+                    await preparationCapture.CaptureConfigurationAsync(written, cancellationToken);
+                }
             }
             return Result(TemplateInvocationStatus.Success, null);
         }
