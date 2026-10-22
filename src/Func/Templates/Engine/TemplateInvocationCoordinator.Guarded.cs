@@ -78,7 +78,7 @@ internal sealed partial class TemplateInvocationCoordinator
             {
                 throw new InvalidTemplateMetadataException("Project layout qualification does not match the exact mounted candidate.");
             }
-            _projectSupport.Planner.ReadOwnedLayout(configuration.Content, layout);
+            _projectSupport.Planner.ReadOwnedLayout(configuration, layout);
             _projectLayouts[new(template.Identity, template.MountPointUri, template.ConfigPlace, configuration.Fingerprint,
                 configuration.HostConfigPlace, configuration.HostData)] = layout;
         }

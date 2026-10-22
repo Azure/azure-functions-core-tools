@@ -67,8 +67,9 @@ internal sealed class FixturePolicy(IFixtureFiles files) : NativeTemplatePolicy
         {
             return ["Owner refused this project."];
         }
-        using var configuration = JsonDocument.Parse(
-            await selected.ReadPackageFileAsync("content/project/.template.config/template.json", cancellationToken));
+        ReadOnlyMemory<byte> raw = await selected.ReadPackageFileAsync("content/project/.template.config/template.json", cancellationToken);
+        using StreamReader reader = new(new MemoryStream(raw.ToArray()));
+        using var configuration = JsonDocument.Parse(await reader.ReadToEndAsync(cancellationToken));
         if (configuration.RootElement.GetProperty("sourceName").GetString() != "Owner.App"
             || configuration.RootElement.GetProperty("primaryOutputs")[0].GetProperty("path").GetString() != "Owner.App.proj"
             || configuration.RootElement.GetProperty("sources")[0].GetProperty("modifiers")[0].GetProperty("rename")
@@ -105,13 +106,17 @@ internal sealed class FixturePolicy(IFixtureFiles files) : NativeTemplatePolicy
             return new(false, ["The owner requires Framework=net10.0."], new Dictionary<string, string?>(), []);
         }
         ReturnedDefaults.Clear();
-        if (!invocation.ExplicitParameterNames.Contains("Framework") && invocation.CanonicalValues.ContainsKey("Framework"))
+        if (Mode != "no-defaults" && !invocation.ExplicitParameterNames.Contains("Framework") && invocation.CanonicalValues.ContainsKey("Framework"))
         {
             ReturnedDefaults["Framework"] = "net10.0";
         }
         if (Mode == "explicit-overwrite")
         {
             ReturnedDefaults["Framework"] = "net9.0";
+        }
+        if (Mode == "replace-greeting")
+        {
+            ReturnedDefaults["Greeting"] = "replaced";
         }
         NativeTemplateProjectBinding? binding = invocation.Source.Identity == "Fixture.Compile"
             ? new(Path.Combine(invocation.ProjectDirectory.Info.FullName, "Fixture.fsproj"), "net10.0", "Fixture") : null;

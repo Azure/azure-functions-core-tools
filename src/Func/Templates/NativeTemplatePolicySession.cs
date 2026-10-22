@@ -168,7 +168,16 @@ internal sealed class NativeTemplatePolicySession(
             {
                 TemplateArgumentParseRequest input = request.ArgumentSource
                     ?? throw new InvalidDataException("Workload defaults require the original host-captured argument provenance.");
-                TemplateCandidateParseResult parsed = _arguments.Parse(input with { CompletedValuesByCanonicalName = values }, cancellationToken);
+                Dictionary<string, string?> completed = new(input.CompletedValuesByCanonicalName
+                    ?? new Dictionary<string, string?>(), StringComparer.Ordinal);
+                foreach ((string key, string? value) in values)
+                {
+                    if (!request.ExplicitParameterNames.Contains(key))
+                    {
+                        completed[key] = value;
+                    }
+                }
+                TemplateCandidateParseResult parsed = _arguments.Parse(input with { CompletedValuesByCanonicalName = completed }, cancellationToken);
                 if (!parsed.IsComplete || !parsed.IsArgumentCompatible)
                 {
                     throw new InvalidDataException("Workload defaults do not satisfy the selected native parameter schema.");

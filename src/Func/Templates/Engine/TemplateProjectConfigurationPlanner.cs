@@ -2,8 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Azure.Functions.Cli.Projects;
 using Microsoft.TemplateEngine.Abstractions;
@@ -71,18 +69,15 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         return CreatePlans(Read(configuration), creation, outputDirectory, changes, directoryOutputs, nativeOwnedLayout: false);
     }
 
-    public IReadOnlyList<TemplateProjectConfigurationDeclaration> ReadOwnedLayout(string configuration, NativeProjectLayoutQualification qualification)
+    public IReadOnlyList<TemplateProjectConfigurationDeclaration> ReadOwnedLayout(TemplateConfigurationSnapshot configuration, NativeProjectLayoutQualification qualification)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(configuration);
+        ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(qualification);
-        Require(string.Equals(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(configuration))),
-            qualification.ConfigurationFingerprint, StringComparison.OrdinalIgnoreCase),
+        Require(string.Equals(configuration.Fingerprint, qualification.ConfigurationFingerprint, StringComparison.OrdinalIgnoreCase),
             "The selected project configuration does not match its source qualification.");
         try
         {
-            using var document = JsonDocument.Parse(configuration,
-                new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
-            JsonElement root = document.RootElement;
+            JsonElement root = configuration.Root;
             Require(root.ValueKind == JsonValueKind.Object, "Project template configuration must be an object.");
             RejectDuplicates(root);
             Require(root.TryGetProperty("identity", out JsonElement identity) && ReadString(identity, "identity") == qualification.TemplateIdentity,
@@ -110,7 +105,7 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         }
     }
 
-    public IReadOnlyList<TemplateProjectConfigurationPlan> CreateOwnedPlans(string configuration, ICreationResult creation, string outputDirectory,
+    public IReadOnlyList<TemplateProjectConfigurationPlan> CreateOwnedPlans(TemplateConfigurationSnapshot configuration, ICreationResult creation, string outputDirectory,
         IReadOnlyList<TemplateFileChange> changes, IReadOnlySet<string> directoryOutputs, NativeProjectLayoutQualification qualification,
         IReadOnlyDictionary<string, string?> parameters, ICreationEffects mapping)
     {

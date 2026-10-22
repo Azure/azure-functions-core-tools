@@ -25,25 +25,13 @@ internal sealed partial class TemplateInvocationCoordinator(
 
     public bool ProjectTemplatesEnabled => _projectSupport is not null;
 
-    public IReadOnlyList<TemplateProjectConfigurationDeclaration> ValidateProjectConfiguration(string configuration)
-    {
-        if (_projectSupport is null)
-        {
-            throw new InvalidOperationException("Project templates are not enabled for this invocation flow.");
-        }
-
-        return _projectSupport.OwnedLayout is { } layout
-            ? _projectSupport.Planner.ReadOwnedLayout(configuration, layout)
-            : _projectSupport.Planner.Read(configuration);
-    }
-
     internal IReadOnlyList<TemplateProjectConfigurationDeclaration> ValidateProjectConfiguration(
         ITemplateInfo template, TemplateConfigurationSnapshot configuration)
     {
         TemplateProjectSupport support = ProjectSupport(template, configuration)
             ?? throw new InvalidOperationException("Project templates are not enabled for this invocation flow.");
         return support.OwnedLayout is { } layout
-            ? support.Planner.ReadOwnedLayout(configuration.Content, layout) : support.Planner.Read(configuration.Content);
+            ? support.Planner.ReadOwnedLayout(configuration, layout) : support.Planner.Read(configuration.Content);
     }
 
     public void ThrowIfDisposed() => _engine.ThrowIfDisposed();
@@ -236,7 +224,7 @@ internal sealed partial class TemplateInvocationCoordinator(
                     Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
                 IReadOnlyList<TemplateFileChange> actual = DescribeActualOutputs(image, configuration, effects, includeExistingDirectories: true);
                 configurationPlans = project.OwnedLayout is { } layout
-                    ? project.Planner.CreateOwnedPlans(configuration.Content, effects.CreationResult, output, actual, directories,
+                    ? project.Planner.CreateOwnedPlans(configuration, effects.CreationResult, output, actual, directories,
                         layout, request.Parameters, effects)
                     : project.Planner.CreatePlans(configuration.Content, effects.CreationResult, output, actual, directories);
                 if (configurationPlans.Any(project.Writer.ConfigurationExists))

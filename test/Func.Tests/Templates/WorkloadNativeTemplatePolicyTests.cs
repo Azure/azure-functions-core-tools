@@ -3,10 +3,14 @@
 
 using System.Security.Cryptography;
 using System.Runtime.Loader;
+using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Xml.Linq;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
@@ -29,6 +33,135 @@ public sealed partial class BundledNodeTemplateTests
 {
     private const string PolicyRuntimeId = "Fixture.Policy.Runtime";
     private const string PolicyAssembly = "Azure.Functions.Cli.Workloads.Tests.Fixtures.NativePolicy.dll";
+
+    [Theory]
+    [InlineData(false, false, "valid")]
+    [InlineData(false, true, "valid")]
+    [InlineData(true, false, "valid")]
+    [InlineData(true, true, "valid")]
+    [InlineData(false, false, "no-defaults")]
+    [InlineData(true, true, "no-defaults")]
+    [InlineData(false, true, "replace-greeting")]
+    [InlineData(true, true, "replace-greeting")]
+    public async Task LoadedPolicy_ExplicitDefaultAndPromptValues_ComposeThroughActualCommands(bool item, bool prompt, string mode)
+    {
+        WorkloadEntry entry = await InstallPolicyFixtureAsync(composedParameters: true, promptRequired: prompt);
+        string target = Path.Combine(_root, "composed-owner-values");
+        var directory = WorkingDirectory.FromExplicit(target);
+        var contexts = Substitute.For<INewExecutionContextResolver>();
+        contexts.ResolveAsync(Arg.Any<NewExecutionRequest>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(new NewExecutionContextResult(new(directory, new(directory, "fixture", "Fixture")), null));
+        PolicyPromptInteraction interaction = new();
+        using ServiceProvider provider = await CreatePolicyServicesAsync(contexts: contexts, interaction: interaction);
+        using IServiceScope scope = provider.CreateScope();
+        NativeTemplatePolicy policy = scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicyRegistration>().Policy;
+        policy.GetType().GetProperty("Mode")!.SetValue(policy, mode);
+        var availability = new TemplateConstraintEvaluationSnapshot([new(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), entry.Aliases, true)]);
+        if (item)
+        {
+            Directory.CreateDirectory(target);
+        }
+        int exit = item
+            ? await new NewExecutionCommand(scope.ServiceProvider.GetRequiredService<INewExecutionRunner>(),
+                provider.GetRequiredService<NewExecutionRenderer>(), availability)
+                .ParseInvocation(["Fixture.Editor", "--path", target, "--name", "KeptName", "--Greeting", "hello", "--output", "json"]).InvokeAsync()
+            : await new InitExecutionCommand(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>(),
+                provider.GetRequiredService<InitExecutionRenderer>(), availability)
+                .ParseInvocation([target, "--template", "Fixture.Project", "--name", "KeptName", "--Greeting", "hello", "--output", "json"]).InvokeAsync();
+
+        exit.Should().Be(mode == "replace-greeting" ? 1 : 0, interaction.AllOutput);
+        interaction.Prompts.Should().Be(prompt ? 1 : 0);
+        if (mode == "replace-greeting")
+        {
+            if (item)
+            {
+                Directory.GetFileSystemEntries(target).Should().BeEmpty();
+            }
+            else
+            {
+                Directory.Exists(target).Should().BeFalse();
+            }
+            interaction.AllOutput.Should().Contain("explicit or undeclared");
+            return;
+        }
+        NativeTemplateCapturedOutput capture = GetFixtureState<NativeTemplateCapturedOutput>(policy, "LastCapture");
+        capture.Invocation.CanonicalValues["Greeting"].Should().Be("hello");
+        capture.Invocation.CanonicalValues["Framework"].Should().Be(mode == "no-defaults" ? "net8.0" : "net10.0");
+        capture.Invocation.CanonicalValues["Prompted"].Should().Be(prompt ? "host-prompt-value" : "authored-prompt");
+        capture.Invocation.ExplicitParameterNames.Should().BeEquivalentTo(["Greeting"]);
+        capture.Invocation.Name.Should().Be("KeptName");
+        if (!item)
+        {
+            File.ReadAllText(Path.Combine(target, "KeptName.proj"))
+                .Should().Be($"KeptName|{capture.Invocation.CanonicalValues["Framework"]}|hello|{capture.Invocation.CanonicalValues["Prompted"]}");
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task LoadedPolicy_RawConfigurationFingerprint_PreservesBomAndRefusesChangedRawSource(bool bom, bool drift)
+    {
+        WorkloadEntry entry = await InstallPolicyFixtureAsync(utf8Bom: bom);
+        using ServiceProvider provider = await CreatePolicyServicesAsync();
+        using IServiceScope scope = provider.CreateScope();
+        string target = Path.Combine(_root, "raw-owner-project");
+        var availability = new TemplateConstraintEvaluationSnapshot([new(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), entry.Aliases, true)]);
+        using Templater templater = await scope.ServiceProvider.GetRequiredService<ITemplaterFactory>().CreateProjectAsync(
+            new(WorkingDirectory.FromExplicit(target)), availability, provider.GetRequiredService<TemplateProjectSupport>(), CancellationToken.None);
+        IReadOnlyList<TemplateCatalogEntry> catalog = await templater.ListAsync(TemplateType.Project);
+        NativeTemplatePolicy policy = scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicyRegistration>().Policy;
+        GetFixtureState<NativeTemplateSource>(policy, "LastSource").Identity.Should().Be("Fixture.Project");
+        catalog.Should().ContainSingle().Which.ProjectConfigurationDiagnostic.Should().BeNull("unchanged raw bytes must retain their original qualification");
+        catalog.Should().ContainSingle().Which.ProjectConfigurations.Should().ContainSingle("the original raw bytes must admit the owned declaration");
+        var resolution = await templater.ResolveGroupAsync("Fixture.Project", TemplateType.Project);
+        resolution.Status.Should().Be(TemplateResolutionStatus.Success);
+        ResolvedTemplate selected = resolution.Group![0];
+        ReadOnlyMemory<byte> original = await selected.ReadPackageFileAsync("content/project/.template.config/template.json", CancellationToken.None);
+        string.Equals(selected.ConfigurationSha256, Convert.ToHexString(SHA256.HashData(original.Span)), StringComparison.OrdinalIgnoreCase)
+            .Should().BeTrue("the fingerprint must identify the original package bytes");
+        if (bom)
+        {
+            original.Span[..3].SequenceEqual(new UTF8Encoding(true).GetPreamble()).Should().BeTrue();
+        }
+        NativeProjectLayoutQualification wrongPin = new(selected.Entry.Identity, new('A', 64), new(0, "fixture", "Fixture"));
+        TemplateProjectConfigurationPlanner planner = provider.GetRequiredService<TemplateProjectSupport>().Planner;
+        Action mismatched = () => planner.ReadOwnedLayout(selected.Configuration!, wrongPin);
+        mismatched.Should().Throw<InvalidTemplateMetadataException>().WithMessage("*does not match its source qualification*");
+        Action missingSnapshot = () => planner.ReadOwnedLayout(null!, wrongPin);
+        missingSnapshot.Should().Throw<ArgumentNullException>().WithParameterName("configuration");
+        Action missingDeclaration = () => planner.ReadOwnedLayout(selected.Configuration!, null!);
+        missingDeclaration.Should().Throw<ArgumentNullException>().WithParameterName("qualification");
+        ResolvedTemplate foreign = (await templater.ResolveGroupAsync("Fixture.Editor", TemplateType.Item)).Group![0];
+        NativeProjectLayoutQualification actualPin = new(selected.Entry.Identity, selected.ConfigurationSha256!, new(0, "fixture", "Fixture"));
+        Action swappedSource = () => planner.ReadOwnedLayout(foreign.Configuration!, actualPin);
+        swappedSource.Should().Throw<InvalidTemplateMetadataException>().WithMessage("*does not match its source qualification*");
+        if (drift)
+        {
+            using var archive = ZipFile.Open(selected.PackageMountPoint!, ZipArchiveMode.Update);
+            var configuration = archive.GetEntry("content/project/.template.config/template.json")!;
+            using MemoryStream raw = new();
+            using (Stream input = configuration.Open())
+            {
+                input.CopyTo(raw);
+            }
+            configuration.Delete();
+            using Stream changed = archive.CreateEntry("content/project/.template.config/template.json").Open();
+            changed.Write([.. raw.ToArray(), (byte)' ']);
+        }
+
+        int exit = await new InitExecutionCommand(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>(),
+            provider.GetRequiredService<InitExecutionRenderer>(), availability)
+            .ParseInvocation([target, "--template", "Fixture.Project", "--name", "Created", "--non-interactive", "--output", "json"]).InvokeAsync();
+
+        exit.Should().Be(drift ? 1 : 0, _interaction.AllOutput);
+        Directory.Exists(target).Should().Be(!drift);
+        if (!drift)
+        {
+            File.ReadAllText(Path.Combine(target, "Created.proj")).Should().Be("Created|net10.0");
+        }
+    }
 
     [Fact]
     public async Task LoadedPolicy_SourceDeclaration_ReachesRealCatalogResolveAndInitWithAlternativeLayout()
@@ -574,7 +707,7 @@ public sealed partial class BundledNodeTemplateTests
     }
 
     private async Task<ServiceProvider> CreatePolicyServicesAsync(IBasicCompanionCatalog? authority = null,
-        IProjectStack? additionalStack = null, INewExecutionContextResolver? contexts = null)
+        IProjectStack? additionalStack = null, INewExecutionContextResolver? contexts = null, IInteractionService? interaction = null)
     {
         return await CreateServicesAsync(services =>
         {
@@ -589,6 +722,10 @@ public sealed partial class BundledNodeTemplateTests
             {
                 services.AddSingleton(contexts);
             }
+            if (interaction is not null)
+            {
+                services.AddSingleton(interaction);
+            }
             if (authority is not null)
             {
                 services.AddSingleton(authority);
@@ -601,10 +738,36 @@ public sealed partial class BundledNodeTemplateTests
         }, validateScopes: true);
     }
 
-    private async Task<WorkloadEntry> InstallPolicyFixtureAsync(bool fromCatalog = false)
+    private async Task<WorkloadEntry> InstallPolicyFixtureAsync(bool fromCatalog = false,
+        bool composedParameters = false, bool promptRequired = false, bool utf8Bom = false)
     {
         string input = Directory.CreateDirectory(Path.Combine(_root, "policy-content")).FullName;
         WritePolicyContent(input);
+        if (composedParameters)
+        {
+            string[] kinds = ["project", "editor"];
+            foreach (string kind in kinds)
+            {
+                string path = Path.Combine(input, "content", kind, ".template.config", "template.json");
+                var configuration = JsonNode.Parse(File.ReadAllText(path))!;
+                configuration["symbols"] ??= new JsonObject();
+                JsonObject symbols = configuration["symbols"]!.AsObject();
+                symbols["Framework"] ??= JsonNode.Parse(
+                    """{"type":"parameter","datatype":"choice","defaultValue":"net8.0","choices":[{"choice":"net8.0"},{"choice":"net9.0"},{"choice":"net10.0"}]}""");
+                symbols["Greeting"] = JsonNode.Parse(
+                    """{"type":"parameter","datatype":"string","defaultValue":"authored-greeting","replaces":"GREETING"}""");
+                symbols["Prompted"] = promptRequired ? JsonNode.Parse(
+                    """{"type":"parameter","datatype":"string","isRequired":true,"replaces":"PROMPTED"}""")
+                    : JsonNode.Parse("""{"type":"parameter","datatype":"string","defaultValue":"authored-prompt","replaces":"PROMPTED"}""");
+                File.WriteAllText(path, configuration.ToJsonString());
+            }
+            File.WriteAllText(Path.Combine(input, "content", "project", "Owner.App.proj"), "Owner.App|FRAMEWORK|GREETING|PROMPTED");
+        }
+        if (utf8Bom)
+        {
+            string path = Path.Combine(input, "content", "project", ".template.config", "template.json");
+            File.WriteAllBytes(path, [.. new UTF8Encoding(true).GetPreamble(), .. File.ReadAllBytes(path)]);
+        }
         string native = Path.Combine(_root, "policy-templates.nupkg");
         WritePolicyPackage(input, native, "Fixture.Policy.Templates", "2.0.0", "FuncTemplate");
         string runtime = Directory.CreateDirectory(Path.Combine(_root, "policy-runtime")).FullName;
@@ -712,5 +875,18 @@ public sealed partial class BundledNodeTemplateTests
         public string Stack => "foreign";
         public IReadOnlyList<string> SupportedLanguages => ["Fixture"];
         public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => new Dictionary<string, IReadOnlyList<string>>();
+    }
+
+    private sealed class PolicyPromptInteraction : TestInteractionService, IInteractionService
+    {
+        public override bool IsInteractive => true;
+        public int Prompts { get; private set; }
+
+        Task<string> IInteractionService.PromptForInputAsync(string prompt, string? defaultValue, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Prompts++;
+            return Task.FromResult("host-prompt-value");
+        }
     }
 }
