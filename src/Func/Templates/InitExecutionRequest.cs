@@ -18,7 +18,10 @@ internal sealed record InitExecutionRequest(
     bool DryRun,
     bool JsonOutput,
     IReadOnlyList<string> RawTemplateTokens,
-    IReadOnlySet<string> ReservedAliases);
+    IReadOnlySet<string> ReservedAliases)
+{
+    internal Acquisition.NativeTemplateSelection? ArtifactBinding { get; init; }
+}
 
 internal sealed record InitExecutionResult(string Kind, bool Succeeded)
 {

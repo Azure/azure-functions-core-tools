@@ -84,9 +84,72 @@ displayed as claims only, never fetched or interpreted as approval. Stale metada
 is visibly identified. The only permitted writes are those of the existing
 manifest metadata cache.
 
-Exact-artifact ownership, approval, consent, acquisition and fresh-init selection
-remain subsequent integration gates. This browser neither opens the installed
-template store nor provides an install/create action.
+The default browser still neither opens the installed template store nor provides
+an install/create action. Consent, acquisition and public init integration remain
+subsequent gates.
+
+#### Internal exact-artifact binding
+
+The additive artifact-binding layer is opt-in through
+`AddNativeTemplateArtifactBinding`, alongside the staged native setup services.
+It does not register a public command, enable a default route, populate production
+authority or authorize a producer rollout.
+
+`InitExecutionRequest.ArtifactBinding` carries a full ordinal template identity,
+package ID, normalized version, source and SHA-256 coordinates, plus the selected
+physical workload owner and any logical pointer, runtime identifier and entry
+point. These are coordinates, not proof. Null preserves direct-init resolution,
+short names, precedence, adoption and repair.
+
+Bound init creates a new workload capability scope after acquisition has ended.
+One current registry snapshot feeds workload registration, availability, stack
+metadata and project-configuration support. Failed workload loading or
+configuration refuses this scope rather than using a partial registration or
+falling back to the original command container. The scope outlives preview,
+creation and mandatory configuration. Its artifact verifier refuses subsequent
+registry changes. It does not reuse an acquisition transaction or its leases.
+
+Inside the fresh protected project session, init lists project entries once.
+Exactly one entry must match the full identity and package coordinates. The
+verifier then joins the current installed owner, bundled schema-2 association,
+host/channel/role policy, retained provenance and the actual current managed
+archive. It uses the existing complete archive inspector through the session's
+filesystem, checks the discovered engine inventory and compares every mounted
+file with that archive. The owner must also be the unique physical workload
+registration loaded as a runtime capability by that same fresh scope. Retained
+registry rows that are not the live loaded version cannot authorize the binding.
+A receipt, package descriptor or manifest claim alone cannot satisfy the binding.
+No path or mounted handle comes from the caller.
+
+The singleton entry passes through `CreateGroupAsync` using the same flow's
+object identity. There is no group expansion or short-name fallback. Existing
+metadata, constraint, explicit filter, strict argument and required-value checks
+still apply. The selected invocation retains its artifact verifier at the
+existing source checks, including before output commits. Existing authoritative
+preview, all-project configuration checks, target recheck and partial-output
+reporting remain shared with direct init. Bound invocations reject concurrent use
+of their session and cannot survive its disposal.
+
+An optional internal `QuickstartBrowseRequest.InstalledQuery` enables duplicate
+projection using a separate fresh, clean-store read flow. Remote rows are omitted
+only for the corresponding independently proven current installation with exact
+identity, package, version, source and digest. The remote reference stays
+unverified. Missing proof leaves the row visible with installed-proof diagnostics.
+Availability diagnostics remain present even for a proven duplicate that is
+currently restricted. This is not a new quickstart classification or a
+mixed-stack eligibility policy.
+
+Browse projection and init dry-run require a clean native store. They do not
+install content or recover a pending journal. Ordinary unbound browse still does
+not inspect the native store. Empty production association authority yields no
+qualified installation proof, even if a receipt is retained. Test packages and
+fixture authorities demonstrate mechanics only, not production approval.
+An explicit preview or experimental association permits inspection of matching
+prerelease artifacts, while the existing planner still enforces the exact
+channel policy and artifact range. For an installed artifact with no asserted
+channel, prerelease admission is derived from that exact artifact version; the
+same qualified association and exact byte checks still apply. A null channel is
+not treated as stable.
 
 #### Internal catalog preparation
 

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml;
 using Azure.Functions.Cli.Common;
@@ -16,10 +17,15 @@ internal interface IBasicArtifactInspector
     public Task ValidateAsync(string archive, BasicTemplateArtifact artifact, CancellationToken cancellationToken);
 }
 
+internal interface IBasicArchiveInspector
+{
+    public Task ValidateArchiveAsync(Stream archive, BasicTemplateArtifact artifact, CancellationToken cancellationToken);
+}
+
 /// <summary>
 /// Checks exact archive bytes and the complete raw template inventory against qualified content evidence.
 /// </summary>
-internal sealed class BasicArtifactInspector(IFileSystem fileSystem) : IBasicArtifactInspector
+internal sealed class BasicArtifactInspector(IFileSystem fileSystem) : IBasicArtifactInspector, IBasicArchiveInspector
 {
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
@@ -27,14 +33,24 @@ internal sealed class BasicArtifactInspector(IFileSystem fileSystem) : IBasicArt
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(archive);
         ArgumentNullException.ThrowIfNull(artifact);
-        if (!string.Equals(await _fileSystem.ComputeSha256Async(archive, cancellationToken), artifact.Sha256, StringComparison.OrdinalIgnoreCase))
+        using Stream stream = _fileSystem.OpenReadIfExists(archive) ?? throw new FileNotFoundException("The qualified template archive is missing.", archive);
+        await ValidateArchiveAsync(stream, artifact, cancellationToken);
+    }
+
+    public async Task ValidateArchiveAsync(Stream archive, BasicTemplateArtifact artifact, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(archive);
+        ArgumentNullException.ThrowIfNull(artifact);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!string.Equals(Convert.ToHexString(await SHA256.HashDataAsync(archive, cancellationToken)), artifact.Sha256, StringComparison.OrdinalIgnoreCase))
         {
             throw Invalid(artifact, "The archive digest does not match the reviewed exact artifact.");
         }
 
+        archive.Position = 0;
         try
         {
-            using PackageArchiveReader reader = new(archive);
+            using PackageArchiveReader reader = new(archive, leaveStreamOpen: true);
             (string id, NuGetVersion version, string[] types) = ReadMetadata(reader, artifact);
             if (!string.Equals(id, artifact.PackageId, StringComparison.OrdinalIgnoreCase) || version != artifact.Version)
             {

@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Acquisition;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -26,6 +27,19 @@ internal static class NativeTemplateSetupRegistration
         services.AddSingleton<BasicAcquisitionRunner>();
         services.AddSingleton<NativeTemplateSetupSupport>(provider =>
             new(provider.GetRequiredService<BasicAcquisitionRunner>(), AssemblyCliVersionProvider.Instance));
+        return services;
+    }
+
+    /// <summary>
+    /// Adds internal artifact binding without activating a public init or acquisition route.
+    /// </summary>
+    public static IServiceCollection AddNativeTemplateArtifactBinding(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton<NativeTemplateArtifactVerifier>();
+        services.AddSingleton<IBasicArchiveInspector, BasicArtifactInspector>();
+        services.AddSingleton<IBoundInitScopeFactory, BoundInitScopeFactory>();
+        services.AddSingleton<Quickstart.QuickstartInstalledTemplates>();
         return services;
     }
 }

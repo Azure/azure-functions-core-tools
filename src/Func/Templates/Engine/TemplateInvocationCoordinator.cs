@@ -461,6 +461,10 @@ internal sealed class TemplateInvocationCoordinator(
         TemplateConfigurationSnapshot current;
         try
         {
+            if (configuration.ValidateArtifactAsync is { } validate)
+            {
+                await validate(cancellationToken);
+            }
             current = await _engine.ReadConfigurationAsync(template, cancellationToken);
         }
         catch (InvalidTemplateMetadataException exception)
