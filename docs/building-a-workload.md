@@ -191,6 +191,22 @@ For existing Node callers, omitted properties retain
 This is a packaging contract, not a new feed, release, admission policy, or
 public command route; installed archives still require the existing validation.
 
+### Contributing native language policy
+
+An owning runtime workload can register `builder.AddNativeTemplatePolicy<TPolicy>()`
+using the shared `Azure.Functions.Cli.Templates.Native` boundary. Reference only
+Abstractions, not Func or TemplateEngine. The host supplies the selected source
+and invocation views and validates their actual installed owner and provenance.
+Project layout declarations must exist before catalog eligibility, not first
+appear after rendering.
+
+The optional package, restore, compile and create-only methods qualify existing
+roles. They do not grant execution. Append is the only public execution
+transport; other roles require an exact private host-composed executor or fail
+before output installation. See the [native policy and lifetime limits](func-init-execution/stack-inventory.md#workload-owned-native-policy).
+This does not enable the public native route or register production stack policies.
+A workload compiled against this boundary requires a host that contains it.
+
 Add a sibling `Directory.Version.props` for the workload version:
 
 ```xml

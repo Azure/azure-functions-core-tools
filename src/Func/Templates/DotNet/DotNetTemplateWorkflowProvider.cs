@@ -71,12 +71,13 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
             "Azure.Functions.Templates.DotNet", StringComparison.OrdinalIgnoreCase) == true;
     }
 
-    public Task<DotNetProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
+    public Task<NativeProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(source);
         cancellationToken.ThrowIfCancellationRequested();
-        DotNetProjectLayoutQualification? qualification = _sources.Matches(source.Entry, source.Configuration.Fingerprint)
-            ? new(source.Entry.Identity, source.Configuration.Fingerprint) : null;
+        NativeProjectLayoutQualification? qualification = _sources.Matches(source.Entry, source.Configuration.Fingerprint)
+            && source.Entry.Type == TemplateType.Project && source.Entry.Language is "C#" or "F#"
+            ? new(source.Entry.Identity, source.Configuration.Fingerprint, new(0, Stack, source.Entry.Language)) : null;
         return Task.FromResult(qualification);
     }
 
@@ -122,7 +123,7 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
                 MsBuildBindings = new(project.Properties.ProjectFilePath, source.TemplateIdentity, source.Identity,
                     source.Sha256, project.Properties.TargetFramework, project.Properties.RootNamespace),
             };
-            NativeTemplatePreparationResult captured = await selected.CaptureNativePreparationAsync(request, _files,
+            NativeTemplatePreparationResult captured = await selected.CaptureNativePreparationAsync(request,
                 expandFiles: selected.Entry.Language == "F#", cancellationToken);
             if (captured.Snapshot is not { } snapshot)
             {
@@ -180,7 +181,7 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
         };
         try
         {
-            NativeTemplatePreparationResult captured = await selected.CaptureNativePreparationAsync(request, _files, expandFiles: true, cancellationToken);
+            NativeTemplatePreparationResult captured = await selected.CaptureNativePreparationAsync(request, expandFiles: true, cancellationToken);
             if (captured.Snapshot is not { } snapshot)
             {
                 return NativeTemplateInvocationPreparation.Reject(captured.Failure?.Diagnostic ?? "Native .NET project preparation did not produce a selected output plan.");

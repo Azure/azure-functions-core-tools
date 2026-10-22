@@ -95,7 +95,7 @@ internal sealed class NativeTemplateCommandAdapter(
                 SelectedItemEffects = _selectedItemEffects,
             };
             NewExecutionResult result = await _items.ExecuteAsync(request, _availability, cancellationToken);
-            if (request.DryRun || !result.HasCompletedCreation)
+            if (request.DryRun || !result.HasReturnedCreationResult)
             {
                 cancellationToken.ThrowIfCancellationRequested();
             }

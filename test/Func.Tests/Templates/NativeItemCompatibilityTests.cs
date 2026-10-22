@@ -221,8 +221,8 @@ public sealed class NativeItemCompatibilityTests
         ISelectedTemplateInvoker invoker = Substitute.For<ISelectedTemplateInvoker>();
         invoker.InvokeAsync(Arg.Any<TemplateInvocationRequest>(), Arg.Any<CancellationToken>())
             .Returns(new TemplateInvocationResult(TemplateInvocationStatus.Success, []));
-        return new(entry, invoker,
-            validateConfiguration: _ => Task.FromResult<TemplateInvocationResult?>(null));
+        invoker.ValidateConfigurationAsync(Arg.Any<CancellationToken>()).Returns((TemplateInvocationResult?)null);
+        return new(entry, invoker);
     }
 
     private static TemplateCandidateParseResult Arguments() => new("Controlled", new Dictionary<string, string?>(), [], [], [], []);

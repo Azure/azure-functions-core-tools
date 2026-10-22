@@ -5,7 +5,8 @@ Define the context-bound Microsoft.TemplateEngine integration layer for listing,
 ## Public native entry
 
 `Program` runs `NativeCliEntryPoint` by default. Ordinary `func init` and `func new`
-use installed Microsoft.TemplateEngine templates and CLI-owned stack workflows;
+use installed Microsoft.TemplateEngine templates, workload-owned native policies,
+and stack compatibility workflows;
 there is no opt-in flag, environment switch, or automatic legacy-template fallback.
 The old command implementations remain available only to internal compatibility controls.
 Unrelated commands retain the common command graph, start-argument normalization,
@@ -111,14 +112,13 @@ both synchronous and asynchronous help actions through the common command base.
 The public `init` grammar has no host JSON output option; this does not add one or
 change the separate internal INIT harness's prompt policy.
 
-After native project creation and mandatory CLI configuration commit, cancellation
-anywhere in owned stack-preparation completion, including selected-source
-revalidation before `CompleteAsync`, warns on stderr that outputs were retained
-and then rethrows the original cancellation. It does not run the next preparation
-step, roll back files, or turn optional-preparation cancellation into success,
-even when preparation was configured to skip. Pre-create cancellation and
-completed native creation without optional preparation retain their existing
-semantics.
+After native project creation and mandatory CLI configuration commit, a thrown
+stack-preparation cancellation retains the original exception and warns that
+outputs were retained and preparation may be incomplete. A returned preparation
+result is recorded before observing cancellation. Its success, failure, skipped
+operations, diagnostics and typed effects survive the runner and renderer gates.
+Preparation never starts after partial native installation or configuration.
+Adoption and repair retain their separate cancellation contracts.
 
 ## Shared Parser Draft Qualification
 
@@ -140,7 +140,7 @@ The public native entry composes this support through the same protected project
 
 Language-alias metadata keys are matched case-insensitively, consistent with the installed catalog, while configuration retains the selected stack's canonical language spelling.
 
-The current subset supports unconditional literal primary-output paths, the default source layout, content parameters and installed stack/language aliases. It rejects source remapping, topology conditions, filename-renaming symbols, supplemental configuration and ordinary post-actions before creation. Resolved `host.json` roots are inventoried independently of configuration declarations. Every root must have exactly one configuration action, and template content cannot author `.func/config.json`.
+The generic subset supports unconditional literal primary-output paths, the default source layout, content parameters and installed stack/language aliases. It rejects source remapping, topology conditions, filename-renaming symbols, supplemental configuration and ordinary post-actions before creation. An explicitly source-qualified .NET layout separately supports its single renamed project and static ignore-file mapping through a controlled dependency capability. Resolved `host.json` roots are inventoried independently of configuration declarations. Every root must have exactly one configuration action, and template content cannot author `.func/config.json`.
 
 A configuration anchor can be another generated primary-output file when its resolved parent is an independently discovered host root. An anchor outside those roots is rejected before creation.
 
@@ -296,8 +296,9 @@ conflict checks. Native force consent is not CLI force authorization. Preview
 captures an image without installing real output. Separate preview and apply
 invocations reevaluate the template and can produce different generated names;
 each apply admits and installs its own captured image without another render.
-Item post-actions, native deletion, metadata mutations and private-output
-timestamp inspection remain unavailable through this capture path. Filesystem routing is not a sandbox for arbitrary
+Item post-actions require an explicitly supplied controlled effect capability.
+Native deletion, metadata mutations and private-output timestamp inspection remain
+unavailable through this capture path. Filesystem routing is not a sandbox for arbitrary
 extension code or process, environment and network access.
 
 Apply revalidates mounted source identity and real target state before installing
@@ -316,6 +317,22 @@ after partial installation reports the completed real file and directory entries
 without rolling them back. Once all output is installed, late cancellation does
 not erase its successful effects. A successful private native render alone is
 never reported as completed real output.
+
+Guarded source, dependency and preparation authority joins the actual per-create
+regular-file bytes and kinds to native source mappings and selected package pins.
+Missing, extra, duplicate or unbound mappings refuse before real installation.
+Detached captures copy evaluated actions, outputs and bytes. Preparation cannot
+reuse a preview when the current capture differs. Ordinary generated topology
+retains the existing image admission rules.
+
+Controlled effect preflight sees the immutable capture for prospective generated
+targets. Execution begins only after required native and configuration success.
+Returned effect outcomes are recorded before cancellation and no next dependency
+starts after cancellation. Logical completion, including editor no-ops, does not
+set the native committed-output marker. Append effects remain a separate typed
+ledger, not native Create, Change, Overwrite or Delete entries. Thrown effect
+cancellation preserves the original exception and warns about known prior
+outcomes and the unknown current outcome.
 
 Resolved bundle versions are validated when constructing the command context;
 host.json version ranges are not resolved versions. Bundle constraint input comes

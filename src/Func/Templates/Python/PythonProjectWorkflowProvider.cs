@@ -22,7 +22,7 @@ internal sealed class PythonProjectWorkflowProvider(PythonTemplateSourceReader s
             && entry.Language == "Python" && entry.Package?.Identifier == PythonTemplateSourceReader.PackageId;
     }
 
-    public async Task<DotNetProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
+    public async Task<NativeProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(source);
         cancellationToken.ThrowIfCancellationRequested();

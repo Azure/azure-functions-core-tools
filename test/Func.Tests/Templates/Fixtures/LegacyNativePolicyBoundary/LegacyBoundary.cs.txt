@@ -1,0 +1,32 @@
+using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workloads;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace LegacyNativePolicyBoundary;
+
+public sealed class LegacyBuilder(IServiceCollection services) : FunctionsCliBuilder
+{
+    public override IServiceCollection Services => services;
+
+    public override void RegisterCommand(FuncCommand command) { }
+
+    public override void RegisterCommand<TCommand>() { }
+
+    public override void RegisterCommand(Type commandType) { }
+
+    public override void AddProjectFactory(IFunctionsProjectFactory factory) { }
+
+    public override void AddProjectFactory<TFactory>() { }
+}
+
+public sealed class LegacyWorkload : Workload
+{
+    public override string DisplayName => "Legacy fixture";
+
+    public override string Description => "Compiled against the reviewed pre-policy Abstractions binary.";
+
+    public override void Configure(FunctionsCliBuilder builder) => builder.Services.AddSingleton(new LegacyMarker());
+}
+
+public sealed class LegacyMarker;

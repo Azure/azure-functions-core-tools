@@ -8,9 +8,6 @@ using Microsoft.TemplateEngine.Abstractions.Constraints;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
-/// <summary>
-/// Creates host constraints bound to one command's captured workload and bundle context.
-/// </summary>
 internal sealed class FuncTemplateConstraintFactory(string type, FuncTemplateConstraintEvaluator evaluator, TemplateConstraintEvaluationSnapshot snapshot, TemplateEngineBundleContext? bundle = null) : ITemplateConstraintFactory
 {
     private static readonly Guid _workloadConstraintId = new("d10ef758-4363-4359-a749-2a241ff892fd");

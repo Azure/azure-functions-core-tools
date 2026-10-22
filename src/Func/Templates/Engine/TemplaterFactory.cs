@@ -5,17 +5,19 @@ using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
-internal sealed class TemplaterFactory(ITemplateStore store, IFileSystem fileSystem) : ITemplaterFactory
+internal sealed class TemplaterFactory(ITemplateStore store, IFileSystem fileSystem,
+    WorkloadNativeTemplatePolicies? policies = null) : ITemplaterFactory
 {
     private readonly ITemplateStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly WorkloadNativeTemplatePolicies? _policies = policies;
 
     public async Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken,
         Action<TemplateStoreWaitReason>? waiting = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken, waiting: waiting);
-        return new(session, new(session, _fileSystem));
+        return new(session, new(session, _fileSystem, policies: _policies));
     }
 
     public async Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
@@ -24,7 +26,7 @@ internal sealed class TemplaterFactory(ITemplateStore store, IFileSystem fileSys
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(snapshot);
         TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken, snapshot, waiting: waiting);
-        return new(session, new(session, _fileSystem));
+        return new(session, new(session, _fileSystem, policies: _policies));
     }
 
     public async Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
@@ -34,6 +36,6 @@ internal sealed class TemplaterFactory(ITemplateStore store, IFileSystem fileSys
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(projectSupport);
         TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken, snapshot, waiting: waiting);
-        return new(session, new(session, _fileSystem, projectSupport));
+        return new(session, new(session, _fileSystem, projectSupport, _policies));
     }
 }

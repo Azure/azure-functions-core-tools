@@ -8,7 +8,6 @@ using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Components;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.Mount;
-using Microsoft.TemplateEngine.Abstractions.Parameters;
 using Microsoft.TemplateEngine.Abstractions.PhysicalFileSystem;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge;
@@ -38,7 +37,6 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
     private readonly Dictionary<string, string> _packagePins = new(StringComparer.Ordinal);
     private readonly IDisposable? _ownership;
     private readonly TemplateStoreEngineDiagnostics? _diagnostics;
-    private NativeMsBuildBindingSnapshot? _msBuildBindings;
     private bool _disposed;
 
     public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null,
@@ -113,6 +111,15 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
 
     private static TemplatePackageInfo? PackageInfo(ITemplatePackage? package) =>
         package is IManagedTemplatePackage managed ? new(managed.Identifier, managed.Version) : null;
+
+    Task<string?> ITemplateInvocationEngine.ValidatePinnedPackageAsync(ITemplateInfo template, CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        return _packagePins.TryGetValue(template.MountPointUri, out string? expected)
+            ? ValidatePackageHashAsync(template.MountPointUri, expected, cancellationToken)
+            : Task.FromResult<string?>(null);
+    }
 
     public IEngineEnvironmentSettings Settings
     {
@@ -192,15 +199,22 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
             hostData = await hostReader.ReadToEndAsync(cancellationToken);
         }
 
+        string packageRoot = configurationFile.MountPoint.Root.FullPath.Replace('\\', '/').TrimEnd('/') + "/";
+        string mountedConfiguration = configurationFile.FullPath.Replace('\\', '/');
+        if (!mountedConfiguration.StartsWith(packageRoot, StringComparison.Ordinal))
+        {
+            throw new InvalidTemplateMetadataException("The configuration is outside its captured package mount.");
+        }
         return new(configuration, fingerprint, TemplateCatalogProjector.GetTemplateType(loaded), Array.AsReadOnly<ITemplateParameter>([.. loaded.ParameterDefinitions]))
         {
-            DefaultName = string.IsNullOrEmpty(loaded.DefaultName) ? null : loaded.DefaultName,
+            DefaultName = loaded.DefaultName,
+            PackageConfigurationPath = mountedConfiguration[packageRoot.Length..],
             HostConfigPlace = hostFile?.FullPath,
             HostData = hostData,
         };
     }
 
-    internal async Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken)
+    public async Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
@@ -209,7 +223,7 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
             throw new ArgumentException("Supply an exact package-relative source path without traversal.", nameof(relativePath));
         }
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
         if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
         {
@@ -235,6 +249,45 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
         await stream.CopyToAsync(content, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return content.ToArray();
+    }
+
+    public void ApplyBindings(NativeMsBuildBindingSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ThrowIfDisposed();
+        _settings.Components.AddComponent(typeof(IBindSymbolSource), new NativeMsBuildBindingSnapshotSource(snapshot));
+    }
+
+    public async Task<TemplateEffectSource> CaptureMappedSourceAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+        string relative = NativeTemplateSourceSnapshot.Normalize(relativePath.Replace('\\', '/'));
+        if (Path.IsPathRooted(relative) || relative.Split('/').Any(part => part is "" or "." or ".."))
+        {
+            throw new InvalidTemplateMetadataException("The native source mapping is not an exact template-relative regular file.");
+        }
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
+        {
+            throw new InvalidTemplateMetadataException("The selected template has no registered generator.");
+        }
+        ITemplate? loaded = await generator.LoadTemplateAsync(_settings, template, null, cancellationToken);
+        using var lifetime = loaded as IDisposable;
+        if (loaded?.Configuration is not IFile configuration || loaded.TemplateSourceRoot is not { } root)
+        {
+            throw new InvalidTemplateMetadataException("The selected template has no mounted native source root.");
+        }
+        string mounted = root.FullPath.TrimEnd('/', '\\') + "/" + relative;
+        string mountRoot = configuration.MountPoint.Root.FullPath.TrimEnd('/', '\\') + "/";
+        if (!mounted.StartsWith(mountRoot, StringComparison.Ordinal))
+        {
+            throw new InvalidTemplateMetadataException("The native source mapping is outside the selected package.");
+        }
+        string packagePath = mounted[mountRoot.Length..];
+        ReadOnlyMemory<byte> bytes = await ReadPackageFileAsync(template, packagePath, cancellationToken);
+        return new(template.Identity, packagePath, Convert.ToHexString(SHA256.HashData(bytes.Span)));
     }
 
     public virtual async Task<IReadOnlyCollection<string>> ReadPackageTypesAsync(ITemplatePackage? package, CancellationToken cancellationToken)
@@ -319,131 +372,6 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
         }
     }
 
-    Task<ReadOnlyMemory<byte>> ITemplateInvocationEngine.ReadPackageFileAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken)
-        => ReadPackageFileAsync(template, relativePath, cancellationToken);
-
-    Task<string?> ITemplateInvocationEngine.ValidatePinnedPackageAsync(ITemplateInfo template, CancellationToken cancellationToken)
-    {
-        ThrowIfDisposed();
-        cancellationToken.ThrowIfCancellationRequested();
-        return _packagePins.TryGetValue(template.MountPointUri, out string? expected)
-            ? ValidatePackageHashAsync(template.MountPointUri, expected, cancellationToken)
-            : Task.FromResult<string?>(null);
-    }
-
-    string? ITemplateInvocationEngine.QualifyMsBuildBindings(
-        ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request)
-    {
-        ThrowIfDisposed();
-        if (request.MsBuildBindings is not { } snapshot)
-        {
-            if (_msBuildBindings is not null)
-            {
-                return "This controlled session requires its exact explicit MSBuild snapshot on every invocation.";
-            }
-
-            if (configuration.Type == TemplateType.Item && request.EffectSupport is not null
-                && configuration.Root.TryGetProperty("symbols", out JsonElement symbols) && symbols.ValueKind == JsonValueKind.Object
-                && symbols.EnumerateObject().Any(symbol => symbol.Value.ValueKind == JsonValueKind.Object
-                    && symbol.Value.TryGetProperty("binding", out JsonElement binding) && binding.ValueKind == JsonValueKind.String
-                    && binding.GetString()!.StartsWith("msbuild:", StringComparison.OrdinalIgnoreCase)))
-            {
-                return "Controlled item effects require an explicit evaluated MSBuild snapshot; template framework defaults are not a project binding.";
-            }
-
-            return null;
-        }
-
-        NativeTemplateInvocationEffects? effects = request.EffectSupport;
-        if (configuration.Type != TemplateType.Item || !string.Equals(Context.Project?.Stack, "dotnet", StringComparison.OrdinalIgnoreCase)
-            || effects is null || effects.ProjectDirectory is null
-            || snapshot.TemplateIdentity != template.Identity
-            || snapshot.SourceIdentity != $"{template.MountPointUri}::{template.ConfigPlace}"
-            || !string.Equals(snapshot.SourceFingerprint, configuration.Fingerprint, StringComparison.OrdinalIgnoreCase)
-            || !Path.IsPathFullyQualified(effects.ExactProjectPath)
-            || !SamePath(snapshot.ProjectFilePath, effects.ExactProjectPath)
-            || Context.Project is null || !SamePath(Context.Project.RootDirectory.Info.FullName, effects.ProjectDirectory.Info.FullName))
-        {
-            return "The MSBuild snapshot does not match the exact selected item, mounted configuration, project or controlled effects boundary.";
-        }
-
-        string relative = Path.GetRelativePath(Context.Project.RootDirectory.Info.FullName, snapshot.ProjectFilePath);
-        if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-        {
-            return "The evaluated MSBuild project is outside the selected Functions project.";
-        }
-
-        if (_msBuildBindings is not null)
-        {
-            return _msBuildBindings == snapshot ? null : "A controlled native session cannot replace its immutable MSBuild snapshot.";
-        }
-
-        _settings.Components.AddComponent(typeof(IBindSymbolSource), new NativeMsBuildBindingSnapshotSource(snapshot));
-        _msBuildBindings = snapshot;
-        return null;
-    }
-
-    IReadOnlyDictionary<string, object> ITemplateInvocationEngine.GetPopulatedParameters(
-        ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request)
-    {
-        ThrowIfDisposed();
-        if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
-        {
-            throw new InvalidOperationException($"Selected template '{template.Identity}' has no registered generator.");
-        }
-
-        string? name = !string.IsNullOrEmpty(request.Name) ? request.Name
-            : template.PreferDefaultName || string.IsNullOrEmpty(request.OutputDirectory.Info.Name) ? template.DefaultName
-            : request.OutputDirectory.Info.Name;
-        Dictionary<string, object> values = new(StringComparer.Ordinal);
-        foreach (ITemplateParameter parameter in configuration.Parameters)
-        {
-            if (parameter.Precedence.PrecedenceDefinition is PrecedenceDefinition.Disabled or PrecedenceDefinition.ConditionalyDisabled)
-            {
-                continue;
-            }
-
-            string? value = null;
-            if (!parameter.IsName)
-            {
-                _settings.Host.TryGetHostParamDefault(parameter.Name, out value);
-                if (value is null && !parameter.Precedence.CanBeRequired)
-                {
-                    value = parameter.DefaultValue;
-                }
-            }
-
-            object? converted = parameter.IsName ? name : null;
-            if (request.Parameters.TryGetValue(parameter.Name, out string? supplied))
-            {
-                value = supplied ?? parameter.DefaultIfOptionWithoutValue;
-            }
-
-            if (value is not null)
-            {
-                converted = generator.ConvertParameterValueToType(_settings, parameter, value, out bool error);
-                if (error)
-                {
-                    continue;
-                }
-            }
-
-            if (converted is not null)
-            {
-                values[parameter.Name] = converted;
-            }
-        }
-
-        return values;
-    }
-
-    Task<ITemplateCreationResult> ITemplateInvocationEngine.InstantiateAsync(
-        ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
-    {
-        ThrowIfDisposed();
-        return InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
-    }
-
     public void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
     async Task<ITemplateCreationResult> ITemplateInvocationEngine.RenderImageAsync(
@@ -476,28 +404,9 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
         }
     }
 
-    protected virtual async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
-        InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
-    {
-        IPhysicalFileSystem? previous = _host.PreflightFileSystem;
-        if (dryRun && request.PreviewAfterDirectoryCleanup && request.DryRun && request.Force
-            && TemplateCatalogProjector.GetTemplateType(template) == TemplateType.Project)
-        {
-            _host.PreflightFileSystem = new PlannedCleanupTemplateFileSystem(_host.FileSystem, request.OutputDirectory.Info.FullName);
-        }
-        try
-        {
-            return await _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName,
-                parameters, forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
-        }
-        finally
-        {
-            _host.PreflightFileSystem = previous;
-        }
-    }
-
-    private static bool SamePath(string left, string right) => string.Equals(Path.GetFullPath(left), Path.GetFullPath(right),
-        Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
+        => _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName, parameters,
+            forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
 
     public void Dispose()
     {

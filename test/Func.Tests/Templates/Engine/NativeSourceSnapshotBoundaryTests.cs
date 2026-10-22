@@ -6,7 +6,9 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.PhysicalFileSystem;
 using Microsoft.TemplateEngine.Edge.Template;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -67,6 +69,29 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Invoke_LowercaseDigestPins_RetainsExactSourceAndOutputAssociation()
+    {
+        await InstallAsync("regular");
+        using Templater templater = TemplateFixtures.CreateTemplater(new(Context(), Path.Combine(_root, "hive")));
+        var selected = (await templater.ResolveGroupAsync("Placed", TemplateType.Item)).Group![0];
+        var request = Request(selected);
+        var snapshot = request.SourceSnapshot!;
+        TemplateEffectSource[] pins = [.. snapshot.Sources.Select(source => source with { Sha256 = source.Sha256.ToLowerInvariant() })];
+        NativeTemplateOutputSource[] outputs = [.. snapshot.Outputs.Select(output => output with
+        {
+            Source = pins.Single(pin => pin.Identity == output.Source.Identity),
+        })];
+
+        var result = await selected.InvokeAsync(request with
+        {
+            SourceSnapshot = new(snapshot.TemplateIdentity, snapshot.ConfigurationSha256.ToLowerInvariant(), pins, outputs),
+        }, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
+        File.ReadAllText(Path.Combine(Base, "generated", "items", "Named.js")).Should().Be("static body");
+    }
+
     [Theory]
     [InlineData("placeholder")]
     [InlineData("extra")]
@@ -123,6 +148,43 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
         Directory.Exists(Base).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("extra-file")]
+    [InlineData("extra-directory")]
+    [InlineData("unmapped")]
+    public async Task Invoke_ActualImageDiffersFromReportedRegularSources_RefusesBeforeAnyInstall(string mismatch)
+    {
+        await InstallAsync("regular");
+        using Templater templater = TemplateFixtures.CreateTemplater(new PlacementSession(Context(), Path.Combine(_root, "hive"), () => { },
+            (fileSystem, output) =>
+            {
+                if (mismatch == "extra-file") fileSystem.WriteAllText(Path.Combine(output, "unreported.js"), "captured but not reported");
+                if (mismatch == "extra-directory") fileSystem.CreateDirectory(Path.Combine(output, "unreported"));
+            },
+            original =>
+            {
+                if (mismatch != "unmapped") return original;
+                var change = Substitute.For<IFileChange>();
+                change.TargetRelativePath.Returns(original.CreationEffects!.FileChanges.Single().TargetRelativePath);
+                change.ChangeKind.Returns(ChangeKind.Create);
+                var effects = Substitute.For<ICreationEffects>();
+                effects.FileChanges.Returns([change]);
+                effects.CreationResult.Returns(original.CreationResult!);
+                var result = Substitute.For<ITemplateCreationResult>();
+                result.Status.Returns(CreationResultStatus.Success);
+                result.CreationEffects.Returns(effects);
+                result.CreationResult.Returns(original.CreationResult!);
+                return result;
+            }));
+        var selected = (await templater.ResolveGroupAsync("Placed", TemplateType.Item)).Group![0];
+
+        var result = await selected.InvokeAsync(Request(selected), CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
+        result.HasCommittedOutput.Should().BeFalse();
+        Directory.Exists(Base).Should().BeFalse();
+    }
+
     [Fact]
     public async Task Capture_PrivateExpansion_RevalidatesPinnedBodyAfterNativePreview()
     {
@@ -131,7 +193,7 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
             () => File.AppendAllText(Path.Combine(Package, "seed.js"), "changed")));
         var selected = (await templater.ResolveGroupAsync("Placed", TemplateType.Item)).Group![0];
 
-        var result = await selected.CaptureNativePreparationAsync(Request(selected), new PhysicalFileSystem(), true, CancellationToken.None);
+        var result = await selected.CaptureNativePreparationAsync(Request(selected), true, CancellationToken.None);
 
         result.Failure!.Status.Should().Be(TemplateInvocationStatus.TemplateChanged);
         Directory.Exists(Base).Should().BeFalse();
@@ -212,14 +274,19 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
         await TemplateFixtures.InstallAsync(Package, Path.Combine(_root, "hive"), CancellationToken.None);
     }
 
-    private sealed class PlacementSession(TemplateEngineContext context, string hive, Action afterPreview) : TemplateEngineSession(context, hive)
+    private sealed class PlacementSession(TemplateEngineContext context, string hive, Action afterPreview,
+        Action<IPhysicalFileSystem, string>? afterCapture = null, Func<ITemplateCreationResult, ITemplateCreationResult>? report = null) : TemplateEngineSession(context, hive)
     {
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
             InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
         {
             var result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
-            if (dryRun) afterPreview();
-            return result;
+            if (!dryRun)
+            {
+                afterPreview();
+                afterCapture?.Invoke(Settings.Host.FileSystem, request.OutputDirectory.Info.FullName);
+            }
+            return report?.Invoke(result) ?? result;
         }
     }
 }

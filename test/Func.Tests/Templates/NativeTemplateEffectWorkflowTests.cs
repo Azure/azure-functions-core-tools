@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Tests.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge.Template;
 using NSubstitute;
@@ -126,6 +127,53 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
         result.Diagnostic.Should().Contain("not handled");
         capability.ReceivedCalls().Should().BeEmpty();
         Directory.Exists(Output.Info.FullName).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task NativeSession_EditorOnlyExistingTarget_CompletesWithoutInventingPhysicalOutput()
+    {
+        using var session = await OpenNativeAsync(editorOnly: true);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
+        var selected = (await templater.ResolveGroupAsync(Source.TemplateIdentity, TemplateType.Item)).Group![0];
+        Directory.CreateDirectory(Output.Info.FullName);
+        var capability = Capability();
+
+        var result = await selected.InvokeAsync(new(Output, new Dictionary<string, string?>())
+        {
+            EffectSupport = new(Output, Project, capability, Confirmed: true),
+        }, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateInvocationStatus.Success, result.Diagnostic);
+        result.Effects!.CompletedEffects.Should().ContainSingle().Which.Should().BeOfType<TemplateEditorNoOpEffect>();
+        result.HasCommittedOutput.Should().BeFalse();
+        result.Changes.Should().BeEmpty();
+        Directory.GetFileSystemEntries(Output.Info.FullName).Should().BeEmpty();
+        await capability.DidNotReceive().ExecuteAsync(Arg.Any<TemplateEffect>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NativeSession_CancellationAfterNativeCommit_DoesNotStartRequiredEffectsOrClaimCompletion()
+    {
+        using var session = await OpenNativeAsync();
+        using CancellationTokenSource cancellation = new();
+        var files = new RecordingCommitFileSystem(new PhysicalFileSystem()) { AfterMove = _ => cancellation.Cancel() };
+        using Templater templater = TemplateFixtures.CreateTemplater(session, files);
+        var selected = (await templater.ResolveGroupAsync(Source.TemplateIdentity, TemplateType.Item)).Group![0];
+        var capability = Capability();
+
+        var result = await selected.InvokeAsync(new(Output, new Dictionary<string, string?>())
+        {
+            EffectSupport = new(Output, Project, capability, Confirmed: true),
+        }, cancellation.Token);
+
+        result.Status.Should().Be(TemplateInvocationStatus.EffectFailure);
+        result.HasCommittedOutput.Should().BeTrue();
+        result.Effects!.Kind.Should().Be("incomplete");
+        result.Effects.Succeeded.Should().BeFalse();
+        result.Effects.CompletedEffects.Should().BeEmpty();
+        result.Effects.FailedEffects.Should().BeEmpty();
+        File.ReadAllText(Path.Combine(Output.Info.FullName, "source.txt")).Should().Be("native source");
+        await capability.DidNotReceive().ExecuteAsync(Arg.Any<TemplateEffect>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -296,6 +344,71 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
         (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Should().BeSameAs(failure);
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public async Task Workflow_ReturnedEffectThenCancellation_RetainsOutcomeAndNeverStartsNext(bool succeeded, bool remaining)
+    {
+        using CancellationTokenSource cancellation = new();
+        var capability = Capability();
+        var first = new TemplatePackageReferenceEffect(Source, Project, "Controlled.Package", "1.0.0", ".csproj", ContinueOnError: true);
+        var next = new TemplateRestoreEffect(Source, Project, false);
+        capability.ExecuteAsync(first, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return new TemplateEffectExecutionResult(succeeded, ["returned diagnostic"], TargetMayHaveChanged: !succeeded);
+        });
+        var plan = remaining ? Plan(first, next) : Plan(first);
+
+        var result = await _workflow.ExecuteAsync(plan, capability, dryRun: false, confirmed: true, cancellation.Token);
+
+        result.Succeeded.Should().Be(succeeded && !remaining);
+        result.Kind.Should().Be(remaining ? "incomplete" : succeeded ? "applied" : "partialFailure");
+        result.CompletedEffects.Should().Equal(succeeded ? [first] : []);
+        result.FailedEffects.Should().Equal(succeeded ? [] : [first]);
+        result.Diagnostics.Should().Contain("returned diagnostic");
+        if (!succeeded)
+        {
+            result.Diagnostics.Should().Contain(message => message.Contains("partial changes", StringComparison.Ordinal));
+        }
+        await capability.DidNotReceive().ExecuteAsync(next, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Workflow_EditorNoOp_CompletesLogicallyWithoutCapabilityExecution()
+    {
+        var capability = Capability();
+        var editor = new TemplateEditorNoOpEffect(Source);
+
+        var result = await _workflow.ExecuteAsync(Plan(editor), capability, dryRun: false, confirmed: true, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        result.CompletedEffects.Should().Equal(editor);
+        await capability.DidNotReceive().ExecuteAsync(Arg.Any<TemplateEffect>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Workflow_ThrownCancellation_RetainsOriginalExceptionAndKnownPriorUnknownCurrentDiagnostic()
+    {
+        using CancellationTokenSource cancellation = new();
+        var capability = Capability();
+        var known = new TemplateEditorNoOpEffect(Source);
+        var current = new TemplateRestoreEffect(Source, Project, false);
+        var failure = new OperationCanceledException("capability canceled", cancellation.Token);
+        capability.ExecuteAsync(current, Arg.Any<CancellationToken>()).Returns<Task<TemplateEffectExecutionResult>>(_ => throw failure);
+
+        Func<Task> act = () => _workflow.ExecuteAsync(Plan(known, current), capability, dryRun: false, confirmed: true, cancellation.Token);
+
+        var observed = (await act.Should().ThrowAsync<OperationCanceledException>()).Which;
+        observed.Should().BeSameAs(failure);
+        observed.CancellationToken.Should().Be(cancellation.Token);
+        observed.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey].Should().BeOfType<string>()
+            .Which.Should().Contain("1 completed").And.Contain("outcome is unknown");
+        await capability.Received(1).ExecuteAsync(current, Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Workflow_UnsupportedEffectAfterValidOne_DeniesWholePlanBeforeCapability()
     {
@@ -310,7 +423,7 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
     }
 
     [Fact]
-    public void Planner_CreateOnlyQualificationAndBoundary_DoNotBroadenNativeProjectGuards()
+    public async Task Planner_CreateOnlyStructure_DoesNotGrantOwnerPolicyOrExecution()
     {
         var allowed = _planner.PlanFilesAndDependencies(Output,
             [new TemplateCreateFileEffect(Source, Path.Combine(Output.Info.FullName, "requirements.psd1"), "expanded")]);
@@ -320,8 +433,12 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
             [new TemplateAppendFileEffect(Source, Path.Combine(_root, "outside.py"), "expanded", new string('b', 64))]);
 
         allowed.Plan.Should().NotBeNull();
-        other.Plan.Should().BeNull();
+        other.Plan.Should().NotBeNull();
         outside.Plan.Should().BeNull();
+        NativeTemplateEffectResult refused = await _workflow.ExecuteAsync(other.Plan!, null, false, true, CancellationToken.None);
+        refused.Kind.Should().Be("capabilityRequired");
+        refused.Succeeded.Should().BeFalse();
+        Directory.Exists(Output.Info.FullName).Should().BeFalse();
     }
 
     public void Dispose()
@@ -347,7 +464,7 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
         return capability;
     }
 
-    private async Task<TemplateEngineSession> OpenNativeAsync(bool unknownAction = false)
+    private async Task<TemplateEngineSession> OpenNativeAsync(bool unknownAction = false, bool editorOnly = false)
     {
         string package = Path.Combine(_root, "package");
         Directory.CreateDirectory(Path.Combine(package, ".template.config"));
@@ -366,6 +483,14 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
                {"actionId":"{{{NativeTemplateEffectPlanner.EditorActionId}}}","continueOnError":true,"args":{"files":"0"}}
                {{{unknown}}}]}
             """);
+        if (editorOnly)
+        {
+            File.Delete(Path.Combine(package, "source.txt"));
+            File.WriteAllText(Path.Combine(package, ".template.config", "template.json"), $$$"""
+                {"identity":"Controlled.Effects","name":"Editor only","shortName":"controlled-effects","tags":{"type":"item"},
+                 "postActions":[{"actionId":"{{{NativeTemplateEffectPlanner.EditorActionId}}}","continueOnError":true,"args":{"files":"0"}}]}
+                """);
+        }
         string hive = Path.Combine(_root, "hive");
         await TemplateFixtures.InstallAsync(package, hive, CancellationToken.None);
         return new(new(WorkingDirectory.FromExplicit(_root)), hive);

@@ -35,56 +35,6 @@ public sealed class NativeItemOutputIntentTests
         invalid.Should().Throw<ArgumentOutOfRangeException>();
     }
 
-    [Theory]
-    [InlineData("Mode", "host:func:item-output-intent", true)]
-    [InlineData("CompletelyDifferentName", "host:func:item-output-intent", true)]
-    [InlineData("Mode", "host:func:stack", false)]
-    [InlineData("Mode", "host:WorkingDirectory", false)]
-    [InlineData("Mode", "msbuild:TargetFramework", false)]
-    [InlineData("Mode", "host:func:item-output-intent-other", false)]
-    public void SourceCondition_OnlyExactContextOwnedBindingIsStable(string name, string binding, bool allowed)
-    {
-        string configuration = $$$"""
-            {"identity":"Conditional","symbols":{"{{{name}}}":{"type":"bind","binding":"{{{binding}}}"}},
-             "sources":[{"condition":"{{{name}}} == \"legacy\"","target":"authored"}]}
-            """;
-        TemplateEngineContext context = new(WorkingDirectory.FromExplicit(Path.GetTempPath()));
-
-        string? diagnostic = TemplateOutputPathValidator.GetDiagnostic(configuration, context: context);
-
-        (diagnostic is null).Should().Be(allowed);
-        TemplateOutputPathValidator.GetDiagnostic(configuration).Should().NotBeNull("a key without a frozen host context is not authority");
-    }
-
-    [Theory]
-    [InlineData("""{"Entropy":{"type":"generated","generator":"guid"},"Entropy-D":{"type":"bind","binding":"host:func:item-output-intent"}}""", "Entropy-D")]
-    [InlineData("""{"Input":{"type":"parameter"},"Input{-VALUE-FORMS-}identity":{"type":"bind","binding":"host:func:item-output-intent"}}""", "Input{-VALUE-FORMS-}identity")]
-    [InlineData("""{"Mode":{"type":"bind","binding":"host:func:item-output-intent"},"Derived":{"type":"computed","value":"Mode == \"legacy\""}}""", "Derived")]
-    public void SourceCondition_ImmutableBindingDoesNotBlessAliasesOrComputedSymbols(string symbols, string condition)
-    {
-        string configuration = $$$"""{"identity":"Conditional","symbols":{{{symbols}}},"sources":[{"condition":"{{{condition}}} == \"legacy\""}]}""";
-        TemplateEngineContext context = new(WorkingDirectory.FromExplicit(Path.GetTempPath()));
-
-        string? diagnostic = TemplateOutputPathValidator.GetDiagnostic(configuration, context: context);
-
-        diagnostic.Should().NotBeNull();
-    }
-
-    [Fact]
-    public void SourceCondition_AdditionalConfigurationDoesNotGrantFrozenBindingAuthority()
-    {
-        const string configuration = """
-            {"identity":"Conditional","additionalConfigFiles":["other.json"],
-             "symbols":{"Mode":{"type":"bind","binding":"host:func:item-output-intent"}},
-             "sources":[{"condition":"Mode == \"legacy\""}]}
-            """;
-        TemplateEngineContext context = new(WorkingDirectory.FromExplicit(Path.GetTempPath()));
-
-        string? diagnostic = TemplateOutputPathValidator.GetDiagnostic(configuration, context: context);
-
-        diagnostic.Should().NotBeNull();
-    }
-
     [Fact]
     public void SourceSnapshot_CopiesPinsAndRejectsInvalidAssociations()
     {

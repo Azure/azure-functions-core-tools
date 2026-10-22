@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Projects;
 
@@ -40,7 +41,7 @@ internal static class TemplatesServiceCollectionExtensions
         services.AddSingleton<ITemplateArgumentParser, TemplateArgumentParser>();
         services.AddSingleton<TemplateExecutionInteraction>();
         services.AddSingleton<INewExecutionContextResolver, NewExecutionContextResolver>();
-        services.AddSingleton<INewExecutionRunner, NewExecutionRunner>();
+        services.AddScoped<INewExecutionRunner, NewExecutionRunner>();
         services.AddSingleton<NewExecutionRenderer>();
         services.AddScoped<IInitExecutionRunner, InitExecutionRunner>();
         services.AddSingleton<InitExecutionRenderer>();
@@ -49,10 +50,19 @@ internal static class TemplatesServiceCollectionExtensions
         services.AddSingleton<TemplateProjectConfigurationWriter>();
         services.AddSingleton<Func<InstalledProjectStackCatalog>>(provider => provider.GetRequiredService<InstalledProjectStackCatalog>);
         services.AddSingleton<Func<TemplateProjectSupport>>(provider => provider.GetRequiredService<TemplateProjectSupport>);
-        services.AddSingleton<ITemplaterFactory, TemplaterFactory>();
+        services.AddScoped<ITemplaterFactory, TemplaterFactory>();
         services.AddSingleton<ITemplateStoreLock, FileTemplateStoreLock>();
         services.AddSingleton<ITemplateStore, TemplateStore>();
 
+        return services;
+    }
+
+    internal static IServiceCollection AddWorkloadNativeTemplatePolicies(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.TryAddSingleton<Acquisition.INativeTemplateOwnership, Acquisition.NativeTemplateOwnership>();
+        services.TryAddScoped<NativeTemplatePolicyAdmission>();
+        services.TryAddScoped<WorkloadNativeTemplatePolicies>();
         return services;
     }
 }

@@ -23,7 +23,8 @@ internal sealed class NewExecutionRunner(
     IInteractionService interaction,
     TemplateExecutionInteraction prompts,
     NativeTemplateWorkflowRegistry? workflows = null,
-    NativeTemplateStackCompatibility? stackCompatibility = null) : INewExecutionRunner
+    NativeTemplateStackCompatibility? stackCompatibility = null,
+    WorkloadNativeTemplatePolicies? policies = null) : INewExecutionRunner
 {
     private readonly INewExecutionContextResolver _contexts = contexts ?? throw new ArgumentNullException(nameof(contexts));
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
@@ -32,6 +33,7 @@ internal sealed class NewExecutionRunner(
     private readonly TemplateExecutionInteraction _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
     private readonly NativeTemplateWorkflowRegistry? _workflows = workflows;
     private readonly NativeTemplateStackCompatibility? _stackCompatibility = stackCompatibility;
+    private readonly WorkloadNativeTemplatePolicies? _policies = policies;
 
     public async Task<NewExecutionResult> ExecuteAsync(
         NewExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -82,7 +84,7 @@ internal sealed class NewExecutionRunner(
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
         NewExecutionResult result = await ExecuteAsync(templater, request, canPrompt, cancellationToken);
-        if (request.DryRun || !result.HasCompletedCreation)
+        if (request.DryRun || !result.HasReturnedCreationResult)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -225,6 +227,32 @@ internal sealed class NewExecutionRunner(
                 "This item declares an internal role and cannot be invoked as an ordinary function template.") with { SelectedTemplate = selected.Entry };
         }
 
+        if (_policies is not null)
+        {
+            try
+            {
+                WorkloadNativeTemplatePolicyAdapter? owned = await _policies.FindAsync(selected, cancellationToken);
+                if (owned is not null)
+                {
+                    provider = owned;
+                    compatibility = owned;
+                    selectedEffects = owned;
+                }
+            }
+            catch (InvalidTemplateMetadataException exception)
+            {
+                return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
+            }
+            catch (IOException exception)
+            {
+                return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
+            }
+        }
+
         NativeSelectedItemBinding? effectBinding = null;
         if (selectedEffects is { } effectSupport)
         {
@@ -279,7 +307,11 @@ internal sealed class NewExecutionRunner(
         cancellationToken.ThrowIfCancellationRequested();
         var invocationRequest = new TemplateInvocationRequest(
             request.WorkingDirectory, final.ValuesByCanonicalName,
-            itemName?.Name ?? request.Name ?? (provider is null ? null : selected.Entry.DefaultName), request.DryRun, request.Force);
+            itemName?.Name ?? request.Name ?? (provider is null ? null : selected.Entry.DefaultName), request.DryRun, request.Force)
+        {
+            ExplicitParameterNames = final.ExplicitParameterNames,
+            ArgumentSource = new(selected.Entry.Identity, selected.Parameters, request.ReservedAliases, request.RawTemplateTokens),
+        };
         if (provider is not null)
         {
             NativeTemplateInvocationPreparation prepared = await provider.PrepareAsync(
@@ -305,10 +337,22 @@ internal sealed class NewExecutionRunner(
             };
         }
 
-        TemplateInvocationResult? effectInvocation = selectedEffects is not null && effectBinding is not null
-            ? await selectedEffects.InvokeAsync(templater, selected, effectBinding, invocationRequest, cancellationToken) : null;
-        cancellationToken.ThrowIfCancellationRequested();
-        TemplateInvocationResult invocation = effectInvocation ?? await selected.InvokeAsync(invocationRequest, cancellationToken);
+        TemplateInvocationResult invocation;
+        try
+        {
+            TemplateInvocationResult? effectInvocation = selectedEffects is not null && effectBinding is not null
+                ? await selectedEffects.InvokeAsync(templater, selected, effectBinding, invocationRequest, cancellationToken) : null;
+            if (effectInvocation is null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            invocation = effectInvocation ?? await selected.InvokeAsync(invocationRequest, cancellationToken);
+        }
+        catch (OperationCanceledException exception) when (exception.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey] is string)
+        {
+            _interaction.WriteWarning((string)exception.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey]!);
+            throw;
+        }
         bool success = invocation.Status == TemplateInvocationStatus.Success;
 
         NewExecutionResult result = new(success ? request.DryRun ? "previewed" : "created" : "invocationFailed", success)
@@ -319,7 +363,7 @@ internal sealed class NewExecutionRunner(
             ItemName = itemName,
             Diagnostics = invocation.Diagnostic is null ? [] : [invocation.Diagnostic],
         };
-        if (request.DryRun || !result.HasCompletedCreation)
+        if (request.DryRun || !result.HasReturnedCreationResult)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }

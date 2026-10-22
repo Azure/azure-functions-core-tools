@@ -9,4 +9,13 @@ namespace Azure.Functions.Cli.Templates.Engine;
 internal interface ISelectedTemplateInvoker
 {
     public Task<TemplateInvocationResult> InvokeAsync(TemplateInvocationRequest request, CancellationToken cancellationToken);
+
+    public Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(string relativePath, CancellationToken cancellationToken)
+        => throw new InvalidOperationException("Selected-package source access is not available.");
+
+    public Task<TemplateInvocationResult?> ValidateConfigurationAsync(CancellationToken cancellationToken)
+        => throw new InvalidOperationException("Selected configuration validation is not available.");
+
+    public Task<NativeTemplatePreparationResult> CaptureAsync(TemplateInvocationRequest request, bool expandFiles, CancellationToken cancellationToken)
+        => throw new InvalidOperationException("Selected-source capture is not available.");
 }

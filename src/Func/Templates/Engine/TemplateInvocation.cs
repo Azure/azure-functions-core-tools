@@ -22,6 +22,24 @@ internal sealed record TemplateInvocationRequest(WorkingDirectory OutputDirector
     public bool PreserveExistingFiles { get; init; }
 
     public bool PreviewAfterDirectoryCleanup { get; init; }
+
+    public NativeTemplatePreparationSnapshot? ExpectedPreparation { get; init; }
+
+    internal IReadOnlyList<TemplateEffectSource> CapturedSources { get; init; } = [];
+
+    internal bool RequireCapturedSources { get; init; }
+
+    internal IReadOnlySet<string> ExplicitParameterNames { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+    internal TemplateArgumentParseRequest? ArgumentSource { get; init; }
+
+    internal NativeTemplatePolicyCandidate? PolicyCandidate { get; init; }
+
+    internal bool PolicyEffectsConfirmed { get; init; }
+
+    internal TemplateFSharpCompileEffect? PolicyCompileRepair { get; init; }
+
+    internal BoundNativeTemplateExecutor? OwnerExecutor { get; init; }
 }
 
 internal sealed record NativeTemplateInvocationEffects(
@@ -103,12 +121,16 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
 
     public IReadOnlyList<string> ConfiguredProjects { get; init; } = [];
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public NativeTemplateEffectResult? Effects { get; init; }
+
+    [JsonIgnore]
+    internal NativeTemplatePreparationSnapshot? Capture { get; init; }
+
     /// <summary>
     /// Distinguishes completed real output from a preview or a conflict plan without changing the serialized result.
     /// </summary>
     internal bool HasCommittedOutput { get; init; }
-
-    public NativeTemplateEffectResult? Effects { get; init; }
 }
 
 /// <summary>
@@ -120,6 +142,8 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
 /// <param name="Parameters">Native definitions loaded from the mounted configuration.</param>
 internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters)
 {
+    internal string? PackageConfigurationPath { get; init; }
+
     public string Content { get; } = Content ?? throw new ArgumentNullException(nameof(Content));
 
     /// <summary>

@@ -4,14 +4,16 @@
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Pins an explicitly selected .NET project configuration for the bounded, internal layout adapter.
+/// Pins a source-declared project anchor before catalog eligibility and actual native capture.
 /// </summary>
-internal sealed record DotNetProjectLayoutQualification
+internal sealed record NativeProjectLayoutQualification
 {
-    public DotNetProjectLayoutQualification(string templateIdentity, string configurationFingerprint)
+    public NativeProjectLayoutQualification(string templateIdentity, string configurationFingerprint,
+        Native.NativeTemplateProjectAnchor anchor)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(templateIdentity);
         ArgumentException.ThrowIfNullOrWhiteSpace(configurationFingerprint);
+        ArgumentNullException.ThrowIfNull(anchor);
         if (configurationFingerprint.Length != 64 || !configurationFingerprint.All(Uri.IsHexDigit))
         {
             throw new ArgumentException("Project layout qualification requires an exact configuration SHA-256.", nameof(configurationFingerprint));
@@ -19,9 +21,14 @@ internal sealed record DotNetProjectLayoutQualification
 
         TemplateIdentity = templateIdentity;
         ConfigurationFingerprint = configurationFingerprint;
+        Anchor = new(anchor.PrimaryOutputIndex, anchor.Stack, anchor.Language);
     }
 
     public string TemplateIdentity { get; }
 
     public string ConfigurationFingerprint { get; }
+
+    public Native.NativeTemplateProjectAnchor Anchor { get; }
+
+    internal NativeTemplatePolicyCandidate? Policy { get; init; }
 }

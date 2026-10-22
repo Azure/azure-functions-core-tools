@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Security.Cryptography;
+using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 
@@ -123,21 +124,25 @@ internal sealed class NativeSelectedItemAppendSupport(IFileSystem fileSystem, IN
             return Failure("The helper role, identity, package/version, language, configuration or owned source changed.");
         }
 
-        using TempDirectory temporary = _fileSystem.CreateTempDirectory();
-        var output = WorkingDirectory.FromExplicit(temporary.Path);
-        TemplateInvocationResult expansion = await helper.InvokeAsync(new(output, request.Parameters, request.Name), cancellationToken);
+        NativeTemplatePreparationResult expansion = await helper.CaptureNativePreparationAsync(
+            request with { DryRun = true, Force = false }, expandFiles: true, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        string expectedOutput = Path.Combine(output.Info.FullName, mapping.ExpectedHelperOutput);
-        if (expansion.Status != TemplateInvocationStatus.Success || expansion.Changes.Count != 1
-            || Path.GetFullPath(Path.Combine(output.Info.FullName, expansion.Changes[0].Path)) != expectedOutput
-            || !_fileSystem.FileExists(expectedOutput) || _fileSystem.DirectoryExists(expectedOutput)
-            || !_fileSystem.GetFileSystemEntries(output.Info.FullName).SequenceEqual([expectedOutput], StringComparer.Ordinal))
+        if (expansion.Failure is not null || expansion.Snapshot is not { } snapshot
+            || snapshot.ExpandedFiles.Count != 1
+            || !snapshot.ExpandedFiles.TryGetValue(mapping.ExpectedHelperOutput, out ReadOnlyMemory<byte> expanded)
+            || snapshot.Effects.FileChanges.Count != 1
+            || snapshot.Effects.CreationResult.PostActions.Count != 0)
         {
             return Failure("Internal native expansion did not produce exactly the expected regular file; no live append was attempted.");
         }
 
-        string? content = await _fileSystem.ReadAllTextIfExistsAsync(expectedOutput, cancellationToken);
-        if (content is null || !await SourceMatchesAsync(helper, mapping.HelperSource, cancellationToken)
+        string content;
+        using (MemoryStream stream = new(expanded.ToArray(), writable: false))
+        using (StreamReader reader = new(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true))
+        {
+            content = await reader.ReadToEndAsync(cancellationToken);
+        }
+        if (!await SourceMatchesAsync(helper, mapping.HelperSource, cancellationToken)
             || !await SourceMatchesAsync(selected, mapping.MappingSource, cancellationToken)
             || !await SourceMatchesAsync(selected, mapping.CreateSource, cancellationToken))
         {
@@ -162,13 +167,11 @@ internal sealed class NativeSelectedItemAppendSupport(IFileSystem fileSystem, IN
 
         NativeTemplateEffectResult applied = await new NativeTemplateEffectWorkflow().ExecuteAsync(
             planned.Plan, _capability, request.DryRun, confirmed, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
         return new(applied.Succeeded ? TemplateInvocationStatus.Success : TemplateInvocationStatus.EffectFailure,
-            request.DryRun || applied.CompletedEffects.Count > 0 ? [new(mapping.AppendTargetFileName, TemplateFileChangeKind.Append)] : [],
+            [],
             applied.Diagnostics.Count == 0 ? null : string.Join(" ", applied.Diagnostics))
         {
             Effects = applied,
-            HasCommittedOutput = !request.DryRun && applied.CompletedEffects.Count > 0,
         };
     }
 

@@ -41,6 +41,10 @@ internal static class TemplateCatalogProjector
         {
             using var document = JsonDocument.Parse(configuration,
                 new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new InvalidTemplateMetadataException("Internal template role metadata must be an object.");
+            }
             JsonProperty[] roles = [.. document.RootElement.EnumerateObject()
                 .Where(property => property.Name.Equals("tags", StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.Object)
                 .SelectMany(property => property.Value.EnumerateObject())
@@ -106,6 +110,7 @@ internal static class TemplateCatalogProjector
 
         FuncHostTemplateMetadata metadata;
         IReadOnlyList<TemplateParameterDefinition> parameters;
+        string? declaredRole = null;
         string? metadataDiagnostic = null;
         try
         {
@@ -115,6 +120,7 @@ internal static class TemplateCatalogProjector
             parameters = configuration is null
                 ? TemplateParameterProjector.Project(template.ParameterDefinitions, metadata)
                 : TemplateParameterProjector.Project(configuration.Parameters, metadata, configuration.Root);
+            declaredRole = configuration is null ? GetTag(template, "func-role") : ReadInternalRole(configuration.Content);
         }
         catch (InvalidTemplateMetadataException ex)
         {
@@ -138,8 +144,8 @@ internal static class TemplateCatalogProjector
             parameters,
             metadataDiagnostic)
         {
-            DefaultName = NullIfEmpty(template.DefaultName),
-            DeclaredInternalRole = GetTag(template, "func-role"),
+            DefaultName = configuration is null ? NullIfEmpty(template.DefaultName) : NullIfEmpty(configuration.DefaultName),
+            DeclaredInternalRole = declaredRole,
         };
     }
 

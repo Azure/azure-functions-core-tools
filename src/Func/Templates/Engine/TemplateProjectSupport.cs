@@ -13,7 +13,7 @@ internal sealed record TemplateProjectSupport(
 
     public TemplateProjectConfigurationWriter Writer { get; } = Writer ?? throw new ArgumentNullException(nameof(Writer));
 
-    public DotNetProjectLayoutQualification? DotNetLayout { get; init; }
+    public NativeProjectLayoutQualification? OwnedLayout { get; init; }
 
-    public Func<NativeProjectTemplateSource, CancellationToken, Task<DotNetProjectLayoutQualification?>>? QualifyLayoutAsync { get; init; }
+    public Func<NativeProjectTemplateSource, CancellationToken, Task<NativeProjectLayoutQualification?>>? QualifyLayoutAsync { get; init; }
 }
