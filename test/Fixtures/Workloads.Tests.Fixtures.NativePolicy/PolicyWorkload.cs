@@ -49,7 +49,8 @@ internal sealed class FixturePolicy(IFixtureFiles files) : NativeTemplatePolicy
     public override bool Handles(NativeTemplateSource selected)
     {
         LastSource = selected;
-        return selected.PackageId is "Fixture.Policy.Templates" or "Fixture.Policy.External" && selected.PackageVersion == "2.0.0";
+        return Mode != "unhandled"
+            && selected.PackageId is "Fixture.Policy.Templates" or "Fixture.Policy.External" && selected.PackageVersion == "2.0.0";
     }
 
     public override NativeTemplatePolicyStages GetRequestedStages(NativeTemplateSource selected)

@@ -60,12 +60,20 @@ internal sealed class WorkloadNativeTemplatePolicies(
         {
             if (_candidates.TryGetValue(key, out NativeTemplatePolicyCandidate? existing))
             {
+                if (requireLayout && !existing.Admission.Required)
+                {
+                    throw new InvalidDataException("The required project layout was not included in this source admission. Rerun selection.");
+                }
                 await existing.RevalidateDeclarationAsync(cancellationToken);
                 return existing;
             }
-            BoundNativeTemplatePolicy? owner = await _admission.TryBindAsync(entry, mountPoint, cancellationToken);
+            BoundNativeTemplatePolicy? owner = await _admission.TryBindAsync(entry, mountPoint, cancellationToken, required: requireLayout);
             if (owner is null)
             {
+                if (requireLayout)
+                {
+                    throw new InvalidDataException("This project requires an authorized owning workload layout policy. Update the owning workload and Azure Functions CLI.");
+                }
                 return null;
             }
             bool binding = configuration.Root.TryGetProperty("symbols", out JsonElement symbols) && symbols.ValueKind == JsonValueKind.Object

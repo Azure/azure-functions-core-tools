@@ -80,6 +80,7 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("foreign-stack")]
     [InlineData("unknown-stage")]
     [InlineData("refused")]
+    [InlineData("unhandled")]
     public async Task LoadedPolicy_InvalidSourceDeclaration_RefusesBeforeSelectionOrOutput(string mode)
     {
         WorkloadEntry entry = await InstallPolicyFixtureAsync();
@@ -100,8 +101,37 @@ public sealed partial class BundledNodeTemplateTests
             provider.GetRequiredService<InstalledProjectStackCatalog>().FindStack("foreign").Should().NotBeNull();
             _interaction.AllOutput.Should().Contain("actual admitted runtime stack");
         }
+        if (mode == "unhandled")
+        {
+            _interaction.AllOutput.Should().Contain("does not handle this required native content");
+        }
         Directory.Exists(target).Should().BeFalse();
         _interaction.AllOutput.Should().NotContain("\"succeeded\":true");
+    }
+
+    [Fact]
+    public async Task LoadedPolicy_UnhandledOrdinaryGenericProject_KeepsItsExistingMetadataRoute()
+    {
+        WorkloadEntry fixture = await InstallPolicyFixtureAsync();
+        WorkloadEntry node = (await _installer.InstallFromPackageAsync(BuiltArchive)).Entry;
+        using ServiceProvider provider = await CreatePolicyServicesAsync();
+        using IServiceScope scope = provider.CreateScope();
+        NativeTemplatePolicy policy = scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicyRegistration>().Policy;
+        policy.GetType().GetProperty("Mode")!.SetValue(policy, "unhandled");
+        string target = Path.Combine(_root, "ordinary-node-project");
+        InitExecutionCommand command = new(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>(),
+            provider.GetRequiredService<InitExecutionRenderer>(), new(
+                [new(fixture.PackageId, NuGetVersion.Parse(fixture.PackageVersion), fixture.Aliases, true),
+                 new(node.PackageId, NuGetVersion.Parse(node.PackageVersion), node.Aliases, true)]));
+
+        int exit = await command.ParseInvocation([target, "--template", "Azure.Functions.Node.Basic.JavaScript",
+            "--name", "Ordinary", "--non-interactive", "--output", "json"]).InvokeAsync();
+
+        exit.Should().Be(0, _interaction.AllOutput);
+        File.Exists(Path.Combine(target, "host.json")).Should().BeTrue();
+        using var configuration = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, ".func", "config.json")));
+        configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+        policy.GetType().GetProperty("LastCapture")!.GetValue(policy).Should().BeNull();
     }
 
     [Fact]
