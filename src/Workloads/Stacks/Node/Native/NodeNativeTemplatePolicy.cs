@@ -81,6 +81,17 @@ internal sealed class NodeNativeTemplatePolicy : NativeTemplatePolicy
         {
             return new(false, ["The native Node output is not bound to its exact selected source body."]);
         }
+        string root = captured.Invocation.OutputDirectory.Info.FullName;
+        string target = Path.GetFullPath(file.TargetRelativePath, root);
+        if (captured.Directories.Any(directory =>
+        {
+            string relative = Path.GetRelativePath(Path.GetFullPath(directory, root), target);
+            return relative is "." or ".." || Path.IsPathRooted(relative)
+                || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+        }))
+        {
+            return new(false, ["Node function creation requires exactly one regular file and only its ancestor directories."]);
+        }
         return new(true, []);
     }
 

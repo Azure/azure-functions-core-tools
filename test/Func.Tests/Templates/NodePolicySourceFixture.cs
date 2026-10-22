@@ -72,12 +72,12 @@ internal sealed class NodePolicySourceFixture : NativeTemplateSource, IDisposabl
 
     internal void ChangeConfiguration(Action<JsonNode> change) => Change(_configuration, change);
 
-    internal void ChangeNativeBody()
+    internal void ChangeNativeBody(string content = "different native body")
     {
         JsonNode manifest = JsonNode.Parse(_files["provenance/node/compatibility.json"])!;
         string path = manifest["templates"]!.AsArray().Single(value => value!["identity"]!.GetValue<string>() == Identity)!
             ["content"]!["path"]!.GetValue<string>();
-        _files[path] = "different native body"u8.ToArray();
+        _files[path] = System.Text.Encoding.UTF8.GetBytes(content);
         RebindOwnDescriptor(path);
     }
 

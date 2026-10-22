@@ -122,6 +122,8 @@ public sealed partial class BundledNodeTemplateTests
         created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
         string output = legacy ? Path.Combine(targetPath, "src", "functions") : targetPath;
         File.ReadAllText(Path.Combine(output, defaults.Name + "." + alias)).Should().Contain("app.http(", "authLevel: 'anonymous'");
+        string[] expectedDirectories = legacy ? [Path.Combine(targetPath, "src"), Path.Combine(targetPath, "src", "functions")] : [];
+        Directory.GetDirectories(targetPath, "*", SearchOption.AllDirectories).Should().BeEquivalentTo(expectedDirectories);
     }
 
     [Fact]
@@ -204,16 +206,22 @@ public sealed partial class BundledNodeTemplateTests
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
 
-    [Fact]
-    public async Task Producer_LoadedOwner_UnexpectedNativeOutput_IsRejectedBeforeUserWrites()
+    [Theory]
+    [InlineData("unexpected.txt", false)]
+    [InlineData("unexpected.txt", true)]
+    [InlineData("empty/-.-", false)]
+    [InlineData("empty/-.-", true)]
+    [InlineData("empty/_._", false)]
+    [InlineData("empty/_._", true)]
+    public async Task Producer_LoadedOwner_UnexpectedNativeOutput_IsRejectedBeforeUserWrites(string extraPath, bool legacy)
     {
         WorkloadEntry stack = await InstallAssociationStackAsync();
         string changedArchive = Path.Combine(_root, "functions-with-extra-output.nupkg");
         File.Copy(FunctionArchive, changedArchive);
         using (var archive = ZipFile.Open(changedArchive, ZipArchiveMode.Update))
-        using (var writer = new StreamWriter(archive.CreateEntry("content/http-js/unexpected.txt").Open()))
+        using (var writer = new StreamWriter(archive.CreateEntry("content/http-js/" + extraPath).Open()))
         {
-            writer.Write("unexpected native output");
+            writer.Write(extraPath == "unexpected.txt" ? "unexpected native output" : "");
         }
         NodeFunctionCatalogFixture catalog = new(stack, changedArchive);
         (await catalog.InstallAsync(_templates, _workloads, _paths, _installer, _files,
@@ -225,7 +233,9 @@ public sealed partial class BundledNodeTemplateTests
         File.WriteAllText(user, "preserve existing user bytes");
         var availability = new TemplateConstraintEvaluationSnapshot([new(stack.PackageId, NuGetVersion.Parse(stack.PackageVersion), ["node"], true)]);
         using var templater = await scope.ServiceProvider.GetRequiredService<ITemplaterFactory>()
-            .CreateAsync(new(output, new(output, "node", "JavaScript")), availability, CancellationToken.None);
+            .CreateAsync(new(output, new(output, "node", "JavaScript"),
+                itemOutputIntent: legacy ? NativeItemOutputIntent.LegacyWorkflowRelative : NativeItemOutputIntent.LiteralOutput),
+                availability, CancellationToken.None);
         var selected = (await templater.ResolveGroupAsync("HttpTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
         var provider = await scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicies>().FindAsync(selected, CancellationToken.None);
         provider.Should().NotBeNull();
@@ -236,7 +246,10 @@ public sealed partial class BundledNodeTemplateTests
             ArgumentSource = input, ExplicitParameterNames = parsed.ExplicitParameterNames,
         };
         var prepared = await provider!.PrepareAsync(
-            new NativeItemWorkflowContext(templater, selected, parsed, NodeComposedItem(output.Info.FullName, selected.Entry.Identity), request),
+            new NativeItemWorkflowContext(templater, selected, parsed, NodeComposedItem(output.Info.FullName, selected.Entry.Identity) with
+            {
+                OutputIntent = legacy ? NativeItemOutputIntent.LegacyWorkflowRelative : NativeItemOutputIntent.LiteralOutput,
+            }, request),
             CancellationToken.None);
 
         var result = await selected.InvokeAsync(prepared.Request!, CancellationToken.None);
@@ -244,6 +257,7 @@ public sealed partial class BundledNodeTemplateTests
         result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate, result.Diagnostic);
         result.Diagnostic.Should().Contain("exactly one regular file");
         Directory.GetFiles(output.Info.FullName).Should().Equal(user);
+        Directory.GetDirectories(output.Info.FullName, "*", SearchOption.AllDirectories).Should().BeEmpty();
         File.ReadAllText(user).Should().Be("preserve existing user bytes");
     }
 }

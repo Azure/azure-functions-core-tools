@@ -193,7 +193,46 @@ internal sealed class NodeItemSource
         {
             throw Invalid("The native Node layout differs from its original write directory and literal alternative.");
         }
-        string expected = Text(Property(original, "files"), Text(read, "filePath")).Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
+        string body = Text(files, Text(read, "filePath"));
+        Dictionary<string, string?> replacements = new(StringComparer.Ordinal);
+        foreach (JsonElement input in Items(job, "inputs"))
+        {
+            string token = Text(input, "assignTo");
+            if (token == "$(FUNCTION_NAME_INPUT)")
+            {
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(token)
+                || !replacements.TryAdd(Text(input, "paramId"), body.Contains(token, StringComparison.Ordinal) ? token : null))
+            {
+                throw Invalid("The original Node replacement inputs must have unique prompt IDs and nonempty tokens.");
+            }
+        }
+        foreach (JsonProperty symbol in symbols.EnumerateObject())
+        {
+            if (symbol.Name == "AuthLevel" && Text(original, "id") == "HttpTrigger-" + language)
+            {
+                continue;
+            }
+            bool hasReplacement = symbol.Value.TryGetProperty("replaces", out JsonElement replacement);
+            if (replacements.TryGetValue(symbol.Name, out string? token))
+            {
+                if (token is null ? hasReplacement
+                    : !hasReplacement || replacement.ValueKind != JsonValueKind.String || replacement.GetString() != token)
+                {
+                    throw Invalid("The native Node replacement differs from its original input and actual body token.");
+                }
+            }
+            else if (hasReplacement)
+            {
+                throw Invalid("The native Node source declares an unowned replacement.");
+            }
+        }
+        if (replacements.Keys.Any(name => !symbols.TryGetProperty(name, out _)))
+        {
+            throw Invalid("The native Node source omits an original input symbol.");
+        }
+        string expected = body.Replace("$(FUNCTION_NAME_INPUT)", sourceName, StringComparison.Ordinal);
         if (symbols.TryGetProperty("AuthLevel", out JsonElement auth))
         {
             if (Text(auth, "type") != "parameter" || Text(auth, "datatype") != "choice"

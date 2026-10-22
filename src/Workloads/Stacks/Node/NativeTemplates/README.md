@@ -336,11 +336,12 @@ qualification are unchanged.
 that outer artifact into private homes, and exercises the staged command
 contracts and ownership/failure/cancellation controls.
 
-The process fixture's `bundled-node` mode accepts a private root, project path,
+The historical process fixture's `bundled-node` mode accepts a private root, project path,
 `js|ts`, then actual locally built Node/host/worker/bundle archive paths. Set
 `FUNC_CLI_HOME` and `FUNC_CLI_WORKLOADS_HOME` to private directories first.
-It installs the supplied archives, opens a fresh actual workload host, previews
-then creates `basic` and `http`, and runs the installed Node preparation hook.
-The resulting project can be launched with public
-`func run <path> --offline --output plain`. Use private host ports and a
-controlled emulator with private data/endpoints when storage is required.
+It installs those archives and attempts the earlier `basic` then `http` journey.
+The current Basic archive contains only projects. This fixture does not supply
+the separate Functions archive or its qualified schema version 2 acquisition
+records, so that HTTP journey is blocked with the current producer split.
+Earlier source-specific Linux evidence does not qualify this current process
+journey, dependency preparation or a live backend.

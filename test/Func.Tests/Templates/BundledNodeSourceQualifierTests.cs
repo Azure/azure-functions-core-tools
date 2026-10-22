@@ -165,13 +165,110 @@ public sealed partial class BundledNodeTemplateTests
         Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
 
-    private async Task<NodePolicySourceFixture> ReadQualifiedSourceAsync()
+    [Fact]
+    public async Task SourceQualifier_OriginalNoOpPrompt_RemainsUnbound()
+    {
+        var original = ReadNodeSource().Templates.Single(value => value.Id == "TimerTrigger-JavaScript");
+        var input = original.Jobs!.Single().Inputs!.Single(value => value.ParamId == "timerTrigger-schedule");
+        original.Files!.Single().Value.Should().Contain("0 */5 * * * *").And.NotContain(input.AssignTo!);
+        using var source = await ReadQualifiedSourceAsync();
+
+        var qualified = await new NodeItemSource().ReadAsync(source, CancellationToken.None);
+
+        var config = JsonNode.Parse((await source.ReadPackageFileAsync(qualified.ConfigurationPath, CancellationToken.None)).Span)!;
+        config["symbols"]!["timerTrigger-schedule"]!.AsObject().Should().NotContainKey("replaces");
+    }
+
+    [Theory]
+    [InlineData("noopLiteral")]
+    [InlineData("noopToken")]
+    [InlineData("foreignSymbol")]
+    [InlineData("intentSymbol")]
+    [InlineData("nullReplacement")]
+    public async Task SourceQualifier_UnownedReplacement_RefusesRepinnedConfiguration(string corruption)
+    {
+        var original = ReadNodeSource().Templates.Single(value => value.Id == "TimerTrigger-JavaScript");
+        original.Files!.Single().Value.Should().NotContain("$(SCHEDULE_INPUT)");
+        using var source = await ReadQualifiedSourceAsync();
+        source.ChangeConfiguration(config =>
+        {
+            if (corruption == "foreignSymbol")
+            {
+                config["symbols"]!["Foreign"] = new JsonObject { ["type"] = "parameter", ["replaces"] = "0 */5 * * * *" };
+            }
+            else if (corruption == "intentSymbol")
+            {
+                config["symbols"]!["InvocationOutputIntent"]!["replaces"] = "0 */5 * * * *";
+            }
+            else
+            {
+                config["symbols"]!["timerTrigger-schedule"]!["replaces"] = corruption switch
+                {
+                    "noopToken" => "$(SCHEDULE_INPUT)",
+                    "nullReplacement" => null,
+                    _ => "0 */5 * * * *",
+                };
+            }
+        });
+
+        Func<Task> qualify = () => new NodeItemSource().ReadAsync(source, CancellationToken.None);
+
+        await qualify.Should().ThrowAsync<InvalidDataException>();
+        Directory.Exists(Path.Combine(_root, "src")).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("$(SCHEDULE_INPUT)", true)]
+    [InlineData("foreign", false)]
+    [InlineData(null, false)]
+    public async Task SourceQualifier_AuthoredReplacement_RequiresOriginalToken(string? replacement, bool accepted)
+    {
+        using var source = await ReadQualifiedSourceAsync();
+        string body = "";
+        source.ChangeOriginal(raw =>
+        {
+            body = raw["files"]!["function.js"]!.GetValue<string>().Replace("0 */5 * * * *", "$(SCHEDULE_INPUT)", StringComparison.Ordinal);
+            raw["files"]!["function.js"] = body;
+        });
+        source.ChangeNativeBody(body.Replace("$(FUNCTION_NAME_INPUT)", "funcNodeItem", StringComparison.Ordinal));
+        if (replacement is not null)
+        {
+            source.ChangeConfiguration(config => config["symbols"]!["timerTrigger-schedule"]!["replaces"] = replacement);
+        }
+
+        Func<Task> qualify = () => new NodeItemSource().ReadAsync(source, CancellationToken.None);
+
+        if (accepted)
+        {
+            await qualify.Should().NotThrowAsync();
+        }
+        else
+        {
+            await qualify.Should().ThrowAsync<InvalidDataException>();
+        }
+    }
+
+    [Theory]
+    [InlineData("HttpTrigger-JavaScript")]
+    [InlineData("HttpTrigger-TypeScript")]
+    public async Task SourceQualifier_AuthoredHttpAuthorization_PreservesExplicitReplacement(string identity)
+    {
+        ReadNodeSource().Templates.Single(value => value.Id == identity).Files!.Single().Value.Should().Contain("authLevel: 'anonymous'");
+        using var source = await ReadQualifiedSourceAsync(identity);
+
+        var qualified = await new NodeItemSource().ReadAsync(source, CancellationToken.None);
+
+        var config = JsonNode.Parse((await source.ReadPackageFileAsync(qualified.ConfigurationPath, CancellationToken.None)).Span)!;
+        config["symbols"]!["AuthLevel"]!["replaces"]!.GetValue<string>().Should().Be("__AUTH_LEVEL__");
+    }
+
+    private async Task<NodePolicySourceFixture> ReadQualifiedSourceAsync(string identity = "TimerTrigger-JavaScript")
     {
         await InstallNodeAuthoringCatalogAsync();
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         using var session = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None, availability);
         using var templater = TemplateFixtures.CreateTemplater(session);
-        var selected = (await templater.ResolveGroupAsync("TimerTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
+        var selected = (await templater.ResolveGroupAsync(identity, TemplateType.Item, CancellationToken.None)).Group!.Single();
         return new(selected, FunctionArchive);
     }
 
