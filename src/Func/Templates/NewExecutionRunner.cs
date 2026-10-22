@@ -24,6 +24,8 @@ internal sealed class NewExecutionRunner(
     TemplateExecutionInteraction prompts,
     NativeTemplateWorkflowRegistry? workflows = null, WorkloadNativeTemplatePolicies? policies = null) : INewExecutionRunner
 {
+    private const string WorkflowUnavailableMessage =
+        "No workload-owned or explicitly composed native item workflow is available for the selected installed stack.";
     private readonly INewExecutionContextResolver _contexts = contexts ?? throw new ArgumentNullException(nameof(contexts));
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
@@ -86,9 +88,9 @@ internal sealed class NewExecutionRunner(
     {
         string language = templater.Context.Project!.Language!;
         INativeItemWorkflowProvider? provider = _workflows?.FindItem(templater.Context.Project.Stack!);
-        if (_workflows is not null && provider is null)
+        if (_workflows is not null && provider is null && _policies is null)
         {
-            return NewExecutionResult.Reject("workflowUnavailable", "No CLI-owned native item workflow is composed for the selected installed stack.");
+            return NewExecutionResult.Reject("workflowUnavailable", WorkflowUnavailableMessage);
         }
 
         INativeItemCompatibility? compatibility = provider?.Compatibility ?? (_workflows is null ? request.ItemCompatibility : null);
@@ -103,6 +105,50 @@ internal sealed class NewExecutionRunner(
             TemplateCatalogEntry[] visible = [.. catalog.Where(entry => !entry.IsHidden && entry.DeclaredInternalRole is null
                 && entry.MetadataDiagnostic is null && entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible
                 && string.Equals(entry.Language, language, StringComparison.OrdinalIgnoreCase))];
+            if (_workflows is not null)
+            {
+                List<TemplateCatalogEntry> qualified = [];
+                foreach (TemplateCatalogEntry entry in visible)
+                {
+                    try
+                    {
+                        TemplateResolutionResult resolution = await templater.CreateGroupAsync([entry], cancellationToken);
+                        if (resolution.Status != TemplateResolutionStatus.Success)
+                        {
+                            return NewExecutionResult.Reject("workflowUnavailable",
+                                resolution.Diagnostic ?? "The listed native source is no longer available.") with { Templates = [entry] };
+                        }
+                        ResolvedTemplate candidate = resolution.Group!.Single();
+                        WorkloadNativeTemplatePolicyAdapter? owned = _policies is null ? null
+                            : await _policies.FindAsync(candidate, cancellationToken);
+                        if (owned is not null)
+                        {
+                            NativeSelectedItemBinding binding = await owned.ResolveAsync(candidate, cancellationToken);
+                            if (binding.Diagnostics.Count > 0)
+                            {
+                                return NewExecutionResult.Reject("workflowUnavailable", [.. binding.Diagnostics]) with { Templates = [entry] };
+                            }
+                            if (!binding.InternalExpansionOnly)
+                            {
+                                qualified.Add(entry);
+                            }
+                        }
+                        else if (provider is not null)
+                        {
+                            qualified.Add(entry);
+                        }
+                    }
+                    catch (Exception exception) when (exception is InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
+                    {
+                        return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { Templates = [entry] };
+                    }
+                }
+                if (provider is null && qualified.Count == 0)
+                {
+                    return NewExecutionResult.Reject("workflowUnavailable", WorkflowUnavailableMessage);
+                }
+                visible = [.. qualified];
+            }
             if (request.List)
             {
                 if (request.TemplateReference is { } reference)
@@ -238,6 +284,11 @@ internal sealed class NewExecutionRunner(
             {
                 return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
             }
+        }
+
+        if (_workflows is not null && provider is null)
+        {
+            return NewExecutionResult.Reject("workflowUnavailable", WorkflowUnavailableMessage) with { SelectedTemplate = selected.Entry };
         }
 
         NativeSelectedItemBinding? effectBinding = null;
