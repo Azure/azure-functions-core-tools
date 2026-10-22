@@ -26,7 +26,7 @@ using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
-public sealed class ArtifactBindingJourneyTests : IDisposable
+public sealed partial class ArtifactBindingJourneyTests : IDisposable
 {
     private const string Identity = "Fixture.Exact.Project";
     private const string PackageId = "Fixture.Exact.Templates";
@@ -652,7 +652,7 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
             _files, Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>(), scopes ? _scopes : null);
     }
 
-    private async Task SeedAsync(string? change = null, BundleChannel channel = BundleChannel.Stable)
+    private async Task SeedAsync(string? change = null, BundleChannel channel = BundleChannel.Stable, bool installTemplates = true)
     {
         string artifactVersion = channel switch
         {
@@ -673,12 +673,20 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
         string ownerId = reader.NuspecReader.GetId();
         string ownerVersion = reader.NuspecReader.GetVersion().ToNormalizedString();
         string install = _paths.GetInstallDirectory(ownerId, ownerVersion);
-        Directory.CreateDirectory(install);
-        ZipFile.ExtractToDirectory(nodeArchive, install);
-        var metadata = new WorkloadMetadataReader().Read(install);
-        WorkloadEntry owner = new() { PackageId = ownerId, PackageVersion = ownerVersion, Source = Source,
-            Kind = WorkloadKind.Workload, EntryPoint = metadata.EntryPoint, Aliases = ["node"] };
-        await _workloads.SaveWorkloadAsync(owner, CancellationToken.None);
+        WorkloadEntry owner;
+        if (installTemplates)
+        {
+            Directory.CreateDirectory(install);
+            ZipFile.ExtractToDirectory(nodeArchive, install);
+            var metadata = new WorkloadMetadataReader().Read(install);
+            owner = new() { PackageId = ownerId, PackageVersion = ownerVersion, Source = Source,
+                Kind = WorkloadKind.Workload, EntryPoint = metadata.EntryPoint, Aliases = ["node"] };
+            await _workloads.SaveWorkloadAsync(owner, CancellationToken.None);
+        }
+        else
+        {
+            owner = await SeedGuidedOwnerAsync(nodeArchive);
+        }
         string archive = Path.Combine(_root, "exact.nupkg");
         using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
         {
@@ -707,8 +715,11 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
         }
         _catalog.Json = document.ToJsonString();
         var artifact = (await _catalog.LoadAsync(CancellationToken.None)).Artifacts.Single();
-        await TemplateFixtures.InstallAsync(archive, _templates.Hive, CancellationToken.None);
-        await _ownership.RecordAsync(artifact, CancellationToken.None);
+        if (installTemplates)
+        {
+            await TemplateFixtures.InstallAsync(archive, _templates.Hive, CancellationToken.None);
+            await _ownership.RecordAsync(artifact, CancellationToken.None);
+        }
         _selection = new(Identity, new(PackageId, artifactVersion, digest), Source, NativeTemplateOwnerIdentity.FromEntry(owner), channel);
     }
 

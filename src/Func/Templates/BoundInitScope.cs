@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -24,6 +25,8 @@ internal sealed class BoundInitScope(TemplateConstraintEvaluationSnapshot availa
     public InstalledProjectStackCatalog Catalog { get; } = catalog ?? throw new ArgumentNullException(nameof(catalog));
     public TemplateProjectSupport Support { get; } = support ?? throw new ArgumentNullException(nameof(support));
     public NativeTemplateArtifactVerifier Verifier { get; } = verifier ?? throw new ArgumentNullException(nameof(verifier));
+
+    public IReadOnlyDictionary<string, WorkloadEntry> StackOwners { get; init; } = new Dictionary<string, WorkloadEntry>();
 
     public void Dispose() => _lifetime.Dispose();
 }

@@ -9,7 +9,13 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Quickstart;
+using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Acquisition;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Discovery;
+using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -52,6 +58,18 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Description = "Re-initialize the directory: deletes its contents (except .git) before scaffolding the new project."
     };
 
+    public Option<bool> GuidedOption { get; } = new("--guided") { Description = "Opt in to staged installed-template selection and qualified quickstart discovery. Does not replace ordinary init." };
+
+    public Option<string?> QuickstartOption { get; } = new("--quickstart") { Description = "Exact discovery catalog ID for --guided; never a template identity or implicit install.", Arity = ArgumentArity.ExactlyOne };
+
+    public Option<string?> TemplateOption { get; } = new("--template", "-t") { Description = "Installed project-template identity for --guided. Unknown references never trigger acquisition.", Arity = ArgumentArity.ExactlyOne };
+
+    public Option<bool> AcquireQuickstartOption { get; } = new("--acquire-quickstart") { Description = "Explicit script authorization to acquire the exact qualified --quickstart plan and create its project. Requires --guided." };
+
+    public Option<bool> DryRunOption { get; } = new("--dry-run") { Description = "With --guided, preview installed payloads without writes. Missing payloads produce metadata intent only." };
+
+    public Option<bool> NonInteractiveOption { get; } = new("--non-interactive") { Description = "With --guided, require explicit selections instead of prompting." };
+
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettingsProvider;
@@ -60,6 +78,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly InstalledBundleScanner _bundleScanner;
     private readonly IFileSystem _fileSystem;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
+    private readonly IQuickstartInitCoordinator? _guided;
 
     public InitCommand(
         IInteractionService interaction,
@@ -69,7 +88,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IHostJsonBundleSectionReader bundleSectionReader,
         InstalledBundleScanner bundleScanner,
         IFileSystem fileSystem,
-        IEnumerable<IProjectInitializer> initializers)
+        IEnumerable<IProjectInitializer> initializers,
+        IQuickstartInitCoordinator? guided = null)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -89,6 +109,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _bundleScanner = bundleScanner;
         _fileSystem = fileSystem;
         _initializers = initializers.ToList();
+        _guided = guided;
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
         LanguageOption.Description = BuildLanguageOptionDescription(_initializers);
@@ -98,6 +119,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(NameOption);
         Options.Add(LanguageOption);
         Options.Add(ForceOption);
+        Options.Add(GuidedOption);
+        Options.Add(QuickstartOption);
+        Options.Add(TemplateOption);
+        Options.Add(AcquireQuickstartOption);
+        Options.Add(DryRunOption);
+        Options.Add(NonInteractiveOption);
 
         // Workload-contributed options are attached after built-ins so they
         // appear as a clearly-grouped block in --help output. Multiple workloads
@@ -116,6 +143,55 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
+        bool guided = parseResult.GetValue(GuidedOption);
+        Option[] guidedOnly = [QuickstartOption, TemplateOption, AcquireQuickstartOption, DryRunOption, NonInteractiveOption];
+        if (!guided && guidedOnly.Any(option => parseResult.GetResult(option) is { Implicit: false }))
+        {
+            _interaction.WriteError("Template discovery options require the staged --guided path. Ordinary init is unchanged; unknown --template references never install packages.");
+            return 1;
+        }
+        if (guided)
+        {
+            if (_guided is null)
+            {
+                _interaction.WriteError("The staged guided-init services are unavailable in this host. Ordinary init is still supported.");
+                return 1;
+            }
+            HashSet<Option> supported = [StackOption, NameOption, LanguageOption, ForceOption, GuidedOption, .. guidedOnly];
+            for (Command? parent = Parents.OfType<Command>().FirstOrDefault(); parent is not null; parent = parent.Parents.OfType<Command>().FirstOrDefault())
+            {
+                supported.UnionWith(parent.Options.Where(option => option.Recursive));
+            }
+            if (parseResult.CommandResult.Children.OfType<System.CommandLine.Parsing.OptionResult>()
+                .Any(result => !result.Implicit && !supported.Contains(result.Option)))
+            {
+                _interaction.WriteError("Workload initializer options are not supported by staged --guided init. Use ordinary init for those options.");
+                return 1;
+            }
+            if (parseResult.GetValue(AcquireQuickstartOption) && parseResult.GetValue(QuickstartOption) is null)
+            {
+                _interaction.WriteError("--acquire-quickstart requires an explicit --quickstart catalog ID. It never authorizes an installed-template reference.");
+                return 1;
+            }
+            InitExecutionRequest request = new(parseResult.GetValue(PathArgument!)!, parseResult.GetValue(TemplateOption), parseResult.GetValue(NameOption),
+                parseResult.GetValue(StackOption), parseResult.GetValue(LanguageOption), parseResult.GetValue(ForceOption),
+                parseResult.GetValue(NonInteractiveOption), parseResult.GetValue(DryRunOption), false, [],
+                Options.Concat(supported).SelectMany(option => option.Aliases.Prepend(option.Name)).ToHashSet(StringComparer.Ordinal));
+            InitExecutionResult result;
+            try
+            {
+                result = await _guided.ExecuteAsync(new(request, parseResult.GetValue(QuickstartOption),
+                    parseResult.GetValue(AcquireQuickstartOption)), cancellationToken);
+            }
+            catch (Exception exception) when (exception is BasicAcquisitionException or TemplateStoreRecoveryRequiredException
+                or WorkloadRecoveryRequiredException or WorkloadPlanChangedException or InvalidWorkloadException
+                or ConflictingProjectStackMetadataException)
+            {
+                throw new GracefulException($"Guided init could not continue. {exception.Message}", isUserError: true, innerException: exception);
+            }
+            return new InitExecutionRenderer(_interaction).Render(result, jsonOutput: false);
+        }
+
         // Two workloads claiming the same stack is unrecoverable: `--stack`
         // would be ambiguous and auto-select would silently pick whichever
         // DI returned first. Validated lazily here (rather than in the ctor)

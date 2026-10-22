@@ -18,7 +18,7 @@ internal interface ITemplaterFactory
         CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null);
 
     /// <summary>
-    /// Creates an internal project-enabled flow; production commands and DI do not activate this staged path yet.
+    /// Creates a project-enabled flow used by staged execution and opt-in guided init.
     /// </summary>
     /// <exception cref="ArgumentNullException">The context, availability snapshot or paired project support is null.</exception>
     public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,

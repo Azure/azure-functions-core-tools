@@ -1,3 +1,79 @@
+## Current staged integration
+
+`func init MyConnector --guided` opts into stack selection, installed project
+templates and **Browse more templates**. Ordinary `func init MyConnector` still
+uses the existing workload initializer. This is not the default-init migration.
+The existing `func quickstart` commands remain available.
+
+The guided route uses the same browser, with an explicit **Use this template**
+result. Default browsing remains read-only and never selects even a single
+result automatically. Search, resource and IaC filters remain available.
+Only independently verified exact installed duplicates are suppressed.
+Unknown installed proof stays visible with a diagnostic.
+
+Before downloading, guided init joins an advertised full identity, package,
+version, HTTPS source and SHA256 to the independently bundled schema2 authority.
+The association must cover the actual loaded stack owner, physical and logical
+identity, source, host version, channel and `additional-project` role. It includes
+the complete archive inventory and content revision. Remote project and workload
+declarations are displayed as unverified claims, not interpreted as approval.
+The resolved required companion packages, exact bytes, source, owner and target
+are displayed before an explicit default-no acquisition confirmation.
+
+Consent binds the complete resolved candidate plan, selected exact archives and
+workload inventory. The existing acquisition runner revalidates these before
+preparation and writer admission. Changed plans fail instead of selecting another
+version. It does not upgrade workloads, change feeds or replace existing native
+package ownership. Acquisition must finish successfully and release prepared
+payloads, reuse evidence and leases before a new bound init scope opens.
+Fresh runtime registration and exact installed artifact verification remain
+mandatory. Native preview and mandatory project configuration share the same
+selected flow and completed parameters. Interactive creation requires a second
+default-no confirmation of those actual effects. Declining creation retains any
+explicitly acquired packages and reports that fact.
+Cancellation during acquisition reports retained-package and recovery diagnostics,
+then propagates command cancellation after acquisition cleanup. It never starts
+project creation or claims rollback.
+
+Scripts must select a stack and either an installed template or a catalog ID.
+Choosing guided mode is not acquisition authorization.
+
+```text
+func init MyConnector --guided --stack node --template <installed-full-identity> --non-interactive
+func init MyConnector --guided --stack node --quickstart <exact-catalog-id> --acquire-quickstart --non-interactive
+func init MyConnector --guided --stack node --template <installed-full-identity> --dry-run
+```
+
+`--acquire-quickstart` authorizes the displayed independently qualified exact
+acquisition and creation plan in scripts. It requires `--quickstart` and cannot
+authorize an installed `--template`. Interactive invocations still prompt.
+An unknown installed reference never starts discovery or acquisition.
+`--quickstart` and `--template` cannot be combined. All these options require
+`--guided`; they do not redirect ordinary init.
+
+Dry-run never acquires, registers, repairs, recovers or cleans. A discovery
+selection without installed payload reports metadata intent and a diagnostic,
+not a fictitious engine preview. Use an installed `--template` for native
+dry-run. Guided init rejects nonempty targets, adoption, repair and `--force`
+before acquisition or cleanup. The ordinary path retains its existing adoption,
+repair, force and workload-option behavior, including response files. Guided
+init does not accept workload initializer options. Arbitrary native parameter
+tokens remain supported by the separate staged `InitExecutionCommand`, not by
+this public opt-in adapter. Required native values can be prompted interactively;
+scripts fail if they are unresolved.
+
+**Remaining gates.** The bundled production authority is still unqualified and
+contains no approved quickstart associations. Production acquisition therefore
+fails explicitly. Real fixtures demonstrate the complete mechanics, not publisher
+or hosted release qualification. Production needs an approved `FuncTemplate`
+archive, package/version/source/digest/contentRevision, full inventory and
+actual stack/host/channel/role association. The default-init cutover still needs
+the initializer compatibility inventory, full public parameter integration,
+compatible force support, production replacement parity and legacy removal
+approval. No held Node executor or ordinary post-action dispatcher is enabled.
+Later policy alignment must preserve dispatch and rebuild policy/factory services
+in the same fresh scope. The DA6B foundation remains the explicit baseline.
+
 ## Context
 
 See `proposal.md` for motivation and `specs/func-init-quickstarts/spec.md` for the behavior contract.
@@ -61,8 +137,9 @@ Only declared Functions project configuration actions participate in Func topolo
 #### Read-only browse presentation
 
 The internal `IQuickstartBrowser.BrowseAsync(QuickstartBrowseRequest, CancellationToken)`
-is registered with DI for a later guided init caller. It does not add a public
-command or connect to init yet. It returns no template selector or authorization.
+is registered with DI and reused by opt-in guided init. It does not add a
+standalone browse command. Its default request returns no template nomination.
+`AllowSelection` enables an explicit nomination, never authorization.
 It resolves stack IDs and aliases from installed `IProjectStack` capabilities,
 using the existing quickstart provider only to bridge legacy language spelling.
 The selected stack filters discovery metadata, not producer-declared project
@@ -85,15 +162,16 @@ is visibly identified. The only permitted writes are those of the existing
 manifest metadata cache.
 
 The default browser still neither opens the installed template store nor provides
-an install/create action. Consent, acquisition and public init integration remain
-subsequent gates.
+an install/create action. Only the opt-in guided caller enables nomination and
+composes the separate authority, consent, acquisition and creation gates above.
 
 #### Internal exact-artifact binding
 
 The additive artifact-binding layer is opt-in through
 `AddNativeTemplateArtifactBinding`, alongside the staged native setup services.
-It does not register a public command, enable a default route, populate production
-authority or authorize a producer rollout.
+The registration helpers do not register a command, enable the default init
+route, populate production authority or authorize a producer rollout. The CLI
+host now composes these helpers for its explicit `--guided` route.
 
 `InitExecutionRequest.ArtifactBinding` carries a full ordinal template identity,
 package ID, normalized version, source and SHA-256 coordinates, plus the selected
@@ -154,7 +232,7 @@ not treated as stable.
 #### Internal catalog preparation
 
 The CLI has an internal read-only catalog adapter alongside the legacy manifest
-service. It does not change the public quickstart or init commands. Both views
+service. Legacy quickstart commands and the default init route are unchanged. Both views
 use the existing manifest URL, validation, local override, and metadata cache.
 The public `QuickstartEntry` and legacy list/info JSON shapes are unchanged.
 

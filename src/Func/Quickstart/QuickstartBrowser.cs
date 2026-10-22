@@ -10,14 +10,16 @@ internal sealed record QuickstartBrowseRequest(
     string? Stack = null, string? Language = null, string? Resource = null, string? Iac = null, string? Search = null)
 {
     internal QuickstartInstalledQuery? InstalledQuery { get; init; }
+
+    internal bool AllowSelection { get; init; }
 }
 
 /// <summary>
-/// Presents discovery metadata only. Completion never returns an acquisition or creation selection.
+/// Presents discovery metadata. An explicit selection nominates metadata, never acquisition authority.
 /// </summary>
 internal interface IQuickstartBrowser
 {
-    public Task BrowseAsync(QuickstartBrowseRequest request, CancellationToken cancellationToken);
+    public Task<QuickstartCatalogEntry?> BrowseAsync(QuickstartBrowseRequest request, CancellationToken cancellationToken);
 }
 
 internal sealed class QuickstartBrowser(
@@ -42,14 +44,14 @@ internal sealed class QuickstartBrowser(
     private readonly QuickstartCatalogRenderer _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
     private readonly QuickstartInstalledTemplates? _installed = installed;
 
-    public async Task BrowseAsync(QuickstartBrowseRequest request, CancellationToken cancellationToken)
+    public async Task<QuickstartCatalogEntry?> BrowseAsync(QuickstartBrowseRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
         IProjectStack? stack = await SelectStackAsync(request.Stack, cancellationToken);
         if (stack is null)
         {
-            return;
+            return null;
         }
 
         IQuickstartProvider? provider = _providers.SingleOrDefault(candidate =>
@@ -62,7 +64,7 @@ internal sealed class QuickstartBrowser(
             if (language is null)
             {
                 _interaction.WriteError($"Language '{request.Language}' is not supported by '{stack.Stack}'. Choose one of: {string.Join(", ", stack.SupportedLanguages)}.");
-                return;
+                return null;
             }
         }
 
@@ -110,7 +112,7 @@ internal sealed class QuickstartBrowser(
             _renderer.WriteResults(results.Entries);
             if (!_interaction.IsInteractive)
             {
-                return;
+                return null;
             }
 
             // Ordinals disambiguate even duplicate catalog IDs without treating either as an owner.
@@ -130,11 +132,16 @@ internal sealed class QuickstartBrowser(
             {
                 _renderer.WriteDetails(entry, provider?.GetDisplayLanguage(entry.Entry.Language) ?? entry.Entry.Language);
                 string navigation = await _interaction.PromptForSelectionAsync(
-                    "Template details (no install or create action):", [Back, Cancel], cancellationToken);
+                    request.AllowSelection ? "Template details (selection still requires qualification and consent):" : "Template details (no install or create action):",
+                    request.AllowSelection ? ["Use this template", Back, Cancel] : [Back, Cancel], cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                if (request.AllowSelection && navigation == "Use this template")
+                {
+                    return entry;
+                }
                 if (navigation != Back)
                 {
-                    return;
+                    return null;
                 }
             }
             else if (action is Search or Resource or Iac)
@@ -156,7 +163,7 @@ internal sealed class QuickstartBrowser(
             }
             else
             {
-                return;
+                return null;
             }
         }
     }
