@@ -132,9 +132,10 @@ The synchronized consumer uses installed `IProjectStack` metadata through the
 same shared `InstalledProjectStackCatalog` used by its project planner. It does
 not read initializer metadata or invoke initializer behavior. Composition-root
 delegates defer that catalog and the existing paired `TemplateProjectSupport`
-until the workflow needs them. The catalog resolves once before support or an
-engine environment is requested, so conflicting definitions still return the
-structured `duplicateStacks` failure without creating files.
+until the workflow needs them. The production registrations supply that support
+as a singleton over the registered planner and writer. The catalog resolves once
+before support or an engine environment is requested, so conflicting definitions
+still return the structured `duplicateStacks` failure without creating files.
 
 Conflicts at the catalog's existing duplicate-ID and alias-ownership checks now
 throw the internal `ConflictingProjectStackMetadataException` subtype of
