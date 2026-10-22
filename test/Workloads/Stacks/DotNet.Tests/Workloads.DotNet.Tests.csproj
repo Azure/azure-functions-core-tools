@@ -8,6 +8,19 @@
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/DotNet/Workloads.DotNet.csproj" />
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.TemplateEngine.Edge" />
+    <PackageReference Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" />
   </ItemGroup>
+
+  <Target Name="PackNativeDotNetForTests" AfterTargets="Build">
+    <ItemGroup>
+      <_PreviousNativeDotNetTestArchive Include="$(OutDir)bundled-dotnet-artifacts/Azure.Functions.Cli.Workloads.DotNet.*.nupkg" />
+    </ItemGroup>
+    <Delete Files="@(_PreviousNativeDotNetTestArchive)" />
+    <MSBuild Projects="$(SrcRoot)Workloads/Stacks/DotNet/Workloads.DotNet.csproj" Targets="Pack"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-dotnet-artifacts" />
+    <Copy SourceFiles="$(NuGetPackageRoot)microsoft.azure.functions.worker.itemtemplates/4.0.5590/microsoft.azure.functions.worker.itemtemplates.4.0.5590.nupkg;$(NuGetPackageRoot)microsoft.azure.functions.worker.projecttemplates/4.0.5337/microsoft.azure.functions.worker.projecttemplates.4.0.5337.nupkg"
+      DestinationFolder="$(OutDir)upstream-dotnet-inputs" />
+  </Target>
 
 </Project>

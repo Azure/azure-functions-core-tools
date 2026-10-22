@@ -4,7 +4,11 @@
 using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
 
+#if FUNC_HOST_DOTNET_TEMPLATES
+namespace Azure.Functions.Cli.Templates.DotNet.Shared;
+#else
 namespace Azure.Functions.Cli.Workloads.DotNet;
+#endif
 
 /// <summary>
 /// Resolves the full path to the <c>dotnet</c> muxer using well-known environment

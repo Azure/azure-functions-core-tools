@@ -7,14 +7,25 @@
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>dotnet</WorkloadAlias>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <BundledTemplatesProject>$(MSBuildProjectDirectory)/NativeTemplates/Workloads.DotNet.Templates.csproj</BundledTemplatesProject>
+    <BundledTemplatesPackageId>Azure.Functions.Templates.DotNet</BundledTemplatesPackageId>
+    <BundledTemplatesPackagePath>templates/dotnet.nupkg</BundledTemplatesPackagePath>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.DotNet.Tests" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="NuGet.Versioning" />
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <ProjectReference Include="NativeTemplates/Workloads.DotNet.Templates.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <Compile Remove="NativeTemplates/**" />
+    <EmbeddedResource Remove="NativeTemplates/**" />
   </ItemGroup>
+
+  <Import Project="$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets" />
 
 </Project>
