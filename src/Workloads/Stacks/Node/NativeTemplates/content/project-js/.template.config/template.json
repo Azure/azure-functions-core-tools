@@ -11,6 +11,7 @@
   "symbols": {
     "PackageName": { "type": "derived", "valueSource": "name", "valueTransform": "npmName", "replaces": "__PROJECT_NAME__" },
     "NoBundles": { "type": "parameter", "datatype": "Boolean", "defaultValue": "false", "description": "Create host.json without an extension bundle." },
+    "SkipNpmInstall": { "type": "parameter", "datatype": "Boolean", "defaultValue": "false", "description": "Skip npm dependency installation in the explicitly composed preparation flow." },
     "BundlesChannel": { "type": "parameter", "datatype": "choice", "defaultValue": "Stable", "description": "Extension bundle channel.",
       "choices": [{ "choice": "Stable" }, { "choice": "Preview" }, { "choice": "Experimental" }] },
     "BundleId": { "type": "generated", "generator": "switch", "replaces": "__BUNDLE_ID__",

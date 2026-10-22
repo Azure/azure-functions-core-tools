@@ -119,8 +119,8 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         inner.NuspecReader.GetPackageTypes().Select(type => type.Name).Should().Equal("FuncTemplate");
         inner.GetFiles().Should().Contain("LICENSE", "content/project-js/.funcignore", "content/project-ts/.gitignore");
         asset.GetProperty("templates").EnumerateArray().Select(template => template.GetProperty("identity").GetString())
-            .Should().BeEquivalentTo("Azure.Functions.Node.Basic.JavaScript", "Azure.Functions.Node.Basic.TypeScript",
-                "Azure.Functions.Node.Http.JavaScript", "Azure.Functions.Node.Http.TypeScript");
+            .Should().BeEquivalentTo(ReadNodeSource().Templates.Select(template => NativeNodeIdentity(template.Id!))
+                .Concat(["Azure.Functions.Node.Basic.JavaScript", "Azure.Functions.Node.Basic.TypeScript"]));
         Read(inner, "content/project-js/package.json").Should().Contain("\"main\": \"src/functions/*.js\"", "\"@azure/functions\": \"^4.0.0\"");
         Read(inner, "content/project-ts/package.json").Should().Contain("\"main\": \"dist/src/functions/*.js\"", "\"build\": \"tsc\"");
         Read(inner, "content/http-js/httpTrigger.js").Should().Contain("app.http('httpTrigger'", "return { body: `Hello, ${name}!` };").And.NotContain("function.json");

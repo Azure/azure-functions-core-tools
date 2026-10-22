@@ -4,15 +4,20 @@
   "identity": "Azure.Functions.Node.Http.TypeScript",
   "groupIdentity": "Azure.Functions.Node.Http",
   "name": "HTTP trigger",
-  "shortName": "http",
+  "shortName": ["http", "HttpTrigger-TypeScript", "HTTP trigger"],
   "tags": { "type": "item", "language": "TypeScript" },
   "sourceName": "httpTrigger",
   "defaultName": "httpTrigger",
   "preferNameDirectory": false,
   "symbols": {
+    "InvocationOutputIntent": { "type": "bind", "binding": "host:func:item-output-intent" },
     "AuthLevel": { "type": "parameter", "datatype": "choice", "defaultValue": "anonymous", "replaces": "__AUTH_LEVEL__", "description": "HTTP authorization level.",
       "choices": [{ "choice": "anonymous" }, { "choice": "function" }, { "choice": "admin" }] }
   },
+  "sources": [
+    { "source": "./", "target": "src/functions/", "condition": "(InvocationOutputIntent == \"legacy\")" },
+    { "source": "./", "target": "./", "condition": "(InvocationOutputIntent != \"legacy\")" }
+  ],
   "constraints": {
     "host": { "type": "host", "args": [{ "hostname": "func" }] },
     "stack": { "type": "func-workload", "args": "node" }

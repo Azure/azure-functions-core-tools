@@ -470,20 +470,18 @@ public sealed partial class BundledNodeTemplateTests
     private string AdmissionMultiAssetArchive()
     {
         string original = Path.Combine(_root, "native-original.nupkg");
+        BasicTemplateDefinition[] definitions;
         using (var outer = new NuGet.Packaging.PackageArchiveReader(BuiltArchive))
         using (var output = File.Create(original))
         {
             outer.GetStream("tools/any/templates/node-basic.nupkg").CopyTo(output);
+            using var declaration = JsonDocument.Parse(outer.GetStream("bundled-templates.json"));
+            definitions = [.. declaration.RootElement.GetProperty("assets")[0].GetProperty("templates").EnumerateArray()
+                .Select(template => new BasicTemplateDefinition(template.GetProperty("path").GetString()!,
+                    template.GetProperty("identity").GetString()!, template.GetProperty("type").GetString()!))];
         }
         string other = Path.Combine(_root, "native-other.nupkg");
         File.Copy(original, other);
-        BasicTemplateDefinition[] definitions =
-        [
-            new("content/http-js/.template.config/template.json", "Azure.Functions.Node.Http.JavaScript", "item"),
-            new("content/http-ts/.template.config/template.json", "Azure.Functions.Node.Http.TypeScript", "item"),
-            new("content/project-js/.template.config/template.json", "Azure.Functions.Node.Basic.JavaScript", "project"),
-            new("content/project-ts/.template.config/template.json", "Azure.Functions.Node.Basic.TypeScript", "project"),
-        ];
         using (var native = ZipFile.Open(other, ZipArchiveMode.Update))
         {
             var nuspec = native.GetEntry("Azure.Functions.Templates.Node.Basic.nuspec")!;

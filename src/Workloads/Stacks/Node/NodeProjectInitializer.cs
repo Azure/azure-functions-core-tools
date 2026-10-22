@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Commands;
@@ -15,7 +14,7 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// for JS or TS, merges the default extension bundle into <c>host.json</c>,
 /// and optionally runs <c>npm install</c>.
 /// </summary>
-internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectInitializer
+internal sealed class NodeProjectInitializer(NodeProjectStack stack, NodeNpmInstaller npmInstaller) : IProjectInitializer
 {
     private const string ProjectNamePlaceholder = "__PROJECT_NAME__";
     private static readonly Assembly _assembly = typeof(NodeProjectInitializer).Assembly;
@@ -26,7 +25,8 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
 
     // Internal seam so tests can stub out the `npm install` invocation
     // without spawning real processes.
-    internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunNpmInstall { get; set; } = DefaultRunNpmInstall;
+    internal Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> RunNpmInstall { get; set; } =
+        (npmInstaller ?? throw new ArgumentNullException(nameof(npmInstaller))).InstallAsync;
 
     public string Stack => _stack.Stack;
 
@@ -161,42 +161,6 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack) : IProjectI
             ["id"] = ExtensionBundle.IdFor(channel),
             ["version"] = ExtensionBundle.DefaultVersionRange,
         };
-    }
-
-    private static async Task<(int ExitCode, string Stderr)> DefaultRunNpmInstall(string workingDirectory, CancellationToken cancellationToken)
-    {
-        try
-        {
-            // Windows resolves `npm` via the `npm.cmd` shim, which only works
-            // when the launcher is shell-spawned. Direct Process.Start of "npm"
-            // fails on Windows otherwise.
-            bool isWindows = OperatingSystem.IsWindows();
-            var psi = new ProcessStartInfo
-            {
-                FileName = isWindows ? "cmd.exe" : "npm",
-                Arguments = isWindows ? "/c npm install" : "install",
-                WorkingDirectory = workingDirectory,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return (-1, "Failed to start 'npm' process.");
-            }
-
-            string stderr = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return (process.ExitCode, stderr);
-        }
-        catch (Exception ex)
-        {
-            // 'npm' may not be installed; the scaffolded files are still valid.
-            return (-1, ex.Message);
-        }
     }
 
     internal string NormalizeLanguage(string? language)

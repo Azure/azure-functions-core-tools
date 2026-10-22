@@ -15,8 +15,30 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void Constructor_NullStack_Throws()
     {
-        FluentActions.Invoking(() => new NodeProjectInitializer(null!))
+        FluentActions.Invoking(() => new NodeProjectInitializer(null!, new NodeNpmInstaller()))
             .Should().ThrowExactly<ArgumentNullException>().WithParameterName("stack");
+    }
+
+    [Fact]
+    public void Constructor_NullNpmInstaller_Throws()
+    {
+        FluentActions.Invoking(() => new NodeProjectInitializer(new NodeProjectStack(), null!))
+            .Should().ThrowExactly<ArgumentNullException>().WithParameterName("npmInstaller");
+    }
+
+    [Fact]
+    public async Task RunNpmInstall_DefaultDelegate_UsesInjectedOwnedHelperWithoutScaffolding()
+    {
+        var npm = new RecordingNpmInstaller();
+        NodeProjectInitializer initializer = new(new NodeProjectStack(), npm);
+        using var cancellation = new CancellationTokenSource();
+
+        (int ExitCode, string Stderr) result = await initializer.RunNpmInstall(_projectDir.FullName, cancellation.Token);
+
+        result.Should().Be((7, "owned helper stderr"));
+        npm.Path.Should().Be(_projectDir.FullName);
+        npm.Token.Should().Be(cancellation.Token);
+        _projectDir.GetFileSystemInfos().Should().BeEmpty();
     }
 
     private readonly DirectoryInfo _projectDir;
@@ -44,7 +66,7 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsNode()
     {
-        new NodeProjectInitializer(new NodeProjectStack()).Stack.Should().Be("node");
+        new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller()).Stack.Should().Be("node");
     }
 
     [Theory]
@@ -59,7 +81,7 @@ public class NodeProjectInitializerTests : IDisposable
     [InlineData("unknown", "unknown")]
     public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
     {
-        new NodeProjectInitializer(new NodeProjectStack()).NormalizeLanguage(input).Should().Be(expected);
+        new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller()).NormalizeLanguage(input).Should().Be(expected);
     }
 
     [Fact]
@@ -91,7 +113,7 @@ public class NodeProjectInitializerTests : IDisposable
     public void GetInitOptions_RegistersBundleAndNpmOptions()
     {
         RootCommand root = [];
-        IReadOnlyList<Option> options = new NodeProjectInitializer(new NodeProjectStack()).GetInitOptions(new InitOptionRegistry(root));
+        IReadOnlyList<Option> options = new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller()).GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         names.Should().Contain("--no-bundles");
@@ -249,7 +271,7 @@ public class NodeProjectInitializerTests : IDisposable
         string[]? args = null,
         Action<NodeProjectInitializer>? configure = null)
     {
-        NodeProjectInitializer initializer = new(new NodeProjectStack())
+        NodeProjectInitializer initializer = new(new NodeProjectStack(), new NodeNpmInstaller())
         {
             // Stub by default so tests don't spawn real npm.
             RunNpmInstall = (_, _) => Task.FromResult((0, string.Empty)),
@@ -268,5 +290,18 @@ public class NodeProjectInitializerTests : IDisposable
 
         ParseResult parseResult = root.Parse(args ?? []);
         return initializer.InitializeAsync(context, parseResult);
+    }
+
+    private sealed class RecordingNpmInstaller : NodeNpmInstaller
+    {
+        public string? Path { get; private set; }
+        public CancellationToken Token { get; private set; }
+
+        public override Task<(int ExitCode, string Stderr)> InstallAsync(string workingDirectory, CancellationToken cancellationToken)
+        {
+            Path = workingDirectory;
+            Token = cancellationToken;
+            return Task.FromResult((7, "owned helper stderr"));
+        }
     }
 }
