@@ -208,6 +208,15 @@ Nested `invocation.changes` paths identify the actual authored destinations.
 This is an intentional internal result-semantics change; property names are
 unchanged.
 
+`NodeStagedEntryPlacementTests.cs` additionally exercises the explicit
+`NativeCliEntryPoint` full argv/boot/parser path. Existing public `[path]`
+syntax receives legacy-relative placement, including a nested base already
+named `src/functions` without deduplication; the staged `NewExecutionCommand`
+`--path` surface remains literal. Prefix files and a linked prefix are
+refused as structured failures without falling back to the legacy engine.
+`Program` retains its internal `Legacy` default: this staged entry proof is
+not permission to switch the default route.
+
 ## Staged creation, not a public command switch
 
 Project templates use the **draft** configuration action

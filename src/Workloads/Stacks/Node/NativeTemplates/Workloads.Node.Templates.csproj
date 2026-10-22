@@ -32,8 +32,8 @@
   <Target Name="StageNativeNodeItems" BeforeTargets="_GetPackageFiles">
     <PropertyGroup>
       <_NodeItemSource>$(MSBuildProjectDirectory)/../../../Templates/Node/content/v2/</_NodeItemSource>
-      <_NodeItemOutput>$(IntermediateOutputPath)native-items/</_NodeItemOutput>
-      <_NodeProvenanceOutput>$(IntermediateOutputPath)native-provenance/</_NodeProvenanceOutput>
+      <_NodeItemOutput>$(IntermediateOutputPath)native-items/$(PackageVersion)/</_NodeItemOutput>
+      <_NodeProvenanceOutput>$(IntermediateOutputPath)native-provenance/$(PackageVersion)/</_NodeProvenanceOutput>
     </PropertyGroup>
     <RemoveDir Directories="$(_NodeItemOutput)" />
     <RemoveDir Directories="$(_NodeProvenanceOutput)" />

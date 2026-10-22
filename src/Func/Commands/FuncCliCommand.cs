@@ -65,6 +65,11 @@ internal abstract class FuncCliCommand : Command
                 return Task.FromResult(sync.Invoke(parseResult));
             }
 
+            if (helpOption?.Action is AsynchronousCommandLineAction asynchronous)
+            {
+                return asynchronous.InvokeAsync(parseResult, cancellationToken);
+            }
+
             current = current.Parents.OfType<Command>().FirstOrDefault();
         }
 
@@ -75,6 +80,11 @@ internal abstract class FuncCliCommand : Command
         if (rootHelp?.Action is SynchronousCommandLineAction rootSync)
         {
             return Task.FromResult(rootSync.Invoke(parseResult));
+        }
+
+        if (rootHelp?.Action is AsynchronousCommandLineAction rootAsync)
+        {
+            return rootAsync.InvokeAsync(parseResult, cancellationToken);
         }
 
         // Help action not wired (command was constructed outside Parser.CreateCommand,

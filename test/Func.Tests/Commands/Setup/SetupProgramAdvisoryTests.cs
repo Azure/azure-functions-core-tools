@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Storage;
+using NSubstitute;
 using Xunit.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Commands.Setup;
@@ -299,4 +300,9 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
         events.Should().NotBeEmpty();
         return [.. events];
     }
+
+    internal static Task<CliProcessTestRunner.CliResult> RunCliAsync(
+        string directory, string home, string workloadsHome, string project, IReadOnlyList<string> args, CancellationToken cancellationToken)
+        => new CliProcessTestRunner(Substitute.For<ITestOutputHelper>())
+            .RunAsync(directory, home, workloadsHome, project, args, cancellationToken);
 }
