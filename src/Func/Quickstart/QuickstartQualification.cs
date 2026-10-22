@@ -101,5 +101,12 @@ internal sealed class QuickstartQualification(IBasicCompanionCatalog catalog, Ba
         return new(request with { Approval = approval }, selection);
     }
 
+    internal static bool IsCandidateRefusal(BasicAcquisitionFailure failure)
+        => failure is BasicAcquisitionFailure.MissingMapping or BasicAcquisitionFailure.SourceConflict
+            or BasicAcquisitionFailure.RangeConflict or BasicAcquisitionFailure.HostConflict
+            or BasicAcquisitionFailure.ChannelConflict or BasicAcquisitionFailure.OwnershipUnavailable
+            or BasicAcquisitionFailure.InstalledConflict or BasicAcquisitionFailure.PayloadUnavailable
+            or BasicAcquisitionFailure.InvalidArtifact;
+
     private static BasicAcquisitionException Unqualified(string message) => new(BasicAcquisitionFailure.MissingMapping, message);
 }

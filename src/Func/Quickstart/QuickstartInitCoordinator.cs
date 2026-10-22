@@ -52,7 +52,9 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         cancellationToken.ThrowIfCancellationRequested();
         if (input.Name is not null && string.IsNullOrWhiteSpace(input.Name)
             || input.TemplateReference is not null && string.IsNullOrWhiteSpace(input.TemplateReference)
-            || request.QuickstartId is not null && string.IsNullOrWhiteSpace(request.QuickstartId))
+            || request.QuickstartId is not null && string.IsNullOrWhiteSpace(request.QuickstartId)
+            || input.ExplicitStack is not null && string.IsNullOrWhiteSpace(input.ExplicitStack)
+            || input.ExplicitLanguage is not null && string.IsNullOrWhiteSpace(input.ExplicitLanguage))
         {
             return InitExecutionResult.Reject("invalidSelection", "Supply nonempty --name, --template and --quickstart values when specified.");
         }
@@ -62,7 +64,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         }
         if (input.Force)
         {
-            return InitExecutionResult.Reject("forceNotQualified", "Guided init does not support --force. Nothing was deleted; choose a new empty target.");
+            return InitExecutionResult.Reject("forceNotQualified", "Project-template init does not support --force. Nothing was deleted; choose a new empty target.");
         }
         if (request.QuickstartId is not null && input.TemplateReference is not null)
         {
@@ -75,14 +77,29 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
             {
                 return InitExecutionResult.ContinueWithLegacyInitializer();
             }
-            return InitExecutionResult.Reject("unsupportedTarget", $"Guided init requires an empty target. {targetDiagnostic}");
+            return InitExecutionResult.Reject("unsupportedTarget", $"Project-template init requires an empty target. {targetDiagnostic}");
         }
         bool interactive = !input.NonInteractive && _interaction.IsInteractive;
+        if (!request.OfferBasicSelection && request.QuickstartId is null && input.TemplateReference is null)
+        {
+            return InitExecutionResult.Reject("missingSelection",
+                "Select an installed project with --template or a catalog template with --quickstart before using template-backed init options.");
+        }
+        if (request.QuickstartId is not null)
+        {
+            return await ExecuteQuickstartSelectionAsync(request, interactive, cancellationToken);
+        }
+        if (input.TemplateReference is not null)
+        {
+            return await ExecuteInstalledTemplateSelectionAsync(input, interactive, cancellationToken);
+        }
+
         QualifiedQuickstart? qualified = null;
         NativeTemplateSelection? installedSelection = null;
         BundledBasicSelection? bundledSelection = null;
-        string? installedIdentity = input.TemplateReference;
+        string? installedIdentity = null;
         string stackName;
+        OwnedStackCandidate? selectedOwnerCandidate = null;
         QuickstartInstalledQuery query;
         // No native reader, prepared payload or engine handle survives this selection phase.
         BoundInitScope scope;
@@ -118,13 +135,14 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 {
                     return InitExecutionResult.ContinueWithLegacyInitializer();
                 }
-                return InitExecutionResult.Reject("missingStack", "Select an installed stack with --stack, or cancel guided init without changes.");
+                return InitExecutionResult.Reject("missingStack", "Select an installed stack with --stack, or cancel project-template selection without changes.");
             }
             stackName = stack.Stack;
             if (!scope.StackOwners.TryGetValue(stackName, out WorkloadEntry? owner))
             {
-                return InitExecutionResult.Reject("ownerUnavailable", "The selected stack has no unique actual loaded runtime owner. Repair its workload before guided init.");
+                return InitExecutionResult.Reject("ownerUnavailable", "The selected stack has no unique actual loaded runtime owner. Repair its workload before selecting a project template.");
             }
+            selectedOwnerCandidate = new(stack, owner);
             query = new(input.WorkingDirectory, NativeTemplateOwnerIdentity.FromEntry(owner));
             if (input.ExplicitStack is not null && input.ExplicitLanguage is not null
                 && new InstalledProjectStackCatalog([stack]).GetCanonicalLanguage(input.ExplicitLanguage) is null)
@@ -136,7 +154,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 return InitExecutionResult.Reject("invalidLanguage", "The requested language is not supported by the selected installed stack.");
             }
             QuickstartCatalogEntry? nomination = null;
-            if (installedIdentity is null && request.QuickstartId is null)
+            if (installedIdentity is null)
             {
                 if (!interactive)
                 {
@@ -232,35 +250,6 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
             }
             if (installedIdentity is null)
             {
-                if (request.QuickstartId is not null)
-                {
-                    QuickstartCatalog results = await _catalog.SearchAsync(new(LegacyStack: stack), cancellationToken);
-                    _catalogRenderer.WriteProvenance(results.Provenance);
-                    QuickstartCatalogEntry[] matches = [.. results.Entries.Where(entry => entry.Entry.Id == request.QuickstartId)];
-                    if (matches.Length == 0)
-                    {
-                        QuickstartCatalog all = await _catalog.SearchAsync(new(), cancellationToken);
-                        QuickstartCatalogEntry[] otherStacks = [.. all.Entries.Where(entry => entry.Entry.Id == request.QuickstartId)];
-                        if (otherStacks.Length == 1)
-                        {
-                            string language = otherStacks[0].Entry.Language;
-                            string[] compatible = [.. scope.Catalog.Stacks.Where(candidate =>
-                                new InstalledProjectStackCatalog([candidate]).GetCanonicalLanguage(language) is not null)
-                                .Select(candidate => $"--stack {candidate.Stack}")];
-                            string hint = compatible.Length > 0
-                                ? $"Choose {string.Join(" or ", compatible)}."
-                                : $"Use 'func setup' to install a stack supporting the catalog language '{language}', then select it with --stack.";
-                            return InitExecutionResult.Reject("quickstartStackMismatch",
-                                $"Quickstart '{request.QuickstartId}' is not available for the selected stack '{stackName}'. {hint}");
-                        }
-                    }
-                    if (matches.Length != 1)
-                    {
-                        return InitExecutionResult.Reject("ambiguousQuickstart", "Supply one exact, unique discovery --quickstart ID for the selected stack.");
-                    }
-                    nomination = matches[0];
-                    _catalogRenderer.WriteDetails(nomination, nomination.Entry.Language);
-                }
                 if (nomination is null)
                 {
                     return Canceled();
@@ -275,67 +264,19 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 }
             }
         }
+        if (qualified is not null)
+        {
+            return await ExecuteQualifiedQuickstartAsync(request,
+                new(selectedOwnerCandidate!.Stack, qualified), interactive, cancellationToken);
+        }
         InitExecutionRequest execution = input with
         {
-            TemplateReference = qualified?.Selection.TemplateIdentity ?? installedIdentity,
-            ArtifactBinding = qualified?.Selection ?? installedSelection,
+            TemplateReference = installedSelection?.TemplateIdentity ?? installedIdentity,
+            ArtifactBinding = installedSelection,
             BundledBinding = bundledSelection,
             RefreshCapabilities = true,
             ConfirmCreation = interactive,
         };
-        if (qualified is not null)
-        {
-            WritePlan(qualified, input);
-            if (input.DryRun)
-            {
-                return InitExecutionResult.Reject("payloadRequired",
-                    "Metadata intent only. Dry-run did not acquire, register, recover or clean anything. An engine preview requires the exact installed payload; use --template after explicit acquisition.");
-            }
-            if (!interactive && !request.AuthorizeAcquisition)
-            {
-                return InitExecutionResult.Reject("acquisitionAuthorizationRequired",
-                    "This exact acquisition plan is not authorized. In scripts, supply --quickstart; --guided alone is not consent.");
-            }
-            if (interactive && !await _interaction.ConfirmAsync("Acquire the exact plan above, then preview project creation?", false, false, cancellationToken))
-            {
-                return Canceled();
-            }
-            cancellationToken.ThrowIfCancellationRequested();
-            using (BoundInitScope current = await _scopes.CreateAsync(cancellationToken))
-            {
-                if (!current.StackOwners.TryGetValue(stackName, out WorkloadEntry? currentOwner)
-                    || NativeTemplateOwnerIdentity.FromEntry(currentOwner) != qualified.Selection.Owner)
-                {
-                    return InitExecutionResult.Reject("planChanged", "The actual loaded stack owner changed after consent. Select and approve again.");
-                }
-            }
-            if (_targets.GetDiagnostic(input.WorkingDirectory) is { } changedTarget)
-            {
-                return InitExecutionResult.Reject("targetChanged", $"The target changed after consent. No payload was acquired. {changedTarget}");
-            }
-            BasicAcquisitionResult acquired = await _acquisition.RunAsync(qualified.Acquisition, cancellationToken);
-            if (acquired.Status == BasicAcquisitionStatus.Canceled)
-            {
-                string completed = acquired.Completed.Count == 0 ? string.Empty
-                    : $" Verified completed packages remain: {string.Join(", ", acquired.Completed.Select(step => $"{step.PackageId}@{step.Version}"))}.";
-                _interaction.WriteWarning($"{acquired.Message}{completed}"
-                    + (acquired.Failure is { } failure ? $" Acquisition diagnostic: {failure}." : string.Empty));
-                throw new OperationCanceledException(acquired.Message, acquired.Cause, cancellationToken);
-            }
-            if (acquired.Status != BasicAcquisitionStatus.Completed || acquired.Failure is not null
-                || acquired.Revision != qualified.Acquisition.Approval!.Plan.Revision
-                || acquired.Source != qualified.Selection.Source
-                || !acquired.Completed.Any(step => string.Equals(step.PackageId, qualified.Acquisition.StackPackageId, StringComparison.OrdinalIgnoreCase)
-                    && step.Version == qualified.Acquisition.StackVersion.ToNormalizedString())
-                || qualified.Acquisition.Approval.Artifacts.Any(artifact => !acquired.Completed.Any(step =>
-                    string.Equals(step.PackageId, artifact.PackageId, StringComparison.OrdinalIgnoreCase)
-                    && step.Version == artifact.Version.ToNormalizedString())))
-            {
-                return InitExecutionResult.Reject("acquisitionFailed",
-                    $"Acquisition ended with {acquired.Status} ({acquired.Failure}). {acquired.Message}",
-                    $"Completed packages remain: {string.Join(", ", acquired.Completed.Select(step => $"{step.PackageId} {step.Version}"))}. No project creation was attempted; no rollback is claimed.");
-            }
-        }
         cancellationToken.ThrowIfCancellationRequested();
         return await _init.ExecuteAsync(execution, new([]), cancellationToken);
     }
@@ -371,9 +312,336 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         return selected == Cancel ? (null, true) : (choices.GetValueOrDefault(selected), false);
     }
 
-    private void WritePlan(QualifiedQuickstart qualified, InitExecutionRequest input)
+    private async Task<InitExecutionResult> ExecuteQuickstartSelectionAsync(QuickstartInitRequest request, bool interactive,
+        CancellationToken cancellationToken)
+    {
+        QuickstartCatalog catalog = await _catalog.SearchAsync(new(), cancellationToken);
+        _catalogRenderer.WriteProvenance(catalog.Provenance);
+        QuickstartCatalogEntry[] nominations = [.. catalog.Entries.Where(entry => entry.Entry.Id == request.QuickstartId)];
+        if (nominations.Length != 1)
+        {
+            return InitExecutionResult.Reject("ambiguousQuickstart",
+                nominations.Length == 0
+                    ? $"Quickstart '{request.QuickstartId}' was not found in the discovery catalog."
+                    : "Supply one exact, unique discovery --quickstart ID.");
+        }
+
+        QuickstartCatalogEntry nomination = nominations[0];
+        _catalogRenderer.WriteDetails(nomination, nomination.Entry.Language);
+        QualifiedQuickstartCandidate[] candidates;
+        List<string> diagnostics = [];
+        using (BoundInitScope scope = await _scopes.CreateAsync(cancellationToken))
+        {
+            InitExecutionResult? stackError = GetOwnedStackCandidates(scope, request.Init, out List<OwnedStackCandidate> ownedStacks, out _);
+            if (stackError is not null)
+            {
+                return stackError;
+            }
+
+            List<QualifiedQuickstartCandidate> qualified = [];
+            foreach (OwnedStackCandidate candidate in ownedStacks)
+            {
+                QuickstartInstalledQuery query = new(request.Init.WorkingDirectory, NativeTemplateOwnerIdentity.FromEntry(candidate.Owner));
+                try
+                {
+                    QualifiedQuickstart result = await _qualification.ResolveAsync(nomination, query, candidate.Owner, cancellationToken);
+                    qualified.Add(new(candidate.Stack, result));
+                }
+                catch (BasicAcquisitionException exception) when (QuickstartQualification.IsCandidateRefusal(exception.Failure))
+                {
+                    diagnostics.Add($"{candidate.Stack.Stack}: {exception.Message}");
+                }
+                catch (BasicAcquisitionException exception)
+                {
+                    return InitExecutionResult.Reject("qualificationUnavailable", exception.Message);
+                }
+            }
+            candidates = [.. qualified];
+        }
+
+        if (candidates.Length == 0)
+        {
+            string details = diagnostics.Count == 0 ? "No uniquely owned installed stack supports the selected quickstart."
+                : string.Join(" ", diagnostics);
+            return InitExecutionResult.Reject(diagnostics.Count > 0 ? "qualificationUnavailable" : "quickstartNotQualified",
+                $"Quickstart '{request.QuickstartId}' has no independently qualified installed stack candidate. {details}");
+        }
+
+        QualifiedQuickstartCandidate selected;
+        if (candidates.Length == 1)
+        {
+            selected = candidates[0];
+        }
+        else
+        {
+            if (!interactive)
+            {
+                return InitExecutionResult.Reject("ambiguousQuickstartStack",
+                    $"Quickstart '{request.QuickstartId}' has multiple qualified installed stack owners. Supply --stack: {string.Join(", ", candidates.Select(candidate => candidate.Stack.Stack))}.");
+            }
+
+            Dictionary<string, QualifiedQuickstartCandidate> choices = candidates.ToDictionary(
+                candidate => $"{candidate.Stack.DisplayName} ({candidate.Stack.Stack}; {candidate.Qualified.Selection.Owner.PackageId} {candidate.Qualified.Selection.Owner.Version})",
+                StringComparer.Ordinal);
+            string choice = await _interaction.PromptForSelectionAsync("Select the qualified project stack:", [.. choices.Keys, Cancel],
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!choices.TryGetValue(choice, out selected!))
+            {
+                return Canceled();
+            }
+        }
+
+        return await ExecuteQualifiedQuickstartAsync(request, selected, interactive, cancellationToken);
+    }
+
+    private async Task<InitExecutionResult> ExecuteInstalledTemplateSelectionAsync(InitExecutionRequest input, bool interactive,
+        CancellationToken cancellationToken)
+    {
+        InstalledTemplateCandidate[] candidates;
+        bool exactIdentityFound = false;
+        List<string> diagnostics = [];
+        using (BoundInitScope scope = await _scopes.CreateAsync(cancellationToken))
+        {
+            InitExecutionResult? stackError = GetOwnedStackCandidates(scope, input, out List<OwnedStackCandidate> ownedStacks,
+                out string? canonicalLanguage);
+            if (stackError is not null)
+            {
+                return stackError;
+            }
+
+            using Templater templates = await _templates.CreateProjectAsync(new(input.WorkingDirectory) { RequireCleanStore = true },
+                scope.Availability, scope.Support, cancellationToken);
+            List<InstalledTemplateCandidate> selected = [];
+            foreach (OwnedStackCandidate candidate in ownedStacks)
+            {
+                IReadOnlyList<InstalledTemplateArtifact> installed = await templates.ProjectArtifactsAsync(scope.Verifier,
+                    NativeTemplateOwnerIdentity.FromEntry(candidate.Owner), null, cancellationToken, scope.BundledVerifier);
+                InstalledTemplateArtifact[] exact = [.. installed.Where(item => string.Equals(item.Entry.Identity, input.TemplateReference, StringComparison.Ordinal))];
+                if (exact.Length == 0)
+                {
+                    continue;
+                }
+                exactIdentityFound = true;
+                if (exact.Length != 1)
+                {
+                    diagnostics.Add($"{candidate.Stack.Stack}: the installed identity is duplicated.");
+                    continue;
+                }
+
+                InstalledTemplateArtifact artifact = exact[0];
+                if (artifact.Failure is IOException ioFailure)
+                {
+                    throw ioFailure;
+                }
+                if (artifact.Failure is UnauthorizedAccessException accessFailure)
+                {
+                    throw accessFailure;
+                }
+                var ownerIdentity = NativeTemplateOwnerIdentity.FromEntry(candidate.Owner);
+                bool externallyBound = artifact.Selection is { } external && external.Owner == ownerIdentity;
+                bool bundledBound = artifact.BundledSelection is { } bundled && bundled.Owner == ownerIdentity;
+                if (artifact.Diagnostic is not null || externallyBound == bundledBound
+                    || !QuickstartInstalledTemplates.SupportsTemplateConfiguration(artifact.Entry, scope.Catalog,
+                        candidate.Stack, canonicalLanguage))
+                {
+                    diagnostics.Add($"{candidate.Stack.Stack}: {artifact.Diagnostic ?? "the installed project declarations do not match its owner stack and language capabilities."}");
+                    continue;
+                }
+
+                selected.Add(new(candidate.Stack, candidate.Owner, artifact));
+            }
+            candidates = [.. selected];
+        }
+
+        if (candidates.Length == 0)
+        {
+            return InitExecutionResult.Reject(exactIdentityFound ? "templateNotQualified" : "templateNotInstalled",
+                exactIdentityFound
+                    ? $"Installed template '{input.TemplateReference}' has no uniquely owner-bound compatible project candidate. {string.Join(" ", diagnostics)}"
+                    : $"Template '{input.TemplateReference}' is not installed. Use 'func new install <package>' to install it explicitly; --template never triggers acquisition.");
+        }
+
+        InstalledTemplateCandidate selectedCandidate;
+        if (candidates.Length == 1)
+        {
+            selectedCandidate = candidates[0];
+        }
+        else
+        {
+            if (!interactive)
+            {
+                return InitExecutionResult.Reject("ambiguousTemplateStack",
+                    $"Template '{input.TemplateReference}' has multiple qualified installed stack owners. Supply --stack: {string.Join(", ", candidates.Select(candidate => candidate.Stack.Stack))}.");
+            }
+
+            Dictionary<string, InstalledTemplateCandidate> choices = candidates.ToDictionary(
+                candidate => $"{candidate.Stack.DisplayName} ({candidate.Stack.Stack}; {candidate.Owner.PackageId} {candidate.Owner.PackageVersion})",
+                StringComparer.Ordinal);
+            string choice = await _interaction.PromptForSelectionAsync("Select the installed template's project stack:", [.. choices.Keys, Cancel],
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!choices.TryGetValue(choice, out selectedCandidate!))
+            {
+                return Canceled();
+            }
+        }
+
+        InstalledTemplateArtifact binding = selectedCandidate.Artifact;
+        InitExecutionRequest execution = input with
+        {
+            ExplicitStack = input.ExplicitStack ?? selectedCandidate.Stack.Stack,
+            ArtifactBinding = binding.Selection,
+            BundledBinding = binding.BundledSelection,
+            RefreshCapabilities = true,
+            ConfirmCreation = interactive,
+        };
+        return await _init.ExecuteAsync(execution, new([]), cancellationToken);
+    }
+
+    private InitExecutionResult? GetOwnedStackCandidates(BoundInitScope scope, InitExecutionRequest input,
+        out List<OwnedStackCandidate> candidates, out string? canonicalLanguage)
+    {
+        candidates = [];
+        canonicalLanguage = null;
+        IProjectStack[] available;
+        if (input.ExplicitStack is not null)
+        {
+            IProjectStack? requested = scope.Catalog.FindStack(input.ExplicitStack);
+            if (requested is null)
+            {
+                return InitExecutionResult.Reject("invalidStack",
+                    $"Stack '{input.ExplicitStack}' must identify one installed stack. Supported stacks: {string.Join(", ", scope.Catalog.Stacks.Select(stack => stack.Stack))}.");
+            }
+            if (!scope.StackOwners.TryGetValue(requested.Stack, out WorkloadEntry? owner))
+            {
+                return InitExecutionResult.Reject("ownerUnavailable",
+                    $"Stack '{requested.Stack}' has no unique actual loaded runtime owner. Repair its workload before selecting a project template.");
+            }
+            available = [requested];
+            candidates.Add(new(requested, owner));
+        }
+        else
+        {
+            available = [.. scope.Catalog.Stacks];
+            foreach (IProjectStack stack in available)
+            {
+                if (scope.StackOwners.TryGetValue(stack.Stack, out WorkloadEntry? owner))
+                {
+                    candidates.Add(new(stack, owner));
+                }
+            }
+        }
+
+        if (input.ExplicitLanguage is not null)
+        {
+            canonicalLanguage = scope.Catalog.GetCanonicalLanguage(input.ExplicitLanguage);
+            if (canonicalLanguage is null)
+            {
+                return InitExecutionResult.Reject("invalidLanguage",
+                    $"Language '{input.ExplicitLanguage}' is not supported by an installed stack.");
+            }
+            if (input.ExplicitStack is not null && !available[0].SupportedLanguages.Contains(canonicalLanguage, StringComparer.OrdinalIgnoreCase))
+            {
+                return InitExecutionResult.Reject("invalidLanguage",
+                    $"Language '{input.ExplicitLanguage}' is not supported by stack '{available[0].Stack}'.");
+            }
+            List<OwnedStackCandidate> matching = [];
+            foreach (OwnedStackCandidate candidate in candidates)
+            {
+                if (candidate.Stack.SupportedLanguages.Contains(canonicalLanguage, StringComparer.OrdinalIgnoreCase))
+                {
+                    matching.Add(candidate);
+                }
+            }
+            candidates = matching;
+        }
+
+        if (candidates.Count == 0)
+        {
+            return InitExecutionResult.Reject("noCompatibleStack",
+                input.ExplicitLanguage is null
+                    ? "No uniquely owned installed stack is available for project-template selection."
+                    : $"No uniquely owned installed stack supports language '{input.ExplicitLanguage}'.");
+        }
+
+        return null;
+    }
+
+
+    private async Task<InitExecutionResult> ExecuteQualifiedQuickstartAsync(QuickstartInitRequest request,
+        QualifiedQuickstartCandidate candidate, bool interactive, CancellationToken cancellationToken)
+    {
+        InitExecutionRequest input = request.Init;
+        QualifiedQuickstart qualified = candidate.Qualified;
+        string stackName = candidate.Stack.Stack;
+        WritePlan(qualified, input, stackName);
+        if (input.DryRun)
+        {
+            return InitExecutionResult.Reject("payloadRequired",
+                "Metadata intent only. Dry-run did not acquire, register, recover or clean anything. An engine preview requires the exact installed payload; use --template after explicit acquisition.");
+        }
+        if (!interactive && !request.AuthorizeAcquisition)
+        {
+            return InitExecutionResult.Reject("acquisitionAuthorizationRequired",
+                "This exact acquisition plan is not authorized. In scripts, select it with --quickstart.");
+        }
+        if (interactive && !await _interaction.ConfirmAsync("Acquire the exact plan above, then preview project creation?", false, false, cancellationToken))
+        {
+            return Canceled();
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        using (BoundInitScope current = await _scopes.CreateAsync(cancellationToken))
+        {
+            if (!current.StackOwners.TryGetValue(stackName, out WorkloadEntry? currentOwner)
+                || NativeTemplateOwnerIdentity.FromEntry(currentOwner) != qualified.Selection.Owner)
+            {
+                return InitExecutionResult.Reject("planChanged", "The actual loaded stack owner changed after consent. Select and approve again.");
+            }
+        }
+        if (_targets.GetDiagnostic(input.WorkingDirectory) is { } changedTarget)
+        {
+            return InitExecutionResult.Reject("targetChanged", $"The target changed after consent. No payload was acquired. {changedTarget}");
+        }
+        BasicAcquisitionResult acquired = await _acquisition.RunAsync(qualified.Acquisition, cancellationToken);
+        if (acquired.Status == BasicAcquisitionStatus.Canceled)
+        {
+            string completed = acquired.Completed.Count == 0 ? string.Empty
+                : $" Verified completed packages remain: {string.Join(", ", acquired.Completed.Select(step => $"{step.PackageId}@{step.Version}"))}.";
+            _interaction.WriteWarning($"{acquired.Message}{completed}"
+                + (acquired.Failure is { } failure ? $" Acquisition diagnostic: {failure}." : string.Empty));
+            throw new OperationCanceledException(acquired.Message, acquired.Cause, cancellationToken);
+        }
+        if (acquired.Status != BasicAcquisitionStatus.Completed || acquired.Failure is not null
+            || acquired.Revision != qualified.Acquisition.Approval!.Plan.Revision
+            || acquired.Source != qualified.Selection.Source
+            || !acquired.Completed.Any(step => string.Equals(step.PackageId, qualified.Acquisition.StackPackageId, StringComparison.OrdinalIgnoreCase)
+                && step.Version == qualified.Acquisition.StackVersion.ToNormalizedString())
+            || qualified.Acquisition.Approval.Artifacts.Any(artifact => !acquired.Completed.Any(step =>
+                string.Equals(step.PackageId, artifact.PackageId, StringComparison.OrdinalIgnoreCase)
+                && step.Version == artifact.Version.ToNormalizedString())))
+        {
+            return InitExecutionResult.Reject("acquisitionFailed",
+                $"Acquisition ended with {acquired.Status} ({acquired.Failure}). {acquired.Message}",
+                $"Completed packages remain: {string.Join(", ", acquired.Completed.Select(step => $"{step.PackageId} {step.Version}"))}. No project creation was attempted; no rollback is claimed.");
+        }
+
+        InitExecutionRequest execution = input with
+        {
+            ExplicitStack = input.ExplicitStack ?? stackName,
+            TemplateReference = qualified.Selection.TemplateIdentity,
+            ArtifactBinding = qualified.Selection,
+            RefreshCapabilities = true,
+            ConfirmCreation = interactive,
+        };
+        cancellationToken.ThrowIfCancellationRequested();
+        return await _init.ExecuteAsync(execution, new([]), cancellationToken);
+    }
+
+    private void WritePlan(QualifiedQuickstart qualified, InitExecutionRequest input, string stackName)
     {
         _interaction.WriteSectionHeader("Independently qualified acquisition plan");
+        _interaction.WriteLine($"Selected project stack: {stackName}");
         _interaction.WriteLine($"Template: {qualified.Selection.TemplateIdentity}");
         _interaction.WriteLine($"Target: {input.WorkingDirectory.Info.FullName}");
         _interaction.WriteLine($"Name: {input.Name ?? "(template default)"}; language filter: {input.ExplicitLanguage ?? "all"}");
@@ -401,4 +669,10 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
     }
 
     private static InitExecutionResult Canceled() => InitExecutionResult.Reject("canceled", "Project template selection canceled before acquisition or project writes.");
+
+    private sealed record OwnedStackCandidate(IProjectStack Stack, WorkloadEntry Owner);
+
+    private sealed record QualifiedQuickstartCandidate(IProjectStack Stack, QualifiedQuickstart Qualified);
+
+    private sealed record InstalledTemplateCandidate(IProjectStack Stack, WorkloadEntry Owner, InstalledTemplateArtifact Artifact);
 }

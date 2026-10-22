@@ -99,8 +99,7 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
         string stack = provider?.Stack ?? entry.Language.ToLowerInvariant();
         if (item.MetadataStatus == QuickstartPackageMetadataStatus.Unverified && item.PackageReference?.Artifact is not null)
         {
-            string stackOption = provider is null ? string.Empty : $" --stack {provider.Stack}";
-            _interaction.WriteHint($"Inspect without acquisition: func init <path> --guided{stackOption} --quickstart {entry.Id} --dry-run");
+            _interaction.WriteHint($"Inspect without acquisition: func init <path> --quickstart {entry.Id} --dry-run");
             _interaction.WriteHint("Package metadata is unverified. Creation requires an installed stack and independent artifact qualification; this listing does not establish acquisition readiness.");
         }
         else

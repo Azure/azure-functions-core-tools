@@ -58,21 +58,19 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Description = "Re-initialize the directory: deletes its contents (except .git) before scaffolding the new project."
     };
 
-    public Option<bool> GuidedOption { get; } = new("--guided") { Description = "Opt in to staged installed-template selection; --quickstart implies this route. Does not replace ordinary init." };
+    public Option<string?> QuickstartOption { get; } = new("--quickstart") { Description = "Exact discovery catalog ID; authorizes its qualified acquisition and selects project creation.", Arity = ArgumentArity.ExactlyOne };
 
-    public Option<string?> QuickstartOption { get; } = new("--quickstart") { Description = "Exact discovery catalog ID; implies --guided and authorization for its qualified acquisition plan.", Arity = ArgumentArity.ExactlyOne };
-
-    public Option<string?> TemplateOption { get; } = new("--template", "-t") { Description = "Installed project-template identity for --guided. Unknown references never trigger acquisition.", Arity = ArgumentArity.ExactlyOne };
+    public Option<string?> TemplateOption { get; } = new("--template", "-t") { Description = "Installed project-template identity. Unknown references never trigger acquisition.", Arity = ArgumentArity.ExactlyOne };
 
     public Option<bool> AcquireQuickstartOption { get; } = new("--acquire-quickstart") { Description = "Explicit authorization for the exact qualified --quickstart plan; redundant when --quickstart is supplied." };
 
-    public Option<bool> DryRunOption { get; } = new("--dry-run") { Description = "With --guided, preview installed payloads without writes. Missing payloads produce metadata intent only." };
+    public Option<bool> DryRunOption { get; } = new("--dry-run") { Description = "Preview installed project-template payloads without writes. Missing quickstart payloads produce metadata intent only." };
 
-    public Option<bool> NonInteractiveOption { get; } = new("--non-interactive") { Description = "With --guided, require explicit selections instead of prompting." };
+    public Option<bool> NonInteractiveOption { get; } = new("--non-interactive") { Description = "Require explicit selections instead of prompting." };
 
     public Option<string[]> TemplateArgumentOption { get; } = new("--template-argument")
     {
-        Description = "One raw native token, repeated in order (e.g. --template-argument=--symbol --template-argument=value). Requires an explicit path and --guided with --template, or --quickstart.",
+        Description = "One raw native token, repeated in order (e.g. --template-argument=--symbol --template-argument=value). Requires an explicit path and --template or --quickstart.",
         Arity = ArgumentArity.OneOrMore,
         AllowMultipleArgumentsPerToken = false,
         Hidden = true,
@@ -86,7 +84,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly InstalledBundleScanner _bundleScanner;
     private readonly IFileSystem _fileSystem;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
-    private readonly IQuickstartInitCoordinator? _guided;
+    private readonly IQuickstartInitCoordinator? _initCoordinator;
 
     public InitCommand(
         IInteractionService interaction,
@@ -97,7 +95,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         InstalledBundleScanner bundleScanner,
         IFileSystem fileSystem,
         IEnumerable<IProjectInitializer> initializers,
-        IQuickstartInitCoordinator? guided = null)
+        IQuickstartInitCoordinator? initCoordinator = null)
         : base("init", "Initialize a new Azure Functions project. Run 'func init MyApp' to choose Basic, an installed template or Browse interactively. Quickstarts need no template parameters.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -117,7 +115,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _bundleScanner = bundleScanner;
         _fileSystem = fileSystem;
         _initializers = initializers.ToList();
-        _guided = guided;
+        _initCoordinator = initCoordinator;
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
         LanguageOption.Description = BuildLanguageOptionDescription(_initializers);
@@ -127,7 +125,6 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(NameOption);
         Options.Add(LanguageOption);
         Options.Add(ForceOption);
-        Options.Add(GuidedOption);
         Options.Add(QuickstartOption);
         Options.Add(TemplateOption);
         Options.Add(AcquireQuickstartOption);
@@ -161,32 +158,34 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     {
         string? quickstartId = parseResult.GetValue(QuickstartOption);
         bool quickstartSelected = quickstartId is not null;
-        bool guided = parseResult.GetValue(GuidedOption) || quickstartSelected;
+        string? templateReference = parseResult.GetValue(TemplateOption);
+        bool staged = quickstartSelected || templateReference is not null
+            || parseResult.GetValue(AcquireQuickstartOption) || parseResult.GetValue(DryRunOption)
+            || parseResult.GetValue(NonInteractiveOption);
         bool authorizeAcquisition = parseResult.GetValue(AcquireQuickstartOption) || quickstartSelected;
         string[] nativeTokens = parseResult.GetValue(TemplateArgumentOption) ?? [];
         if (nativeTokens.Length > 0)
         {
-            if (!guided || (parseResult.GetValue(TemplateOption) is null && parseResult.GetValue(QuickstartOption) is null)
-                || parseResult.GetResult(PathArgument!)?.Tokens.Count != 1)
+            if ((templateReference is null && !quickstartSelected) || parseResult.GetResult(PathArgument!)?.Tokens.Count != 1)
             {
-                _interaction.WriteError("--template-argument requires an explicit target path and either --guided with an installed --template identity or a --quickstart catalog ID. It cannot be used with the Basic initializer menu.");
+                _interaction.WriteError("--template-argument requires an explicit target path and an installed --template identity or --quickstart catalog ID. It cannot be used with the Basic initializer menu.");
                 return 1;
             }
         }
-        Option[] guidedOnly = [QuickstartOption, TemplateOption, AcquireQuickstartOption, DryRunOption, NonInteractiveOption];
-        if (!guided && guidedOnly.Any(option => parseResult.GetResult(option) is { Implicit: false }))
+        if (parseResult.GetValue(AcquireQuickstartOption) && !quickstartSelected)
         {
-            _interaction.WriteError("Template discovery options require the staged --guided path. Ordinary init is unchanged; unknown --template references never install packages.");
+            _interaction.WriteError("--acquire-quickstart requires an explicit --quickstart catalog ID. It never authorizes an installed-template reference.");
             return 1;
         }
-        if (guided)
+        if (staged)
         {
-            if (_guided is null)
+            if (_initCoordinator is null)
             {
-                _interaction.WriteError("The staged guided-init services are unavailable in this host. Ordinary init is still supported.");
+                _interaction.WriteError("Project-template init services are unavailable in this host. Ordinary init is still supported.");
                 return 1;
             }
-            HashSet<Option> supported = [StackOption, NameOption, LanguageOption, ForceOption, GuidedOption, TemplateArgumentOption, .. guidedOnly];
+            Option[] stagedOptions = [QuickstartOption, TemplateOption, AcquireQuickstartOption, DryRunOption, NonInteractiveOption];
+            HashSet<Option> supported = [StackOption, NameOption, LanguageOption, ForceOption, TemplateArgumentOption, .. stagedOptions];
             for (Command? parent = Parents.OfType<Command>().FirstOrDefault(); parent is not null; parent = parent.Parents.OfType<Command>().FirstOrDefault())
             {
                 supported.UnionWith(parent.Options.Where(option => option.Recursive));
@@ -194,15 +193,10 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             if (parseResult.CommandResult.Children.OfType<System.CommandLine.Parsing.OptionResult>()
                 .Any(result => !result.Implicit && !supported.Contains(result.Option)))
             {
-                _interaction.WriteError("Workload initializer options are not supported by staged --guided init. Use ordinary init for those options.");
+                _interaction.WriteError("Workload initializer options are not supported when selecting a project template. Use ordinary init for those options.");
                 return 1;
             }
-            if (parseResult.GetValue(AcquireQuickstartOption) && parseResult.GetValue(QuickstartOption) is null)
-            {
-                _interaction.WriteError("--acquire-quickstart requires an explicit --quickstart catalog ID. It never authorizes an installed-template reference.");
-                return 1;
-            }
-            InitExecutionRequest request = new(parseResult.GetValue(PathArgument!)!, parseResult.GetValue(TemplateOption), parseResult.GetValue(NameOption),
+            InitExecutionRequest request = new(parseResult.GetValue(PathArgument!)!, templateReference, parseResult.GetValue(NameOption),
                 parseResult.GetValue(StackOption), parseResult.GetValue(LanguageOption), parseResult.GetValue(ForceOption),
                 parseResult.GetValue(NonInteractiveOption), parseResult.GetValue(DryRunOption), false,
                 Array.AsReadOnly(nativeTokens),
@@ -210,13 +204,13 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             InitExecutionResult result;
             try
             {
-                result = await _guided.ExecuteAsync(new(request, quickstartId, authorizeAcquisition), cancellationToken);
+                result = await _initCoordinator.ExecuteAsync(new(request, quickstartId, authorizeAcquisition), cancellationToken);
             }
             catch (Exception exception) when (exception is BasicAcquisitionException or TemplateStoreRecoveryRequiredException
                 or WorkloadRecoveryRequiredException or WorkloadPlanChangedException or InvalidWorkloadException
                 or ConflictingProjectStackMetadataException)
             {
-                throw new GracefulException($"Guided init could not continue. {exception.Message}", isUserError: true, innerException: exception);
+                throw new GracefulException($"Project-template init could not continue. {exception.Message}", isUserError: true, innerException: exception);
             }
             return new InitExecutionRenderer(_interaction).Render(result, jsonOutput: false);
         }
@@ -244,7 +238,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         {
             var nativeStacks = _initializers.Select(initializer => initializer.Stack)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            HashSet<Option> reserved = [StackOption, NameOption, LanguageOption, ForceOption, GuidedOption, QuickstartOption,
+            HashSet<Option> reserved = [StackOption, NameOption, LanguageOption, ForceOption, QuickstartOption,
                 TemplateOption, AcquireQuickstartOption, DryRunOption, NonInteractiveOption];
             for (Command? parent = Parents.OfType<Command>().FirstOrDefault(); parent is not null; parent = parent.Parents.OfType<Command>().FirstOrDefault())
             {
@@ -258,7 +252,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             InitExecutionResult menuResult;
             try
             {
-                menuResult = await _guided!.ExecuteAsync(new(menuRequest, NativeStacks: nativeStacks, OfferBasicSelection: true), cancellationToken);
+                menuResult = await _initCoordinator!.ExecuteAsync(new(menuRequest, NativeStacks: nativeStacks, OfferBasicSelection: true), cancellationToken);
             }
             catch (Exception exception) when (exception is BasicAcquisitionException or TemplateStoreRecoveryRequiredException
                 or WorkloadRecoveryRequiredException or WorkloadPlanChangedException or InvalidWorkloadException
@@ -529,7 +523,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     private bool ShouldOfferDefaultTemplateMenu(ParseResult parseResult, WorkingDirectory workingDirectory)
     {
-        if (_guided is null || !_interaction.IsInteractive || _initializers.Count == 0
+        if (_initCoordinator is null || !_interaction.IsInteractive || _initializers.Count == 0
             || parseResult.GetValue(ForceOption)
             || parseResult.GetResult(NameOption) is { Implicit: false } && string.IsNullOrWhiteSpace(parseResult.GetValue(NameOption))
             || DetectInitializationState(workingDirectory.Info) != InitializationState.Empty

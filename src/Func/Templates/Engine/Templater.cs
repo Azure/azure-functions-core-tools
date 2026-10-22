@@ -95,7 +95,8 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
                     result.Add(new(candidate.Entry, selection, Diagnostic(candidate)));
                     continue;
                 }
-                catch (BasicAcquisitionException exception)
+                catch (BasicAcquisitionException exception) when (exception.Failure is not
+                    (BasicAcquisitionFailure.PlanChanged or BasicAcquisitionFailure.RecoveryRequired))
                 {
                     externalFailure = exception;
                 }
@@ -106,12 +107,17 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
                     result.Add(new(candidate.Entry, null, Diagnostic(candidate)) { BundledSelection = bundled });
                     continue;
                 }
-                result.Add(new(candidate.Entry, null, externalFailure.Message));
+                result.Add(new(candidate.Entry, null, externalFailure.Message) { Failure = externalFailure });
             }
-            catch (Exception exception) when (exception is BasicAcquisitionException or Workloads.Discovery.InvalidWorkloadException
+            catch (BasicAcquisitionException exception) when (exception.Failure is not
+                (BasicAcquisitionFailure.PlanChanged or BasicAcquisitionFailure.RecoveryRequired))
+            {
+                result.Add(new(candidate.Entry, null, exception.Message) { Failure = exception });
+            }
+            catch (Exception exception) when (exception is Workloads.Discovery.InvalidWorkloadException
                 or InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
             {
-                result.Add(new(candidate.Entry, null, exception.Message));
+                result.Add(new(candidate.Entry, null, exception.Message) { Failure = exception });
             }
         }
         return result.AsReadOnly();

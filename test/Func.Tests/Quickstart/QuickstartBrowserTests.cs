@@ -17,11 +17,13 @@ public class QuickstartBrowserTests
     [Theory]
     [InlineData("Absent")]
     [InlineData("Unverified")]
-    public async Task BrowseAsync_ProductionConsole_LiteralCatalogLabelsOpenDetailsAndSelectExactEntry(string status)
+    public async Task BrowseAsync_ProductionConsole_LiteralCatalogLabelsOpenDetailsWithoutTreatingClaimsAsSelection(string status)
     {
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
         stderr.Enqueue(ConsoleKey.Enter);
+        stderr.Enqueue(ConsoleKey.Enter);
+        for (int i = 0; i < 6; i++) stderr.Enqueue(ConsoleKey.DownArrow);
         stderr.Enqueue(ConsoleKey.Enter);
         SpectreInteractionService interaction = new(new DefaultTheme(), stdout, stderr);
         QuickstartCatalogEntry entry = new(QuickstartTestHelpers.CreateEntry(id: "id[bad]", displayName: "[red]Name[/]"),
@@ -31,11 +33,11 @@ public class QuickstartBrowserTests
             .Returns(new QuickstartCatalog([entry], new(QuickstartCatalogOrigin.LocalFile, "fixture", null)));
         QuickstartBrowser browser = new(catalog, new([Stack()]), [], interaction, new(interaction));
 
-        QuickstartBrowseResult result = await browser.BrowseAsync(new() { AllowSelection = true }, CancellationToken.None);
+        QuickstartBrowseResult result = await browser.BrowseAsync(new(), CancellationToken.None);
 
-        result.Outcome.Should().Be(QuickstartBrowseOutcome.Selected);
-        result.Entry.Should().BeSameAs(entry);
-        stderr.Output.Should().Contain($"[red]Name[/] (id[bad]) [{status}]");
+        result.Outcome.Should().Be(QuickstartBrowseOutcome.Canceled);
+        result.Entry.Should().BeNull();
+        stderr.Output.Should().Contain("[red]Name[/] (id[bad])").And.NotContain($"[{status}]");
         stdout.Output.Should().Contain("[red]Name[/]").And.Contain("id[bad]");
     }
 
@@ -70,7 +72,7 @@ public class QuickstartBrowserTests
         await fixture.Browser.BrowseAsync(new(), CancellationToken.None);
 
         interaction.Selections.Should().HaveCount(3);
-        interaction.Selections[0].Single(choice => choice.StartsWith("View ", StringComparison.Ordinal)).Should().Contain("http-py");
+        interaction.Selections[0].Should().Contain("HTTP Trigger (http-py)");
         interaction.AllOutput.Should().Contain("Legacy entry without a package reference");
         interaction.AllOutput.Should().Contain("not proof of single-stack");
         interaction.AllOutput.Should().NotContain("Run:").And.NotContain("SUCCESS:");
@@ -93,6 +95,25 @@ public class QuickstartBrowserTests
     }
 
     [Fact]
+    public async Task BrowseAsync_SelectionWithoutQualificationService_DoesNotOfferCatalogRows()
+    {
+        ScriptedInteraction interaction = new(true, "first");
+        Fixture fixture = new(interaction, [QuickstartTestHelpers.CreateEntry()]);
+
+        QuickstartBrowseResult result = await fixture.Browser.BrowseAsync(new()
+        {
+            AllowSelection = true,
+            InstalledQuery = new(Azure.Functions.Cli.Common.WorkingDirectory.FromExplicit(Path.GetTempPath()),
+                new("Owner", "1.0.0", "https://fixture.invalid")),
+        }, CancellationToken.None);
+
+        result.Outcome.Should().Be(QuickstartBrowseOutcome.Canceled);
+        interaction.Selections.Should().BeEmpty();
+        interaction.AllOutput.Should().Contain("cannot verify available templates")
+            .And.NotContain("http-py");
+    }
+
+    [Fact]
     public async Task BrowseAsync_DuplicateIdsAndNames_CanInspectEachDistinctRow()
     {
         ScriptedInteraction interaction = new(true, "second", "Cancel browsing");
@@ -104,7 +125,8 @@ public class QuickstartBrowserTests
 
         await fixture.Browser.BrowseAsync(new(), CancellationToken.None);
 
-        interaction.Selections[0].Count(choice => choice.StartsWith("View ", StringComparison.Ordinal)).Should().Be(2);
+        interaction.Selections[0].Count(choice => choice.StartsWith("HTTP Trigger (http-py)", StringComparison.Ordinal)).Should().Be(2);
+        interaction.Selections[0].Distinct(StringComparer.Ordinal).Should().HaveCount(interaction.Selections[0].Length);
         interaction.AllOutput.Should().Contain("Second row").And.Contain("Conflicting");
         interaction.AllOutput.Should().NotContain("First row");
     }
