@@ -239,6 +239,50 @@ internal static class TemplateFixtures
         return packageDirectory;
       }
 
+    public static string WriteRunnableNodeProjectPackage(string parentDirectory)
+    {
+      string package = Path.Combine(parentDirectory, "runnable-node-templates");
+      string project = Path.Combine(package, "project");
+      WriteTemplate(project,
+        """
+        {
+          "identity":"Func.Tests.RunnableNodeProject","name":"Project journey","shortName":"func-tests-runnable-node",
+          "tags":{"type":"project","language":"JavaScript"},"sourceName":"FuncProject",
+          "constraints":{
+            "host":{"type":"host","args":[{"hostname":"func"}]},
+            "stack":{"type":"func-workload","args":"node"}
+          },
+          "primaryOutputs":[{"path":"host.json"}],
+          "symbols":{"Greeting":{"type":"parameter","datatype":"string","defaultValue":"hello","replaces":"GREETING"}},
+          "postActions":[{"actionId":"00e33184-ffc7-43ef-bec0-b1684df8ad56",
+          "args":{"primaryOutputIndex":"0","stack":"node","language":"js"}}]
+        }
+        """,
+        ("host.json", "{\"version\":\"2.0\"}"));
+      File.WriteAllText(Path.Combine(project, "package.json"), """{"name":"funcproject","version":"1.0.0","private":true}""");
+      File.WriteAllText(Path.Combine(project, "local.settings.json"),
+        """{"IsEncrypted":false,"Values":{"AzureWebJobsStorage":"UseDevelopmentStorage=true","FUNCTIONS_WORKER_RUNTIME":"node"}}""");
+      string function = Path.Combine(project, "Hello");
+      Directory.CreateDirectory(function);
+      File.WriteAllText(Path.Combine(function, "function.json"),
+        """
+        {
+          "bindings":[
+          {"authLevel":"anonymous","type":"httpTrigger","direction":"in","name":"req","methods":["get"],"route":"hello"},
+          {"type":"http","direction":"out","name":"res"}
+          ],
+          "scriptFile":"index.js"
+        }
+        """);
+      File.WriteAllText(Path.Combine(function, "index.js"),
+        """
+        module.exports = async function (context) {
+          context.res = { status: 200, body: "GREETING from FuncProject" };
+        };
+        """);
+      return package;
+    }
+
     public static string WriteSharedJourneyPackage(string parentDirectory, bool shared = true, string? packageTypeVersion = null, bool multiple = false)
     {
         string folder = WriteJourneyPackage(parentDirectory);
@@ -286,13 +330,15 @@ internal static class TemplateFixtures
     /// <summary>
     /// Installs a folder package into the template engine settings at <paramref name="settingsLocation"/>.
     /// </summary>
-    public static async Task InstallAsync(string packageDirectory, string settingsLocation)
+    public static async Task InstallAsync(string packageDirectory, string settingsLocation, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(packageDirectory));
         using TemplateEngineSession session = new(context, settingsLocation);
 
         IManagedTemplatePackageProvider provider = session.PackageManager.GetBuiltInManagedProvider(InstallationScope.Global);
-        IReadOnlyList<InstallResult> results = await provider.InstallAsync([new InstallRequest(packageDirectory)], CancellationToken.None);
+      IReadOnlyList<InstallResult> results = await provider.InstallAsync([new InstallRequest(packageDirectory)], cancellationToken);
+      cancellationToken.ThrowIfCancellationRequested();
 
         InstallResult result = results.Should().ContainSingle().Subject;
         result.Success.Should().BeTrue(result.ErrorMessage ?? string.Empty);

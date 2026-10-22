@@ -132,6 +132,50 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Theory]
+    [InlineData("JavaScript")]
+    [InlineData("javascript")]
+    public async Task ProjectJourney_NodeHttpFixture_GeneratesFunctionAndCanonicalConfiguration(string aliasKey)
+    {
+        using var fixture = await NodeProjectFixture.CreateAsync(_root, CancellationToken.None, aliasKey);
+        var output = fixture.Output;
+
+        var preview = await fixture.Template.InvokeAsync(fixture.Request with { DryRun = true }, CancellationToken.None);
+
+        preview.Status.Should().Be(TemplateInvocationStatus.Success);
+        preview.ConfiguredProjects.Should().BeEmpty();
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+
+        var created = await fixture.Template.InvokeAsync(fixture.Request, CancellationToken.None);
+
+        created.Status.Should().Be(TemplateInvocationStatus.Success);
+        created.HasCommittedOutput.Should().BeTrue();
+        created.ConfiguredProjects.Should().ContainSingle().Which.Should().Be(output.Info.FullName);
+        var function = JsonNode.Parse(File.ReadAllText(Path.Combine(output.Info.FullName, "Hello", "function.json")))!;
+        function["bindings"]!.AsArray().Should().Contain(binding => binding!["type"]!.GetValue<string>() == "httpTrigger");
+        File.ReadAllText(Path.Combine(output.Info.FullName, "Hello", "index.js")).Should().Contain("Hello from GeneratedApp").And.NotContain("GREETING");
+        var settings = JsonNode.Parse(File.ReadAllText(Path.Combine(output.Info.FullName, "local.settings.json")))!;
+        settings["Values"]!["AzureWebJobsStorage"]!.GetValue<string>().Should().Be("UseDevelopmentStorage=true");
+        var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(output.Info.FullName, ".func", "config.json")).Build();
+        StackOptions options = new();
+        new StackOptionsSetup(configuration).Configure(options);
+        options.Runtime.Should().Be("node");
+        options.Language.Should().Be("JavaScript");
+    }
+
+    [Fact]
+    public async Task FixtureInstallAsync_PreCancelled_DoesNotCreateHive()
+    {
+        var package = TemplateFixtures.WriteRunnableNodeProjectPackage(_root);
+        var hive = Path.Combine(_root, "cancelled-install-hive");
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        Func<Task> action = () => TemplateFixtures.InstallAsync(package, hive, cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        Directory.Exists(hive).Should().BeFalse();
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ProjectJourney_MountedTypeChanges_RequiresReselection(bool beforeSelection)
