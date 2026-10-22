@@ -857,11 +857,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         await InstallAsync();
         using BufferedConsole stdout = new(true, true, noColor: true);
         using BufferedConsole stderr = new(true, true, noColor: true);
-        stderr.Enqueue(ConsoleKey.DownArrow);
-        stderr.Enqueue(ConsoleKey.Enter);
-        stderr.Enqueue(ConsoleKey.X, 'x');
-        stderr.Enqueue(ConsoleKey.Enter);
-        var harness = CreateHarness(new SpectreInteractionService(new DefaultTheme(), stdout, stderr));
+        var harness = CreateHarness(LiteralChoiceInteraction(stdout, stderr));
         var before = Snapshot();
 
         int exit = await harness.InvokeAsync(["prompt", "--path", Target, "--dry-run"]);
@@ -869,6 +865,37 @@ public sealed class NewExecutionJourneyTests : IDisposable
         exit.Should().Be(0);
         stderr.Output.Should().Contain("Func.Consumer.[bad]").And.Contain("Func.Consumer.[red]styled[/]");
         harness.Result!.SelectedTemplate!.Identity.Should().Be("Func.Consumer.[red]styled[/]");
+        harness.Result.ArgumentResults.Single().ValuesByCanonicalName.Should().Contain("Value", "x");
+        Snapshot().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_FamilyLabels_EitherOfferedOrder_SelectsExactRawIdentity(bool styledFirst)
+    {
+        WritePromptTemplate("string", identity: "Func.Consumer.[bad]");
+        WritePromptTemplate("string", identity: "Func.Consumer.[red]styled[/]", folder: "prompt-other");
+        await InstallAsync();
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        List<string[]> offered = [];
+        var harness = CreateHarness(LiteralChoiceInteraction(stdout, stderr, styledFirst, offered));
+        var before = Snapshot();
+
+        int exit = await harness.InvokeAsync(["prompt", "--path", Target, "--dry-run"]);
+
+        exit.Should().Be(0);
+        string[] actualChoices = offered.Should().ContainSingle().Subject;
+        actualChoices.Should().Equal(styledFirst
+            ? ["Func.Consumer.[[red]]styled[[/]]", "Func.Consumer.[[bad]]"]
+            : ["Func.Consumer.[[bad]]", "Func.Consumer.[[red]]styled[[/]]"]);
+        stderr.Reads.Should().Be(styledFirst ? 3 : 4);
+        stderr.Output.Should().Contain("Func.Consumer.[bad]").And.Contain("Func.Consumer.[red]styled[/]");
+        harness.Result!.Kind.Should().Be("previewed");
+        harness.Result.SelectedTemplate!.Identity.Should().Be("Func.Consumer.[red]styled[/]");
+        harness.Result.ArgumentResults.Single().ValuesByCanonicalName.Should().Contain("Value", "x");
         Snapshot().Should().BeEquivalentTo(before);
         Directory.Exists(Target).Should().BeFalse();
     }
@@ -1226,6 +1253,50 @@ public sealed class NewExecutionJourneyTests : IDisposable
         interaction.IsInteractive.Returns(true);
         interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.ArgAt<IEnumerable<string>>(1).First());
+        return interaction;
+    }
+
+    private static IInteractionService LiteralChoiceInteraction(
+        BufferedConsole stdout, BufferedConsole stderr, bool? styledFirst = null, List<string[]>? offered = null)
+    {
+        var spectre = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+        var interaction = Substitute.For<IInteractionService>();
+        interaction.IsInteractive.Returns(spectre.IsInteractive);
+        interaction.PromptForSelectionAsync(Arg.Any<string>(), Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                string[] choices = [.. call.ArgAt<IEnumerable<string>>(1)];
+                if (styledFirst is not null)
+                {
+                    Array.Sort(choices, StringComparer.Ordinal);
+                    if (styledFirst.Value)
+                    {
+                        Array.Reverse(choices);
+                    }
+                }
+
+                offered?.Add(choices);
+                choices.Should().ContainSingle(choice => choice == "Func.Consumer.[[red]]styled[[/]]");
+                int index = Array.IndexOf(choices, "Func.Consumer.[[red]]styled[[/]]");
+                for (int i = 0; i < index; i++)
+                {
+                    stderr.Enqueue(ConsoleKey.DownArrow);
+                }
+
+                stderr.Enqueue(ConsoleKey.Enter);
+                return spectre.PromptForSelectionAsync(call.ArgAt<string>(0), choices, call.ArgAt<CancellationToken>(2));
+            });
+        interaction.PromptForInputAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                stderr.Enqueue(ConsoleKey.X, 'x');
+                stderr.Enqueue(ConsoleKey.Enter);
+                return spectre.PromptForInputAsync(call.ArgAt<string>(0), call.ArgAt<string?>(1), call.ArgAt<CancellationToken>(2));
+            });
+        interaction.When(service => service.WriteSectionHeader(Arg.Any<string>()))
+            .Do(call => spectre.WriteSectionHeader(call.Arg<string>()));
+        interaction.When(service => service.WriteLine(Arg.Any<Action<InlineLine>>()))
+            .Do(call => spectre.WriteLine(call.Arg<Action<InlineLine>>()));
         return interaction;
     }
 
