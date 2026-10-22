@@ -34,15 +34,15 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public sealed partial class ArtifactBindingJourneyTests
 {
     [Fact]
-    public async Task Guided_PublicParser_BrowseConsentRealAcquisitionFreshBoundCreateAndRepeatInstalledVisibility()
+    public async Task DefaultInit_PublicParser_BrowseConsentRealAcquisitionFreshBoundCreateAndRepeatInstalledVisibility()
     {
         await SeedAsync(installTemplates: false);
         GuidedInteraction interaction = new(true, ["first", "Browse more templates", "first", "Use this template"], [true, true]);
         var journey = Guided(interaction);
-        var command = GuidedCommand(journey.Coordinator, interaction);
+        var command = GuidedCommand(journey.Coordinator, interaction, [NodeInitializer()]);
         RootCommand root = [command];
 
-        var exit = await root.Parse(["init", Target, "--guided"]).InvokeAsync();
+        var exit = await root.Parse(["init", Target]).InvokeAsync();
 
         exit.Should().Be(0, interaction.AllOutput);
         journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
@@ -55,6 +55,7 @@ public sealed partial class ArtifactBindingJourneyTests
         interaction.AllOutput.Should().Contain("Independently qualified").And.Contain("fixture-only").And.Contain(_selection.Artifact.Sha256);
         interaction.AllOutput.Should().Contain("unverified claims");
         interaction.AllOutput.Should().Contain("Select a project stack:");
+        interaction.AllOutput.Should().Contain("Basic Functions app");
 
         var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(
             await journey.Catalog.SearchAsync(new(), CancellationToken.None), new(DirectoryTarget, _selection.Owner), CancellationToken.None);
@@ -71,6 +72,89 @@ public sealed partial class ArtifactBindingJourneyTests
         journey.Payload.Requested.Should().HaveCount(1, "installed selection never re-acquires");
         repeated.Payload.Requested.Should().BeEmpty();
         File.ReadAllText(Path.Combine(secondTarget.Info.FullName, "value.txt")).Should().Be("exact");
+    }
+
+    [Fact]
+    public async Task DefaultInit_BasicSelection_UsesExistingInitializerWithoutWritingBeforeSelection()
+    {
+        await SeedAsync(installTemplates: false);
+        GuidedInteraction interaction = new(true, ["first", "Basic Functions app"], []);
+        interaction.SelectionMade = () => Directory.Exists(Target).Should().BeFalse();
+        IProjectInitializer initializer = NodeInitializer();
+        var journey = Guided(interaction);
+        var command = GuidedCommand(journey.Coordinator, interaction, [initializer]);
+        RootCommand root = [command];
+
+        int exit = await root.Parse(["init", Target]).InvokeAsync();
+
+        exit.Should().Be(0, interaction.AllOutput);
+        await initializer.Received(1).InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
+        File.Exists(Path.Combine(Target, "value.txt")).Should().BeFalse();
+        interaction.AllOutput.Should().Contain("Select a project stack:").And.Contain("Basic Functions app");
+        interaction.Confirmations.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DefaultInit_CancelAtStackSelectionLeavesTargetAndInstalledTemplateHiveUnchanged(bool multipleStacks)
+    {
+        await SeedAsync(installTemplates: false);
+        GuidedInteraction interaction = new(true, ["Cancel", "first"], []);
+        interaction.SelectionMade = () => Directory.Exists(Target).Should().BeFalse();
+        IProjectInitializer nodeInitializer = NodeInitializer();
+        IProjectInitializer[] initializers = multipleStacks ? [nodeInitializer, DotNetInitializer()] : [nodeInitializer];
+        var journey = Guided(interaction, scopes: multipleStacks ? new AdditionalStackScopeFactory(_scopes) : null);
+        var command = GuidedCommand(journey.Coordinator, interaction, initializers);
+        RootCommand root = [command];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target]).InvokeAsync();
+
+        exit.Should().Be(1);
+        Directory.Exists(Target).Should().BeFalse();
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeFalse();
+        TemplateState().Should().BeEquivalentTo(before);
+        journey.Payload.Requested.Should().BeEmpty();
+        foreach (IProjectInitializer initializer in initializers)
+        {
+            await initializer.DidNotReceive().InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
+        }
+        interaction.SelectionTitles.Should().ContainSingle().Which.Should().Be("Select a project stack:");
+        if (multipleStacks)
+        {
+            interaction.SelectionChoices[0].Should().Contain(["Node.js (node)", ".NET (dotnet)"]);
+        }
+        else
+        {
+            interaction.SelectionChoices[0].Should().Contain("Node.js (node)").And.NotContain(".NET (dotnet)");
+        }
+        interaction.AllOutput.Should().Contain("canceled");
+    }
+
+    [Fact]
+    public async Task DefaultInit_CancelAtTemplateSelectionLeavesTargetAndInstalledTemplateHiveUnchanged()
+    {
+        await SeedAsync(installTemplates: false);
+        GuidedInteraction interaction = new(true, ["first", "Cancel"], []);
+        interaction.SelectionMade = () => Directory.Exists(Target).Should().BeFalse();
+        IProjectInitializer initializer = NodeInitializer();
+        var journey = Guided(interaction);
+        var command = GuidedCommand(journey.Coordinator, interaction, [initializer]);
+        RootCommand root = [command];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target]).InvokeAsync();
+
+        exit.Should().Be(1);
+        Directory.Exists(Target).Should().BeFalse();
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeFalse();
+        TemplateState().Should().BeEquivalentTo(before);
+        journey.Payload.Requested.Should().BeEmpty();
+        await initializer.DidNotReceive().InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
+        interaction.SelectionTitles.Should().Equal("Select a project stack:", "Select a project template for Node.js (node):");
+        interaction.AllOutput.Should().Contain("canceled");
     }
 
     [Theory]
@@ -556,8 +640,9 @@ public sealed partial class ArtifactBindingJourneyTests
 
     private (QuickstartInitCoordinator Coordinator, FixturePayloadSource Payload, TrackingLifecycle Lifecycle,
         IQuickstartCatalogService Catalog, QuickstartQualification Qualification, BasicAcquisitionRunner Acquisition)
-        Guided(GuidedInteraction interaction, IFileSystem? installation = null)
+        Guided(GuidedInteraction interaction, IFileSystem? installation = null, IBoundInitScopeFactory? scopes = null)
     {
+        IBoundInitScopeFactory scopeFactory = scopes ?? _scopes;
         var source = Substitute.For<IQuickstartCatalogSource>();
         using var package = JsonDocument.Parse($$"""
             {"schemaVersion":1,"packageId":"{{PackageId}}","version":"{{_selection.Artifact.Version}}","source":"{{Source}}",
@@ -588,16 +673,43 @@ public sealed partial class ArtifactBindingJourneyTests
         var init = new InitExecutionRunner(factory, arguments, new(arguments, interaction), interaction, new(interaction), new(_files),
             () => throw new InvalidOperationException("Guided flow must refresh capabilities."),
             () => throw new InvalidOperationException("Guided flow must refresh project support."),
-            _files, Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>(), new AcquisitionBoundaryScopes(_scopes, lifecycle));
-        var browser = new FreshBrowser(catalog, _scopes, Factory, interaction);
-        return (new(_scopes, Factory, browser, catalog, qualification, acquisition, init, new(_files), interaction, renderer),
+            _files, Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>(), new AcquisitionBoundaryScopes(scopeFactory, lifecycle));
+        var browser = new FreshBrowser(catalog, scopeFactory, Factory, interaction);
+        return (new(scopeFactory, Factory, browser, catalog, qualification, acquisition, init, new(_files), interaction, renderer),
             payload, lifecycle, catalog, qualification, acquisition);
     }
 
-    private InitCommand GuidedCommand(IQuickstartInitCoordinator coordinator, IInteractionService interaction)
+    private InitCommand GuidedCommand(IQuickstartInitCoordinator coordinator, IInteractionService interaction,
+        IEnumerable<IProjectInitializer>? initializers = null)
         => new(interaction, Substitute.For<IWorkloadHintRenderer>(), Substitute.For<ILocalSettingsProvider>(),
             Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-            new(Substitute.For<IInstalledBundleWorkloads>()), _files, [], coordinator);
+            new(Substitute.For<IInstalledBundleWorkloads>()), _files, initializers ?? [], coordinator);
+
+    private static IProjectInitializer NodeInitializer()
+    {
+        IProjectInitializer initializer = Substitute.For<IProjectInitializer>();
+        initializer.Stack.Returns("node");
+        initializer.SupportedLanguages.Returns(["JavaScript"]);
+        initializer.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>());
+        initializer.WorkerRuntimeAliases.Returns(["node"]);
+        initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
+        initializer.InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        return initializer;
+    }
+
+    private static IProjectInitializer DotNetInitializer()
+    {
+        IProjectInitializer initializer = Substitute.For<IProjectInitializer>();
+        initializer.Stack.Returns("dotnet");
+        initializer.SupportedLanguages.Returns(["C#"]);
+        initializer.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>());
+        initializer.WorkerRuntimeAliases.Returns(["dotnet"]);
+        initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
+        initializer.InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        return initializer;
+    }
 
     private Dictionary<string, byte[]> TemplateState()
         => Directory.Exists(_templates.Hive) ? HiveBytes() : [];
@@ -634,15 +746,21 @@ public sealed partial class ArtifactBindingJourneyTests
         private readonly Queue<bool> _confirmations = new(confirmations);
         public override bool IsInteractive => interactive;
         public List<bool> Confirmations { get; } = [];
+        public List<string> SelectionTitles { get; } = [];
+        public List<string[]> SelectionChoices { get; } = [];
         public CancellationToken ConfirmationToken { get; private set; }
         public Func<Task>? Confirming { get; set; }
+        public Action? SelectionMade { get; set; }
 
         Task<string> IInteractionService.PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string[] options = [.. choices];
             string selected = _selections.Dequeue();
+            SelectionTitles.Add(title);
+            SelectionChoices.Add(options);
             WriteLine($"SELECT: {title} [{string.Join(", ", options)}]");
+            SelectionMade?.Invoke();
             return Task.FromResult(selected switch
             {
                 "first" => options[0],
@@ -662,6 +780,27 @@ public sealed partial class ArtifactBindingJourneyTests
                 await Confirming();
             }
             return _confirmations.Dequeue();
+        }
+    }
+
+    private sealed class AdditionalStackScopeFactory(IBoundInitScopeFactory inner) : IBoundInitScopeFactory
+    {
+        public async Task<BoundInitScope> CreateAsync(CancellationToken cancellationToken)
+        {
+            BoundInitScope scope = await inner.CreateAsync(cancellationToken);
+            IProjectStack dotnet = Substitute.For<IProjectStack>();
+            dotnet.Stack.Returns("dotnet");
+            dotnet.DisplayName.Returns(".NET");
+            dotnet.WorkerRuntimeAliases.Returns(["dotnet"]);
+            dotnet.SupportedLanguages.Returns(["C#"]);
+            dotnet.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>());
+            var owners = scope.StackOwners.ToDictionary(pair => pair.Key, pair => pair.Value,
+                StringComparer.OrdinalIgnoreCase);
+            owners.Add("dotnet", scope.StackOwners["node"]);
+            return new(scope.Availability, new([.. scope.Catalog.Stacks, dotnet]), scope.Support, scope.Verifier, scope)
+            {
+                StackOwners = owners,
+            };
         }
     }
 

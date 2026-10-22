@@ -27,8 +27,19 @@ internal sealed record InitExecutionRequest(
     internal bool ConfirmCreation { get; init; }
 }
 
+internal enum InitExecutionContinuation
+{
+    Completed,
+    BasicProject,
+    LegacyInitializer,
+}
+
 internal sealed record InitExecutionResult(string Kind, bool Succeeded)
 {
+    public InitExecutionContinuation Continuation { get; init; }
+
+    public string? SelectedStack { get; init; }
+
     public TemplateEngineContext? Context { get; init; }
 
     public IReadOnlyList<string> Diagnostics { get; init; } = [];
@@ -48,6 +59,15 @@ internal sealed record InitExecutionResult(string Kind, bool Succeeded)
     public InitExistingProjectConfiguration? Configuration { get; init; }
 
     public static InitExecutionResult Reject(string kind, params string[] diagnostics) => new(kind, false) { Diagnostics = diagnostics };
+
+    public static InitExecutionResult ContinueWithBasicProject(string stack)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        return new("basicProjectSelected", true) { Continuation = InitExecutionContinuation.BasicProject, SelectedStack = stack };
+    }
+
+    public static InitExecutionResult ContinueWithLegacyInitializer()
+        => new("legacyInitializerSelected", true) { Continuation = InitExecutionContinuation.LegacyInitializer };
 }
 
 internal sealed record InitExistingProjectConfiguration(string Root, string Stack, string Language, bool Repair, bool Written = false)

@@ -10,7 +10,12 @@ using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Quickstart;
 
-internal sealed record QuickstartInitRequest(InitExecutionRequest Init, string? QuickstartId = null, bool AuthorizeAcquisition = false);
+internal sealed record QuickstartInitRequest(
+    InitExecutionRequest Init,
+    string? QuickstartId = null,
+    bool AuthorizeAcquisition = false,
+    IReadOnlySet<string>? NativeStacks = null,
+    bool OfferBasicSelection = false);
 
 internal interface IQuickstartInitCoordinator
 {
@@ -25,6 +30,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
     BasicAcquisitionRunner acquisition, IInitExecutionRunner init, InitExecutionTargetInspector targets,
     IInteractionService interaction, QuickstartCatalogRenderer catalogRenderer) : IQuickstartInitCoordinator
 {
+    private const string Basic = "Basic Functions app";
     private const string Browse = "Browse more templates";
     private const string Cancel = "Cancel";
     private readonly IBoundInitScopeFactory _scopes = scopes ?? throw new ArgumentNullException(nameof(scopes));
@@ -65,6 +71,10 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         string? targetDiagnostic = _targets.GetDiagnostic(input.WorkingDirectory);
         if (targetDiagnostic is not null)
         {
+            if (request.OfferBasicSelection)
+            {
+                return InitExecutionResult.ContinueWithLegacyInitializer();
+            }
             return InitExecutionResult.Reject("unsupportedTarget", $"Guided init requires an empty target. {targetDiagnostic}");
         }
         bool interactive = !input.NonInteractive && _interaction.IsInteractive;
@@ -74,11 +84,39 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         string stackName;
         QuickstartInstalledQuery query;
         // No native reader, prepared payload or engine handle survives this selection phase.
-        using (BoundInitScope scope = await _scopes.CreateAsync(cancellationToken))
+        BoundInitScope scope;
+        try
         {
-            IProjectStack? stack = await SelectStackAsync(scope.Catalog, input.ExplicitStack, interactive, cancellationToken);
+            scope = await _scopes.CreateAsync(cancellationToken);
+        }
+        catch (ConflictingProjectStackMetadataException) when (request.OfferBasicSelection)
+        {
+            return InitExecutionResult.ContinueWithLegacyInitializer();
+        }
+        using (scope)
+        {
+            IReadOnlySet<string>? nativeStacks = request.NativeStacks;
+            IReadOnlySet<string>? ownedStacks = request.OfferBasicSelection
+                ? scope.StackOwners.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                : null;
+            if (request.OfferBasicSelection && (nativeStacks is null || !scope.Catalog.Stacks.Any(stack =>
+                nativeStacks.Contains(stack.Stack) && ownedStacks!.Contains(stack.Stack))))
+            {
+                return InitExecutionResult.ContinueWithLegacyInitializer();
+            }
+            (IProjectStack? Stack, bool Canceled) stackSelection = await SelectStackAsync(scope.Catalog, input.ExplicitStack, interactive,
+                nativeStacks, ownedStacks, cancellationToken);
+            if (request.OfferBasicSelection && stackSelection.Canceled)
+            {
+                return DefaultSelectionCanceled();
+            }
+            IProjectStack? stack = stackSelection.Stack;
             if (stack is null)
             {
+                if (request.OfferBasicSelection)
+                {
+                    return InitExecutionResult.ContinueWithLegacyInitializer();
+                }
                 return InitExecutionResult.Reject("missingStack", "Select an installed stack with --stack, or cancel guided init without changes.");
             }
             stackName = stack.Stack;
@@ -87,8 +125,13 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 return InitExecutionResult.Reject("ownerUnavailable", "The selected stack has no unique actual loaded runtime owner. Repair its workload before guided init.");
             }
             query = new(input.WorkingDirectory, NativeTemplateOwnerIdentity.FromEntry(owner));
-            if (input.ExplicitLanguage is not null && new InstalledProjectStackCatalog([stack]).GetCanonicalLanguage(input.ExplicitLanguage) is null)
+            if (input.ExplicitStack is not null && input.ExplicitLanguage is not null
+                && new InstalledProjectStackCatalog([stack]).GetCanonicalLanguage(input.ExplicitLanguage) is null)
             {
+                if (request.OfferBasicSelection)
+                {
+                    return InitExecutionResult.ContinueWithLegacyInitializer();
+                }
                 return InitExecutionResult.Reject("invalidLanguage", "The requested language is not supported by the selected installed stack.");
             }
             if (installedIdentity is null && request.QuickstartId is null)
@@ -99,23 +142,57 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                         "Without interactive input, supply --template <installed-full-identity> or --quickstart <catalog-id>. Discovery never auto-selects a result.");
                 }
                 IReadOnlyList<InstalledTemplateArtifact> installed;
-                using (Templater flow = await _templates.CreateProjectAsync(new(input.WorkingDirectory) { RequireCleanStore = true },
-                    scope.Availability, scope.Support, cancellationToken))
+                try
                 {
+                    using Templater flow = await _templates.CreateProjectAsync(new(input.WorkingDirectory) { RequireCleanStore = true },
+                        scope.Availability, scope.Support, cancellationToken);
                     installed = await flow.ProjectArtifactsAsync(scope.Verifier, query.Owner, query.Channel, cancellationToken);
+                }
+                catch (TemplateStoreRecoveryRequiredException) when (request.OfferBasicSelection)
+                {
+                    _interaction.WriteWarning("Installed template choices are unavailable while template-store recovery is pending. Continuing with the existing init initializer.");
+                    return InitExecutionResult.ContinueWithLegacyInitializer();
                 }
                 Dictionary<string, InstalledTemplateArtifact> choices = [];
                 foreach (InstalledTemplateArtifact item in installed)
                 {
-                    string proof = item.Selection is null ? "unqualified artifact proof" : "verified artifact";
-                    choices.Add($"{choices.Count + 1}. {item.Entry.Name} ({item.Entry.Identity}) [{proof}]", item);
+                    if (request.OfferBasicSelection && item.Entry.IsHidden)
+                    {
+                        continue;
+                    }
                     if (item.Diagnostic is not null)
                     {
                         _interaction.WriteWarning($"{item.Entry.Identity}: {item.Diagnostic}");
                     }
+                    if (request.OfferBasicSelection && item.Diagnostic is not null)
+                    {
+                        continue;
+                    }
+
+                    string context = item.Entry.ProjectConfigurations is { Count: > 0 } declarations
+                        ? $"projects {string.Join(", ", declarations.Select(declaration => $"{declaration.Stack}/{declaration.Language}"))}"
+                        : $"language {item.Entry.Language ?? "unspecified"}";
+                    string binding = item.Selection is { } selection
+                        ? $"bound to {selection.Owner.PackageId} {selection.Owner.Version}"
+                        : "native binding not proven";
+                    string package = item.Entry.Package is { } packageInfo
+                        ? $"package {packageInfo.Identifier}"
+                        : "package unavailable";
+                    choices.Add($"{item.Entry.Name} ({item.Entry.Identity}; {context}; {package}; {binding})", item);
                 }
-                string choice = await _interaction.PromptForSelectionAsync("Select an installed project template:", choices.Keys.Concat([Browse, Cancel]), cancellationToken);
+                List<string> menu = [];
+                if (request.OfferBasicSelection)
+                {
+                    menu.Add(Basic);
+                }
+                menu.AddRange(choices.Keys);
+                menu.AddRange([Browse, Cancel]);
+                string choice = await _interaction.PromptForSelectionAsync($"Select a project template for {stack.DisplayName} ({stackName}):", menu, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                if (request.OfferBasicSelection && choice == Basic)
+                {
+                    return InitExecutionResult.ContinueWithBasicProject(stackName);
+                }
                 if (choices.TryGetValue(choice, out InstalledTemplateArtifact? selected))
                 {
                     installedIdentity = selected.Entry.Identity;
@@ -227,21 +304,30 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         return await _init.ExecuteAsync(execution, new([]), cancellationToken);
     }
 
-    private async Task<IProjectStack?> SelectStackAsync(InstalledProjectStackCatalog catalog, string? requested,
-        bool interactive, CancellationToken cancellationToken)
+    private async Task<(IProjectStack? Stack, bool Canceled)> SelectStackAsync(InstalledProjectStackCatalog catalog, string? requested,
+        bool interactive, IReadOnlySet<string>? nativeStacks, IReadOnlySet<string>? ownedStacks, CancellationToken cancellationToken)
     {
         if (requested is not null)
         {
-            return string.IsNullOrWhiteSpace(requested) ? null : catalog.FindStack(requested);
+            if (string.IsNullOrWhiteSpace(requested))
+            {
+                return (null, false);
+            }
+            IProjectStack? found = catalog.FindStack(requested);
+            return (found is not null && (nativeStacks is null || nativeStacks.Contains(found.Stack))
+                && (ownedStacks is null || ownedStacks.Contains(found.Stack)) ? found : null, false);
         }
-        if (!interactive || catalog.Stacks.Count == 0)
+        IProjectStack[] available = [.. catalog.Stacks.Where(stack =>
+            (nativeStacks is null || nativeStacks.Contains(stack.Stack))
+            && (ownedStacks is null || ownedStacks.Contains(stack.Stack)))];
+        if (!interactive || available.Length == 0)
         {
-            return null;
+            return (null, false);
         }
-        var choices = catalog.Stacks.ToDictionary(stack => $"{stack.DisplayName} ({stack.Stack})", StringComparer.Ordinal);
+        Dictionary<string, IProjectStack> choices = available.ToDictionary(stack => $"{stack.DisplayName} ({stack.Stack})", StringComparer.Ordinal);
         string selected = await _interaction.PromptForSelectionAsync("Select a project stack:", choices.Keys.Append(Cancel), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return choices.GetValueOrDefault(selected);
+        return selected == Cancel ? (null, true) : (choices.GetValueOrDefault(selected), false);
     }
 
     private void WritePlan(QualifiedQuickstart qualified, InitExecutionRequest input)
@@ -268,4 +354,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
     }
 
     private static InitExecutionResult Canceled() => InitExecutionResult.Reject("canceled", "Guided init canceled before acquisition or project writes.");
+
+    private static InitExecutionResult DefaultSelectionCanceled()
+        => InitExecutionResult.Reject("canceled", "Project template selection canceled before acquisition or project writes.");
 }
