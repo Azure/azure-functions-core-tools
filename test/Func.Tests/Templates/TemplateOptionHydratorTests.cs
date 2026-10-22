@@ -57,6 +57,70 @@ public class TemplateOptionHydratorTests
         options[0].Name.Should().Be("--auth-level");
     }
 
+    [Fact]
+    public void Prompt_WithoutDescription_UsesParameterDescription()
+    {
+        var hydrator = new TemplateOptionHydrator([]);
+        TemplateUserPrompt prompt = new("authLevel", null, "string", null, null, false, null, null, null);
+
+        IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
+
+        options.Should().ContainSingle().Subject.Description.Should().Be("Value for template parameter 'authLevel'.");
+    }
+
+    [Fact]
+    public void Prompt_WithWhitespaceDescription_UsesParameterDescription()
+    {
+        var hydrator = new TemplateOptionHydrator([]);
+        TemplateUserPrompt prompt = new("authLevel", " \t ", "string", null, null, false, null, null, null);
+
+        IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
+
+        options.Should().ContainSingle().Subject.Description.Should().Be("Value for template parameter 'authLevel'.");
+    }
+
+    [Fact]
+    public void Prompt_WithLineFeedDescription_UsesSingleLineDescription()
+    {
+        var hydrator = new TemplateOptionHydrator([]);
+        TemplateUserPrompt prompt = new(
+            "authLevel",
+            "Controls access.\nUse anonymous for public endpoints.",
+            "string",
+            null,
+            null,
+            false,
+            null,
+            null,
+            null);
+
+        IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
+
+        options.Should().ContainSingle().Subject.Description.Should().Be(
+            "Controls access. Use anonymous for public endpoints.");
+    }
+
+    [Fact]
+    public void Prompt_WithCarriageReturnDescription_UsesSingleLineDescription()
+    {
+        var hydrator = new TemplateOptionHydrator([]);
+        TemplateUserPrompt prompt = new(
+            "authLevel",
+            "Controls access.\rUse anonymous for public endpoints.",
+            "string",
+            null,
+            null,
+            false,
+            null,
+            null,
+            null);
+
+        IReadOnlyList<Option> options = hydrator.Hydrate(TemplateWithPrompts([prompt]));
+
+        options.Should().ContainSingle().Subject.Description.Should().Be(
+            "Controls access. Use anonymous for public endpoints.");
+    }
+
     [Theory]
     [InlineData("authLevel", "--auth-level")]
     [InlineData("AccessRights", "--access-rights")]

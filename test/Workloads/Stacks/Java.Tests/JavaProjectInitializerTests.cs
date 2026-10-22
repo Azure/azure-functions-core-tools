@@ -57,6 +57,11 @@ public class JavaProjectInitializerTests : IDisposable
 
         Assert.Contains("--no-bundles", names);
         Assert.Contains("--bundles-channel", names);
+        options.Should().OnlyContain(option =>
+            option.Description != null &&
+            !string.IsNullOrWhiteSpace(option.Description) &&
+            !option.Description.Contains('\r') &&
+            !option.Description.Contains('\n'));
     }
 
     [Fact]

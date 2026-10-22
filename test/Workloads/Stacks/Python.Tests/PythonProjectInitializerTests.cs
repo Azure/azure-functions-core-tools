@@ -85,6 +85,11 @@ public class PythonProjectInitializerTests : IDisposable
 
         names.Should().Contain("--no-bundles");
         names.Should().Contain("--bundles-channel");
+        options.Should().OnlyContain(option =>
+            option.Description != null &&
+            !string.IsNullOrWhiteSpace(option.Description) &&
+            !option.Description.Contains('\r') &&
+            !option.Description.Contains('\n'));
     }
 
     [Fact]
