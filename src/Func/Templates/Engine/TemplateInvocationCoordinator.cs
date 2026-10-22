@@ -23,14 +23,14 @@ internal sealed class TemplateInvocationCoordinator(
 
     public bool ProjectTemplatesEnabled => _projectSupport is not null;
 
-    public void ValidateProjectConfiguration(string configuration)
+    public IReadOnlyList<TemplateProjectConfigurationDeclaration> ValidateProjectConfiguration(string configuration)
     {
         if (_projectSupport is null)
         {
             throw new InvalidOperationException("Project templates are not enabled for this invocation flow.");
         }
 
-        _projectSupport.Planner.Read(configuration);
+        return _projectSupport.Planner.Read(configuration);
     }
 
     public void ThrowIfDisposed() => _engine.ThrowIfDisposed();
@@ -132,7 +132,10 @@ internal sealed class TemplateInvocationCoordinator(
                     DescribeActualOutputs(image, configuration, native.CreationEffects, includeExistingDirectories: true), directories);
                 if (configurationPlans.Any(project.Writer.ConfigurationExists))
                 {
-                    return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic);
+                    return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic)
+                    {
+                        ProjectConfigurations = configurationPlans,
+                    };
                 }
 
                 changes = Array.AsReadOnly<TemplateFileChange>([.. nativeChanges,
@@ -140,35 +143,44 @@ internal sealed class TemplateInvocationCoordinator(
             }
             catch (InvalidTemplateMetadataException exception)
             {
-                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message)
+                {
+                    ProjectConfigurations = configurationPlans,
+                };
             }
         }
 
         string? outputFailure = GetOutputDiagnostic(image, configurationPlans);
         if (outputFailure is not null)
         {
-            return new(TemplateInvocationStatus.Failed, [], outputFailure);
+            return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
         }
         configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
         if (configurationFailure is not null)
         {
-            return configurationFailure;
+            return configurationFailure with { ProjectConfigurations = configurationPlans };
         }
 
         bool requiresForce = !request.Force && changes.Any(change => change.Kind != TemplateFileChangeKind.Create);
         if (request.DryRun)
         {
-            return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null);
+            return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null)
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
         if (requiresForce)
         {
-            return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.");
+            return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.")
+            {
+                ProjectConfigurations = configurationPlans,
+            };
         }
 
         TemplateInvocationResult installed = await InstallAsync(template, configuration, request, image, nativeChanges, cancellationToken);
         if (installed.Status != TemplateInvocationStatus.Success || project is null)
         {
-            return installed;
+            return installed with { ProjectConfigurations = configurationPlans };
         }
 
         return await ConfigureAsync(template, configuration, project, image, configurationPlans, installed, cancellationToken);
@@ -251,6 +263,7 @@ internal sealed class TemplateInvocationCoordinator(
 
         TemplateInvocationResult Result(TemplateInvocationStatus status, string? diagnostic) => new(status, completed.AsReadOnly(), diagnostic)
         {
+            ProjectConfigurations = plans,
             ConfiguredProjects = configured.AsReadOnly(),
             HasCommittedOutput = installed.HasCommittedOutput || configured.Count > 0,
         };

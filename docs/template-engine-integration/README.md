@@ -18,7 +18,7 @@ This draft proposes scalar options with one explicit value, including booleans; 
 
 The explicit internal `CreateProjectAsync` flow adds mandatory CLI-owned configuration to installed project-template creation. Existing `CreateAsync` calls remain item-only. The project flow requires supplied availability, installed `IProjectStack` metadata from the existing stack catalog, and paired `TemplateProjectSupport` planner/writer support.
 
-This is staged internal support: production commands do not call `CreateProjectAsync`, and the planner and writer are not registered in production DI. Existing public `init` and `new` routes remain unchanged.
+This is staged internal support: the planner and writer are registered in DI for the unregistered `InitExecutionCommand` consumer, but no production command activates the project flow through `CreateProjectAsync`. Existing public `init` and `new` routes remain unchanged.
 
 Language-alias metadata keys are matched case-insensitively, consistent with the installed catalog, while configuration retains the selected stack's canonical language spelling.
 
@@ -37,6 +37,28 @@ After a configuration write commits, its root and file change are recorded befor
 The project policy runs on the captured native image and resolved primary outputs before real installation, without rerendering or dispatching arbitrary native post-actions. The complete captured directory inventory remains available for path, link, kind and source checks, including existing directory no-ops omitted from reported changes. Creation results report installed native effects plus only completed configuration writes, not unwritten preview configuration paths. The session retains native lifetime ownership and the invocation coordinator owns the optional project policy.
 
 The fixture action ID `00e33184-ffc7-43ef-bec0-b1684df8ad56` remains proposed, not a stable public authoring contract. These tests qualify controlled runtime fixtures and configuration compatibility, not production template packages or a public command switch. Ordinary restores, wider project topology, live-hive leases and concurrent filesystem mutation remain outside this qualified subset.
+
+## Staged project consumer projections
+
+The unregistered [staged INIT consumer](../func-init-execution/proposal.md#staged-installed-project-consumer)
+composes this project runtime with template-first command binding and the shared
+strict argument parser. In a project-enabled flow, catalog entries expose
+`ProjectConfigurations` declarations from the same snapshot already validated by
+the planner; malformed declarations retain separate project and constraint
+diagnostics and cannot become a selected capability. Item entries and item-only
+flows do not acquire project declarations.
+Project errors do not populate the func host `MetadataDiagnostic` field or erase
+projected parameters. Previously eligible project-validation failures retain
+their failed classification; an independent project-diagnostic guard also blocks
+group and capability creation.
+
+Project invocation results additionally expose `ProjectConfigurations`, the
+already computed native/preflight plans, separately from `ConfiguredProjects`,
+the successfully finalized roots. Plans do not imply completion, including on
+configuration failure. Neither projection changes the provisional action schema,
+native creation order, failure file-change reporting or path/type validation.
+Once planning succeeds, later conflict and revalidation results retain the same
+ordered plans; failures before planning do not invent plans.
 
 ## Existing-project configuration persistence
 

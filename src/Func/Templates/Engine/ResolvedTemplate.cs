@@ -14,7 +14,8 @@ internal sealed class ResolvedTemplate
     {
         ArgumentNullException.ThrowIfNull(entry);
         _invoker = invoker ?? throw new ArgumentNullException(nameof(invoker));
-        if (entry.ConstraintEvaluation.Status != TemplateConstraintEvaluationStatus.Eligible || entry.MetadataDiagnostic is not null)
+        if (entry.ConstraintEvaluation.Status != TemplateConstraintEvaluationStatus.Eligible
+            || entry.MetadataDiagnostic is not null || entry.ProjectConfigurationDiagnostic is not null)
         {
             throw new ArgumentException("Only a validated eligible template can be resolved.", nameof(entry));
         }

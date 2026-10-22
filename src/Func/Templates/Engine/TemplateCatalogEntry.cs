@@ -36,6 +36,10 @@ internal sealed record TemplateCatalogEntry(
     string? MetadataDiagnostic)
 {
     public TemplateConstraintEvaluation ConstraintEvaluation { get; init; } = TemplateConstraintEvaluation.NotEvaluated;
+
+    public IReadOnlyList<TemplateProjectConfigurationDeclaration>? ProjectConfigurations { get; init; }
+
+    public string? ProjectConfigurationDiagnostic { get; init; }
 }
 
 /// <summary>

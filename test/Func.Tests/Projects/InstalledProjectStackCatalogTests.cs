@@ -42,7 +42,7 @@ public class InstalledProjectStackCatalogTests
         IProjectStack second = CreateStack(duplicate, "F#", "fsharp");
 
         FluentActions.Invoking(() => new InstalledProjectStackCatalog([first, second]))
-            .Should().ThrowExactly<InvalidOperationException>().WithMessage("*Multiple*stack*");
+            .Should().ThrowExactly<ConflictingProjectStackMetadataException>().WithMessage("*Multiple*stack*");
     }
 
     [Theory]
@@ -108,7 +108,7 @@ public class InstalledProjectStackCatalogTests
         IProjectStack[] stacks = reverse ? [second, first] : [first, second];
 
         FluentActions.Invoking(() => new InstalledProjectStackCatalog(stacks))
-            .Should().ThrowExactly<InvalidOperationException>().WithMessage("*native*first*");
+            .Should().ThrowExactly<ConflictingProjectStackMetadataException>().WithMessage("*native*first*");
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public class InstalledProjectStackCatalogTests
         IProjectStack second = CreateStack("second", "Python", "SCRIPT");
 
         FluentActions.Invoking(() => new InstalledProjectStackCatalog([first, second]))
-            .Should().ThrowExactly<InvalidOperationException>().WithMessage("*language*SCRIPT*JavaScript*Python*");
+            .Should().ThrowExactly<ConflictingProjectStackMetadataException>().WithMessage("*language*SCRIPT*JavaScript*Python*");
     }
 
     [Theory]
@@ -131,7 +131,20 @@ public class InstalledProjectStackCatalogTests
         IProjectStack[] stacks = reverse ? [second, first] : [first, second];
 
         FluentActions.Invoking(() => new InstalledProjectStackCatalog(stacks))
-            .Should().ThrowExactly<InvalidOperationException>();
+            .Should().ThrowExactly<ConflictingProjectStackMetadataException>();
+    }
+
+    [Fact]
+    public void Constructor_ConflictSubtype_PreservesInvalidOperationCatchCompatibility()
+    {
+        IProjectStack first = CreateStack("node", "JavaScript", "js");
+        IProjectStack second = CreateStack("NODE", "Python", "py");
+
+        Action act = () => _ = new InstalledProjectStackCatalog([first, second]);
+
+        var exception = act.Should().ThrowExactly<ConflictingProjectStackMetadataException>().Which;
+        exception.Should().BeAssignableTo<InvalidOperationException>();
+        exception.Message.Should().Be("Multiple installed workloads claim the 'NODE' stack.");
     }
 
     [Theory]

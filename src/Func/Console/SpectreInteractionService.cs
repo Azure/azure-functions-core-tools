@@ -129,10 +129,9 @@ internal class SpectreInteractionService : IInteractionService
     {
         ArgumentNullException.ThrowIfNull(value);
 
-        // Bypass _stdout (which would re-render via Spectre) and write the
-        // raw JSON directly so consumers piping `--json` get clean output.
+        // Bypass Spectre rendering so piped JSON remains raw data.
         string json = System.Text.Json.JsonSerializer.Serialize(value, _jsonOptions);
-        System.Console.Out.WriteLine(json);
+        WriteRawLine(json);
     }
 
     private static readonly System.Text.Json.JsonSerializerOptions _jsonOptions = new()

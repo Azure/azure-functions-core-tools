@@ -76,6 +76,9 @@ internal sealed record TemplateFileChange(string Path, TemplateFileChangeKind Ki
 /// </summary>
 internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status, IReadOnlyList<TemplateFileChange> Changes, string? Diagnostic = null)
 {
+    [JsonIgnore]
+    public IReadOnlyList<TemplateProjectConfigurationPlan> ProjectConfigurations { get; init; } = [];
+
     public IReadOnlyList<string> ConfiguredProjects { get; init; } = [];
 
     /// <summary>
