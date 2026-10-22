@@ -58,6 +58,58 @@ Only declared Functions project configuration actions participate in Func topolo
 
 ### Package installation remains explicit
 
+#### Internal catalog preparation
+
+The CLI has an internal read-only catalog adapter alongside the legacy manifest
+service. It does not change the public quickstart or init commands. Both views
+use the existing manifest URL, validation, local override, and metadata cache.
+The public `QuickstartEntry` and legacy list/info JSON shapes are unchanged.
+
+For joint manifest/producer review, the adapter recognizes a proposed optional
+per-entry `packageReference` object. This is not a published producer schema or
+permission to populate production registrations. Its proposed version 1 fields
+are:
+
+- `schemaVersion`, the integer `1`.
+- `packageId`, `version`, `source`, and `templateIdentity`, the advertised exact
+  package reference and full template identity. Version ranges are invalid.
+  The proposed source representation is an absolute HTTPS URL without user
+  information or a fragment. Parsing it does not approve that source.
+- Optional `groupIdentity`, a nonempty descriptive identity.
+- Optional `artifact`, containing `algorithm` (`sha256`), a 64-character
+  hexadecimal `digest`, and a nonempty opaque `evidenceReference`.
+- Optional `projects` and `requiredWorkloads`, retained as opaque JSON pending
+  agreement on publication-derived summary formats. They are not evaluated as
+  topology, workload constraints, or executable actions.
+
+Missing, null, malformed, unsupported, and conflicting references are distinct
+catalog outcomes. Otherwise-valid legacy entries remain available through the
+legacy service. Duplicate catalog IDs, competing template package owners, and
+conflicting advertised sources/digests for one package version receive explicit
+conflict diagnostics. Filters do not hide conflicts elsewhere in the document.
+
+Every structurally accepted reference remains **unverified**. Evidence
+references are never fetched by this adapter. There is no approved/ready state,
+installed ownership comparison, payload acquisition, or target creation.
+Metadata transport records distinguish download, fresh/revalidated/stale cache,
+and local override. Unknown cache origin remains unknown, including after a
+304 response. Caller cancellation is not converted into stale-cache success.
+Conditional requests use only an ETag from the configured source. An unsolicited
+304 does not refresh the cache timestamp or label an unrelated cache revalidated.
+The existing stale-cache fallback remains available with its original provenance.
+
+Search/resource/IaC/language filtering preserves the legacy manifest semantics.
+An optional legacy stack capability and existing quickstart language provider
+can narrow those legacy language labels. This is not generated-topology
+eligibility and does not decide heterogeneous-template behavior. No filter
+infers stack identity from a package name.
+
+Before a public browse consumer or acquisition flow ships, the owners must agree
+extension placement/versioning, exact-reference variants, source normalization,
+summary formats, authenticated approval and revocation/freshness/offline policy,
+and the foundation's installed ownership and init handoff contracts. The
+adapter does not change publishing inputs or establish a second registry.
+
 `func init` queries only the installed template catalog. An unknown `--template` reference produces:
 
 ```text

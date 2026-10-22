@@ -82,7 +82,7 @@ public sealed class QuickstartManifestServiceTests
     public async Task GetManifestAsync_RefreshesCacheTimestamp_On304()
     {
         string manifest = CreateManifestJson("existing-entry", "Python", "http", "refs/tags/v1.0.0");
-        ManifestCacheMeta staleMeta = new("\"etag1\"", DateTimeOffset.UtcNow.AddHours(-25));
+        ManifestCacheMeta staleMeta = new("\"etag1\"", DateTimeOffset.UtcNow.AddHours(-25), _options.ManifestUrl);
         IManifestCache cache = CreateCache(manifestJson: manifest, meta: staleMeta);
 
         QuickstartManifestService service = CreateService(
@@ -257,6 +257,11 @@ public sealed class QuickstartManifestServiceTests
 
             result.Entries.Should().ContainSingle();
             result.Entries[0].Id.Should().Be("local-entry");
+            QuickstartCatalog catalog = await new QuickstartCatalogService(service).SearchAsync(new(), CancellationToken.None);
+            catalog.Entries.Should().ContainSingle().Which.Entry.Id.Should().Be("local-entry");
+            catalog.Provenance.Origin.Should().Be(QuickstartCatalogOrigin.LocalFile);
+            catalog.Provenance.SourceUrl.Should().Be(tempFile);
+            cache.DidNotReceive().WriteManifest(Arg.Any<string>());
         }
         finally
         {
@@ -390,4 +395,3 @@ public sealed class QuickstartManifestServiceTests
         }
     }
 }
-

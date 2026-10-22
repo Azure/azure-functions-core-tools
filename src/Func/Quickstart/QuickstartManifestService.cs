@@ -17,7 +17,7 @@ internal sealed class QuickstartManifestService(
     IManifestCache cache,
     IOptions<QuickstartManifestOptions> options,
     TimeProvider timeProvider,
-    ILogger<QuickstartManifestService> logger) : IQuickstartManifestService
+    ILogger<QuickstartManifestService> logger) : IQuickstartManifestService, IQuickstartCatalogSource
 {
     private const string HttpSchemePrefix = "http";
 
@@ -28,8 +28,13 @@ internal sealed class QuickstartManifestService(
     private readonly ILogger<QuickstartManifestService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <inheritdoc/>
-    public async Task<QuickstartManifest> GetManifestAsync(CancellationToken cancellationToken = default)
+    public async Task<QuickstartManifest> GetManifestAsync(CancellationToken cancellationToken = default) =>
+        (await GetCatalogDocumentAsync(cancellationToken)).Manifest;
+
+    /// <inheritdoc/>
+    public async Task<QuickstartCatalogDocument> GetCatalogDocumentAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _cache.EnsureDirectory();
 
         if (TryGetLocalFilePath(_options.ManifestUrl, out string? localPath) && localPath is not null)
@@ -41,25 +46,27 @@ internal sealed class QuickstartManifestService(
         if (cachedMeta is not null && IsCacheFresh(cachedMeta))
         {
             _logger.LogDebug("Quickstart manifest cache is fresh; using cached copy.");
-            return LoadCachedManifest();
+            return LoadCachedManifest(cachedMeta, QuickstartCatalogOrigin.FreshCache);
         }
 
         // Try CDN with ETag conditional request.
         try
         {
-            QuickstartManifest? result = await TryFetchFromCdnAsync(cachedMeta?.ETag, cancellationToken);
+            QuickstartCatalogDocument? result = await TryFetchFromCdnAsync(cachedMeta, cancellationToken);
             if (result is not null)
             {
                 return result;
             }
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        catch (Exception ex) when (ex is HttpRequestException or JsonException
+            || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
         {
             _logger.LogWarning(ex, "CDN fetch failed for quickstart manifest.");
         }
 
         // Fallback: return stale cache if available.
-        QuickstartManifest? cached = TryLoadCachedManifest();
+        cancellationToken.ThrowIfCancellationRequested();
+        QuickstartCatalogDocument? cached = TryLoadCachedManifest(cachedMeta, QuickstartCatalogOrigin.StaleCache);
         if (cached is not null)
         {
             _logger.LogWarning("Using stale cached quickstart manifest.");
@@ -71,10 +78,11 @@ internal sealed class QuickstartManifestService(
             "Check your network connection and try again.");
     }
 
-    private async Task<QuickstartManifest?> TryFetchFromCdnAsync(string? etag, CancellationToken cancellationToken)
+    private async Task<QuickstartCatalogDocument?> TryFetchFromCdnAsync(ManifestCacheMeta? cachedMeta, CancellationToken cancellationToken)
     {
         HttpClient httpClient = _httpClientFactory.CreateClient(QuickstartRegistration.HttpClientName);
         using HttpRequestMessage request = new(HttpMethod.Get, _options.ManifestUrl);
+        string? etag = cachedMeta?.SourceUrl == _options.ManifestUrl ? cachedMeta.ETag : null;
         if (!string.IsNullOrEmpty(etag))
         {
             request.Headers.TryAddWithoutValidation("If-None-Match", etag);
@@ -84,9 +92,16 @@ internal sealed class QuickstartManifestService(
 
         if (response.StatusCode == HttpStatusCode.NotModified)
         {
+            if (string.IsNullOrEmpty(etag))
+            {
+                _logger.LogWarning("Manifest returned 304 without a source-matched conditional request; cache was not revalidated.");
+                return null;
+            }
+
             _logger.LogDebug("Manifest not modified (304); refreshing cache timestamp.");
-            _cache.WriteMeta(new ManifestCacheMeta(etag ?? string.Empty, _timeProvider.GetUtcNow(), _options.ManifestUrl));
-            return LoadCachedManifest();
+            ManifestCacheMeta refreshed = new(etag, _timeProvider.GetUtcNow(), cachedMeta?.SourceUrl);
+            _cache.WriteMeta(refreshed);
+            return LoadCachedManifest(refreshed, QuickstartCatalogOrigin.RevalidatedCache);
         }
 
         response.EnsureSuccessStatusCode();
@@ -94,15 +109,16 @@ internal sealed class QuickstartManifestService(
         string content = await response.Content.ReadAsStringAsync(cancellationToken);
         string? newEtag = response.Headers.ETag?.Tag;
 
-        List<QuickstartEntry>? entries = DeserializeEntries(content);
+        List<QuickstartManifestItem>? entries = DeserializeEntries(content);
         if (entries is null)
         {
             return null;
         }
 
+        ManifestCacheMeta downloaded = new(newEtag ?? string.Empty, _timeProvider.GetUtcNow(), _options.ManifestUrl);
         _cache.WriteManifest(content);
-        _cache.WriteMeta(new ManifestCacheMeta(newEtag ?? string.Empty, _timeProvider.GetUtcNow(), _options.ManifestUrl));
-        return BuildManifest(entries);
+        _cache.WriteMeta(downloaded);
+        return BuildManifest(entries, new(QuickstartCatalogOrigin.Download, downloaded.SourceUrl, downloaded.CachedAt));
     }
 
     private static bool TryGetLocalFilePath(string url, out string? localPath)
@@ -132,7 +148,7 @@ internal sealed class QuickstartManifestService(
         return false;
     }
 
-    private async Task<QuickstartManifest> LoadFromLocalFileAsync(string path, CancellationToken cancellationToken)
+    private async Task<QuickstartCatalogDocument> LoadFromLocalFileAsync(string path, CancellationToken cancellationToken)
     {
         _logger.LogDebug("Loading quickstart manifest from local file '{Path}'.", path);
 
@@ -147,7 +163,7 @@ internal sealed class QuickstartManifestService(
 
         string errorMessage = $"Manifest override file '{path}' is empty or malformed.";
 
-        List<QuickstartEntry>? entries;
+        List<QuickstartManifestItem>? entries;
         try
         {
             entries = DeserializeEntries(json);
@@ -158,15 +174,16 @@ internal sealed class QuickstartManifestService(
         }
 
         return entries is not null
-            ? BuildManifest(entries)
+            ? BuildManifest(entries, new(QuickstartCatalogOrigin.LocalFile, _options.ManifestUrl, null))
             : throw new InvalidOperationException(errorMessage);
     }
 
-    private QuickstartManifest BuildManifest(List<QuickstartEntry> entries)
+    private QuickstartCatalogDocument BuildManifest(List<QuickstartManifestItem> entries, QuickstartCatalogProvenance provenance)
     {
-        List<QuickstartEntry> filtered = [];
-        foreach (QuickstartEntry entry in entries)
+        List<QuickstartManifestItem> filtered = [];
+        foreach (QuickstartManifestItem item in entries)
         {
+            QuickstartEntry entry = item.Entry;
             (string Identifier, List<string> MissingFields)? missingInfo = GetMissingFields(entry);
             if (missingInfo is not null)
             {
@@ -187,10 +204,11 @@ internal sealed class QuickstartManifestService(
                 continue;
             }
 
-            filtered.Add(entry);
+            filtered.Add(item);
         }
 
-        return new QuickstartManifest(filtered);
+        return new(new QuickstartManifest(filtered.Select(item => item.Entry).ToList()),
+            filtered.OrderBy(item => item.Entry.Priority).ToList().AsReadOnly(), provenance);
     }
 
     private static (string Identifier, List<string> MissingFields)? GetMissingFields(QuickstartEntry entry)
@@ -222,12 +240,42 @@ internal sealed class QuickstartManifestService(
             && entry.GitRef.StartsWith(QuickstartConstants.TagRefPrefix, StringComparison.Ordinal);
     }
 
-    private static List<QuickstartEntry>? DeserializeEntries(string json)
+    private static List<QuickstartManifestItem>? DeserializeEntries(string json)
     {
         QuickstartManifestEnvelope? envelope = JsonSerializer.Deserialize(
             json, QuickstartJsonContext.Default.QuickstartManifestEnvelope);
 
-        return envelope?.Templates;
+        if (envelope?.Templates is null)
+        {
+            return null;
+        }
+
+        List<QuickstartManifestItem> items = [];
+        foreach (JsonElement element in envelope.Templates)
+        {
+            QuickstartEntry entry = element.Deserialize(QuickstartJsonContext.Default.QuickstartEntry)
+                ?? throw new JsonException("A quickstart manifest entry must be an object.");
+            JsonElement metadata = default;
+            string? diagnostic = null;
+            bool found = false;
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, "packageReference", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (found)
+                    {
+                        diagnostic = "The packageReference property is duplicated.";
+                    }
+
+                    found = true;
+                    metadata = property.Value;
+                }
+            }
+
+            items.Add(new(entry, metadata, diagnostic));
+        }
+
+        return items;
     }
 
     private bool IsCacheFresh(ManifestCacheMeta meta) =>
@@ -235,11 +283,11 @@ internal sealed class QuickstartManifestService(
         && meta.SourceUrl == _options.ManifestUrl
         && _cache.ManifestExists();
 
-    private QuickstartManifest LoadCachedManifest() =>
-        TryLoadCachedManifest()
+    private QuickstartCatalogDocument LoadCachedManifest(ManifestCacheMeta? meta, QuickstartCatalogOrigin origin) =>
+        TryLoadCachedManifest(meta, origin)
         ?? throw new InvalidOperationException("Cached manifest file is missing or corrupt.");
 
-    private QuickstartManifest? TryLoadCachedManifest()
+    private QuickstartCatalogDocument? TryLoadCachedManifest(ManifestCacheMeta? meta, QuickstartCatalogOrigin origin)
     {
         try
         {
@@ -249,8 +297,8 @@ internal sealed class QuickstartManifestService(
                 return null;
             }
 
-            List<QuickstartEntry>? entries = DeserializeEntries(json);
-            return entries is null ? null : BuildManifest(entries);
+            List<QuickstartManifestItem>? entries = DeserializeEntries(json);
+            return entries is null ? null : BuildManifest(entries, new(origin, meta?.SourceUrl, meta?.CachedAt));
         }
         catch (JsonException ex)
         {

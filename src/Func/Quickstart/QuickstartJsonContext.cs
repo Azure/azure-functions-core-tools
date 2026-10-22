@@ -11,5 +11,6 @@ namespace Azure.Functions.Cli.Quickstart;
 /// </summary>
 [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
 [JsonSerializable(typeof(QuickstartManifestEnvelope))]
+[JsonSerializable(typeof(QuickstartEntry))]
 [JsonSerializable(typeof(ManifestCacheMeta))]
 internal sealed partial class QuickstartJsonContext : JsonSerializerContext;
