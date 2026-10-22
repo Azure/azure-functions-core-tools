@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Formats.Asn1;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Security.Cryptography.Pkcs;
@@ -132,16 +133,10 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
     [InlineData("missing-country", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington")]
     [InlineData("extra-ou", "CN=Microsoft Corporation, O=Microsoft Corporation, OU=Workloads, L=Redmond, S=Washington, C=US")]
     [InlineData("duplicate-cn", "CN=Microsoft Corporation, CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    [InlineData("multivalued-rdn", "CN=Microsoft Corporation + O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
     public async Task ValidChain_WithWrongAuthorIdentity_IsRejected(string caseName, string subject)
     {
         using X509Certificate2 root = CreateRoot();
         using X509Certificate2 author = CreateAuthor(root, subject);
-        if (subject.Contains('+'))
-        {
-            author.SubjectName.EnumerateRelativeDistinguishedNames().Should().Contain(name => name.HasMultipleElements);
-        }
-
         string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author);
         Func<Task> act = async () =>
         {
@@ -150,6 +145,48 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
 
         await act.Should().ThrowExactlyAsync<InvalidWorkloadException>()
             .WithMessage("*Microsoft Corporation*", "subject case {0} must not qualify", caseName);
+    }
+
+    [Fact]
+    public async Task ValidChain_WithMultivaluedAuthorIdentity_IsRejected()
+    {
+        (string Oid, string Value)[][] names =
+        [
+            [("2.5.4.3", "Microsoft Corporation"), ("2.5.4.10", "Microsoft Corporation")],
+            [("2.5.4.7", "Redmond")],
+            [("2.5.4.8", "Washington")],
+            [("2.5.4.6", "US")],
+        ];
+        AsnWriter writer = new(AsnEncodingRules.DER);
+        // Encode the RDN sets directly because subject-string parsing differs across platforms.
+        using (writer.PushSequence())
+        {
+            foreach (var name in names)
+            {
+                using (writer.PushSetOf())
+                {
+                    foreach (var (oid, value) in name)
+                    {
+                        using (writer.PushSequence())
+                        {
+                            writer.WriteObjectIdentifier(oid);
+                            writer.WriteCharacterString(UniversalTagNumber.PrintableString, value);
+                        }
+                    }
+                }
+            }
+        }
+
+        using X509Certificate2 root = CreateRoot();
+        using X509Certificate2 author = CreateAuthor(root, new X500DistinguishedName(writer.Encode()));
+        author.SubjectName.EnumerateRelativeDistinguishedNames().Should().ContainSingle(name => name.HasMultipleElements);
+        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author);
+        Func<Task> act = async () =>
+        {
+            using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
+        };
+
+        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*Microsoft Corporation*");
     }
 
     [Fact]
@@ -441,6 +478,10 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
 
     private static X509Certificate2 CreateAuthor(X509Certificate2 root, string subject, bool expired = false, bool timestamping = false,
         int keySize = 2048, DateTimeOffset? notBefore = null, DateTimeOffset? notAfter = null)
+        => CreateAuthor(root, new X500DistinguishedName(subject), expired, timestamping, keySize, notBefore, notAfter);
+
+    private static X509Certificate2 CreateAuthor(X509Certificate2 root, X500DistinguishedName subject, bool expired = false,
+        bool timestamping = false, int keySize = 2048, DateTimeOffset? notBefore = null, DateTimeOffset? notAfter = null)
     {
         using var key = RSA.Create(keySize);
         CertificateRequest request = new(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);

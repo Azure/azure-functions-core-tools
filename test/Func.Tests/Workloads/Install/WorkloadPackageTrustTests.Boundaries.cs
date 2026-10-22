@@ -76,7 +76,6 @@ public sealed partial class WorkloadPackageTrustTests
     [InlineData(false, 0, true)]
     [InlineData(false, 1, true)]
     [InlineData(true, -1, true)]
-    [InlineData(true, 0, true)]
     [InlineData(true, 1, false)]
     public async Task Timestamp_AuthorValidityBoundaries_AreEnforced(bool endBoundary, int offsetSeconds, bool accepted)
     {
@@ -101,6 +100,45 @@ public sealed partial class WorkloadPackageTrustTests
         else
         {
             await act.Should().ThrowExactlyAsync<InvalidWorkloadException>();
+        }
+    }
+
+    [Fact]
+    public async Task Timestamp_AtAuthorExpiry_UsesNativeChainValidation()
+    {
+        var expiry = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-12).ToUnixTimeSeconds());
+        using X509Certificate2 root = CreateRoot();
+        using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject, notAfter: expiry);
+        using X509Certificate2 timestamper = CreateAuthor(root, "CN=Test Timestamp Authority", timestamping: true,
+            notBefore: expiry.AddHours(-24));
+        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author, timestamper, root, timestampTime: expiry);
+        using X509Chain nativeChain = new();
+        nativeChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        nativeChain.ChainPolicy.CustomTrustStore.Add(root);
+        nativeChain.ChainPolicy.ApplicationPolicy.Add(new("1.3.6.1.5.5.7.3.3"));
+        nativeChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        nativeChain.ChainPolicy.DisableCertificateDownloads = true;
+        nativeChain.ChainPolicy.VerificationTime = expiry.UtcDateTime;
+        // Expiry equality differs by native engine; the verifier must preserve that decision.
+        bool nativeAccepted = nativeChain.Build(author);
+        output.WriteLine("Native chain accepts author at NotAfter: {0}", nativeAccepted);
+        if (!nativeAccepted)
+        {
+            nativeChain.ChainStatus.Should().ContainSingle().Which.Status.Should().Be(X509ChainStatusFlags.NotTimeValid);
+        }
+
+        Func<Task> act = async () =>
+        {
+            using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
+        };
+
+        if (nativeAccepted)
+        {
+            await act.Should().NotThrowAsync();
+        }
+        else
+        {
+            await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*bundled workload trust anchor*");
         }
     }
 
