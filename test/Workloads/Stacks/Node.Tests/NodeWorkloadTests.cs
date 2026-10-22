@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workloads.Node.Native;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -44,7 +45,7 @@ public class NodeWorkloadTests
     }
 
     [Fact]
-    public void Configure_AddsProjectFactory()
+    public void Configure_AddsProjectFactoryAndNativeItemPolicy()
     {
         ServiceCollection services = new();
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
@@ -53,5 +54,6 @@ public class NodeWorkloadTests
         new NodeWorkload().Configure(builder);
 
         builder.Received(1).AddProjectFactory(Arg.Any<NodeProjectFactory>());
+        builder.Received(1).AddNativeTemplatePolicy<NodeNativeTemplatePolicy>();
     }
 }
