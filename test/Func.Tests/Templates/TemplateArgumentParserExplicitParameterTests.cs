@@ -6,7 +6,7 @@ using Azure.Functions.Cli.Templates.Engine;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
-public sealed class NativeExplicitParameterProvenanceTests
+public sealed class TemplateArgumentParserExplicitParameterTests
 {
     [Theory]
     [InlineData("--target-framework", "net8.0")]
