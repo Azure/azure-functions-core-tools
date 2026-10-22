@@ -209,3 +209,54 @@ This opt-in repair is an approved intentional correction to the characterized
 upstream omission, not a claim that the old workflow compiled the generated
 function. Public commands, default registrations and no-capability denial stay
 unchanged.
+
+### Explicit CLI-owned workflow composition
+
+`NativeTemplateWorkflowHostFactory` is an internal opt-in composition root, not
+the public `Program` / `Parser` route. It captures actual workload load and
+`Configure` outcomes before building the host, then creates a new DI scope for
+each native workflow invocation. Workload and CLI/template homes remain
+independent inputs. `AddNativeTemplateWorkflowComposition(capture, ...)` selects
+only successfully attributed stack service descriptors for the single
+`InstalledProjectStackCatalog`; failed or unattributed registrations are not
+made usable by their presence in DI. An incomplete, cross-host or altered boot
+receipt refuses composition rather than reconstructing availability afterward.
+
+The host also retains the default singleton filesystem and installation metadata
+reader. Explicit filesystem overrides still win over profile defaults; neither
+registration grants stack authority. Constructing the host, reader or native
+invocation does not read installation metadata. An explicit metadata read uses
+`CliEnvironmentOptions.BaseDirectory` (the application's installation directory,
+defaulting to `AppContext.BaseDirectory`), not either workload or CLI/template
+home. Missing metadata and invalid metadata retain their reader errors without
+blocking unrelated native generation. Optional stream reads coexist with the
+create-only, cancellation-aware native filesystem operations.
+
+CLI-owned `INativeItemWorkflowProvider` and `INativeProjectWorkflowProvider`
+implementations are explicitly supplied. Native runners select them from the
+resolved installed stack and exact selected source, not from test-provided
+request capability fields. A missing project provider refuses instead of
+silently skipping preparation. Providers cannot replace the command's target,
+effective name, preview or force policy. The parser's immutable
+`ExplicitParameterNames` distinguishes user-supplied values from native authored
+defaults without rebuilding aliases from a dictionary.
+
+Project layout qualification is per mounted candidate in the same session, so
+one globally preselected .NET C# layout is not reused for F#. The selected
+provider prepares the canonical invocation and owned project preparation; the
+ordinary adoption/repair paths still do not load or regenerate templates.
+
+`ResolvedTemplate.CaptureNativePreparationAsync` supplies actual native
+evaluated effects and, when requested, detached source bytes from owned private
+output. It reuses selected-configuration and topology/path checks before and
+after expansion, requires an explicit effective name and create-only effects
+for private generation, rejects unexpected files/directories or output kinds,
+and never dispatches native post-actions or provider hooks. It is not live
+generation, a public action ABI, or authority to bypass the final invocation's
+source and target checks.
+
+The existing registered public commands, legacy hydration/help, destructive
+force behavior and rollout policy are unchanged. Native HTTP output placement
+still follows the requested execution directory; a nested factory journey is
+not proof that switching the public project-root `new` route preserves every
+legacy output path.
