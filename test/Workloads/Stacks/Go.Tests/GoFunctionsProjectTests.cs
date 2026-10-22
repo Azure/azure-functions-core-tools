@@ -49,9 +49,9 @@ public class GoFunctionsProjectTests : IDisposable
         string expectedName = OperatingSystem.IsWindows() ? "app.exe" : "app";
         observedRoot.Should().Be(_projectDir.FullName);
         observedOutput.Should().Be(Path.Combine(_projectDir.FullName, "bin", expectedName));
-        // StartupDirectory must remain the project root so the host finds host.json
-        // and the worker's `defaultExecutablePath = bin/app` resolves correctly.
         context.StartupDirectory.FullName.Should().Be(_projectDir.FullName);
+        context.EnvironmentVariables[GoFunctionsProject.WorkerExecutablePathEnvironmentVariable].Should()
+            .Be(Path.Combine("bin", expectedName));
     }
 
     [Fact]
@@ -110,6 +110,8 @@ public class GoFunctionsProjectTests : IDisposable
 
         invoked.Should().BeFalse();
         context.StartupDirectory.FullName.Should().Be(_projectDir.FullName);
+        string expectedName = OperatingSystem.IsWindows() ? "app.exe" : "app";
+        context.EnvironmentVariables[GoFunctionsProject.WorkerExecutablePathEnvironmentVariable].Should().Be(Path.Combine("bin", expectedName));
     }
 
     [Fact]

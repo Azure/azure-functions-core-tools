@@ -13,6 +13,8 @@ internal sealed class TemplateInvocationFileSystem(IPhysicalFileSystem basis) : 
     private readonly IPhysicalFileSystem _basis = basis ?? throw new ArgumentNullException(nameof(basis));
     private TemplateOutputImage? _image;
 
+    private IPhysicalFileSystem ReadFileSystem => _image?.ReadFileSystem ?? _basis;
+
     public void BeginCapture(TemplateOutputImage image)
     {
         ArgumentNullException.ThrowIfNull(image);
@@ -30,13 +32,13 @@ internal sealed class TemplateInvocationFileSystem(IPhysicalFileSystem basis) : 
         }
     }
 
-    public bool DirectoryExists(string path) => _image?.HasDirectory(path) == true || _basis.DirectoryExists(path);
+    public bool DirectoryExists(string path) => _image?.HasDirectory(path) == true || ReadFileSystem.DirectoryExists(path);
 
-    public bool FileExists(string path) => _image?.HasFile(path) == true || _basis.FileExists(path);
+    public bool FileExists(string path) => _image?.HasFile(path) == true || ReadFileSystem.FileExists(path);
 
     public Stream OpenRead(string path) => _image?.HasFile(path) == true
         ? _image.OpenCaptured(_image.GetRelative(path)!)
-        : _basis.OpenRead(path);
+        : ReadFileSystem.OpenRead(path);
 
     public string ReadAllText(string path)
     {
@@ -53,7 +55,7 @@ internal sealed class TemplateInvocationFileSystem(IPhysicalFileSystem basis) : 
     }
 
     public FileAttributes GetFileAttributes(string path) => _image?.HasFile(path) == true ? FileAttributes.Normal
-        : _image?.HasDirectory(path) == true ? FileAttributes.Directory : _basis.GetFileAttributes(path);
+        : _image?.HasDirectory(path) == true ? FileAttributes.Directory : ReadFileSystem.GetFileAttributes(path);
 
     public DateTime GetLastWriteTimeUtc(string path)
     {
@@ -62,7 +64,7 @@ internal sealed class TemplateInvocationFileSystem(IPhysicalFileSystem basis) : 
             throw new NotSupportedException("Physical timestamps are unavailable for privately captured native output.");
         }
 
-        return _basis.GetLastWriteTimeUtc(path);
+        return ReadFileSystem.GetLastWriteTimeUtc(path);
     }
 
     public string GetCurrentDirectory() => _basis.GetCurrentDirectory();
@@ -84,13 +86,13 @@ internal sealed class TemplateInvocationFileSystem(IPhysicalFileSystem basis) : 
     }
 
     public IEnumerable<string> EnumerateFileSystemEntries(string path, string pattern, SearchOption option)
-        => Enumerate(path, pattern, option, _basis.EnumerateFileSystemEntries, files: true, directories: true);
+        => Enumerate(path, pattern, option, ReadFileSystem.EnumerateFileSystemEntries, files: true, directories: true);
 
     public IEnumerable<string> EnumerateDirectories(string path, string pattern, SearchOption option)
-        => Enumerate(path, pattern, option, _basis.EnumerateDirectories, files: false, directories: true);
+        => Enumerate(path, pattern, option, ReadFileSystem.EnumerateDirectories, files: false, directories: true);
 
     public IEnumerable<string> EnumerateFiles(string path, string pattern, SearchOption option)
-        => Enumerate(path, pattern, option, _basis.EnumerateFiles, files: true, directories: false);
+        => Enumerate(path, pattern, option, ReadFileSystem.EnumerateFiles, files: true, directories: false);
 
     public void WriteAllText(string path, string value)
     {
@@ -160,12 +162,12 @@ internal sealed class TemplateInvocationFileSystem(IPhysicalFileSystem basis) : 
             return enumerate(path, pattern, option);
         }
 
-        if (!image.HasDirectory(path) && !_basis.DirectoryExists(path))
+        if (!image.HasDirectory(path) && !ReadFileSystem.DirectoryExists(path))
         {
             throw new DirectoryNotFoundException($"Native output directory '{path}' does not exist.");
         }
 
-        IEnumerable<string> original = _basis.DirectoryExists(path) ? enumerate(path, pattern, option) : [];
+        IEnumerable<string> original = ReadFileSystem.DirectoryExists(path) ? enumerate(path, pattern, option) : [];
         return original.Concat(image.Enumerate(path, pattern, option, files, directories))
             .Distinct(Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
     }

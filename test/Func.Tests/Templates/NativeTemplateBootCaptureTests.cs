@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
@@ -17,6 +18,22 @@ public sealed class NativeTemplateBootCaptureTests : IDisposable
     private const string Namespace = "Azure.Functions.Cli.Workloads.Tests.Fixtures.WithCommand.";
     private readonly string _home = Path.Combine(Path.GetTempPath(), "func-native-capture-" + Guid.NewGuid().ToString("N"));
     private readonly List<ServiceProvider> _providers = [];
+
+    [Fact]
+    public void InitializerMetadata_NullInitializer_RejectsInvalidDependency()
+    {
+        Action create = () => new InitializerProjectStackMetadata(null!);
+        create.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void StackCompatibility_NullDependencies_RejectsInvalidComposition()
+    {
+        Action capture = () => new NativeTemplateStackCompatibility(null!, new InstalledProjectStackCatalog([]));
+        Action stacks = () => new NativeTemplateStackCompatibility(new NativeTemplateWorkloadCapture(), null!);
+        capture.Should().Throw<ArgumentNullException>();
+        stacks.Should().Throw<ArgumentNullException>();
+    }
 
     [Fact]
     public async Task RegisterWorkloadsAsync_ActualSelectionAndConfiguration_CapturesOnlySelectedRuntimeOutcomes()
@@ -105,6 +122,37 @@ public sealed class NativeTemplateBootCaptureTests : IDisposable
         var snapshot = await availability.CaptureAsync(CancellationToken.None);
 
         snapshot.Workloads.Should().ContainSingle().Which.IsUsable.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PublicEntry_InitializerOnlyOldStack_AdoptsAndHealsButCannotGenerateBeforeExplicitUpdate()
+    {
+        Stage([Entry("LegacyPhysical", "1.0.0", "LegacyInitializerWorkload")]);
+        string cli = Path.Combine(_home, "cli");
+        string target = Path.Combine(_home, "project");
+        Directory.CreateDirectory(target);
+        File.WriteAllText(Path.Combine(target, "host.json"), """{"version":"2.0","user":true}""");
+        TestInteractionService output = new();
+        NativeCliEntryPoint entry = new();
+        int adopted = await entry.ExecuteAsync(["init", target, "-s", "legacy", "-l", "Legacy"], output,
+            new(_home), new(cli), CancellationToken.None, versionCheck: _ => Task.FromResult<string?>(null));
+        adopted.Should().Be(0, output.AllOutput);
+        string configurationPath = CliConfigurationPathsOptions.GetProjectConfigPath(new(target));
+        File.WriteAllText(configurationPath, """{"stack":{"runtime":"legacy"},"user":42}""");
+        int healed = await entry.ExecuteAsync(["init", target, "-l", "Other"], output, new(_home), new(cli),
+            CancellationToken.None, versionCheck: _ => Task.FromResult<string?>(null));
+        healed.Should().Be(0, output.AllOutput);
+        using var configuration = JsonDocument.Parse(File.ReadAllText(configurationPath));
+        configuration.RootElement.GetProperty("user").GetInt32().Should().Be(42);
+        configuration.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be("Other");
+        var before = Directory.GetFiles(target, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+
+        int generated = await entry.ExecuteAsync(["init", target, "-s", "legacy", "-l", "Legacy", "--force"], output,
+            new(_home), new(cli), CancellationToken.None, versionCheck: _ => Task.FromResult<string?>(null));
+
+        generated.Should().Be(1);
+        output.AllOutput.Should().Contain("func workload update LegacyPhysical").And.NotContain("Legacy scaffolding");
+        Directory.GetFiles(target, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes).Should().BeEquivalentTo(before);
     }
 
     public void Dispose()

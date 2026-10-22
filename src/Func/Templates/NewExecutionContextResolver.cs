@@ -44,14 +44,14 @@ internal sealed class NewExecutionContextResolver(
         => ResolveCoreAsync(request, canPrompt, null, cancellationToken);
 
     internal Task<NewExecutionContextResult> ResolveNativeAsync(NewExecutionRequest request, bool canPrompt,
-        InstalledProjectStackCatalog stackCatalog, CancellationToken cancellationToken)
+        InstalledProjectStackCatalog stackCatalog, CancellationToken cancellationToken, NativeTemplateStackCompatibility? stackCompatibility = null)
     {
         ArgumentNullException.ThrowIfNull(stackCatalog);
-        return ResolveCoreAsync(request, canPrompt, stackCatalog, cancellationToken);
+        return ResolveCoreAsync(request, canPrompt, stackCatalog, cancellationToken, stackCompatibility);
     }
 
     private async Task<NewExecutionContextResult> ResolveCoreAsync(NewExecutionRequest request, bool canPrompt,
-        InstalledProjectStackCatalog? stackCatalog, CancellationToken cancellationToken)
+        InstalledProjectStackCatalog? stackCatalog, CancellationToken cancellationToken, NativeTemplateStackCompatibility? stackCompatibility = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.WorkingDirectory);
@@ -156,6 +156,12 @@ internal sealed class NewExecutionContextResolver(
             return Fail("invalidLanguage", requestedLanguage is null
                 ? $"Cannot determine the project language. Supply --language <{string.Join("|", supportedLanguages)}> or run 'func init' to repair the project."
                 : $"Language '{requestedLanguage}' is not supported by stack '{stack}'. Use --language with one of: {string.Join(", ", supportedLanguages)}.");
+        }
+
+        if (stackCompatibility?.GetDiagnostic(stack) is { } compatibilityDiagnostic)
+        {
+            TemplateEngineContext context = new(request.WorkingDirectory, new(root, stack, languages[0]), itemOutputIntent: request.OutputIntent);
+            return new(context, NewExecutionResult.Reject("stackUpdateRequired", compatibilityDiagnostic) with { Context = context });
         }
 
         ProfileResolution profile;

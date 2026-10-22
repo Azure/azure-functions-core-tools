@@ -195,14 +195,14 @@ public sealed partial class BundledNodeTemplateTests
     }
 
     [Fact]
-    public async Task StagedEntry_UnsupportedStatefulInitRefusesBeforeMutation()
+    public async Task PublicEntry_DeclinedForceRefusesBeforeMutation()
     {
         await _installer.InstallFromPackageAsync(BuiltArchive);
         string target = Path.Combine(_root, "owned");
         Directory.CreateDirectory(target);
         string source = Path.Combine(target, "user.txt");
         File.WriteAllText(source, "preserve");
-        TestInteractionService output = new();
+        InteractivePublicEntryOutput output = new();
 
         int exit = await new NativeCliEntryPoint().ExecuteAsync(["init", target, "-s", "node", "-l", "js", "--force"],
             output, _paths, new(Home), CancellationToken.None, configure: TrackEntryContexts, versionCheck: _ => Task.FromResult<string?>(null));
@@ -210,14 +210,14 @@ public sealed partial class BundledNodeTemplateTests
         exit.Should().Be(1);
         File.ReadAllText(source).Should().Be("preserve");
         File.Exists(Path.Combine(target, ".func", "config.json")).Should().BeFalse();
-        output.AllOutput.Should().Contain("fresh project creation only");
+        output.AllOutput.Should().Contain("Init cancelled").And.Contain("default: False");
     }
 
     [Theory]
     [InlineData("host.json")]
     [InlineData(".func")]
     [InlineData(".git")]
-    public async Task StagedEntry_FreshCohort_RefusesExistingMarkersWithoutReadingOrChangingStatefulConfiguration(string marker)
+    public async Task PublicEntry_ExistingMarkers_UseAdoptionOrCreationAndPreserveUserBytes(string marker)
     {
         await _installer.InstallFromPackageAsync(BuiltArchive);
         string target = Path.Combine(_root, "existing-marker");
@@ -233,14 +233,16 @@ public sealed partial class BundledNodeTemplateTests
         string[] directoriesBefore = Directory.GetDirectories(target, "*", SearchOption.AllDirectories);
         TestInteractionService output = new();
 
-        int exit = await new NativeCliEntryPoint().ExecuteAsync(["init", target, "-s", "node", "-l", "js"],
+        int exit = await new NativeCliEntryPoint().ExecuteAsync(["init", target, "-s", "node", "-l", "js", "--skip-npm-install"],
             output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
 
-        exit.Should().Be(1);
-        output.AllOutput.Should().Contain("requires a new empty directory").And.NotContain("unexpected error");
-        Directory.GetFiles(target, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllText).Should().BeEquivalentTo(before);
-        Directory.GetDirectories(target, "*", SearchOption.AllDirectories).Should().BeEquivalentTo(directoriesBefore);
-        File.Exists(Path.Combine(target, "package.json")).Should().BeFalse();
+        exit.Should().Be(marker == ".func" ? 1 : 0, output.AllOutput);
+        output.AllOutput.Should().NotContain("unexpected error");
+        foreach (var file in before) File.ReadAllText(file.Key).Should().Be(file.Value);
+        foreach (string directory in directoriesBefore) Directory.Exists(directory).Should().BeTrue();
+        File.Exists(Path.Combine(target, "package.json")).Should().Be(marker == ".git");
+        if (marker == ".func") output.AllOutput.Should().Contain("Correct its JSON");
+        if (marker == "host.json") output.AllOutput.Should().Contain("Existing project adopted");
     }
 
     private void TrackEntryContexts(IServiceCollection services) => _loadContexts.AddRange(
@@ -316,22 +318,32 @@ public sealed partial class BundledNodeTemplateTests
     }
 
     [Fact]
-    public async Task Program_DefaultPolicy_RemainsLegacyAndDoesNotExposeStagedForceRefusal()
+    public async Task Program_DefaultPolicy_UsesNativeForceCreation()
     {
         await _installer.InstallFromPackageAsync(BuiltArchive);
         string target = Path.Combine(_root, "default-process-project");
         Directory.CreateDirectory(target);
         string userFile = Path.Combine(target, "temporary-test-owned.txt");
         File.WriteAllText(userFile, "only this test owns this temporary source");
+        Directory.CreateDirectory(Path.Combine(target, ".git"));
+        File.WriteAllText(Path.Combine(target, ".git", "HEAD"), "ref: refs/heads/user-branch");
+        Directory.CreateDirectory(Path.Combine(target, ".func"));
+        File.WriteAllText(Path.Combine(target, ".func", "config.json"), "{malformed user configuration");
         using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(60));
 
         var result = await SetupProgramAdvisoryTests.RunCliAsync(Path.Combine(_root, "default-process"), Home, _paths.Home, target,
             ["init", target, "-s", "node", "-l", "js", "--force", "--no-bundles", "--skip-npm-install"], cancellation.Token);
 
         result.ExitCode.Should().Be(0, result.StandardOutput + result.StandardError);
-        result.StandardOutput.Should().Contain("Project initialized for").And.NotContain("staged entry");
+        result.StandardOutput.Should().Contain("Initialized project template 'Azure.Functions.Node.Basic.JavaScript'").And.NotContain("staged entry");
         result.StandardError.Should().NotContain("fresh project creation only");
         File.Exists(userFile).Should().BeFalse();
         File.Exists(Path.Combine(target, "package.json")).Should().BeTrue();
+        File.ReadAllText(Path.Combine(target, ".git", "HEAD")).Should().Be("ref: refs/heads/user-branch");
+    }
+
+    private sealed class InteractivePublicEntryOutput : TestInteractionService
+    {
+        public override bool IsInteractive => true;
     }
 }

@@ -20,17 +20,20 @@ internal sealed class TemplateOutputImage : IDisposable
     private bool _sealed;
     private bool _disposed;
 
-    public TemplateOutputImage(IPhysicalFileSystem basis, string output, CancellationToken cancellationToken)
+    public TemplateOutputImage(IPhysicalFileSystem basis, string output, CancellationToken cancellationToken, bool previewAfterDirectoryCleanup = false)
     {
         _basis = basis ?? throw new ArgumentNullException(nameof(basis));
         ArgumentException.ThrowIfNullOrWhiteSpace(output);
         Output = Path.GetFullPath(output);
+        ReadFileSystem = previewAfterDirectoryCleanup ? new PlannedCleanupTemplateFileSystem(_basis, Output) : _basis;
         _cancellationToken = cancellationToken;
         _files = new(_pathComparer);
         _directories = new(_pathComparer) { "." };
     }
 
     public string Output { get; }
+
+    internal IPhysicalFileSystem ReadFileSystem { get; }
 
     public string? Diagnostic { get; private set; }
 
@@ -94,7 +97,7 @@ internal sealed class TemplateOutputImage : IDisposable
     public void CreateDirectory(string path)
     {
         string relative = ValidateWrite(path);
-        if (_files.ContainsKey(relative) || _basis.FileExists(path))
+        if (_files.ContainsKey(relative) || ReadFileSystem.FileExists(path))
         {
             ConflictDiagnostic = $"A file occupies native output directory '{relative}'.";
             throw new IOException(ConflictDiagnostic);
@@ -107,14 +110,14 @@ internal sealed class TemplateOutputImage : IDisposable
     public Stream CreateFile(string path)
     {
         string relative = ValidateWrite(path);
-        if (_directories.Contains(relative) || _basis.DirectoryExists(path))
+        if (_directories.Contains(relative) || ReadFileSystem.DirectoryExists(path))
         {
             ConflictDiagnostic = $"A directory occupies native output file '{relative}'.";
             throw new IOException(ConflictDiagnostic);
         }
 
         string parent = Path.GetDirectoryName(relative) is { Length: > 0 } directory ? directory : ".";
-        if (!_directories.Contains(parent) && !_basis.DirectoryExists(GetTarget(parent)))
+        if (!_directories.Contains(parent) && !ReadFileSystem.DirectoryExists(GetTarget(parent)))
         {
             throw new DirectoryNotFoundException($"Native output directory '{parent}' does not exist.");
         }
@@ -171,6 +174,10 @@ internal sealed class TemplateOutputImage : IDisposable
         if (relative is null)
         {
             return "Template output escapes the requested output directory.";
+        }
+        if (ReadFileSystem is PlannedCleanupTemplateFileSystem planned && planned.IsPreservedPath(path))
+        {
+            return "A force preview cannot write preserved .git content.";
         }
         if (relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar])
             .Any(component => component.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
@@ -240,7 +247,7 @@ internal sealed class TemplateOutputImage : IDisposable
         string? parent = Path.GetDirectoryName(relative);
         while (!string.IsNullOrEmpty(parent))
         {
-            if (_files.ContainsKey(parent) || _basis.FileExists(GetTarget(parent)))
+            if (_files.ContainsKey(parent) || ReadFileSystem.FileExists(GetTarget(parent)))
             {
                 ConflictDiagnostic = $"A file occupies native output directory '{parent}'.";
                 throw new IOException(ConflictDiagnostic);

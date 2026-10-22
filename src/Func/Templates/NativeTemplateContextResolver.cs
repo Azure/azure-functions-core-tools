@@ -23,12 +23,13 @@ internal sealed class NativeTemplateContextResolver(
     IHostJsonBundleSectionReader hostReader,
     IExtensionBundleResolver bundles,
     TemplateEngineBundleContextReader bundleContextReader,
-    bool enableBundleBindingConstraints = false) : INewExecutionContextResolver
+    bool enableBundleBindingConstraints = false,
+    NativeTemplateStackCompatibility? stackCompatibility = null) : INewExecutionContextResolver
 {
     private readonly InstalledProjectStackCatalog _stackCatalog = stackCatalog ?? throw new ArgumentNullException(nameof(stackCatalog));
     private readonly NewExecutionContextResolver _resolver = new(fileSystem, projects, profiles, stackOptions, [], hostReader, bundles,
         bundleContextReader ?? throw new ArgumentNullException(nameof(bundleContextReader)), enableBundleBindingConstraints);
 
     public Task<NewExecutionContextResult> ResolveAsync(NewExecutionRequest request, bool canPrompt, CancellationToken cancellationToken)
-        => _resolver.ResolveNativeAsync(request, canPrompt, _stackCatalog, cancellationToken);
+        => _resolver.ResolveNativeAsync(request, canPrompt, _stackCatalog, cancellationToken, stackCompatibility);
 }

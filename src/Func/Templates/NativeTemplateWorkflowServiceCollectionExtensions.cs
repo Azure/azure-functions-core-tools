@@ -35,16 +35,22 @@ internal static class NativeTemplateWorkflowServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(capture);
         services.AddSingleton(capture);
-        services.AddSingleton(provider => new InstalledProjectStackCatalog(capture.SelectConfiguredStacks(
-            provider.GetServices<IProjectStack>().ToArray(), services)));
+        services.AddSingleton(provider =>
+        {
+            IReadOnlyList<IProjectStack> stacks = capture.SelectConfiguredStacks(provider.GetServices<IProjectStack>().ToArray(), services);
+            IReadOnlyList<IProjectStack> legacy = capture.SelectConfiguredInitializerMetadata(
+                provider.GetServices<IProjectInitializer>().ToArray(), services, stacks);
+            return new InstalledProjectStackCatalog(stacks.Concat(legacy));
+        });
         services.AddScoped<INativeTemplateAvailability, NativeTemplateAvailability>();
+        services.AddScoped<NativeTemplateStackCompatibility>();
         services.AddSingleton<TemplateEngineBundleContextReader>();
         services.AddScoped<INewExecutionContextResolver>(provider => new NativeTemplateContextResolver(
             provider.GetRequiredService<IFileSystem>(), provider.GetRequiredService<IFunctionsProjectResolver>(),
             provider.GetRequiredService<IProfileResolver>(), provider.GetRequiredService<IOptionsMonitor<StackOptions>>(),
             provider.GetRequiredService<InstalledProjectStackCatalog>(), provider.GetRequiredService<IHostJsonBundleSectionReader>(),
             provider.GetRequiredService<IExtensionBundleResolver>(), provider.GetRequiredService<TemplateEngineBundleContextReader>(),
-            enableBundleBindingConstraints));
+            enableBundleBindingConstraints, provider.GetRequiredService<NativeTemplateStackCompatibility>()));
         return services.AddNativeTemplateWorkflowComposition();
     }
 }

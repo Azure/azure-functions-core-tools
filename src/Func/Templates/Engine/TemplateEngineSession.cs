@@ -34,6 +34,8 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
     private readonly TemplatePackageManager _packageManager;
     private readonly TemplateConstraintManager _constraintManager;
     private readonly TemplateCreator _creator;
+    private readonly NativeTemplatePackageScope? _packageScope;
+    private readonly Dictionary<string, string> _packagePins = new(StringComparer.Ordinal);
     private readonly IDisposable? _ownership;
     private readonly TemplateStoreEngineDiagnostics? _diagnostics;
     private NativeMsBuildBindingSnapshot? _msBuildBindings;
@@ -46,6 +48,7 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
 
         Context = context;
+        _packageScope = snapshot?.PackageScope;
         _ownership = ownership;
         _diagnostics = diagnostics;
         _host = new(context, snapshot, diagnostics);
@@ -56,6 +59,60 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
     }
 
     public TemplateEngineContext Context { get; }
+
+    internal async Task<NativeTemplatePackageDisposition> ClassifyPackageScopeAsync(ITemplatePackage? package, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        NativeTemplatePackageDisposition result = _packageScope is null ? new(true)
+            : await _packageScope.ClassifyAsync(PackageInfo(package), cancellationToken);
+        if (!result.Include && result.OwnedSha256 is { } hash && package is not null)
+        {
+            try
+            {
+                if (await ValidatePackageHashAsync(package.MountPointUri, hash, cancellationToken) is { } diagnostic)
+                {
+                    return new(true, "The claimed inactive native registration is not proven owned. " + diagnostic);
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return new(true, $"The claimed inactive native registration cannot be validated: {exception.Message}");
+            }
+        }
+        return result;
+    }
+
+    internal async Task<string?> ValidatePackageScopeAsync(ITemplatePackage? package, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_packageScope is null || package is null || PackageInfo(package) is not { } info)
+        {
+            return null;
+        }
+        (string? hash, string? diagnostic) = await _packageScope.VerifyAsync(info, cancellationToken);
+        if (diagnostic is not null || hash is null)
+        {
+            return diagnostic;
+        }
+        string? failure = await ValidatePackageHashAsync(package.MountPointUri, hash, cancellationToken);
+        if (failure is null)
+        {
+            _packagePins[package.MountPointUri] = hash;
+        }
+        return failure;
+    }
+
+    private Task<string?> ValidatePackageHashAsync(string archive, string expected, CancellationToken cancellationToken)
+    {
+        NativeTemplatePackageScope scope = _packageScope
+            ?? throw new InvalidOperationException("Native archive verification requires a captured package scope.");
+        return scope.ValidateArchiveAsync(_settings.Host.FileSystem, archive, expected, cancellationToken);
+    }
+
+    private static TemplatePackageInfo? PackageInfo(ITemplatePackage? package) =>
+        package is IManagedTemplatePackage managed ? new(managed.Identifier, managed.Version) : null;
 
     public IEngineEnvironmentSettings Settings
     {
@@ -89,7 +146,11 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
         }
     }
 
-    internal void CheckStoreDiagnostics() => _diagnostics?.ThrowIfCacheFailed();
+    internal void CheckStoreDiagnostics()
+    {
+        _host.ThrowIfCohortFailed();
+        _diagnostics?.ThrowIfCacheFailed();
+    }
 
     public virtual async Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
     {
@@ -261,6 +322,15 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
     Task<ReadOnlyMemory<byte>> ITemplateInvocationEngine.ReadPackageFileAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken)
         => ReadPackageFileAsync(template, relativePath, cancellationToken);
 
+    Task<string?> ITemplateInvocationEngine.ValidatePinnedPackageAsync(ITemplateInfo template, CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        return _packagePins.TryGetValue(template.MountPointUri, out string? expected)
+            ? ValidatePackageHashAsync(template.MountPointUri, expected, cancellationToken)
+            : Task.FromResult<string?>(null);
+    }
+
     string? ITemplateInvocationEngine.QualifyMsBuildBindings(
         ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request)
     {
@@ -406,9 +476,25 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
         }
     }
 
-    protected virtual Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
-        => _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName, parameters,
-            forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
+    protected virtual async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
+        InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
+    {
+        IPhysicalFileSystem? previous = _host.PreflightFileSystem;
+        if (dryRun && request.PreviewAfterDirectoryCleanup && request.DryRun && request.Force
+            && TemplateCatalogProjector.GetTemplateType(template) == TemplateType.Project)
+        {
+            _host.PreflightFileSystem = new PlannedCleanupTemplateFileSystem(_host.FileSystem, request.OutputDirectory.Info.FullName);
+        }
+        try
+        {
+            return await _creator.InstantiateAsync(template, request.Name, request.OutputDirectory.Info.Name, request.OutputDirectory.Info.FullName,
+                parameters, forceCreation: dryRun || request.Force, dryRun: dryRun, cancellationToken: cancellationToken);
+        }
+        finally
+        {
+            _host.PreflightFileSystem = previous;
+        }
+    }
 
     private static bool SamePath(string left, string right) => string.Equals(Path.GetFullPath(left), Path.GetFullPath(right),
         Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);

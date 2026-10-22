@@ -58,12 +58,13 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         _installer = CreateInstaller(coordinator);
     }
 
-    private WorkloadInstaller CreateInstaller(IWorkloadOperationCoordinator coordinator, IFileSystem? bundleFiles = null)
+    private WorkloadInstaller CreateInstaller(IWorkloadOperationCoordinator coordinator, IFileSystem? bundleFiles = null,
+        IWorkloadRuntimeIdentifierProvider? runtimeOverride = null)
     {
         var bundles = new BundledTemplateInstaller(_templates, _inspector, bundleFiles ?? _files, new(Home));
         var metadata = new WorkloadMetadataReader();
-        var runtime = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
-        runtime.Current.Returns("win-x64");
+        var runtime = runtimeOverride ?? Substitute.For<IWorkloadRuntimeIdentifierProvider>();
+        if (runtimeOverride is null) runtime.Current.Returns("win-x64");
         var selector = new WorkloadRidPackageSelector(runtime);
         return new(_source, new WorkloadPackageInspector(metadata, selector), selector,
             new WorkloadDeploymentService(_paths, _workloads, metadata, coordinator, _files, bundles),
@@ -568,7 +569,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     }
 
     [Fact]
-    public async Task UndeclaredUpdate_CannotCreateNewVersionBesideBundledSibling()
+    public async Task UndeclaredUpdate_PreservesBundledSiblingRegistrationWhileMovingOnlyTheSelectedLegacyOwner()
     {
         var bundled = await _installer.InstallFromPackageAsync(BuiltArchive);
         var legacy = new WorkloadEntry { PackageId = bundled.Entry.PackageId, PackageVersion = "0.1.0", EntryPoint = bundled.Entry.EntryPoint,
@@ -584,12 +585,17 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
             new BundledTemplateInstaller(_templates, _inspector, _files, new(Home)));
         using var prepared = await deployment.PrepareAsync(inspected, incoming, WorkloadOwnershipKind.Explicit, null, true, null, CancellationToken.None);
         using var operation = await coordinator.AcquireAsync(CancellationToken.None);
-        string before = File.ReadAllText(_paths.WorkloadRegistryPath);
-        Func<Task> update = () => deployment.UpdatePreparedAsync(operation, legacy, prepared, CancellationToken.None);
+        var nativeBefore = MigrationFiles(Path.Combine(Home, "templates"));
 
-        await update.Should().ThrowAsync<InvalidWorkloadException>().WithMessage("*bundled sibling*not supported*");
-        File.ReadAllText(_paths.WorkloadRegistryPath).Should().Be(before);
-        Directory.Exists(_paths.GetInstallDirectory(legacy.PackageId, "2.0.0")).Should().BeFalse();
+        var updated = await deployment.UpdatePreparedAsync(operation, legacy, prepared, CancellationToken.None);
+
+        updated.PackageVersion.Should().Be("2.0.0");
+        updated.BundledTemplatesDeclared.Should().BeFalse();
+        (await _workloads.GetWorkloadsAsync()).Should().HaveCount(2).And.ContainEquivalentOf(bundled.Entry);
+        Directory.Exists(_paths.GetInstallDirectory(legacy.PackageId, "2.0.0")).Should().BeTrue();
+        AssertMigrationFilesUnchanged(Path.Combine(Home, "templates"), nativeBefore);
+        using var retained = await deployment.PrepareReuseAsync(bundled.Entry, CancellationToken.None);
+        await deployment.ValidateReuseAsync(operation, retained, CancellationToken.None, checkOnly: true);
     }
 
     [Theory]
@@ -649,7 +655,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         var entry = result.Entry;
         _source.ResolveLatestVersionAsync(entry.PackageId, true, Arg.Any<NuGetVersion>(), false, entry.Source, Arg.Any<CancellationToken>())
             .Returns(new ResolvedPackage(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), new(entry.Source)));
-        string ownerPath = Path.Combine(Home, "templates", ".bundled-owners", "azure.functions.templates.node.basic.json");
+        string ownerPath = BundledOwnerPath();
         string before = File.ReadAllText(ownerPath);
 
         var update = await _installer.UpdateAsync(entry.PackageId, null, entry.Source, true, false);
@@ -681,7 +687,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     }
 
     [Fact]
-    public async Task CachedLogicalUpdate_CannotMoveOwnershipBesideBundledSibling()
+    public async Task CachedLogicalUpdate_MovesOnlyTheLegacyOwnerAndPreservesBundledSiblingRegistration()
     {
         var bundled = await _installer.InstallFromPackageAsync(BuiltArchive);
         var oldLogical = new LogicalPackage { PackageId = "Historical.Pointer", PackageVersion = "0.1.0", Source = bundled.Entry.Source };
@@ -705,13 +711,17 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         using var prepared = await deployment.PrepareReuseAsync(cached, CancellationToken.None);
         using var operation = await coordinator.AcquireAsync(CancellationToken.None);
         await deployment.ValidateReuseAsync(operation, prepared, CancellationToken.None);
-        string before = File.ReadAllText(_paths.WorkloadRegistryPath);
-        Func<Task> update = () => deployment.TryReuseImplementationForUpdateAsync(operation, legacy, cached.PackageId, cached.PackageVersion, "win-x64",
-            new LogicalPackage { PackageId = oldLogical.PackageId, PackageVersion = cached.PackageVersion, Source = oldLogical.Source }, CancellationToken.None);
+        var nativeBefore = MigrationFiles(Path.Combine(Home, "templates"));
 
-        await update.Should().ThrowAsync<InvalidWorkloadException>().WithMessage("*bundled sibling*not supported*");
-        File.ReadAllText(_paths.WorkloadRegistryPath).Should().Be(before);
-        (await _workloads.GetWorkloadsAsync()).Single(row => row.PackageVersion == "0.1.0").LogicalPackage.Should().BeEquivalentTo(oldLogical);
+        var updated = await deployment.TryReuseImplementationForUpdateAsync(operation, legacy, cached.PackageId, cached.PackageVersion, "win-x64",
+            new LogicalPackage { PackageId = oldLogical.PackageId, PackageVersion = cached.PackageVersion, Source = oldLogical.Source }, CancellationToken.None);
+        operation.CompleteMutation();
+
+        updated.Should().NotBeNull();
+        updated!.Entry.LogicalPackage!.PackageVersion.Should().Be(cached.PackageVersion);
+        (await _workloads.GetWorkloadsAsync()).Should().HaveCount(2).And.ContainEquivalentOf(bundled.Entry);
+        AssertMigrationFilesUnchanged(Path.Combine(Home, "templates"), nativeBefore);
+        Directory.Exists(cachedDirectory).Should().BeTrue();
     }
 
     [Theory]

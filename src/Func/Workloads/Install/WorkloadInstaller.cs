@@ -285,7 +285,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         InspectedWorkloadPackage package = await _packageInspector.InspectAsync(download.Path, cancellationToken);
         ValidateResolvedIdentity(resolved, package.Identity);
         using PreparedWorkloadDeployment prepared = await _deploymentService.PrepareAsync(package, resolved.Source.Source,
-            WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true, progress, cancellationToken);
+            WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true, progress, cancellationToken, currentEntry);
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
         await RevalidateTargetAsync(operation, packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, currentEntry, cancellationToken);
         WorkloadEntry newEntry = await _deploymentService.UpdatePreparedAsync(operation, currentEntry, prepared, cancellationToken);
@@ -348,7 +348,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         WorkloadEntry? reusable = await _deploymentService.GetReusableImplementationAsync(
             selection.PackageId, pointer.Identity.Version, selection.RuntimeIdentifier, cancellationToken);
 
-        if (reusable is not null)
+        if (reusable is not null && !_deploymentService.HasBundledTemplates(reusable))
         {
             using PreparedWorkloadReuse preparedReuse = await _deploymentService.PrepareReuseAsync(reusable, cancellationToken);
             using IWorkloadOperation reuseOperation = await _coordinator.AcquireAsync(cancellationToken);
@@ -370,7 +370,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         ValidateResolvedIdentity(implementationResolved, implementation.Identity);
         _ridPackageSelector.ValidateImplementation(pointer, selection, implementation);
         using PreparedWorkloadDeployment prepared = await _deploymentService.PrepareAsync(implementation, implementationResolved.Source.Source,
-            WorkloadOwnershipKind.Logical, newLogical, force: true, progress, cancellationToken);
+            WorkloadOwnershipKind.Logical, newLogical, force: true, progress, cancellationToken, currentEntry);
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
         await RevalidateTargetAsync(operation, packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, currentEntry, cancellationToken);
         WorkloadEntry newEntry = await _deploymentService.UpdatePreparedAsync(operation, currentEntry, prepared, cancellationToken);

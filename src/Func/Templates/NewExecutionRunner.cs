@@ -22,7 +22,8 @@ internal sealed class NewExecutionRunner(
     ITemplateArgumentParser arguments,
     IInteractionService interaction,
     TemplateExecutionInteraction prompts,
-    NativeTemplateWorkflowRegistry? workflows = null) : INewExecutionRunner
+    NativeTemplateWorkflowRegistry? workflows = null,
+    NativeTemplateStackCompatibility? stackCompatibility = null) : INewExecutionRunner
 {
     private readonly INewExecutionContextResolver _contexts = contexts ?? throw new ArgumentNullException(nameof(contexts));
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
@@ -30,6 +31,7 @@ internal sealed class NewExecutionRunner(
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly TemplateExecutionInteraction _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
     private readonly NativeTemplateWorkflowRegistry? _workflows = workflows;
+    private readonly NativeTemplateStackCompatibility? _stackCompatibility = stackCompatibility;
 
     public async Task<NewExecutionResult> ExecuteAsync(
         NewExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -68,6 +70,14 @@ internal sealed class NewExecutionRunner(
 
         TemplateEngineContext context = resolved.Context ?? throw new InvalidOperationException("Context resolution returned no outcome.");
         context = context with { RequireCleanStore = request.DryRun || request.List };
+        if (_stackCompatibility?.GetDiagnostic(context.Project!.Stack!) is { } diagnostic)
+        {
+            return NewExecutionResult.Reject("stackUpdateRequired", diagnostic) with { Context = context };
+        }
+        if (_stackCompatibility is not null)
+        {
+            availability = _stackCompatibility.ForStack(availability, context.Project!.Stack!);
+        }
         using Templater templater = await _factory.CreateAsync(context, availability, cancellationToken,
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
@@ -87,7 +97,9 @@ internal sealed class NewExecutionRunner(
         INativeItemWorkflowProvider? provider = _workflows?.FindItem(templater.Context.Project.Stack!);
         if (_workflows is not null && provider is null)
         {
-            return NewExecutionResult.Reject("workflowUnavailable", "No CLI-owned native item workflow is composed for the selected installed stack.");
+            return NewExecutionResult.Reject("workflowUnavailable",
+                $"Stack '{templater.Context.Project.Stack}' does not supply a first-party function-item workflow. "
+                + "Use the stack's project tooling to add functions; no project files were changed.");
         }
 
         INativeItemCompatibility? compatibility = provider?.Compatibility ?? (_workflows is null ? request.ItemCompatibility : null);

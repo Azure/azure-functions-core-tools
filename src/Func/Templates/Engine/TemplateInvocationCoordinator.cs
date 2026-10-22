@@ -117,6 +117,15 @@ internal sealed class TemplateInvocationCoordinator(
         }
 
         TemplateProjectSupport? project = configuration.Type == TemplateType.Project ? ProjectSupport(configuration.Content) : null;
+        if (request.PreserveExistingFiles && project is null)
+        {
+            return new(TemplateInvocationStatus.InvalidArguments, [], "Existing-file preservation is only supported for project initialization.");
+        }
+        if (request.PreviewAfterDirectoryCleanup && (!request.DryRun || !request.Force || project is null))
+        {
+            return new(TemplateInvocationStatus.InvalidArguments, [],
+                "Directory-cleanup intent is only supported for a forced project preview, never actual invocation.");
+        }
         bool qualifiedDotNetProject = project?.DotNetLayout is not null;
         if (project is not null)
         {
@@ -142,11 +151,11 @@ internal sealed class TemplateInvocationCoordinator(
         }
 
         string output = request.OutputDirectory.Info.FullName;
-        using TemplateOutputImage image = new(_engine.FileSystem, output, cancellationToken);
+        using TemplateOutputImage image = new(_engine.FileSystem, output, cancellationToken, request.PreviewAfterDirectoryCleanup);
         ITemplateCreationResult native;
         try
         {
-            native = await _engine.RenderImageAsync(template, request,
+            native = await _engine.RenderImageAsync(template, request with { Force = request.Force || request.PreserveExistingFiles },
                 CreateInputData(configuration.Parameters, request.Parameters), image, cancellationToken);
         }
         catch (InvalidTemplateMetadataException exception)
@@ -200,6 +209,11 @@ internal sealed class TemplateInvocationCoordinator(
         }
 
         IReadOnlyList<TemplateFileChange> nativeChanges = DescribeActualOutputs(image, configuration, native.CreationEffects);
+        if (request.PreserveExistingFiles)
+        {
+            nativeChanges = Array.AsReadOnly<TemplateFileChange>([.. nativeChanges.Select(change =>
+                _engine.FileSystem.FileExists(image.GetTarget(change.Path)) ? change with { Kind = TemplateFileChangeKind.Preserve } : change)]);
+        }
         IReadOnlyList<TemplateFileChange> changes = nativeChanges;
         NativeTemplateEffectResult? effectPreview = null;
         IReadOnlyList<TemplateProjectConfigurationPlan> configurationPlans = [];
@@ -215,7 +229,7 @@ internal sealed class TemplateInvocationCoordinator(
                     ? project.Planner.CreateDotNetPlans(configuration.Content, native.CreationEffects, output, layout, request.Parameters,
                         actualOutputs, directories)
                     : project.Planner.CreatePlans(configuration.Content, native.CreationResult, output, actualOutputs, directories);
-                if (configurationPlans.Any(project.Writer.ConfigurationExists))
+                if (!request.PreviewAfterDirectoryCleanup && configurationPlans.Any(project.Writer.ConfigurationExists))
                 {
                     return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic)
                     {
@@ -295,7 +309,8 @@ internal sealed class TemplateInvocationCoordinator(
             return configurationFailure with { ProjectConfigurations = configurationPlans };
         }
 
-        bool requiresForce = !request.Force && changes.Any(change => change.Kind != TemplateFileChangeKind.Create);
+        bool requiresForce = !request.Force && changes.Any(change => change.Kind != TemplateFileChangeKind.Create
+            && !(request.PreserveExistingFiles && change.Kind == TemplateFileChangeKind.Preserve));
         if (request.DryRun)
         {
             return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null)
@@ -408,7 +423,9 @@ internal sealed class TemplateInvocationCoordinator(
 
         TemplateFileChange[] changes =
             [.. effects.FileChanges.Select(change => TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind))];
-        diagnostic = ValidateOutputPaths(request.OutputDirectory.Info.FullName, changes);
+        bool cleanupPreview = request.PreviewAfterDirectoryCleanup && request.DryRun && request.Force && ProjectTemplatesEnabled
+            && configuration.Type == TemplateType.Project;
+        diagnostic = ValidateOutputPaths(request.OutputDirectory.Info.FullName, changes, cleanupPreview);
         if (diagnostic is not null)
         {
             return Failed(diagnostic);
@@ -417,14 +434,23 @@ internal sealed class TemplateInvocationCoordinator(
         Dictionary<string, ReadOnlyMemory<byte>> expanded = new(StringComparer.Ordinal);
         if (expandFiles)
         {
-            if (string.IsNullOrWhiteSpace(request.Name) || effects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create))
+            if (string.IsNullOrWhiteSpace(request.Name) || effects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create
+                && !(cleanupPreview && change.ChangeKind is ChangeKind.Change or ChangeKind.Overwrite)))
             {
                 return Failed("Private native expansion requires an explicit effective name and create-only native outputs.");
             }
 
             using TempDirectory temporary = fileSystem.CreateTempDirectory();
             var output = WorkingDirectory.FromExplicit(temporary.Path);
-            TemplateInvocationRequest expansionRequest = request with { OutputDirectory = output, EffectSupport = null, MsBuildBindings = null };
+            TemplateInvocationRequest expansionRequest = request with
+            {
+                OutputDirectory = output,
+                EffectSupport = null,
+                MsBuildBindings = null,
+                Force = false,
+                PreserveExistingFiles = false,
+                PreviewAfterDirectoryCleanup = false,
+            };
             diagnostic = ValidateOutputPaths(output.Info.FullName, changes);
             if (diagnostic is not null)
             {
@@ -528,7 +554,7 @@ internal sealed class TemplateInvocationCoordinator(
             string? parent = Path.GetDirectoryName(path);
             while (parent is not null && image.GetRelative(parent) is { } relative && relative != ".")
             {
-                if (_engine.FileSystem.FileExists(parent))
+                if (image.ReadFileSystem.FileExists(parent))
                 {
                     return "A template output directory ancestor is an existing file. Choose an output directory without file collisions.";
                 }
@@ -629,11 +655,11 @@ internal sealed class TemplateInvocationCoordinator(
 
             string target = image.GetTarget(relative);
             bool file = files.Contains(relative);
-            if (!file && !includeExistingDirectories && _engine.FileSystem.DirectoryExists(target))
+            if (!file && !includeExistingDirectories && image.ReadFileSystem.DirectoryExists(target))
             {
                 continue;
             }
-            bool overwrite = file && _engine.FileSystem.FileExists(target);
+            bool overwrite = file && image.ReadFileSystem.FileExists(target);
             changes.Add(new(path, overwrite ? TemplateFileChangeKind.Overwrite : TemplateFileChangeKind.Create));
         }
 
@@ -655,6 +681,9 @@ internal sealed class TemplateInvocationCoordinator(
         try
         {
             Dictionary<string, TargetState> targets = new(Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+            HashSet<string> preserved = new(changes.Where(change => change.Kind == TemplateFileChangeKind.Preserve)
+                .Select(change => image.GetRelative(image.GetTarget(change.Path))!),
+                Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
             foreach (string file in image.Files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -667,6 +696,14 @@ internal sealed class TemplateInvocationCoordinator(
                 if (state.Directory)
                 {
                     return new(TemplateInvocationStatus.FileConflict, [], $"A directory occupies native output file '{file}'.");
+                }
+                if (preserved.Contains(file))
+                {
+                    if (!state.File)
+                    {
+                        return new(TemplateInvocationStatus.FileConflict, [], $"Preserved native output file '{file}' changed before installation. Rerun initialization.");
+                    }
+                    continue;
                 }
                 if (state.File && !request.Force)
                 {
@@ -846,8 +883,9 @@ internal sealed class TemplateInvocationCoordinator(
             ? directory && !file : file && !directory;
     }
 
-    private string? ValidateOutputPaths(string output, IReadOnlyList<TemplateFileChange> changes)
+    private string? ValidateOutputPaths(string output, IReadOnlyList<TemplateFileChange> changes, bool cleanupPreview = false)
     {
+        PlannedCleanupTemplateFileSystem? planned = cleanupPreview ? new(_engine.FileSystem, output) : null;
         foreach (TemplateFileChange change in changes)
         {
             string? path = Path.GetFullPath(Path.Combine(output, change.Path));
@@ -856,6 +894,10 @@ internal sealed class TemplateInvocationCoordinator(
             if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             {
                 return "Template output escapes the requested output directory.";
+            }
+            if (planned?.IsPreservedPath(path) == true)
+            {
+                return "A force preview cannot write preserved .git content.";
             }
 
             // The requested output directory is the boundary; linked parents do not redirect individual template paths.
@@ -869,7 +911,8 @@ internal sealed class TemplateInvocationCoordinator(
                         return "Template output uses a symbolic link or reparse point. Choose an unlinked output directory.";
                     }
 
-                    if (!string.Equals(path, target, StringComparison.Ordinal) && (attributes & FileAttributes.Directory) == 0)
+                    if (!string.Equals(path, target, StringComparison.Ordinal) && (attributes & FileAttributes.Directory) == 0
+                        && planned?.IsScheduledForDeletion(path) != true)
                     {
                         return "A template output directory ancestor is an existing file. Choose an output directory without file collisions.";
                     }
@@ -903,9 +946,15 @@ internal sealed class TemplateInvocationCoordinator(
     internal async Task<TemplateInvocationResult?> ValidateSelectedConfigurationAsync(
         ITemplateInfo template, TemplateConfigurationSnapshot configuration, CancellationToken cancellationToken)
     {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
         TemplateConfigurationSnapshot current;
         try
         {
+            if (await _engine.ValidatePinnedPackageAsync(template, cancellationToken) is { } packageFailure)
+            {
+                return new(TemplateInvocationStatus.TemplateChanged, [], packageFailure);
+            }
             current = await _engine.ReadConfigurationAsync(template, cancellationToken);
         }
         catch (InvalidTemplateMetadataException exception)

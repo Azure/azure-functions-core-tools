@@ -35,7 +35,7 @@ internal interface IWorkloadDeploymentService
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken);
     public Task<PreparedWorkloadDeployment> PrepareAsync(InspectedWorkloadPackage package, string source,
         WorkloadOwnershipKind ownership, LogicalPackage? logicalPackage, bool force,
-        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken);
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken, WorkloadEntry? updateFrom = null);
     public Task<WorkloadInstallResult> InstallPreparedAsync(IWorkloadOperation operation, PreparedWorkloadDeployment prepared,
         IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken);
     public Task<WorkloadEntry> UpdatePreparedAsync(IWorkloadOperation operation, WorkloadEntry currentEntry,

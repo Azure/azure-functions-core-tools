@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Installer;
+using Microsoft.TemplateEngine.Abstractions.Mount;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Settings;
 using NuGet.Versioning;
@@ -19,16 +20,23 @@ namespace Azure.Functions.Cli.Workloads.Install;
 
 internal interface IBundledTemplateInstaller
 {
-    public Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin,
-        CancellationToken cancellationToken, bool checkOnly = false);
+    public Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin, CancellationToken cancellationToken,
+        PreparedBundledTemplates? replacing = null, bool retainPrevious = false, bool checkOnly = false);
+    /// <summary>
+    /// Reads exact version ownership, including legacy receipts, without migrating or writing native state.
+    /// </summary>
+    /// <exception cref="InvalidWorkloadException">The package identity or its ownership receipts are invalid or conflicting.</exception>
+    public Task<BundledTemplateOwner?> ReadOwnerAsync(string packageId, string version, CancellationToken cancellationToken);
     /// <summary>
     /// Checks every native owner before admitting the workload, retaining native protection through registration and recovery.
+    /// Explicit updates may supply workload rollback to settle both stores before releasing native protection.
     /// </summary>
     /// <exception cref="InvalidWorkloadException">Native ownership conflicts before workload admission.</exception>
     /// <exception cref="BundledTemplateRegistrationException">Registration fails after workload admission and native recovery.</exception>
     /// <exception cref="BundledTemplateRegistrationCanceledException">Cancellation retains the admitted stack after native recovery.</exception>
     public Task<WorkloadInstallResult> CommitAsync(PreparedBundledTemplates prepared,
-        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken);
+        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? rollbackWorkload = null);
     public Task ValidateInstalledAsync(PreparedBundledTemplates prepared, CancellationToken cancellationToken);
 }
 
@@ -39,10 +47,13 @@ internal sealed record BundledTemplateAsset(string Path, string PackageId, strin
 internal sealed record BundledTemplatesManifest(int SchemaVersion, IReadOnlyList<BundledTemplateAsset> Assets);
 
 internal sealed class PreparedBundledTemplates(TempDirectory staging, BundledTemplateOrigin origin,
-    IReadOnlyList<(string Archive, BasicTemplateArtifact Artifact)> assets) : IDisposable
+    IReadOnlyList<(string Archive, BasicTemplateArtifact Artifact)> assets, PreparedBundledTemplates? replacing = null,
+    bool retainPrevious = false) : IDisposable
 {
     public BundledTemplateOrigin Origin { get; } = origin;
     public IReadOnlyList<(string Archive, BasicTemplateArtifact Artifact)> Assets { get; } = assets;
+    public PreparedBundledTemplates? Replacing { get; } = replacing;
+    public bool RetainPrevious { get; } = retainPrevious;
     public void Dispose() => staging.Dispose();
 }
 
@@ -65,8 +76,8 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly CliConfigurationPathsOptions _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
-    public async Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin,
-        CancellationToken cancellationToken, bool checkOnly = false)
+    public async Task<PreparedBundledTemplates?> PrepareAsync(string directory, BundledTemplateOrigin origin, CancellationToken cancellationToken,
+        PreparedBundledTemplates? replacing = null, bool retainPrevious = false, bool checkOnly = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentNullException.ThrowIfNull(origin);
@@ -81,45 +92,13 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             return null;
         }
 
-        BundledTemplatesManifest manifest;
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-            RejectDuplicates(document.RootElement);
-            manifest = JsonSerializer.Deserialize(json, BundledTemplateJsonContext.Default.BundledTemplatesManifest)
-                ?? throw Invalid("The manifest must be an object.");
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidWorkloadException($"Invalid {ManifestName}: {exception.Message}", exception);
-        }
-
-        if (manifest.SchemaVersion != 1 || manifest.Assets is null || manifest.Assets.Count == 0)
-        {
-            throw Invalid("A schemaVersion 1 manifest requires at least one asset.");
-        }
-
+        BundledTemplatesManifest manifest = ReadManifest(json);
         TempDirectory staging = _fileSystem.CreateTempDirectory();
         try
         {
             List<(string Archive, BasicTemplateArtifact Artifact)> assets = [];
-            HashSet<string> paths = new(StringComparer.OrdinalIgnoreCase);
-            HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
-            HashSet<string> identities = new(StringComparer.Ordinal);
             foreach (BundledTemplateAsset asset in manifest.Assets)
             {
-                if (asset is null || !IsRelativeAsset(asset.Path) || !paths.Add(asset.Path)
-                    || string.IsNullOrWhiteSpace(asset.PackageId) || !Regex.IsMatch(asset.PackageId, @"\A[A-Za-z0-9_.-]+\z")
-                    || !ids.Add(asset.PackageId) || !NuGetVersion.TryParse(asset.Version, out NuGetVersion? version)
-                    || asset.Sha256 is null || !Regex.IsMatch(asset.Sha256, @"\A[0-9a-fA-F]{64}\z")
-                    || asset.Templates is null || asset.Templates.Count == 0
-                    || asset.Templates.Any(template => template is null || string.IsNullOrWhiteSpace(template.Identity)
-                        || !identities.Add(template.Identity) || template.Type is not ("project" or "item")
-                        || string.IsNullOrWhiteSpace(template.Path)))
-                {
-                    throw Invalid("Asset paths, identities, versions, digests and complete template inventories must be valid and unique.");
-                }
-
                 string archive = Path.Combine(staging.Path, $"{assets.Count}.nupkg");
                 try
                 {
@@ -130,7 +109,8 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
                     throw new InvalidWorkloadException($"Declared bundled archive '{asset.Path}' for '{asset.PackageId}' is missing. " +
                         "Preserve the installation and request explicit repair using its original complete workload artifact.", exception);
                 }
-                BasicTemplateArtifact artifact = new(asset.PackageId, version, origin.Source, asset.Sha256, origin.Sha256, asset.Templates);
+                BasicTemplateArtifact artifact = new(asset.PackageId, NuGetVersion.Parse(asset.Version), origin.Source, asset.Sha256,
+                    origin.Sha256, asset.Templates);
                 await ValidateArtifactAsync(archive, artifact, cancellationToken);
 
                 assets.Add((archive, artifact));
@@ -154,13 +134,14 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             // Check incumbent ownership before stack admission, and again inside the exclusive native transaction.
             using (TemplateEngineSession reader = await OpenReadAsync(context, cancellationToken))
             {
+                await ValidateReplacementAsync(reader, replacing, cancellationToken);
                 foreach ((_, BasicTemplateArtifact artifact) in assets)
                 {
-                    await CheckIncumbentAsync(reader, origin, artifact, cancellationToken);
+                    await CheckIncumbentAsync(reader, origin, artifact, cancellationToken, retainPrevious ? null : replacing);
                 }
             }
 
-            return new(staging, origin, assets.AsReadOnly());
+            return new(staging, origin, assets.AsReadOnly(), replacing, retainPrevious);
         }
         catch
         {
@@ -169,11 +150,61 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
         }
     }
 
+    /// <summary>
+    /// Validates a bundled-template declaration without inspecting files or native state.
+    /// </summary>
+    /// <exception cref="InvalidWorkloadException">The declaration is invalid or ambiguous.</exception>
+    internal static BundledTemplatesManifest ReadManifest(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        BundledTemplatesManifest manifest;
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            RejectDuplicates(document.RootElement);
+            manifest = JsonSerializer.Deserialize(json, BundledTemplateJsonContext.Default.BundledTemplatesManifest)
+                ?? throw Invalid("The manifest must be an object.");
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidWorkloadException($"Invalid {ManifestName}: {exception.Message}", exception);
+        }
+
+        if (manifest.SchemaVersion != 1 || manifest.Assets is null || manifest.Assets.Count == 0)
+        {
+            throw Invalid("A schemaVersion 1 manifest requires at least one asset.");
+        }
+
+        HashSet<string> paths = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> identities = new(StringComparer.Ordinal);
+        foreach (BundledTemplateAsset asset in manifest.Assets)
+        {
+            if (asset is null || !IsRelativeAsset(asset.Path) || !paths.Add(asset.Path)
+                || string.IsNullOrWhiteSpace(asset.PackageId) || !Regex.IsMatch(asset.PackageId, @"\A[A-Za-z0-9_.-]+\z")
+                || !ids.Add(asset.PackageId) || !NuGetVersion.TryParse(asset.Version, out _)
+                || asset.Sha256 is null || !Regex.IsMatch(asset.Sha256, @"\A[0-9a-fA-F]{64}\z")
+                || asset.Templates is null || asset.Templates.Count == 0
+                || asset.Templates.Any(template => template is null || string.IsNullOrWhiteSpace(template.Identity)
+                    || !identities.Add(template.Identity) || template.Type is not ("project" or "item")
+                    || string.IsNullOrWhiteSpace(template.Path)))
+            {
+                throw Invalid("Asset paths, identities, versions, digests and complete template inventories must be valid and unique.");
+            }
+        }
+        return manifest;
+    }
+
     public async Task<WorkloadInstallResult> CommitAsync(PreparedBundledTemplates prepared,
-        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken)
+        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? rollbackWorkload = null)
     {
         ArgumentNullException.ThrowIfNull(prepared);
         ArgumentNullException.ThrowIfNull(admitWorkload);
+        if (prepared.Replacing is not null && rollbackWorkload is null)
+        {
+            throw new ArgumentException("Replacing a bundled stack requires workload rollback.", nameof(rollbackWorkload));
+        }
         foreach ((string archive, BasicTemplateArtifact artifact) in prepared.Assets)
         {
             await ValidateArtifactAsync(archive, artifact, cancellationToken);
@@ -183,35 +214,55 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
         try
         {
             using TemplateStoreWriteSession transaction = await _store.OpenWriteAsync(Context(_paths.Home), cancellationToken);
-            await transaction.ExecuteAsync(async (session, token) =>
+            bool admissionStarted = false;
+            IReadOnlyList<(BundledTemplateOwner Owner, string Archive)> protectedOwners = [];
+            try
             {
-                List<bool> reused = [];
-                foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
+                await transaction.ExecuteAsync(async (session, token) =>
                 {
-                    reused.Add(await CheckIncumbentAsync(session, prepared.Origin, artifact, token));
-                }
-
-                token.ThrowIfCancellationRequested();
-                admitted = await admitWorkload(token)
-                    ?? throw new InvalidOperationException("The workload admission callback returned no result.");
-                for (int index = 0; index < prepared.Assets.Count; index++)
-                {
-                    token.ThrowIfCancellationRequested();
-                    if (!reused[index])
+                    await ValidateReplacementAsync(session, prepared.Replacing, token);
+                    List<bool> reused = [];
+                    foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
                     {
-                        await InstallAsync(session, prepared.Assets[index].Archive, token);
+                        reused.Add(await CheckIncumbentAsync(session, prepared.Origin, artifact, token,
+                            prepared.RetainPrevious ? null : prepared.Replacing));
                     }
-                }
-            }, async (session, token) =>
-            {
-                foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
+
+                    protectedOwners = await MigrateOwnersAsync(session, prepared, token);
+                    token.ThrowIfCancellationRequested();
+                    admissionStarted = true;
+                    admitted = await admitWorkload(token)
+                        ?? throw new InvalidOperationException("The workload admission callback returned no result.");
+                    if (prepared.Replacing is not null && !prepared.RetainPrevious)
+                    {
+                        await RemoveReplacementAsync(session, prepared.Replacing, token);
+                    }
+                    for (int index = 0; index < prepared.Assets.Count; index++)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (!reused[index])
+                        {
+                            await InstallAsync(session, prepared.Assets[index].Archive, token);
+                        }
+                    }
+                }, async (session, token) =>
                 {
-                    await ValidateInstalledAsync(session, artifact, token);
-                    BundledTemplateOwner owner = new(prepared.Origin, artifact.PackageId, artifact.Version.ToNormalizedString(), artifact.Sha256);
-                    await _fileSystem.WriteAllTextAsync(OwnerPath(artifact.PackageId),
-                        JsonSerializer.Serialize(owner, BundledTemplateJsonContext.Default.BundledTemplateOwner), token);
-                }
-            }, cancellationToken);
+                    foreach ((_, BasicTemplateArtifact artifact) in prepared.Assets)
+                    {
+                        await ValidateInstalledAsync(session, artifact, token);
+                        BundledTemplateOwner owner = new(prepared.Origin, artifact.PackageId, artifact.Version.ToNormalizedString(), artifact.Sha256);
+                        await WriteOwnerAsync(owner, token);
+                    }
+                    await ValidateRetainedOwnersAsync(session, prepared, protectedOwners, token);
+                }, cancellationToken);
+            }
+            catch when (admissionStarted && rollbackWorkload is not null)
+            {
+                // Recovery and workload rollback both settle before the native lease is released.
+                admitted = null;
+                await rollbackWorkload(CancellationToken.None);
+                throw;
+            }
         }
         catch (OperationCanceledException exception) when (admitted is not null)
         {
@@ -240,40 +291,73 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
     }
 
     private async Task<bool> CheckIncumbentAsync(TemplateEngineSession session, BundledTemplateOrigin origin,
-        BasicTemplateArtifact artifact, CancellationToken cancellationToken)
+        BasicTemplateArtifact artifact, CancellationToken cancellationToken, PreparedBundledTemplates? replacing = null)
     {
         IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, cancellationToken);
-        IManagedTemplatePackage[] matches = [.. packages.Where(package => string.Equals(package.Identifier, artifact.PackageId, StringComparison.OrdinalIgnoreCase))];
-        IReadOnlyList<ITemplateInfo> templates = await session.PackageManager.GetTemplatesAsync(cancellationToken);
-        session.CheckStoreDiagnostics();
-        if (templates.Any(template => artifact.Templates.Any(expected => expected.Identity == template.Identity)
-            && !matches.Any(package => package.MountPointUri == template.MountPointUri)))
+        IManagedTemplatePackage[] sameId = [.. packages.Where(package =>
+            string.Equals(package.Identifier, artifact.PackageId, StringComparison.OrdinalIgnoreCase))];
+        IManagedTemplatePackage[] matches = [.. sameId.Where(package => HasVersion(package, artifact.Version))];
+        HashSet<string> otherOwnedVersions = new(StringComparer.Ordinal);
+        foreach (IManagedTemplatePackage package in sameId.Where(package => !HasVersion(package, artifact.Version)))
         {
-            throw Invalid($"Template identity collision for '{artifact.PackageId}'. User-installed content is not replaced.");
+            if (!NuGetVersion.TryParse(package.Version, out NuGetVersion? version)
+                || sameId.Count(candidate => HasVersion(candidate, version)) != 1)
+            {
+                throw Invalid($"Package '{package.Identifier}' {package.Version} has ambiguous native registrations. No replacement is authorized.");
+            }
+            BundledTemplateOwner owner = await ReadOwnerAsync(package.Identifier, version.ToNormalizedString(), cancellationToken)
+                ?? throw Invalid($"Package '{package.Identifier}' {package.Version} has unknown or conflicting native ownership. No replacement is authorized.");
+            await ValidateOwnerArchiveAsync(package, owner, cancellationToken);
+            otherOwnedVersions.Add(package.MountPointUri);
         }
+        IReadOnlyList<ITemplatePackage> allPackages = await session.PackageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
+        Scanner scanner = new(session.Settings);
+        foreach (ITemplatePackage package in allPackages)
+        {
+            if (matches.Any(match => match.MountPointUri == package.MountPointUri)
+                || otherOwnedVersions.Contains(package.MountPointUri)
+                || (package is IManagedTemplatePackage managed && replacing is not null && replacing.Assets.Any(asset =>
+                    string.Equals(asset.Artifact.PackageId, managed.Identifier, StringComparison.OrdinalIgnoreCase)
+                    && HasVersion(managed, asset.Artifact.Version))))
+            {
+                continue;
+            }
 
-        string? receipt = await _fileSystem.ReadAllTextIfExistsAsync(OwnerPath(artifact.PackageId), cancellationToken);
-        BundledTemplateOwner? owner;
-        try
-        {
-            owner = receipt is null ? null : JsonSerializer.Deserialize(receipt, BundledTemplateJsonContext.Default.BundledTemplateOwner);
+            using ScanResult scanned = await scanner.ScanAsync(package.MountPointUri, logValidationResults: false,
+                returnInvalidTemplates: true, cancellationToken);
+            if (scanned.Templates.Any(template => artifact.Templates.Any(expected => expected.Identity == template.Identity)))
+            {
+                throw Invalid($"Template identity collision for '{artifact.PackageId}'. User-installed content is not replaced.");
+            }
         }
-        catch (JsonException exception)
-        {
-            throw new InvalidWorkloadException($"Bundled ownership for '{artifact.PackageId}' is malformed. Preserve the installation and request explicit repair.", exception);
-        }
+        session.CheckStoreDiagnostics();
+
+        BundledTemplateOwner? incumbent = await ReadOwnerAsync(artifact.PackageId, artifact.Version.ToNormalizedString(), cancellationToken);
         BundledTemplateOwner expectedOwner = new(origin, artifact.PackageId, artifact.Version.ToNormalizedString(), artifact.Sha256);
+        BasicTemplateArtifact? previous = replacing?.Assets.Select(asset => asset.Artifact).SingleOrDefault(candidate =>
+            string.Equals(candidate.PackageId, artifact.PackageId, StringComparison.OrdinalIgnoreCase) && candidate.Version == artifact.Version);
+        if (previous is not null && incumbent == new BundledTemplateOwner(replacing!.Origin, previous.PackageId,
+            previous.Version.ToNormalizedString(), previous.Sha256))
+        {
+            if (matches.Length != 1)
+            {
+                throw Invalid($"The incumbent package '{artifact.PackageId}' is not registered. Repair it from its original source before updating.");
+            }
+
+            await ValidateInstalledAsync(session, previous, cancellationToken);
+            return false;
+        }
         if (matches.Length == 0)
         {
-            if (owner is not null && owner != expectedOwner)
+            if (incumbent is not null && incumbent != expectedOwner)
             {
-                throw Invalid($"Bundled ownership for '{artifact.PackageId}' conflicts. Automatic upgrades and side-by-side bundles are not supported.");
+                throw Invalid($"Bundled ownership for '{artifact.PackageId}' {artifact.Version} conflicts. No replacement is authorized.");
             }
 
             return false;
         }
 
-        if (matches.Length != 1 || owner != expectedOwner)
+        if (matches.Length != 1 || incumbent != expectedOwner)
         {
             throw Invalid($"Package '{artifact.PackageId}' has unknown or conflicting native ownership. No replacement is authorized.");
         }
@@ -282,31 +366,91 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
         return true;
     }
 
+    private async Task ValidateReplacementAsync(TemplateEngineSession session, PreparedBundledTemplates? replacing,
+        CancellationToken cancellationToken)
+    {
+        if (replacing is null)
+        {
+            return;
+        }
+
+        foreach ((_, BasicTemplateArtifact artifact) in replacing.Assets)
+        {
+            if (!await CheckIncumbentAsync(session, replacing.Origin, artifact, cancellationToken))
+            {
+                throw Invalid($"The incumbent package '{artifact.PackageId}' is not registered. Repair it from its original source before updating.");
+            }
+        }
+    }
+
+    private async Task RemoveReplacementAsync(TemplateEngineSession session, PreparedBundledTemplates replacing,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, cancellationToken);
+        IManagedTemplatePackageProvider provider = session.PackageManager.GetBuiltInManagedProvider(InstallationScope.Global);
+        IManagedTemplatePackage[] owned = [.. packages.Where(package => replacing.Assets.Any(asset =>
+            string.Equals(asset.Artifact.PackageId, package.Identifier, StringComparison.OrdinalIgnoreCase)
+            && HasVersion(package, asset.Artifact.Version)))];
+        IReadOnlyList<UninstallResult> results = await provider.UninstallAsync(owned, cancellationToken);
+        if (results.Count != replacing.Assets.Count || results.Any(result => !result.Success))
+        {
+            throw Invalid("Native bundled-template replacement failed. The previous registration will be restored.");
+        }
+
+        foreach ((_, BasicTemplateArtifact artifact) in replacing.Assets)
+        {
+            BundledTemplateOwner expected = new(replacing.Origin, artifact.PackageId, artifact.Version.ToNormalizedString(), artifact.Sha256);
+            await DeleteOwnerAsync(expected, cancellationToken);
+        }
+    }
+
     private async Task ValidateInstalledAsync(TemplateEngineSession session, BasicTemplateArtifact artifact, CancellationToken cancellationToken)
     {
         IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, cancellationToken);
-        IManagedTemplatePackage[] matches = [.. packages.Where(package => string.Equals(package.Identifier, artifact.PackageId, StringComparison.OrdinalIgnoreCase))];
-        if (matches.Length != 1 || !NuGetVersion.TryParse(matches[0].Version, out NuGetVersion? version) || version != artifact.Version)
+        IManagedTemplatePackage[] matches = [.. packages.Where(package =>
+            string.Equals(package.Identifier, artifact.PackageId, StringComparison.OrdinalIgnoreCase) && HasVersion(package, artifact.Version))];
+        if (matches.Length != 1)
         {
             throw Invalid($"The native provider did not register exact package '{artifact.PackageId}' {artifact.Version}.");
         }
 
         await ValidateArtifactAsync(matches[0].MountPointUri, artifact, cancellationToken);
-        IReadOnlyList<ITemplateInfo> templates = await session.PackageManager.GetTemplatesAsync(cancellationToken);
-        foreach (ITemplateInfo template in templates.Where(template => template.MountPointUri == matches[0].MountPointUri))
+        Scanner scanner = new(session.Settings);
+        using ScanResult scanned = await scanner.ScanAsync(matches[0].MountPointUri, logValidationResults: false,
+            returnInvalidTemplates: true, cancellationToken);
+        IReadOnlyList<IScanTemplateInfo> templates = scanned.Templates;
+        foreach (IScanTemplateInfo template in templates)
         {
+            if (!template.IsValid || template.MountPointUri != scanned.MountPoint.MountPointUri)
+            {
+                throw Invalid($"The engine did not discover valid exact-package metadata for '{artifact.PackageId}' {artifact.Version}.");
+            }
             try
             {
-                FuncHostTemplateMetadataReader.Read(template);
+                string? hostPath = template.HostConfigFiles.GetValueOrDefault(FuncTemplateEngineHost.Identifier);
+                string? hostData = null;
+                if (hostPath is not null)
+                {
+                    IFile? hostFile = scanned.MountPoint.FileInfo(hostPath);
+                    if (hostFile is not { Exists: true })
+                    {
+                        throw new InvalidTemplateMetadataException("The declared func host metadata could not be read from the exact mounted archive.");
+                    }
+                    using Stream stream = hostFile.OpenRead();
+                    using StreamReader reader = new(stream);
+                    hostData = await reader.ReadToEndAsync(cancellationToken);
+                }
+                FuncHostTemplateMetadataReader.Read(hostPath, hostData);
             }
             catch (InvalidTemplateMetadataException exception)
             {
                 throw new InvalidWorkloadException($"Invalid bundled template host metadata: {exception.Message}", exception);
             }
         }
-        string[] actual = [.. templates.Where(template => template.MountPointUri == matches[0].MountPointUri).Select(template => template.Identity)];
         session.CheckStoreDiagnostics();
-        if (actual.Length != artifact.Templates.Count || artifact.Templates.Any(template => !actual.Contains(template.Identity, StringComparer.Ordinal)))
+        if (templates.Count != artifact.Templates.Count || artifact.Templates.Any(expected => !templates.Any(template =>
+            template.Identity == expected.Identity && template.TagsCollection.GetValueOrDefault("type") == expected.Type
+            && template.ConfigPlace.Replace('\\', '/').TrimStart('/') == expected.Path)))
         {
             throw Invalid($"The engine did not discover the complete declared inventory for '{artifact.PackageId}'.");
         }
@@ -334,7 +478,168 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
         }
     }
 
-    private string OwnerPath(string id) => Path.Combine(_paths.Home, "templates", ".bundled-owners", id.ToLowerInvariant() + ".json");
+    public async Task<BundledTemplateOwner?> ReadOwnerAsync(string packageId, string version, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        if (packageId is "." or ".." || !Regex.IsMatch(packageId, @"\A[A-Za-z0-9_.-]+\z"))
+        {
+            throw Invalid($"Package identity '{packageId}' is invalid. No ownership receipt was read.");
+        }
+        if (!NuGetVersion.TryParse(version, out NuGetVersion? parsed))
+        {
+            throw Invalid($"Native package '{packageId}' has no valid exact version. Preserve the installation and request explicit repair.");
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        string normalized = parsed.ToNormalizedString();
+        BundledTemplateOwner? owner = await ReadOwnerFileAsync(OwnerPath(packageId, normalized), packageId, cancellationToken);
+        if (owner is not null && !SameVersion(owner.Version, normalized))
+        {
+            throw Invalid($"Bundled ownership for '{packageId}' {version} conflicts with its version-qualified receipt.");
+        }
+
+        BundledTemplateOwner? legacy = await ReadOwnerFileAsync(LegacyOwnerPath(packageId), packageId, cancellationToken);
+        if (legacy is not null && SameVersion(legacy.Version, normalized))
+        {
+            if (owner is not null && owner != legacy)
+            {
+                throw Invalid($"Bundled ownership for '{packageId}' {version} has conflicting receipts. Preserve the installation and request explicit repair.");
+            }
+            owner ??= legacy;
+        }
+        return owner;
+    }
+
+    private async Task<BundledTemplateOwner?> ReadOwnerFileAsync(string path, string id, CancellationToken cancellationToken)
+    {
+        string? json = await _fileSystem.ReadAllTextIfExistsAsync(path, cancellationToken);
+        if (json is null)
+        {
+            return null;
+        }
+        try
+        {
+            BundledTemplateOwner owner = JsonSerializer.Deserialize(json, BundledTemplateJsonContext.Default.BundledTemplateOwner)
+                ?? throw Invalid($"Bundled ownership for '{id}' is invalid.");
+            if (!string.Equals(owner.PackageId, id, StringComparison.OrdinalIgnoreCase) || !NuGetVersion.TryParse(owner.Version, out _)
+                || owner.Sha256 is null || !Regex.IsMatch(owner.Sha256, @"\A[0-9a-fA-F]{64}\z") || owner.Origin is null
+                || string.IsNullOrWhiteSpace(owner.Origin.PackageId) || !NuGetVersion.TryParse(owner.Origin.Version, out _)
+                || string.IsNullOrWhiteSpace(owner.Origin.Source) || owner.Origin.Sha256 is null
+                || !Regex.IsMatch(owner.Origin.Sha256, @"\A[0-9a-fA-F]{64}\z"))
+            {
+                throw Invalid($"Bundled ownership for '{id}' is invalid. Preserve the installation and request explicit repair.");
+            }
+            return owner;
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidWorkloadException($"Bundled ownership for '{id}' is malformed. Preserve the installation and request explicit repair.", exception);
+        }
+    }
+
+    private async Task ValidateOwnerArchiveAsync(IManagedTemplatePackage package, BundledTemplateOwner owner, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(package.Identifier, owner.PackageId, StringComparison.OrdinalIgnoreCase)
+            || !SameVersion(package.Version, owner.Version)
+            || !string.Equals(await _fileSystem.ComputeSha256Async(package.MountPointUri, cancellationToken), owner.Sha256,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw Invalid($"The registered archive for '{package.Identifier}' {package.Version} conflicts with its validated bundled owner.");
+        }
+    }
+
+    private async Task<IReadOnlyList<(BundledTemplateOwner Owner, string Archive)>> MigrateOwnersAsync(TemplateEngineSession session,
+        PreparedBundledTemplates prepared, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, cancellationToken);
+        List<(BundledTemplateOwner Owner, string Archive)> owners = [];
+        HashSet<string> affected = new(prepared.Assets.Select(asset => asset.Artifact.PackageId), StringComparer.OrdinalIgnoreCase);
+        if (prepared.Replacing is not null)
+        {
+            affected.UnionWith(prepared.Replacing.Assets.Select(asset => asset.Artifact.PackageId));
+        }
+        foreach (IManagedTemplatePackage package in packages.Where(package => affected.Contains(package.Identifier)))
+        {
+            if (!NuGetVersion.TryParse(package.Version, out NuGetVersion? version))
+            {
+                throw Invalid($"Native package '{package.Identifier}' has no valid exact version. Preserve the installation and request explicit repair.");
+            }
+            BundledTemplateOwner? owner = await ReadOwnerAsync(package.Identifier, version.ToNormalizedString(), cancellationToken);
+            if (owner is not null)
+            {
+                await ValidateOwnerArchiveAsync(package, owner, cancellationToken);
+                owners.Add((owner, package.MountPointUri));
+                if (!_fileSystem.FileExists(OwnerPath(owner.PackageId, owner.Version))
+                    || await ReadOwnerFileAsync(LegacyOwnerPath(owner.PackageId), owner.PackageId, cancellationToken) == owner)
+                {
+                    await WriteOwnerAsync(owner, cancellationToken);
+                }
+            }
+        }
+        return owners;
+    }
+
+    private async Task ValidateRetainedOwnersAsync(TemplateEngineSession session, PreparedBundledTemplates prepared,
+        IReadOnlyList<(BundledTemplateOwner Owner, string Archive)> owners, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, cancellationToken);
+        foreach ((BundledTemplateOwner owner, string archive) in owners)
+        {
+            if (!prepared.RetainPrevious && prepared.Replacing is not null && owner.Origin == prepared.Replacing.Origin
+                && prepared.Replacing.Assets.Any(asset => string.Equals(asset.Artifact.PackageId, owner.PackageId, StringComparison.OrdinalIgnoreCase)
+                    && SameVersion(asset.Artifact.Version.ToNormalizedString(), owner.Version)))
+            {
+                continue;
+            }
+
+            IManagedTemplatePackage[] matches = [.. packages.Where(package =>
+                string.Equals(package.Identifier, owner.PackageId, StringComparison.OrdinalIgnoreCase) && SameVersion(package.Version, owner.Version))];
+            if (matches.Length != 1 || matches[0].MountPointUri != archive
+                || await ReadOwnerAsync(owner.PackageId, owner.Version, cancellationToken) != owner)
+            {
+                throw Invalid($"The retained registration for '{owner.PackageId}' {owner.Version} changed during the update.");
+            }
+            await ValidateOwnerArchiveAsync(matches[0], owner, cancellationToken);
+        }
+    }
+
+    private async Task WriteOwnerAsync(BundledTemplateOwner owner, CancellationToken cancellationToken)
+    {
+        await _fileSystem.WriteAllTextAsync(OwnerPath(owner.PackageId, owner.Version),
+            JsonSerializer.Serialize(owner, BundledTemplateJsonContext.Default.BundledTemplateOwner), cancellationToken);
+        BundledTemplateOwner? legacy = await ReadOwnerFileAsync(LegacyOwnerPath(owner.PackageId), owner.PackageId, cancellationToken);
+        if (legacy == owner)
+        {
+            _fileSystem.DeleteFile(LegacyOwnerPath(owner.PackageId));
+        }
+    }
+
+    private async Task DeleteOwnerAsync(BundledTemplateOwner owner, CancellationToken cancellationToken)
+    {
+        if (await ReadOwnerAsync(owner.PackageId, owner.Version, cancellationToken) != owner)
+        {
+            throw Invalid($"Bundled ownership for '{owner.PackageId}' {owner.Version} changed during replacement.");
+        }
+
+        _fileSystem.DeleteFile(OwnerPath(owner.PackageId, owner.Version));
+        if (await ReadOwnerFileAsync(LegacyOwnerPath(owner.PackageId), owner.PackageId, cancellationToken) == owner)
+        {
+            _fileSystem.DeleteFile(LegacyOwnerPath(owner.PackageId));
+        }
+    }
+
+    private string OwnerPath(string id, string version)
+        => Path.Combine(_paths.Home, "templates", ".bundled-owners", id.ToLowerInvariant(),
+            NuGetVersion.Parse(version).ToNormalizedString().ToLowerInvariant() + ".json");
+
+    private string LegacyOwnerPath(string id)
+        => Path.Combine(_paths.Home, "templates", ".bundled-owners", id.ToLowerInvariant() + ".json");
+
+    private static bool HasVersion(IManagedTemplatePackage package, NuGetVersion version)
+        => NuGetVersion.TryParse(package.Version, out NuGetVersion? parsed) && parsed == version;
+
+    private static bool SameVersion(string? left, string? right)
+        => NuGetVersion.TryParse(left, out NuGetVersion? first) && NuGetVersion.TryParse(right, out NuGetVersion? second) && first == second;
 
     private async Task<TemplateEngineSession> OpenReadAsync(TemplateEngineContext context, CancellationToken cancellationToken)
     {

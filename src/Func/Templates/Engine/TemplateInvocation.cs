@@ -18,6 +18,10 @@ internal sealed record TemplateInvocationRequest(WorkingDirectory OutputDirector
     public NativeMsBuildBindingSnapshot? MsBuildBindings { get; init; }
 
     public NativeTemplateSourceSnapshot? SourceSnapshot { get; init; }
+
+    public bool PreserveExistingFiles { get; init; }
+
+    public bool PreviewAfterDirectoryCleanup { get; init; }
 }
 
 internal sealed record NativeTemplateInvocationEffects(
@@ -55,6 +59,7 @@ internal enum TemplateFileChangeKind
     Overwrite,
     Delete,
     Append,
+    Preserve,
 }
 
 /// <summary>
@@ -83,6 +88,7 @@ internal sealed record TemplateFileChange(string Path, TemplateFileChangeKind Ki
         TemplateFileChangeKind.Overwrite => "Overwrite",
         TemplateFileChangeKind.Delete => "Delete",
         TemplateFileChangeKind.Append => "Append",
+        TemplateFileChangeKind.Preserve => "Preserve",
         _ => throw new ArgumentOutOfRangeException(nameof(Kind), Kind, "Unsupported internal template file-change kind."),
     };
 }

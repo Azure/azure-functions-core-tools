@@ -68,7 +68,7 @@ public sealed partial class BundledNodeTemplateTests
             await deployment.InstallPreparedAsync(operation, firstPlan, null, CancellationToken.None);
         }
         string before = File.ReadAllText(_paths.WorkloadRegistryPath);
-        string receipt = Path.Combine(Home, "templates", ".bundled-owners", "azure.functions.templates.node.basic.json");
+        string receipt = BundledOwnerPath();
         string beforeReceipt = File.ReadAllText(receipt);
         using var rejected = await coordinator.AcquireAsync(CancellationToken.None);
         Func<Task> commit = () => deployment.InstallPreparedAsync(rejected, secondPlan, null, CancellationToken.None);

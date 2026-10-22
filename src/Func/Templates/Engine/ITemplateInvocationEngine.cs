@@ -22,6 +22,8 @@ internal interface ITemplateInvocationEngine
 
     public Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken);
 
+    public Task<string?> ValidatePinnedPackageAsync(ITemplateInfo template, CancellationToken cancellationToken);
+
     public string? QualifyMsBuildBindings(ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request);
 
     public IReadOnlyDictionary<string, object> GetPopulatedParameters(
