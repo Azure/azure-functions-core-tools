@@ -43,11 +43,17 @@ internal sealed class NativeTemplateArtifactVerifier(IBasicCompanionCatalog cata
     private readonly IWorkloadStore _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
     private readonly IBasicArchiveInspector _inspector = inspector ?? throw new ArgumentNullException(nameof(inspector));
     private string? _inventory;
+    private IReadOnlySet<NativeTemplateOwnerIdentity>? _usableOwners;
 
-    internal NativeTemplateArtifactVerifier ForInventory(IReadOnlyList<WorkloadEntry> entries)
+    internal NativeTemplateArtifactVerifier ForInventory(IReadOnlyList<WorkloadEntry> entries, IReadOnlyList<WorkloadEntry> usableRuntimeOwners)
     {
         ArgumentNullException.ThrowIfNull(entries);
-        return new(_catalog, _planner, _ownership, _workloads, _inspector) { _inventory = Inventory(entries) };
+        ArgumentNullException.ThrowIfNull(usableRuntimeOwners);
+        return new(_catalog, _planner, _ownership, _workloads, _inspector)
+        {
+            _inventory = Inventory(entries),
+            _usableOwners = usableRuntimeOwners.Select(NativeTemplateOwnerIdentity.FromEntry).ToHashSet(),
+        };
     }
 
     private static string Inventory(IReadOnlyList<WorkloadEntry> entries)
@@ -93,9 +99,9 @@ internal sealed class NativeTemplateArtifactVerifier(IBasicCompanionCatalog cata
             throw Unavailable("Installed workloads changed after the fresh capability scope was built. Rebuild the scope and select again.");
         }
         WorkloadEntry[] owners = [.. installed.Where(entry => NativeTemplateOwnerIdentity.FromEntry(entry) == selection.Owner)];
-        if (owners.Length != 1)
+        if (owners.Length != 1 || _usableOwners is null || !_usableOwners.Contains(selection.Owner))
         {
-            throw Unavailable("The selected workload owner is missing, changed or ambiguous.");
+            throw Unavailable("The selected workload owner is not the unique live runtime capability in the fresh scope.");
         }
         WorkloadEntry owner = owners[0];
         BasicCompanionManifest manifest = await _catalog.LoadAsync(cancellationToken);
@@ -106,7 +112,7 @@ internal sealed class NativeTemplateArtifactVerifier(IBasicCompanionCatalog cata
         }
         BasicAcquisitionRequest request = new(id, version, session.Context.CommandDirectory, selection.Source)
         {
-            IncludePrerelease = selection.Channel == BundleChannel.Preview,
+            IncludePrerelease = selection.Channel is not null,
             NativeContext = new(owner, FuncTemplateEngineHost.Identifier, NuGetVersion.Parse(AssemblyCliVersionProvider.Instance.Version),
                 selection.Channel, [NativeTemplateContentRole.AdditionalProject]),
         };

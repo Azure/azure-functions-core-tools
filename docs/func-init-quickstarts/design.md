@@ -115,8 +115,11 @@ verifier then joins the current installed owner, bundled schema-2 association,
 host/channel/role policy, retained provenance and the actual current managed
 archive. It uses the existing complete archive inspector through the session's
 filesystem, checks the discovered engine inventory and compares every mounted
-file with that archive. A receipt, package descriptor or manifest claim alone
-cannot satisfy the binding. No path or mounted handle comes from the caller.
+file with that archive. The owner must also be the unique physical workload
+registration loaded as a runtime capability by that same fresh scope. Retained
+registry rows that are not the live loaded version cannot authorize the binding.
+A receipt, package descriptor or manifest claim alone cannot satisfy the binding.
+No path or mounted handle comes from the caller.
 
 The singleton entry passes through `CreateGroupAsync` using the same flow's
 object identity. There is no group expansion or short-name fallback. Existing
@@ -141,6 +144,9 @@ install content or recover a pending journal. Ordinary unbound browse still does
 not inspect the native store. Empty production association authority yields no
 qualified installation proof, even if a receipt is retained. Test packages and
 fixture authorities demonstrate mechanics only, not production approval.
+An explicit preview or experimental association permits inspection of matching
+prerelease artifacts, while the existing planner still enforces the exact
+channel policy and artifact range.
 
 #### Internal catalog preparation
 

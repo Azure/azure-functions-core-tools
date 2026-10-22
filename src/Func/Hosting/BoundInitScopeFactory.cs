@@ -44,6 +44,17 @@ internal sealed class BoundInitScopeFactory(WorkloadPathsOptions paths, IWorkloa
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            List<WorkloadEntry> usableRuntimeOwners = [];
+            foreach (RuntimeWorkloadInfo runtime in loaded.OfType<RuntimeWorkloadInfo>())
+            {
+                WorkloadEntry[] matches = [.. entries.Where(entry => entry.Kind == WorkloadKind.Workload
+                    && string.Equals(entry.PackageId, runtime.PackageId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(entry.PackageVersion, runtime.PackageVersion, StringComparison.Ordinal))];
+                if (matches.Length == 1)
+                {
+                    usableRuntimeOwners.Add(matches[0]);
+                }
+            }
             TemplateConstraintEvaluationSnapshot availability = new([.. entries.Select(entry =>
             {
                 if (!NuGetVersion.TryParse(entry.PackageVersion, out NuGetVersion? version))
@@ -56,7 +67,7 @@ internal sealed class BoundInitScopeFactory(WorkloadPathsOptions paths, IWorkloa
                     current is not null, entry.LogicalPackage?.PackageId);
             })]);
             return new(availability, provider.GetRequiredService<InstalledProjectStackCatalog>(),
-                provider.GetRequiredService<TemplateProjectSupport>(), _verifier.ForInventory(entries), lifetime);
+                provider.GetRequiredService<TemplateProjectSupport>(), _verifier.ForInventory(entries, usableRuntimeOwners), lifetime);
         }
         catch
         {

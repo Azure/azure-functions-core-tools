@@ -91,6 +91,57 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
     }
 
     [Theory]
+    [InlineData(BundleChannel.Preview)]
+    [InlineData(BundleChannel.Experimental)]
+    public async Task BoundInit_QualifiedPrereleaseChannel_PreviewsAndCreatesExactArtifact(BundleChannel channel)
+    {
+        await SeedAsync(channel: channel);
+        var runner = Runner();
+
+        var preview = await runner.ExecuteAsync(Request(dryRun: true), new([]), CancellationToken.None);
+
+        preview.Kind.Should().Be("previewed");
+        preview.SelectedTemplate!.Identity.Should().Be(Identity);
+        preview.SelectedTemplate.Package!.Version.Should().Be(_selection.Artifact.Version);
+        Directory.Exists(Target).Should().BeFalse();
+
+        var result = await runner.ExecuteAsync(Request(), new([]), CancellationToken.None);
+
+        result.Kind.Should().Be("created");
+        File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact");
+    }
+
+    [Theory]
+    [InlineData(BundleChannel.Stable)]
+    [InlineData(BundleChannel.Preview)]
+    public async Task BoundInit_ExperimentalArtifactWithWrongChannel_RefusesWithoutOutput(BundleChannel channel)
+    {
+        await SeedAsync(channel: BundleChannel.Experimental);
+        var request = Request() with { ArtifactBinding = _selection with { Channel = channel } };
+
+        var result = await Runner().ExecuteAsync(request, new([]), CancellationToken.None);
+
+        result.Kind.Should().Be("bindingMismatch");
+        result.Succeeded.Should().BeFalse();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Projection_QualifiedExperimentalArtifact_SuppressesExactRemoteDuplicate()
+    {
+        await SeedAsync(channel: BundleChannel.Experimental);
+        QuickstartCatalog catalog = new([Remote()], new(QuickstartCatalogOrigin.LocalFile, null, null));
+
+        var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(catalog,
+            new(DirectoryTarget, _selection.Owner, BundleChannel.Experimental), CancellationToken.None);
+
+        projection.Catalog.Entries.Should().BeEmpty();
+        projection.Installed.Should().Contain(item => item.Entry.Identity == Identity
+            && item.Selection != null && item.Selection.Channel == BundleChannel.Experimental);
+        catalog.Entries.Single().MetadataStatus.Should().Be(QuickstartPackageMetadataStatus.Unverified);
+    }
+
+    [Theory]
     [InlineData("short-name")]
     [InlineData("other-full-id")]
     [InlineData("package")]
@@ -297,6 +348,49 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
     }
 
     [Fact]
+    public async Task BoundInit_RetainedOwnerIsNotLiveCapability_RejectsItAndAcceptsQualifiedLiveOwner()
+    {
+        await SeedAsync();
+        WorkloadEntry retained = (await _workloads.GetWorkloadsAsync(CancellationToken.None)).Single();
+        const string liveVersion = "99.0.0";
+        CopyDirectory(_paths.GetInstallDirectory(retained.PackageId, retained.PackageVersion),
+            _paths.GetInstallDirectory(retained.PackageId, liveVersion));
+        WorkloadEntry live = new()
+        {
+            PackageId = retained.PackageId,
+            PackageVersion = liveVersion,
+            Source = retained.Source,
+            Kind = retained.Kind,
+            Aliases = retained.Aliases,
+            DisplayName = retained.DisplayName,
+            Description = retained.Description,
+            RuntimeIdentifier = retained.RuntimeIdentifier,
+            LogicalPackage = retained.LogicalPackage,
+            EntryPoint = retained.EntryPoint,
+        };
+        await _workloads.SaveWorkloadAsync(live, CancellationToken.None);
+        AddStackAuthorityVersion(liveVersion);
+        var staleRequest = Request(dryRun: true);
+
+        var stale = await Runner().ExecuteAsync(staleRequest, new([]), CancellationToken.None);
+
+        stale.Kind.Should().Be("bindingMismatch");
+        stale.Succeeded.Should().BeFalse();
+        Directory.Exists(Target).Should().BeFalse();
+
+        var liveRequest = staleRequest with
+        {
+            ArtifactBinding = _selection with { Owner = NativeTemplateOwnerIdentity.FromEntry(live) },
+        };
+        var current = await Runner().ExecuteAsync(liveRequest, new([]), CancellationToken.None);
+
+        current.Kind.Should().Be("previewed");
+        current.SelectedTemplate!.Identity.Should().Be(Identity);
+        current.Preview!.ProjectConfigurations.Should().ContainSingle().Which.Stack.Should().Be("node");
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task BoundFlow_StaleEntryDisposedSessionAndConcurrentUse_RejectWithoutEscapedHandles()
     {
         await SeedAsync();
@@ -373,7 +467,9 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
             }
             return await _ownership.GetRetainedAsync(call.Arg<string>(), call.Arg<CancellationToken>());
         });
-        var verifier = new NativeTemplateArtifactVerifier(_catalog, new(), ownership, _workloads, new BasicArtifactInspector(_files));
+        IReadOnlyList<WorkloadEntry> entries = await _workloads.GetWorkloadsAsync(CancellationToken.None);
+        var verifier = new NativeTemplateArtifactVerifier(_catalog, new(), ownership, _workloads, new BasicArtifactInspector(_files))
+            .ForInventory(entries, entries);
         var bound = await flow.BindProjectAsync(entry, _selection, verifier, CancellationToken.None);
         block = true;
         TemplateInvocationRequest request = new(DirectoryTarget, new Dictionary<string, string?>(), DryRun: true);
@@ -406,7 +502,9 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
             cancellation.Cancel();
             return await _ownership.GetRetainedAsync(call.Arg<string>(), call.Arg<CancellationToken>());
         });
-        var verifier = new NativeTemplateArtifactVerifier(_catalog, new(), ownership, _workloads, new BasicArtifactInspector(_files));
+        IReadOnlyList<WorkloadEntry> entries = await _workloads.GetWorkloadsAsync(CancellationToken.None);
+        var verifier = new NativeTemplateArtifactVerifier(_catalog, new(), ownership, _workloads, new BasicArtifactInspector(_files))
+            .ForInventory(entries, entries);
 
         Func<Task> bind = () => flow.BindProjectAsync(entry, _selection, verifier, cancellation.Token);
 
@@ -519,8 +617,22 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
             _files, Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>(), scopes ? _scopes : null);
     }
 
-    private async Task SeedAsync(string? change = null)
+    private async Task SeedAsync(string? change = null, BundleChannel channel = BundleChannel.Stable)
     {
+        string artifactVersion = channel switch
+        {
+            BundleChannel.Stable => "1.0.0",
+            BundleChannel.Preview => "1.0.0-preview.1",
+            BundleChannel.Experimental => "1.0.0-experimental.1",
+            _ => throw new ArgumentOutOfRangeException(nameof(channel)),
+        };
+        string channelName = channel switch
+        {
+            BundleChannel.Stable => "stable",
+            BundleChannel.Preview => "preview",
+            BundleChannel.Experimental => "experimental",
+            _ => throw new ArgumentOutOfRangeException(nameof(channel)),
+        };
         string nodeArchive = Directory.GetFiles(AppContext.BaseDirectory, "Azure.Functions.Cli.Workloads.Node.*.nupkg", SearchOption.AllDirectories).Single();
         using PackageArchiveReader reader = new(nodeArchive);
         string ownerId = reader.NuspecReader.GetId();
@@ -536,7 +648,7 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
         using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
         {
             Write(zip, PackageId + ".nuspec", $$"""
-                <?xml version="1.0"?><package><metadata><id>{{PackageId}}</id><version>1.0.0</version><authors>fixture</authors>
+                <?xml version="1.0"?><package><metadata><id>{{PackageId}}</id><version>{{artifactVersion}}</version><authors>fixture</authors>
                 <description>Artifact binding evidence only.</description><packageTypes><packageType name="FuncTemplate"/></packageTypes></metadata></package>
                 """);
             WriteProject(zip, "exact", Identity, 0, change);
@@ -547,9 +659,9 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
         var document = JsonNode.Parse($$"""
             {"schemaVersion":2,"revision":"binding-fixture-only","stacks":[
               {"packageId":"{{ownerId}}","versions":"[{{ownerVersion}}]","sources":["{{Source}}"],"hostIdentifier":"func",
-               "engineHostVersions":"[1.0.0,99.0.0)","channels":["stable"],"companions":[
-                 {"packageId":"{{PackageId}}","versions":"[1.0.0]","requiredRoles":["additional-project"]}]}],
-             "artifacts":[{"packageId":"{{PackageId}}","version":"1.0.0","source":"{{Source}}","sha256":"{{digest}}",
+               "engineHostVersions":"[1.0.0,99.0.0)","channels":["{{channelName}}"],"companions":[
+                 {"packageId":"{{PackageId}}","versions":"[{{artifactVersion}}]","requiredRoles":["additional-project"]}]}],
+             "artifacts":[{"packageId":"{{PackageId}}","version":"{{artifactVersion}}","source":"{{Source}}","sha256":"{{digest}}",
                "contentRevision":"fixture-only","basicOnly":false,"templates":[
                  {"path":"exact/.template.config/template.json","identity":"{{Identity}}","type":"{{type}}","contentRole":"additional-project"},
                  {"path":"sibling/.template.config/template.json","identity":"Fixture.Sibling.Project","type":"project","contentRole":"additional-project"}]}]}
@@ -562,7 +674,27 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
         var artifact = (await _catalog.LoadAsync(CancellationToken.None)).Artifacts.Single();
         await TemplateFixtures.InstallAsync(archive, _templates.Hive, CancellationToken.None);
         await _ownership.RecordAsync(artifact, CancellationToken.None);
-        _selection = new(Identity, new(PackageId, "1.0.0", digest), Source, NativeTemplateOwnerIdentity.FromEntry(owner), BundleChannel.Stable);
+        _selection = new(Identity, new(PackageId, artifactVersion, digest), Source, NativeTemplateOwnerIdentity.FromEntry(owner), channel);
+    }
+
+    private void AddStackAuthorityVersion(string version)
+    {
+        var document = JsonNode.Parse(_catalog.Json)!.AsObject();
+        var stack = (JsonObject)document["stacks"]![0]!.DeepClone();
+        stack["versions"] = $"[{version}]";
+        document["stacks"]!.AsArray().Add(stack);
+        _catalog.Json = document.ToJsonString();
+    }
+
+    private static void CopyDirectory(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        {
+            string target = Path.Combine(destination, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
+        }
     }
 
     private static void WriteProject(ZipArchive zip, string folder, string identity, int precedence, string? change)
@@ -599,7 +731,7 @@ public sealed class ArtifactBindingJourneyTests : IDisposable
         new QuickstartEntry("fixture", "Fixture", "JavaScript", "http", null, "https://example.invalid/repo", "folder",
             null, "Unverified remote claim", null, null, 0),
         QuickstartPackageMetadataStatus.Unverified,
-        new(PackageId, "1.0.0", Source, Identity, null, new("sha256", _selection.Artifact.Sha256, "inert-claim"), default, default), "unverified");
+        new(PackageId, _selection.Artifact.Version, Source, Identity, null, new("sha256", _selection.Artifact.Sha256, "inert-claim"), default, default), "unverified");
 
     private Dictionary<string, byte[]> HiveBytes() => Directory.GetFiles(_templates.Hive, "*", SearchOption.AllDirectories)
         .ToDictionary(path => Path.GetRelativePath(_templates.Hive, path), File.ReadAllBytes);
