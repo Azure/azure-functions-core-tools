@@ -12,12 +12,13 @@ using NuGet.Versioning;
 using NuGet.Packaging;
 using NuGet.Packaging.Signing;
 using NSubstitute;
+using Xunit.Abstractions;
 using HashAlgorithmName = System.Security.Cryptography.HashAlgorithmName;
 using Rfc3161TimestampTokenInfo = System.Security.Cryptography.Pkcs.Rfc3161TimestampTokenInfo;
 
 namespace Azure.Functions.Cli.Tests.Workloads.Install;
 
-public sealed class WorkloadPackageTrustTests : WorkloadInstallerTestBase
+public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) : WorkloadInstallerTestBase
 {
     private const string MicrosoftSubject = "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US";
     private const string OfficialId = "Azure.Functions.Cli.Workloads.Test";
@@ -73,6 +74,11 @@ public sealed class WorkloadPackageTrustTests : WorkloadInstallerTestBase
                 Action delete = () => File.Delete(snapshotPath);
                 delete.Should().Throw<IOException>();
             }
+            else
+            {
+                File.GetUnixFileMode(Path.GetDirectoryName(snapshotPath)!)
+                    .Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
         }
 
         File.Exists(snapshotPath).Should().BeFalse();
@@ -95,14 +101,16 @@ public sealed class WorkloadPackageTrustTests : WorkloadInstallerTestBase
         File.Exists(source).Should().BeTrue();
     }
 
-    [Fact]
-    public async Task ValidAuthors_CanRotateLeafCertificatesUnderApprovedRoot()
+    [Theory]
+    [InlineData(MicrosoftSubject)]
+    [InlineData("C=US, S=Washington, L=Redmond, O=Microsoft Corporation, CN=Microsoft Corporation")]
+    public async Task ValidAuthors_CanRotateLeafCertificatesUnderApprovedRoot(string subject)
     {
         using X509Certificate2 root = CreateRoot();
         TestRootTrust trust = new(root);
         for (int index = 0; index < 2; index++)
         {
-            using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject);
+            using X509Certificate2 author = CreateAuthor(root, subject);
             string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author);
             using var snapshot = await trust.AcquireAsync(signed, false, TestContextToken());
             File.Exists(snapshot.Path).Should().BeTrue();
@@ -110,20 +118,38 @@ public sealed class WorkloadPackageTrustTests : WorkloadInstallerTestBase
     }
 
     [Theory]
-    [InlineData("CN=Not Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    [InlineData("CN=Microsoft Corporation, O=Not Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    [InlineData("CN=Microsoft Corporation Attacker, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    public async Task ValidChain_WithWrongAuthorIdentity_IsRejected(string subject)
+    [InlineData("wrong-cn", "CN=Not Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
+    [InlineData("wrong-organization", "CN=Microsoft Corporation, O=Not Microsoft Corporation, L=Redmond, S=Washington, C=US")]
+    [InlineData("cn-substring", "CN=Microsoft Corporation Attacker, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
+    [InlineData("wrong-locality", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Seattle, S=Washington, C=US")]
+    [InlineData("wrong-state", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Oregon, C=US")]
+    [InlineData("wrong-country", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=CA")]
+    [InlineData("wrong-case", "CN=microsoft corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
+    [InlineData("missing-cn", "O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
+    [InlineData("missing-organization", "CN=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
+    [InlineData("missing-locality", "CN=Microsoft Corporation, O=Microsoft Corporation, S=Washington, C=US")]
+    [InlineData("missing-state", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, C=US")]
+    [InlineData("missing-country", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington")]
+    [InlineData("extra-ou", "CN=Microsoft Corporation, O=Microsoft Corporation, OU=Workloads, L=Redmond, S=Washington, C=US")]
+    [InlineData("duplicate-cn", "CN=Microsoft Corporation, CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
+    [InlineData("multivalued-rdn", "CN=Microsoft Corporation + O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
+    public async Task ValidChain_WithWrongAuthorIdentity_IsRejected(string caseName, string subject)
     {
         using X509Certificate2 root = CreateRoot();
         using X509Certificate2 author = CreateAuthor(root, subject);
+        if (subject.Contains('+'))
+        {
+            author.SubjectName.EnumerateRelativeDistinguishedNames().Should().Contain(name => name.HasMultipleElements);
+        }
+
         string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author);
         Func<Task> act = async () =>
         {
             using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
         };
 
-        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*Microsoft Corporation*");
+        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>()
+            .WithMessage("*Microsoft Corporation*", "subject case {0} must not qualify", caseName);
     }
 
     [Fact]
@@ -413,27 +439,31 @@ public sealed class WorkloadPackageTrustTests : WorkloadInstallerTestBase
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-2), DateTimeOffset.UtcNow.AddDays(3));
     }
 
-    private static X509Certificate2 CreateAuthor(X509Certificate2 root, string subject, bool expired = false, bool timestamping = false)
+    private static X509Certificate2 CreateAuthor(X509Certificate2 root, string subject, bool expired = false, bool timestamping = false,
+        int keySize = 2048, DateTimeOffset? notBefore = null, DateTimeOffset? notAfter = null)
     {
-        using var key = RSA.Create(2048);
+        using var key = RSA.Create(keySize);
         CertificateRequest request = new(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
         request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(timestamping ? "1.3.6.1.5.5.7.3.8" : "1.3.6.1.5.5.7.3.3")], true));
-        using X509Certificate2 certificate = request.Create(root, DateTimeOffset.UtcNow.AddDays(-1),
-            expired ? DateTimeOffset.UtcNow.AddHours(-12) : DateTimeOffset.UtcNow.AddDays(1), RandomNumberGenerator.GetBytes(16));
+        using X509Certificate2 certificate = request.Create(root, notBefore ?? DateTimeOffset.UtcNow.AddDays(-1),
+            notAfter ?? (expired ? DateTimeOffset.UtcNow.AddHours(-12) : DateTimeOffset.UtcNow.AddDays(1)), RandomNumberGenerator.GetBytes(16));
         return certificate.CopyWithPrivateKey(key);
     }
 
     private static async Task<string> SignAsync(string path, X509Certificate2 root, X509Certificate2 author,
         X509Certificate2? timestamper = null, X509Certificate2? timestampRoot = null, bool wrongImprint = false,
-        bool repository = false, bool corruptSignature = false)
+        bool repository = false, bool corruptSignature = false, int timestampCount = 1, DateTimeOffset? timestampTime = null,
+        bool weakTimestampDigest = false, bool weakTimestampSignatureDigest = false)
     {
         string signed = path + ".signed.nupkg";
+        // NuGet requests own their certificates; preserve the caller's signer for additional packages.
+        using X509Certificate2 requestCertificate = new(author);
         using SignPackageRequest request = repository
-            ? new RepositorySignPackageRequest(author, NuGet.Common.HashAlgorithmName.SHA256,
+            ? new RepositorySignPackageRequest(requestCertificate, NuGet.Common.HashAlgorithmName.SHA256,
                 NuGet.Common.HashAlgorithmName.SHA256, new Uri("https://example.test/v3/index.json"), ["test"])
-            : new AuthorSignPackageRequest(author, NuGet.Common.HashAlgorithmName.SHA256);
+            : new AuthorSignPackageRequest(requestCertificate, NuGet.Common.HashAlgorithmName.SHA256);
         await using FileStream input = File.OpenRead(path);
         await using FileStream output = File.Create(signed);
         using SignedPackageArchive archive = new(input, output);
@@ -455,19 +485,22 @@ public sealed class WorkloadPackageTrustTests : WorkloadInstallerTestBase
         }
 
         cms.ComputeSignature(signer);
-        if (timestamper is not null)
+        for (int index = 0; timestamper is not null && index < timestampCount; index++)
         {
-            byte[] imprint = SHA256.HashData(wrongImprint ? [1, 2, 3] : cms.SignerInfos[0].GetSignature());
-            Rfc3161TimestampTokenInfo token = new(new Oid("1.2.3.4"), new Oid("2.16.840.1.101.3.4.2.1"),
-                imprint, new byte[] { 1 }, DateTimeOffset.UtcNow.AddHours(-18), null, false, null, null, null);
+            byte[] signatureValue = wrongImprint ? [1, 2, 3] : cms.SignerInfos[0].GetSignature();
+            byte[] imprint = weakTimestampDigest ? SHA1.HashData(signatureValue) : SHA256.HashData(signatureValue);
+            string digestOid = weakTimestampDigest ? "1.3.14.3.2.26" : "2.16.840.1.101.3.4.2.1";
+            Rfc3161TimestampTokenInfo token = new(new Oid("1.2.3.4"), new Oid(digestOid),
+                imprint, new byte[] { (byte)(index + 1) }, timestampTime ?? DateTimeOffset.UtcNow.AddHours(-18), null, false, null, null, null);
             SignedCms timestampCms = new(new ContentInfo(new Oid("1.2.840.113549.1.9.16.1.4"), token.Encode()));
             CmsSigner timestampSigner = new(SubjectIdentifierType.IssuerAndSerialNumber, timestamper)
             {
                 IncludeOption = X509IncludeOption.EndCertOnly,
-                DigestAlgorithm = new Oid("2.16.840.1.101.3.4.2.1"),
+                DigestAlgorithm = new Oid(weakTimestampSignatureDigest ? "1.3.14.3.2.26" : "2.16.840.1.101.3.4.2.1"),
             };
             timestampSigner.Certificates.Add(timestampRoot!);
-            using AuthorSignPackageRequest timestampRequest = new(timestamper, NuGet.Common.HashAlgorithmName.SHA256);
+            using X509Certificate2 timestampCertificate = new(timestamper);
+            using AuthorSignPackageRequest timestampRequest = new(timestampCertificate, NuGet.Common.HashAlgorithmName.SHA256);
             foreach (CryptographicAttributeObject attribute in SigningUtility.CreateSignedAttributes(timestampRequest, [timestamper, timestampRoot!]))
             {
                 if (attribute.Oid.Value == "1.2.840.113549.1.9.16.2.47")
