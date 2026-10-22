@@ -11,6 +11,30 @@ namespace Azure.Functions.Cli.Tests.Console;
 
 public class SpectreInteractionServiceTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WriteLine_NullableInlineAndThemeStyles_PreserveLiteralTextAndColorPolicy(bool noColor)
+    {
+        using var stdout = new BufferedConsole(true, true, noColor);
+        using var stderr = new BufferedConsole(true, true, noColor);
+        var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+
+        service.WriteLine(line => line.Plain("[plain]").Space().Heading("[heading]").Space()
+            .Styled("[styled]", service.Theme.Hyperlink));
+
+        stdout.Output.Should().Contain("[plain]").And.Contain("[heading]").And.Contain("[styled]");
+        stderr.Output.Should().BeEmpty();
+        if (noColor)
+        {
+            stdout.Output.Should().NotMatchRegex(@"\x1b\[(?:3[0-7]|9[0-7]|38;[25];)[0-9;]*m");
+        }
+        else
+        {
+            stdout.Output.Should().MatchRegex(@"\x1b\[(?:3[0-7]|9[0-7]|38;[25];)[0-9;]*m");
+        }
+    }
+
     [Fact]
     public void WriteJson_UsesRawInjectedStdoutWithoutMarkupOrWrapping()
     {
@@ -162,6 +186,31 @@ public class SpectreInteractionServiceTests
         bool canSelect = input && stderrAnsi;
         result.Should().Equal(canSelect ? ["second"] : []);
         AssertStderrPrompt(stdout, stderr, canSelect, 3);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("styled")]
+    [InlineData("[red]")]
+    [InlineData("missing")]
+    public async Task PromptForSelectionAsync_LiteralLabelsAndSearch_ReturnExactOriginalChoice(string search)
+    {
+        using var stdout = new BufferedConsole(true, true, noColor: true);
+        using var stderr = new BufferedConsole(true, true, noColor: true);
+        string[] choices = ["Name [bad] [Absent]", "Name [red]styled[/] [Unverified]"];
+        foreach (char character in search)
+        {
+            stderr.Enqueue(ConsoleKey.A, character);
+        }
+        stderr.Enqueue(ConsoleKey.DownArrow);
+        stderr.Enqueue(ConsoleKey.Enter);
+        var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+
+        string result = await service.PromptForSelectionAsync("Pick [template]", choices, CancellationToken.None);
+
+        result.Should().Be(choices[1]);
+        stderr.Output.Should().Contain("Pick [template]").And.Contain(choices[0]).And.Contain(choices[1]);
+        stdout.Output.Should().BeEmpty();
     }
 
     [Theory]

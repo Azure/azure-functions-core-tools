@@ -75,6 +75,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Description = "One raw native token, repeated in order (e.g. --template-argument=--symbol --template-argument=value). Requires an explicit path, --guided and --template or --quickstart.",
         Arity = ArgumentArity.OneOrMore,
         AllowMultipleArgumentsPerToken = false,
+        Hidden = true,
     };
 
     private readonly IInteractionService _interaction;
@@ -97,7 +98,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IFileSystem fileSystem,
         IEnumerable<IProjectInitializer> initializers,
         IQuickstartInitCoordinator? guided = null)
-        : base("init", "Initialize a new Azure Functions project or select an installed project template interactively.")
+        : base("init", "Initialize a new Azure Functions project. Run 'func init MyApp' to choose Basic, an installed template or Browse interactively. Quickstarts need no template parameters.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(hintRenderer);

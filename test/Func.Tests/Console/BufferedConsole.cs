@@ -68,5 +68,6 @@ internal sealed class BufferedConsole : IAnsiConsole, IAnsiConsoleInput, IDispos
 
     public void Clear(bool home) => _console.Clear(home);
     public void Write(IRenderable renderable) => _console.Write(renderable);
+    public void WriteAnsi(Action<AnsiWriter> action) => _console.WriteAnsi(action);
     public void Dispose() => _writer.Dispose();
 }

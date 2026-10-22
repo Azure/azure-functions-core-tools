@@ -351,7 +351,8 @@ public sealed class GuidedInitCommandTests
 
         exit.Should().Be(0);
         interaction.AllOutput.Should().Contain("--guided").And.Contain("--acquire-quickstart").And.Contain("--template");
-        interaction.AllOutput.Should().Contain("--template-argument");
+        interaction.AllOutput.Should().NotContain("--template-argument");
+        interaction.AllOutput.Should().Contain("func init MyApp").And.Contain("Quickstarts need no template parameters");
         interaction.AllOutput.Should().Contain("staged");
     }
 

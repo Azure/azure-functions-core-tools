@@ -105,10 +105,10 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 return InitExecutionResult.ContinueWithLegacyInitializer();
             }
             (IProjectStack? Stack, bool Canceled) stackSelection = await SelectStackAsync(scope.Catalog, input.ExplicitStack, interactive,
-                nativeStacks, ownedStacks, cancellationToken);
+                nativeStacks, ownedStacks, request.OfferBasicSelection, cancellationToken);
             if (request.OfferBasicSelection && stackSelection.Canceled)
             {
-                return DefaultSelectionCanceled();
+                return Canceled();
             }
             IProjectStack? stack = stackSelection.Stack;
             if (stack is null)
@@ -134,6 +134,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 }
                 return InitExecutionResult.Reject("invalidLanguage", "The requested language is not supported by the selected installed stack.");
             }
+            QuickstartCatalogEntry? nomination = null;
             if (installedIdentity is null && request.QuickstartId is null)
             {
                 if (!interactive)
@@ -187,44 +188,74 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 }
                 menu.AddRange(choices.Keys);
                 menu.AddRange([Browse, Cancel]);
-                string choice = await _interaction.PromptForSelectionAsync($"Select a project template for {stack.DisplayName} ({stackName}):", menu, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-                if (request.OfferBasicSelection && choice == Basic)
+                while (installedIdentity is null && nomination is null)
                 {
-                    return InitExecutionResult.ContinueWithBasicProject(stackName);
-                }
-                if (choices.TryGetValue(choice, out InstalledTemplateArtifact? selected))
-                {
-                    installedIdentity = selected.Entry.Identity;
-                    installedSelection = selected.Selection;
-                }
-                else if (choice != Browse)
-                {
-                    return Canceled();
+                    string choice = await _interaction.PromptForSelectionAsync(
+                        $"Select a project template for {stack.DisplayName} ({stackName}):", menu, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (request.OfferBasicSelection && choice == Basic)
+                    {
+                        return InitExecutionResult.ContinueWithBasicProject(stackName);
+                    }
+                    if (choices.TryGetValue(choice, out InstalledTemplateArtifact? selected))
+                    {
+                        installedIdentity = selected.Entry.Identity;
+                        installedSelection = selected.Selection;
+                    }
+                    else if (choice == Browse)
+                    {
+                        QuickstartBrowseResult browsing = await _browser.BrowseAsync(new(stackName, input.ExplicitLanguage)
+                        {
+                            AllowSelection = true,
+                            InstalledQuery = query,
+                        }, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (browsing.Outcome == QuickstartBrowseOutcome.Back)
+                        {
+                            continue;
+                        }
+                        if (browsing.Outcome != QuickstartBrowseOutcome.Selected || browsing.Entry is null)
+                        {
+                            return Canceled();
+                        }
+                        nomination = browsing.Entry;
+                    }
+                    else
+                    {
+                        return Canceled();
+                    }
                 }
             }
             if (installedIdentity is null)
             {
-                QuickstartCatalogEntry? nomination;
                 if (request.QuickstartId is not null)
                 {
                     QuickstartCatalog results = await _catalog.SearchAsync(new(LegacyStack: stack), cancellationToken);
                     _catalogRenderer.WriteProvenance(results.Provenance);
                     QuickstartCatalogEntry[] matches = [.. results.Entries.Where(entry => entry.Entry.Id == request.QuickstartId)];
+                    if (matches.Length == 0)
+                    {
+                        QuickstartCatalog all = await _catalog.SearchAsync(new(), cancellationToken);
+                        QuickstartCatalogEntry[] otherStacks = [.. all.Entries.Where(entry => entry.Entry.Id == request.QuickstartId)];
+                        if (otherStacks.Length == 1)
+                        {
+                            string language = otherStacks[0].Entry.Language;
+                            string[] compatible = [.. scope.Catalog.Stacks.Where(candidate =>
+                                new InstalledProjectStackCatalog([candidate]).GetCanonicalLanguage(language) is not null)
+                                .Select(candidate => $"--stack {candidate.Stack}")];
+                            string hint = compatible.Length > 0
+                                ? $"Choose {string.Join(" or ", compatible)}."
+                                : $"Use 'func setup' to install a stack supporting the catalog language '{language}', then select it with --stack.";
+                            return InitExecutionResult.Reject("quickstartStackMismatch",
+                                $"Quickstart '{request.QuickstartId}' is not available for the selected stack '{stackName}'. {hint}");
+                        }
+                    }
                     if (matches.Length != 1)
                     {
                         return InitExecutionResult.Reject("ambiguousQuickstart", "Supply one exact, unique discovery --quickstart ID for the selected stack.");
                     }
                     nomination = matches[0];
                     _catalogRenderer.WriteDetails(nomination, nomination.Entry.Language);
-                }
-                else
-                {
-                    nomination = await _browser.BrowseAsync(new(stackName, input.ExplicitLanguage)
-                    {
-                        AllowSelection = true,
-                        InstalledQuery = query,
-                    }, cancellationToken);
                 }
                 if (nomination is null)
                 {
@@ -305,7 +336,8 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
     }
 
     private async Task<(IProjectStack? Stack, bool Canceled)> SelectStackAsync(InstalledProjectStackCatalog catalog, string? requested,
-        bool interactive, IReadOnlySet<string>? nativeStacks, IReadOnlySet<string>? ownedStacks, CancellationToken cancellationToken)
+        bool interactive, IReadOnlySet<string>? nativeStacks, IReadOnlySet<string>? ownedStacks, bool useSoleDefault,
+        CancellationToken cancellationToken)
     {
         if (requested is not null)
         {
@@ -323,6 +355,10 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         if (!interactive || available.Length == 0)
         {
             return (null, false);
+        }
+        if (useSoleDefault && available.Length == 1)
+        {
+            return (available[0], false);
         }
         Dictionary<string, IProjectStack> choices = available.ToDictionary(stack => $"{stack.DisplayName} ({stack.Stack})", StringComparer.Ordinal);
         string selected = await _interaction.PromptForSelectionAsync("Select a project stack:", choices.Keys.Append(Cancel), cancellationToken);
@@ -353,8 +389,5 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         _interaction.WriteWarning("Remote project and workload declarations remain unverified claims. Native generation and required CLI configuration are previewed after exact acquisition, before interactive creation consent. No feed, pin or workload upgrade is authorized.");
     }
 
-    private static InitExecutionResult Canceled() => InitExecutionResult.Reject("canceled", "Guided init canceled before acquisition or project writes.");
-
-    private static InitExecutionResult DefaultSelectionCanceled()
-        => InitExecutionResult.Reject("canceled", "Project template selection canceled before acquisition or project writes.");
+    private static InitExecutionResult Canceled() => InitExecutionResult.Reject("canceled", "Project template selection canceled before acquisition or project writes.");
 }
