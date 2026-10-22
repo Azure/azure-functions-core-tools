@@ -184,7 +184,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     {
         await InstallAsync();
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "controls"));
-        var templater = CreateTemplater(output);
+        using var templater = CreateTemplater(output);
         var wrongType = await templater.ResolveGroupAsync("Func.Tests.Parser.Project", TemplateType.Item, CancellationToken.None);
         var group = (await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None)).Group!;
         var selected = group[0];
@@ -281,6 +281,25 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         }
     }
 
+    [Fact]
+    public void SnapshotProject_EmptyParentDirectory_DetectsChangesWithoutFileChanges()
+    {
+        string project = Path.Combine(_root, "project");
+        Directory.CreateDirectory(project);
+        File.WriteAllText(Path.Combine(project, "host.json"), "{}");
+        var before = SnapshotProject();
+
+        string parent = Directory.CreateDirectory(Path.Combine(project, "functions")).FullName;
+        var after = SnapshotProject();
+
+        after.Should().ContainKey("functions");
+        after["functions"].Should().BeNull();
+        after["host.json"].Should().Be(before["host.json"]);
+        before.Should().NotContainKey("functions");
+        Directory.Delete(parent);
+        SnapshotProject().Should().BeEquivalentTo(before);
+    }
+
     private TemplateCandidateParseResult Parse(ResolvedTemplate template, IReadOnlyList<string> raw,
         IReadOnlyDictionary<string, string?>? completed = null)
         => _parser.Parse(new(template.Entry.Identity, template.Parameters, _reserved, raw, completed));
@@ -294,9 +313,18 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         return new TemplaterFactory(new CliConfigurationPathsOptions(Path.Combine(_root, "home")), new PhysicalFileSystem()).Create(context, snapshot);
     }
 
-    private Dictionary<string, string> SnapshotProject()
-        => Directory.GetFiles(Path.Combine(_root, "project"), "*", SearchOption.AllDirectories)
-            .ToDictionary(path => Path.GetRelativePath(Path.Combine(_root, "project"), path), File.ReadAllText);
+    private Dictionary<string, string?> SnapshotProject()
+    {
+        string project = Path.Combine(_root, "project");
+        var snapshot = Directory.GetDirectories(project, "*", SearchOption.AllDirectories)
+            .ToDictionary(path => Path.GetRelativePath(project, path), _ => (string?)null);
+        foreach (string file in Directory.GetFiles(project, "*", SearchOption.AllDirectories))
+        {
+            snapshot.Add(Path.GetRelativePath(project, file), File.ReadAllText(file));
+        }
+
+        return snapshot;
+    }
 
     private async Task InstallAsync(string scalarType = "string", bool requireBundle = false)
     {
