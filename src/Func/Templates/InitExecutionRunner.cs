@@ -30,7 +30,8 @@ internal sealed class InitExecutionRunner(
     Func<TemplateProjectSupport> projectSupport,
     IFileSystem fileSystem,
     ILocalSettingsProvider localSettings,
-    IFunctionsProjectResolver projects) : IInitExecutionRunner
+    IFunctionsProjectResolver projects,
+    IBoundInitScopeFactory? boundScopes = null) : IInitExecutionRunner
 {
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
@@ -43,6 +44,7 @@ internal sealed class InitExecutionRunner(
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly ILocalSettingsProvider _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
     private readonly IFunctionsProjectResolver _projects = projects ?? throw new ArgumentNullException(nameof(projects));
+    private readonly IBoundInitScopeFactory? _boundScopes = boundScopes;
 
     public async Task<InitExecutionResult> ExecuteAsync(
         InitExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -52,7 +54,18 @@ internal sealed class InitExecutionRunner(
         ArgumentNullException.ThrowIfNull(request.WorkingDirectory);
         ArgumentNullException.ThrowIfNull(request.RawTemplateTokens);
         ArgumentNullException.ThrowIfNull(request.ReservedAliases);
+        if (request.ArtifactBinding is { } suppliedBinding)
+        {
+            ArgumentNullException.ThrowIfNull(suppliedBinding.Artifact);
+            ArgumentNullException.ThrowIfNull(suppliedBinding.Owner);
+            ArgumentException.ThrowIfNullOrWhiteSpace(suppliedBinding.TemplateIdentity);
+        }
         cancellationToken.ThrowIfCancellationRequested();
+        if (request.ArtifactBinding is { } binding && request.TemplateReference is not null
+            && !string.Equals(request.TemplateReference, binding.TemplateIdentity, StringComparison.Ordinal))
+        {
+            return InitExecutionResult.Reject("bindingConflict", "The explicit template reference conflicts with the exact artifact binding. No fallback is permitted.");
+        }
         if (request.TemplateReference is not null && string.IsNullOrWhiteSpace(request.TemplateReference))
         {
             return InitExecutionResult.Reject("invalidTemplateReference", "Supply a nonempty --template identity or short name.");
@@ -90,16 +103,23 @@ internal sealed class InitExecutionRunner(
             return InitExecutionResult.Reject("unsupportedTarget", target.Diagnostic!);
         }
 
+        if (request.ArtifactBinding is not null && _boundScopes is null)
+        {
+            return InitExecutionResult.Reject("bindingUnavailable", "Exact artifact binding requires a fresh post-acquisition workload scope.");
+        }
+        BoundInitScope? refreshedScope = null;
         InstalledProjectStackCatalog catalog;
         try
         {
-            catalog = _stackCatalog();
+            refreshedScope = request.ArtifactBinding is null ? null : await _boundScopes!.CreateAsync(cancellationToken);
+            catalog = refreshedScope?.Catalog ?? _stackCatalog();
         }
         catch (ConflictingProjectStackMetadataException exception)
         {
             return InitExecutionResult.Reject("duplicateStacks",
                 $"Installed stack metadata conflicts. {exception.Message} Inspect 'func workload list' and remove the conflict.");
         }
+        using BoundInitScope? boundScope = refreshedScope;
 
         cancellationToken.ThrowIfCancellationRequested();
         bool repair = target.State == InitExecutionTargetState.Configured
@@ -112,7 +132,7 @@ internal sealed class InitExecutionRunner(
         }
 
         bool existing = target.State == InitExecutionTargetState.Adoptable || repair;
-        if (existing && request.TemplateReference is not null)
+        if (existing && (request.TemplateReference is not null || request.ArtifactBinding is not null))
         {
             return InitExecutionResult.Reject("templateOnExistingProject",
                 "--template cannot be used during adoption or repair. Reinitialization requires --force, which is not qualified by this staged consumer; nothing was changed.");
@@ -157,12 +177,12 @@ internal sealed class InitExecutionRunner(
             RequireCleanStore = request.DryRun,
         };
         cancellationToken.ThrowIfCancellationRequested();
-        TemplateProjectSupport support = _projectSupport();
+        TemplateProjectSupport support = boundScope?.Support ?? _projectSupport();
         cancellationToken.ThrowIfCancellationRequested();
-        using Templater templater = await _factory.CreateProjectAsync(context, availability, support, cancellationToken,
+        using Templater templater = await _factory.CreateProjectAsync(context, boundScope?.Availability ?? availability, support, cancellationToken,
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
-        InitExecutionResult result = await ExecuteAsync(templater, request, Matches, cancellationToken);
+        InitExecutionResult result = await ExecuteAsync(templater, request, Matches, boundScope?.Verifier, cancellationToken);
         if (!HasConfirmedCreationResult(result, request.DryRun))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -310,13 +330,41 @@ internal sealed class InitExecutionRunner(
     }
 
     private async Task<InitExecutionResult> ExecuteAsync(Templater templater, InitExecutionRequest request,
-        Func<string, string, bool> matches, CancellationToken cancellationToken)
+        Func<string, string, bool> matches, Acquisition.NativeTemplateArtifactVerifier? verifier, CancellationToken cancellationToken)
     {
         bool canPrompt = !request.NonInteractive && _interaction.IsInteractive;
         List<TemplateGroup> groups = [];
         List<TemplateCandidateParseResult> parsed = [];
         List<TemplateCatalogEntry> considered = [];
-        if (request.TemplateReference is null)
+        if (request.ArtifactBinding is { } binding)
+        {
+            IReadOnlyList<TemplateCatalogEntry> catalog = await templater.ListAsync(TemplateType.Project, cancellationToken);
+            TemplateCatalogEntry[] exact = [.. catalog.Where(entry => string.Equals(entry.Identity, binding.TemplateIdentity, StringComparison.Ordinal)
+                && entry.Package is { } package && string.Equals(package.Identifier, binding.Artifact.PackageId, StringComparison.OrdinalIgnoreCase)
+                && package.Version == binding.Artifact.Version)];
+            if (exact.Length != 1)
+            {
+                return InitExecutionResult.Reject("bindingMismatch", "The full bound project identity is missing or ambiguous in this fresh session. No name fallback is permitted.");
+            }
+            TemplateCatalogEntry entry = exact[0];
+            considered.Add(entry);
+            if (!CanMatch(entry))
+            {
+                return InitExecutionResult.Reject("projectFilterConflict", "The bound project's declarations conflict with the explicit stack/language filters.")
+                    with { Templates = [entry] };
+            }
+            try
+            {
+                TemplateResolutionResult resolution = await templater.BindProjectAsync(entry, binding, verifier!, cancellationToken);
+                AddSelectable(resolution.Group!);
+            }
+            catch (Exception exception) when (exception is InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
+            {
+                return InitExecutionResult.Reject("bindingMismatch", $"The exact artifact could not be revalidated. {exception.Message}")
+                    with { Templates = [entry] };
+            }
+        }
+        else if (request.TemplateReference is null)
         {
             IReadOnlyList<TemplateCatalogEntry> catalog = await templater.ListAsync(TemplateType.Project, cancellationToken);
             considered.AddRange(catalog.Where(entry => !entry.IsHidden && CanMatch(entry)));

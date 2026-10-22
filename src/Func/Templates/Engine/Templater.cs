@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Settings;
@@ -19,6 +21,69 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
     private IReadOnlyList<MalformedTypeDescriptor> _malformedTypes = [];
 
     public TemplateEngineContext Context => _session.Context;
+
+    internal async Task<TemplateResolutionResult> BindProjectAsync(TemplateCatalogEntry entry, NativeTemplateSelection selection,
+        NativeTemplateArtifactVerifier verifier, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(selection);
+        ArgumentNullException.ThrowIfNull(verifier);
+        using IDisposable operation = _session.EnterBoundOperation();
+        IReadOnlyList<Candidate> candidates = await GetCandidatesAsync(cancellationToken);
+        Candidate candidate = candidates.SingleOrDefault(candidate => ReferenceEquals(candidate.Entry, entry))
+            ?? throw new ArgumentException("The selected entry must originate from this fresh template flow.", nameof(entry));
+        if (entry.Type != TemplateType.Project || entry.Identity != selection.TemplateIdentity)
+        {
+            throw new InvalidTemplateMetadataException("The bound selection is not the exact project template identity.");
+        }
+        await ValidateAsync(cancellationToken);
+        if (!IsEligible(candidate))
+        {
+            return CreateGroup([candidate]);
+        }
+        _candidates = Array.AsReadOnly<Candidate>([.. candidates.Select(item => ReferenceEquals(item, candidate)
+            ? candidate with { Configuration = candidate.Configuration! with { ValidateArtifactAsync = ValidateAsync } }
+            : item)]);
+        return await CreateGroupAsync([entry], cancellationToken);
+
+        async Task ValidateAsync(CancellationToken token)
+        {
+            try
+            {
+                await verifier.VerifyAsync(_session, candidate.Template, selection, token);
+            }
+            catch (BasicAcquisitionException exception)
+            {
+                throw new InvalidTemplateMetadataException($"Exact artifact binding failed: {exception.Message}", exception);
+            }
+        }
+    }
+
+    internal async Task<IReadOnlyList<InstalledTemplateArtifact>> ProjectArtifactsAsync(NativeTemplateArtifactVerifier verifier,
+        NativeTemplateOwnerIdentity owner, BundleChannel? channel, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(verifier);
+        ArgumentNullException.ThrowIfNull(owner);
+        using IDisposable operation = _session.EnterBoundOperation();
+        IReadOnlyList<Candidate> candidates = await GetCandidatesAsync(cancellationToken);
+        List<InstalledTemplateArtifact> result = [];
+        foreach (Candidate candidate in candidates.Where(candidate => candidate.Entry.Type == TemplateType.Project))
+        {
+            try
+            {
+                NativeTemplateSelection selection = await verifier.ProjectAsync(_session, candidate.Template, owner, channel, cancellationToken);
+                string? diagnostic = IsEligible(candidate) ? null
+                    : candidate.Entry.MetadataDiagnostic ?? candidate.Entry.ProjectConfigurationDiagnostic
+                        ?? string.Join(" ", candidate.Entry.ConstraintEvaluation.Diagnostics.Select(item => item.Message));
+                result.Add(new(candidate.Entry, selection, diagnostic));
+            }
+            catch (Exception exception) when (exception is BasicAcquisitionException or InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
+            {
+                result.Add(new(candidate.Entry, null, exception.Message));
+            }
+        }
+        return result.AsReadOnly();
+    }
 
     /// <summary>
     /// Lists the installed templates of <paramref name="type"/>, including hidden templates and templates whose func
@@ -115,7 +180,8 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
                 continue;
             }
 
-            items.Add(new(candidate.Entry, new SelectedTemplateInvoker(candidate.Template, candidate.Configuration!, _invocation)));
+            items.Add(new(candidate.Entry, new SelectedTemplateInvoker(candidate.Template, candidate.Configuration!, _invocation,
+                candidate.Configuration!.ValidateArtifactAsync is null ? null : _session)));
         }
 
         TemplateGroup group = new(items.AsReadOnly(), diagnostics.AsReadOnly());

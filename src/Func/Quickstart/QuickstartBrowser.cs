@@ -7,7 +7,10 @@ using Azure.Functions.Cli.Projects;
 namespace Azure.Functions.Cli.Quickstart;
 
 internal sealed record QuickstartBrowseRequest(
-    string? Stack = null, string? Language = null, string? Resource = null, string? Iac = null, string? Search = null);
+    string? Stack = null, string? Language = null, string? Resource = null, string? Iac = null, string? Search = null)
+{
+    internal QuickstartInstalledQuery? InstalledQuery { get; init; }
+}
 
 /// <summary>
 /// Presents discovery metadata only. Completion never returns an acquisition or creation selection.
@@ -22,7 +25,8 @@ internal sealed class QuickstartBrowser(
     InstalledProjectStackCatalog stacks,
     IEnumerable<IQuickstartProvider> providers,
     IInteractionService interaction,
-    QuickstartCatalogRenderer renderer) : IQuickstartBrowser
+    QuickstartCatalogRenderer renderer,
+    QuickstartInstalledTemplates? installed = null) : IQuickstartBrowser
 {
     private const string Back = "Back";
     private const string Cancel = "Cancel browsing";
@@ -36,6 +40,7 @@ internal sealed class QuickstartBrowser(
     private readonly IReadOnlyList<IQuickstartProvider> _providers = [.. providers ?? throw new ArgumentNullException(nameof(providers))];
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly QuickstartCatalogRenderer _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
+    private readonly QuickstartInstalledTemplates? _installed = installed;
 
     public async Task BrowseAsync(QuickstartBrowseRequest request, CancellationToken cancellationToken)
     {
@@ -71,6 +76,23 @@ internal sealed class QuickstartBrowser(
                 ct => _catalog.SearchAsync(query, ct),
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
+            if (request.InstalledQuery is { } installedQuery)
+            {
+                if (_installed is null)
+                {
+                    _interaction.WriteWarning("Installed artifact proof is unavailable. Discovery entries remain visible and unverified.");
+                }
+                else
+                {
+                    QuickstartInstalledProjection projection = await _installed.ProjectAsync(results, installedQuery, cancellationToken);
+                    results = projection.Catalog;
+                    foreach (Templates.Engine.InstalledTemplateArtifact item in projection.Installed.Where(item => item.Diagnostic is not null))
+                    {
+                        _interaction.WriteWarning($"Installed template '{item.Entry.Identity}': {item.Diagnostic}");
+                    }
+                    _interaction.WriteHint("Only exact independently verified installed duplicates are omitted. Remote package metadata remains unverified.");
+                }
+            }
             if (language is not null)
             {
                 results = results with

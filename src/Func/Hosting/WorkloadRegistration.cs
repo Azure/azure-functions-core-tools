@@ -5,6 +5,7 @@ using System.Diagnostics;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Invocation;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -48,11 +49,15 @@ internal static class WorkloadRegistration
     /// <param name="paths">Pre-resolved workload paths, including the workload home. Construct with the default ctor to use the env-var-aware resolver, or with an explicit home in tests.</param>
     /// <param name="interaction">Used to surface per-workload load and Configure failures as warnings.</param>
     /// <param name="cancellationToken">Cancellation propagated to manifest reads.</param>
+    /// <param name="installedSnapshot">Optional registry snapshot used when rebuilding a protected logical flow.</param>
+    /// <param name="requireCompleteRegistration">Refuses a partial capability scope when a workload fails to load or configure.</param>
     public static async Task RegisterWorkloadsAsync(
         IServiceCollection services,
         WorkloadPathsOptions paths,
         IInteractionService interaction,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<WorkloadEntry>? installedSnapshot = null,
+        bool requireCompleteRegistration = false)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(paths);
@@ -64,7 +69,7 @@ internal static class WorkloadRegistration
         using Activity? activity = CliTelemetry.Trace.StartWorkloadBootActivity();
         try
         {
-            int loadedCount = await RegisterCoreAsync(services, paths, interaction, cancellationToken);
+            int loadedCount = await RegisterCoreAsync(services, paths, interaction, cancellationToken, installedSnapshot, requireCompleteRegistration);
             activity?.SetTag(TelemetryConventions.CliWorkloadCount, loadedCount);
         }
         catch (Exception ex)
@@ -78,13 +83,15 @@ internal static class WorkloadRegistration
         IServiceCollection services,
         WorkloadPathsOptions paths,
         IInteractionService interaction,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<WorkloadEntry>? installedSnapshot,
+        bool requireCompleteRegistration)
     {
         var store = new WorkloadStore(paths, new FileWorkloadOperationCoordinator(paths));
         var runtimeIdentifierProvider = new WorkloadRuntimeIdentifierProvider();
         var loader = new WorkloadLoader(paths, runtimeIdentifierProvider);
 
-        IReadOnlyList<WorkloadEntry> allEntries = await store.GetWorkloadsAsync(cancellationToken);
+        IReadOnlyList<WorkloadEntry> allEntries = installedSnapshot ?? await store.GetWorkloadsAsync(cancellationToken);
         IReadOnlyList<WorkloadEntry> compatibleEntries = SelectRuntimeCompatibleEntries(
             allEntries,
             runtimeIdentifierProvider.Current,
@@ -104,6 +111,18 @@ internal static class WorkloadRegistration
             }
             catch (Exception ex)
             {
+                if (requireCompleteRegistration)
+                {
+                    foreach (RuntimeWorkloadInfo loaded in runtimeWorkloads)
+                    {
+                        loaded.LoadContext.Unload();
+                    }
+                    if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    throw new InvalidWorkloadException($"Workload '{entry.PackageId}@{entry.PackageVersion}' could not load into the fresh capability scope. Repair it before retrying.", ex);
+                }
                 interaction.WriteWarning(
                     $"Workload '{entry.PackageId}@{entry.PackageVersion}' could not be loaded: {ex.Message}");
             }
@@ -134,6 +153,18 @@ internal static class WorkloadRegistration
             }
             catch (Exception ex)
             {
+                if (requireCompleteRegistration)
+                {
+                    foreach (RuntimeWorkloadInfo loaded in runtimeWorkloads)
+                    {
+                        loaded.LoadContext.Unload();
+                    }
+                    if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    throw new InvalidWorkloadException($"Workload '{workload.PackageId}@{workload.PackageVersion}' could not configure the fresh capability scope. Repair it before retrying.", ex);
+                }
                 // A misbehaving workload must not brick the CLI: the user
                 // still needs `func workload uninstall` to remove it.
                 // Not transactional: services registered before the throw

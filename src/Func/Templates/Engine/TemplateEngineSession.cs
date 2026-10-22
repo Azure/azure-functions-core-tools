@@ -4,6 +4,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.Mount;
@@ -35,6 +36,7 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
     private readonly IDisposable? _ownership;
     private readonly TemplateStoreEngineDiagnostics? _diagnostics;
     private bool _disposed;
+    private int _boundOperation;
 
     public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null,
         IDisposable? ownership = null, TemplateStoreEngineDiagnostics? diagnostics = null)
@@ -87,6 +89,103 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
     }
 
     internal void CheckStoreDiagnostics() => _diagnostics?.ThrowIfCacheFailed();
+
+    internal IDisposable EnterBoundOperation()
+    {
+        ThrowIfDisposed();
+        if (Interlocked.CompareExchange(ref _boundOperation, 1, 0) != 0)
+        {
+            throw new InvalidOperationException("An artifact-bound template flow cannot be used concurrently.");
+        }
+        return new BoundOperation(this);
+    }
+
+    internal async Task<TemplateArtifactIdentity?> ReadCurrentArtifactAsync(ITemplateInfo template, CancellationToken cancellationToken)
+    {
+        IManagedTemplatePackage? package = await FindCurrentPackageAsync(template, cancellationToken);
+        if (package is null)
+        {
+            return null;
+        }
+        using Stream stream = _settings.Host.FileSystem.OpenRead(package.MountPointUri);
+        string digest = Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
+        return new(package.Identifier, package.Version!, digest);
+    }
+
+    internal async Task ValidateCurrentArtifactAsync(ITemplateInfo template, BasicTemplateArtifact artifact,
+        IBasicArchiveInspector inspector, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(artifact);
+        ArgumentNullException.ThrowIfNull(inspector);
+        IManagedTemplatePackage? package = await FindCurrentPackageAsync(template, cancellationToken);
+        if (package is null || !string.Equals(package.Identifier, artifact.PackageId, StringComparison.OrdinalIgnoreCase)
+            || package.Version != artifact.Version.ToNormalizedString())
+        {
+            throw new InvalidTemplateMetadataException("The selected template is not mounted from the authorized exact package.");
+        }
+        using Stream stream = _settings.Host.FileSystem.OpenRead(package.MountPointUri);
+        await inspector.ValidateArchiveAsync(stream, artifact, cancellationToken);
+        IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
+        string[] identities = [.. templates.Where(item => item.MountPointUri == package.MountPointUri).Select(item => item.Identity)];
+        CheckStoreDiagnostics();
+        if (identities.Length != artifact.Templates.Count
+            || identities.Distinct(StringComparer.Ordinal).Count() != identities.Length
+            || artifact.Templates.Any(item => !identities.Contains(item.Identity, StringComparer.Ordinal)))
+        {
+            throw new InvalidTemplateMetadataException("The current engine inventory differs from the qualified archive inventory.");
+        }
+        if (!_settings.Components.TryGetComponent(template.GeneratorId, out IGenerator? generator) || generator is null)
+        {
+            throw new InvalidTemplateMetadataException("The bound template has no registered generator.");
+        }
+        ITemplate? loaded = await generator.LoadTemplateAsync(_settings, template, null, cancellationToken);
+        using var lifetime = loaded as IDisposable;
+        if (loaded?.Configuration is not IFile configuration)
+        {
+            throw new InvalidTemplateMetadataException("The bound template has no mounted archive configuration.");
+        }
+        stream.Position = 0;
+        using PackageArchiveReader reader = new(stream, leaveStreamOpen: true);
+        var mountedFiles = configuration.MountPoint.Root.EnumerateFiles("*", SearchOption.AllDirectories)
+            .ToDictionary(file => Path.GetRelativePath(configuration.MountPoint.Root.FullPath, file.FullPath).Replace('\\', '/'), StringComparer.Ordinal);
+        string[] paths = [.. await reader.GetFilesAsync(cancellationToken)];
+        if (paths.Length != mountedFiles.Count)
+        {
+            throw new InvalidTemplateMetadataException("The current mount has a different file inventory from the qualified archive.");
+        }
+        foreach (string path in paths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!mountedFiles.TryGetValue(path, out IFile? file) || !file.Exists)
+            {
+                throw new InvalidTemplateMetadataException("The current mount is missing qualified archive content.");
+            }
+            using Stream expected = await reader.GetStreamAsync(path, cancellationToken);
+            using Stream mounted = file.OpenRead();
+            byte[] expectedHash = await SHA256.HashDataAsync(expected, cancellationToken);
+            byte[] mountedHash = await SHA256.HashDataAsync(mounted, cancellationToken);
+            if (!expectedHash.AsSpan().SequenceEqual(mountedHash))
+            {
+                throw new InvalidTemplateMetadataException("The current mounted content differs from the qualified archive bytes. Open a fresh template session.");
+            }
+        }
+    }
+
+    private async Task<IManagedTemplatePackage?> FindCurrentPackageAsync(ITemplateInfo template, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        IReadOnlyList<IManagedTemplatePackage> packages = await _packageManager.GetManagedTemplatePackagesAsync(false, cancellationToken);
+        IManagedTemplatePackage[] matches = [.. packages.Where(package => package.MountPointUri == template.MountPointUri)];
+        CheckStoreDiagnostics();
+        if (matches.Length != 1 || string.IsNullOrWhiteSpace(matches[0].Version)
+            || _settings.Host.FileSystem.DirectoryExists(matches[0].MountPointUri))
+        {
+            return null;
+        }
+        return matches[0];
+    }
 
     public virtual async Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
     {
@@ -218,6 +317,20 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
     }
 
     public void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+
+    private sealed class BoundOperation(TemplateEngineSession session) : IDisposable
+    {
+        private TemplateEngineSession? _session = session;
+
+        public void Dispose()
+        {
+            TemplateEngineSession? owner = Interlocked.Exchange(ref _session, null);
+            if (owner is not null)
+            {
+                Interlocked.Exchange(ref owner._boundOperation, 0);
+            }
+        }
+    }
 
     async Task<ITemplateCreationResult> ITemplateInvocationEngine.RenderImageAsync(
         ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, TemplateOutputImage image, CancellationToken cancellationToken)

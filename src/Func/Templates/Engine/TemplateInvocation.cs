@@ -96,6 +96,8 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
 /// <param name="Parameters">Native definitions loaded from the mounted configuration.</param>
 internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters)
 {
+    internal Func<CancellationToken, Task>? ValidateArtifactAsync { get; init; }
+
     public string Content { get; } = Content ?? throw new ArgumentNullException(nameof(Content));
 
     /// <summary>
