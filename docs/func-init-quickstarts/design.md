@@ -67,9 +67,49 @@ dry-run. Guided init rejects nonempty targets, adoption, repair and `--force`
 before acquisition or cleanup. The legacy initializer path retains its existing
 adoption, repair, force and workload-option behavior, including response files.
 Guided init does not accept workload initializer options. Arbitrary native
-parameter tokens remain supported by the separate staged
-`InitExecutionCommand`, not by this public opt-in adapter. Required native
-values can be prompted interactively; scripts fail if they are unresolved.
+parameter tokens are available through repeated `--template-argument=<token>`
+options on the public guided adapter. Each occurrence supplies exactly one raw
+token, in order, to the existing selected-template parser. An explicit target
+path, `--guided`, and either `--template` or `--quickstart` are required. This
+does not add optional parameter entry to the default interactive menu or pass
+native arguments to Basic. Required native values can still be prompted
+interactively; scripts fail if they are unresolved.
+
+```text
+func init MyConnector --guided --stack node --template <installed-full-identity> --non-interactive --template-argument=--greeting --template-argument="hello world" --template-argument=--enabled=false
+func init MyConnector --guided --stack node --quickstart <exact-catalog-id> --acquire-quickstart --non-interactive --template-argument=--required --template-argument=value
+```
+
+Use `=` on the host option for dash-prefixed and `@`-prefixed raw tokens.
+The raw native token can itself contain an inline value, as in
+`--template-argument=--enabled=false`, or its value can be the next repeated
+option. Boolean symbols require an explicit `true` or `false`; supplying only
+the symbol is an error. Empty raw host-option values are rejected rather than
+dropped; use `--template-argument=--greeting=` for an empty native string.
+Scalar types, choices, required values and duplicate
+long/short aliases are validated by `TemplateArgumentParser`, not a second
+public argument parser. Host and initializer aliases remain reserved, including
+`--template-argument`. A conflicting native alias uses the existing canonical
+fallback, for example `--template-argument=--param:Stack=node` or
+`--template-argument=-p:s=node`. Native name input remains the host's `--name`.
+No native token authorizes acquisition or sets another host option.
+
+There is deliberately no native `-- <arguments>` suffix. A variadic positional
+would also capture host typos before the delimiter in System.CommandLine 2.0.6,
+changing `ParseResult.Errors`, help and other parser consumers. The repeated
+option keeps strict unknown-option and extra-positional errors without changing
+global parser settings. Initializer-only options remain legacy-only.
+
+Public response files retain System.CommandLine expansion, nested references,
+quoting and backslash behavior. The resulting raw option values are never
+expanded again by the native parser. Use `--template-argument=@file` for a
+literal `@file` value, including inside a response file. A bare `@file` token
+still requests public response expansion. In the existing parser a direct argv
+token after `--` is literal, but bare references inside response-file contents
+are recursively expanded before insertion, even if textually after a delimiter.
+This change does not normalize those different behaviors or enable a native
+suffix. Missing response files and invalid host grammar still produce public
+parse errors.
 
 **Remaining gates.** The bundled production authority is still unqualified and
 contains no approved quickstart associations. Production acquisition therefore
@@ -77,7 +117,7 @@ fails explicitly. Real fixtures demonstrate the complete mechanics, not publishe
 or hosted release qualification. Production needs an approved `FuncTemplate`
 archive, package/version/source/digest/contentRevision, full inventory and
 actual stack/host/channel/role association. The default-init cutover still needs
-the initializer compatibility inventory, full public parameter integration,
+the initializer compatibility inventory, default-menu optional parameter integration,
 compatible force support, production replacement parity and legacy removal
 approval. No held Node executor or ordinary post-action dispatcher is enabled.
 Later policy alignment must preserve dispatch and rebuild policy/factory services
