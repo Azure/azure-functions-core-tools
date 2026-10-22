@@ -29,7 +29,7 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
         string output = nested ? Path.Combine(Base, "generated", "items") : Base;
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(output),
             itemOutputIntent: legacy ? NativeItemOutputIntent.LegacyWorkflowRelative : NativeItemOutputIntent.LiteralOutput);
-        using Templater templater = new(new TemplateEngineSession(context, Path.Combine(_root, "hive")));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(context, Path.Combine(_root, "hive")));
         var selected = (await templater.ResolveGroupAsync("Placed", TemplateType.Item)).Group![0];
         var request = Request(selected) with { OutputDirectory = context.CommandDirectory };
 
@@ -55,7 +55,7 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
             string output = Path.Combine(Base, index.ToString(System.Globalization.CultureInfo.InvariantCulture));
             TemplateEngineContext context = new(WorkingDirectory.FromExplicit(output),
                 itemOutputIntent: modes[index] ? NativeItemOutputIntent.LegacyWorkflowRelative : NativeItemOutputIntent.LiteralOutput);
-            using Templater templater = new(new TemplateEngineSession(context, Path.Combine(_root, "hive")));
+            using Templater templater = TemplateFixtures.CreateTemplater(new(context, Path.Combine(_root, "hive")));
             var selected = (await templater.ResolveGroupAsync("Placed", TemplateType.Item)).Group![0];
 
             var result = await selected.InvokeAsync(Request(selected) with { OutputDirectory = context.CommandDirectory }, CancellationToken.None);
@@ -77,7 +77,7 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
     public async Task Invoke_ExpectedRegularSourceContract_RefusesDirectoryExtraAndWrongSource(string invalid)
     {
         await InstallAsync(invalid);
-        using Templater templater = new(new TemplateEngineSession(Context(), Path.Combine(_root, "hive")));
+        using Templater templater = TemplateFixtures.CreateTemplater(new(Context(), Path.Combine(_root, "hive")));
         var selected = (await templater.ResolveGroupAsync("Placed", TemplateType.Item)).Group![0];
         var request = Request(selected, invalid == "wrong-name" ? "other.js" : invalid == "placeholder" ? "seed.js/empty-marker" : "seed.js");
 
@@ -95,7 +95,7 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
     public async Task Invoke_PinnedSourceChangesAfterNativePreview_RefusesBeforeLiveCreate(string changed)
     {
         await InstallAsync("regular");
-        using Templater templater = new(new PlacementSession(Context(), Path.Combine(_root, "hive"),
+        using Templater templater = TemplateFixtures.CreateTemplater(new PlacementSession(Context(), Path.Combine(_root, "hive"),
             () => File.AppendAllText(Path.Combine(Package, changed.Replace('/', Path.DirectorySeparatorChar)),
                 changed.EndsWith("template.json", StringComparison.Ordinal) ? "\n " : "changed")));
         var selected = (await templater.ResolveGroupAsync("Placed", TemplateType.Item)).Group![0];
@@ -111,7 +111,7 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
     {
         await InstallAsync("regular");
         int previews = 0;
-        using Templater templater = new(new PlacementSession(Context(), Path.Combine(_root, "hive"), () => previews++));
+        using Templater templater = TemplateFixtures.CreateTemplater(new PlacementSession(Context(), Path.Combine(_root, "hive"), () => previews++));
         var selected = (await templater.ResolveGroupAsync("Placed", TemplateType.Item)).Group![0];
         var request = Request(selected);
         File.AppendAllText(Path.Combine(Package, "seed.js"), "changed");
@@ -127,7 +127,7 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
     public async Task Capture_PrivateExpansion_RevalidatesPinnedBodyAfterNativePreview()
     {
         await InstallAsync("regular");
-        using Templater templater = new(new PlacementSession(Context(), Path.Combine(_root, "hive"),
+        using Templater templater = TemplateFixtures.CreateTemplater(new PlacementSession(Context(), Path.Combine(_root, "hive"),
             () => File.AppendAllText(Path.Combine(Package, "seed.js"), "changed")));
         var selected = (await templater.ResolveGroupAsync("Placed", TemplateType.Item)).Group![0];
 
@@ -142,7 +142,7 @@ public sealed class NativeSourceSnapshotBoundaryTests : IDisposable
     {
         await InstallAsync("regular");
         string outside = Directory.CreateDirectory(Path.Combine(_root, "outside")).FullName;
-        using Templater templater = new(new PlacementSession(Context(), Path.Combine(_root, "hive"), () =>
+        using Templater templater = TemplateFixtures.CreateTemplater(new PlacementSession(Context(), Path.Combine(_root, "hive"), () =>
         {
             Directory.CreateDirectory(Base);
             Directory.CreateSymbolicLink(Path.Combine(Base, "generated"), outside);

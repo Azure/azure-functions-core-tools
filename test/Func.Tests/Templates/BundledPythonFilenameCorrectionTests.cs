@@ -119,7 +119,7 @@ public sealed partial class BundledPythonTemplateTests
             var append = new TemplateInvocationRequest(output, parameters, "AddedFunction", DryRun: true);
             var appendPreview = await support.InvokeAsync(templater, selected, binding, append, CancellationToken.None);
             appendPreview!.Status.Should().Be(TemplateInvocationStatus.Success, appendPreview.Diagnostic);
-            appendPreview.Changes.Should().Equal(new TemplateFileChange("function_app.py", "Append"));
+            appendPreview.Changes.Should().Equal(new TemplateFileChange("function_app.py", TemplateFileChangeKind.Append));
             File.ReadAllBytes(app).Should().Equal(before);
             capability.Executions.Should().Be(0);
 

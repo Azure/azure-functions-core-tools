@@ -107,7 +107,10 @@ public sealed class DotNetNativeContextualHelpTests : IDisposable
         };
         string fingerprint = failure == "unqualified" ? new string('0', 64)
             : "65B1EC29BE5F6176FF0C8ECC1755683970E3D2F69089A709AFB3E593924F6CD7";
-        ResolvedTemplate selected = new(entry, (_, _) => throw new InvalidOperationException("Help must not invoke the selected item."),
+        ISelectedTemplateInvoker invoker = Substitute.For<ISelectedTemplateInvoker>();
+        invoker.InvokeAsync(Arg.Any<TemplateInvocationRequest>(), Arg.Any<CancellationToken>())
+            .Returns<TemplateInvocationResult>(_ => throw new InvalidOperationException("Help must not invoke the selected item."));
+        ResolvedTemplate selected = new(entry, invoker,
             configurationSha256: fingerprint,
             validateConfiguration: _ => Task.FromResult<TemplateInvocationResult?>(failure == "changed"
                 ? new(TemplateInvocationStatus.TemplateChanged, [], "changed") : null));

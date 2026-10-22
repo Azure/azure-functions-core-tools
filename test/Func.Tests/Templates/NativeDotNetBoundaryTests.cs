@@ -37,7 +37,8 @@ public sealed class NativeDotNetBoundaryTests : IDisposable
             ["F#"] = ["fsharp"],
         });
         TemplateProjectSupport support = new(new(new([stack])), new(new PhysicalFileSystem()));
-        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive, projectSupport: support);
+        using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
+        TemplateInvocationCoordinator invocation = new(session, new PhysicalFileSystem(), support);
         ITemplateInfo template = (await session.PackageManager.GetTemplatesAsync(CancellationToken.None))
             .Single(template => template.Identity == $"Microsoft.AzureFunctions.ProjectTemplate.{language}.Isolated.3.x");
         TemplateConfigurationSnapshot configuration = await session.ReadConfigurationAsync(template, CancellationToken.None);
@@ -49,7 +50,7 @@ public sealed class NativeDotNetBoundaryTests : IDisposable
         preview.Status.Should().Be(CreationResultStatus.Success);
         preview.CreationEffects!.CreationResult.PrimaryOutputs.Should().ContainSingle().Which.Path.Should().Be("Sample" + extension);
 
-        TemplateInvocationResult refused = await session.InvokeAsync(template, configuration,
+        TemplateInvocationResult refused = await invocation.InvokeAsync(template, configuration,
             new(WorkingDirectory.FromExplicit(output), parameters, "Sample", DryRun: true), CancellationToken.None);
 
         refused.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
@@ -66,12 +67,13 @@ public sealed class NativeDotNetBoundaryTests : IDisposable
     {
         await InstallArchiveAsync();
         using TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), Hive);
+        TemplateInvocationCoordinator invocation = new(session, new PhysicalFileSystem());
         ITemplateInfo template = (await session.PackageManager.GetTemplatesAsync(CancellationToken.None))
             .Single(template => template.Identity == $"Azure.Function.{language}.Isolated.HttpTrigger.3.x");
         TemplateConfigurationSnapshot configuration = await session.ReadConfigurationAsync(template, CancellationToken.None);
         string output = Path.Combine(_root, language);
 
-        TemplateInvocationResult refused = await session.InvokeAsync(template, configuration,
+        TemplateInvocationResult refused = await invocation.InvokeAsync(template, configuration,
             new(WorkingDirectory.FromExplicit(output), new Dictionary<string, string?>(), "Greeting"), CancellationToken.None);
 
         refused.Status.Should().Be(TemplateInvocationStatus.Failed);

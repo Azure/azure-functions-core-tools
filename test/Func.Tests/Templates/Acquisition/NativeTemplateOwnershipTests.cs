@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
 using NSubstitute;
 using NuGet.Versioning;
+using NativeTemplateOwnership = Azure.Functions.Cli.Templates.Acquisition.NativeTemplateOwnership;
 
 namespace Azure.Functions.Cli.Tests.Templates.Acquisition;
 

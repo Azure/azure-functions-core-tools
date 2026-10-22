@@ -413,8 +413,9 @@ public sealed partial class DotNetDirectProviderTests(ITestOutputHelper testOutp
             QualifyLayoutAsync = provider.QualifyLayoutAsync,
         };
         TemplateEngineContext context = language is null ? new(directory) : new(directory, new(directory, "dotnet", language));
-        var session = new TemplateEngineSession(context, hive, projectSupport: support);
-        return new(new(session), provider, runner, directory, project, archive, Path.GetRelativePath(package, itemConfig).Replace('\\', '/'));
+        var session = new TemplateEngineSession(context, hive);
+        return new(TemplateFixtures.CreateTemplater(session, projectSupport: support),
+            provider, runner, directory, project, archive, Path.GetRelativePath(package, itemConfig).Replace('\\', '/'));
     }
 
     private async Task<ResolvedTemplate> SelectItemAsync(Fixture fixture, string language)

@@ -193,7 +193,7 @@ public sealed partial class BundledNodeTemplateTests
         TemplateInvocationRequest request;
         string archive;
         using (var session = await _templates.OpenReadAsync(context, CancellationToken.None, availability))
-        using (var templater = new Templater(session))
+        using (var templater = TemplateFixtures.CreateTemplater(session))
         {
             var selected = (await templater.ResolveGroupAsync("HttpTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
             var source = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
@@ -218,7 +218,7 @@ public sealed partial class BundledNodeTemplateTests
             writer.Write(text + "\n");
         }
         using var changedSession = await _templates.OpenReadAsync(context, CancellationToken.None, availability);
-        using var changedTemplates = new Templater(changedSession);
+        using var changedTemplates = TemplateFixtures.CreateTemplater(changedSession);
         var current = (await changedTemplates.ResolveGroupAsync("HttpTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
 
         var result = await current.InvokeAsync(request, CancellationToken.None);
@@ -252,7 +252,7 @@ public sealed partial class BundledNodeTemplateTests
                 Directory.CreateSymbolicLink(link, outside);
             },
         };
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("HttpTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
         var source = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
         var parsed = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));

@@ -449,7 +449,8 @@ public sealed partial class BundledRemainingProjectTemplateTests : IDisposable
     {
         TemplateProjectConfigurationPlanner planner = new(new(services.GetServices<IProjectStack>()));
         TemplateProjectConfigurationWriter writer = new(_files);
-        return new(new(new(output), Hive, installed ? Snapshot(stack) : new([]), new(planner, writer)));
+        return TemplateFixtures.CreateTemplater(new(new(output), Hive, installed ? Snapshot(stack) : new([])),
+            _files, new(planner, writer));
     }
 
     private static TemplateConstraintEvaluationSnapshot Snapshot(string alias)

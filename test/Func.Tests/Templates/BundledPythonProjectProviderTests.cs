@@ -76,8 +76,9 @@ public sealed partial class BundledPythonTemplateTests
         var factory = Substitute.For<ITemplaterFactory>();
         factory.CreateProjectAsync(Arg.Any<TemplateEngineContext>(), Arg.Any<TemplateConstraintEvaluationSnapshot>(),
             Arg.Any<TemplateProjectSupport>(), Arg.Any<CancellationToken>(), Arg.Any<Action<TemplateStoreWaitReason>?>())
-            .Returns(call => Task.FromResult(new Templater(new TemplateEngineSession(call.ArgAt<TemplateEngineContext>(0), Hive,
-                call.ArgAt<TemplateConstraintEvaluationSnapshot>(1), call.ArgAt<TemplateProjectSupport>(2)))));
+            .Returns(call => Task.FromResult(TemplateFixtures.CreateTemplater(
+                new(call.ArgAt<TemplateEngineContext>(0), Hive, call.ArgAt<TemplateConstraintEvaluationSnapshot>(1)),
+                projectSupport: call.ArgAt<TemplateProjectSupport>(2))));
         ServiceCollection services = new();
         services.AddSingleton<IInteractionService>(Substitute.For<IInteractionService>());
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();

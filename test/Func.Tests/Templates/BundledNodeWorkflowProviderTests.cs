@@ -109,7 +109,7 @@ public sealed partial class BundledNodeTemplateTests
         var context = new TemplateEngineContext(target, new(target, "node", language), bundle, enableBundleBindingConstraints: true);
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         using var session = await _templates.OpenReadAsync(context, CancellationToken.None, availability);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(identity, TemplateType.Item, CancellationToken.None)).Group!.Single();
         var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));
         INativeItemWorkflowProvider provider = new NodeTemplateWorkflowProvider(_interaction, _files, new NodeNpmInstaller());

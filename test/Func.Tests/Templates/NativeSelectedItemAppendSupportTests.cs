@@ -56,7 +56,7 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
         created!.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
         File.ReadAllText(Target).Should().Be("# user-owned\n\nChosenName|CanonicalValue|python");
         capability.Executions.Should().Be(1);
-        created.Changes.Should().Equal(new TemplateFileChange("function_app.py", "Append"));
+        created.Changes.Should().Equal(new TemplateFileChange("function_app.py", TemplateFileChangeKind.Append));
     }
 
     [Theory]
@@ -335,7 +335,8 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
         return await OpenExistingAsync();
     }
 
-    private Task<Templater> OpenExistingAsync() => Task.FromResult(new Templater(new TemplateEngineSession(Context, Path.Combine(_root, "hive"))));
+    private Task<Templater> OpenExistingAsync() =>
+        Task.FromResult(TemplateFixtures.CreateTemplater(new(Context, Path.Combine(_root, "hive"))));
 
     private void WriteTemplate(string folder, string identity, string output, string content, bool hidden)
     {

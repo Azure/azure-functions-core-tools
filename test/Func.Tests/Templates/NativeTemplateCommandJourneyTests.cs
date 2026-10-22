@@ -1120,18 +1120,18 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
 
         public Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
             CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
-            => Task.FromResult(new Templater(new CancelingNativeSession(context, hive, snapshot, null, cancellation, boundary,
+            => Task.FromResult(TemplateFixtures.CreateTemplater(new CancelingNativeSession(context, hive, snapshot, cancellation, boundary,
                 result => NativeResult = result)));
 
         public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
             TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
-            => Task.FromResult(new Templater(new TemplateEngineSession(context, hive, snapshot, projectSupport)));
+            => Task.FromResult(TemplateFixtures.CreateTemplater(new(context, hive, snapshot), projectSupport: projectSupport));
     }
 
     private sealed class CancelingNativeSession(TemplateEngineContext context, string hive,
-        TemplateConstraintEvaluationSnapshot availability, TemplateProjectSupport? support,
+        TemplateConstraintEvaluationSnapshot availability,
         CancellationTokenSource cancellation, string boundary, Action<ITemplateCreationResult> observe)
-        : TemplateEngineSession(context, hive, availability, support)
+        : TemplateEngineSession(context, hive, availability)
     {
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
             InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)

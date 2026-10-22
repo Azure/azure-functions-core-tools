@@ -161,7 +161,7 @@ public sealed class NativeTemplatePreparationCaptureTests : IDisposable
         string hive = Path.Combine(_root, "hive");
         await TemplateFixtures.InstallAsync(Package, hive, CancellationToken.None);
         var directory = WorkingDirectory.FromExplicit(Target);
-        return new(new CaptureSession(new(directory, new(directory, "dotnet", "F#")), hive, afterExpansion));
+        return TemplateFixtures.CreateTemplater(new CaptureSession(new(directory, new(directory, "dotnet", "F#")), hive, afterExpansion));
     }
 
     private sealed class CaptureSession(TemplateEngineContext context, string hive, Action<string, CancellationToken>? afterExpansion)

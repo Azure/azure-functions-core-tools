@@ -69,7 +69,7 @@ public sealed class NativeDotNetProjectBindingTests : IDisposable
         await TemplateFixtures.InstallAsync(ExtractArchive(), hive);
         var directory = WorkingDirectory.FromExplicit(_root);
         using TemplateEngineSession session = new(new(directory, new(directory, "dotnet", "C#")), hive);
-        using Templater resolver = new(session);
+        using Templater resolver = TemplateFixtures.CreateTemplater(session);
         TemplateResolutionResult resolution = await resolver.ResolveGroupAsync(
             "Azure.Function.CSharp.Isolated.HttpTrigger.3.x", TemplateType.Item, CancellationToken.None);
         resolution.Status.Should().Be(TemplateResolutionStatus.Success);

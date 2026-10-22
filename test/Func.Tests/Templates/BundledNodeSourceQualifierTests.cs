@@ -29,7 +29,7 @@ public sealed partial class BundledNodeTemplateTests
         var context = new TemplateEngineContext(WorkingDirectory.FromExplicit(_root), bundle: bundle, enableBundleBindingConstraints: true);
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         using var session = await _templates.OpenReadAsync(context, CancellationToken.None, availability);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         foreach (var raw in ReadNodeSource().Templates)
         {
             var selected = (await templater.ResolveGroupAsync(raw.Id!, TemplateType.Item, CancellationToken.None)).Group!.Single();
@@ -130,7 +130,7 @@ public sealed partial class BundledNodeTemplateTests
         var commandDirectory = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "literal-nested"));
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         using var session = await _templates.OpenReadAsync(new(commandDirectory), CancellationToken.None, availability);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("HttpTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
         var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));
         var command = NodeComposedItem(commandDirectory.Info.FullName, "HttpTrigger-JavaScript") with
@@ -155,7 +155,7 @@ public sealed partial class BundledNodeTemplateTests
         await _installer.InstallFromPackageAsync(BuiltArchive);
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         using var session = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None, availability);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("TimerTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
         return await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
     }

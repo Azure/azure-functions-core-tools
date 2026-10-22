@@ -165,7 +165,7 @@ public sealed partial class BundledPythonTemplateTests : IDisposable
         using var session = await templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None);
         var packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None);
         packages.Should().ContainSingle().Which.Identifier.Should().Be("Azure.Functions.Templates.Python");
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         (await templater.ListAsync(TemplateType.Project)).Should().ContainSingle().Which.Identity.Should().Be("Azure.Functions.Python.Basic");
         var items = await templater.ListAsync(TemplateType.Item);
         items.Where(item => !_helperIdentities.Contains(item.Identity)).Should().HaveCount(25);
@@ -454,8 +454,8 @@ public sealed partial class BundledPythonTemplateTests : IDisposable
         var context = new TemplateEngineContext(directory, new(directory, "python", "Python"), bundle, enableBindingConstraints);
         var snapshot = new TemplateConstraintEvaluationSnapshot([new("python-stack", NuGetVersion.Parse("1.0.0"), ["python"], usable)]);
         TemplateProjectConfigurationPlanner planner = new(new([new PythonProjectStack()]));
-        return new(new TemplateEngineSession(context, Hive, snapshot,
-            new(planner, new TemplateProjectConfigurationWriter(new PhysicalFileSystem()))));
+        return TemplateFixtures.CreateTemplater(new(context, Hive, snapshot),
+            projectSupport: new(planner, new TemplateProjectConfigurationWriter(new PhysicalFileSystem())));
     }
 
     private static string Read(PackageArchiveReader package, string path)

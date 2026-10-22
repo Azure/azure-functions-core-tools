@@ -96,7 +96,7 @@ public sealed partial class BundledNodeTemplateTests
         else
         {
             (await reader.ReadAsync(CancellationToken.None)).Should()
-                .Be(new InstallationMetadata("standalone", InstallationUpdatePolicy.InPlace));
+                .Be(new InstallationMetadata(InstallationUpdatePolicy.InPlace));
         }
     }
 }

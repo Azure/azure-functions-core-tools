@@ -29,7 +29,7 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
         string language, string extension, string canonicalLanguage, int effectCount)
     {
         using ProjectCase source = await OpenProjectAsync(language);
-        using Templater resolver = new(source.Session);
+        using Templater resolver = TemplateFixtures.CreateTemplater(source.Session, projectSupport: source.Support);
         TemplateResolutionResult resolution = await resolver.ResolveGroupAsync(source.Template.Identity, TemplateType.Project, CancellationToken.None);
         resolution.Status.Should().Be(TemplateResolutionStatus.Success);
         ResolvedTemplate selected = resolution.Group![0];
@@ -80,7 +80,7 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
                 source.Capability, Confirmed: refusal != "declined"),
         };
 
-        TemplateInvocationResult result = await source.Session.InvokeAsync(source.Template, source.Configuration, request, CancellationToken.None);
+        TemplateInvocationResult result = await source.Invocation.InvokeAsync(source.Template, source.Configuration, request, CancellationToken.None);
 
         result.Status.Should().Be(TemplateInvocationStatus.EffectFailure, result.Diagnostic);
         Directory.Exists(source.Output).Should().BeFalse();
@@ -105,7 +105,7 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
             Parameters = parameters,
         };
 
-        TemplateInvocationResult result = await source.Session.InvokeAsync(source.Template, source.Configuration, request, CancellationToken.None);
+        TemplateInvocationResult result = await source.Invocation.InvokeAsync(source.Template, source.Configuration, request, CancellationToken.None);
 
         result.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate, result.Diagnostic);
         result.Diagnostic.Should().Contain("explicit Framework");
@@ -216,7 +216,7 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
                 cancellation.Cancel();
                 return Task.FromCanceled(cancellation.Token);
             });
-        Func<Task> action = () => source.Session.InvokeAsync(source.Template, source.Configuration, source.Request(), cancellation.Token);
+        Func<Task> action = () => source.Invocation.InvokeAsync(source.Template, source.Configuration, source.Request(), cancellation.Token);
 
         await action.Should().ThrowAsync<OperationCanceledException>();
         File.Exists(source.Project).Should().BeTrue();
@@ -302,7 +302,7 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
     public async Task QualifiedProject_SelectedSourceChangesAfterResolution_RefusesBeforeNativeCreation()
     {
         using ProjectCase source = await OpenProjectAsync("CSharp", _ => { });
-        using Templater resolver = new(source.Session);
+        using Templater resolver = TemplateFixtures.CreateTemplater(source.Session, projectSupport: source.Support);
         TemplateResolutionResult resolution = await resolver.ResolveGroupAsync(source.Template.Identity, TemplateType.Project, CancellationToken.None);
         resolution.Status.Should().Be(TemplateResolutionStatus.Success);
         string path = Path.Combine(_root, "candidate", "content", "ProjectTemplate-CSharp", ".template.config", "template.json");
@@ -357,9 +357,9 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
         {
             DotNetLayout = new(template.Identity, configuration.Fingerprint),
         };
-        TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), hive, projectSupport: support);
+        TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), hive);
         ProjectDependencyCapability capability = new(new(_runner), session, template, configuration, output, project);
-        return new(session, template, configuration, output, project, capability);
+        return new(session, support, template, configuration, output, project, capability);
     }
 
     private sealed class ConfigurationMutationFileSystem : PhysicalFileSystem
@@ -373,9 +373,11 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
         }
     }
 
-    private sealed record ProjectCase(TemplateEngineSession Session, ITemplateInfo Template, TemplateConfigurationSnapshot Configuration,
-        string Output, string Project, ProjectDependencyCapability Capability) : IDisposable
+    private sealed record ProjectCase(TemplateEngineSession Session, TemplateProjectSupport Support, ITemplateInfo Template,
+        TemplateConfigurationSnapshot Configuration, string Output, string Project, ProjectDependencyCapability Capability) : IDisposable
     {
+        public TemplateInvocationCoordinator Invocation { get; } = new(Session, new PhysicalFileSystem(), Support);
+
         public TemplateInvocationRequest Request() => new(WorkingDirectory.FromExplicit(Output),
             new Dictionary<string, string?> { ["Framework"] = "net10.0" }, "Resolved.App")
         {
@@ -383,7 +385,7 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
         };
 
         public Task<TemplateInvocationResult> InvokeAsync(bool dryRun = false, bool force = false)
-            => Session.InvokeAsync(Template, Configuration, Request() with { DryRun = dryRun, Force = force }, CancellationToken.None);
+            => Invocation.InvokeAsync(Template, Configuration, Request() with { DryRun = dryRun, Force = force }, CancellationToken.None);
 
         public void Dispose() => Session.Dispose();
     }

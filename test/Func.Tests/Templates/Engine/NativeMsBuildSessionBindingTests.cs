@@ -161,6 +161,6 @@ public sealed class NativeMsBuildSessionBindingTests : IDisposable
             """);
         string hive = Path.Combine(_root, "hive");
         await TemplateFixtures.InstallAsync(package, hive, CancellationToken.None);
-        return new(new TemplateEngineSession(new(Directory, new(Directory, "dotnet", "C#")), hive));
+        return TemplateFixtures.CreateTemplater(new(new(Directory, new(Directory, "dotnet", "C#")), hive));
     }
 }

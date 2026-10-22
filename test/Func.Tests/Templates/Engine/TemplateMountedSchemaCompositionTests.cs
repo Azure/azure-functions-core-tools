@@ -84,7 +84,7 @@ public sealed class TemplateMountedSchemaCompositionTests : IDisposable
         var descriptor = (await session.PackageManager.GetTemplatesAsync(CancellationToken.None)).Single();
         descriptor.DefaultName.Should().Be("CachedName");
         var snapshot = await session.ReadConfigurationAsync(descriptor, CancellationToken.None);
-        using Templater second = new(session);
+        using Templater second = TemplateFixtures.CreateTemplater(session);
 
         var current = (await second.ResolveGroupAsync("Func.Tests.Journey", TemplateType.Item, CancellationToken.None)).Group![0];
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "output"));
@@ -108,7 +108,7 @@ public sealed class TemplateMountedSchemaCompositionTests : IDisposable
     private Templater CreateTemplater()
     {
         var directory = WorkingDirectory.FromExplicit(_root);
-        return new(new TemplateEngineSession(new(directory, new(directory, "node", "CSharp")), Hive,
+        return TemplateFixtures.CreateTemplater(new(new(directory, new(directory, "node", "CSharp")), Hive,
             new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)])));
     }
 }

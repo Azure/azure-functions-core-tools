@@ -345,7 +345,7 @@ public sealed partial class BundledNodeTemplateTests
         await TemplateFixtures.InstallAsync(archive, hive, CancellationToken.None);
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         using var session = new TemplateEngineSession(new(WorkingDirectory.FromExplicit(_root)), hive, availability);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var resolution = await templater.ResolveGroupAsync("TimerTrigger-JavaScript", TemplateType.Item, CancellationToken.None);
         if (corruption == "malformedNativeHost")
         {
@@ -409,7 +409,7 @@ public sealed partial class BundledNodeTemplateTests
         await _installer.InstallFromPackageAsync(BuiltArchive);
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0"), ["node"], true)]);
         using var session = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None, availability);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("TimerTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
         var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));
         Func<Task> missingArguments = () => compatibility.ResolveAsync(selected, null!, null, false, CancellationToken.None);
@@ -442,7 +442,7 @@ public sealed partial class BundledNodeTemplateTests
             services.GetServices<IProjectInitializer>(), services.GetRequiredService<IHostJsonBundleSectionReader>(), bundles,
             new TemplateEngineBundleContextReader(_files), enableBundleBindingConstraints: true);
         var arguments = new TemplateArgumentParser();
-        var runner = new NodeBridgeRunner(new NewExecutionRunner(contexts, new TemplaterFactory(_templates), arguments, _interaction,
+        var runner = new NodeBridgeRunner(new NewExecutionRunner(contexts, new TemplaterFactory(_templates, _files), arguments, _interaction,
             new TemplateExecutionInteraction(arguments, _interaction)));
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         var init = new NodeInitRunner(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>());

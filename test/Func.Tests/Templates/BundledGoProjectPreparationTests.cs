@@ -130,7 +130,7 @@ public sealed partial class BundledRemainingProjectTemplateTests
     {
         InstalledProjectStackCatalog catalog = new(services.GetServices<IProjectStack>());
         TemplateProjectSupport support = new(new(catalog), new(_files));
-        TemplaterFactory factory = new(new TemplateStore(new(Home), _files, new FileTemplateStoreLock(), NullLoggerFactory.Instance));
+        TemplaterFactory factory = new(new TemplateStore(new(Home), _files, new FileTemplateStoreLock(), NullLoggerFactory.Instance), _files);
         TemplateArgumentParser arguments = new();
         TestInteractionService interaction = new();
         return new(factory, arguments, new(arguments, interaction), interaction, new(interaction), new(_files),

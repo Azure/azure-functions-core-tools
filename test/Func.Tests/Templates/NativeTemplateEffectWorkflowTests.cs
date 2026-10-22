@@ -66,7 +66,7 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
     public async Task DefaultNativeItem_StillRejectsPostActionsBeforeAnyMutation()
     {
         using var session = await OpenNativeAsync();
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(Source.TemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
 
         var result = await selected.InvokeAsync(new(Output, new Dictionary<string, string?>()), CancellationToken.None);
@@ -80,7 +80,7 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
     public async Task NativeSession_ExplicitCapability_PreviewsThenRequiresConfirmationBeforeFilesOrActions()
     {
         using var session = await OpenNativeAsync();
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(Source.TemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var capability = Capability();
         var support = new NativeTemplateInvocationEffects(Output, Project, capability, Confirmed: false);
@@ -113,7 +113,7 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
     public async Task NativeSession_UnknownAction_RejectsBeforeCapabilityOrNativeFileMutation()
     {
         using var session = await OpenNativeAsync(unknownAction: true);
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(Source.TemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var capability = Capability();
 
@@ -132,7 +132,7 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
     public async Task NativeSession_FailedEffect_ReportsRetainedNativeFilesAndStructuredPartialOutcome()
     {
         using var session = await OpenNativeAsync();
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(Source.TemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var capability = Capability();
         capability.ExecuteAsync(Arg.Any<TemplatePackageReferenceEffect>(), Arg.Any<CancellationToken>())
@@ -168,7 +168,7 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
     public async Task NativeSession_SelectedConfigurationChangesDuringPreflight_UsesExistingFingerprintGuard()
     {
         using var session = await OpenNativeAsync();
-        using Templater templater = new(session);
+        using Templater templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync(Source.TemplateIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var capability = Capability();
         capability.ValidateAsync(Arg.Any<NativeTemplateEffectPlan>(), Arg.Any<CancellationToken>()).Returns(_ =>

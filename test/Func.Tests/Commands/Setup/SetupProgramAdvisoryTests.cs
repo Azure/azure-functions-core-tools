@@ -33,7 +33,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             Directory.CreateDirectory(project);
             await File.WriteAllTextAsync(paths.VersionCachePath, CachedVersion, cancellation.Token);
 
-            CliResult result = await RunCliAsync(directory, paths.Home, workloads.Home, project,
+            CliProcessTestRunner.CliResult result = await RunCliAsync(directory, paths.Home, workloads.Home, project,
                 ["workload", "install", Path.Combine(directory, "missing.nupkg")], cancellation.Token);
 
             result.ExitCode.Should().Be(1);

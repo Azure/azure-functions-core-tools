@@ -263,7 +263,7 @@ public sealed class NativeFSharpRepairJourneyTests : IDisposable
         ITemplateCreationResult expanded = await creator.InstantiateAsync(http, "RepairedHttp", "RepairedHttp", expansion,
             arguments, cancellationToken: CancellationToken.None);
         expanded.Status.Should().Be(CreationResultStatus.Success);
-        Templater resolver = new(session);
+        Templater resolver = TemplateFixtures.CreateTemplater(session);
         ResolvedTemplate selected = (await resolver.ResolveGroupAsync(http.Identity, TemplateType.Item, CancellationToken.None)).Group![0];
         string generated = Path.Combine(projectRoot, "RepairedHttp.fs");
         TemplateEffectSource source = new(selected.Entry.Identity, selected.ConfigurationSourceIdentity!, selected.ConfigurationSha256!);

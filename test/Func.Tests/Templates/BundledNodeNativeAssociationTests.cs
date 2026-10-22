@@ -20,6 +20,7 @@ using NuGet.Packaging;
 using NuGet.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using NativeTemplateOwnership = Azure.Functions.Cli.Templates.Acquisition.NativeTemplateOwnership;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 

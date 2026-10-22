@@ -218,7 +218,10 @@ public sealed class NativeItemCompatibilityTests
             DefaultName = defaultName,
             ConstraintEvaluation = new(TemplateConstraintEvaluationStatus.Eligible, []),
         };
-        return new(entry, (_, _) => Task.FromResult(new TemplateInvocationResult(TemplateInvocationStatus.Success, [])),
+        ISelectedTemplateInvoker invoker = Substitute.For<ISelectedTemplateInvoker>();
+        invoker.InvokeAsync(Arg.Any<TemplateInvocationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new TemplateInvocationResult(TemplateInvocationStatus.Success, []));
+        return new(entry, invoker,
             validateConfiguration: _ => Task.FromResult<TemplateInvocationResult?>(null));
     }
 

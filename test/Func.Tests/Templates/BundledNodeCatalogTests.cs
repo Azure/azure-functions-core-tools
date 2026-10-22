@@ -94,7 +94,7 @@ public sealed partial class BundledNodeTemplateTests
         using var services = await CreateServicesAsync();
         var stack = services.GetServices<IProjectStack>().Single(stack => stack.Stack == "node");
         using var session = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
 
         var items = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
 
@@ -137,7 +137,7 @@ public sealed partial class BundledNodeTemplateTests
         var legacy = ReadNodeSource();
         using var session = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None);
         var nativeTemplates = await session.PackageManager.GetTemplatesAsync(CancellationToken.None);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var items = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
         var creator = new TemplateCreator(session.Settings);
         var index = 0;
@@ -216,7 +216,7 @@ public sealed partial class BundledNodeTemplateTests
             new(WorkingDirectory.FromExplicit(project), "node", language));
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0"), ["node"], true)]);
         using var session = new TemplateEngineSession(context, Path.Combine(Home, "templates"), availability);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var resolution = await templater.ResolveGroupAsync(identity, TemplateType.Item, CancellationToken.None);
         resolution.Status.Should().Be(TemplateResolutionStatus.Success);
         var selected = resolution.Group!.Single();
@@ -254,7 +254,7 @@ public sealed partial class BundledNodeTemplateTests
         var context = new TemplateEngineContext(WorkingDirectory.FromExplicit(_root),
             bundle: bundleId is null ? null : new(bundleId, version!));
         using var session = new TemplateEngineSession(context, Path.Combine(Home, "templates"), snapshot);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
 
         var resolution = await templater.ResolveGroupAsync("QueueTrigger-JavaScript", TemplateType.Item, CancellationToken.None);
 
