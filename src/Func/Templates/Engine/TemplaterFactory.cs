@@ -34,4 +34,15 @@ internal sealed class TemplaterFactory(CliConfigurationPathsOptions configuratio
         TemplateEngineSession session = new(context, settingsLocation, snapshot);
         return new Templater(session, new(session, _fileSystem));
     }
+
+    public Templater CreateProject(
+        TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot, TemplateProjectSupport projectSupport)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(projectSupport);
+        string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
+        TemplateEngineSession session = new(context, settingsLocation, snapshot);
+        return new(session, new(session, _fileSystem, projectSupport));
+    }
 }

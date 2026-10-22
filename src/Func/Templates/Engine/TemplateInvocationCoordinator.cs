@@ -14,10 +14,24 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <summary>
 /// Coordinates selected-source checks, native preview and creation without owning the engine session.
 /// </summary>
-internal sealed class TemplateInvocationCoordinator(ITemplateInvocationEngine engine, IFileSystem fileSystem)
+internal sealed class TemplateInvocationCoordinator(
+    ITemplateInvocationEngine engine, IFileSystem fileSystem, TemplateProjectSupport? projectSupport = null)
 {
     private readonly ITemplateInvocationEngine _engine = engine ?? throw new ArgumentNullException(nameof(engine));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly TemplateProjectSupport? _projectSupport = projectSupport;
+
+    public bool ProjectTemplatesEnabled => _projectSupport is not null;
+
+    public void ValidateProjectConfiguration(string configuration)
+    {
+        if (_projectSupport is null)
+        {
+            throw new InvalidOperationException("Project templates are not enabled for this invocation flow.");
+        }
+
+        _projectSupport.Planner.Read(configuration);
+    }
 
     public void ThrowIfDisposed() => _engine.ThrowIfDisposed();
 
@@ -39,7 +53,19 @@ internal sealed class TemplateInvocationCoordinator(ITemplateInvocationEngine en
             return configurationFailure;
         }
 
-        if (configuration.Root.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
+        TemplateProjectSupport? project = configuration.Type == TemplateType.Project ? _projectSupport : null;
+        if (project is not null)
+        {
+            try
+            {
+                ValidateProjectConfiguration(configuration.Content);
+            }
+            catch (InvalidTemplateMetadataException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
+        }
+        else if (configuration.Root.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
             && property.Value.ValueKind != JsonValueKind.Null && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
         {
             return new(TemplateInvocationStatus.Failed, [], "Item post-actions require a qualified dispatcher and are not supported by this invocation path.");
@@ -87,14 +113,38 @@ internal sealed class TemplateInvocationCoordinator(ITemplateInvocationEngine en
         {
             _ = TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind);
         }
-        if (native.CreationResult.PostActions.Count != 0)
+        if (project is null && native.CreationResult.PostActions.Count != 0)
         {
             return new(TemplateInvocationStatus.Failed, [], "Native creation produced unsupported item post-actions.");
         }
 
-        IReadOnlyList<TemplateFileChange> changes = DescribeActualOutputs(image, configuration, native.CreationEffects);
-        string? outputFailure = changes.Select(change => image.GetPathDiagnostic(image.GetTarget(change.Path)))
-            .FirstOrDefault(diagnostic => diagnostic is not null);
+        IReadOnlyList<TemplateFileChange> nativeChanges = DescribeActualOutputs(image, configuration, native.CreationEffects);
+        IReadOnlyList<TemplateFileChange> changes = nativeChanges;
+        IReadOnlyList<TemplateProjectConfigurationPlan> configurationPlans = [];
+        if (project is not null)
+        {
+            try
+            {
+                HashSet<string> directories = new(image.Directories.Select(image.GetTarget),
+                    Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+                configurationPlans = project.Planner.CreatePlans(
+                    configuration.Content, native.CreationResult, output,
+                    DescribeActualOutputs(image, configuration, native.CreationEffects, includeExistingDirectories: true), directories);
+                if (configurationPlans.Any(project.Writer.ConfigurationExists))
+                {
+                    return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic);
+                }
+
+                changes = Array.AsReadOnly<TemplateFileChange>([.. nativeChanges,
+                    .. configurationPlans.Select(plan => new TemplateFileChange(Path.GetRelativePath(output, plan.ConfigurationPath), TemplateFileChangeKind.Create))]);
+            }
+            catch (InvalidTemplateMetadataException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
+        }
+
+        string? outputFailure = GetOutputDiagnostic(image, configurationPlans);
         if (outputFailure is not null)
         {
             return new(TemplateInvocationStatus.Failed, [], outputFailure);
@@ -115,11 +165,99 @@ internal sealed class TemplateInvocationCoordinator(ITemplateInvocationEngine en
             return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.");
         }
 
-        return await InstallAsync(template, configuration, request, image, changes, cancellationToken);
+        TemplateInvocationResult installed = await InstallAsync(template, configuration, request, image, nativeChanges, cancellationToken);
+        if (installed.Status != TemplateInvocationStatus.Success || project is null)
+        {
+            return installed;
+        }
+
+        return await ConfigureAsync(template, configuration, project, image, configurationPlans, installed, cancellationToken);
+    }
+
+    private string? GetOutputDiagnostic(TemplateOutputImage image, IReadOnlyList<TemplateProjectConfigurationPlan> plans)
+    {
+        foreach (string path in image.Files.Concat(image.Directories).Select(image.GetTarget).Concat(plans.Select(plan => plan.ConfigurationPath)))
+        {
+            if (image.GetPathDiagnostic(path) is { } diagnostic)
+            {
+                return diagnostic;
+            }
+
+            string? parent = Path.GetDirectoryName(path);
+            while (parent is not null && image.GetRelative(parent) is { } relative && relative != ".")
+            {
+                if (_engine.FileSystem.FileExists(parent))
+                {
+                    return "A template output directory ancestor is an existing file. Choose an output directory without file collisions.";
+                }
+
+                parent = Path.GetDirectoryName(parent);
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<TemplateInvocationResult> ConfigureAsync(
+        ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateProjectSupport project,
+        TemplateOutputImage image, IReadOnlyList<TemplateProjectConfigurationPlan> plans,
+        TemplateInvocationResult installed, CancellationToken cancellationToken)
+    {
+        List<TemplateFileChange> completed = [.. installed.Changes];
+        List<string> configured = [];
+        try
+        {
+            foreach (TemplateProjectConfigurationPlan plan in plans)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                TemplateInvocationResult? changed = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+                if (changed is not null)
+                {
+                    return Result(changed.Status, changed.Diagnostic);
+                }
+                if (GetOutputDiagnostic(image, plans) is { } diagnostic)
+                {
+                    return Result(TemplateInvocationStatus.ConfigurationFailure, diagnostic);
+                }
+
+                await project.Writer.WriteAsync(plan, cancellationToken);
+                configured.Add(plan.Root);
+                completed.Add(new(Path.GetRelativePath(image.Output, plan.ConfigurationPath), TemplateFileChangeKind.Create));
+            }
+
+            return Result(TemplateInvocationStatus.Success, null);
+        }
+        catch (OperationCanceledException) when (installed.HasCommittedOutput || configured.Count > 0)
+        {
+            return Result(TemplateInvocationStatus.ConfigurationFailure,
+                "Mandatory project configuration was canceled. Generated files were preserved.");
+        }
+        catch (IOException exception)
+        {
+            return Failure(exception);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Failure(exception);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Failure(exception);
+        }
+
+        TemplateInvocationResult Failure(Exception exception)
+            => Result(TemplateInvocationStatus.ConfigurationFailure,
+                $"Mandatory project configuration failed. Generated files were preserved: {exception.Message}");
+
+        TemplateInvocationResult Result(TemplateInvocationStatus status, string? diagnostic) => new(status, completed.AsReadOnly(), diagnostic)
+        {
+            ConfiguredProjects = configured.AsReadOnly(),
+            HasCommittedOutput = installed.HasCommittedOutput || configured.Count > 0,
+        };
     }
 
     private IReadOnlyList<TemplateFileChange> DescribeActualOutputs(
-        TemplateOutputImage image, TemplateConfigurationSnapshot configuration, ICreationEffects effects)
+        TemplateOutputImage image, TemplateConfigurationSnapshot configuration, ICreationEffects effects, bool includeExistingDirectories = false)
     {
         StringComparer comparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
         HashSet<string> files = new(image.Files, comparer);
@@ -148,7 +286,7 @@ internal sealed class TemplateInvocationCoordinator(ITemplateInvocationEngine en
 
             string target = image.GetTarget(relative);
             bool file = files.Contains(relative);
-            if (!file && _engine.FileSystem.DirectoryExists(target))
+            if (!file && !includeExistingDirectories && _engine.FileSystem.DirectoryExists(target))
             {
                 continue;
             }
@@ -332,9 +470,12 @@ internal sealed class TemplateInvocationCoordinator(ITemplateInvocationEngine en
             return new(TemplateInvocationStatus.TemplateChanged, [], "Selected template configuration changed. Rerun selection.");
         }
 
-        return current.Type == TemplateType.Item && current.Type == configuration.Type
+        bool qualified = current.Type == TemplateType.Item || (current.Type == TemplateType.Project && ProjectTemplatesEnabled);
+        return qualified && current.Type == configuration.Type
             ? null
-            : new(TemplateInvocationStatus.InvalidTemplate, [], "Current mounted template type is not a qualified item template. Correct its type and rerun selection.");
+            : new(TemplateInvocationStatus.InvalidTemplate, [], ProjectTemplatesEnabled
+                ? "Current mounted template type is not qualified for this invocation flow. Correct its type and rerun selection."
+                : "Current mounted template type is not a qualified item template. Correct its type and rerun selection.");
     }
 
     private static TemplateInvocationStatus MapCreationStatus(CreationResultStatus status, CancellationToken cancellationToken)

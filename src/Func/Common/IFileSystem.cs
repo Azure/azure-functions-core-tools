@@ -34,6 +34,16 @@ internal interface IFileSystem
     public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Atomically creates a text file without replacing an existing file or directory, creating parent directories if needed.
+    /// </summary>
+    /// <exception cref="ArgumentException">The path is empty or invalid.</exception>
+    /// <exception cref="ArgumentNullException">The path or contents is null.</exception>
+    /// <exception cref="IOException">The destination already exists or the file cannot be created.</exception>
+    /// <exception cref="UnauthorizedAccessException">The destination cannot be written.</exception>
+    /// <exception cref="OperationCanceledException">Cancellation was requested before the file was committed.</exception>
+    public Task CreateAllTextAsync(string path, string contents, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Streams <paramref name="content"/> to <paramref name="filePath"/>,
     /// creating or overwriting the file.
     /// </summary>

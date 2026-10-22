@@ -2,13 +2,17 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
+using System.Text.Json;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Tests.Common;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
+using Microsoft.TemplateEngine.Edge.Template;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
-using NuGet.Versioning;
 using NSubstitute;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -189,6 +193,475 @@ public sealed class TemplateEngineSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task NativePreview_ConditionalPrimaryOutputs_PreservesRawActionIndexAndResolvedPath()
+    {
+        var package = TemplateFixtures.WriteBasicPackage(_root);
+        File.WriteAllText(Path.Combine(package, "project", ".template.config", "template.json"),
+            $$"""
+            {
+              "identity": "{{TemplateFixtures.ProjectTemplateIdentity}}",
+              "name": "Project topology qualification",
+              "shortName": "func-tests-project",
+              "tags": { "type": "project" },
+              "sourceName": "FuncProject",
+              "sources": [ { "source": "./", "target": "FuncProject/" } ],
+              "primaryOutputs": [
+                { "path": "disabled/host.json", "condition": "false" },
+                { "path": "FuncProject/host.json" }
+              ],
+              "postActions": [ {
+                "actionId": "00e33184-ffc7-43ef-bec0-b1684df8ad56",
+                "continueOnError": false,
+                "args": { "primaryOutputIndex": "1", "stack": "python", "language": "python" }
+              } ]
+            }
+            """);
+        await TemplateFixtures.InstallAsync(package, Hive);
+        using TemplateEngineSession session = new(CommandContext("project-preview"), Hive);
+        var template = (await session.PackageManager.GetTemplatesAsync(CancellationToken.None))
+            .Single(template => template.Identity == TemplateFixtures.ProjectTemplateIdentity);
+        TemplateCreator creator = new(session.Settings);
+        var output = DirectoryUnderRoot("project-output");
+
+        var preview = await creator.InstantiateAsync(template, "Renamed", "Renamed", output.Info.FullName,
+            new Dictionary<string, string?>(), dryRun: true, cancellationToken: CancellationToken.None);
+
+        preview.Status.Should().Be(CreationResultStatus.Success);
+        var effects = preview.CreationEffects!;
+        effects.CreationResult.PrimaryOutputs.Should().ContainSingle();
+        Path.GetFullPath(Path.Combine(output.Info.FullName, effects.CreationResult.PrimaryOutputs.Single().Path))
+            .Should().Be(Path.Combine(output.Info.FullName, "Renamed", "host.json"));
+        effects.CreationResult.PostActions.Should().ContainSingle().Which.Args["primaryOutputIndex"].Should().Be("1");
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+
+        var created = await creator.InstantiateAsync(template, "Renamed", "Renamed", output.Info.FullName,
+            new Dictionary<string, string?>(), cancellationToken: CancellationToken.None);
+
+        created.Status.Should().Be(CreationResultStatus.Success);
+        File.Exists(Path.Combine(output.Info.FullName, "Renamed", "host.json")).Should().BeTrue();
+        File.Exists(Path.Combine(output.Info.FullName, "Renamed", ".func", "config.json")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_GeneratedHost_PersistsCliStackShapeAtomically()
+    {
+        var project = DirectoryUnderRoot("configuration-project");
+        Directory.CreateDirectory(project.Info.FullName);
+        var host = Path.Combine(project.Info.FullName, "host.json");
+        File.WriteAllText(host, "{\"version\":\"2.0\"}");
+        TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
+        TemplateProjectConfigurationPlan plan = new(host, "python", "python");
+
+        await writer.WriteAsync(plan, CancellationToken.None);
+
+        using var config = JsonDocument.Parse(File.ReadAllText(plan.ConfigurationPath));
+        config.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("python");
+        config.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be("python");
+        Directory.GetFiles(Path.GetDirectoryName(plan.ConfigurationPath)!).Should().ContainSingle().Which.Should().Be(plan.ConfigurationPath);
+        File.ReadAllText(host).Should().Be("{\"version\":\"2.0\"}");
+    }
+
+    [Fact]
+    public void ProjectConfigurationWriter_NullFileSystem_Throws()
+    {
+        Action construct = () => new TemplateProjectConfigurationWriter(null!);
+
+        construct.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_DestinationAppearsAtCommit_PreservesUserBytes()
+    {
+        Directory.CreateDirectory(_root);
+        var host = Path.Combine(_root, "host.json");
+        File.WriteAllText(host, "{\"version\":\"2.0\"}");
+        CommitBoundaryFileSystem fileSystem = new(path => File.WriteAllBytes(path, [0, 1, 255, 42]));
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+        TemplateProjectConfigurationPlan plan = new(host, "python", "Python");
+
+        Func<Task> write = () => writer.WriteAsync(plan, CancellationToken.None);
+
+        await write.Should().ThrowAsync<IOException>();
+        File.ReadAllBytes(plan.ConfigurationPath).Should().Equal(0, 1, 255, 42);
+        File.ReadAllText(host).Should().Be("{\"version\":\"2.0\"}");
+        Directory.GetFiles(Path.GetDirectoryName(plan.ConfigurationPath)!).Should().Equal(plan.ConfigurationPath);
+    }
+
+    [Fact]
+    public void ConfigurationExists_NullPlan_ThrowsWithoutFileSystemCalls()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+
+        Action exists = () => writer.ConfigurationExists(null!);
+
+        exists.Should().Throw<ArgumentNullException>().WithParameterName("plan");
+        fileSystem.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(false, false, false)]
+    public void ConfigurationExists_FileOrDirectory_UsesInjectedAuthority(bool file, bool directory, bool occupied)
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+        TemplateProjectConfigurationPlan plan = new(Path.Combine(_root, "host.json"), "python", "Python");
+        fileSystem.FileExists(plan.ConfigurationPath).Returns(file);
+        fileSystem.DirectoryExists(plan.ConfigurationPath).Returns(directory);
+
+        var result = writer.ConfigurationExists(plan);
+
+        result.Should().Be(occupied);
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_MissingPrimaryOutput_ReportsMissingFileWithoutCreatingConfiguration()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+        TemplateProjectConfigurationPlan plan = new(Path.Combine(_root, "host.json"), "python", "Python");
+
+        Func<Task> write = () => writer.WriteAsync(plan, CancellationToken.None);
+
+        var exception = (await write.Should().ThrowAsync<FileNotFoundException>()).Which;
+        exception.FileName.Should().Be(plan.PrimaryOutput);
+        exception.Message.Should().Be("The generated primary output is missing. Project configuration was not written.");
+        await fileSystem.DidNotReceive().CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_ConfigurationDestinationIsDirectory_RefusesWithoutWriting()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+        TemplateProjectConfigurationPlan plan = new(Path.Combine(_root, "host.json"), "python", "Python");
+        fileSystem.FileExists(plan.PrimaryOutput).Returns(true);
+        fileSystem.DirectoryExists(plan.ConfigurationPath).Returns(true);
+
+        Func<Task> write = () => writer.WriteAsync(plan, CancellationToken.None);
+
+        await write.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Existing project configuration is user-owned. Use the existing initializer to adopt or repair it.");
+        await fileSystem.DidNotReceive().CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ProjectConfigurationPlanner_NullStackCatalog_Throws()
+    {
+        Action construct = () => new TemplateProjectConfigurationPlanner(null!);
+
+        construct.Should().Throw<ArgumentNullException>().WithParameterName("stackCatalog");
+    }
+
+    [Fact]
+    public void ReadProjectConfiguration_MutableStackMetadata_DoesNotChangeCapturedDeclarations()
+    {
+        List<string> languages = ["Python"];
+        List<string> pythonAliases = ["py"];
+        Dictionary<string, IReadOnlyList<string>> aliases = new(StringComparer.Ordinal) { ["Python"] = pythonAliases };
+        var stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns("python");
+        stack.DisplayName.Returns("Python");
+        stack.SupportedLanguages.Returns(languages);
+        stack.SupportedLanguageAliases.Returns(aliases);
+        TemplateProjectConfigurationPlanner planner = new(new([stack]));
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var configuration = File.ReadAllText(Path.Combine(package, "project", ".template.config", "template.json"));
+        stack.Stack.Returns("changed-stack");
+        languages[0] = "ChangedLanguage";
+        pythonAliases[0] = "changed-alias";
+        aliases["Python"] = ["replacement-alias"];
+        aliases["ChangedLanguage"] = ["new-alias"];
+
+        var declaration = planner.Read(configuration).Should().ContainSingle().Subject;
+
+        declaration.Stack.Should().Be("python");
+        declaration.Language.Should().Be("Python");
+        Action readChangedAlias = () => planner.Read(configuration.Replace("\"py\"", "\"changed-alias\"", StringComparison.Ordinal));
+        readChangedAlias.Should().Throw<InvalidTemplateMetadataException>()
+            .WithMessage("Configuration language must identify exactly one supported stack language.");
+    }
+
+    [Fact]
+    public void CreateProjectPlans_NullDirectoryOutputs_Throws()
+    {
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+        var effects = Substitute.For<ICreationEffects>();
+
+        Action create = () => planner.CreatePlans("{}", effects.CreationResult, _root, [], null!);
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName("directoryOutputs");
+    }
+
+    [Theory]
+    [InlineData("creation")]
+    [InlineData("changes")]
+    public void CreateProjectPlans_NullCapturedInput_Throws(string argument)
+    {
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+
+        Action create = () => planner.CreatePlans("{}", argument == "creation" ? null! : Substitute.For<ICreationResult>(),
+            _root, argument == "changes" ? null! : [], new HashSet<string>(StringComparer.Ordinal));
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName(argument);
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_NullPlan_ThrowsWithoutFileSystemCalls()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+
+        Func<Task> write = () => writer.WriteAsync(null!, CancellationToken.None);
+
+        await write.Should().ThrowAsync<ArgumentNullException>().WithParameterName("plan");
+        fileSystem.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(null, typeof(ArgumentNullException))]
+    [InlineData("", typeof(ArgumentException))]
+    [InlineData(" ", typeof(ArgumentException))]
+    public Task WriteProjectConfigurationAsync_InvalidPrimaryOutput_ThrowsWithoutFileSystemCalls(string? invalid, Type exceptionType)
+        => AssertInvalidPlanAsync(new(invalid!, "python", "Python"), "PrimaryOutput", exceptionType);
+
+    [Theory]
+    [InlineData(null, typeof(ArgumentNullException))]
+    [InlineData("", typeof(ArgumentException))]
+    [InlineData(" ", typeof(ArgumentException))]
+    public Task WriteProjectConfigurationAsync_InvalidStack_ThrowsWithoutFileSystemCalls(string? invalid, Type exceptionType)
+        => AssertInvalidPlanAsync(new(Path.Combine(_root, "host.json"), invalid!, "Python"), "Stack", exceptionType);
+
+    [Theory]
+    [InlineData(null, typeof(ArgumentNullException))]
+    [InlineData("", typeof(ArgumentException))]
+    [InlineData(" ", typeof(ArgumentException))]
+    public Task WriteProjectConfigurationAsync_InvalidLanguage_ThrowsWithoutFileSystemCalls(string? invalid, Type exceptionType)
+        => AssertInvalidPlanAsync(new(Path.Combine(_root, "host.json"), "python", invalid!), "Language", exceptionType);
+
+    private static async Task AssertInvalidPlanAsync(TemplateProjectConfigurationPlan plan, string field, Type exceptionType)
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+
+        Func<Task> write = () => writer.WriteAsync(plan, CancellationToken.None);
+
+        var exception = (await write.Should().ThrowAsync<ArgumentException>().WithParameterName($"plan.{field}")).Which;
+        exception.GetType().Should().Be(exceptionType);
+        fileSystem.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_RelativePrimaryOutput_ThrowsWithoutFileSystemCalls()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+        TemplateProjectConfigurationPlan plan = new("host.json", "python", "Python");
+
+        Func<Task> write = () => writer.WriteAsync(plan, CancellationToken.None);
+
+        await write.Should().ThrowAsync<ArgumentException>().WithParameterName("plan");
+        fileSystem.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task WriteProjectConfigurationAsync_PreCanceled_ThrowsWithoutFileSystemCalls()
+    {
+        var fileSystem = Substitute.For<IFileSystem>();
+        TemplateProjectConfigurationWriter writer = new(fileSystem);
+        TemplateProjectConfigurationPlan plan = new(Path.Combine(_root, "host.json"), "python", "Python");
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        Func<Task> write = () => writer.WriteAsync(plan, cancellation.Token);
+
+        await write.Should().ThrowAsync<OperationCanceledException>();
+        fileSystem.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("py")]
+    [InlineData("PY")]
+    [InlineData("python-alt")]
+    [InlineData("Python")]
+    public void ReadProjectConfiguration_CatalogAliasKeyCasing_PreservesCanonicalLanguage(string language)
+    {
+        var stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns("python");
+        stack.DisplayName.Returns("Python");
+        stack.SupportedLanguages.Returns(["Python"]);
+        stack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            ["Python"] = ["python-alt"],
+            ["PYTHON"] = ["py"],
+        });
+        InstalledProjectStackCatalog catalog = new([stack]);
+        TemplateProjectConfigurationPlanner planner = new(catalog);
+        var configuration = $$$"""
+            {
+              "constraints":{"host":{"type":"host","args":[{"hostname":"func"}]}},
+              "primaryOutputs":[{"path":"host.json"}],
+              "postActions":[{"actionId":"00e33184-ffc7-43ef-bec0-b1684df8ad56",
+                "args":{"primaryOutputIndex":"0","stack":"python","language":"{{{language}}}"}}]
+            }
+            """;
+        catalog.GetCanonicalLanguage(language).Should().Be("Python");
+
+        var declaration = planner.Read(configuration).Should().ContainSingle().Subject;
+
+        declaration.Stack.Should().Be("python");
+        declaration.Language.Should().Be("Python");
+    }
+
+    [Fact]
+    public void ReadProjectConfiguration_ValidRawArguments_PreserveCanonicalMetadata()
+    {
+        var initializer = Substitute.For<IProjectStack>();
+        initializer.Stack.Returns("python");
+        initializer.DisplayName.Returns("Python");
+        initializer.SupportedLanguages.Returns(["Python"]);
+        initializer.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["Python"] = ["py"] });
+        TemplateProjectConfigurationPlanner planner = new(new([initializer]));
+        var configuration = """
+            {
+              "constraints":{"host":{"type":"host","args":[{"hostname":"func"}]}},
+              "primaryOutputs":[{"path":"host.json"}],
+              "postActions":[{"actionId":"00e33184-ffc7-43ef-bec0-b1684df8ad56","continueOnError":false,
+                "args":{"primaryOutputIndex":"0","stack":"PYTHON","language":"py"}}]
+            }
+            """;
+
+        var declaration = planner.Read(configuration).Should().ContainSingle().Which;
+
+        declaration.PrimaryOutputIndex.Should().Be(0);
+        declaration.Stack.Should().Be("python");
+        declaration.Language.Should().Be("Python");
+    }
+
+    [Theory]
+    [InlineData("0", "false", "'primaryOutputIndex' must be a nonempty raw string.")]
+    [InlineData("\"-1\"", "false", "primaryOutputIndex must reference an authored primary output using a nonnegative invariant integer string.")]
+    [InlineData("\"1\"", "false", "primaryOutputIndex must reference an authored primary output using a nonnegative invariant integer string.")]
+    [InlineData("\"0\"", "true", "Mandatory project configuration cannot continue on error.")]
+    [InlineData("\"0\"", "\"false\"", "Mandatory project configuration cannot continue on error.")]
+    public void ReadProjectConfiguration_InvalidRawArguments_ReportSpecificRule(string index, string continueOnError, string diagnostic)
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var path = Path.Combine(package, "project", ".template.config", "template.json");
+        var configuration = File.ReadAllText(path)
+            .Replace("\"primaryOutputIndex\":\"0\"", $"\"primaryOutputIndex\":{index}", StringComparison.Ordinal)
+            .Replace("\"actionId\":", $"\"continueOnError\":{continueOnError},\"actionId\":", StringComparison.Ordinal);
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+
+        Action read = () => planner.Read(configuration);
+
+        read.Should().Throw<InvalidTemplateMetadataException>().WithMessage(diagnostic);
+    }
+
+    [Theory]
+    [InlineData("\"primaryOutputIndex\":\"0\",\"primaryOutputIndex\":\"0\",\"stack\":\"python\",\"language\":\"py\"",
+        "Duplicate project configuration property 'primaryOutputIndex'.")]
+    [InlineData("\"primaryOutputIndex\":\"0\",\"stack\":\"python\"",
+        "Configuration arguments must be exactly primaryOutputIndex, stack and language.")]
+    [InlineData("\"primaryOutputIndex\":\"0\",\"stack\":\"python\",\"language\":\"py\",\"extra\":\"value\"",
+        "Configuration arguments must be exactly primaryOutputIndex, stack and language.")]
+    [InlineData("\"primaryOutputIndex\":\"0\",\"stack\":false,\"language\":\"py\"", "'stack' must be a nonempty raw string.")]
+    [InlineData("\"primaryOutputIndex\":\"0\",\"stack\":\"unknown\",\"language\":\"py\"",
+        "Configuration stack must identify exactly one installed stack.")]
+    [InlineData("\"primaryOutputIndex\":\"0\",\"stack\":\"python\",\"language\":\"unknown\"",
+        "Configuration language must identify exactly one supported stack language.")]
+    public void ReadProjectConfiguration_InvalidObjectShape_FailsClosed(string arguments, string diagnostic)
+    {
+        var initializer = Substitute.For<IProjectStack>();
+        initializer.Stack.Returns("python");
+        initializer.DisplayName.Returns("Python");
+        initializer.SupportedLanguages.Returns(["Python"]);
+        initializer.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["Python"] = ["py"] });
+        TemplateProjectConfigurationPlanner planner = new(new([initializer]));
+        var configuration = $$$"""
+            {
+              "constraints":{"host":{"type":"host","args":[{"hostname":"func"}]}},
+              "primaryOutputs":[{"path":"host.json"}],
+              "postActions":[{"actionId":"00e33184-ffc7-43ef-bec0-b1684df8ad56","args":{ {{{arguments}}} }}]
+            }
+            """;
+
+        Action read = () => planner.Read(configuration);
+
+        read.Should().Throw<InvalidTemplateMetadataException>().WithMessage(diagnostic);
+    }
+
+    [Fact]
+    public void ReadProjectConfiguration_MalformedUnicodeProperty_IsMetadataFailure()
+    {
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+
+        Action read = () => planner.Read("{\"extra\":{\"\\uD800\":1}}");
+
+        read.Should().Throw<InvalidTemplateMetadataException>();
+    }
+
+    [Theory]
+    [InlineData("{", typeof(JsonException))]
+    [InlineData("{\"extra\":{\"\\uD800\":1}}", typeof(InvalidOperationException))]
+    [InlineData("{\"constraints\":{\"host\":{\"type\":\"host\",\"args\":[{\"hostname\":\"func\"}]}},\"primaryOutputs\":[{\"path\":\"host.json\"}],\"sourceName\":\"\\uD800\"}", typeof(InvalidOperationException))]
+    public void ReadProjectConfiguration_ParserFailure_PreservesInnerException(string configuration, Type exceptionType)
+    {
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+
+        Action read = () => planner.Read(configuration);
+
+        var exception = read.Should().Throw<InvalidTemplateMetadataException>().Which;
+        exception.InnerException.Should().BeAssignableTo(exceptionType);
+        exception.InnerException!.StackTrace.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Theory]
+    [InlineData("sources", "[]", "Project topology property 'sources' is not qualified for this creation path.")]
+    [InlineData("Sources", "[]", "Project topology property 'sources' is not qualified for this creation path.")]
+    [InlineData("Symbols", "{}", "Duplicate project configuration property 'Symbols'.")]
+    [InlineData("additionalConfigFiles", "[]", "Project topology property 'additionalConfigFiles' is not qualified for this creation path.")]
+    [InlineData("baselines", "{}", "Project topology property 'baselines' is not qualified for this creation path.")]
+    [InlineData("primaryOutputs", "[{\"path\":\"host.json\",\"condition\":\"true\"}]",
+        "Only unconditional literal primary outputs are qualified for project configuration.")]
+    [InlineData("postActions", "[{\"actionId\":\"17a32346-c721-42cd-a520-4d1cada22ba2\",\"args\":{}}]",
+        "This project path supports only mandatory CLI configuration actions.")]
+    public void ReadProjectConfiguration_UnqualifiedTopologyOrAction_FailsClosed(string property, string value, string diagnostic)
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var configuration = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(package, "project", ".template.config", "template.json")))!;
+        configuration[property] = System.Text.Json.Nodes.JsonNode.Parse(value);
+        var initializer = Substitute.For<IProjectStack>();
+        initializer.Stack.Returns("python");
+        initializer.DisplayName.Returns("Python");
+        initializer.SupportedLanguages.Returns(["Python"]);
+        initializer.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["Python"] = ["py"] });
+        TemplateProjectConfigurationPlanner planner = new(new([initializer]));
+
+        Action read = () => planner.Read(configuration.ToJsonString());
+
+        read.Should().Throw<InvalidTemplateMetadataException>().WithMessage(diagnostic);
+    }
+
+    [Fact]
+    public void ReadProjectConfiguration_NonCanonicalSymbols_ReportsSpellingRule()
+    {
+        var package = TemplateFixtures.WriteProjectJourneyPackage(_root);
+        var configuration = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(Path.Combine(package, "project", ".template.config", "template.json")))!.AsObject();
+        configuration.Remove("symbols");
+        configuration["Symbols"] = new System.Text.Json.Nodes.JsonObject();
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+
+        Action read = () => planner.Read(configuration.ToJsonString());
+
+        read.Should().Throw<InvalidTemplateMetadataException>()
+            .WithMessage("Project symbol metadata must use the canonical symbols property name.");
+    }
+
+    [Fact]
     public void Settings_UseTheSuppliedSettingsLocation()
     {
         using TemplateEngineSession session = new(CommandContext("command"), Hive);
@@ -239,6 +712,19 @@ public sealed class TemplateEngineSessionTests : IDisposable
         Action act = () => _ = new TemplateEngineSession(null!, Hive);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("context");
+    }
+
+    [Theory]
+    [InlineData("Planner")]
+    [InlineData("Writer")]
+    public void ProjectSupport_MissingDependency_IdentifiesMissingArgument(string missing)
+    {
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+        TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
+
+        Action construct = () => new TemplateProjectSupport(missing == "Planner" ? null! : planner, missing == "Writer" ? null! : writer);
+
+        construct.Should().Throw<ArgumentNullException>().WithParameterName(missing);
     }
 
     [Theory]

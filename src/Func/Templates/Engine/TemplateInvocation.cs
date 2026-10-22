@@ -9,7 +9,7 @@ using Microsoft.TemplateEngine.Abstractions;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Supplies canonical parameter values and output intent for one selected item invocation.
+/// Supplies canonical parameter values and output intent for one selected template invocation.
 /// </summary>
 internal sealed record TemplateInvocationRequest(WorkingDirectory OutputDirectory, IReadOnlyDictionary<string, string?> Parameters, string? Name = null, bool DryRun = false, bool Force = false);
 
@@ -27,6 +27,7 @@ internal enum TemplateInvocationStatus
     TemplateUnavailable,
     InvalidTemplate,
     EngineFailure,
+    ConfigurationFailure,
 }
 
 /// <summary>
@@ -75,6 +76,8 @@ internal sealed record TemplateFileChange(string Path, TemplateFileChangeKind Ki
 /// </summary>
 internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status, IReadOnlyList<TemplateFileChange> Changes, string? Diagnostic = null)
 {
+    public IReadOnlyList<string> ConfiguredProjects { get; init; } = [];
+
     /// <summary>
     /// Distinguishes completed real output from a preview or a conflict plan without changing the serialized result.
     /// </summary>

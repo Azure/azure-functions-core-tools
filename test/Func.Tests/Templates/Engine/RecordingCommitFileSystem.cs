@@ -22,6 +22,7 @@ internal sealed class RecordingCommitFileSystem(IFileSystem basis) : IFileSystem
     public Task<string?> ReadAllTextIfExistsAsync(string path, CancellationToken cancellationToken) => _basis.ReadAllTextIfExistsAsync(path, cancellationToken);
     public Stream? OpenReadIfExists(string path) => _basis.OpenReadIfExists(path);
     public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken) => _basis.WriteAllTextAsync(path, contents, cancellationToken);
+    public Task CreateAllTextAsync(string path, string contents, CancellationToken cancellationToken) => _basis.CreateAllTextAsync(path, contents, cancellationToken);
     public async Task SaveStreamToFileAsync(string filePath, Stream content, CancellationToken cancellationToken)
     {
         await _basis.SaveStreamToFileAsync(filePath, content, cancellationToken);

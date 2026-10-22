@@ -162,9 +162,16 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
                 TemplateConstraintEvaluation evaluation = await _session.EvaluateConstraintsAsync(configuration.Root, cancellationToken, packageTypes);
                 if (entry.Type == TemplateType.Project && evaluation.Status == TemplateConstraintEvaluationStatus.Eligible)
                 {
-                    evaluation = new(TemplateConstraintEvaluationStatus.NotEvaluated,
-                        [new("project-configuration", "configuration", TemplateConstraintEvaluationStatus.NotEvaluated,
-                            "Project invocation requires qualified mandatory configuration actions and is unavailable in this item-only flow.", "Use the existing project initializer until project-template creation is qualified.")]);
+                    if (_invocation.ProjectTemplatesEnabled)
+                    {
+                        _invocation.ValidateProjectConfiguration(configuration.Content);
+                    }
+                    else
+                    {
+                        evaluation = new(TemplateConstraintEvaluationStatus.NotEvaluated,
+                            [new("project-configuration", "configuration", TemplateConstraintEvaluationStatus.NotEvaluated,
+                                "Project invocation requires qualified mandatory configuration actions and is unavailable in this item-only flow.", "Use the existing project initializer until project-template creation is qualified.")]);
+                    }
                 }
 
                 candidates.Add(new(template, entry with { ConstraintEvaluation = evaluation }, configuration));

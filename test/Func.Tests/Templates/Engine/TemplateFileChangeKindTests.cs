@@ -65,7 +65,7 @@ public sealed class TemplateFileChangeKindTests
 
         json.Should().Be("{\"Path\":\"result.txt\",\"Kind\":\"" + kind + "\"}");
         camelCase.Should().Be("{\"path\":\"result.txt\",\"kind\":\"" + kind + "\"}");
-        result.Should().Be("{\"Status\":0,\"Changes\":[{\"Path\":\"result.txt\",\"Kind\":\"" + kind + "\"}],\"Diagnostic\":null}");
+        result.Should().Be("{\"Status\":0,\"Changes\":[{\"Path\":\"result.txt\",\"Kind\":\"" + kind + "\"}],\"Diagnostic\":null,\"ConfiguredProjects\":[]}");
         committed.Should().Be(result);
         change.ToString().Should().Be("TemplateFileChange { Path = result.txt, Kind = " + kind + " }");
     }

@@ -28,8 +28,9 @@ internal static class TemplateFixtures
     public const string DotnetHostOnlyTemplateIdentity = "Func.Tests.DotnetHostOnly";
     public const string HiddenTemplateIdentity = "Func.Tests.Hidden";
 
-    public static Templater CreateTemplater(TemplateEngineSession session, IFileSystem? fileSystem = null)
-        => new(session, new(session, fileSystem ?? new PhysicalFileSystem()));
+    public static Templater CreateTemplater(
+        TemplateEngineSession session, IFileSystem? fileSystem = null, TemplateProjectSupport? projectSupport = null)
+        => new(session, new(session, fileSystem ?? new PhysicalFileSystem(), projectSupport));
 
     /// <summary>
     /// Writes a folder package with one item template, one basic project template, and two templates without an item
@@ -217,6 +218,26 @@ internal static class TemplateFixtures
             ("ItemFunction.txt", "ItemFunction GREETING"));
         return packageDirectory;
     }
+
+      public static string WriteProjectJourneyPackage(string parentDirectory)
+      {
+        string packageDirectory = Path.Combine(parentDirectory, "project-journey-templates");
+        WriteTemplate(Path.Combine(packageDirectory, "project"),
+          """
+          {
+            "identity":"Func.Tests.Project","name":"Project journey","shortName":"func-tests-project",
+            "tags":{"type":"project"},"sourceName":"FuncProject",
+            "constraints":{"host":{"type":"host","args":[{"hostname":"func"}]}},
+            "primaryOutputs":[{"path":"host.json"}],
+            "symbols":{"Greeting":{"type":"parameter","datatype":"string","defaultValue":"hello","replaces":"GREETING"}},
+            "postActions":[{"actionId":"00e33184-ffc7-43ef-bec0-b1684df8ad56",
+            "args":{"primaryOutputIndex":"0","stack":"python","language":"py"}}]
+          }
+          """,
+            ("host.json", "{\"version\":\"2.0\"}"));
+          File.WriteAllText(Path.Combine(packageDirectory, "project", "FuncProject.txt"), "FuncProject GREETING");
+        return packageDirectory;
+      }
 
     public static string WriteSharedJourneyPackage(string parentDirectory, bool shared = true, string? packageTypeVersion = null, bool multiple = false)
     {
