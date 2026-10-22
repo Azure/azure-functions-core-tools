@@ -1,14 +1,12 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-extern alias CliHost;
-
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Node;
+using Azure.Functions.Cli.Templates.Native;
 using Azure.Functions.Cli.Workloads.Node;
 using Azure.Functions.Cli.Workloads.Node.Native;
 using Azure.Functions.Cli.Templates.Acquisition;
@@ -16,7 +14,6 @@ using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using NuGet.Versioning;
-using NodeNpmInstaller = CliHost::Azure.Functions.Cli.Workloads.Node.NodeNpmInstaller;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -25,9 +22,9 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public void Provider_NullDependencies_RejectProgrammerErrors()
     {
-        Action files = () => new NodeTemplateWorkflowProvider(null!, new NodeNpmInstaller());
-        Action npm = () => new NodeTemplateWorkflowProvider(_files, null!);
-        files.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
+        Action policy = () => new NodeNativeTemplatePolicy(null!);
+        Action npm = () => new NodeProjectPreparation(null!);
+        policy.Should().Throw<ArgumentNullException>().WithParameterName("preparation");
         npm.Should().Throw<ArgumentNullException>().WithParameterName("npmInstaller");
     }
 
@@ -35,63 +32,33 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("Azure.Functions.Node.Basic.JavaScript", "JavaScript", "Azure.Functions.Templates.Node.Basic", "1.0.0", true, true)]
     [InlineData("Azure.Functions.Node.Basic.TypeScript", "TypeScript", "Azure.Functions.Templates.Node.Basic", "1.0.0-preview.2", true, true)]
     [InlineData("Azure.Functions.Node.Basic.JavaScript", "JavaScript", "Other.Package", "1.0.0", true, false)]
-    [InlineData("Azure.Functions.Node.Basic.JavaScript", "TypeScript", "Azure.Functions.Templates.Node.Basic", "1.0.0", true, false)]
-    [InlineData("Azure.Functions.Node.Basic.JavaScript", "js", "Azure.Functions.Templates.Node.Basic", "1.0.0", true, false)]
-    [InlineData("Azure.Functions.Node.Other.JavaScript", "JavaScript", "Azure.Functions.Templates.Node.Basic", "1.0.0", true, false)]
-    [InlineData("Azure.Functions.Node.Basic.JavaScript", "JavaScript", "Azure.Functions.Templates.Node.Basic", null, true, false)]
-    [InlineData("Azure.Functions.Node.Basic.JavaScript", "JavaScript", "Azure.Functions.Templates.Node.Basic", "[1.0,2.0)", true, false)]
+    [InlineData("Azure.Functions.Node.Basic.JavaScript", "TypeScript", "Azure.Functions.Templates.Node.Basic", "1.0.0", true, true)]
+    [InlineData("Azure.Functions.Node.Basic.JavaScript", "js", "Azure.Functions.Templates.Node.Basic", "1.0.0", true, true)]
+    [InlineData("Azure.Functions.Node.Other.JavaScript", "JavaScript", "Azure.Functions.Templates.Node.Basic", "1.0.0", true, true)]
+    [InlineData("Azure.Functions.Node.Basic.JavaScript", "JavaScript", "Azure.Functions.Templates.Node.Basic", null, true, true)]
+    [InlineData("Azure.Functions.Node.Basic.JavaScript", "JavaScript", "Azure.Functions.Templates.Node.Basic", "[1.0,2.0)", true, true)]
     [InlineData("Azure.Functions.Node.Http.JavaScript", "JavaScript", "Azure.Functions.Templates.Node.Basic", "1.0.0", false, false)]
-    public void Provider_Handles_ClaimsOnlyOwnedProjectIdentityPackageAndCanonicalLanguage(
+    public void Provider_RequiredPhase_CannotBeSuppressedByMalformedBasicProjectMetadata(
         string identity, string language, string package, string? version, bool project, bool expected)
     {
-        var provider = new NodeTemplateWorkflowProvider(_files, new NodeNpmInstaller());
-        TemplateCatalogEntry entry = new(identity, "Controlled", null, project ? TemplateType.Project : TemplateType.Item,
-            [], null, language, 0, new(package, version), false, [], null);
+        var source = Substitute.For<NativeTemplateSource>();
+        source.Identity.Returns(identity);
+        source.Language.Returns(language);
+        source.PackageId.Returns(package);
+        source.PackageVersion.Returns(version!);
+        source.IsProject.Returns(project);
+        var policy = new NodeNativeTemplatePolicy(new(new()));
 
-        provider.Handles(entry).Should().Be(expected);
-    }
-
-    [Fact]
-    public async Task Provider_ActualInstalledPackage_UsesHostCompiledHelperAndQualifiedProjectAdapters()
-    {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
-        using var services = await CreateServicesAsync();
-        var target = WorkingDirectory.FromExplicit(Path.Combine(_root, "provider-project"));
-        var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
-        using var templater = await services.GetRequiredService<ITemplaterFactory>().CreateProjectAsync(new(target), availability,
-            services.GetRequiredService<TemplateProjectSupport>(), CancellationToken.None);
-        var selected = (await templater.ResolveGroupAsync("Azure.Functions.Node.Basic.TypeScript", TemplateType.Project, CancellationToken.None)).Group!.Single();
-        var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));
-        var native = await selected.InvokeAsync(new(target, arguments.ValuesByCanonicalName, DryRun: true), CancellationToken.None);
-        var npm = Substitute.For<NodeNpmInstaller>();
-        npm.InstallAsync(target.Info.FullName, Arg.Any<CancellationToken>()).Returns(call =>
+        policy.RequiresProjectPreparation(source).Should().Be(expected);
+        if (expected)
         {
-            File.Exists(Path.Combine(target.Info.FullName, ".func", "config.json")).Should().BeTrue();
-            File.Exists(Path.Combine(target.Info.FullName, "package.json")).Should().BeTrue();
-            return (0, "host-compiled helper supplied explicitly");
-        });
-        var provider = new NodeTemplateWorkflowProvider(_files, npm);
-        INativeProjectWorkflowProvider projects = provider;
-
-        provider.Handles(selected.Entry).Should().BeTrue();
-        provider.Stack.Should().Be("node");
-        projects.Preparation.Should().BeOfType<NodeProjectPreparation>();
-        typeof(NodeNpmInstaller).Assembly.Should().BeSameAs(typeof(NodeProjectPreparation).Assembly);
-        services.GetServices<IProjectInitializer>().Single(initializer => initializer.Stack == "node").GetType().Assembly
-            .Should().NotBeSameAs(typeof(NodeNpmInstaller).Assembly);
-        services.GetService<NodeNpmInstaller>().Should().BeNull("the physical stack's helper is a different assembly type");
-
-        var context = new NativeProjectPreparationContext(selected, target, arguments.ValuesByCanonicalName, native);
-        var preview = await projects.Preparation!.PreviewAsync(context, CancellationToken.None);
-        await npm.DidNotReceive().InstallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        (await selected.InvokeAsync(new(target, arguments.ValuesByCanonicalName), CancellationToken.None)).Status.Should().Be(TemplateInvocationStatus.Success);
-        var completed = await projects.Preparation.CompleteAsync(context, preview, CancellationToken.None);
-
-        completed.Succeeded.Should().BeTrue();
-        completed.Diagnostics.Should().Contain("host-compiled helper supplied explicitly");
-        await npm.Received(1).InstallAsync(target.Info.FullName, Arg.Any<CancellationToken>());
-        Action noEntry = () => provider.Handles(null!);
-        noEntry.Should().Throw<ArgumentNullException>().WithParameterName("entry");
+            policy.CreateProjectPreparation(source).Should().BeOfType<NodeProjectPreparation>();
+        }
+        else
+        {
+            Action unsupported = () => policy.CreateProjectPreparation(source);
+            unsupported.Should().Throw<NotSupportedException>();
+        }
     }
 
     [Theory]

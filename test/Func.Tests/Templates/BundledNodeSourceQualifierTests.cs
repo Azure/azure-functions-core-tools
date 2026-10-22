@@ -153,7 +153,7 @@ public sealed partial class BundledNodeTemplateTests
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", legacy ? "legacy-nested" : "literal-nested"));
         var values = source.CanonicalParameters.ToDictionary(parameter => parameter.Id, parameter => parameter.DefaultValue, StringComparer.Ordinal);
         var invocation = new NodePolicyInvocationFixture(source, output, values);
-        NativeTemplatePolicy policy = new NodeNativeTemplatePolicy();
+        NativeTemplatePolicy policy = new NodeNativeTemplatePolicy(new(new()));
 
         var prepared = await policy.QualifyInvocationAsync(invocation, CancellationToken.None);
 
@@ -290,7 +290,7 @@ public sealed partial class BundledNodeTemplateTests
             values.Remove("timerTrigger-schedule");
         }
 
-        var qualified = await new NodeNativeTemplatePolicy().QualifyInvocationAsync(
+        var qualified = await new NodeNativeTemplatePolicy(new(new())).QualifyInvocationAsync(
             new NodePolicyInvocationFixture(source, output, values, explicitNames), CancellationToken.None);
 
         qualified.Succeeded.Should().BeFalse();

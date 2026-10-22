@@ -7,9 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Func/Func.csproj" Aliases="global,CliHost" />
+    <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/NativeTemplates/Workloads.Node.FunctionTemplates.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Workloads/Stacks/Node.Tests/Workloads.Node.Tests.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../Fixtures/Templates.Tests.StoreProcess/Templates.Tests.StoreProcess.csproj"
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../Fixtures/Workloads.Tests.OperationProcess/Workloads.Tests.OperationProcess.csproj"

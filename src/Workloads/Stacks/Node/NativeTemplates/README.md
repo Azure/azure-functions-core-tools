@@ -190,28 +190,31 @@ the public `func init` / `func new` continue their existing paths. This package
 does not claim M3/M4 production completion or qualify other runtimes.
 
 Ordinary template-authored creation post-actions remain unsupported by the
-staged project path. A private bridge harness can explicitly supply
-`NodeProjectPreparation`, which plans the fixed `NodeNpmInstall` operation and
-honors the canonical `SkipNpmInstall` parameter (`--skip-npm-install`).
-Preview never starts npm; completion uses the existing owned npm helper only
-after native project files and mandatory CLI configuration exist. Nonzero
-results retain those files, preserve stderr, and report `partialPreparation`.
-Cancellation emits a retained-output warning, then propagates without claiming
-completion or rollback.
-The existing preparation bridge remains CLI-internal until a neutral owning
-workload completion contract preserves its preview, skip, cancellation and
-partial-result ledger. This is a remaining ownership migration gate, not a
-new npm execution path. No preparation provider is registered by default, and no arbitrary command
-string is accepted from a template.
+staged project path. The loaded Node policy declares required preparation for
+its Basic project package and supplies the workload-owned `NodeProjectPreparation`
+capability through the neutral typed preparation boundary. The workload owns
+source validation, the canonical `SkipNpmInstall` policy (`--skip-npm-install`)
+and fixed npm execution. Other stacks can provide the same neutral capability
+without adding a Core language dispatcher.
 
-The Node initializer's npm process logic is extracted once into internal
-`NodeNpmInstaller.cs`, compiled by the Node workload and source-linked by the
-CLI. The legacy delegate, best-effort result behavior, process arguments and
-cancellation/error semantics remain unchanged; there is no runtime reference
-between the CLI and physical stack assemblies. Controlled helper substitutes
-prove native init ordering/skip/failure behavior, not an actual dependency
-restore. A separate offline real-npm proof on a private dependency-free package
-does not qualify installation of a generated project's published dependencies.
+Preview never starts npm. Completion receives the host-issued created image and
+copied canonical configuration only after native files and mandatory CLI
+configuration have been committed and revalidated against the writer receipt.
+The host binds the exact loaded owner, source, invocation and one-use plan.
+Missing preparation cannot fall back to a request-supplied provider. Nonzero
+helper results retain committed files, preserve diagnostics and report
+`partialPreparation`. Cancellation propagates with a retained-output warning,
+without claiming completion or rollback.
+
+`NodeNpmInstaller.cs` is compiled only by the Node workload. Its strict native
+path drains both process streams and preserves cancellation. The legacy
+initializer retains its separate best-effort failure result and dependency
+warning. There is no CLI source link or runtime reference to the physical
+stack assembly, no public process-command API and no template-supplied command.
+Controlled helper substitutes prove source/configuration ordering and
+skip/failure/cancellation behavior, not actual dependency installation.
+The generic private compatibility bridge still retains its old operation enum
+for non-owned tests. Loaded Node preparation does not use that legacy route.
 
 The staged journey also explicitly calls the existing installed Node project's
 `PrepareForHostRunAsync`: restore missing `node_modules`, then compile TS via

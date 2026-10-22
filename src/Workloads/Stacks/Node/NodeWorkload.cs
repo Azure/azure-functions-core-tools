@@ -27,6 +27,7 @@ public sealed class NodeWorkload : Workload
         builder.Services.AddSingleton<NodeProjectStack>();
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<NodeProjectStack>());
         builder.Services.AddSingleton<NodeNpmInstaller>();
+        builder.Services.AddSingleton<NodeProjectPreparation>();
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, NodeQuickstartProvider>();
         builder.AddNativeTemplatePolicy<NodeNativeTemplatePolicy>();

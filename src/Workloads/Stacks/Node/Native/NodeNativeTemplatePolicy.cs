@@ -10,12 +10,24 @@ namespace Azure.Functions.Cli.Workloads.Node.Native;
 /// <summary>
 /// Qualifies Node template sources through their actual owning workload registration.
 /// </summary>
-internal sealed class NodeNativeTemplatePolicy : NativeTemplatePolicy
+internal sealed class NodeNativeTemplatePolicy(NodeProjectPreparation preparation) : NativeTemplatePolicy
 {
+    private readonly NodeProjectPreparation _preparation = preparation ?? throw new ArgumentNullException(nameof(preparation));
     private readonly NodeItemSource _items = new();
     private readonly NodeProjectSource _projects = new();
 
     public override string Stack => "node";
+
+    public override bool RequiresProjectPreparation(NativeTemplateSource selected) => NodeProjectPreparation.RequiresPreparation(selected);
+
+    public override INativeTemplateProjectPreparation CreateProjectPreparation(NativeTemplateSource selected)
+    {
+        if (!RequiresProjectPreparation(selected))
+        {
+            throw new NotSupportedException("The selected source does not declare owned Node basic project preparation.");
+        }
+        return _preparation;
+    }
 
     public override bool Handles(NativeTemplateSource selected)
     {
@@ -67,6 +79,11 @@ internal sealed class NodeNativeTemplatePolicy : NativeTemplatePolicy
     {
         ArgumentNullException.ThrowIfNull(captured);
         await captured.RevalidateAsync(cancellationToken);
+        if (captured.Invocation.Source.IsProject)
+        {
+            NativeTemplateProjectPreparationPlan project = await _preparation.PreviewAsync(captured, cancellationToken);
+            return new(project.Succeeded, project.Diagnostics);
+        }
         NodeQualifiedItem item = await _items.ReadAsync(captured.Invocation.Source, cancellationToken);
         if (captured.Files.Count != 1 || captured.PrimaryOutputs.Count != 0)
         {

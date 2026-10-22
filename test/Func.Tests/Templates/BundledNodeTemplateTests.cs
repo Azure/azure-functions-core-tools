@@ -165,11 +165,13 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     public async Task StagedCommands_ActualInstalledBundle_PreviewAndCreateProjectThenHttpWithCanonicalConfiguration(
         string alias, string language, string extension, string main)
     {
-        var installed = await _installer.InstallFromPackageAsync(BuiltArchive);
-        await InstallFunctionAuthoringArchiveAsync();
-        using var provider = await CreateServicesAsync();
+        var entry = await InstallAssociationStackAsync();
+        var catalog = new NodeFunctionCatalogFixture(entry, FunctionArchive);
+        (await catalog.InstallAsync(_templates, _workloads, _paths, _installer, _files,
+            AdmissionDeployment(new FileWorkloadOperationCoordinator(_paths)), Home, _root)).Status.Should().Be(BasicAcquisitionStatus.Completed);
+        using var provider = await CreateNodePreparationServicesAsync((_, _) => Task.FromResult((0, "")), catalog: catalog);
         using var scope = provider.CreateScope();
-        var availability = new TemplateConstraintEvaluationSnapshot([new(installed.Entry.PackageId, NuGetVersion.Parse(installed.Entry.PackageVersion), ["node"], true)]);
+        var availability = new TemplateConstraintEvaluationSnapshot([new(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), ["node"], true)]);
         var init = new InitExecutionCommand(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>(),
             provider.GetRequiredService<InitExecutionRenderer>(), availability);
         string project = Path.Combine(_root, "app-" + alias);
