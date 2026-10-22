@@ -78,6 +78,11 @@ func
 
 Workloads can add their own subcommands by calling `builder.RegisterCommand(...)` from inside `IWorkload.Configure` (see [building-a-workload.md](building-a-workload.md)). Workload commands are described in parser-independent terms via `FuncCommand` / `FuncCommandOption` / `FuncCommandArgument`; the host wraps each one in an internal `ExternalCommand` adapter that translates the descriptors to `System.CommandLine` and tracks the registering workload for diagnostics.
 
+The unregistered `NewExecutionCommand` exercises a proposed native item-template
+consumer in tests; it does not replace `new [path]` in this command tree. See the
+[staged consumer boundary](func-new-execution/proposal.md#staged-native-item-consumer)
+for its grammar, dependency handoff and public-cutover exclusions.
+
 ## Command Architecture
 
 All commands extend `FuncCliCommand` → `System.CommandLine.Command`.
