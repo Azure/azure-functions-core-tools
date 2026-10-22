@@ -74,4 +74,17 @@ internal interface IWorkloadStore
     /// </summary>
     public Task<WorkloadOwnershipMoveResult> MoveExplicitOwnershipAsync(string oldPackageId, string oldVersion,
         WorkloadEntry newEntry, CancellationToken cancellationToken = default);
+
+    public Task SaveWorkloadAsync(IWorkloadOperation operation, WorkloadEntry entry, CancellationToken cancellationToken);
+    public Task<bool> RemoveWorkloadAsync(IWorkloadOperation operation, string packageId, string version, CancellationToken cancellationToken);
+    public Task ReplaceWorkloadAsync(IWorkloadOperation operation, string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken);
+    public Task<WorkloadEntry> AddOwnershipAsync(IWorkloadOperation operation, WorkloadEntry entry,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken);
+    public Task<WorkloadOwnershipRemovalResult> RemoveOwnershipAsync(IWorkloadOperation operation, string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken);
+    public Task<WorkloadOwnershipMoveResult> MoveLogicalOwnershipAsync(IWorkloadOperation operation, string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken);
+    public Task<WorkloadOwnershipMoveResult> MoveExplicitOwnershipAsync(IWorkloadOperation operation, string oldPackageId, string oldVersion,
+        WorkloadEntry newEntry, CancellationToken cancellationToken);
 }

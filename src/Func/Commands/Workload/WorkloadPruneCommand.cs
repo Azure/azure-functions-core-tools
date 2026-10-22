@@ -21,6 +21,7 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
     private readonly IInteractionService _interaction;
     private readonly IWorkloadInstaller _installer;
     private readonly IWorkloadStore _store;
+    private readonly IWorkloadOperationCoordinator _coordinator;
 
     public Argument<string?> WorkloadArgument { get; } = new("id")
     {
@@ -33,12 +34,14 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
         Description = "Disable alias matching. <id> must be the literal package id.",
     };
 
-    public WorkloadPruneCommand(IInteractionService interaction, IWorkloadInstaller installer, IWorkloadStore store)
+    public WorkloadPruneCommand(IInteractionService interaction, IWorkloadInstaller installer, IWorkloadStore store,
+        IWorkloadOperationCoordinator coordinator)
         : base("prune", "Remove inactive side-by-side workload installs.")
     {
         _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
         _installer = installer ?? throw new ArgumentNullException(nameof(installer));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
 
         WorkloadArgument.AddOptionalIdValidator();
 
@@ -51,6 +54,8 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
         string? identifier = parseResult.GetValue(WorkloadArgument);
         bool exact = parseResult.GetValue(ExactOption);
 
+        // Prune selection grants deletion authority, so retain the operation through every selected removal.
+        using IWorkloadOperation operation = await AcquireOperationAsync(cancellationToken);
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         if (installed.Count == 0)
         {
@@ -81,16 +86,8 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
             for (int i = 1; i < ordered.Count; i++)
             {
                 PruneCandidate candidate = ordered[i];
-                bool removed = candidate.Ownership == WorkloadOwnershipKind.Logical
-                    ? await _installer.UninstallAsync(
-                        candidate.PackageId,
-                        candidate.PackageVersion,
-                        WorkloadOwnershipKind.Logical,
-                        cancellationToken)
-                    : await _installer.UninstallAsync(
-                        candidate.PackageId,
-                        candidate.PackageVersion,
-                        cancellationToken);
+                bool removed = await _installer.UninstallAsync(operation, candidate.PackageId, candidate.PackageVersion,
+                    candidate.Ownership, cancellationToken);
                 if (removed)
                 {
                     removedCount++;
@@ -106,6 +103,24 @@ internal sealed class WorkloadPruneCommand : FuncCliCommand
         }
 
         return 0;
+    }
+
+    private async Task<IWorkloadOperation> AcquireOperationAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+            ArgumentNullException.ThrowIfNull(operation);
+            return operation;
+        }
+        catch (WorkloadRecoveryRequiredException exception)
+        {
+            throw new GracefulException(exception.Message, exception, isUserError: true);
+        }
+        catch (WorkloadLockNotSupportedException exception)
+        {
+            throw new GracefulException(exception.Message, exception, isUserError: true);
+        }
     }
 
     private static IReadOnlyList<PruneCandidate> ScopeToTarget(

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands.Start.Host;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 using NuGet.Packaging;
@@ -10,16 +11,33 @@ using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Workloads.Install;
 
-internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadStore store, IWorkloadMetadataReader metadataReader)
+internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadStore store, IWorkloadMetadataReader metadataReader,
+    IWorkloadOperationCoordinator coordinator, IFileSystem fileSystem)
     : IWorkloadDeploymentService
 {
     private readonly IWorkloadPaths _paths = paths ?? throw new ArgumentNullException(nameof(paths));
     private readonly IWorkloadStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IWorkloadMetadataReader _metadataReader =
         metadataReader ?? throw new ArgumentNullException(nameof(metadataReader));
+    private readonly IWorkloadOperationCoordinator _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public async Task<WorkloadEntry> GetUpdateTargetAsync(string packageId, NuGetVersion? targetInstalledVersion,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default)
+    {
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        return await GetUpdateTargetAsync(operation, packageId, targetInstalledVersion, ownership, cancellationToken);
+    }
+
+    public async Task<WorkloadEntry> GetUpdateTargetAsync(IWorkloadOperation operation, string packageId, NuGetVersion? targetInstalledVersion,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
+    {
+        ValidateOperation(operation);
+        return await GetAdvisoryUpdateTargetAsync(packageId, targetInstalledVersion, ownership, cancellationToken);
+    }
+
+    public async Task<WorkloadEntry> GetAdvisoryUpdateTargetAsync(string packageId, NuGetVersion? targetInstalledVersion,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
 
@@ -50,6 +68,19 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
     public async Task<WorkloadInstallResult?> TryReuseExplicitAsync(string packageId, string version, CancellationToken cancellationToken = default)
     {
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        return await TryReuseExplicitAsync(operation, packageId, version, cancellationToken);
+    }
+
+    public async Task<WorkloadInstallResult?> TryReuseExplicitAsync(IWorkloadOperation operation, string packageId, string version,
+        CancellationToken cancellationToken)
+    {
+        ValidateOperation(operation);
+        return await GetAdvisoryExplicitReuseAsync(packageId, version, cancellationToken);
+    }
+
+    public async Task<WorkloadInstallResult?> GetAdvisoryExplicitReuseAsync(string packageId, string version, CancellationToken cancellationToken)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
 
@@ -67,60 +98,184 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         return new WorkloadInstallResult(existing, true);
     }
 
-    public Task<WorkloadInstallResult?> TryReuseImplementationAsync(string packageId, string version, string runtimeIdentifier, LogicalPackage logicalPackage, CancellationToken cancellationToken = default)
-        => TryReuseImplementationCoreAsync(packageId, version, runtimeIdentifier, logicalPackage, currentLogicalOwner: null, cancellationToken);
+    public async Task<WorkloadEntry?> GetReusableImplementationAsync(string packageId, string version, string runtimeIdentifier,
+        CancellationToken cancellationToken)
+        => FindReusableImplementation(await _store.GetWorkloadsAsync(cancellationToken), packageId, version, runtimeIdentifier);
 
-    public Task<WorkloadInstallResult?> TryReuseImplementationForUpdateAsync(WorkloadEntry currentEntry, string packageId, string version,
+    public async Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        string directory = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        WorkloadMetadata metadata;
+        try
+        {
+            metadata = _metadataReader.Read(directory);
+        }
+        catch (Exception exception) when (exception is InvalidWorkloadException or DirectoryNotFoundException)
+        {
+            throw new InvalidWorkloadException($"The installed workload '{entry.PackageId}' {entry.PackageVersion} payload is damaged. " +
+                "Preserve the installation and explicitly repair it from its original source.", exception);
+        }
+        if (metadata.Kind != entry.Kind || metadata.RuntimeIdentifier != entry.RuntimeIdentifier
+            || metadata.EntryPoint?.AssemblyPath != entry.EntryPoint?.AssemblyPath || metadata.EntryPoint?.Type != entry.EntryPoint?.Type
+            || !_fileSystem.DirectoryExists(WorkloadPackageLayout.GetContentRoot(directory, metadata.RuntimeIdentifier))
+            || (metadata.EntryPoint is { } entryPoint
+                && !_fileSystem.FileExists(Path.GetFullPath(Path.Combine(directory, entryPoint.AssemblyPath)))
+                && !_fileSystem.FileExists(Path.GetFullPath(Path.Combine(directory, "tools", "any", entryPoint.AssemblyPath)))))
+        {
+            throw new InvalidWorkloadException($"The installed workload '{entry.PackageId}' {entry.PackageVersion} payload is damaged or conflicts with its registry entry. " +
+                "Preserve the installation and explicitly repair it from its original source.");
+        }
+        Dictionary<string, string> hashes = new(StringComparer.Ordinal);
+        foreach (string file in _fileSystem.GetFiles(directory))
+        {
+            hashes.Add(Path.GetRelativePath(directory, file), await _fileSystem.ComputeSha256Async(file, cancellationToken));
+        }
+
+        return new(entry, hashes);
+    }
+
+    public async Task ValidateReuseAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        await ValidateCurrentEntryAsync(operation, prepared.Entry, cancellationToken);
+        await ValidateHashesAsync(prepared.Hashes, _paths.GetInstallDirectory(prepared.Entry.PackageId, prepared.Entry.PackageVersion), cancellationToken);
+    }
+
+    public async Task<WorkloadInstallResult?> TryReuseImplementationAsync(string packageId, string version, string runtimeIdentifier,
+        LogicalPackage logicalPackage, CancellationToken cancellationToken = default)
+    {
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        WorkloadInstallResult? result = await TryReuseImplementationAsync(operation, packageId, version, runtimeIdentifier, logicalPackage, cancellationToken);
+        operation.CompleteMutation();
+        return result;
+    }
+
+    public Task<WorkloadInstallResult?> TryReuseImplementationAsync(IWorkloadOperation operation, string packageId, string version,
+        string runtimeIdentifier, LogicalPackage logicalPackage, CancellationToken cancellationToken)
+        => TryReuseImplementationCoreAsync(operation, packageId, version, runtimeIdentifier, logicalPackage, currentLogicalOwner: null, cancellationToken);
+
+    public async Task<WorkloadInstallResult?> TryReuseImplementationForUpdateAsync(WorkloadEntry currentEntry, string packageId, string version,
         string runtimeIdentifier, LogicalPackage logicalPackage, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(currentEntry);
-        return TryReuseImplementationCoreAsync(packageId, version, runtimeIdentifier, logicalPackage, currentEntry, cancellationToken);
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        WorkloadInstallResult? result = await TryReuseImplementationForUpdateAsync(operation, currentEntry, packageId, version,
+            runtimeIdentifier, logicalPackage, cancellationToken);
+        operation.CompleteMutation();
+        return result;
+    }
+
+    public async Task<WorkloadInstallResult?> TryReuseImplementationForUpdateAsync(IWorkloadOperation operation, WorkloadEntry currentEntry,
+        string packageId, string version, string runtimeIdentifier, LogicalPackage logicalPackage, CancellationToken cancellationToken)
+    {
+        await ValidateCurrentEntryAsync(operation, currentEntry, cancellationToken);
+        return await TryReuseImplementationCoreAsync(operation, packageId, version, runtimeIdentifier, logicalPackage, currentEntry, cancellationToken);
+    }
+
+    public async Task<PreparedWorkloadDeployment> PrepareAsync(InspectedWorkloadPackage package, string source,
+        WorkloadOwnershipKind ownership, LogicalPackage? logicalPackage, bool force,
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        WorkloadOwnershipRules.ValidateDestination(null, logicalPackage, ownership);
+        if (await _fileSystem.ComputeSha256Async(package.Path, cancellationToken) != package.Sha256)
+        {
+            throw new WorkloadPlanChangedException();
+        }
+
+        if (package.Role == WorkloadPackageRole.Pointer)
+        {
+            throw new InvalidWorkloadException($"Pointer package '{package.Identity.PackageId}' cannot be installed as a physical workload.");
+        }
+
+        string expectedState = WorkloadStateSnapshot.CaptureAffected(await _store.GetWorkloadsAsync(cancellationToken),
+            package.Identity.PackageId, logicalPackage?.PackageId);
+        TempDirectory staging = _fileSystem.CreateTempDirectory();
+        try
+        {
+            progress?.Report(new(WorkloadInstallPhase.Extracting, $"Extracting workload '{package.Identity.PackageId}' {package.Identity.Version}"));
+            using (PackageArchiveReader reader = OpenPackage(package.Path))
+            {
+                await ExtractPackageAsync(reader, staging.Path, cancellationToken);
+            }
+
+            if (await _fileSystem.ComputeSha256Async(package.Path, cancellationToken) != package.Sha256)
+            {
+                throw new WorkloadPlanChangedException();
+            }
+
+            WorkloadMetadata metadata = _metadataReader.Read(staging.Path);
+            EnsureMetadataMatchesInspection(package.Metadata, metadata, package.Identity.PackageId);
+            EnsureHostExecutableBit(staging.Path, package.Identity.PackageId, metadata.RuntimeIdentifier);
+            Dictionary<string, string> hashes = new(StringComparer.Ordinal);
+            foreach (string path in _fileSystem.GetFiles(staging.Path))
+            {
+                hashes.Add(Path.GetRelativePath(staging.Path, path), await _fileSystem.ComputeSha256Async(path, cancellationToken));
+            }
+
+            return new(staging, package, source, ownership, logicalPackage, force, hashes, expectedState);
+        }
+        catch
+        {
+            staging.Dispose();
+            throw;
+        }
     }
 
     public async Task<WorkloadInstallResult> InstallAsync(InspectedWorkloadPackage package, string source, WorkloadOwnershipKind ownership,
         LogicalPackage? logicalPackage, bool force, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(package);
-        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        using PreparedWorkloadDeployment prepared = await PrepareAsync(package, source, ownership, logicalPackage, force, progress, cancellationToken);
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        return await InstallPreparedAsync(operation, prepared, progress, cancellationToken);
+    }
 
+    public async Task<WorkloadInstallResult> InstallPreparedAsync(IWorkloadOperation operation, PreparedWorkloadDeployment prepared,
+        IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
+    {
+        ValidateOperation(operation);
+        ArgumentNullException.ThrowIfNull(prepared);
+        await ValidatePreparedAsync(prepared, cancellationToken);
+        InspectedWorkloadPackage package = prepared.Package;
+        WorkloadOwnershipKind ownership = prepared.Ownership;
+        LogicalPackage? logicalPackage = prepared.LogicalPackage;
         string packageId = package.Identity.PackageId;
         string version = package.Identity.Version;
         string installPath = _paths.GetInstallDirectory(packageId, version);
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
+        if (prepared.CaptureState(installed) != prepared.ExpectedState)
+        {
+            throw new WorkloadPlanChangedException();
+        }
         WorkloadEntry? existing = installed.FirstOrDefault(entry =>
             string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(entry.PackageVersion, version, StringComparison.Ordinal));
         WorkloadEntry? currentLogicalOwner = ResolveCurrentLogicalOwner(installed, ownership, logicalPackage);
         bool logicalOwnerMoves = LogicalOwnerMoves(currentLogicalOwner, packageId, version);
+        WorkloadOwnershipRules.ValidateDestination(existing, logicalPackage, ownership);
 
-        if (!force && existing is not null && IsExistingInstallationValid(existing, package.Metadata))
+        if (!prepared.Force && existing is not null && IsExistingInstallationValid(existing, package.Metadata))
         {
-            return await AttachOwnershipAsync(existing, ownership, logicalPackage, currentLogicalOwner, cancellationToken);
+            WorkloadInstallResult attached = await AttachOwnershipAsync(operation, existing, ownership, logicalPackage, currentLogicalOwner, cancellationToken);
+            operation.CompleteMutation();
+            return attached;
         }
 
-        string stagingPath = installPath + ".staging-" + Guid.NewGuid().ToString("N");
+        string stagingPath = prepared.StagingPath;
         bool movedToFinal = false;
+        bool registered = false;
         try
         {
-            progress?.Report(new WorkloadInstallProgress(
-                WorkloadInstallPhase.Extracting,
-                $"Extracting workload '{packageId}' {version}"));
-            Directory.CreateDirectory(stagingPath);
-            using (PackageArchiveReader reader = OpenPackage(package.Path))
-            {
-                await ExtractPackageAsync(reader, stagingPath, cancellationToken);
-            }
-
-            WorkloadMetadata metadata = _metadataReader.Read(stagingPath);
-            EnsureMetadataMatchesInspection(package.Metadata, metadata, packageId);
-            EnsureHostExecutableBit(stagingPath, packageId, metadata.RuntimeIdentifier);
-            WorkloadEntry incoming = CreateEntry(package, source, ownership, logicalPackage);
+            WorkloadEntry incoming = CreateEntry(package, prepared.Source, ownership, logicalPackage);
             WorkloadEntry entry = existing is null
                 ? incoming
                 : MergeForReinstall(existing, incoming, ownership);
 
+            cancellationToken.ThrowIfCancellationRequested();
+            operation.BeginMutation();
             DeleteInstallDirectory(installPath);
-
+            Directory.CreateDirectory(Path.GetDirectoryName(installPath)!);
             MoveDirectory(stagingPath, installPath);
             movedToFinal = true;
             progress?.Report(new WorkloadInstallProgress(
@@ -130,22 +285,28 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             if (logicalOwnerMoves)
             {
                 WorkloadOwnershipMoveResult moved =
-                    await _store.MoveLogicalOwnershipAsync(currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, entry, cancellationToken);
+                    await _store.MoveLogicalOwnershipAsync(operation, currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, entry, cancellationToken);
+                registered = true;
                 if (moved.PreviousEntryRemoved)
                 {
                     TryDeleteDirectory(_paths.GetInstallDirectory(currentLogicalOwner.PackageId, currentLogicalOwner.PackageVersion));
                 }
 
+                await ValidatePayloadAsync(prepared, installPath, CancellationToken.None);
+                operation.CompleteMutation();
                 return new WorkloadInstallResult(moved.Entry, false);
             }
 
-            await _store.SaveWorkloadAsync(entry, cancellationToken);
+            await _store.SaveWorkloadAsync(operation, entry, cancellationToken);
+            registered = true;
+            await ValidatePayloadAsync(prepared, installPath, CancellationToken.None);
+            operation.CompleteMutation();
             return new WorkloadInstallResult(entry, false);
         }
         catch
         {
             TryDeleteDirectory(stagingPath);
-            if (movedToFinal && existing is null)
+            if (movedToFinal && existing is null && !registered && await IsUnregisteredAsync(packageId, version))
             {
                 TryDeleteDirectory(installPath);
             }
@@ -158,37 +319,41 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         WorkloadOwnershipKind ownership, LogicalPackage? logicalPackage, IProgress<WorkloadInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(currentEntry);
-        ArgumentNullException.ThrowIfNull(package);
-        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        using PreparedWorkloadDeployment prepared = await PrepareAsync(package, source, ownership, logicalPackage, force: true, progress, cancellationToken);
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        return await UpdatePreparedAsync(operation, currentEntry, prepared, cancellationToken);
+    }
 
-        if (package.Role == WorkloadPackageRole.Pointer)
+    public async Task<WorkloadEntry> UpdatePreparedAsync(IWorkloadOperation operation, WorkloadEntry currentEntry,
+        PreparedWorkloadDeployment prepared, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        await ValidateCurrentEntryAsync(operation, currentEntry, cancellationToken);
+        await ValidatePreparedAsync(prepared, cancellationToken);
+        InspectedWorkloadPackage package = prepared.Package;
+        IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
+        if (prepared.CaptureState(installed) != prepared.ExpectedState)
         {
-            throw new InvalidWorkloadException(
-                $"Pointer package '{package.Identity.PackageId}' cannot be installed as a physical workload.");
+            throw new WorkloadPlanChangedException();
         }
 
+        WorkloadEntry? destination = installed.SingleOrDefault(entry =>
+            string.Equals(entry.PackageId, package.Identity.PackageId, StringComparison.OrdinalIgnoreCase)
+            && entry.PackageVersion == package.Identity.Version);
+        WorkloadOwnershipRules.ValidateDestination(destination, prepared.LogicalPackage, prepared.Ownership);
         string finalPath = _paths.GetInstallDirectory(package.Identity.PackageId, package.Identity.Version);
-        string stagingPath = finalPath + ".staging-" + Guid.NewGuid().ToString("N");
+        string stagingPath = prepared.StagingPath;
         try
         {
-            Directory.CreateDirectory(stagingPath);
-            using (PackageArchiveReader reader = OpenPackage(package.Path))
-            {
-                await ExtractPackageAsync(reader, stagingPath, cancellationToken);
-            }
-
-            WorkloadMetadata metadata = _metadataReader.Read(stagingPath);
-            EnsureMetadataMatchesInspection(package.Metadata, metadata, package.Identity.PackageId);
-            EnsureHostExecutableBit(stagingPath, package.Identity.PackageId, metadata.RuntimeIdentifier);
-            WorkloadEntry incoming = CreateEntry(package, source, ownership, logicalPackage);
-
+            WorkloadEntry incoming = CreateEntry(package, prepared.Source, prepared.Ownership, prepared.LogicalPackage);
+            cancellationToken.ThrowIfCancellationRequested();
+            operation.BeginMutation();
             DeleteInstallDirectory(finalPath);
-
+            Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
             MoveDirectory(stagingPath, finalPath);
-            WorkloadOwnershipMoveResult moved = ownership == WorkloadOwnershipKind.Logical
-                ? await _store.MoveLogicalOwnershipAsync(currentEntry.PackageId, currentEntry.PackageVersion, incoming, cancellationToken)
-                : await _store.MoveExplicitOwnershipAsync(currentEntry.PackageId, currentEntry.PackageVersion, incoming, cancellationToken);
+            WorkloadOwnershipMoveResult moved = prepared.Ownership == WorkloadOwnershipKind.Logical
+                ? await _store.MoveLogicalOwnershipAsync(operation, currentEntry.PackageId, currentEntry.PackageVersion, incoming, cancellationToken)
+                : await _store.MoveExplicitOwnershipAsync(operation, currentEntry.PackageId, currentEntry.PackageVersion, incoming, cancellationToken);
 
             if (moved.PreviousEntryRemoved)
             {
@@ -199,6 +364,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                 }
             }
 
+            await ValidatePayloadAsync(prepared, finalPath, CancellationToken.None);
+            operation.CompleteMutation();
             return moved.Entry;
         }
         catch
@@ -213,6 +380,20 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        return await UninstallAsync(operation, packageId, version, ownership, cancellationToken);
+    }
+
+    public async Task<bool> UninstallAsync(IWorkloadOperation operation, string packageId, string version,
+        WorkloadOwnershipKind ownership, CancellationToken cancellationToken)
+    {
+        ValidateOperation(operation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        if (!Enum.IsDefined(ownership))
+        {
+            throw new ArgumentOutOfRangeException(nameof(ownership));
+        }
 
         string physicalPackageId = packageId;
         string physicalVersion = version;
@@ -238,7 +419,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             physicalVersion = logicalMatches[0].PackageVersion;
         }
 
-        WorkloadOwnershipRemovalResult result = await _store.RemoveOwnershipAsync(physicalPackageId, physicalVersion, ownership, cancellationToken);
+        WorkloadOwnershipRemovalResult result = await _store.RemoveOwnershipAsync(operation, physicalPackageId, physicalVersion, ownership, cancellationToken);
         if (!result.OwnershipRemoved)
         {
             return false;
@@ -246,15 +427,17 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
         if (result.EntryRemoved)
         {
-            TryDeleteDirectory(_paths.GetInstallDirectory(physicalPackageId, physicalVersion));
+            DeleteInstallDirectory(_paths.GetInstallDirectory(physicalPackageId, physicalVersion));
         }
 
+        operation.CompleteMutation();
         return true;
     }
 
-    private async Task<WorkloadInstallResult?> TryReuseImplementationCoreAsync(string packageId, string version, string runtimeIdentifier,
+    private async Task<WorkloadInstallResult?> TryReuseImplementationCoreAsync(IWorkloadOperation operation, string packageId, string version, string runtimeIdentifier,
         LogicalPackage logicalPackage, WorkloadEntry? currentLogicalOwner, CancellationToken cancellationToken)
     {
+        ValidateOperation(operation);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
         ArgumentException.ThrowIfNullOrWhiteSpace(runtimeIdentifier);
@@ -267,18 +450,19 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             return null;
         }
 
+        WorkloadOwnershipRules.ValidateDestination(existing, logicalPackage, WorkloadOwnershipKind.Logical);
         currentLogicalOwner ??= ResolveCurrentLogicalOwner(installed, WorkloadOwnershipKind.Logical, logicalPackage);
-        return await AttachOwnershipAsync(existing, WorkloadOwnershipKind.Logical, logicalPackage, currentLogicalOwner, cancellationToken);
+        return await AttachOwnershipAsync(operation, existing, WorkloadOwnershipKind.Logical, logicalPackage, currentLogicalOwner, cancellationToken);
     }
 
-    private async Task<WorkloadInstallResult> AttachOwnershipAsync(WorkloadEntry existing, WorkloadOwnershipKind ownership,
+    private async Task<WorkloadInstallResult> AttachOwnershipAsync(IWorkloadOperation operation, WorkloadEntry existing, WorkloadOwnershipKind ownership,
         LogicalPackage? logicalPackage, WorkloadEntry? currentLogicalOwner, CancellationToken cancellationToken)
     {
         if (LogicalOwnerMoves(currentLogicalOwner, existing.PackageId, existing.PackageVersion))
         {
             WorkloadEntry incoming = CopyForOwnership(existing, WorkloadOwnershipKind.Logical, logicalPackage);
             WorkloadOwnershipMoveResult moved =
-                await _store.MoveLogicalOwnershipAsync(currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, incoming, cancellationToken);
+                await _store.MoveLogicalOwnershipAsync(operation, currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, incoming, cancellationToken);
             if (moved.PreviousEntryRemoved)
             {
                 TryDeleteDirectory(_paths.GetInstallDirectory(currentLogicalOwner.PackageId, currentLogicalOwner.PackageVersion));
@@ -293,8 +477,71 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
 
         WorkloadEntry attached =
-            await _store.AddOwnershipAsync(CopyForOwnership(existing, ownership, logicalPackage), ownership, cancellationToken);
+            await _store.AddOwnershipAsync(operation, CopyForOwnership(existing, ownership, logicalPackage), ownership, cancellationToken);
         return new WorkloadInstallResult(attached, false);
+    }
+
+    private void ValidateOperation(IWorkloadOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        operation.Validate(_paths);
+    }
+
+    private async Task<bool> IsUnregisteredAsync(string packageId, string version)
+    {
+        try
+        {
+            IReadOnlyList<WorkloadEntry> entries = await _store.GetWorkloadsAsync(CancellationToken.None);
+            return !entries.Any(entry => string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
+                && entry.PackageVersion == version);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or GracefulException)
+        {
+            // Failed cleanup inspection must preserve the payload and original failure. The dirty intent blocks subsequent writers.
+            return false;
+        }
+    }
+
+    private async Task ValidateCurrentEntryAsync(IWorkloadOperation operation, WorkloadEntry currentEntry, CancellationToken cancellationToken)
+    {
+        ValidateOperation(operation);
+        ArgumentNullException.ThrowIfNull(currentEntry);
+        WorkloadEntry? actual = (await _store.GetWorkloadsAsync(cancellationToken)).SingleOrDefault(entry =>
+            string.Equals(entry.PackageId, currentEntry.PackageId, StringComparison.OrdinalIgnoreCase)
+            && entry.PackageVersion == currentEntry.PackageVersion);
+        if (actual is null || !WorkloadStateSnapshot.Same(actual, currentEntry))
+        {
+            throw new WorkloadPlanChangedException();
+        }
+    }
+
+    private Task ValidatePreparedAsync(PreparedWorkloadDeployment prepared, CancellationToken cancellationToken)
+        => ValidatePayloadAsync(prepared, prepared.StagingPath, cancellationToken);
+
+    private async Task ValidatePayloadAsync(PreparedWorkloadDeployment prepared, string directory, CancellationToken cancellationToken)
+        => await ValidateHashesAsync(prepared.Hashes, directory, cancellationToken);
+
+    private async Task ValidateHashesAsync(IReadOnlyDictionary<string, string> hashes, string directory, CancellationToken cancellationToken)
+    {
+        if (!_fileSystem.DirectoryExists(directory))
+        {
+            throw new WorkloadPlanChangedException();
+        }
+
+        IReadOnlyList<string> files = _fileSystem.GetFiles(directory);
+        if (files.Count != hashes.Count)
+        {
+            throw new WorkloadPlanChangedException();
+        }
+
+        foreach (string file in files)
+        {
+            if (!hashes.TryGetValue(Path.GetRelativePath(directory, file), out string? expected)
+                || await _fileSystem.ComputeSha256Async(file, cancellationToken) != expected)
+            {
+                throw new WorkloadPlanChangedException();
+            }
+        }
     }
 
     private static WorkloadEntry? ResolveCurrentLogicalOwner(IReadOnlyList<WorkloadEntry> installed, WorkloadOwnershipKind ownership,
@@ -586,17 +833,17 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
     }
 
-    private static void DeleteInstallDirectory(string path)
+    private void DeleteInstallDirectory(string path)
     {
-        if (!Directory.Exists(path))
+        if (!_fileSystem.DirectoryExists(path))
         {
             return;
         }
 
-        Directory.Delete(path, recursive: true);
+        _fileSystem.DeleteDirectory(path);
 
         // Windows can report a successful delete while the directory lingers until the last handle closes.
-        if (Directory.Exists(path))
+        if (_fileSystem.DirectoryExists(path))
         {
             throw new IOException($"Failed to remove the existing install directory '{path}'.");
         }

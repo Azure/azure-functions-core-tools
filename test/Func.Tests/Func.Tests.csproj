@@ -11,6 +11,8 @@
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" />
     <ProjectReference Include="../Fixtures/Templates.Tests.StoreProcess/Templates.Tests.StoreProcess.csproj"
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="../Fixtures/Workloads.Tests.OperationProcess/Workloads.Tests.OperationProcess.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Target Name="RecordCliProductOutput" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="ResolveProjectReferences">
@@ -23,6 +25,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Update/Fixtures/version.json" LogicalName="Azure.Functions.Cli.Tests.Update.Fixtures.version.json" />
+    <EmbeddedResource Include="Templates/Acquisition/Fixtures/basic-companions.json" LogicalName="Azure.Functions.Cli.Tests.Templates.Acquisition.basic-companions.json" />
   </ItemGroup>
 
   <!-- Test fixtures: built and copied to output as content; loaded via reflection. -->

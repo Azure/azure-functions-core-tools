@@ -400,7 +400,7 @@ public sealed class WorkloadProgramSmokeTests(ITestOutputHelper output)
             await File.WriteAllTextAsync(
                 manifest, JsonSerializer.Serialize(metadata, WorkloadJsonContext.Default.WorkloadMetadata), cancellation.Token);
             await File.WriteAllTextAsync(payload, PayloadContent, cancellation.Token);
-            WorkloadStore store = new(workloads);
+            WorkloadStore store = new(workloads, new FileWorkloadOperationCoordinator(workloads));
             await store.SaveWorkloadAsync(workload, cancellation.Token);
 
             string[] preservedFiles = [workloads.WorkloadRegistryPath, manifest, payload, paths.VersionCachePath, source];

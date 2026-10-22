@@ -19,7 +19,7 @@ public class WorkloadManifestSchemaTests : IDisposable
     {
         _tempHome = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         var paths = new WorkloadPathsOptions(_tempHome);
-        _store = new WorkloadStore(paths);
+        _store = new WorkloadStore(paths, new FileWorkloadOperationCoordinator(paths));
         _registryPath = paths.WorkloadRegistryPath;
     }
 

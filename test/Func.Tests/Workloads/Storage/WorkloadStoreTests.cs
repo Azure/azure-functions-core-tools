@@ -18,7 +18,7 @@ public class WorkloadStoreTests : IDisposable
     {
         _tempHome = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         _paths = new WorkloadPathsOptions(_tempHome);
-        _store = new WorkloadStore(_paths);
+        _store = new WorkloadStore(_paths, new FileWorkloadOperationCoordinator(_paths));
     }
 
     public void Dispose()
@@ -473,13 +473,13 @@ public class WorkloadStoreTests : IDisposable
             InstallRefCount = 1,
         };
 
-    private sealed class ThrowingSerializeStore(IWorkloadPaths paths) : WorkloadStore(paths)
+    private sealed class ThrowingSerializeStore(IWorkloadPaths paths) : WorkloadStore(paths, new FileWorkloadOperationCoordinator(paths))
     {
         internal override Task SerializeAsync(Stream stream, WorkloadRegistry registry, CancellationToken cancellationToken)
             => throw new InvalidOperationException("boom");
     }
 
-    private sealed class CountingSerializeStore(IWorkloadPaths paths) : WorkloadStore(paths)
+    private sealed class CountingSerializeStore(IWorkloadPaths paths) : WorkloadStore(paths, new FileWorkloadOperationCoordinator(paths))
     {
         public int SerializeCount { get; private set; }
 

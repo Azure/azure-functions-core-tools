@@ -259,7 +259,7 @@ public sealed class SetupRunnerProfileLifecycleTests
 
         public Fixture(bool secondProfileFails = false, bool firstProfileFails = false)
         {
-            Store = new WorkloadStore(Paths);
+            Store = new WorkloadStore(Paths, new FileWorkloadOperationCoordinator(Paths));
             Scopes = [Profile("p1", "4.1.0", !firstProfileFails), Profile("p2", "4.2.0", !secondProfileFails), Profile("p3", "4.3.0", true)];
             Profiles.ResolveProfileScopesAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<SetupRenderer>(), Arg.Any<CancellationToken>())
                 .Returns(Scopes);

@@ -19,6 +19,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
     <InternalsVisibleTo Include="Azure.Functions.Cli.Templates.Tests.StoreProcess" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.Tests.OperationProcess" />
     <!-- Required for NSubstitute (Castle DynamicProxy) to mock internal interfaces. -->
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
@@ -31,6 +32,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Profiles/BuiltInProfiles.json" LogicalName="Azure.Functions.Cli.Profiles.BuiltInProfiles.json" />
+    <EmbeddedResource Include="Templates/Acquisition/BasicCompanions.json" LogicalName="Azure.Functions.Cli.Templates.Acquisition.BasicCompanions.json" />
   </ItemGroup>
 
   <ItemGroup>
