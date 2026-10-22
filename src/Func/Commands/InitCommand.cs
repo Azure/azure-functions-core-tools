@@ -59,6 +59,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IFunctionsProjectResolver _projectResolver;
     private readonly IHostJsonBundleSectionReader _bundleSectionReader;
     private readonly InstalledBundleScanner _bundleScanner;
+    private readonly IFileSystem _fileSystem;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
     public InitCommand(
@@ -68,6 +69,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IFunctionsProjectResolver projectResolver,
         IHostJsonBundleSectionReader bundleSectionReader,
         InstalledBundleScanner bundleScanner,
+        IFileSystem fileSystem,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
@@ -77,6 +79,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         ArgumentNullException.ThrowIfNull(projectResolver);
         ArgumentNullException.ThrowIfNull(bundleSectionReader);
         ArgumentNullException.ThrowIfNull(bundleScanner);
+        ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
@@ -85,6 +88,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _projectResolver = projectResolver;
         _bundleSectionReader = bundleSectionReader;
         _bundleScanner = bundleScanner;
+        _fileSystem = fileSystem;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -304,7 +308,24 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         if (healExisting)
         {
-            MergeLanguageIntoConfig(workingDirectory.Info, persistedLanguage);
+            try
+            {
+                await MergeLanguageIntoConfigAsync(workingDirectory.Info, persistedLanguage, cancellationToken);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                throw new GracefulException(
+                    $"Could not repair '{CliConfigurationPathsOptions.ProjectConfigDisplayPath}'. " +
+                    "Check that the file contains valid JSON and is writable, then re-run `func init`. The project was not completed.",
+                    ex,
+                    isUserError: true);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            _interaction.WriteLine(l => l
+                .Muted("· Updated ")
+                .Code(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
+                .Muted($" with language: {persistedLanguage}."));
             _interaction.WriteBlankLine();
             _interaction.WriteLine(l => l
                 .Success("✓ ")
@@ -314,7 +335,24 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return 0;
         }
 
-        WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
+        try
+        {
+            await WriteCliConfigurationFileAsync(workingDirectory.Info, initializer.Stack, persistedLanguage, force, cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            throw new GracefulException(
+                $"Could not write '{CliConfigurationPathsOptions.ProjectConfigDisplayPath}'. " +
+                "Check the configuration path and write permissions, then re-run `func init`. The project was not initialized.",
+                ex,
+                isUserError: true);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        _interaction.WriteLine(l => l
+            .Muted("· Wrote ")
+            .Code(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
+            .Muted("."));
         _interaction.WriteBlankLine();
 
         if (adoptExisting)
@@ -573,96 +611,74 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
     }
 
-    private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
+    /// <summary>
+    /// Atomically creates required CLI configuration before adoption or scaffolding.
+    /// </summary>
+    /// <exception cref="IOException">The configuration could not be written.</exception>
+    /// <exception cref="UnauthorizedAccessException">The configuration path is not writable.</exception>
+    /// <exception cref="InvalidOperationException">User configuration appeared before a non-forced write.</exception>
+    private async Task WriteCliConfigurationFileAsync(
+        DirectoryInfo workingDirectory, string? stack, string? language, bool force, CancellationToken cancellationToken)
     {
-        string folder = CliConfigurationPathsOptions.GetProjectConfigFolderPath(workingDirectory);
+        cancellationToken.ThrowIfCancellationRequested();
         string path = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
 
         // Treat an existing file as user-owned unless --force was passed.
-        if (File.Exists(path) && !force)
+        if (_fileSystem.FileExists(path) && !force)
         {
-            return;
+            throw new InvalidOperationException("Existing project configuration was not replaced.");
         }
 
-        try
+        var stackConfig = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(stack))
         {
-            Directory.CreateDirectory(folder);
-
-            var stackConfig = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (!string.IsNullOrWhiteSpace(stack))
-            {
-                stackConfig[CliConfigurationNames.StackRuntimeKey] = stack;
-            }
-            if (!string.IsNullOrWhiteSpace(language))
-            {
-                stackConfig[CliConfigurationNames.StackLanguageKey] = language;
-            }
-
-            var payload = new Dictionary<string, object>(StringComparer.Ordinal);
-            if (stackConfig.Count > 0)
-            {
-                payload[CliConfigurationNames.StackSectionName] = stackConfig;
-            }
-
-            string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-            });
-
-            File.WriteAllText(path, json + Environment.NewLine);
-
-            _interaction.WriteLine(l => l
-                .Muted("· Wrote ")
-                .Code(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
-                .Muted("."));
+            stackConfig[CliConfigurationNames.StackRuntimeKey] = stack;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        if (!string.IsNullOrWhiteSpace(language))
         {
-            // Skeleton write failed; warn and let init succeed. The user can
-            // create .func/config.json by hand if they want stack pinning.
-            _interaction.WriteLine(l => l
-                .Warning("! ")
-                .Muted($"Could not write {CliConfigurationPathsOptions.ProjectConfigDisplayPath} (")
-                .Code(ex.Message)
-                .Muted(")."));
+            stackConfig[CliConfigurationNames.StackLanguageKey] = language;
+        }
+
+        var payload = new Dictionary<string, object>(StringComparer.Ordinal);
+        if (stackConfig.Count > 0)
+        {
+            payload[CliConfigurationNames.StackSectionName] = stackConfig;
+        }
+
+        string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        if (force)
+        {
+            await _fileSystem.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
+        }
+        else
+        {
+            await _fileSystem.CreateAllTextAsync(path, json + Environment.NewLine, cancellationToken);
         }
     }
 
-    // Patches stack.language into an existing .func/config.json without
-    // touching any other key. Used for the PartiallyInitialized heal path so
-    // users keep their profiles / custom keys instead of reaching for --force.
-    private void MergeLanguageIntoConfig(DirectoryInfo workingDirectory, string? language)
+    /// <summary>
+    /// Atomically fills the missing language while preserving every other configuration key.
+    /// </summary>
+    /// <exception cref="IOException">The existing configuration could not be read or updated.</exception>
+    /// <exception cref="UnauthorizedAccessException">The configuration path is not accessible.</exception>
+    /// <exception cref="JsonException">The existing configuration is invalid.</exception>
+    private async Task MergeLanguageIntoConfigAsync(
+        DirectoryInfo workingDirectory, string? language, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(language))
-        {
-            return;
-        }
-
+        ArgumentException.ThrowIfNullOrWhiteSpace(language);
+        cancellationToken.ThrowIfCancellationRequested();
         string path = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
-        try
-        {
-            string existing = File.ReadAllText(path);
-            JsonObject root = JsonNode.Parse(existing) as JsonObject ?? [];
-            JsonObject stack = root[CliConfigurationNames.StackSectionName] as JsonObject ?? [];
-            stack[CliConfigurationNames.StackLanguageKey] = language;
-            root[CliConfigurationNames.StackSectionName] = stack;
+        string existing = await _fileSystem.ReadAllTextIfExistsAsync(path, cancellationToken)
+            ?? throw new FileNotFoundException("The project configuration to repair is missing.", path);
+        JsonObject root = JsonNode.Parse(existing) as JsonObject
+            ?? throw new JsonException("Project configuration must contain a JSON object.");
+        JsonObject stack = root[CliConfigurationNames.StackSectionName] as JsonObject
+            ?? throw new JsonException("Project configuration must contain a stack object.");
+        stack[CliConfigurationNames.StackLanguageKey] = language;
 
-            string json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(path, json + Environment.NewLine);
-
-            _interaction.WriteLine(l => l
-                .Muted("· Updated ")
-                .Code(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
-                .Muted($" with language: {language}."));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            _interaction.WriteLine(l => l
-                .Warning("! ")
-                .Muted($"Could not update {CliConfigurationPathsOptions.ProjectConfigDisplayPath} (")
-                .Code(ex.Message)
-                .Muted(")."));
-        }
+        string json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        cancellationToken.ThrowIfCancellationRequested();
+        await _fileSystem.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
     }
 
     private async Task<(string? Language, int? ErrorCode)> ResolveLanguageAsync(

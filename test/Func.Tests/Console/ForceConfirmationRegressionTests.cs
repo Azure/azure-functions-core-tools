@@ -5,6 +5,7 @@ using System.CommandLine;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Quickstart;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
@@ -59,7 +60,7 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
         await AssertForceConfirmationAsync(
             service => new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), localSettings,
                 Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-                new InstalledBundleScanner(bundles), [initializer]),
+                new InstalledBundleScanner(bundles), new PhysicalFileSystem(), [initializer]),
             stdoutInput, stdoutAnsi, stderrInput, stderrAnsi, response, CancellationToken.None);
 
         await initializer.Received(!stdoutInput || response == Response.Yes ? 1 : 0).InitializeAsync(

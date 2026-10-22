@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Tests.Common;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
@@ -43,8 +44,9 @@ public class InitCommandTests
             .Returns([]);
     }
 
-    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
+    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers, IFileSystem? fileSystem = null) =>
+        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+            new InstalledBundleScanner(_installedBundles), fileSystem ?? new PhysicalFileSystem(), initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -655,7 +657,8 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [dotnet]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+                new InstalledBundleScanner(_installedBundles), new PhysicalFileSystem(), [dotnet]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
@@ -819,7 +822,8 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var python = new FakeProjectInitializer("python");
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [python]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+                new InstalledBundleScanner(_installedBundles), new PhysicalFileSystem(), [python]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync();
@@ -1274,6 +1278,605 @@ public class InitCommandTests
         finally
         {
             CleanupDirectory(newDir);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_ConfigWriteFails_DoesNotReportSuccessOrScaffold()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string hostPath = Path.Combine(directory, "host.json");
+            string configFolder = Path.Combine(directory, ".func");
+            File.WriteAllText(hostPath, "{\"version\":\"2.0\"}");
+            File.WriteAllText(configFolder, "user-owned file");
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer]);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            exception.Which.InnerException.Should().BeAssignableTo<IOException>();
+            exception.Which.Message.Should().Contain(CliConfigurationPathsOptions.ProjectConfigDisplayPath);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(hostPath).Should().Be("{\"version\":\"2.0\"}");
+            File.ReadAllText(configFolder).Should().Be("user-owned file");
+            _interaction.Lines.Should().NotContain(line => line.Contains("Existing project adopted", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Heal_ConfigBecomesInvalid_DoesNotReportSuccessOrReplaceIt()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            File.WriteAllText(configPath, "{\"stack\":{\"runtime\":\"dotnet\"},\"custom\":\"keep\"}");
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    File.WriteAllText(configPath, "invalid JSON");
+                    return ProjectResolutionResults.Resolved(new StubFunctionsProject("dotnet", "C#"), "stub");
+                });
+            var initializer = new FakeProjectInitializer("dotnet", supportedLanguages: ["C#", "F#"]);
+            var command = CreateCommand([initializer]);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            exception.Which.InnerException.Should().BeAssignableTo<JsonException>();
+            exception.Which.Message.Should().Contain(CliConfigurationPathsOptions.ProjectConfigDisplayPath);
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(configPath).Should().Be("invalid JSON");
+            _interaction.Lines.Should().NotContain(line => line.Contains("Existing project completed", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitCommand_Heal_ConfigReadFails_PreservesProjectAndCause(bool denied)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            File.WriteAllText(configPath, """{"stack":{"runtime":"node"},"profiles":["custom"],"custom":{"keep":true}}""");
+            byte[] original = File.ReadAllBytes(configPath);
+            var fileSystem = Substitute.For<IFileSystem>();
+            Exception failure = denied ? new UnauthorizedAccessException("denied") : new IOException("read failed");
+            fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>())
+                .Returns(Task.FromException<string?>(failure));
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            exception.Which.InnerException.Should().BeSameAs(failure);
+            exception.Which.IsUserError.Should().BeTrue();
+            exception.Which.Message.Should().Contain(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
+                .And.Contain("re-run `func init`");
+            File.ReadAllBytes(configPath).Should().Equal(original);
+            await fileSystem.Received(1).ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>());
+            await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task InitCommand_ConfigPersistenceFails_PreservesProjectAndCause(bool heal, bool denied)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string hostPath = Path.Combine(directory, "host.json");
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            const string original = """{"stack":{"runtime":"node"},"profiles":["custom"],"custom":{"keep":true}}""";
+            File.WriteAllText(hostPath, "{\"version\":\"2.0\"}");
+            if (heal) File.WriteAllText(configPath, original);
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>()).Returns(original);
+            Exception failure = denied ? new UnauthorizedAccessException("denied") : new IOException("write failed");
+            if (heal)
+            {
+                fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(Task.FromException(failure));
+            }
+            else
+            {
+                fileSystem.CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(Task.FromException(failure));
+            }
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            exception.Which.InnerException.Should().BeSameAs(failure);
+            exception.Which.IsUserError.Should().BeTrue();
+            exception.Which.Message.Should().Contain("re-run `func init`");
+            initializer.WasInvoked.Should().BeFalse();
+            File.ReadAllText(hostPath).Should().Be("{\"version\":\"2.0\"}");
+            if (heal) File.ReadAllText(configPath).Should().Be(original);
+            else File.Exists(configPath).Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+            if (heal)
+            {
+                await fileSystem.Received(1).WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            }
+            else
+            {
+                await fileSystem.Received(1).CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            }
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitCommand_ConfigWriteIsCancelled_DoesNotReportSuccessOrScaffold(bool heal)
+    {
+        using var cancellation = new CancellationTokenSource();
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            const string original = """{"stack":{"runtime":"node"},"custom":"keep"}""";
+            File.WriteAllText(Path.Combine(directory, "host.json"), "{}");
+            if (heal) File.WriteAllText(configPath, original);
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>()).Returns(original);
+            Task CancelWriteAsync(CancellationToken forwarded)
+            {
+                forwarded.CanBeCanceled.Should().BeTrue();
+                cancellation.Cancel();
+                forwarded.IsCancellationRequested.Should().BeTrue();
+                return Task.FromCanceled(forwarded);
+            }
+            if (heal)
+            {
+                fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(call => CancelWriteAsync(call.Arg<CancellationToken>()));
+            }
+            else
+            {
+                fileSystem.CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(call => CancelWriteAsync(call.Arg<CancellationToken>()));
+            }
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token))
+                .Should().ThrowAsync<OperationCanceledException>();
+
+            initializer.WasInvoked.Should().BeFalse();
+            if (heal) File.ReadAllText(configPath).Should().Be(original);
+            else File.Exists(configPath).Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task InitCommand_CancelledAfterConfigCommit_PreservesConfigWithoutSuccessOrScaffolding(bool adopt, bool heal)
+    {
+        using var cancellation = new CancellationTokenSource();
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            const string original = """{"stack":{"runtime":"node"},"custom":"keep"}""";
+            if (adopt || heal) File.WriteAllText(Path.Combine(directory, "host.json"), "{}");
+            if (heal) File.WriteAllText(configPath, original);
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>()).Returns(original);
+            async Task CommitAndCancelAsync(string contents, CancellationToken forwarded)
+            {
+                forwarded.CanBeCanceled.Should().BeTrue();
+                PhysicalFileSystem physical = new();
+                if (heal) await physical.WriteAllTextAsync(configPath, contents, forwarded);
+                else await physical.CreateAllTextAsync(configPath, contents, forwarded);
+                cancellation.Cancel();
+                forwarded.IsCancellationRequested.Should().BeTrue();
+            }
+            if (heal)
+            {
+                fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(call => CommitAndCancelAsync(call.ArgAt<string>(1), call.Arg<CancellationToken>()));
+            }
+            else
+            {
+                fileSystem.CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(call => CommitAndCancelAsync(call.ArgAt<string>(1), call.Arg<CancellationToken>()));
+            }
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token))
+                .Should().ThrowAsync<OperationCanceledException>();
+
+            AssertConfigJsonHasShape(directory, expectedStack: "node", expectedLanguage: "javascript");
+            if (heal)
+            {
+                using var config = JsonDocument.Parse(File.ReadAllText(configPath));
+                config.RootElement.GetProperty("custom").GetString().Should().Be("keep");
+            }
+            Directory.GetFiles(Path.Combine(directory, ".func"), "config.json.tmp.*").Should().BeEmpty();
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+            if (heal)
+            {
+                await fileSystem.Received(1).WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            }
+            else
+            {
+                await fileSystem.Received(1).CreateAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            }
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitCommand_CancelledAfterLanguageDetection_DoesNotStartConfigWrite(bool heal)
+    {
+        using var cancellation = new CancellationTokenSource();
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            const string original = """{"stack":{"runtime":"node"},"custom":"keep"}""";
+            File.WriteAllText(Path.Combine(directory, "host.json"), "{}");
+            if (heal) File.WriteAllText(configPath, original);
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>()).Returns(_ =>
+            {
+                cancellation.Cancel();
+                return ProjectResolutionResults.Resolved(new StubFunctionsProject("node", "JavaScript"), "stub");
+            });
+            var fileSystem = Substitute.For<IFileSystem>();
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token))
+                .Should().ThrowAsync<OperationCanceledException>();
+
+            await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            initializer.WasInvoked.Should().BeFalse();
+            if (heal) File.ReadAllText(configPath).Should().Be(original);
+            else File.Exists(configPath).Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_NewProject_ConfigWriteFails_DoesNotInvokeInitializer()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var fileSystem = Substitute.For<IFileSystem>();
+            var failure = new IOException("write failed");
+            fileSystem.CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromException(failure));
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            exception.Which.InnerException.Should().BeSameAs(failure);
+            initializer.WasInvoked.Should().BeFalse();
+            Directory.GetFileSystemEntries(directory).Should().BeEmpty();
+            _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitCommand_Force_ConfigWriteFails_PreservesCauseWithoutScaffolding(bool denied)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            File.WriteAllText(configPath, """{"stack":{"runtime":"node"},"custom":"previous"}""");
+            File.WriteAllText(Path.Combine(directory, "previous.txt"), "previous source");
+            var fileSystem = Substitute.For<IFileSystem>();
+            Exception failure = denied ? new UnauthorizedAccessException("denied") : new IOException("write failed");
+            fileSystem.WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    Directory.GetFileSystemEntries(directory).Should().BeEmpty();
+                    return Task.FromException(failure);
+                });
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript", "--force"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            exception.Which.InnerException.Should().BeSameAs(failure);
+            exception.Which.IsUserError.Should().BeTrue();
+            exception.Which.Message.Should().Contain(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
+                .And.Contain("re-run `func init`");
+            await fileSystem.Received(1).WriteAllTextAsync(configPath, Arg.Any<string>(), Arg.Any<CancellationToken>());
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            initializer.WasInvoked.Should().BeFalse();
+            Directory.GetFileSystemEntries(directory).Should().BeEmpty();
+            _interaction.Lines.Should().OnlyContain(line => line.StartsWith("WARNING:", StringComparison.Ordinal)
+                || line.StartsWith("CONFIRM:", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_ConfigAppearsBeforeWrite_DoesNotReplaceIt()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            File.WriteAllText(Path.Combine(directory, "host.json"), "{}");
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.FileExists(CliConfigurationPathsOptions.GetProjectConfigPath(new(directory))).Returns(true);
+            var initializer = new FakeProjectInitializer("node");
+            var command = CreateCommand([initializer], fileSystem);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            exception.Which.InnerException.Should().BeOfType<InvalidOperationException>();
+            await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            await fileSystem.DidNotReceiveWithAnyArgs().CreateAllTextAsync(default!, default!, default);
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task InitCommand_ConfigAppearsAtAtomicCommit_RespectsForce(bool adopt, bool force)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string hostPath = Path.Combine(directory, "host.json");
+            if (adopt) File.WriteAllText(hostPath, "{\"version\":\"2.0\",\"keep\":true}");
+            byte[] sentinel = [0, 1, 255, 42];
+            var fileSystem = new CommitBoundaryFileSystem(destination => File.WriteAllBytes(destination, sentinel));
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            File.Exists(configPath).Should().BeFalse();
+            List<string> arguments = [directory, "--stack", "node", "--language", "javascript"];
+            if (force) arguments.Add("--force");
+            int? exitCode = null;
+
+            var failure = await Record.ExceptionAsync(async () => exitCode = await command.Parse([.. arguments])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }));
+
+            fileSystem.CommitCalls.Should().Be(1);
+            Directory.GetFiles(Path.GetDirectoryName(configPath)!).Should().Equal(configPath);
+            if (force)
+            {
+                failure.Should().BeNull();
+                exitCode.Should().Be(0);
+                initializer.WasInvoked.Should().BeTrue();
+                AssertConfigJsonHasShape(directory, expectedStack: "node", expectedLanguage: "javascript");
+            }
+            else
+            {
+                File.ReadAllBytes(configPath).Should().Equal(sentinel);
+                var graceful = failure.Should().BeOfType<GracefulException>().Subject;
+                graceful.InnerException.Should().BeSameAs(fileSystem.CommitFailure);
+                graceful.InnerException.Should().BeAssignableTo<IOException>();
+                graceful.IsUserError.Should().BeTrue();
+                exitCode.Should().BeNull();
+                initializer.WasInvoked.Should().BeFalse();
+                _interaction.Lines.Should().BeEmpty();
+                if (adopt) File.ReadAllText(hostPath).Should().Be("{\"version\":\"2.0\",\"keep\":true}");
+
+                int repeated = await command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                    .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+                repeated.Should().Be(1);
+                fileSystem.CommitCalls.Should().Be(1);
+                File.ReadAllBytes(configPath).Should().Equal(sentinel);
+                initializer.WasInvoked.Should().BeFalse();
+            }
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public void InitCommand_NullFileSystem_Throws()
+    {
+        FluentActions.Invoking(() => new InitCommand(
+            _interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+            new InstalledBundleScanner(_installedBundles), null!, []))
+            .Should().ThrowExactly<ArgumentNullException>().WithParameterName("fileSystem");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("[]")]
+    [InlineData("{}")]
+    [InlineData("{\"stack\":[]}")]
+    public async Task InitCommand_Heal_ConfigCannotBeMerged_DoesNotWriteReplacement(string? current)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            const string original = """{"stack":{"runtime":"node"},"custom":"keep"}""";
+            File.WriteAllText(configPath, original);
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>()).Returns(current);
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>();
+
+            if (current is null) exception.Which.InnerException.Should().BeOfType<FileNotFoundException>();
+            else exception.Which.InnerException.Should().BeAssignableTo<JsonException>();
+            await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            File.ReadAllText(configPath).Should().Be(original);
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Heal_CancelledDuringConfigRead_DoesNotStartWrite()
+    {
+        using var cancellation = new CancellationTokenSource();
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        try
+        {
+            string configPath = Path.Combine(directory, ".func", "config.json");
+            const string original = """{"stack":{"runtime":"node"},"custom":"keep"}""";
+            File.WriteAllText(configPath, original);
+            var fileSystem = Substitute.For<IFileSystem>();
+            fileSystem.ReadAllTextIfExistsAsync(configPath, Arg.Any<CancellationToken>()).Returns(_ =>
+            {
+                cancellation.Cancel();
+                return original;
+            });
+            var initializer = new FakeProjectInitializer("node", supportedLanguages: ["JavaScript", "TypeScript"]);
+            var command = CreateCommand([initializer], fileSystem);
+
+            await FluentActions.Awaiting(() => command.Parse([directory, "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, cancellation.Token))
+                .Should().ThrowAsync<OperationCanceledException>();
+
+            await fileSystem.DidNotReceiveWithAnyArgs().WriteAllTextAsync(default!, default!, default);
+            File.ReadAllText(configPath).Should().Be(original);
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Adopt_UnexpectedWriterFailure_IsNotWrapped()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            File.WriteAllText(Path.Combine(directory, "host.json"), "{}");
+            var fileSystem = Substitute.For<IFileSystem>();
+            var failure = new NotSupportedException("unexpected writer defect");
+            fileSystem.CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromException(failure));
+            var initializer = new FakeProjectInitializer("node");
+            var command = CreateCommand([initializer], fileSystem);
+
+            var exception = await FluentActions.Awaiting(() => command.Parse([directory, "--stack", "node", "--language", "javascript"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowExactlyAsync<NotSupportedException>();
+
+            exception.Which.Should().BeSameAs(failure);
+            initializer.WasInvoked.Should().BeFalse();
+            _interaction.Lines.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
         }
     }
 
