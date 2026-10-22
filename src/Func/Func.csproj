@@ -14,7 +14,7 @@
     <IsPackable>false</IsPackable>
     <IsPublishable>true</IsPublishable>
     <EnableDemoProject>true</EnableDemoProject>
-    <DefineConstants>$(DefineConstants);FUNC_HOST_DOTNET_TEMPLATES;FUNC_GO_TEMPLATE_HELPERS;FUNC_POWERSHELL_TEMPLATE_HELPERS;FUNC_PYTHON_TEMPLATE_HELPERS</DefineConstants>
+    <DefineConstants>$(DefineConstants);FUNC_HOST_DOTNET_TEMPLATES;FUNC_GO_TEMPLATE_HELPERS;FUNC_POWERSHELL_TEMPLATE_HELPERS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -48,8 +48,6 @@
     <Compile Include="../Workloads/Stacks/Go/GoProjectPreparation.cs" Link="Templates/Go/GoProjectPreparation.cs" />
     <Compile Include="../Workloads/Stacks/PowerShell/PowerShellProjectPreparation.cs" Link="Templates/PowerShell/PowerShellProjectPreparation.cs" />
     <EmbeddedResource Include="../Workloads/Stacks/PowerShell/Templates/requirements.psd1" LogicalName="func.Templates.requirements.psd1" />
-    <Compile Include="../Workloads/Stacks/Python/IPythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/IPythonTemplateAppendExecutor.cs" />
-    <Compile Include="../Workloads/Stacks/Python/PythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/PythonTemplateAppendExecutor.cs" />
   </ItemGroup>
 
   <ItemGroup>

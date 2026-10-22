@@ -10,6 +10,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="func" />
     <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.Python" />
   </ItemGroup>
 
   <ItemGroup>

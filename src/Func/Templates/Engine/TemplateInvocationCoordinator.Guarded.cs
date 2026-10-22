@@ -66,7 +66,8 @@ internal sealed partial class TemplateInvocationCoordinator
             requiresLayout = true;
         }
         NativeTemplatePolicyCandidate? owned = _policies is null ? null
-            : await _policies.QualifyProjectAsync(source, requiresLayout, cancellationToken);
+            : await _policies.QualifyProjectAsync(source, requiresLayout, cancellationToken,
+                allowCoreLayoutFallback: _projectSupport.QualifyLayoutAsync is not null);
         NativeProjectLayoutQualification? layout = owned?.Project is { } anchor
             ? new(entry.Identity, configuration.Fingerprint, anchor) { Policy = owned }
             : owned is null && _projectSupport.QualifyLayoutAsync is { } qualify ? await qualify(source, cancellationToken) : null;

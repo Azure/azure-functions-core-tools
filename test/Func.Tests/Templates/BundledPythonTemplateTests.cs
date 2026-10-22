@@ -72,6 +72,7 @@ public sealed partial class BundledPythonTemplateTests : IDisposable
         using var inner = new PackageArchiveReader(_archive);
 
         outer.NuspecReader.GetPackageTypes().Select(type => type.Name).Should().Contain("FuncCliWorkload").And.NotContain("FuncTemplate");
+        outer.GetFiles().Should().Contain(["tools/any/Azure.Functions.Cli.Workloads.Python.dll", "tools/any/Azure.Functions.Cli.Templates.V2.dll"]);
         inner.NuspecReader.GetPackageTypes().Select(type => type.Name).Should().Equal("FuncTemplate");
         inner.NuspecReader.GetId().Should().Be("Azure.Functions.Templates.Python");
         inner.NuspecReader.GetVersion().Should().Be(outer.NuspecReader.GetVersion());

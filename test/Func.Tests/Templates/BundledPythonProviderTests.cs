@@ -8,9 +8,9 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Python;
-using Azure.Functions.Cli.Templates.Python.Shared;
+using Azure.Functions.Cli.Templates.Native;
 using Azure.Functions.Cli.Tests.Templates.Engine;
+using Azure.Functions.Cli.Workloads.Python;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge.Template;
 using NSubstitute;
@@ -28,7 +28,7 @@ public sealed partial class BundledPythonTemplateTests
         await InstallAsync();
         using var templater = CreateTemplater(await ReadBundleAsync(channel));
         var entries = await templater.ListAsync(TemplateType.Item);
-        var reader = new PythonTemplateSourceReader();
+        var reader = new PythonPolicyTestReader();
         var eligible = entries.Where(entry => entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible).ToList();
         eligible.Should().HaveCount(expected * 2);
         foreach (var entry in eligible)
@@ -43,7 +43,8 @@ public sealed partial class BundledPythonTemplateTests
             {
                 result.Binding.Append.Should().NotBeNull();
                 result.Binding.Append!.Package.Should().Be(entry.Package);
-                result.Binding.Append.ConfigurationSha256.Should().Be(selected.ConfigurationSha256!.ToLowerInvariant());
+                string.Equals(result.Binding.Append.ConfigurationSha256, selected.ConfigurationSha256, StringComparison.OrdinalIgnoreCase)
+                    .Should().BeTrue();
                 result.Binding.Append.CreateTargetFileName.Should().Be("function_app.py");
                 result.Compatibility.Should().NotBeNull();
             }
@@ -112,7 +113,7 @@ public sealed partial class BundledPythonTemplateTests
         var result = await provider.Compatibility.ResolveAsync(helper, parsed, "Greeting", false, CancellationToken.None);
 
         result.Succeeded.Should().BeFalse();
-        result.Diagnostics.Should().Contain(diagnostic => diagnostic.Contains("Internal Python", StringComparison.Ordinal));
+        result.Diagnostics.Should().Contain(diagnostic => diagnostic.Contains("internal helper", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -121,14 +122,14 @@ public sealed partial class BundledPythonTemplateTests
         await InstallAsync();
         using var templater = CreateTemplater(await ReadBundleAsync("stable"));
         var selected = (await templater.ResolveGroupAsync("HttpTrigger-Python", TemplateType.Item)).Group!.Single();
-        var source = await new PythonTemplateSourceReader().ReadAsync(selected, CancellationToken.None);
+        var source = await new PythonPolicyTestReader().ReadAsync(selected, CancellationToken.None);
         var root = WorkingDirectory.FromExplicit(Path.Combine(_root, "capability"));
         Directory.CreateDirectory(root.Info.FullName);
         var app = Path.Combine(root.Info.FullName, "function_app.py");
         File.WriteAllText(app, "user code\n");
         var digest = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(app)));
         var executor = Substitute.For<IPythonTemplateAppendExecutor>();
-        var capability = new PythonAppendCapability(new PhysicalFileSystem(), new PythonTemplateSourceReader(), executor, selected, root);
+        var capability = CreatePythonAppendCapability(selected, root, executor);
         var append = new TemplateAppendFileEffect(source.HelperSource, app, "native expanded snippet", digest);
         var unsupported = new TemplateRestoreEffect(source.HelperSource, Path.Combine(root.Info.FullName, "project.csproj"), false);
 
@@ -150,15 +151,15 @@ public sealed partial class BundledPythonTemplateTests
         await InstallAsync();
         using var templater = CreateTemplater(await ReadBundleAsync("stable"));
         var selected = (await templater.ResolveGroupAsync("HttpTrigger-Python", TemplateType.Item)).Group!.Single();
-        var source = await new PythonTemplateSourceReader().ReadAsync(selected, CancellationToken.None);
+        var source = await new PythonPolicyTestReader().ReadAsync(selected, CancellationToken.None);
         var root = WorkingDirectory.FromExplicit(Path.Combine(_root, "capability"));
         Directory.CreateDirectory(root.Info.FullName);
         var app = Path.Combine(root.Info.FullName, "function_app.py");
         File.WriteAllText(app, "user code");
         var executor = Substitute.For<IPythonTemplateAppendExecutor>();
-        var guard = Substitute.For<PythonAppendTargetGuard>();
+        var guard = Substitute.ForPartsOf<PythonAppendTargetGuard>();
         guard.GetDiagnostic(root.Info.FullName, app).Returns("Linked target refused.");
-        var capability = new PythonAppendCapability(new PhysicalFileSystem(), new PythonTemplateSourceReader(), executor, selected, root, guard);
+        var capability = CreatePythonAppendCapability(selected, root, executor, guard);
         var append = new TemplateAppendFileEffect(source.HelperSource, app, "expanded", Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(app))));
 
         var result = await capability.ExecuteAsync(append, CancellationToken.None);
@@ -173,18 +174,20 @@ public sealed partial class BundledPythonTemplateTests
     public void PythonProvider_NullDependencies_AreRejected()
     {
         var sources = new PythonTemplateSourceReader();
-        var interaction = Substitute.For<IInteractionService>();
-        var files = new PhysicalFileSystem();
         var executor = new PythonTemplateAppendExecutor();
+        var guard = new PythonAppendTargetGuard();
+        var selected = Substitute.For<NativeTemplateSource>();
+        var output = WorkingDirectory.FromExplicit(Path.GetTempPath());
         Action[] constructors =
         [
-            () => new PythonItemCompatibility(null!, sources),
-            () => new PythonItemCompatibility(interaction, null!),
-            () => new PythonSelectedItemEffects(null!, sources, executor, false),
-            () => new PythonSelectedItemEffects(files, null!, executor, false),
-            () => new PythonSelectedItemEffects(files, sources, null!, false),
-            () => new PythonItemWorkflowProvider(null!, new(files, sources, executor, false)),
-            () => new PythonItemWorkflowProvider(new(interaction, sources), null!),
+            () => new PythonTemplatePolicy(null!, executor, guard),
+            () => new PythonTemplatePolicy(sources, null!, guard),
+            () => new PythonTemplatePolicy(sources, executor, null!),
+            () => new PythonAppendCapability(null!, executor, selected, output, guard),
+            () => new PythonAppendCapability(sources, null!, selected, output, guard),
+            () => new PythonAppendCapability(sources, executor, null!, output, guard),
+            () => new PythonAppendCapability(sources, executor, selected, null!, guard),
+            () => new PythonAppendCapability(sources, executor, selected, output, null!),
         ];
         foreach (var constructor in constructors)
         {
@@ -218,8 +221,7 @@ public sealed partial class BundledPythonTemplateTests
             }
         });
         var selected = (await templater.ResolveGroupAsync("HttpTrigger-Python", TemplateType.Item)).Group!.Single();
-        PythonSelectedItemEffects effects = new(
-            new PhysicalFileSystem(), new PythonTemplateSourceReader(), new PythonTemplateAppendExecutor(), confirmed: true);
+        var effects = CreatePythonProvider().Effects;
         var binding = await effects.ResolveAsync(selected, cancellation.Token);
         var request = new TemplateInvocationRequest(root, new Dictionary<string, string?> { ["httpTrigger-authLevel"] = "ANONYMOUS" }, "Greeting");
 
@@ -241,13 +243,24 @@ public sealed partial class BundledPythonTemplateTests
     }
 
     [Fact]
-    public void PythonProvider_HostHelpersDoNotReferencePhysicalStackAssemblyOrIntroducePublicTypes()
+    public void PythonProvider_CoreAssemblyDoesNotOwnPythonTemplateImplementations()
     {
-        var host = typeof(PythonItemWorkflowProvider).Assembly;
+        var host = typeof(Templater).Assembly;
+
+        host.GetTypes().Where(type => type.Namespace is not null
+            && type.Namespace.StartsWith("Azure.Functions.Cli.Templates.Python", StringComparison.Ordinal)).Should().BeEmpty();
         host.GetReferencedAssemblies().Select(assembly => assembly.Name).Should().NotContain("Azure.Functions.Cli.Workloads.Python");
-        typeof(PythonItemWorkflowProvider).IsPublic.Should().BeFalse();
-        typeof(PythonProjectWorkflowProvider).IsPublic.Should().BeFalse();
-        typeof(PythonTemplateAppendExecutor).Assembly.Should().BeSameAs(host);
+    }
+
+    [Fact]
+    public void PythonProvider_StackOwnsPolicyReaderAndExecutorWithoutReferencingCoreOrIntroducingPublicTypes()
+    {
+        var workload = typeof(PythonTemplatePolicy).Assembly;
+        workload.GetReferencedAssemblies().Select(assembly => assembly.Name).Should().NotContain("func");
+        typeof(PythonTemplatePolicy).IsPublic.Should().BeFalse();
+        typeof(PythonTemplateSourceReader).IsPublic.Should().BeFalse();
+        typeof(PythonTemplateSourceReader).Assembly.Should().BeSameAs(workload);
+        typeof(PythonTemplateAppendExecutor).Assembly.Should().BeSameAs(workload);
         typeof(PythonTemplateAppendExecutor).IsPublic.Should().BeFalse();
     }
 
@@ -257,7 +270,7 @@ public sealed partial class BundledPythonTemplateTests
         await InstallAsync();
         using var templater = CreateTemplater(await ReadBundleAsync("stable"));
         var selected = (await templater.ResolveGroupAsync("HttpTrigger-Python", TemplateType.Item)).Group!.Single();
-        var source = await new PythonTemplateSourceReader().ReadAsync(selected, CancellationToken.None);
+        var source = await new PythonPolicyTestReader().ReadAsync(selected, CancellationToken.None);
         var targetRoot = Directory.CreateDirectory(Path.Combine(_root, "real-target"));
         var realApp = Path.Combine(targetRoot.FullName, "function_app.py");
         File.WriteAllText(realApp, "user code\n");
@@ -266,8 +279,7 @@ public sealed partial class BundledPythonTemplateTests
         var targetLink = Path.Combine(outside.FullName, "function_app.py");
         File.CreateSymbolicLink(targetLink, realApp);
         var deniedRoot = WorkingDirectory.FromExplicit(outside.FullName);
-        var capability = new PythonAppendCapability(new PhysicalFileSystem(), new PythonTemplateSourceReader(),
-            new PythonTemplateAppendExecutor(), selected, deniedRoot);
+        var capability = CreatePythonAppendCapability(selected, deniedRoot);
 
         var refused = await capability.ExecuteAsync(new TemplateAppendFileEffect(source.HelperSource, targetLink, "must not append", digest),
             CancellationToken.None);
@@ -281,21 +293,13 @@ public sealed partial class BundledPythonTemplateTests
         Directory.CreateSymbolicLink(rootLink, targetRoot.FullName);
         var allowedRoot = WorkingDirectory.FromExplicit(rootLink);
         var linkedApp = Path.Combine(rootLink, "function_app.py");
-        var allowed = new PythonAppendCapability(new PhysicalFileSystem(), new PythonTemplateSourceReader(),
-            new PythonTemplateAppendExecutor(), selected, allowedRoot);
+        var allowed = CreatePythonAppendCapability(selected, allowedRoot);
         var result = await allowed.ExecuteAsync(new TemplateAppendFileEffect(source.HelperSource, linkedApp, "approved append", digest),
             CancellationToken.None);
 
         result.Succeeded.Should().BeTrue(string.Join(" ", result.Diagnostics));
         File.ReadAllText(realApp).Should().Be("user code\napproved append");
         Directory.Delete(rootLink);
-    }
-
-    private static PythonItemWorkflowProvider CreatePythonProvider(bool confirmed = true)
-    {
-        var sources = new PythonTemplateSourceReader();
-        return new(new(Substitute.For<IInteractionService>(), sources),
-            new(new PhysicalFileSystem(), sources, new PythonTemplateAppendExecutor(), confirmed));
     }
 
     private void CorruptPythonProviderArchive(string corruption)

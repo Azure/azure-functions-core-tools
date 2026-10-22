@@ -1,13 +1,13 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.Loader;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Python;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
@@ -19,8 +19,6 @@ using NSubstitute;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Versioning;
-using HostPythonAppendExecutor = Azure.Functions.Cli.Templates.Python.Shared.PythonTemplateAppendExecutor;
-using HostPythonAppendInterface = Azure.Functions.Cli.Templates.Python.Shared.IPythonTemplateAppendExecutor;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -29,34 +27,12 @@ public sealed partial class BundledPythonTemplateTests
     [Fact]
     public async Task PythonBootFactory_ActualInstalledStackAndSourceBoundProviders_InitThenNewWithAllRequestCapabilitiesUnset()
     {
-        PhysicalFileSystem files = new();
-        WorkloadPathsOptions paths = new(Path.Combine(_root, "boot-workloads"));
-        var home = Path.Combine(_root, "boot-cli");
-        FileWorkloadOperationCoordinator coordinator = new(paths);
-        WorkloadStore workloads = new(paths, coordinator);
-        TemplateStore templates = new(new(home), files, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
-        BundledTemplateInstaller bundles = new(templates, new BasicArtifactInspector(files), files, new(home));
-        WorkloadMetadataReader metadata = new();
-        var runtime = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
-        runtime.Current.Returns("win-x64");
-        WorkloadRidPackageSelector selector = new(runtime);
-        var packageSource = Substitute.For<IWorkloadPackageSource>();
-        WorkloadInstaller installer = new(packageSource, new WorkloadPackageInspector(metadata, selector), selector,
-            new WorkloadDeploymentService(paths, workloads, metadata, coordinator, files, bundles), coordinator, workloads, files);
-        await installer.InstallFromPackageAsync(BuiltArchive);
-        await installer.InstallFromPackageAsync(BuildMetadataOnlyPythonBundle());
+        var (paths, home, packageSource) = await InstallPythonRuntimeAsync("boot");
         var interaction = Substitute.For<IInteractionService>();
         NativeTemplateWorkflowHostFactory factory = new();
         using var host = await factory.CreateAsync(interaction, paths, new(home), services =>
         {
             _loadedBootWorkload = services.Any(service => service.ImplementationInstance is RuntimeWorkloadInfo);
-            services.AddScoped<PythonTemplateSourceReader>();
-            services.AddScoped<PythonItemCompatibility>();
-            services.AddScoped<HostPythonAppendInterface, HostPythonAppendExecutor>();
-            services.AddScoped(provider => new PythonSelectedItemEffects(provider.GetRequiredService<IFileSystem>(),
-                provider.GetRequiredService<PythonTemplateSourceReader>(), provider.GetRequiredService<HostPythonAppendInterface>(), confirmed: true));
-            services.AddScoped<INativeItemWorkflowProvider, PythonItemWorkflowProvider>();
-            services.AddScoped<INativeProjectWorkflowProvider, PythonProjectWorkflowProvider>();
         }, enableBundleBindingConstraints: true, CancellationToken.None);
         _loadedBootWorkload.Should().BeTrue("the actual installed physical Python workload must configure before providers are composed");
         var target = WorkingDirectory.FromExplicit(Path.Combine(_root, "boot-project"));
@@ -66,6 +42,13 @@ public sealed partial class BundledPythonTemplateTests
 
         using (var invocation = host.CreateInvocation())
         {
+            var policy = invocation.Services.GetServices<WorkloadNativeTemplatePolicyRegistration>()
+                .Should().ContainSingle(registration => registration.Policy.Stack == "python").Subject;
+            policy.Policy.GetType().Assembly.GetName().Name.Should().Be("Azure.Functions.Cli.Workloads.Python");
+            policy.Policy.GetType().Assembly.GetReferencedAssemblies().Should().NotContain(assembly => assembly.Name == "func");
+            AssemblyLoadContext.GetLoadContext(policy.Policy.GetType().Assembly).Should().BeSameAs(policy.Owner.LoadContext);
+            invocation.Services.GetServices<INativeItemWorkflowProvider>().Should().NotContain(provider => provider.Stack == "python");
+            invocation.Services.GetServices<INativeProjectWorkflowProvider>().Should().NotContain(provider => provider.Stack == "python");
             var preview = await invocation.Composer.ExecuteProjectAsync(project, CancellationToken.None);
             preview.Succeeded.Should().BeTrue(string.Join(" ", preview.Diagnostics));
             Directory.Exists(target.Info.FullName).Should().BeFalse();
@@ -99,6 +82,95 @@ public sealed partial class BundledPythonTemplateTests
         Directory.Exists(Path.Combine(target.Info.FullName, ".venv")).Should().BeFalse();
         File.Exists(Path.Combine(target.Info.FullName, ".func", "config.json")).Should().BeTrue();
         packageSource.ReceivedCalls().Should().BeEmpty("boot/creation uses only actually installed local packages");
+    }
+
+    [Fact]
+    public async Task PythonBootFactory_RegisteredPythonPolicy_PreservesOtherStacksCoreProjectQualification()
+    {
+        var (paths, home, _) = await InstallPythonRuntimeAsync("mixed", includeDotNet: true);
+        NativeTemplateWorkflowHostFactory factory = new();
+        using var host = await factory.CreateAsync(Substitute.For<IInteractionService>(), paths, new(home), services =>
+        {
+            _loadedBootWorkload = services.Any(service => service.ImplementationInstance is RuntimeWorkloadInfo);
+            services.AddFirstPartyNativeWorkflows();
+        }, enableBundleBindingConstraints: true, CancellationToken.None);
+        using var invocation = host.CreateInvocation();
+        var registrations = invocation.Services.GetServices<WorkloadNativeTemplatePolicyRegistration>().ToArray();
+        registrations.Should().ContainSingle().Which.Policy.Stack.Should().Be("python");
+        var availability = await invocation.Services.GetRequiredService<INativeTemplateAvailability>().CaptureAsync(CancellationToken.None);
+        var workflows = invocation.Services.GetRequiredService<NativeTemplateWorkflowRegistry>();
+        var support = invocation.Services.GetRequiredService<TemplateProjectSupport>() with { QualifyLayoutAsync = workflows.QualifyLayoutAsync };
+        using var templater = await invocation.Services.GetRequiredService<ITemplaterFactory>().CreateProjectAsync(
+            new(WorkingDirectory.FromExplicit(Path.Combine(_root, "mixed-project"))), availability, support, CancellationToken.None);
+
+        var catalog = await templater.ListAsync(TemplateType.Project, CancellationToken.None);
+
+        var dotnet = catalog.Where(entry => entry.Package?.Identifier == "Azure.Functions.Templates.DotNet").ToArray();
+        dotnet.Should().NotBeEmpty();
+        foreach (var entry in dotnet)
+        {
+            entry.ProjectConfigurationDiagnostic.Should().BeNull(entry.Identity);
+            entry.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Eligible, entry.Identity);
+        }
+        var target = WorkingDirectory.FromExplicit(Path.Combine(_root, "mixed-preview"));
+        var preview = await invocation.Composer.ExecuteProjectAsync(new(target,
+            dotnet.First(entry => entry.Language == "C#").Identity, "MixedStack", "dotnet", "csharp",
+            false, true, true, false, [], new HashSet<string>()), CancellationToken.None);
+        preview.Succeeded.Should().BeTrue(string.Join(" ", preview.Diagnostics));
+        Directory.Exists(target.Info.FullName).Should().BeFalse();
+    }
+
+    private async Task<(WorkloadPathsOptions Paths, string Home, IWorkloadPackageSource PackageSource)> InstallPythonRuntimeAsync(
+        string prefix, bool includeDotNet = false)
+    {
+        PhysicalFileSystem files = new();
+        WorkloadPathsOptions paths = new(Path.Combine(_root, prefix + "-workloads"));
+        var home = Path.Combine(_root, prefix + "-cli");
+        FileWorkloadOperationCoordinator coordinator = new(paths);
+        WorkloadStore workloads = new(paths, coordinator);
+        TemplateStore templates = new(new(home), files, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        BundledTemplateInstaller bundles = new(templates, new BasicArtifactInspector(files), files, new(home));
+        WorkloadMetadataReader metadata = new();
+        var runtime = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
+        runtime.Current.Returns("win-x64");
+        WorkloadRidPackageSelector selector = new(runtime);
+        var packageSource = Substitute.For<IWorkloadPackageSource>();
+        WorkloadInstaller installer = new(packageSource, new WorkloadPackageInspector(metadata, selector), selector,
+            new WorkloadDeploymentService(paths, workloads, metadata, coordinator, files, bundles), coordinator, workloads, files);
+        await installer.InstallFromPackageAsync(BuiltArchive);
+        await installer.InstallFromPackageAsync(BuildMetadataOnlyPythonBundle());
+        if (includeDotNet)
+        {
+            var dotnet = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "bundled-dotnet-artifacts"), "*.nupkg").Single();
+            await installer.InstallFromPackageAsync(dotnet);
+        }
+        return (paths, home, packageSource);
+    }
+
+    private string BuildUnownedPythonItem()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_root, "unowned-python-item")).FullName;
+        var configuration = Path.Combine(Directory.CreateDirectory(Path.Combine(root, ".template.config")).FullName, "template.json");
+        File.WriteAllText(configuration, """
+            {"identity":"Fixture.Unowned.Python","name":"Unowned Python item","shortName":"unowned-python",
+             "tags":{"type":"item","language":"Python"}}
+            """);
+        var content = Path.Combine(root, "unowned.py");
+        File.WriteAllText(content, "unowned content must not be generated");
+        PackageBuilder builder = new()
+        {
+            Id = "Fixture.Unowned.Python.Templates",
+            Version = NuGetVersion.Parse("1.0.0"),
+            Description = "Native source without runtime-owner provenance.",
+        };
+        builder.Authors.Add("test");
+        builder.PackageTypes.Add(new PackageType("FuncTemplate", new Version(0, 0)));
+        builder.Files.Add(new PhysicalPackageFile { SourcePath = configuration, TargetPath = "content/.template.config/template.json" });
+        builder.Files.Add(new PhysicalPackageFile { SourcePath = content, TargetPath = "content/unowned.py" });
+        var archive = Path.Combine(root, "unowned.nupkg");
+        using var stream = File.Create(archive);
+        builder.Save(stream);
+        return archive;
     }
 
     private string BuildMetadataOnlyPythonBundle() => BuildMetadataOnlyPythonBundle(_root, _archive);

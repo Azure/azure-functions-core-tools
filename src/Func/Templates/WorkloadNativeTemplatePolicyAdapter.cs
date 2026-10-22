@@ -9,12 +9,13 @@ using Azure.Functions.Cli.Templates.Native;
 namespace Azure.Functions.Cli.Templates;
 
 internal sealed class WorkloadNativeTemplatePolicyAdapter(
-    NativeTemplatePolicyCandidate candidate, WorkloadNativeTemplatePolicies policies,
+    NativeTemplatePolicyCandidate candidate, Func<ResolvedTemplate, CancellationToken, Task<WorkloadNativeTemplatePolicyAdapter?>> findPolicy,
     IFileSystem files, IInteractionService interaction, ITemplateArgumentParser arguments)
     : INativeItemWorkflowProvider, INativeProjectWorkflowProvider, INativeItemCompatibility, INativeSelectedItemEffects
 {
     private readonly NativeTemplatePolicyCandidate _candidate = candidate ?? throw new ArgumentNullException(nameof(candidate));
-    private readonly WorkloadNativeTemplatePolicies _policies = policies ?? throw new ArgumentNullException(nameof(policies));
+    private readonly Func<ResolvedTemplate, CancellationToken, Task<WorkloadNativeTemplatePolicyAdapter?>> _findPolicy =
+        findPolicy ?? throw new ArgumentNullException(nameof(findPolicy));
     private readonly IFileSystem _files = files ?? throw new ArgumentNullException(nameof(files));
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
@@ -123,7 +124,7 @@ internal sealed class WorkloadNativeTemplatePolicyAdapter(
         WorkloadNativeAppendCapability adapter = new(capability, templater.Context.Project?.RootDirectory ?? request.OutputDirectory, source);
         NativeSelectedItemAppendSupport support = new(_files, adapter, async (helper, token) =>
         {
-            WorkloadNativeTemplatePolicyAdapter provider = await _policies.FindAsync(helper, token)
+            WorkloadNativeTemplatePolicyAdapter provider = await _findPolicy(helper, token)
                 ?? throw new InvalidDataException("The internal helper has no bound owning workload policy.");
             if (!ReferenceEquals(provider._candidate.Admission.Registration, _candidate.Admission.Registration))
             {

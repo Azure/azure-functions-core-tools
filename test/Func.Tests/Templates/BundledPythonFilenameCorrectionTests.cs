@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Python;
 using Azure.Functions.Cli.Templates.V2;
 using NSubstitute;
 
@@ -226,7 +225,7 @@ public sealed partial class BundledPythonTemplateTests
 
     private async Task<string> ResolveFilenameNameAsync(ResolvedTemplate selected, string? requestedName, CancellationToken cancellationToken = default)
     {
-        PythonItemCompatibility compatibility = new(Substitute.For<IInteractionService>(), new PythonTemplateSourceReader());
+        var compatibility = CreatePythonProvider().Compatibility;
         var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []), cancellationToken);
         var result = await compatibility.ResolveAsync(selected, arguments, requestedName, false, cancellationToken);
         result.Succeeded.Should().BeTrue(string.Join(" ", result.Diagnostics));

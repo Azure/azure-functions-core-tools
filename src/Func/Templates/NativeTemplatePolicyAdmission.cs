@@ -41,8 +41,15 @@ internal sealed class NativeTemplatePolicyAdmission(
     private readonly BasicAcquisitionPlanner? _planner = planner;
     private readonly IBundledTemplateInstaller? _bundledTemplates = bundledTemplates;
 
+    public bool HasPolicyForStack(string stack)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        return _registrations.Any(registration => string.Equals(registration.Policy.Stack, stack, StringComparison.OrdinalIgnoreCase));
+    }
+
     public async Task<BoundNativeTemplatePolicy?> TryBindAsync(
-        TemplateCatalogEntry entry, string mountPoint, CancellationToken cancellationToken, bool required = false)
+        TemplateCatalogEntry entry, string mountPoint, CancellationToken cancellationToken,
+        bool required = false, bool allowCoreLayoutFallback = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentException.ThrowIfNullOrWhiteSpace(mountPoint);
@@ -86,7 +93,7 @@ internal sealed class NativeTemplatePolicyAdmission(
                 token => CaptureAsync(registration, entry, mountPoint, token)));
         }
         bool claimedBasic = bundled is not null && _registrations.Any(registration => MatchesRuntimeOrigin(registration, bundled));
-        if (matches.Count == 0 && external is null && !required && !claimedBasic)
+        if (matches.Count == 0 && external is null && !claimedBasic && (!required || allowCoreLayoutFallback))
         {
             return null;
         }

@@ -164,7 +164,8 @@ preserving original bytes, BOM, user code and the legacy newline rule.
 Missing/changed targets, repeated stale effects and pre-cancellation refuse
 without writes. An I/O error or cancellation during writing can leave a
 partial append; it is not a transactional rollback implementation.
-These services are DI-registered but have no public command route.
+The planner remains a legacy service; the append executor also serves the
+workload-owned native policy described below.
 The focused asset tests execute all pinned helper expansions through the
 actual native engine and then the owned executor, comparing the resulting
 app bytes with the actual legacy append path. Additional tests consume the
@@ -181,46 +182,52 @@ hashes. Unaffected HTTP, occupied-directory, decline, cancellation and internal
 helper denial remain controls; the corrected native cases no longer claim
 legacy path parity.
 
-## CLI-owned adapters (unregistered)
+## Workload-owned native policy
 
-`src/Func/Templates/Python/` contains the production item compatibility,
-source-map reader, selected-item effects and append capability. Explicit
-`PythonItemWorkflowProvider` composition uses the same resolved template's
-mounted reader for package/version, original and helper configuration hashes,
-source hashes, internal roles, defaults, required values, choices and original
-regex validation. Unknown, malformed, duplicated or changed mappings refuse;
-the package ID alone is not authorization.
-Original prompt documents are matched case-insensitively, preserving the
-legacy labels and validators while retaining raw canonical argument IDs.
-Prompt IDs that collide under that lookup are refused before projection.
-The actual `NewExecutionRunner`
-tests use this provider through the common workflow composer with request
-capability fields unset, rather than supplying test-only mapping callbacks.
+`PythonWorkload` registers `PythonTemplatePolicy` through
+`FunctionsCliBuilder.AddNativeTemplatePolicy<TPolicy>()`. The policy,
+source-map reader, append capability, target guard and executor live in
+`src/Workloads/Stacks/Python/`; the core CLI contains no Python template
+implementations or source-linked Python helpers. The stack reuses the
+internal V2 schema and prompt projection without invoking its legacy renderer.
+The existing language-neutral contracts in `Abstractions/Templates/Native`
+remain unchanged. Template packages remain data-only.
 
-`PythonProjectWorkflowProvider` qualifies only the packaged basic project.
-It has no preparation action: initialization does not run pip, create a venv,
-or call a second legacy initializer. Generic paired CLI configuration remains
-mandatory. The production `InitExecutionRunner` tests exercise both the
-normal and no-bundle variants and reject changed owned requirements.
+The host admits the policy from the actual loaded Python runtime and binds
+it to the selected archive's installed payload, bundled ownership and
+provenance. A registered stack policy permits selection, not execution of an
+unowned template. A selected item without an admitted provider refuses
+instead of falling back to plain native creation.
+Other installed stacks retain their existing core project-layout qualifiers
+when no workload policy claims their bundled source. A refusing or invalid
+registered owner is never bypassed by that compatibility path.
 
-The CLI source-links the existing append interface and executor, using a
-host-only namespace conditional to avoid exposing identically named internal
-types from two assemblies to friend tests. The helper bodies and physical
-workload DI behavior are unchanged. There is no runtime reference from the CLI
-to the physical Python stack, reflection provider, public SDK API or global
-provider registration. The physical legacy planner remains unchanged; native
-job selection is still owned by the common selected-item support.
+The workload reads through the host-issued `NativeTemplateSource`, retaining
+package/version checks, original and helper configuration/source hashes,
+internal roles, defaults, required values, choices and original regex rules.
+Unknown, malformed, duplicated or changed mappings refuse; a package ID alone
+is not authorization. Original prompt documents are matched case-insensitively
+while raw canonical argument IDs are preserved. Colliding prompt IDs refuse
+before projection.
 
-The CLI append capability checks the exact target and SHA-256 before
+The generic host adapter applies compatibility and expands only the exact
+source-bound helper through the existing native engine. The selected command
+authorizes its append; direct internal invocations still require explicit
+confirmation. The Python policy grants no other effect permissions.
+The basic project's existing configuration action remains mandatory, with
+no pip, venv creation or second legacy initializer. Installed-workload boot
+and public-command tests obtain the policy through runtime loading rather
+than injecting a Python provider into the host.
+
+The workload append capability checks the exact target and SHA-256 before
 execution, rejects links below the explicit invocation root, and repeats
 validation before append. An explicitly linked invocation root retains the
 existing native boundary semantics. These checks do not make filesystem
 name replacement atomic with opening the helper's file handle; external
 rename/link races and partial I/O/cancellation are not rollback guarantees.
-The earlier private Python 3.13/HTTP qualification belongs to the unchanged
-`6a3c1dea` checkpoint, not this new adapter source.
 
-Public `func init` and `func new` continue their current routes. Actual native
+Public `func init` and `func new` retain their current grammar and output
+through the workload-owned policy. Actual native
 creation tests cover missing-target generation and plain native occupied-target
-refusal alongside the controlled append journey. No Python host,
+refusal alongside controlled append and unowned-source refusal. No Python host,
 worker, backend, Unix or deployment qualification is implied.

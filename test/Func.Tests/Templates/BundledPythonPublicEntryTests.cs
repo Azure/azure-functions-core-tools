@@ -2,17 +2,9 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Templates.Acquisition;
-using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Workloads;
-using Azure.Functions.Cli.Workloads.Catalog;
-using Azure.Functions.Cli.Workloads.Discovery;
-using Azure.Functions.Cli.Workloads.Install;
-using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -22,22 +14,7 @@ public sealed partial class BundledPythonTemplateTests
     [Fact]
     public async Task PythonFullEntry_PublicGrammarAndAutomaticProviders_InitThenRepeatedNewPreservesAppAndOriginalValidation()
     {
-        PhysicalFileSystem files = new();
-        WorkloadPathsOptions paths = new(Path.Combine(_root, "entry-workloads"));
-        var home = Path.Combine(_root, "entry-cli");
-        FileWorkloadOperationCoordinator coordinator = new(paths);
-        WorkloadStore workloads = new(paths, coordinator);
-        TemplateStore templates = new(new(home), files, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
-        BundledTemplateInstaller bundles = new(templates, new BasicArtifactInspector(files), files, new(home));
-        WorkloadMetadataReader metadata = new();
-        var runtime = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
-        runtime.Current.Returns("win-x64");
-        WorkloadRidPackageSelector selector = new(runtime);
-        var source = Substitute.For<IWorkloadPackageSource>();
-        WorkloadInstaller installer = new(source, new WorkloadPackageInspector(metadata, selector), selector,
-            new WorkloadDeploymentService(paths, workloads, metadata, coordinator, files, bundles), coordinator, workloads, files);
-        await installer.InstallFromPackageAsync(BuiltArchive);
-        await installer.InstallFromPackageAsync(BuildMetadataOnlyPythonBundle());
+        var (paths, home, source) = await InstallPythonRuntimeAsync("entry");
         var project = Path.Combine(_root, "full-entry-project");
         var app = Path.Combine(project, "function_app.py");
         NativeCliEntryPoint entry = new();
@@ -100,6 +77,33 @@ public sealed partial class BundledPythonTemplateTests
         helped.Should().Be(0, help.AllOutput);
         help.AllOutput.Should().Contain("[path]", "--http-trigger-auth-level", "ANONYMOUS").And.NotContain("--dry-run");
         File.ReadAllBytes(app).Should().Equal(beforeRefusal);
+        source.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PythonFullEntry_RegisteredPolicyDoesNotAuthorizeUnownedTemplateOrFallBackToPlainCreation()
+    {
+        var (paths, home, source) = await InstallPythonRuntimeAsync("unowned");
+        await TemplateFixtures.InstallAsync(BuildUnownedPythonItem(), Path.Combine(home, "templates"), CancellationToken.None);
+        var project = Path.Combine(_root, "unowned-source-project");
+        NativeCliEntryPoint entry = new();
+        TestInteractionService initialized = new();
+        var initExit = await entry.ExecuteAsync(["init", project, "-s", "python", "-l", "py"],
+            initialized, paths, new(home), CancellationToken.None, TrackPythonEntry, _ => Task.FromResult<string?>(null));
+        initExit.Should().Be(0, initialized.AllOutput);
+        var app = Path.Combine(project, "function_app.py");
+        var before = File.ReadAllBytes(app);
+        TestInteractionService rejected = new();
+
+        var exit = await entry.ExecuteAsync(["new", project, "-t", "Fixture.Unowned.Python", "--output=json", "--non-interactive"],
+            rejected, paths, new(home), CancellationToken.None, TrackPythonEntry, _ => Task.FromResult<string?>(null));
+
+        exit.Should().Be(1, rejected.AllOutput);
+        using var result = JsonDocument.Parse(rejected.Lines.Single(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]);
+        result.RootElement.GetProperty("kind").GetString().Should().Be("workflowUnavailable");
+        result.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
+        File.Exists(Path.Combine(project, "unowned.py")).Should().BeFalse();
+        File.ReadAllBytes(app).Should().Equal(before);
         source.ReceivedCalls().Should().BeEmpty();
     }
 

@@ -6,14 +6,10 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Python;
-using Azure.Functions.Cli.Templates.Python.Shared;
 using Azure.Functions.Cli.Workloads.Python;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using NuGet.Versioning;
-using HostPythonAppendExecutor = Azure.Functions.Cli.Templates.Python.Shared.PythonTemplateAppendExecutor;
-using HostPythonAppendInterface = Azure.Functions.Cli.Templates.Python.Shared.IPythonTemplateAppendExecutor;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -153,13 +149,8 @@ public sealed partial class BundledPythonTemplateTests
         services.AddSingleton<TemplateExecutionInteraction>();
         services.AddSingleton<NewExecutionRenderer>();
         services.AddSingleton<InitExecutionRenderer>();
-        services.AddScoped<PythonTemplateSourceReader>();
-        services.AddScoped<PythonItemCompatibility>();
-        services.AddScoped<HostPythonAppendInterface, HostPythonAppendExecutor>();
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();
-        services.AddScoped(provider => new PythonSelectedItemEffects(provider.GetRequiredService<IFileSystem>(),
-            provider.GetRequiredService<PythonTemplateSourceReader>(), provider.GetRequiredService<HostPythonAppendInterface>(), confirmed));
-        services.AddScoped<INativeItemWorkflowProvider, PythonItemWorkflowProvider>();
+        services.AddScoped<INativeItemWorkflowProvider>(_ => CreatePythonProvider(confirmed, interaction));
         services.AddNativeTemplateWorkflowComposition();
         services.AddSingleton(Substitute.For<IInitExecutionRunner>());
         using var provider = services.BuildServiceProvider();

@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Python;
 using Azure.Functions.Cli.Templates.V2;
 using NSubstitute;
 
@@ -262,7 +261,7 @@ public sealed partial class BundledPythonTemplateTests
 
     private async Task<NativeItemAppendMapping> ReadAppendMappingAsync(ResolvedTemplate selected, CancellationToken cancellationToken = default)
     {
-        var source = await new PythonTemplateSourceReader().ReadAsync(selected, cancellationToken);
+        var source = await new PythonPolicyTestReader().ReadAsync(selected, cancellationToken);
         source.Binding.Diagnostics.Should().BeEmpty();
         return source.Binding.Append!;
     }
@@ -278,7 +277,7 @@ public sealed partial class BundledPythonTemplateTests
         using var templater = CreateTemplater(await ReadBundleAsync("stable"));
         var selected = (await templater.ResolveGroupAsync(id, TemplateType.Item)).Group!.Single();
         var interaction = Substitute.For<IInteractionService>();
-        PythonItemCompatibility compatibility = new(interaction, new PythonTemplateSourceReader());
+        var compatibility = CreatePythonProvider(interaction: interaction).Compatibility;
         string[] tokens = invalidSchedule ? ["--timer-trigger-schedule", "not-a-cron"] : [];
         var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), tokens));
 
@@ -315,9 +314,8 @@ public sealed partial class BundledPythonTemplateTests
     private sealed class OwnedPythonAppendCapability(ResolvedTemplate selected, TemplateEffectSource source, string target)
         : INativeTemplateEffectCapability
     {
-        private readonly PythonAppendCapability _inner = new(new PhysicalFileSystem(), new PythonTemplateSourceReader(),
-            new Azure.Functions.Cli.Templates.Python.Shared.PythonTemplateAppendExecutor(), selected,
-            WorkingDirectory.FromExplicit(Path.GetDirectoryName(target)!));
+        private readonly INativeTemplateEffectCapability _inner = CreatePythonAppendCapability(
+            selected, WorkingDirectory.FromExplicit(Path.GetDirectoryName(target)!));
         private readonly TemplateEffectSource _source = source;
 
         public int Executions { get; private set; }

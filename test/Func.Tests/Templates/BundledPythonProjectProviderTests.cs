@@ -7,7 +7,6 @@ using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Python;
 using Azure.Functions.Cli.Workloads.Python;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -96,8 +95,7 @@ public sealed partial class BundledPythonTemplateTests
         services.AddSingleton<ILocalSettingsProvider, LocalSettingsProvider>();
         var projects = Substitute.For<IFunctionsProjectResolver>();
         services.AddSingleton(projects);
-        services.AddScoped<PythonTemplateSourceReader>();
-        services.AddScoped<INativeProjectWorkflowProvider, PythonProjectWorkflowProvider>();
+        services.AddScoped<INativeProjectWorkflowProvider>(_ => CreatePythonProvider());
         services.AddNativeTemplateWorkflowComposition();
         services.AddSingleton(Substitute.For<INewExecutionRunner>());
         using var provider = services.BuildServiceProvider();
