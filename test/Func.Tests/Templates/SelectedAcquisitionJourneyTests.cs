@@ -225,6 +225,89 @@ public sealed partial class ArtifactBindingJourneyTests
     private BoundInitScopeFactory BundledScopes() => new(_paths, _workloads, _interaction, _files, _verifier,
         new(new BundledTemplateInstaller(_templates, new BasicArtifactInspector(_files), _files, new(Path.Combine(_root, "cli"))), _workloads, _files));
 
+    [Theory]
+    [InlineData("origin")]
+    [InlineData("declaration")]
+    [InlineData("archive")]
+    public async Task Projection_UnrelatedBrokenBundle_PreservesIndependentlyQualifiedExternalProject(string change)
+    {
+        await SeedAsync(installTemplates: false);
+        var journey = Guided(new(false, [], []));
+        var owner = (await _workloads.GetWorkloadsAsync(CancellationToken.None)).Single();
+        var query = new QuickstartInstalledQuery(DirectoryTarget, _selection.Owner);
+        var qualified = await journey.Qualification.ResolveAsync(Remote(), query, owner, CancellationToken.None);
+        var acquisition = await journey.Acquisition.RunAsync(qualified.Acquisition, CancellationToken.None);
+        acquisition.Failure.Should().BeNull();
+        string directory = _paths.GetInstallDirectory(owner.PackageId, owner.PackageVersion);
+        if (change == "origin")
+        {
+            File.WriteAllText(Path.Combine(directory, BundledTemplateInstaller.OriginName), "{}");
+        }
+        else if (change == "declaration")
+        {
+            File.Delete(Path.Combine(directory, BundledTemplateInstaller.ManifestName));
+        }
+        else
+        {
+            File.Delete(Path.Combine(directory, "tools", "any", "templates", "node-basic.nupkg"));
+        }
+        var before = TemplateState();
+        using BoundInitScope scope = await BundledScopes().CreateAsync(CancellationToken.None);
+        using Templater flow = await Factory.CreateProjectAsync(Context, scope.Availability, scope.Support, CancellationToken.None);
+        var externalOnly = await flow.ProjectArtifactsAsync(scope.Verifier, _selection.Owner, null, CancellationToken.None);
+
+        var combined = await flow.ProjectArtifactsAsync(scope.Verifier, _selection.Owner, null, CancellationToken.None, scope.BundledVerifier);
+
+        externalOnly.Should().Contain(item => item.Entry.Identity == Identity && item.Selection != null && item.Diagnostic == null);
+        combined.Should().Contain(item => item.Entry.Identity == Identity && item.Selection != null && item.Diagnostic == null);
+        combined.Should().Contain(item => item.Entry.Identity == "Azure.Functions.Node.Basic.JavaScript"
+            && item.Selection == null && item.BundledSelection == null && item.Diagnostic != null);
+        Directory.Exists(Target).Should().BeFalse();
+        TemplateState().Should().Equal(before);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Projection_IndependentProofs_RequireExternalReceiptWithoutGrantingBundledAuthority(bool missingReceipt)
+    {
+        await SeedAsync(installTemplates: false);
+        var journey = Guided(new(false, [], []));
+        var owner = (await _workloads.GetWorkloadsAsync(CancellationToken.None)).Single();
+        var qualified = await journey.Qualification.ResolveAsync(Remote(), new(DirectoryTarget, _selection.Owner), owner, CancellationToken.None);
+        (await journey.Acquisition.RunAsync(qualified.Acquisition, CancellationToken.None)).Failure.Should().BeNull();
+        if (missingReceipt)
+        {
+            string receipt = Path.Combine(_root, "cli", "templates", ".native-template-owners", PackageId.ToLowerInvariant() + ".json");
+            File.Exists(receipt).Should().BeTrue();
+            File.Delete(receipt);
+        }
+        var before = TemplateState();
+        using BoundInitScope scope = await BundledScopes().CreateAsync(CancellationToken.None);
+        using Templater flow = await Factory.CreateProjectAsync(Context, scope.Availability, scope.Support, CancellationToken.None);
+        var externalOnly = await flow.ProjectArtifactsAsync(scope.Verifier, _selection.Owner, null, CancellationToken.None);
+
+        var combined = await flow.ProjectArtifactsAsync(scope.Verifier, _selection.Owner, null, CancellationToken.None, scope.BundledVerifier);
+
+        var external = combined.Single(item => item.Entry.Identity == Identity);
+        external.BundledSelection.Should().BeNull();
+        if (missingReceipt)
+        {
+            external.Selection.Should().BeNull();
+            external.Diagnostic.Should().Be(externalOnly.Single(item => item.Entry.Identity == Identity).Diagnostic)
+                .And.Contain("no retained lifecycle provenance");
+        }
+        else
+        {
+            external.Selection.Should().NotBeNull();
+            external.Diagnostic.Should().BeNull();
+        }
+        combined.Should().Contain(item => item.Entry.Identity == "Azure.Functions.Node.Basic.JavaScript"
+            && item.Selection == null && item.BundledSelection != null && item.Diagnostic == null);
+        Directory.Exists(Target).Should().BeFalse();
+        TemplateState().Should().Equal(before);
+    }
+
     private void AddUnselectedOptionalAuthority()
     {
         var document = JsonNode.Parse(_catalog.Json)!;

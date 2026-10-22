@@ -171,6 +171,10 @@ bundled ownership. Selection and each protected invocation revalidate that proof
 Missing, malformed, foreign or changed evidence refuses without repair or receipt
 creation. Valid bundled projects appear beside Basic, installed external projects,
 Browse and Cancel in the default menu.
+An independently qualified external project does not depend on unrelated bundled
+evidence. If external proof is unavailable, only complete independent bundled
+proof can authorize a bundled selection. A missing external receipt is not
+bundled authority, and unmatched projects retain their external diagnostic.
 
 Owned A1 to A2 installation remains **blocked** in this layer. Pinning a newer
 nomination is not an upgrade implementation. Existing version and ownership

@@ -88,6 +88,17 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
         {
             try
             {
+                BasicAcquisitionException externalFailure;
+                try
+                {
+                    NativeTemplateSelection selection = await verifier.ProjectAsync(_session, candidate.Template, owner, channel, cancellationToken);
+                    result.Add(new(candidate.Entry, selection, Diagnostic(candidate)));
+                    continue;
+                }
+                catch (BasicAcquisitionException exception)
+                {
+                    externalFailure = exception;
+                }
                 BundledBasicSelection? bundled = bundledVerifier is null ? null
                     : await bundledVerifier.ProjectAsync(_session, candidate.Template, owner, cancellationToken);
                 if (bundled is not null)
@@ -95,8 +106,7 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
                     result.Add(new(candidate.Entry, null, Diagnostic(candidate)) { BundledSelection = bundled });
                     continue;
                 }
-                NativeTemplateSelection selection = await verifier.ProjectAsync(_session, candidate.Template, owner, channel, cancellationToken);
-                result.Add(new(candidate.Entry, selection, Diagnostic(candidate)));
+                result.Add(new(candidate.Entry, null, externalFailure.Message));
             }
             catch (Exception exception) when (exception is BasicAcquisitionException or Workloads.Discovery.InvalidWorkloadException
                 or InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
