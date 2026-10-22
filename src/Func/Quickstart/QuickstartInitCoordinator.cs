@@ -201,6 +201,14 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 return InitExecutionResult.Reject("targetChanged", $"The target changed after consent. No payload was acquired. {changedTarget}");
             }
             BasicAcquisitionResult acquired = await _acquisition.RunAsync(qualified.Acquisition, cancellationToken);
+            if (acquired.Status == BasicAcquisitionStatus.Canceled)
+            {
+                string completed = acquired.Completed.Count == 0 ? string.Empty
+                    : $" Verified completed packages remain: {string.Join(", ", acquired.Completed.Select(step => $"{step.PackageId}@{step.Version}"))}.";
+                _interaction.WriteWarning($"{acquired.Message}{completed}"
+                    + (acquired.Failure is { } failure ? $" Acquisition diagnostic: {failure}." : string.Empty));
+                throw new OperationCanceledException(acquired.Message, acquired.Cause, cancellationToken);
+            }
             if (acquired.Status != BasicAcquisitionStatus.Completed || acquired.Failure is not null
                 || acquired.Revision != qualified.Acquisition.Approval!.Plan.Revision
                 || acquired.Source != qualified.Selection.Source

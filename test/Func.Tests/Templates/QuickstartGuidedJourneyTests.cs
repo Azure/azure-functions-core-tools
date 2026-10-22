@@ -396,9 +396,10 @@ public sealed partial class ArtifactBindingJourneyTests
         if (duringAcquisition)
         {
             journey.Payload.Opening = _ => cancellation.Cancel();
-            var result = await journey.Coordinator.ExecuteAsync(new(GuidedRequest(), "fixture"), cancellation.Token);
-            result.Kind.Should().Be("acquisitionFailed");
-            result.Diagnostics.Should().Contain(message => message.Contains("Canceled", StringComparison.Ordinal));
+            Func<Task> execute = () => journey.Coordinator.ExecuteAsync(new(GuidedRequest(), "fixture"), cancellation.Token);
+            var canceled = await execute.Should().ThrowAsync<OperationCanceledException>();
+            canceled.Which.CancellationToken.Should().Be(interaction.ConfirmationToken);
+            canceled.Which.InnerException.Should().BeOfType<OperationCanceledException>();
         }
         else
         {
@@ -412,6 +413,65 @@ public sealed partial class ArtifactBindingJourneyTests
         }
         journey.Payload.Opened.Should().BeEmpty();
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("consent")]
+    [InlineData("private-acquisition")]
+    [InlineData("prepared-acquisition")]
+    public async Task Guided_PublicParser_CancellationPropagatesAfterAcquisitionCleanupWithoutCreating(string phase)
+    {
+        await SeedAsync(installTemplates: false);
+        using CancellationTokenSource cancellation = new();
+        var interaction = new GuidedInteraction(true, [], [true]);
+        var journey = Guided(interaction);
+        OperationCanceledException original = new("Fixture private acquisition canceled.", cancellation.Token);
+        if (phase == "consent")
+        {
+            interaction.Confirming = () =>
+            {
+                cancellation.Cancel();
+                return Task.CompletedTask;
+            };
+        }
+        else if (phase == "private-acquisition")
+        {
+            journey.Payload.Opening = _ =>
+            {
+                cancellation.Cancel();
+                throw original;
+            };
+        }
+        else
+        {
+            journey.Lifecycle.PreparedAction = cancellation.Cancel;
+        }
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        Func<Task> invoke = () => root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture"])
+            .InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
+
+        var canceled = await invoke.Should().ThrowAsync<OperationCanceledException>();
+
+        canceled.Which.CancellationToken.Should().Be(interaction.ConfirmationToken);
+        if (phase != "consent")
+        {
+            canceled.Which.InnerException.Should().BeAssignableTo<OperationCanceledException>();
+            interaction.AllOutput.Should().Contain("Acquisition canceled").And.Contain("remain").And.Contain(_selection.Owner.PackageId);
+        }
+        if (phase == "private-acquisition")
+        {
+            canceled.Which.InnerException.Should().BeSameAs(original);
+        }
+        if (phase == "prepared-acquisition")
+        {
+            journey.Lifecycle.Prepared.Should().NotBeNull();
+            File.Exists(journey.Lifecycle.Prepared!.Archive).Should().BeFalse();
+        }
+        using IWorkloadOperation operation = await new FileWorkloadOperationCoordinator(_paths).AcquireAsync(CancellationToken.None);
+        operation.Validate(_paths);
+        Directory.Exists(Target).Should().BeFalse();
+        journey.Lifecycle.ObservedFreshBinding.Should().BeFalse();
+        (await _ownership.GetRetainedAsync(PackageId, CancellationToken.None)).Should().BeNull();
     }
 
     [Fact]
@@ -428,6 +488,25 @@ public sealed partial class ArtifactBindingJourneyTests
         result.Diagnostics.Should().Contain(message => message.Contains(_selection.Owner.PackageId, StringComparison.Ordinal)
             && message.Contains("remain", StringComparison.Ordinal));
         File.Exists(journey.Lifecycle.Prepared!.Archive).Should().BeFalse();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Guided_PublicParser_AcquisitionIoFailureRemainsOrdinaryFailureAfterCleanup()
+    {
+        await SeedAsync(installTemplates: false);
+        var interaction = new GuidedInteraction(false, [], []);
+        var journey = Guided(interaction);
+        journey.Lifecycle.CommitFailure = new IOException("Injected template store write failure.");
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture",
+            "--acquire-quickstart", "--non-interactive"]).InvokeAsync(new() { EnableDefaultExceptionHandler = false }, CancellationToken.None);
+
+        exit.Should().Be(1);
+        interaction.AllOutput.Should().Contain("PartialFailure").And.Contain("remain").And.Contain(_selection.Owner.PackageId);
+        File.Exists(journey.Lifecycle.Prepared!.Archive).Should().BeFalse();
+        journey.Lifecycle.ObservedFreshBinding.Should().BeFalse();
         Directory.Exists(Target).Should().BeFalse();
     }
 
@@ -555,6 +634,7 @@ public sealed partial class ArtifactBindingJourneyTests
         private readonly Queue<bool> _confirmations = new(confirmations);
         public override bool IsInteractive => interactive;
         public List<bool> Confirmations { get; } = [];
+        public CancellationToken ConfirmationToken { get; private set; }
         public Func<Task>? Confirming { get; set; }
 
         Task<string> IInteractionService.PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken)
@@ -574,6 +654,7 @@ public sealed partial class ArtifactBindingJourneyTests
         public override async Task<bool> ConfirmAsync(string prompt, bool defaultValue, bool whenInputUnavailable, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ConfirmationToken = cancellationToken;
             Confirmations.Add(defaultValue);
             WriteLine($"CONFIRM: {prompt}");
             if (Confirming is not null)
@@ -590,6 +671,7 @@ public sealed partial class ArtifactBindingJourneyTests
         public bool ObservedFreshBinding { get; set; }
         public IOException? CommitFailure { get; set; }
         public Action? Selecting { get; set; }
+        public Action? PreparedAction { get; set; }
         public Task<BasicTemplateSelection> SelectAsync(BasicCompanionPlan plan, TemplateEngineContext context, CancellationToken cancellationToken)
         {
             Selecting?.Invoke();
@@ -598,7 +680,11 @@ public sealed partial class ArtifactBindingJourneyTests
         public Task<bool> EnsureAsync(BasicTemplateArtifact artifact, TemplateEngineContext context, bool offline, CancellationToken cancellationToken)
             => inner.EnsureAsync(artifact, context, offline, cancellationToken);
         public async Task<PreparedBasicTemplate> PrepareAsync(BasicTemplateSelection selection, TemplateEngineContext context, bool offline, CancellationToken cancellationToken)
-            => Prepared = await inner.PrepareAsync(selection, context, offline, cancellationToken);
+        {
+            Prepared = await inner.PrepareAsync(selection, context, offline, cancellationToken);
+            PreparedAction?.Invoke();
+            return Prepared;
+        }
         public Task<bool> CommitAsync(PreparedBasicTemplate prepared, TemplateEngineContext context, CancellationToken cancellationToken)
             => CommitFailure is null ? inner.CommitAsync(prepared, context, cancellationToken) : throw CommitFailure;
         public Task RevalidatePreparedAsync(PreparedBasicTemplate prepared, TemplateEngineContext context, CancellationToken cancellationToken)

@@ -31,6 +31,9 @@ mandatory. Native preview and mandatory project configuration share the same
 selected flow and completed parameters. Interactive creation requires a second
 default-no confirmation of those actual effects. Declining creation retains any
 explicitly acquired packages and reports that fact.
+Cancellation during acquisition reports retained-package and recovery diagnostics,
+then propagates command cancellation after acquisition cleanup. It never starts
+project creation or claims rollback.
 
 Scripts must select a stack and either an installed template or a catalog ID.
 Choosing guided mode is not acquisition authorization.
