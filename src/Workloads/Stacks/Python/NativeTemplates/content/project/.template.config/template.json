@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": ".NET Foundation",
+  "identity": "Azure.Functions.Python.Basic",
+  "groupIdentity": "Azure.Functions.Python.Basic",
+  "name": "Azure Functions Python v2 project",
+  "shortName": "basic",
+  "tags": { "type": "project", "language": "Python" },
+  "preferNameDirectory": false,
+  "symbols": {
+    "NoBundles": { "type": "parameter", "datatype": "Boolean", "defaultValue": "false", "description": "Create host.json without an extension bundle." },
+    "BundlesChannel": { "type": "parameter", "datatype": "choice", "defaultValue": "Stable", "description": "Extension bundle channel.",
+      "choices": [{ "choice": "Stable" }, { "choice": "Preview" }, { "choice": "Experimental" }] },
+    "BundleId": { "type": "generated", "generator": "switch", "replaces": "__BUNDLE_ID__",
+      "parameters": { "evaluator": "C++", "cases": [
+        { "condition": "(BundlesChannel == \"Stable\")", "value": "Microsoft.Azure.Functions.ExtensionBundle" },
+        { "condition": "(BundlesChannel == \"Preview\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Preview" },
+        { "condition": "(BundlesChannel == \"Experimental\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Experimental" }
+      ] } }
+  },
+  "constraints": { "host": { "type": "host", "args": [{ "hostname": "func" }] } },
+  "primaryOutputs": [{ "path": "host.json" }],
+  "postActions": [{
+    "actionId": "00e33184-ffc7-43ef-bec0-b1684df8ad56",
+    "description": "Write Azure Functions CLI project configuration (draft authoring contract).",
+    "continueOnError": false,
+    "args": { "primaryOutputIndex": "0", "stack": "python", "language": "Python" }
+  }]
+}

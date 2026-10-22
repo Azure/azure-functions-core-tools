@@ -1,0 +1,11 @@
+{
+  "isHidden": false,
+  "symbolInfo": {
+    "chat-model-name": {
+      "longName": "chat-model-name"
+    },
+    "httpTrigger-authLevel": {
+      "longName": "http-trigger-auth-level"
+    }
+  }
+}

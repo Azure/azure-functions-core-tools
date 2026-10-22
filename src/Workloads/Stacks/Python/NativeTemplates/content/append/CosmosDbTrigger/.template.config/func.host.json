@@ -1,0 +1,14 @@
+{
+  "isHidden": true,
+  "symbolInfo": {
+    "cosmosDbTrigger-connection": {
+      "longName": "cosmos-db-trigger-connection"
+    },
+    "cosmosDbTrigger-containerName": {
+      "longName": "cosmos-db-trigger-container-name"
+    },
+    "cosmosDbTrigger-databaseName": {
+      "longName": "cosmos-db-trigger-database-name"
+    }
+  }
+}

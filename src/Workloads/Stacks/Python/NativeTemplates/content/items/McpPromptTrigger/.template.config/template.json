@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Victoria Hall",
+  "constraints": {
+    "bindings": {
+      "args": [
+        "mcpPromptTrigger"
+      ],
+      "type": "func-bundle-bindings"
+    },
+    "bundle": {
+      "args": [
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+          "version": "[4.0.0,)"
+        }
+      ],
+      "type": "func-bundle"
+    },
+    "host": {
+      "args": [
+        {
+          "hostname": "func"
+        }
+      ],
+      "type": "host"
+    },
+    "stack": {
+      "args": "python",
+      "type": "func-workload"
+    }
+  },
+  "defaultName": "mcp_prompt_trigger",
+  "description": "A function that will be run whenever it receives an MCP prompt event",
+  "forms": {
+    "pythonCharacters": {
+      "identifier": "replace",
+      "pattern": "[^A-Za-z0-9_]",
+      "replacement": "_"
+    },
+    "pythonIdentifier": {
+      "identifier": "chain",
+      "steps": [
+        "pythonCharacters",
+        "pythonLeadingDigit"
+      ]
+    },
+    "pythonLeadingDigit": {
+      "identifier": "replace",
+      "pattern": "^(?=[0-9])",
+      "replacement": "_"
+    }
+  },
+  "groupIdentity": "Azure.Functions.Python.McpPromptTrigger",
+  "identity": "Azure.Functions.Python.McpPromptTrigger",
+  "name": "MCP Prompt trigger",
+  "preferNameDirectory": false,
+  "shortName": [
+    "McpPromptTrigger-Python"
+  ],
+  "symbols": {
+    "FunctionIdentifier": {
+      "replaces": "__FUNCTION_NAME__",
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "pythonIdentifier"
+    },
+    "httpTrigger-authLevel": {
+      "choices": [
+        {
+          "choice": "FUNCTION"
+        },
+        {
+          "choice": "ANONYMOUS"
+        },
+        {
+          "choice": "ADMIN"
+        }
+      ],
+      "datatype": "choice",
+      "defaultValue": "FUNCTION",
+      "description": "Authorization level",
+      "isRequired": true,
+      "replaces": "$(AUTHLEVEL_INPUT)",
+      "type": "parameter"
+    }
+  },
+  "tags": {
+    "language": "Python",
+    "type": "item"
+  }
+}

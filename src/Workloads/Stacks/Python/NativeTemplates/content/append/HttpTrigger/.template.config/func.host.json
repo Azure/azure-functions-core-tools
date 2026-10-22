@@ -1,0 +1,8 @@
+{
+  "isHidden": true,
+  "symbolInfo": {
+    "httpTrigger-authLevel": {
+      "longName": "http-trigger-auth-level"
+    }
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Varad Meru (@vrdmr)",
+  "constraints": {
+    "bindings": {
+      "args": [
+        "blobtrigger"
+      ],
+      "type": "func-bundle-bindings"
+    },
+    "bundle": {
+      "args": [
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Preview",
+          "version": "[4.0.0,)"
+        },
+        {
+          "id": "Microsoft.Azure.Functions.ExtensionBundle.Experimental",
+          "version": "[4.0.0,)"
+        }
+      ],
+      "type": "func-bundle"
+    },
+    "host": {
+      "args": [
+        {
+          "hostname": "func"
+        }
+      ],
+      "type": "host"
+    },
+    "stack": {
+      "args": "python",
+      "type": "func-workload"
+    }
+  },
+  "defaultName": "blob_trigger",
+  "description": "A function that will be run whenever a blob is added to a specified container",
+  "forms": {
+    "pythonCharacters": {
+      "identifier": "replace",
+      "pattern": "[^A-Za-z0-9_]",
+      "replacement": "_"
+    },
+    "pythonIdentifier": {
+      "identifier": "chain",
+      "steps": [
+        "pythonCharacters",
+        "pythonLeadingDigit"
+      ]
+    },
+    "pythonLeadingDigit": {
+      "identifier": "replace",
+      "pattern": "^(?=[0-9])",
+      "replacement": "_"
+    }
+  },
+  "groupIdentity": "Azure.Functions.Python.BlobTrigger.Append",
+  "identity": "Azure.Functions.Python.BlobTrigger.Append",
+  "name": "Blob trigger",
+  "preferNameDirectory": false,
+  "primaryOutputs": [
+    {
+      "path": "function_body.py"
+    }
+  ],
+  "shortName": [
+    "__python-append-BlobTrigger"
+  ],
+  "symbols": {
+    "blobTrigger-connection": {
+      "datatype": "string",
+      "defaultValue": "BlobStorageConnectionString",
+      "description": "Storage account connection",
+      "isRequired": true,
+      "replaces": "$(CONNECTION_STRING_INPUT)",
+      "type": "parameter"
+    },
+    "blobTrigger-path": {
+      "datatype": "string",
+      "defaultValue": "blobname",
+      "description": "Path",
+      "isRequired": true,
+      "replaces": "$(PATH_TO_BLOB_INPUT)",
+      "type": "parameter"
+    },
+    "FunctionIdentifier": {
+      "replaces": "__FUNCTION_NAME__",
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "pythonIdentifier"
+    }
+  },
+  "tags": {
+    "func-role": "python-append-helper",
+    "language": "Python",
+    "type": "item"
+  }
+}

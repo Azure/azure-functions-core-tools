@@ -14,6 +14,7 @@
     <IsPackable>false</IsPackable>
     <IsPublishable>true</IsPublishable>
     <EnableDemoProject>true</EnableDemoProject>
+    <DefineConstants>$(DefineConstants);FUNC_PYTHON_TEMPLATE_HELPERS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,6 +33,8 @@
 
   <ItemGroup>
     <Compile Include="../Workloads/Stacks/Node/NodeNpmInstaller.cs" Link="Templates/Node/NodeNpmInstaller.cs" />
+    <Compile Include="../Workloads/Stacks/Python/IPythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/IPythonTemplateAppendExecutor.cs" />
+    <Compile Include="../Workloads/Stacks/Python/PythonTemplateAppendExecutor.cs" Link="Templates/Python/Shared/PythonTemplateAppendExecutor.cs" />
   </ItemGroup>
 
   <ItemGroup>

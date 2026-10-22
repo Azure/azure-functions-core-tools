@@ -1,0 +1,20 @@
+{
+  "isHidden": true,
+  "symbolInfo": {
+    "chat-model-name": {
+      "longName": "chat-model-name"
+    },
+    "embedding-model-name": {
+      "longName": "embedding-model-name"
+    },
+    "httpTrigger-authLevel": {
+      "longName": "http-trigger-auth-level"
+    },
+    "rag-collection-name": {
+      "longName": "rag-collection-name"
+    },
+    "rag-connection": {
+      "longName": "rag-connection"
+    }
+  }
+}

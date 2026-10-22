@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Python/Workloads.Python.csproj" />
     <ProjectReference Include="../Fixtures/Templates.Tests.StoreProcess/Templates.Tests.StoreProcess.csproj"
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../Fixtures/Workloads.Tests.OperationProcess/Workloads.Tests.OperationProcess.csproj"
@@ -82,6 +83,11 @@
   <Target Name="PackBundledNodeForTests" AfterTargets="Build">
     <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" Targets="Pack"
       Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-node-artifacts" />
+  </Target>
+
+  <Target Name="PackBundledPythonForTests" AfterTargets="Build">
+    <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Python/Workloads.Python.csproj" Targets="Pack"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-python-artifacts" />
   </Target>
 
 </Project>

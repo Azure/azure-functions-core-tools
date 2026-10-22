@@ -1,0 +1,11 @@
+{
+  "isHidden": true,
+  "symbolInfo": {
+    "eventhubTrigger-connection": {
+      "longName": "eventhub-trigger-connection"
+    },
+    "eventhubTrigger-eventhubName": {
+      "longName": "eventhub-trigger-eventhub-name"
+    }
+  }
+}
