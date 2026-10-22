@@ -91,7 +91,8 @@ public abstract class WorkloadInstallerTestBase : IDisposable
         WorkloadPackageInspector inspector = new(reader, selector);
         WorkloadPackageSource packageSource =
             new(_catalog, inspector, Options.Create(new WorkloadCatalogOptions { IncludePrerelease = includePrerelease }));
-        WorkloadDeploymentService deploymentService = new(_paths, _store, reader, new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem());
+        WorkloadDeploymentService deploymentService = new(_paths, _store, reader, new FileWorkloadOperationCoordinator(_paths), new PhysicalFileSystem(),
+            Substitute.For<IBundledTemplateInstaller>());
         return new WorkloadInstaller(packageSource, inspector, selector, deploymentService,
             new FileWorkloadOperationCoordinator(_paths), _store, new PhysicalFileSystem());
     }

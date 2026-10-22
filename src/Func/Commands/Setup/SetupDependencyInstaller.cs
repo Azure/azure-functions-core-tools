@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
@@ -30,12 +31,13 @@ internal sealed class SetupDependencyInstaller(
     IInteractionService interaction,
     IWorkloadStore workloadStore,
     IWorkloadCatalog workloadCatalog,
-    IWorkloadInstaller workloadInstaller) : ISetupDependencyInstaller
+    IWorkloadInstaller workloadInstaller, NativeTemplateSetupSupport? nativeTemplates = null) : ISetupDependencyInstaller
 {
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IWorkloadStore _workloadStore = workloadStore ?? throw new ArgumentNullException(nameof(workloadStore));
     private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
     private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller ?? throw new ArgumentNullException(nameof(workloadInstaller));
+    private readonly NativeTemplateSetupSupport? _nativeTemplates = nativeTemplates;
 
     public async Task<SetupDependencyResult> EnsureDependencyAsync(
         SetupCommandOptions options,
@@ -44,6 +46,11 @@ internal sealed class SetupDependencyInstaller(
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(dependency);
+        if (dependency.TemplateDelivery == SetupTemplateDelivery.ExternalNative)
+        {
+            return await EnsureNativeAsync(options, dependency, cancellationToken);
+        }
+        bool requireBundled = _nativeTemplates is not null && dependency.Kind == SetupDependencyKind.Stack;
 
         IReadOnlyList<WorkloadEntry> installed = await _workloadStore.GetWorkloadsAsync(cancellationToken);
         IReadOnlyList<InstalledCandidate> compatibleInstalled = GetInstalledCandidates(installed, dependency, options.IncludePrerelease)
@@ -54,11 +61,17 @@ internal sealed class SetupDependencyInstaller(
         if (options.InstallPolicy == SetupInstallPolicy.IfNeeded && compatibleInstalled.Count > 0)
         {
             InstalledCandidate selected = compatibleInstalled[0];
+            string? failure = await EnsureBundledAsync(selected.Entry, options.Check, options.Source, dependency.PackageId, cancellationToken, requireBundled);
+            if (failure is not null)
+            {
+                return SetupDependencyResult.Failed(dependency, failure);
+            }
+
             return SetupDependencyResult.Satisfied(
                 dependency,
                 selected.Entry.PackageId,
                 selected.Version.ToNormalizedString(),
-                $"{dependency.DisplayName} is already installed.");
+                $"{dependency.DisplayName} is already installed.") with { InstalledWorkload = selected.Entry };
         }
 
         CatalogResolution resolution = await ResolveLatestFromCatalogAsync(dependency, options.Source, options.IncludePrerelease, cancellationToken);
@@ -67,11 +80,18 @@ internal sealed class SetupDependencyInstaller(
             if (compatibleInstalled.Count > 0)
             {
                 InstalledCandidate selected = compatibleInstalled[0];
+                string? failure = await EnsureBundledAsync(selected.Entry, options.Check, options.Source, dependency.PackageId, cancellationToken, requireBundled);
+                if (failure is not null)
+                {
+                    return SetupDependencyResult.Failed(dependency, failure);
+                }
+
                 return SetupDependencyResult.SatisfiedFallback(
                     dependency,
                     selected.Entry.PackageId,
                     selected.Version.ToNormalizedString(),
-                    $"{dependency.DisplayName} is satisfied by installed version {selected.Version.ToNormalizedString()} because catalog resolution failed: {resolution.FailureMessage}");
+                    $"{dependency.DisplayName} is satisfied by installed version {selected.Version.ToNormalizedString()} because catalog resolution failed: {resolution.FailureMessage}")
+                    with { InstalledWorkload = selected.Entry };
             }
 
             if (resolution.PackageMissing && dependency.Optional)
@@ -92,16 +112,23 @@ internal sealed class SetupDependencyInstaller(
         // encodes the channel, so this stays correct when a channeled dependency
         // fell back to the stable channel (where the installed version's channel
         // no longer equals dependency.Channel).
-        bool exactInstalled = IsExactVersionInstalled(installed, dependency, package.Version);
+        WorkloadEntry? exactInstalled = FindExactInstalled(installed, dependency, package.Version);
 
         string targetVersion = package.Version.ToNormalizedString();
-        if (exactInstalled)
+        if (exactInstalled is not null)
         {
+            string? failure = await EnsureBundledAsync(exactInstalled, options.Check, package.Source.Source, package.PackageId, cancellationToken, requireBundled);
+            if (failure is not null)
+            {
+                return SetupDependencyResult.Failed(dependency, failure);
+            }
+
             return SetupDependencyResult.Satisfied(
                 dependency,
                 package.PackageId,
                 targetVersion,
-                $"{dependency.DisplayName} {targetVersion} is already installed.") with { Warning = channelWarning };
+                $"{dependency.DisplayName} {targetVersion} is already installed.")
+                with { Warning = channelWarning, InstalledWorkload = exactInstalled };
         }
 
         if (options.Check)
@@ -137,7 +164,13 @@ internal sealed class SetupDependencyInstaller(
                     cancellationToken);
 
             string installedVersion = installResult.Entry.PackageVersion;
-            return installResult.AlreadyInstalled
+            if (requireBundled && !_workloadInstaller.HasBundledTemplates(installResult.Entry))
+            {
+                return SetupDependencyResult.Failed(dependency,
+                    "The stack remains installed but has no declared bundled starter assets. A native catalog cannot replace that dependency.")
+                    with { PackageId = installResult.Entry.PackageId, Version = installedVersion, InstalledWorkload = installResult.Entry };
+            }
+            SetupDependencyResult result = installResult.AlreadyInstalled
                 ? SetupDependencyResult.Satisfied(
                     dependency,
                     installResult.Entry.PackageId,
@@ -148,6 +181,12 @@ internal sealed class SetupDependencyInstaller(
                     installResult.Entry.PackageId,
                     installedVersion,
                     $"Installed {dependency.DisplayName} {installedVersion}.") with { Warning = channelWarning };
+            return result with { InstalledWorkload = installResult.Entry };
+        }
+        catch (BundledTemplateRegistrationCanceledException ex)
+        {
+            _interaction.WriteWarning(ex.Message);
+            throw;
         }
         catch (WorkloadPackageNotFoundException ex)
         {
@@ -161,6 +200,10 @@ internal sealed class SetupDependencyInstaller(
         {
             return SetupDependencyResult.Failed(dependency, ex.Message);
         }
+        catch (BundledTemplateRegistrationException ex)
+        {
+            return SetupDependencyResult.Failed(dependency, ex.Message);
+        }
         catch (FileNotFoundException ex)
         {
             return SetupDependencyResult.Failed(dependency, ex.Message);
@@ -169,6 +212,39 @@ internal sealed class SetupDependencyInstaller(
         {
             return SetupDependencyResult.Failed(dependency, ex.Message);
         }
+    }
+
+    private async Task<SetupDependencyResult> EnsureNativeAsync(SetupCommandOptions options, SetupDependency dependency,
+        CancellationToken cancellationToken)
+    {
+        if (_nativeTemplates is null)
+        {
+            return SetupDependencyResult.Failed(dependency,
+                "Required native setup support is unavailable. No optional or versionless legacy templates workload was used.");
+        }
+        BasicAcquisitionResult result = await _nativeTemplates.EnsureAsync(options, dependency, cancellationToken);
+        if (result.Status == BasicAcquisitionStatus.Canceled)
+        {
+            string completed = result.Completed.Count == 0 ? string.Empty
+                : $" Verified completed packages remain: {string.Join(", ", result.Completed.Select(step => $"{step.PackageId}@{step.Version}"))}.";
+            _interaction.WriteWarning(result.Message + completed);
+            throw new OperationCanceledException(result.Message, result.Cause, cancellationToken);
+        }
+        BasicAcquisitionStep[] artifacts = [.. result.Completed.Skip(1)];
+        if (result.Status != BasicAcquisitionStatus.Completed || artifacts.Length == 0)
+        {
+            string message = result.Status == BasicAcquisitionStatus.Incomplete
+                ? $"Required {dependency.DisplayName} are not installed. Run 'func setup --features {dependency.Name}' without '--check'. Bundled starter availability does not satisfy external templates."
+                : $"Required {dependency.DisplayName} were not satisfied ({result.Status}, {result.Failure}). {result.Message}";
+            return SetupDependencyResult.Failed(dependency, message) with { NativeAcquisition = result };
+        }
+        bool installed = artifacts.Any(artifact => !artifact.Reused);
+        return new(dependency, installed ? SetupDependencyStatus.Installed : SetupDependencyStatus.Satisfied,
+            artifacts.Length == 1 ? artifacts[0].PackageId : null, artifacts.Length == 1 ? artifacts[0].Version : null,
+            $"Required {dependency.DisplayName} are verified from their qualified native archives.")
+        {
+            NativeAcquisition = result,
+        };
     }
 
     private async Task<CatalogResolution> ResolveLatestFromCatalogAsync(
@@ -309,7 +385,49 @@ internal sealed class SetupDependencyInstaller(
         return candidates;
     }
 
-    private static bool IsExactVersionInstalled(IReadOnlyList<WorkloadEntry> installed, SetupDependency dependency, NuGetVersion version)
+    private async Task<string?> EnsureBundledAsync(WorkloadEntry entry, bool checkOnly, string? requestedSource,
+        string requestedPackageId, CancellationToken cancellationToken, bool required = false)
+    {
+        if (!entry.BundledTemplatesDeclared)
+        {
+            if (!required)
+            {
+                return null;
+            }
+            if (!_workloadInstaller.HasBundledTemplates(entry))
+            {
+                return "The selected stack has no declared bundled starter assets. Required external native templates cannot replace bundled readiness.";
+            }
+        }
+
+        string actualSource = entry.LogicalPackage is { } logical
+            && string.Equals(requestedPackageId, logical.PackageId, StringComparison.OrdinalIgnoreCase) ? logical.Source : entry.Source;
+        if (requestedSource is not null && !string.Equals(requestedSource, actualSource, StringComparison.Ordinal))
+        {
+            return "The requested source conflicts with the installed bundled stack's validated origin. Use its original source to repair it.";
+        }
+
+        try
+        {
+            await _workloadInstaller.EnsureInstalledAsync(entry, cancellationToken, checkOnly);
+            return null;
+        }
+        catch (BundledTemplateRegistrationCanceledException exception)
+        {
+            _interaction.WriteWarning(exception.Message);
+            throw;
+        }
+        catch (BundledTemplateRegistrationException exception)
+        {
+            return exception.Message;
+        }
+        catch (InvalidWorkloadException exception)
+        {
+            return exception.Message;
+        }
+    }
+
+    private static WorkloadEntry? FindExactInstalled(IReadOnlyList<WorkloadEntry> installed, SetupDependency dependency, NuGetVersion version)
     {
         foreach (WorkloadEntry entry in installed)
         {
@@ -317,11 +435,11 @@ internal sealed class SetupDependencyInstaller(
                 && NuGetVersion.TryParse(entry.PackageVersion, out NuGetVersion? installedVersion)
                 && installedVersion.Equals(version))
             {
-                return true;
+                return entry;
             }
         }
 
-        return false;
+        return null;
     }
 
     private static bool MatchesDependency(WorkloadEntry entry, SetupDependency dependency)

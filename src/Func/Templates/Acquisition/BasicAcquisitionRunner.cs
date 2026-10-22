@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
@@ -16,7 +17,8 @@ namespace Azure.Functions.Cli.Templates.Acquisition;
 /// </summary>
 internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, BasicAcquisitionPlanner planner,
     IPackageSourceProvider sourceProvider, IWorkloadStore workloads, IWorkloadPaths workloadPaths,
-    IWorkloadInstaller workloadInstaller, IBasicTemplateLifecycle templates, IFileSystem fileSystem, IWorkloadOperationCoordinator coordinator)
+    IWorkloadInstaller workloadInstaller, IBasicTemplateLifecycle templates, IFileSystem fileSystem, IWorkloadOperationCoordinator coordinator,
+    IWorkloadDeploymentService? nativeDeployment = null)
 {
     private readonly IBasicCompanionCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
     private readonly BasicAcquisitionPlanner _planner = planner ?? throw new ArgumentNullException(nameof(planner));
@@ -27,6 +29,7 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
     private readonly IBasicTemplateLifecycle _templates = templates ?? throw new ArgumentNullException(nameof(templates));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly IWorkloadOperationCoordinator _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
+    private readonly IWorkloadDeploymentService? _nativeDeployment = nativeDeployment;
 
     public async Task<BasicAcquisitionResult> RunAsync(BasicAcquisitionRequest request, CancellationToken cancellationToken)
     {
@@ -39,6 +42,7 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
         string? source = null;
         List<PreparedBasicTemplate> preparedTemplates = [];
         PreparedWorkloadInstall? preparedStack = null;
+        PreparedWorkloadReuse? nativeStack = null;
         bool workloadRecoveryRequired = false;
         try
         {
@@ -48,7 +52,8 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             IReadOnlyList<WorkloadEntry> installed = await _workloads.GetWorkloadsAsync(cancellationToken);
             try
             {
-                source = _sourceProvider.GetSource(request.Source).Source;
+                string resolvedSource = _sourceProvider.GetSource(request.Source).Source;
+                source = request.NativeContext is null ? resolvedSource : BasicCompanionManifestReader.Source(resolvedSource);
             }
             catch (ArgumentException exception)
             {
@@ -61,17 +66,42 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             }
 
             source = plan.Source;
-            TemplateEngineContext context = new(request.Directory);
+            if (request.NativeContext is not null)
+            {
+                WorkloadEntry selectedStack = RequireNativeStack(installed, request);
+                IWorkloadDeploymentService deployment = _nativeDeployment
+                    ?? throw new InvalidOperationException("Native acquisition requires the selected-stack deployment validator.");
+                try
+                {
+                    nativeStack = await deployment.PrepareReuseAsync(selectedStack, cancellationToken, checkOnly: true);
+                }
+                catch (InvalidWorkloadException exception)
+                {
+                    throw NativeStackFailure(exception);
+                }
+            }
+            TemplateEngineContext context = new(request.Directory)
+            {
+                RequireCleanStore = request.Check || request.NativeContext is not null,
+            };
             List<BasicTemplateSelection> selected = [];
             foreach (BasicCompanionPlan companion in plan.Companions)
             {
                 selected.Add(await _templates.SelectAsync(companion, context, cancellationToken));
+            }
+            if (request.NativeContext is not null)
+            {
+                ValidateNativeIdentities(selected);
             }
 
             WorkloadEntry? stack = FindStack(installed, request);
             bool stackInstalled = stack is not null && _fileSystem.DirectoryExists(_workloadPaths.GetInstallDirectory(stack.PackageId, stack.PackageVersion));
             if (request.Check)
             {
+                if (nativeStack is not null)
+                {
+                    return await CheckNativeAsync(manifest, request, nativeStack, context, source, cancellationToken);
+                }
                 return new(stackInstalled && selected.All(selection => selection.Installed)
                     ? BasicAcquisitionStatus.Completed : BasicAcquisitionStatus.Incomplete, revision, source, [],
                     Message: "Check mode does not acquire payloads or repair packages.");
@@ -110,6 +140,10 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
             operation.Validate(_workloadPaths);
             installed = await _workloads.GetWorkloadsAsync(cancellationToken);
+            if (nativeStack is not null)
+            {
+                await ValidateNativeStackAsync(operation, nativeStack, request, installed, cancellationToken);
+            }
             BasicAcquisitionPlan currentPlan = _planner.Plan(manifest, request, installed, source)
                 ?? throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged, "The prepared mapping no longer applies. Re-run explicit repair.");
             foreach (BasicTemplateSelection selection in selected)
@@ -210,6 +244,11 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             return new(BasicAcquisitionStatus.Rejected, revision, source, completed.AsReadOnly(),
                 BasicAcquisitionFailure.RecoveryRequired, exception.Message, exception);
         }
+        catch (TemplateStoreRecoveryRequiredException exception)
+        {
+            return new(BasicAcquisitionStatus.Rejected, revision, source, completed.AsReadOnly(),
+                BasicAcquisitionFailure.RecoveryRequired, exception.Message, exception);
+        }
         catch (WorkloadPlanChangedException exception)
         {
             return new(BasicAcquisitionStatus.Rejected, revision, source, completed.AsReadOnly(),
@@ -218,6 +257,7 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
         finally
         {
             preparedStack?.Dispose();
+            nativeStack?.Dispose();
             foreach (PreparedBasicTemplate prepared in preparedTemplates)
             {
                 prepared.Dispose();
@@ -225,9 +265,89 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
         }
     }
 
+    private static void ValidateNativeIdentities(IReadOnlyList<BasicTemplateSelection> selected)
+    {
+        Dictionary<string, string> owners = new(StringComparer.Ordinal);
+        foreach (BasicTemplateSelection selection in selected)
+        {
+            foreach (BasicTemplateDefinition template in selection.Artifact.Templates)
+            {
+                if (owners.TryGetValue(template.Identity, out string? owner)
+                    && !string.Equals(owner, selection.Artifact.PackageId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new BasicAcquisitionException(BasicAcquisitionFailure.InvalidMapping,
+                        $"Required native packages '{owner}' and '{selection.Artifact.PackageId}' claim the same template identity '{template.Identity}'. No package was acquired.");
+                }
+                owners[template.Identity] = selection.Artifact.PackageId;
+            }
+        }
+    }
+
+    private async Task<BasicAcquisitionResult> CheckNativeAsync(BasicCompanionManifest manifest, BasicAcquisitionRequest request,
+        PreparedWorkloadReuse preparedStack, TemplateEngineContext context, string source, CancellationToken cancellationToken)
+    {
+        using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
+        operation.Validate(_workloadPaths);
+        IReadOnlyList<WorkloadEntry> installed = await _workloads.GetWorkloadsAsync(cancellationToken);
+        await ValidateNativeStackAsync(operation, preparedStack, request, installed, cancellationToken);
+        BasicAcquisitionPlan plan = _planner.Plan(manifest, request, installed, source)
+            ?? throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged, "The required native association no longer applies.");
+        List<BasicAcquisitionStep> ready = [new(request.StackPackageId, request.StackVersion.ToNormalizedString(), true)];
+        bool complete = true;
+        foreach (BasicCompanionPlan companion in plan.Companions)
+        {
+            BasicTemplateSelection actual = await _templates.SelectAsync(companion, context, cancellationToken);
+            complete &= actual.Installed;
+            if (actual.Installed)
+            {
+                ready.Add(new(actual.Artifact.PackageId, actual.Artifact.Version.ToNormalizedString(), true));
+            }
+        }
+        return new(complete ? BasicAcquisitionStatus.Completed : BasicAcquisitionStatus.Incomplete,
+            plan.Revision, plan.Source, ready.AsReadOnly(),
+            Message: "Check mode verifies required native roles without acquiring payloads, repairing packages or recovering retained state.");
+    }
+
+    private async Task ValidateNativeStackAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared,
+        BasicAcquisitionRequest request, IReadOnlyList<WorkloadEntry> installed, CancellationToken cancellationToken)
+    {
+        RequireNativeStack(installed, request);
+        try
+        {
+            await _nativeDeployment!.ValidateReuseAsync(operation, prepared, cancellationToken, checkOnly: true);
+        }
+        catch (InvalidWorkloadException exception)
+        {
+            throw NativeStackFailure(exception);
+        }
+    }
+
+    private static WorkloadEntry RequireNativeStack(IReadOnlyList<WorkloadEntry> installed, BasicAcquisitionRequest request)
+    {
+        WorkloadEntry? actual = FindStack(installed, request);
+        WorkloadEntry selected = request.NativeContext!.SelectedStack;
+        if (actual is null || !WorkloadStateSnapshot.Same(actual, selected))
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
+                "The selected stack owner, version or source changed. Run setup again; no external package was admitted.");
+        }
+        if (actual.Kind != WorkloadKind.Workload || actual.EntryPoint is null)
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.InstalledConflict,
+                "The selected native template association requires an executable installed stack, not a content or catalog row.");
+        }
+        return actual;
+    }
+
+    private static BasicAcquisitionException NativeStackFailure(InvalidWorkloadException exception)
+        => new(exception.InnerException is TemplateStoreRecoveryRequiredException
+                ? BasicAcquisitionFailure.RecoveryRequired : BasicAcquisitionFailure.InstalledConflict,
+            exception.Message, exception);
+
     private async Task IncludeRetainedStackAsync(BasicAcquisitionRequest request, List<BasicAcquisitionStep> completed)
     {
-        if (completed.Any(step => string.Equals(step.PackageId, request.StackPackageId, StringComparison.OrdinalIgnoreCase)))
+        if (request.NativeContext is not null
+            || completed.Any(step => string.Equals(step.PackageId, request.StackPackageId, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
@@ -240,8 +360,17 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
     }
 
     private static WorkloadEntry? FindStack(IReadOnlyList<WorkloadEntry> installed, BasicAcquisitionRequest request)
-        => installed.FirstOrDefault(entry =>
+    {
+        if (request.NativeContext is { } native)
+        {
+            WorkloadEntry[] matches = [.. installed.Where(entry =>
+                string.Equals(entry.PackageId, native.SelectedStack.PackageId, StringComparison.OrdinalIgnoreCase)
+                && entry.PackageVersion == native.SelectedStack.PackageVersion)];
+            return matches.Length == 1 ? matches[0] : null;
+        }
+        return installed.FirstOrDefault(entry =>
             string.Equals(entry.LogicalPackage?.PackageId ?? entry.PackageId, request.StackPackageId, StringComparison.OrdinalIgnoreCase)
             && NuGetVersion.TryParse(entry.LogicalPackage?.PackageVersion ?? entry.PackageVersion, out NuGetVersion? version)
             && version == request.StackVersion);
+    }
 }

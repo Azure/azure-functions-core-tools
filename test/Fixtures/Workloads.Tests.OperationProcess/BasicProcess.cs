@@ -31,9 +31,10 @@ internal sealed class BasicProcess
         WorkloadRidPackageSelector selector = new(new FixedRuntime());
         WorkloadPackageInspector inspector = new(metadata, selector);
         LocalPackages packages = new(args[2]);
-        WorkloadDeploymentService deployment = new(paths, store, metadata, coordinator, fileSystem);
-        WorkloadInstaller installer = new(packages, inspector, selector, deployment, coordinator, store, fileSystem);
         TemplateStore templates = new(new(paths.Home), fileSystem, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        WorkloadDeploymentService deployment = new(paths, store, metadata, coordinator, fileSystem,
+            new BundledTemplateInstaller(templates, new BasicArtifactInspector(fileSystem), fileSystem, new(paths.Home)));
+        WorkloadInstaller installer = new(packages, inspector, selector, deployment, coordinator, store, fileSystem);
         BasicTemplateLifecycle lifecycle = new(templates, packages, new CompletionInspector(fileSystem, args[4] == "fail"), new NoOwner(), fileSystem);
         BasicAcquisitionRunner runner = new(new Catalog(args[3]), new(), new PackageSourceProvider(Options.Create(new WorkloadCatalogOptions { Source = Source })),
             store, paths, installer, lifecycle, fileSystem, new AdmissionGate(coordinator));

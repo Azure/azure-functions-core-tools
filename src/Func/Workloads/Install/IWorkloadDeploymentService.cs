@@ -8,13 +8,26 @@ namespace Azure.Functions.Cli.Workloads.Install;
 
 internal interface IWorkloadDeploymentService
 {
+    public bool HasBundledTemplates(WorkloadEntry entry);
+
     /// <summary>
     /// Prepares hashes only after the installed metadata, declared payload root and entry point match the registry.
     /// </summary>
-    /// <remarks>Entry-point existence preserves the loader's install-root-first lookup and legacy tools/any fallback.</remarks>
+    /// <remarks>
+    /// Entry-point existence preserves the loader's install-root-first lookup and legacy tools/any fallback.
+    /// Check-only preparation refuses pending native recovery without restoring retained state.
+    /// </remarks>
     /// <exception cref="Discovery.InvalidWorkloadException">The retained payload is damaged or conflicts with its registry entry.</exception>
-    public Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken);
-    public Task ValidateReuseAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared, CancellationToken cancellationToken);
+    public Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool checkOnly = false);
+    /// <summary>
+    /// Revalidates the leased registry and payload, optionally checking native registration without registering packages.
+    /// </summary>
+    public Task ValidateReuseAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared, CancellationToken cancellationToken, bool checkOnly = false);
+    /// <summary>
+    /// Revalidates reuse and admits workload ownership before registering bundles under continuous native protection.
+    /// </summary>
+    public Task<WorkloadInstallResult> CommitPreparedReuseAsync(IWorkloadOperation operation, PreparedWorkloadReuse prepared,
+        Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken);
     public Task<WorkloadEntry> GetAdvisoryUpdateTargetAsync(string packageId, NuGetVersion? targetInstalledVersion,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken);
     public Task<WorkloadInstallResult?> GetAdvisoryExplicitReuseAsync(string packageId, string version, CancellationToken cancellationToken);

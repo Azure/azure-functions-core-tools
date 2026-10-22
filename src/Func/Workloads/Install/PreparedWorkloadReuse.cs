@@ -8,4 +8,8 @@ namespace Azure.Functions.Cli.Workloads.Install;
 /// <summary>
 /// Binds advisory reuse to the selected registry row and cached payload bytes without promoting their source trust.
 /// </summary>
-internal sealed record PreparedWorkloadReuse(WorkloadEntry Entry, IReadOnlyDictionary<string, string> Hashes);
+internal sealed record PreparedWorkloadReuse(WorkloadEntry Entry, IReadOnlyDictionary<string, string> Hashes) : IDisposable
+{
+    public PreparedBundledTemplates? BundledTemplates { get; init; }
+    public void Dispose() => BundledTemplates?.Dispose();
+}

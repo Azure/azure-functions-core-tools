@@ -1,0 +1,21 @@
+<Project>
+  <UsingTask TaskName="WriteBundledTemplatesJson" AssemblyFile="$(BaseOutputPath)../Workloads.Sdk/$(Configuration.ToLowerInvariant())/Azure.Functions.Cli.Workloads.Sdk.dll" TaskFactory="TaskHostFactory" />
+  <PropertyGroup>
+    <PackWorkloadDependsOn>$(PackWorkloadDependsOn);_PackBundledNodeTemplates</PackWorkloadDependsOn>
+  </PropertyGroup>
+  <Target Name="_PackBundledNodeTemplates" DependsOnTargets="_SetWorkloadProperties" Condition="'$(WorkloadKind)' == 'workload'">
+    <PropertyGroup>
+      <_BundledTemplatesOutput>$(IntermediateOutputPath)bundled-templates/</_BundledTemplatesOutput>
+      <_BundledNodeArchive>$(_BundledTemplatesOutput)Azure.Functions.Templates.Node.Basic.$(PackageVersion).nupkg</_BundledNodeArchive>
+      <_BundledTemplatesManifest>$(IntermediateOutputPath)bundled-templates.json</_BundledTemplatesManifest>
+    </PropertyGroup>
+    <MSBuild Projects="$(MSBuildProjectDirectory)/NativeTemplates/Workloads.Node.Templates.csproj"
+      Targets="Pack" Properties="Configuration=$(Configuration);PackageOutputPath=$([System.IO.Path]::GetFullPath('$(_BundledTemplatesOutput)'));PackageVersion=$(PackageVersion)" />
+    <WriteBundledTemplatesJson Archive="$(_BundledNodeArchive)" ArchivePath="$(_WorkloadPackageContentRoot)templates/node-basic.nupkg"
+      OutputPath="$(_BundledTemplatesManifest)" />
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(_BundledNodeArchive)" PackagePath="$(_WorkloadPackageContentRoot)templates/node-basic.nupkg" />
+      <TfmSpecificPackageFile Include="$(_BundledTemplatesManifest)" PackagePath="bundled-templates.json" />
+    </ItemGroup>
+  </Target>
+</Project>

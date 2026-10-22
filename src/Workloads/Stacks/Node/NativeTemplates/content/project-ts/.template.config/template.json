@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": ".NET Foundation",
+  "identity": "Azure.Functions.Node.Basic.TypeScript",
+  "groupIdentity": "Azure.Functions.Node.Basic",
+  "name": "Azure Functions Node.js v4 project",
+  "shortName": "basic",
+  "tags": { "type": "project", "language": "TypeScript" },
+  "preferNameDirectory": false,
+  "placeholderFilename": "-.-",
+  "symbols": {
+    "PackageName": { "type": "derived", "valueSource": "name", "valueTransform": "npmName", "replaces": "__PROJECT_NAME__" },
+    "NoBundles": { "type": "parameter", "datatype": "Boolean", "defaultValue": "false", "description": "Create host.json without an extension bundle." },
+    "BundlesChannel": { "type": "parameter", "datatype": "choice", "defaultValue": "Stable", "description": "Extension bundle channel.",
+      "choices": [{ "choice": "Stable" }, { "choice": "Preview" }, { "choice": "Experimental" }] },
+    "BundleId": { "type": "generated", "generator": "switch", "replaces": "__BUNDLE_ID__",
+      "parameters": { "evaluator": "C++", "cases": [
+        { "condition": "(BundlesChannel == \"Stable\")", "value": "Microsoft.Azure.Functions.ExtensionBundle" },
+        { "condition": "(BundlesChannel == \"Preview\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Preview" },
+        { "condition": "(BundlesChannel == \"Experimental\")", "value": "Microsoft.Azure.Functions.ExtensionBundle.Experimental" }
+      ] } }
+  },
+  "forms": {
+    "npmTrim": { "identifier": "replace", "pattern": "^\\s+|\\s+$", "replacement": "" },
+    "npmSpaces": { "identifier": "replace", "pattern": " ", "replacement": "-" },
+    "npmCharacters": { "identifier": "replace", "pattern": "[^a-z0-9._-]", "replacement": "" },
+    "npmFallback": { "identifier": "replace", "pattern": "^$", "replacement": "function-app" },
+    "npmName": { "identifier": "chain", "steps": ["npmTrim", "lowerCase", "npmSpaces", "npmCharacters", "npmFallback"] }
+  },
+  "constraints": { "host": { "type": "host", "args": [{ "hostname": "func" }] } },
+  "primaryOutputs": [{ "path": "host.json" }],
+  "postActions": [{
+    "actionId": "00e33184-ffc7-43ef-bec0-b1684df8ad56",
+    "description": "Write Azure Functions CLI project configuration (draft authoring contract).",
+    "continueOnError": false,
+    "args": { "primaryOutputIndex": "0", "stack": "node", "language": "TypeScript" }
+  }]
+}

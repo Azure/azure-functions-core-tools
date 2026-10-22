@@ -4,6 +4,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Azure.Functions.Cli.Bundles;
+using Azure.Functions.Cli.Projects;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Templates.Acquisition;
@@ -19,12 +20,13 @@ internal sealed class BasicCompanionManifestReader
             RejectDuplicates(raw.RootElement);
             BasicCompanionDocument document = JsonSerializer.Deserialize(json, BasicCompanionJsonContext.Default.BasicCompanionDocument)
                 ?? throw Invalid("The document is null.");
-            if (document.SchemaVersion != 1)
+            if (document.SchemaVersion is not (1 or 2))
             {
                 throw Invalid($"Unsupported schema version '{document.SchemaVersion}'.");
             }
 
             string revision = Text(document.Revision, "revision");
+            bool native = document.SchemaVersion == 2;
             List<BasicStackMapping> stacks = [];
             foreach (BasicStackDocument entry in document.Stacks ?? throw Invalid("stacks must be an array."))
             {
@@ -49,7 +51,22 @@ internal sealed class BasicCompanionManifestReader
                         throw Invalid($"Stack '{id}' has a null companion.");
                     }
 
-                    companions.Add(new(PackageId(requirement.PackageId), Range(requirement.Versions)));
+                    NativeTemplateContentRole[] roles = native
+                        ? [.. (requirement.RequiredRoles ?? throw Invalid("A native companion requires explicit content roles.")).Select(Role)]
+                        : [];
+                    if (native && (roles.Length == 0 || roles.Distinct().Count() != roles.Length))
+                    {
+                        throw Invalid("A native companion requires distinct nonempty content roles.");
+                    }
+                    if (!native && requirement.RequiredRoles is not null)
+                    {
+                        throw Invalid("Native association fields require schema version 2.");
+                    }
+
+                    companions.Add(new(PackageId(requirement.PackageId), Range(requirement.Versions))
+                    {
+                        RequiredRoles = Array.AsReadOnly(roles),
+                    });
                 }
 
                 if (companions.Count == 0 || companions.Select(c => c.PackageId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != companions.Count)
@@ -63,15 +80,36 @@ internal sealed class BasicCompanionManifestReader
                     throw Invalid($"Stack '{id}' has ambiguous overlapping version mappings.");
                 }
 
-                stacks.Add(new(id, range, Array.AsReadOnly(sources), companions.AsReadOnly()));
+                NativeTemplateAssociationPolicy? policy = null;
+                if (native)
+                {
+                    if (entry.HostIdentifier != "func")
+                    {
+                        throw Invalid("Native associations require the exact 'func' host identifier.");
+                    }
+                    BundleChannel[] channels = [.. (entry.Channels ?? throw Invalid("Native associations require explicit channels.")).Select(Channel)];
+                    if (channels.Length == 0 || channels.Distinct().Count() != channels.Length)
+                    {
+                        throw Invalid("Native associations require distinct nonempty channels.");
+                    }
+                    policy = new(entry.HostIdentifier, Range(entry.EngineHostVersions), Array.AsReadOnly(channels));
+                }
+                else if (entry.HostIdentifier is not null || entry.EngineHostVersions is not null || entry.Channels is not null)
+                {
+                    throw Invalid("Native association fields require schema version 2.");
+                }
+
+                stacks.Add(new(id, range, Array.AsReadOnly(sources), companions.AsReadOnly()) { NativePolicy = policy });
             }
 
             List<BasicTemplateArtifact> artifacts = [];
             foreach (BasicArtifactDocument entry in document.Artifacts ?? throw Invalid("artifacts must be an array."))
             {
-                if (entry is null || !entry.BasicOnly)
+                if (entry is null || (!native && !entry.BasicOnly) || (native && entry.BasicOnly))
                 {
-                    throw Invalid("Every artifact requires explicit basic-only qualification.");
+                    throw Invalid(native
+                        ? "External native content cannot be qualified as legacy basic-only content."
+                        : "Every artifact requires explicit basic-only qualification.");
                 }
 
                 string id = PackageId(entry.PackageId);
@@ -89,6 +127,7 @@ internal sealed class BasicCompanionManifestReader
                 }
 
                 List<BasicTemplateDefinition> definitions = [];
+                List<NativeTemplateContentDeclaration> contentRoles = [];
                 foreach (BasicDefinitionDocument definition in entry.Templates ?? throw Invalid($"Artifact '{id}' requires templates."))
                 {
                     if (definition is null)
@@ -114,7 +153,20 @@ internal sealed class BasicCompanionManifestReader
                         throw Invalid($"Artifact '{id}' contains a non-basic template type.");
                     }
 
-                    definitions.Add(new(path, Text(definition.Identity, "template identity"), type));
+                    NativeTemplateContentRole? role = native ? Role(definition.ContentRole) : null;
+                    if ((!native && definition.ContentRole is not null)
+                        || (role == NativeTemplateContentRole.Function && type != "item")
+                        || (role == NativeTemplateContentRole.AdditionalProject && type != "project"))
+                    {
+                        throw Invalid("Template type and explicit content role must agree with the association schema.");
+                    }
+
+                    string identity = Text(definition.Identity, "template identity");
+                    definitions.Add(new(path, identity, type));
+                    if (role is { } contentRole)
+                    {
+                        contentRoles.Add(new(identity, contentRole));
+                    }
                 }
 
                 if (definitions.Count == 0
@@ -129,10 +181,13 @@ internal sealed class BasicCompanionManifestReader
                     throw Invalid($"Artifact '{id}' {version} has duplicate approval records.");
                 }
 
-                artifacts.Add(new(id, version, source, hash.ToLowerInvariant(), Text(entry.ContentRevision, "content revision"), definitions.AsReadOnly()));
+                artifacts.Add(new(id, version, source, hash.ToLowerInvariant(), Text(entry.ContentRevision, "content revision"), definitions.AsReadOnly())
+                {
+                    ContentRoles = contentRoles.AsReadOnly(),
+                });
             }
 
-            return new(revision, stacks.AsReadOnly(), artifacts.AsReadOnly());
+            return new(revision, stacks.AsReadOnly(), artifacts.AsReadOnly()) { SchemaVersion = document.SchemaVersion };
         }
         catch (JsonException exception)
         {
@@ -175,6 +230,21 @@ internal sealed class BasicCompanionManifestReader
     private static string Text(string? value, string field)
         => !string.IsNullOrWhiteSpace(value) && value == value.Trim() ? value : throw Invalid($"{field} must be nonempty without outer whitespace.");
 
+    private static NativeTemplateContentRole Role(string? value) => value switch
+    {
+        "function" => NativeTemplateContentRole.Function,
+        "additional-project" => NativeTemplateContentRole.AdditionalProject,
+        _ => throw Invalid("A native content role must be 'function' or 'additional-project'."),
+    };
+
+    private static BundleChannel Channel(string? value) => value switch
+    {
+        "stable" => BundleChannel.Stable,
+        "preview" => BundleChannel.Preview,
+        "experimental" => BundleChannel.Experimental,
+        _ => throw Invalid("A native channel must be 'stable', 'preview' or 'experimental'."),
+    };
+
     private static void RejectDuplicates(JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object)
@@ -216,12 +286,16 @@ internal sealed class BasicStackDocument
     public string? Versions { get; init; }
     public List<string>? Sources { get; init; }
     public List<BasicRequirementDocument>? Companions { get; init; }
+    public string? HostIdentifier { get; init; }
+    public string? EngineHostVersions { get; init; }
+    public List<string>? Channels { get; init; }
 }
 
 internal sealed class BasicRequirementDocument
 {
     public string? PackageId { get; init; }
     public string? Versions { get; init; }
+    public List<string>? RequiredRoles { get; init; }
 }
 
 internal sealed class BasicArtifactDocument
@@ -240,6 +314,7 @@ internal sealed class BasicDefinitionDocument
     public string? Path { get; init; }
     public string? Identity { get; init; }
     public string? Type { get; init; }
+    public string? ContentRole { get; init; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]

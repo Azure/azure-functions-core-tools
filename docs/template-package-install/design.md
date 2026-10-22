@@ -421,6 +421,81 @@ nonparticipating processes. Curated registration/proof/grammar remains #5640/#56
 curated preinstallation, general scanner or second sample registry is introduced.
 This increment is not M5 or production acquisition completion.
 
+### Staged hybrid setup
+
+`NativeTemplateSetupRegistration.AddNativeTemplateSetup` composes the native
+setup foundation explicitly. The default CLI host does not call it. Public
+setup retains its legacy route, and public init/new activation is unchanged.
+An explicitly planned native dependency cannot fall back to an optional or
+versionless templates workload when native support or qualification is missing.
+
+Bundled stack readiness and required external native readiness are separate
+dependency results. `SetupRunner` carries the actual successful stack result
+into its corresponding native dependency within each profile scope. Native
+planning uses that physical owner and its logical pointer attribution, exact
+version and catalog origin. Profiles retain their host, worker, bundle and
+supported runtime constraints. They cannot supply publication authority.
+
+The existing acquisition reader also supports schema version 2. Stack mappings
+retain literal package IDs, compatible version ranges and approved sources.
+They add `hostIdentifier`, `engineHostVersions` and explicit `channels`.
+`hostIdentifier` must be `func`. The version range describes the actual FUNC
+native host version, including prerelease bounds, not the separately versioned
+Microsoft.TemplateEngine package. The opt-in composition binds the same
+assembly version source used by `FuncTemplateEngineHost`, independently of
+version-command test overrides.
+
+Each companion has explicit `requiredRoles`. Every complete raw template
+inventory entry has `contentRole`, either `function` with native type `item` or
+`additional-project` with native type `project`. Content role does not grant
+executable ownership or permission to bypass native constraints, configuration
+actions or invocation guards. The artifact still needs an exact version,
+source, SHA-256 and content revision. Compatible ranges select only those exact
+qualified artifacts, not future unreviewed bytes. Legacy basic-only records
+cannot satisfy these roles.
+
+The normal explicit, environment and default source selection is resolved once.
+A conflicting effective source is not silently replaced by the stored origin.
+The native path keeps the selected catalog origin rather than silently changing
+feeds. A local archive path is not a native feed binding. An explicit channel is
+not replaced with stable. Without a channel restriction, candidates must still
+match the publisher's approved channels and the caller's prerelease policy.
+Retained stacks sharing an external package constrain its ranges, source and
+host policy. An unrelated package is not an implicit repair target.
+
+Before admission, native setup validates the selected runtime metadata, declared
+payload root and entry-point file, then stages every required archive privately.
+This is not assembly activation or type-load qualification. Under the existing workload operation
+it rechecks the selected owner, source, payload hashes and retained requirements.
+Native registration, discovered host metadata and complete inventory checks use
+the existing protected template lifecycle. Package and template identity
+collisions refuse replacement or adoption.
+
+Native source, digest and exact-version pins live in provenance receipts under
+the existing template hive. They participate in its snapshot, commit and
+recovery, not another installed-template registry. A missing package remains
+missing even if its receipt survives. Repair retains a compatible recorded pin
+and refuses conflicting bytes, versions or sources. Reuse does not rewrite the
+receipt. Failed receipt writes roll back native registration. Completed packages
+remain in the result ledger after a later failure or cancellation.
+
+Check mode validates without payload acquisition, registration or pending-state
+recovery. Both preparation and final reads require a clean native store.
+Ordinary legacy repair keeps the owning store's existing recovery behavior.
+Structured native setup results distinguish selected-stack completion from
+external artifact completion and retain association revision and source.
+Finished results remain visible if cancellation is observed at the return
+boundary, without starting the next dependency or reporting whole-setup success.
+
+The production resource remains deliberately empty and unqualified. Concrete
+publisher-owned native release identities, ranges, digests and inventories are
+still required. The current Node bundle also still includes HTTP items.
+Project-only bundled starter assets and separately released function catalog
+assets remain the Node catalog owner's producer work. Shared packaging remains
+its owning layer's work. Scoped real package fixtures exercise composition and
+staged creation, not production qualification, public activation or live host
+execution. Schema version 1 prototype behavior remains separately covered.
+
 ### Participating workload mutation
 
 The existing coordination feature is relocated into this acquisition layer so

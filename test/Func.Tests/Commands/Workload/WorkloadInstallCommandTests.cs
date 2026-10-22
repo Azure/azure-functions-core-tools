@@ -5,6 +5,9 @@ using System.CommandLine;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands.Workload;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
+using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Catalog;
 using Azure.Functions.Cli.Workloads.Discovery;
@@ -525,6 +528,79 @@ public class WorkloadInstallCommandTests
             Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<WorkloadInstallExpectation>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
         _interaction.Lines.Should().Contain(l =>
             l.StartsWith("HINT:") && l.Contains("func workload update Test.Workload"));
+    }
+
+    [Fact]
+    public async Task Install_AlreadyInstalledBundledStack_RunsInstallerToVerifyOrRepairInsteadOfOfferingUpdate()
+    {
+        var entry = new WorkloadEntry { PackageId = "Test.Workload", PackageVersion = "1.0.0", Aliases = ["test"] };
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+        _installer.HasBundledTemplates(entry).Returns(true);
+        StubCatalogResult();
+
+        int exit = await InvokeAsync(NewInstall(), "Test.Workload");
+
+        exit.Should().Be(0);
+        await _installer.Received(1).InstallFromCatalogAsync("Test.Workload", null, null, (bool?)null, false, false,
+            Arg.Any<WorkloadInstallExpectation>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>());
+        _interaction.Lines.Should().NotContain(line => line.Contains("Update instead", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Install_BundledRegistrationFailure_ReportsRetainedStackAndPreservesCause()
+    {
+        var entry = new WorkloadEntry { PackageId = "Test.Workload", PackageVersion = "1.0.0" };
+        var failure = new BundledTemplateRegistrationException(entry, new IOException("receipt failed"));
+        _installer.InstallFromCatalogAsync(Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+            Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<WorkloadInstallExpectation>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>()).Throws(failure);
+
+        Func<Task> invoke = () => InvokeAsync(NewInstall(), "Test.Workload");
+
+        var error = (await invoke.Should().ThrowAsync<GracefulException>()).Which;
+        error.InnerException.Should().BeSameAs(failure);
+        error.Message.Should().Contain("remains installed", "registration failed", "Retry");
+    }
+
+    [Fact]
+    public async Task Install_BundledRegistrationCancellation_RendersWarningAndPreservesCancellation()
+    {
+        var entry = new WorkloadEntry { PackageId = "Test.Workload", PackageVersion = "1.0.0" };
+        using var cancel = new CancellationTokenSource();
+        cancel.Cancel();
+        var failure = new BundledTemplateRegistrationCanceledException(entry, new OperationCanceledException(cancel.Token), cancel.Token);
+        _installer.InstallFromCatalogAsync(Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+            Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<WorkloadInstallExpectation>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>()).Throws(failure);
+
+        Func<Task> invoke = () => InvokeAsync(NewInstall(), "Test.Workload");
+
+        var error = (await invoke.Should().ThrowAsync<BundledTemplateRegistrationCanceledException>()).Which;
+        error.CancellationToken.Should().Be(cancel.Token);
+        _interaction.Lines.Should().Contain(line => line.Contains("remains installed", StringComparison.Ordinal) && line.Contains("Retry", StringComparison.Ordinal));
+        _interaction.Lines.Should().NotContain(line => line.Contains("Installed workload", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Install_BundledCancellation_RealSpectreAdapterWritesRetainedStateToStderrNotStdout()
+    {
+        using var stdout = new BufferedConsole(false, false, noColor: true);
+        using var stderr = new BufferedConsole(false, false, noColor: true);
+        var interaction = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+        var entry = new WorkloadEntry { PackageId = "Test.Workload", PackageVersion = "1.0.0" };
+        using var cancel = new CancellationTokenSource();
+        cancel.Cancel();
+        var failure = new BundledTemplateRegistrationCanceledException(entry, new OperationCanceledException(cancel.Token), cancel.Token);
+        _installer.InstallFromCatalogAsync(Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
+            Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<WorkloadInstallExpectation>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>()).Throws(failure);
+        var command = new WorkloadInstallCommand(interaction, _installer, _store,
+            new WorkloadUpdateCommand(interaction, _installer, _store, _testCatalogOptions), _testCatalogOptions);
+        Func<Task> invoke = () => InvokeAsync(command, "Test.Workload");
+
+        await invoke.Should().ThrowAsync<BundledTemplateRegistrationCanceledException>();
+        stderr.Output.Should().Contain("remains installed", "registration was canceled", "Retry the same stack install.");
+        stdout.Output.Should().NotContain("remains installed");
     }
 
     [Fact]

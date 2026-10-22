@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Azure.Functions.Cli.Tests.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Parameters;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Template;
 using NuGet.Versioning;
