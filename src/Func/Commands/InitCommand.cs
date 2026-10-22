@@ -70,6 +70,13 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<bool> NonInteractiveOption { get; } = new("--non-interactive") { Description = "With --guided, require explicit selections instead of prompting." };
 
+    public Option<string[]> TemplateArgumentOption { get; } = new("--template-argument")
+    {
+        Description = "One raw native token, repeated in order (e.g. --template-argument=--symbol --template-argument=value). Requires an explicit path, --guided and --template or --quickstart.",
+        Arity = ArgumentArity.OneOrMore,
+        AllowMultipleArgumentsPerToken = false,
+    };
+
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettingsProvider;
@@ -125,6 +132,14 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(AcquireQuickstartOption);
         Options.Add(DryRunOption);
         Options.Add(NonInteractiveOption);
+        Options.Add(TemplateArgumentOption);
+        TemplateArgumentOption.Validators.Add(result =>
+        {
+            if (result.Tokens.Count != result.IdentifierTokenCount || result.Tokens.Any(token => token.Value.Length == 0))
+            {
+                result.AddError("Each --template-argument requires exactly one nonempty raw token. Use --template-argument=<token> for dash-prefixed or @-prefixed values. For an empty native string, use --template-argument=--symbol=.");
+            }
+        });
 
         // Workload-contributed options are attached after built-ins so they
         // appear as a clearly-grouped block in --help output. Multiple workloads
@@ -144,6 +159,16 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         bool guided = parseResult.GetValue(GuidedOption);
+        string[] nativeTokens = parseResult.GetValue(TemplateArgumentOption) ?? [];
+        if (nativeTokens.Length > 0)
+        {
+            if (!guided || (parseResult.GetValue(TemplateOption) is null && parseResult.GetValue(QuickstartOption) is null)
+                || parseResult.GetResult(PathArgument!)?.Tokens.Count != 1)
+            {
+                _interaction.WriteError("--template-argument requires an explicit target path, --guided and an installed --template identity or --quickstart catalog ID. It cannot be used with the Basic initializer menu.");
+                return 1;
+            }
+        }
         Option[] guidedOnly = [QuickstartOption, TemplateOption, AcquireQuickstartOption, DryRunOption, NonInteractiveOption];
         if (!guided && guidedOnly.Any(option => parseResult.GetResult(option) is { Implicit: false }))
         {
@@ -157,7 +182,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 _interaction.WriteError("The staged guided-init services are unavailable in this host. Ordinary init is still supported.");
                 return 1;
             }
-            HashSet<Option> supported = [StackOption, NameOption, LanguageOption, ForceOption, GuidedOption, .. guidedOnly];
+            HashSet<Option> supported = [StackOption, NameOption, LanguageOption, ForceOption, GuidedOption, TemplateArgumentOption, .. guidedOnly];
             for (Command? parent = Parents.OfType<Command>().FirstOrDefault(); parent is not null; parent = parent.Parents.OfType<Command>().FirstOrDefault())
             {
                 supported.UnionWith(parent.Options.Where(option => option.Recursive));
@@ -175,7 +200,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             }
             InitExecutionRequest request = new(parseResult.GetValue(PathArgument!)!, parseResult.GetValue(TemplateOption), parseResult.GetValue(NameOption),
                 parseResult.GetValue(StackOption), parseResult.GetValue(LanguageOption), parseResult.GetValue(ForceOption),
-                parseResult.GetValue(NonInteractiveOption), parseResult.GetValue(DryRunOption), false, [],
+                parseResult.GetValue(NonInteractiveOption), parseResult.GetValue(DryRunOption), false,
+                Array.AsReadOnly(nativeTokens),
                 Options.Concat(supported).SelectMany(option => option.Aliases.Prepend(option.Name)).ToHashSet(StringComparer.Ordinal));
             InitExecutionResult result;
             try

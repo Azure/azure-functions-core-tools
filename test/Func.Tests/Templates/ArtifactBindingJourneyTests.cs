@@ -746,16 +746,37 @@ public sealed partial class ArtifactBindingJourneyTests : IDisposable
     private static void WriteProject(ZipArchive zip, string folder, string identity, int precedence, string? change)
     {
         string constraint = change == "constraint" ? ""","missing":{"type":"func-workload","args":"missing"}""" : "";
+        string symbols = change == "parameters" ? """
+            ,"sourceName":"ProjectName","symbols":{
+              "Required":{"type":"parameter","datatype":"string","isRequired":true,"replaces":"REQUIRED"},
+              "Greeting":{"type":"parameter","datatype":"string","defaultValue":"hello","replaces":"GREETING"},
+              "Enabled":{"type":"parameter","datatype":"bool","defaultValue":"true","replaces":"ENABLED"},
+              "Count":{"type":"parameter","datatype":"integer","defaultValue":"1","replaces":"COUNT"},
+              "Flavor":{"type":"parameter","datatype":"choice","defaultValue":"plain","replaces":"FLAVOR",
+                "choices":[{"choice":"plain"},{"choice":"bold"}]},
+              "Stack":{"type":"parameter","datatype":"string","defaultValue":"default-stack","replaces":"STACK"},
+              "Initializer":{"type":"parameter","datatype":"string","defaultValue":"default-init","replaces":"INIT"}}
+            """ : "";
         Write(zip, folder + "/.template.config/template.json", $$$"""
             {"identity":"{{{identity}}}","name":"{{{identity}}}","shortName":"shared","groupIdentity":"Fixture.Shared",
              "precedence":{{{precedence}}},"tags":{"type":"{{{(change == "type" ? "item" : "project")}}}"},
-             "constraints":{"func":{"type":"host","args":[{"hostname":"func"}]},"node":{"type":"func-workload","args":"node"}{{{constraint}}}},
+             "constraints":{"func":{"type":"host","args":[{"hostname":"func"}]},"node":{"type":"func-workload","args":"node"}{{{constraint}}}}{{{symbols}}},
              "primaryOutputs":[{"path":"host.json"}],"postActions":[{"actionId":"{{{TemplateProjectConfigurationPlanner.ConfigurationActionId}}}",
                "args":{"primaryOutputIndex":"0","stack":"node","language":"JavaScript"}}]}
             """);
         if (change == "metadata")
         {
             Write(zip, folder + "/.template.config/func.host.json", "{invalid");
+        }
+        if (change == "parameters")
+        {
+            Write(zip, folder + "/.template.config/func.host.json", """
+                {"symbolInfo":{"Required":{"longName":"required","shortName":"r"},"Greeting":{"longName":"greeting","shortName":"g"},
+                  "Enabled":{"longName":"enabled","shortName":"e"},"Count":{"longName":"count","shortName":"c"},
+                  "Flavor":{"longName":"flavor","shortName":"f"},"Stack":{"longName":"stack","shortName":"s"},
+                  "Initializer":{"longName":"initializer-option","shortName":"i"}}}
+                """);
+            Write(zip, folder + "/parameters.txt", "REQUIRED|GREETING|ENABLED|COUNT|FLAVOR|STACK|INIT|ProjectName");
         }
         Write(zip, folder + "/host.json", """{"version":"2.0"}""");
         Write(zip, folder + "/value.txt", folder);

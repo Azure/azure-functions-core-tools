@@ -34,6 +34,266 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public sealed partial class ArtifactBindingJourneyTests
 {
     [Fact]
+    public async Task NativeArguments_PublicInstalledPreviewAndCreate_UseExplicitParametersAndMandatoryConfiguration()
+    {
+        await SeedAsync("parameters");
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        var command = GuidedCommand(journey.Coordinator, interaction);
+        command.Options.Add(new Option<string>("--initializer-option", "-i"));
+        RootCommand root = [command];
+        string[] arguments = ["init", Target, "--guided", "--stack", "node", "--language", "JavaScript", "--template", Identity,
+            "--name", "Project with spaces", "--non-interactive"];
+        string[] raw = ["--required", "supplied", "--greeting", "hello world", "--enabled=false", "--count", "42",
+            "--flavor", "bold", "--param:Stack", "native-stack", "-p:i", "native-init"];
+        string[] argumentsForTemplate = [.. raw.Select(token => "--template-argument=" + token)];
+        var before = TemplateState();
+
+        int preview = await root.Parse([.. arguments, "--dry-run", .. argumentsForTemplate]).InvokeAsync();
+
+        preview.Should().Be(0, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("Preview: " + Identity).And.Contain("parameters.txt").And.Contain(".func");
+        Directory.Exists(Target).Should().BeFalse();
+        TemplateState().Should().BeEquivalentTo(before);
+        journey.Payload.Requested.Should().BeEmpty();
+
+        int created = await root.Parse([.. arguments, .. argumentsForTemplate]).InvokeAsync();
+
+        created.Should().Be(0, interaction.AllOutput);
+        File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should()
+            .Be("supplied|hello world|False|42|bold|native-stack|native-init|Project_with_spaces");
+        File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact", "the higher precedence same-short-name sibling is not selected");
+        using var configuration = JsonDocument.Parse(File.ReadAllText(Path.Combine(Target, ".func", "config.json")));
+        configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+        configuration.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be("JavaScript");
+        journey.Payload.Requested.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("--enabled")]
+    [InlineData("--enabled", "not-bool")]
+    [InlineData("--count", "not-int")]
+    [InlineData("--flavor", "unknown")]
+    [InlineData("--greeting", "one", "-g", "two")]
+    [InlineData("--param:Stack", "one", "-p:s", "two")]
+    [InlineData("--stack", "node")]
+    [InlineData("--initializer-option", "ignored")]
+    [InlineData("--greeting", "one", "stray")]
+    [InlineData("--unknown", "ignored")]
+    [InlineData("--acquire-quickstart")]
+    [InlineData("--guided")]
+    public async Task NativeArguments_PublicInstalledInvalidValuesOrAliases_RejectWithoutWrites(params string[] suffix)
+    {
+        await SeedAsync("parameters");
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        var command = GuidedCommand(journey.Coordinator, interaction);
+        command.Options.Add(new Option<string>("--initializer-option", "-i"));
+        RootCommand root = [command];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--template", Identity, "--non-interactive",
+            "--template-argument=--required", "--template-argument=supplied",
+            .. suffix.Select(token => "--template-argument=" + token)]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("No project candidate accepts these template arguments");
+        Directory.Exists(Target).Should().BeFalse();
+        TemplateState().Should().BeEquivalentTo(before);
+        journey.Payload.Requested.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task NativeArguments_PublicScripts_RequireRequiredValueOrExactInstalledIdentity(bool missingRequired)
+    {
+        await SeedAsync("parameters");
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--template", missingRequired ? Identity : "Fixture.Missing",
+            "--non-interactive", "--template-argument=--greeting", "--template-argument=optional"]).InvokeAsync();
+
+        exit.Should().Be(1);
+        interaction.AllOutput.Should().Contain(missingRequired ? "Supply all required template values: --required" : "not installed");
+        Directory.Exists(Target).Should().BeFalse();
+        TemplateState().Should().BeEquivalentTo(before);
+        journey.Payload.Requested.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NativeArguments_PublicScriptQuickstart_RequiresSeparateAcquisitionAuthorization(bool authorize)
+    {
+        await SeedAsync("parameters", installTemplates: false);
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        string[] authorization = authorize ? ["--acquire-quickstart"] : [];
+
+        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture", "--non-interactive",
+            .. authorization, "--template-argument=--required", "--template-argument=script",
+            "--template-argument=--greeting", "--template-argument=selected",
+            "--template-argument=--enabled", "--template-argument=false"]).InvokeAsync();
+
+        if (authorize)
+        {
+            exit.Should().Be(0, interaction.AllOutput);
+            journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
+            journey.Lifecycle.ObservedFreshBinding.Should().BeTrue();
+            File.Exists(journey.Lifecycle.Prepared!.Archive).Should().BeFalse();
+            File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should()
+                .Be("script|selected|False|1|plain|default-stack|default-init|target");
+            File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
+        }
+        else
+        {
+            exit.Should().Be(1);
+            journey.Payload.Requested.Should().BeEmpty();
+            Directory.Exists(Target).Should().BeFalse();
+            interaction.AllOutput.Should().Contain("Scripts must explicitly pass --acquire-quickstart");
+        }
+    }
+
+    [Fact]
+    public async Task NativeArguments_PublicResponseExpandedValuesCannotAuthorizeAcquisition()
+    {
+        await SeedAsync("parameters", installTemplates: false);
+        string flags = Path.Combine(_root, "authorization.rsp");
+        string response = Path.Combine(_root, "init.rsp");
+        File.WriteAllText(flags, "--template-argument=--acquire-quickstart");
+        File.WriteAllText(response, $"\"{Target}\" --guided --stack node --quickstart fixture --non-interactive "
+            + $"--template-argument=--required --template-argument=supplied @{flags}");
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", "@" + response]).InvokeAsync();
+
+        exit.Should().Be(1);
+        journey.Payload.Requested.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+        interaction.AllOutput.Should().Contain("Scripts must explicitly pass --acquire-quickstart");
+    }
+
+    [Fact]
+    public async Task NativeArguments_PublicResponseCreate_DoesNotReexpandInlineLiteralValue()
+    {
+        await SeedAsync("parameters");
+        string literal = Path.Combine(_root, "literal flags.rsp");
+        string nested = Path.Combine(_root, "parameters.rsp");
+        string response = Path.Combine(_root, "init.rsp");
+        File.WriteAllText(literal, "--acquire-quickstart --stack wrong");
+        File.WriteAllText(nested, "--template-argument=--required --template-argument=from-response");
+        File.WriteAllText(response, $"\"{Target}\" --guided --stack node --template {Identity} --non-interactive @{nested} "
+            + $"--template-argument=--greeting \"--template-argument=@{literal}\"");
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", "@" + response]).InvokeAsync();
+
+        exit.Should().Be(0, interaction.AllOutput);
+        File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should()
+            .Be($"from-response|@{literal}|True|1|plain|default-stack|default-init|target");
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
+        journey.Payload.Requested.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("-literal")]
+    public async Task NativeArguments_PublicInlineStringValue_DoesNotUseDefaultOrDropLiteral(string value)
+    {
+        await SeedAsync("parameters");
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--template", Identity, "--non-interactive",
+            "--template-argument=--required", "--template-argument=supplied", "--template-argument=--greeting=" + value]).InvokeAsync();
+
+        exit.Should().Be(0, interaction.AllOutput);
+        File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should()
+            .Be($"supplied|{value}|True|1|plain|default-stack|default-init|target");
+        journey.Payload.Requested.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DefaultInit_InstalledTemplateRequiredPrompt_RemainsAvailableWithoutExplicitNativeArguments()
+    {
+        await SeedAsync("parameters");
+        GuidedInteraction interaction = new(true, ["first", "exact"], [true], ["prompted"]);
+        var journey = Guided(interaction);
+        IProjectInitializer initializer = NodeInitializer();
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction, [initializer])];
+
+        int exit = await root.Parse(["init", Target]).InvokeAsync();
+
+        exit.Should().Be(0, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("INPUT: --required (string)");
+        File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should()
+            .Be("prompted|hello|True|1|plain|default-stack|default-init|target");
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
+        journey.Payload.Requested.Should().BeEmpty();
+        await initializer.DidNotReceive().InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("force")]
+    [InlineData("adopt")]
+    [InlineData("heal")]
+    [InlineData("dry-run")]
+    public async Task NativeArguments_PublicProtectedModes_DoNotAcquireCleanOrRewriteExistingFiles(string mode)
+    {
+        await SeedAsync("parameters", installTemplates: false);
+        if (mode is "adopt" or "heal")
+        {
+            Directory.CreateDirectory(Target);
+            File.WriteAllText(Path.Combine(Target, "host.json"), """{"version":"2.0"}""");
+            if (mode == "heal")
+            {
+                Directory.CreateDirectory(Path.Combine(Target, ".func"));
+                File.WriteAllText(Path.Combine(Target, ".func", "config.json"), """{"stack":{"runtime":"node"},"custom":"retain"}""");
+            }
+        }
+        var before = TemplateState();
+        Dictionary<string, string> targetFiles = Directory.Exists(Target)
+            ? Directory.GetFiles(Target, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllText)
+            : [];
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        string[] flags = mode switch { "force" => ["--force"], "dry-run" => ["--dry-run"], _ => [] };
+
+        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture", "--acquire-quickstart",
+            "--non-interactive", .. flags, "--template-argument=--required", "--template-argument=supplied"]).InvokeAsync();
+
+        exit.Should().Be(1);
+        journey.Payload.Requested.Should().BeEmpty();
+        TemplateState().Should().BeEquivalentTo(before);
+        if (targetFiles.Count == 0)
+        {
+            Directory.Exists(Target).Should().BeFalse();
+        }
+        else
+        {
+            Directory.GetFiles(Target, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllText)
+                .Should().BeEquivalentTo(targetFiles);
+        }
+        interaction.AllOutput.Should().Contain(mode switch
+        {
+            "force" => "does not support --force",
+            "dry-run" => "Metadata intent only",
+            _ => "requires an empty target",
+        });
+    }
+
+    [Fact]
     public async Task DefaultInit_PublicParser_BrowseConsentRealAcquisitionFreshBoundCreateAndRepeatInstalledVisibility()
     {
         await SeedAsync(installTemplates: false);
@@ -740,10 +1000,11 @@ public sealed partial class ArtifactBindingJourneyTests
         return (await installer.InstallFromCatalogAsync(id, version, Source, true, true, false, cancellationToken: CancellationToken.None)).Entry;
     }
 
-    private sealed class GuidedInteraction(bool interactive, string[] selections, bool[] confirmations) : TestInteractionService, IInteractionService
+    private sealed class GuidedInteraction(bool interactive, string[] selections, bool[] confirmations, string[]? inputs = null) : TestInteractionService, IInteractionService
     {
         private readonly Queue<string> _selections = new(selections);
         private readonly Queue<bool> _confirmations = new(confirmations);
+        private readonly Queue<string> _inputs = new(inputs ?? []);
         public override bool IsInteractive => interactive;
         public List<bool> Confirmations { get; } = [];
         public List<string> SelectionTitles { get; } = [];
@@ -751,6 +1012,13 @@ public sealed partial class ArtifactBindingJourneyTests
         public CancellationToken ConfirmationToken { get; private set; }
         public Func<Task>? Confirming { get; set; }
         public Action? SelectionMade { get; set; }
+
+        Task<string> IInteractionService.PromptForInputAsync(string prompt, string? defaultValue, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            WriteLine($"INPUT: {prompt}");
+            return Task.FromResult(_inputs.Dequeue());
+        }
 
         Task<string> IInteractionService.PromptForSelectionAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken)
         {
