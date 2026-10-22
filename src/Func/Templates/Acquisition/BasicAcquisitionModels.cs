@@ -52,6 +52,8 @@ internal sealed record BasicAcquisitionRequest(string StackPackageId, NuGetVersi
     string? Source = null, bool Check = false, bool Offline = false, bool IncludePrerelease = false)
 {
     public NativeTemplateAssociationContext? NativeContext { get; init; }
+
+    public BasicAcquisitionApproval? Approval { get; init; }
 }
 
 internal enum BasicAcquisitionStatus

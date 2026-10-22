@@ -21,6 +21,10 @@ internal sealed record InitExecutionRequest(
     IReadOnlySet<string> ReservedAliases)
 {
     internal Acquisition.NativeTemplateSelection? ArtifactBinding { get; init; }
+
+    internal bool RefreshCapabilities { get; init; }
+
+    internal bool ConfirmCreation { get; init; }
 }
 
 internal sealed record InitExecutionResult(string Kind, bool Succeeded)

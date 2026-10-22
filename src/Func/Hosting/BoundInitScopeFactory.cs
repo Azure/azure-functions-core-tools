@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.Loader;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
@@ -66,8 +67,28 @@ internal sealed class BoundInitScopeFactory(WorkloadPathsOptions paths, IWorkloa
                 return new TemplateConstraintWorkload(entry.PackageId, version, current?.Aliases ?? [],
                     current is not null, entry.LogicalPackage?.PackageId);
             })]);
-            return new(availability, provider.GetRequiredService<InstalledProjectStackCatalog>(),
-                provider.GetRequiredService<TemplateProjectSupport>(), _verifier.ForInventory(entries, usableRuntimeOwners), lifetime);
+            InstalledProjectStackCatalog catalog = provider.GetRequiredService<InstalledProjectStackCatalog>();
+            Dictionary<string, WorkloadEntry> owners = new(StringComparer.OrdinalIgnoreCase);
+            foreach (IProjectStack stack in catalog.Stacks)
+            {
+                RuntimeWorkloadInfo[] contributors = [.. loaded.OfType<RuntimeWorkloadInfo>().Where(runtime =>
+                    ReferenceEquals(runtime.LoadContext, AssemblyLoadContext.GetLoadContext(stack.GetType().Assembly)))];
+                if (contributors.Length == 1)
+                {
+                    RuntimeWorkloadInfo contributor = contributors[0];
+                    WorkloadEntry[] matches = [.. usableRuntimeOwners.Where(entry =>
+                        entry.PackageId == contributor.PackageId && entry.PackageVersion == contributor.PackageVersion)];
+                    if (matches.Length == 1)
+                    {
+                        owners.Add(stack.Stack, matches[0]);
+                    }
+                }
+            }
+            return new(availability, catalog,
+                provider.GetRequiredService<TemplateProjectSupport>(), _verifier.ForInventory(entries, usableRuntimeOwners), lifetime)
+            {
+                StackOwners = owners,
+            };
         }
         catch
         {

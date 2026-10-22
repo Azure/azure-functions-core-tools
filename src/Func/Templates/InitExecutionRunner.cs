@@ -103,7 +103,8 @@ internal sealed class InitExecutionRunner(
             return InitExecutionResult.Reject("unsupportedTarget", target.Diagnostic!);
         }
 
-        if (request.ArtifactBinding is not null && _boundScopes is null)
+        bool refresh = request.ArtifactBinding is not null || request.RefreshCapabilities;
+        if (refresh && _boundScopes is null)
         {
             return InitExecutionResult.Reject("bindingUnavailable", "Exact artifact binding requires a fresh post-acquisition workload scope.");
         }
@@ -111,7 +112,7 @@ internal sealed class InitExecutionRunner(
         InstalledProjectStackCatalog catalog;
         try
         {
-            refreshedScope = request.ArtifactBinding is null ? null : await _boundScopes!.CreateAsync(cancellationToken);
+            refreshedScope = refresh ? await _boundScopes!.CreateAsync(cancellationToken) : null;
             catalog = refreshedScope?.Catalog ?? _stackCatalog();
         }
         catch (ConflictingProjectStackMetadataException exception)
@@ -525,6 +526,18 @@ internal sealed class InitExecutionRunner(
         if (request.DryRun)
         {
             return FromPreview("previewed");
+        }
+
+        if (request.ConfirmCreation)
+        {
+            _renderer.Render(FromPreview("previewed"), jsonOutput: false);
+            _interaction.WriteLine($"Target: {request.WorkingDirectory.Info.FullName}");
+            if (!canPrompt || !await _interaction.ConfirmAsync("Create the previewed project and CLI configuration in this target?",
+                false, false, cancellationToken))
+            {
+                return InitExecutionResult.Reject("creationDeclined",
+                    "Project creation declined. Any explicitly acquired packages remain installed; no project files were written.");
+            }
         }
 
         InitExecutionResult? targetFailure = CheckTarget(request.WorkingDirectory);

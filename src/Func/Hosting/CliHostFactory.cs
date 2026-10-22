@@ -133,6 +133,13 @@ internal static class CliHostFactory
         builder.Services.AddQuickstartManifest();
         builder.Services.AddManagedAzurite();
         builder.Services.AddTemplatesOrchestrator();
+        builder.Services.AddNativeTemplateSetup().AddNativeTemplateArtifactBinding();
+        builder.Services.AddScoped<IQuickstartInitCoordinator, QuickstartInitCoordinator>();
+        builder.Services.AddSingleton<QuickstartQualification>(provider => new(
+            provider.GetRequiredService<Templates.Acquisition.IBasicCompanionCatalog>(),
+            provider.GetRequiredService<Templates.Acquisition.BasicAcquisitionPlanner>(),
+            provider.GetRequiredService<Templates.Acquisition.IBasicTemplateLifecycle>(),
+            provider.GetRequiredService<Workloads.Storage.IWorkloadStore>(), AssemblyCliVersionProvider.Instance));
         builder.Services.AddV2TemplateEngine();
         builder.Services.AddDotNetTemplateEngine();
 

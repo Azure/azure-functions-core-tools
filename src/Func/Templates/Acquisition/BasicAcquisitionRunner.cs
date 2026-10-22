@@ -50,6 +50,7 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             BasicCompanionManifest manifest = await _catalog.LoadAsync(cancellationToken);
             revision = manifest.Revision;
             IReadOnlyList<WorkloadEntry> installed = await _workloads.GetWorkloadsAsync(cancellationToken);
+            ValidateApprovedInventory(request, installed);
             try
             {
                 string resolvedSource = _sourceProvider.GetSource(request.Source).Source;
@@ -66,6 +67,7 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             }
 
             source = plan.Source;
+            request.Approval?.Validate(plan);
             if (request.NativeContext is not null)
             {
                 WorkloadEntry selectedStack = RequireNativeStack(installed, request);
@@ -87,7 +89,7 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             List<BasicTemplateSelection> selected = [];
             foreach (BasicCompanionPlan companion in plan.Companions)
             {
-                selected.Add(await _templates.SelectAsync(companion, context, cancellationToken));
+                selected.Add(await _templates.SelectAsync(request.Approval?.Bind(companion) ?? companion, context, cancellationToken));
             }
             if (request.NativeContext is not null)
             {
@@ -140,24 +142,27 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
             operation.Validate(_workloadPaths);
             installed = await _workloads.GetWorkloadsAsync(cancellationToken);
+            ValidateApprovedInventory(request, installed);
             if (nativeStack is not null)
             {
                 await ValidateNativeStackAsync(operation, nativeStack, request, installed, cancellationToken);
             }
-            BasicAcquisitionPlan currentPlan = _planner.Plan(manifest, request, installed, source)
+            BasicCompanionManifest currentManifest = request.Approval is null ? manifest : await _catalog.LoadAsync(cancellationToken);
+            BasicAcquisitionPlan currentPlan = _planner.Plan(currentManifest, request, installed, source)
                 ?? throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged, "The prepared mapping no longer applies. Re-run explicit repair.");
+            request.Approval?.Validate(currentPlan);
             foreach (BasicTemplateSelection selection in selected)
             {
                 BasicCompanionPlan companion = currentPlan.Companions.Single(c =>
                     string.Equals(c.PackageId, selection.Artifact.PackageId, StringComparison.OrdinalIgnoreCase));
-                if (!companion.Candidates.Contains(selection.Artifact))
+                if (!companion.Candidates.Any(candidate => BasicAcquisitionApproval.Same(candidate, selection.Artifact)))
                 {
                     throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
                         "Retained requirements now require different qualified bytes. Re-run explicit repair; no replacement was downloaded under the lease.");
                 }
 
-                BasicTemplateSelection actual = await _templates.SelectAsync(companion, context, cancellationToken);
-                if (actual.Artifact != selection.Artifact || (selection.Installed && !actual.Installed))
+                BasicTemplateSelection actual = await _templates.SelectAsync(request.Approval?.Bind(companion) ?? companion, context, cancellationToken);
+                if (!BasicAcquisitionApproval.Same(actual.Artifact, selection.Artifact) || (selection.Installed && !actual.Installed))
                 {
                     throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
                         "Companion content or ownership changed after preparation. Re-run explicit repair.");
@@ -283,20 +288,32 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
         }
     }
 
+    private static void ValidateApprovedInventory(BasicAcquisitionRequest request, IReadOnlyList<WorkloadEntry> installed)
+    {
+        if (request.Approval?.WorkloadInventory is { } expected && expected != WorkloadStateSnapshot.Capture(installed))
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
+                "Installed workload state changed after consent. Select and approve the exact plan again.");
+        }
+    }
+
     private async Task<BasicAcquisitionResult> CheckNativeAsync(BasicCompanionManifest manifest, BasicAcquisitionRequest request,
         PreparedWorkloadReuse preparedStack, TemplateEngineContext context, string source, CancellationToken cancellationToken)
     {
         using IWorkloadOperation operation = await _coordinator.AcquireAsync(cancellationToken);
         operation.Validate(_workloadPaths);
         IReadOnlyList<WorkloadEntry> installed = await _workloads.GetWorkloadsAsync(cancellationToken);
+        ValidateApprovedInventory(request, installed);
         await ValidateNativeStackAsync(operation, preparedStack, request, installed, cancellationToken);
-        BasicAcquisitionPlan plan = _planner.Plan(manifest, request, installed, source)
+        BasicCompanionManifest currentManifest = request.Approval is null ? manifest : await _catalog.LoadAsync(cancellationToken);
+        BasicAcquisitionPlan plan = _planner.Plan(currentManifest, request, installed, source)
             ?? throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged, "The required native association no longer applies.");
+        request.Approval?.Validate(plan);
         List<BasicAcquisitionStep> ready = [new(request.StackPackageId, request.StackVersion.ToNormalizedString(), true)];
         bool complete = true;
         foreach (BasicCompanionPlan companion in plan.Companions)
         {
-            BasicTemplateSelection actual = await _templates.SelectAsync(companion, context, cancellationToken);
+            BasicTemplateSelection actual = await _templates.SelectAsync(request.Approval?.Bind(companion) ?? companion, context, cancellationToken);
             complete &= actual.Installed;
             if (actual.Installed)
             {

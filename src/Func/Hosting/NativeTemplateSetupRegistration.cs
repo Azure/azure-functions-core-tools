@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Azure.Functions.Cli.Hosting;
 
 /// <summary>
-/// Composes staged native setup without enabling it in the default CLI host.
+/// Composes native acquisition and exact binding without replacing the default setup or init routes.
 /// </summary>
 internal static class NativeTemplateSetupRegistration
 {
@@ -31,7 +31,7 @@ internal static class NativeTemplateSetupRegistration
     }
 
     /// <summary>
-    /// Adds internal artifact binding without activating a public init or acquisition route.
+    /// Adds artifact binding without registering a command or choosing a public route.
     /// </summary>
     public static IServiceCollection AddNativeTemplateArtifactBinding(this IServiceCollection services)
     {
