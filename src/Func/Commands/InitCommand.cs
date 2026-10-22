@@ -90,7 +90,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IFileSystem fileSystem,
         IEnumerable<IProjectInitializer> initializers,
         IQuickstartInitCoordinator? guided = null)
-        : base("init", "Initialize a new Azure Functions project.")
+        : base("init", "Initialize a new Azure Functions project or select an installed project template interactively.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(hintRenderer);
@@ -210,6 +210,44 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
+        string? basicStack = null;
+        if (ShouldOfferDefaultTemplateMenu(parseResult, workingDirectory))
+        {
+            var nativeStacks = _initializers.Select(initializer => initializer.Stack)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            HashSet<Option> reserved = [StackOption, NameOption, LanguageOption, ForceOption, GuidedOption, QuickstartOption,
+                TemplateOption, AcquireQuickstartOption, DryRunOption, NonInteractiveOption];
+            for (Command? parent = Parents.OfType<Command>().FirstOrDefault(); parent is not null; parent = parent.Parents.OfType<Command>().FirstOrDefault())
+            {
+                reserved.UnionWith(parent.Options.Where(option => option.Recursive));
+            }
+            string? menuLanguage = parseResult.GetValue(LanguageOption);
+            menuLanguage = string.IsNullOrWhiteSpace(menuLanguage) ? null : menuLanguage.Trim().ToLowerInvariant();
+            var menuRequest = new InitExecutionRequest(workingDirectory, null, parseResult.GetValue(NameOption), parseResult.GetValue(StackOption),
+                menuLanguage, false, false, false, false, [],
+                Options.Concat(reserved).SelectMany(option => option.Aliases.Prepend(option.Name)).ToHashSet(StringComparer.Ordinal));
+            InitExecutionResult menuResult;
+            try
+            {
+                menuResult = await _guided!.ExecuteAsync(new(menuRequest, NativeStacks: nativeStacks, OfferBasicSelection: true), cancellationToken);
+            }
+            catch (Exception exception) when (exception is BasicAcquisitionException or TemplateStoreRecoveryRequiredException
+                or WorkloadRecoveryRequiredException or WorkloadPlanChangedException or InvalidWorkloadException
+                or ConflictingProjectStackMetadataException)
+            {
+                throw new GracefulException($"Project template selection could not continue. {exception.Message}", isUserError: true, innerException: exception);
+            }
+            if (menuResult.Continuation == InitExecutionContinuation.BasicProject)
+            {
+                basicStack = menuResult.SelectedStack
+                    ?? throw new InvalidOperationException("The default init menu selected Basic without a stack.");
+            }
+            else if (menuResult.Continuation != InitExecutionContinuation.LegacyInitializer)
+            {
+                return new InitExecutionRenderer(_interaction).Render(menuResult, jsonOutput: false);
+            }
+        }
+
         workingDirectory.CreateIfNotExists();
         bool force = parseResult.GetValue(ForceOption);
         string? language = parseResult.GetValue(LanguageOption);
@@ -217,7 +255,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         {
             language = language.Trim().ToLowerInvariant();
         }
-        string? requestedStack = parseResult.GetValue(StackOption);
+        string? requestedStack = parseResult.GetValue(StackOption) ?? basicStack;
 
         InitializationState state = DetectInitializationState(workingDirectory.Info);
         string? existingRuntime = null;
@@ -458,6 +496,33 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         await WarnIfBundleChannelNotInstalledAsync(workingDirectory.Info, cancellationToken);
 
         return 0;
+    }
+
+    private bool ShouldOfferDefaultTemplateMenu(ParseResult parseResult, WorkingDirectory workingDirectory)
+    {
+        if (_guided is null || !_interaction.IsInteractive || _initializers.Count == 0
+            || parseResult.GetValue(ForceOption)
+            || parseResult.GetResult(NameOption) is { Implicit: false } && string.IsNullOrWhiteSpace(parseResult.GetValue(NameOption))
+            || DetectInitializationState(workingDirectory.Info) != InitializationState.Empty
+            || File.Exists(workingDirectory.Info.FullName)
+            || workingDirectory.Info.Exists && DirectoryGuard.HasNonGitContent(workingDirectory.Info))
+        {
+            return false;
+        }
+
+        if (parseResult.GetValue(StackOption) is { } requested && FindInitializerForCandidate(requested) is null)
+        {
+            return false;
+        }
+
+        HashSet<Option> supported = [StackOption, NameOption, LanguageOption];
+        for (Command? parent = Parents.OfType<Command>().FirstOrDefault(); parent is not null; parent = parent.Parents.OfType<Command>().FirstOrDefault())
+        {
+            supported.UnionWith(parent.Options.Where(option => option.Recursive));
+        }
+
+        return !parseResult.CommandResult.Children.OfType<System.CommandLine.Parsing.OptionResult>()
+            .Any(result => !result.Implicit && !supported.Contains(result.Option));
     }
 
     // A fresh scaffold may pin a preview/experimental bundle channel (via `-c`).

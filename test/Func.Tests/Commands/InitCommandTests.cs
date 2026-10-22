@@ -8,6 +8,8 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Quickstart;
+using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Tests.Common;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
@@ -160,6 +162,95 @@ public class InitCommandTests
             {
                 Directory.Delete(newDir, recursive: true);
             }
+        }
+    }
+
+    [Fact]
+    public async Task DefaultTemplateMenu_Basic_UsesOriginalInitializerAndParseResultWithoutCreatingTargetEarly()
+    {
+        string target = Path.Combine(Path.GetTempPath(), $"func-init-basic-menu-{Guid.NewGuid():N}");
+        var interaction = new InteractiveTestInteractionService();
+        var coordinator = Substitute.For<IQuickstartInitCoordinator>();
+        ParseResult? initializerParseResult = null;
+        var initializer = new FakeProjectInitializer("node", ["JavaScript"],
+            onInitialize: (_, parseResult) => initializerParseResult = parseResult);
+        var command = new InitCommand(interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+            new(_installedBundles), new PhysicalFileSystem(), [initializer], coordinator);
+        coordinator.ExecuteAsync(Arg.Any<QuickstartInitRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var request = call.Arg<QuickstartInitRequest>();
+                request.OfferBasicSelection.Should().BeTrue();
+                request.NativeStacks.Should().Contain("node");
+                request.Init.Name.Should().Be("chosen-name");
+                Directory.Exists(target).Should().BeFalse();
+                return Task.FromResult(InitExecutionResult.ContinueWithBasicProject("node"));
+            });
+        RootCommand root = [command];
+
+        try
+        {
+            int exitCode = await root.Parse(["init", target, "--name", "chosen-name"]).InvokeAsync();
+
+            exitCode.Should().Be(0);
+            await coordinator.Received(1).ExecuteAsync(Arg.Any<QuickstartInitRequest>(), Arg.Any<CancellationToken>());
+            initializer.WasInvoked.Should().BeTrue();
+            initializerParseResult.Should().NotBeNull();
+            initializerParseResult!.GetValue(command.NameOption).Should().Be("chosen-name");
+            using var config = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, ".func", "config.json")));
+            config.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+            interaction.Lines.Should().NotContain(line => line.Contains("SELECT: Select a stack:", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CleanupDirectory(target);
+        }
+    }
+
+    [Theory]
+    [InlineData("--target-framework", "net10.0")]
+    [InlineData("--no-bundles")]
+    [InlineData("--bundles-channel", "experimental")]
+    [InlineData("--skip-npm-install")]
+    [InlineData("--managed-dependencies")]
+    [InlineData("--runtime-version", "7.4")]
+    [InlineData("--skip-go-mod-tidy")]
+    public async Task DefaultTemplateMenu_InitializerOption_PreservesLegacyDispatch(params string[] arguments)
+    {
+        string target = Path.Combine(Path.GetTempPath(), $"func-init-option-menu-{Guid.NewGuid():N}");
+        var interaction = new InteractiveTestInteractionService();
+        var coordinator = Substitute.For<IQuickstartInitCoordinator>();
+        ParseResult? initializerParseResult = null;
+        var initializer = new FakeProjectInitializer("node", ["JavaScript"],
+            optionFactory: registry =>
+            [
+                registry.GetOrAdd(new Option<string?>("--target-framework", "-tfm")),
+                registry.GetOrAdd(new Option<bool>("--no-bundles")),
+                registry.GetOrAdd(new Option<string?>("--bundles-channel", "-c")),
+                registry.GetOrAdd(new Option<bool>("--skip-npm-install")),
+                registry.GetOrAdd(new Option<bool>("--managed-dependencies")),
+                registry.GetOrAdd(new Option<string?>("--runtime-version")),
+                registry.GetOrAdd(new Option<bool>("--skip-go-mod-tidy")),
+            ],
+            onInitialize: (_, parseResult) => initializerParseResult = parseResult);
+        var command = new InitCommand(interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+            new(_installedBundles), new PhysicalFileSystem(), [initializer], coordinator);
+        RootCommand root = [command];
+
+        try
+        {
+            int exitCode = await root.Parse(["init", target, .. arguments]).InvokeAsync();
+
+            exitCode.Should().Be(0);
+            coordinator.ReceivedCalls().Should().BeEmpty();
+            initializer.WasInvoked.Should().BeTrue();
+            initializerParseResult.Should().NotBeNull();
+            initializerParseResult!.CommandResult.Children.OfType<System.CommandLine.Parsing.OptionResult>()
+                .Should().Contain(result => !result.Implicit && result.Option.Name == arguments[0]);
+        }
+        finally
+        {
+            CleanupDirectory(target);
         }
     }
 
