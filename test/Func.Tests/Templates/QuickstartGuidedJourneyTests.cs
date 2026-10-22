@@ -11,12 +11,14 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Tests.Templates.Acquisition;
 using Azure.Functions.Cli.Tests.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
@@ -54,7 +56,7 @@ public sealed partial class ArtifactBindingJourneyTests
         preview.Should().Be(0, interaction.AllOutput);
         interaction.AllOutput.Should().Contain("Preview: " + Identity).And.Contain("parameters.txt").And.Contain(".func");
         Directory.Exists(Target).Should().BeFalse();
-        TemplateState().Should().BeEquivalentTo(before);
+        TemplateState().Should().Equal(before);
         journey.Payload.Requested.Should().BeEmpty();
 
         int created = await root.Parse([.. arguments, .. argumentsForTemplate]).InvokeAsync();
@@ -99,7 +101,7 @@ public sealed partial class ArtifactBindingJourneyTests
         exit.Should().Be(1, interaction.AllOutput);
         interaction.AllOutput.Should().Contain("No project candidate accepts these template arguments");
         Directory.Exists(Target).Should().BeFalse();
-        TemplateState().Should().BeEquivalentTo(before);
+        TemplateState().Should().Equal(before);
         journey.Payload.Requested.Should().BeEmpty();
     }
 
@@ -120,7 +122,7 @@ public sealed partial class ArtifactBindingJourneyTests
         exit.Should().Be(1);
         interaction.AllOutput.Should().Contain(missingRequired ? "Supply all required template values: --required" : "not installed");
         Directory.Exists(Target).Should().BeFalse();
-        TemplateState().Should().BeEquivalentTo(before);
+        TemplateState().Should().Equal(before);
         journey.Payload.Requested.Should().BeEmpty();
     }
 
@@ -227,7 +229,7 @@ public sealed partial class ArtifactBindingJourneyTests
     public async Task DefaultInit_InstalledTemplateRequiredPrompt_RemainsAvailableWithoutExplicitNativeArguments()
     {
         await SeedAsync("parameters");
-        GuidedInteraction interaction = new(true, ["first", "exact"], [true], ["prompted"]);
+        GuidedInteraction interaction = new(true, ["exact"], [true], ["prompted"]);
         var journey = Guided(interaction);
         IProjectInitializer initializer = NodeInitializer();
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction, [initializer])];
@@ -275,7 +277,7 @@ public sealed partial class ArtifactBindingJourneyTests
 
         exit.Should().Be(1);
         journey.Payload.Requested.Should().BeEmpty();
-        TemplateState().Should().BeEquivalentTo(before);
+        TemplateState().Should().Equal(before);
         if (targetFiles.Count == 0)
         {
             Directory.Exists(Target).Should().BeFalse();
@@ -297,7 +299,7 @@ public sealed partial class ArtifactBindingJourneyTests
     public async Task DefaultInit_PublicParser_BrowseConsentRealAcquisitionFreshBoundCreateAndRepeatInstalledVisibility()
     {
         await SeedAsync(installTemplates: false);
-        GuidedInteraction interaction = new(true, ["first", "Browse more templates", "first", "Use this template"], [true, true]);
+        GuidedInteraction interaction = new(true, ["Browse more templates", "first", "Use this template"], [true, true]);
         var journey = Guided(interaction);
         var command = GuidedCommand(journey.Coordinator, interaction, [NodeInitializer()]);
         RootCommand root = [command];
@@ -314,7 +316,7 @@ public sealed partial class ArtifactBindingJourneyTests
         interaction.Confirmations.Should().Equal(false, false);
         interaction.AllOutput.Should().Contain("Independently qualified").And.Contain("fixture-only").And.Contain(_selection.Artifact.Sha256);
         interaction.AllOutput.Should().Contain("unverified claims");
-        interaction.AllOutput.Should().Contain("Select a project stack:");
+        interaction.AllOutput.Should().NotContain("Select a project stack:");
         interaction.AllOutput.Should().Contain("Basic Functions app");
 
         var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(
@@ -324,7 +326,7 @@ public sealed partial class ArtifactBindingJourneyTests
 
         var before = TemplateState();
         var secondTarget = Path.Combine(_root, "second");
-        GuidedInteraction repeatedInteraction = new(true, ["first", "exact"], [true]);
+        GuidedInteraction repeatedInteraction = new(true, ["exact"], [true]);
         var repeated = Guided(repeatedInteraction);
         IProjectInitializer initializer = NodeInitializer();
         RootCommand secondRoot = [GuidedCommand(repeated.Coordinator, repeatedInteraction, [initializer])];
@@ -336,10 +338,9 @@ public sealed partial class ArtifactBindingJourneyTests
         repeated.Payload.Requested.Should().BeEmpty();
         repeated.Lifecycle.Prepared.Should().BeNull();
         repeatedInteraction.Confirmations.Should().Equal([false], "only creation requires confirmation on repeat installed selection");
-        repeatedInteraction.SelectionTitles.Should().HaveCount(2);
-        repeatedInteraction.SelectionTitles[0].Should().Be("Select a project stack:");
-        repeatedInteraction.SelectionChoices[1].Should().Contain(option => option.Contains(Identity, StringComparison.Ordinal));
-        TemplateState().Should().BeEquivalentTo(before);
+        repeatedInteraction.SelectionTitles.Should().ContainSingle().Which.Should().Be("Select a project template for Node.js (node):");
+        repeatedInteraction.SelectionChoices[0].Should().Contain(option => option.Contains(Identity, StringComparison.Ordinal));
+        TemplateState().Should().Equal(before);
         File.ReadAllText(Path.Combine(secondTarget, "value.txt")).Should().Be("exact");
         File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact", "the repeat must use the fresh target");
         using var configuration = JsonDocument.Parse(File.ReadAllText(Path.Combine(secondTarget, ".func", "config.json")));
@@ -354,7 +355,7 @@ public sealed partial class ArtifactBindingJourneyTests
     public async Task DefaultInit_BasicSelection_UsesExistingInitializerWithoutWritingBeforeSelection()
     {
         await SeedAsync(installTemplates: false);
-        GuidedInteraction interaction = new(true, ["first", "Basic Functions app"], []);
+        GuidedInteraction interaction = new(true, ["Basic Functions app"], []);
         interaction.SelectionMade = () => Directory.Exists(Target).Should().BeFalse();
         IProjectInitializer initializer = NodeInitializer();
         var journey = Guided(interaction);
@@ -367,21 +368,99 @@ public sealed partial class ArtifactBindingJourneyTests
         await initializer.Received(1).InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
         File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
         File.Exists(Path.Combine(Target, "value.txt")).Should().BeFalse();
-        interaction.AllOutput.Should().Contain("Select a project stack:").And.Contain("Basic Functions app");
+        interaction.AllOutput.Should().Contain("Select a project template for Node.js (node):").And.Contain("Basic Functions app");
+        interaction.AllOutput.Should().NotContain("Select a project stack:");
         interaction.Confirmations.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task DefaultInit_BrowseBack_ReturnsToTemplateMenuThenBasicUsesOriginalInitializer()
+    {
+        await SeedAsync(installTemplates: false);
+        GuidedInteraction interaction = new(true, ["Browse more templates", "Back", "Basic Functions app"], []);
+        interaction.SelectionMade = () => Directory.Exists(Target).Should().BeFalse();
+        IProjectInitializer initializer = NodeInitializer();
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction, [initializer])];
+
+        int exit = await root.Parse(["init", Target]).InvokeAsync();
+
+        exit.Should().Be(0, interaction.AllOutput);
+        interaction.SelectionTitles.Should().Equal("Select a project template for Node.js (node):",
+            "Browse templates (details only):", "Select a project template for Node.js (node):");
+        journey.Payload.Requested.Should().BeEmpty();
+        interaction.Confirmations.Should().BeEmpty();
+        await initializer.Received(1).InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
+    }
+
     [Theory]
-    [InlineData(false)]
     [InlineData(true)]
-    public async Task DefaultInit_CancelAtStackSelectionLeavesTargetAndInstalledTemplateHiveUnchanged(bool multipleStacks)
+    [InlineData(false)]
+    public async Task DefaultInit_ProductionConsole_EmptyBrowseBackReturnsToMenuWhileCancelStops(bool back)
+    {
+        await SeedAsync(installTemplates: false);
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        stderr.Enqueue(ConsoleKey.DownArrow);
+        stderr.Enqueue(ConsoleKey.Enter);
+        for (int i = 0; i < (back ? 4 : 5); i++) stderr.Enqueue(ConsoleKey.DownArrow);
+        stderr.Enqueue(ConsoleKey.Enter);
+        if (back)
+        {
+            stderr.Enqueue(ConsoleKey.DownArrow);
+            stderr.Enqueue(ConsoleKey.DownArrow);
+            stderr.Enqueue(ConsoleKey.Enter);
+        }
+        SpectreInteractionService interaction = new(new DefaultTheme(), stdout, stderr);
+        IProjectInitializer initializer = NodeInitializer();
+        var journey = CreateGuided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction, [initializer])];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target, "--language", "TypeScript"]).InvokeAsync();
+
+        exit.Should().Be(1, stdout.Output + stderr.Output);
+        stderr.Reads.Should().Be(back ? 10 : 8);
+        stderr.Output.Should().Contain("No templates match").And.Contain("Project template selection canceled")
+            .And.NotContain("Guided init canceled");
+        TemplateState().Should().Equal(before);
+        Directory.Exists(Target).Should().BeFalse();
+        journey.Payload.Requested.Should().BeEmpty();
+        await initializer.DidNotReceive().InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("fixture", "quickstartStackMismatch")]
+    [InlineData("unknown", "ambiguousQuickstart")]
+    public async Task Guided_QuickstartUnavailableForSelectedStack_ReportsRequiredInstalledStackWithoutAcquisition(string id, string kind)
+    {
+        await SeedAsync(installTemplates: false);
+        var journey = Guided(new(false, [], []), scopes: new AdditionalStackScopeFactory(_scopes));
+        var before = TemplateState();
+
+        var result = await journey.Coordinator.ExecuteAsync(
+            new(GuidedRequest() with { ExplicitStack = "dotnet", NonInteractive = true }, id, true), CancellationToken.None);
+
+        result.Kind.Should().Be(kind);
+        if (id == "fixture")
+        {
+            result.Diagnostics.Should().Contain(message => message.Contains("not available for the selected stack 'dotnet'", StringComparison.Ordinal)
+                && message.Contains("--stack node", StringComparison.Ordinal));
+        }
+        journey.Payload.Requested.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+        TemplateState().Should().Equal(before);
+    }
+
+    [Fact]
+    public async Task DefaultInit_MultipleStacksCancelAtStackSelectionLeavesTargetAndInstalledTemplateHiveUnchanged()
     {
         await SeedAsync(installTemplates: false);
         GuidedInteraction interaction = new(true, ["Cancel", "first"], []);
         interaction.SelectionMade = () => Directory.Exists(Target).Should().BeFalse();
         IProjectInitializer nodeInitializer = NodeInitializer();
-        IProjectInitializer[] initializers = multipleStacks ? [nodeInitializer, DotNetInitializer()] : [nodeInitializer];
-        var journey = Guided(interaction, scopes: multipleStacks ? new AdditionalStackScopeFactory(_scopes) : null);
+        IProjectInitializer[] initializers = [nodeInitializer, DotNetInitializer()];
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes));
         var command = GuidedCommand(journey.Coordinator, interaction, initializers);
         RootCommand root = [command];
         var before = TemplateState();
@@ -391,21 +470,14 @@ public sealed partial class ArtifactBindingJourneyTests
         exit.Should().Be(1);
         Directory.Exists(Target).Should().BeFalse();
         File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeFalse();
-        TemplateState().Should().BeEquivalentTo(before);
+        TemplateState().Should().Equal(before);
         journey.Payload.Requested.Should().BeEmpty();
         foreach (IProjectInitializer initializer in initializers)
         {
             await initializer.DidNotReceive().InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
         }
         interaction.SelectionTitles.Should().ContainSingle().Which.Should().Be("Select a project stack:");
-        if (multipleStacks)
-        {
-            interaction.SelectionChoices[0].Should().Contain(["Node.js (node)", ".NET (dotnet)"]);
-        }
-        else
-        {
-            interaction.SelectionChoices[0].Should().Contain("Node.js (node)").And.NotContain(".NET (dotnet)");
-        }
+        interaction.SelectionChoices[0].Should().Contain(["Node.js (node)", ".NET (dotnet)"]);
         interaction.AllOutput.Should().Contain("canceled");
     }
 
@@ -413,7 +485,7 @@ public sealed partial class ArtifactBindingJourneyTests
     public async Task DefaultInit_CancelAtTemplateSelectionLeavesTargetAndInstalledTemplateHiveUnchanged()
     {
         await SeedAsync(installTemplates: false);
-        GuidedInteraction interaction = new(true, ["first", "Cancel"], []);
+        GuidedInteraction interaction = new(true, ["Cancel"], []);
         interaction.SelectionMade = () => Directory.Exists(Target).Should().BeFalse();
         IProjectInitializer initializer = NodeInitializer();
         var journey = Guided(interaction);
@@ -426,10 +498,10 @@ public sealed partial class ArtifactBindingJourneyTests
         exit.Should().Be(1);
         Directory.Exists(Target).Should().BeFalse();
         File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeFalse();
-        TemplateState().Should().BeEquivalentTo(before);
+        TemplateState().Should().Equal(before);
         journey.Payload.Requested.Should().BeEmpty();
         await initializer.DidNotReceive().InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
-        interaction.SelectionTitles.Should().Equal("Select a project stack:", "Select a project template for Node.js (node):");
+        interaction.SelectionTitles.Should().Equal("Select a project template for Node.js (node):");
         interaction.AllOutput.Should().Contain("canceled");
     }
 
@@ -445,7 +517,7 @@ public sealed partial class ArtifactBindingJourneyTests
         await SeedAsync(installTemplates: false);
         string[] selections = mode switch
         {
-            "back" => ["Browse more templates", "Back"],
+            "back" => ["Browse more templates", "Back", "Cancel"],
             "cancel" => ["Cancel"],
             _ => ["Browse more templates", "first", "Use this template"],
         };
@@ -459,7 +531,7 @@ public sealed partial class ArtifactBindingJourneyTests
         result.Kind.Should().Be(expected, interaction.AllOutput);
         journey.Payload.Opened.Should().BeEmpty();
         Directory.Exists(Target).Should().BeFalse();
-        TemplateState().Should().BeEquivalentTo(before);
+        TemplateState().Should().Equal(before);
     }
 
     [Theory]
@@ -741,7 +813,7 @@ public sealed partial class ArtifactBindingJourneyTests
         journey.Payload.Requested.Should().BeEmpty();
         journey.Lifecycle.Prepared.Should().BeNull();
         Directory.Exists(Target).Should().BeFalse();
-        TemplateState().Should().BeEquivalentTo(before);
+        TemplateState().Should().Equal(before);
     }
 
     [Theory]
@@ -917,6 +989,11 @@ public sealed partial class ArtifactBindingJourneyTests
     private (QuickstartInitCoordinator Coordinator, FixturePayloadSource Payload, TrackingLifecycle Lifecycle,
         IQuickstartCatalogService Catalog, QuickstartQualification Qualification, BasicAcquisitionRunner Acquisition)
         Guided(GuidedInteraction interaction, IFileSystem? installation = null, IBoundInitScopeFactory? scopes = null)
+        => CreateGuided(interaction, installation, scopes);
+
+    private (QuickstartInitCoordinator Coordinator, FixturePayloadSource Payload, TrackingLifecycle Lifecycle,
+        IQuickstartCatalogService Catalog, QuickstartQualification Qualification, BasicAcquisitionRunner Acquisition)
+        CreateGuided(IInteractionService interaction, IFileSystem? installation = null, IBoundInitScopeFactory? scopes = null)
     {
         IBoundInitScopeFactory scopeFactory = scopes ?? _scopes;
         var source = Substitute.For<IQuickstartCatalogSource>();
@@ -987,8 +1064,10 @@ public sealed partial class ArtifactBindingJourneyTests
         return initializer;
     }
 
-    private Dictionary<string, byte[]> TemplateState()
-        => Directory.Exists(_templates.Hive) ? HiveBytes() : [];
+    private Dictionary<string, string> TemplateState()
+        => Directory.Exists(_templates.Hive)
+            ? HiveBytes().ToDictionary(pair => pair.Key, pair => Convert.ToHexString(pair.Value))
+            : [];
 
     private async Task<WorkloadEntry> SeedGuidedOwnerAsync(string archive)
     {
@@ -1130,7 +1209,7 @@ public sealed partial class ArtifactBindingJourneyTests
     private sealed class FreshBrowser(IQuickstartCatalogService catalog, IBoundInitScopeFactory scopes,
         ITemplaterFactory templates, IInteractionService interaction) : IQuickstartBrowser
     {
-        public async Task<QuickstartCatalogEntry?> BrowseAsync(QuickstartBrowseRequest request, CancellationToken cancellationToken)
+        public async Task<QuickstartBrowseResult> BrowseAsync(QuickstartBrowseRequest request, CancellationToken cancellationToken)
         {
             using BoundInitScope scope = await scopes.CreateAsync(cancellationToken);
             QuickstartBrowser browser = new(catalog, scope.Catalog, [], interaction, new(interaction), new(templates, scopes));

@@ -327,7 +327,8 @@ internal class SpectreInteractionService : IInteractionService
         }
 
         return await new SelectionPrompt<string>()
-            .Title(title)
+            .Title(Markup.Escape(title))
+            .UseConverter(Markup.Escape)
             .EnableSearch()
             .AddChoices(choiceList)
             .ShowAsync(_stderr, cancellationToken);

@@ -65,6 +65,7 @@ public class QuickstartInfoCommandTests
         _interaction.Lines.Should().Contain(l => l.Contains("http-py"));
         _interaction.Lines.Should().Contain(l => l.Contains("Python"));
         _interaction.Lines.Should().Contain(l => l.Contains("http"));
+        _interaction.AllOutput.Should().Contain("Legacy source scaffolder: func quickstart").And.NotContain("Inspect without acquisition:");
     }
 
     [Fact]
@@ -86,6 +87,45 @@ public class QuickstartInfoCommandTests
         jsonLine.Should().Contain("\"language\":\"Python\"");
         jsonLine.Should().Contain("\"resource\":\"http\"");
         jsonLine.Should().Contain("\"iac\":\"bicep\"");
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task Info_PackageMetadata_UsesInitOnlyWithArtifactMetadataAndNeverClaimsReadiness(bool hasArtifact, bool providerAvailable)
+    {
+        QuickstartEntry entry = QuickstartTestHelpers.CreateEntry();
+        QuickstartPackageReference reference = new("Fixture.Project", "1.0.0", "https://example.test/index.json",
+            "Fixture.Project.Identity", null, hasArtifact ? new("sha256", new('a', 64), "inert") : null, default, default);
+        _catalogService.SearchAsync(Arg.Any<QuickstartCatalogQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new QuickstartCatalog([new(entry, QuickstartPackageMetadataStatus.Unverified, reference, null)],
+                new(QuickstartCatalogOrigin.LocalFile, "fixture", null)));
+        if (providerAvailable)
+        {
+            IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
+            provider.GetDisplayLanguage("Python").Returns("Python");
+            _resolver.FindProviderForLanguage("Python").Returns(provider);
+        }
+        else
+        {
+            _resolver.FindProviderForLanguage("Python").Returns((IQuickstartProvider?)null);
+        }
+
+        int exit = await InvokeAsync(CreateCommand(), "http-py");
+
+        exit.Should().Be(0, _interaction.AllOutput);
+        if (hasArtifact)
+        {
+            string stackOption = providerAvailable ? " --stack python" : string.Empty;
+            _interaction.AllOutput.Should().Contain($"func init <path> --guided{stackOption} --quickstart http-py --dry-run")
+                .And.Contain("does not establish acquisition readiness").And.NotContain("Legacy source scaffolder:");
+        }
+        else
+        {
+            _interaction.AllOutput.Should().Contain("no usable package acquisition metadata")
+                .And.Contain("Legacy source scaffolder: func quickstart");
+        }
     }
 
     [Fact]

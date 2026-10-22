@@ -889,8 +889,8 @@ public sealed class NewExecutionJourneyTests : IDisposable
         exit.Should().Be(0);
         string[] actualChoices = offered.Should().ContainSingle().Subject;
         actualChoices.Should().Equal(styledFirst
-            ? ["Func.Consumer.[[red]]styled[[/]]", "Func.Consumer.[[bad]]"]
-            : ["Func.Consumer.[[bad]]", "Func.Consumer.[[red]]styled[[/]]"]);
+            ? ["Func.Consumer.[red]styled[/]", "Func.Consumer.[bad]"]
+            : ["Func.Consumer.[bad]", "Func.Consumer.[red]styled[/]"]);
         stderr.Reads.Should().Be(styledFirst ? 3 : 4);
         stderr.Output.Should().Contain("Func.Consumer.[bad]").And.Contain("Func.Consumer.[red]styled[/]");
         harness.Result!.Kind.Should().Be("previewed");
@@ -1276,8 +1276,8 @@ public sealed class NewExecutionJourneyTests : IDisposable
                 }
 
                 offered?.Add(choices);
-                choices.Should().ContainSingle(choice => choice == "Func.Consumer.[[red]]styled[[/]]");
-                int index = Array.IndexOf(choices, "Func.Consumer.[[red]]styled[[/]]");
+                choices.Should().ContainSingle(choice => choice == "Func.Consumer.[red]styled[/]");
+                int index = Array.IndexOf(choices, "Func.Consumer.[red]styled[/]");
                 for (int i = 0; i < index; i++)
                 {
                     stderr.Enqueue(ConsoleKey.DownArrow);

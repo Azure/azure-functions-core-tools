@@ -1,11 +1,16 @@
 ## Current staged integration
 
-An eligible interactive fresh-target `func init MyConnector` now offers stack
-selection, **Basic Functions app**, visible installed project templates and
+Start with `func init MyConnector`. Quickstarts are ordinary project templates
+with no user template parameters. An eligible interactive fresh target offers
+**Basic Functions app**, visible installed project templates and
 **Browse more templates**. Basic delegates to the existing workload initializer
 with the original parsed arguments. Installed templates and Browse use the
 existing coordinator, with exact binding and qualified acquisition where
-applicable. Canceling either selection stops before project creation.
+applicable. A sole eligible, uniquely owned installed native stack is selected
+without an extra prompt and remains named in the template menu. Multiple eligible
+stacks still require selection. Explicit stack constraints are never overridden.
+Browse **Back** returns to the invoking template menu, including when no results
+match. **Cancel browsing** and **Cancel** stop before acquisition or project writes.
 
 The default menu requires a uniquely owned installed native stack. Scripts,
 initializer-specific options, `--force`, existing or nonempty targets, and
@@ -66,7 +71,13 @@ not a fictitious engine preview. Use an installed `--template` for native
 dry-run. Guided init rejects nonempty targets, adoption, repair and `--force`
 before acquisition or cleanup. The legacy initializer path retains its existing
 adoption, repair, force and workload-option behavior, including response files.
-Guided init does not accept workload initializer options. Arbitrary native
+Guided init does not accept workload initializer options.
+
+### Advanced native-template compatibility
+
+The general help and quickstart menus do not expose parameter editing.
+The advanced `--template-argument` option remains accepted but hidden from
+general help, following the existing hidden-option convention. Arbitrary native
 parameter tokens are available through repeated `--template-argument=<token>`
 options on the public guided adapter. Each occurrence supplies exactly one raw
 token, in order, to the existing selected-template parser. An explicit target
@@ -77,7 +88,6 @@ interactively; scripts fail if they are unresolved.
 
 ```text
 func init MyConnector --guided --stack node --template <installed-full-identity> --non-interactive --template-argument=--greeting --template-argument="hello world" --template-argument=--enabled=false
-func init MyConnector --guided --stack node --quickstart <exact-catalog-id> --acquire-quickstart --non-interactive --template-argument=--required --template-argument=value
 ```
 
 Use `=` on the host option for dash-prefixed and `@`-prefixed raw tokens.
@@ -229,10 +239,22 @@ without prompting or choosing a template and requires an explicit stack when
 multiple capabilities are installed. Catalog failures and cancellation propagate
 to the caller rather than becoming empty success.
 
+Single-selection titles and choices are literal text at the console adapter.
+The selected value remains the original string, including brackets. Spectre
+Console 0.55.0 supplies the upstream escaped-segment search-highlighting fix,
+so typing to search also preserves these labels. This dependency version adds
+Spectre.Console.Ansi and intentionally disables ANSI when stdout or stderr is
+redirected. No renderer forces ANSI back on. No native grammar, identity,
+provenance or acquisition policy is changed by this rendering correction.
+
 The same renderer enriches human-readable `func quickstart info <id>` with
 transport provenance, package metadata diagnostics and explicitly unverified
 package claims. Legacy list/info JSON shapes and the source scaffolding command
-remain unchanged. Evidence references and opaque project/workload summaries are
+remain unchanged. Entries with usable package and artifact metadata point to
+`func init <path> --guided --stack <stack> --quickstart <id> --dry-run` for
+read-only inspection, not a claim that remote acquisition is ready. Legacy or
+incomplete entries retain an explicitly labeled legacy source-scaffolder hint.
+Evidence references and opaque project/workload summaries are
 displayed as claims only, never fetched or interpreted as approval. Stale metadata
 is visibly identified. The only permitted writes are those of the existing
 manifest metadata cache.

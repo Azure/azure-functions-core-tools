@@ -127,7 +127,7 @@ internal interface IInteractionService
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue, bool whenInputUnavailable, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Prompts on stderr to select from a list of choices. Returns the first choice
+    /// Prompts on stderr to select from literal text choices with a literal text title. Returns the first choice
     /// (or an empty string for no choices) when stderr lacks input or ANSI support.
     /// Throws <see cref="OperationCanceledException"/> on cancellation.
     /// </summary>

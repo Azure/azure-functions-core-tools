@@ -2,9 +2,11 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Tests.Commands.Quickstart;
+using Azure.Functions.Cli.Tests.Console;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -12,6 +14,53 @@ namespace Azure.Functions.Cli.Tests.Quickstart;
 
 public class QuickstartBrowserTests
 {
+    [Theory]
+    [InlineData("Absent")]
+    [InlineData("Unverified")]
+    public async Task BrowseAsync_ProductionConsole_LiteralCatalogLabelsOpenDetailsAndSelectExactEntry(string status)
+    {
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        stderr.Enqueue(ConsoleKey.Enter);
+        stderr.Enqueue(ConsoleKey.Enter);
+        SpectreInteractionService interaction = new(new DefaultTheme(), stdout, stderr);
+        QuickstartCatalogEntry entry = new(QuickstartTestHelpers.CreateEntry(id: "id[bad]", displayName: "[red]Name[/]"),
+            Enum.Parse<QuickstartPackageMetadataStatus>(status), null, null);
+        IQuickstartCatalogService catalog = Substitute.For<IQuickstartCatalogService>();
+        catalog.SearchAsync(Arg.Any<QuickstartCatalogQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new QuickstartCatalog([entry], new(QuickstartCatalogOrigin.LocalFile, "fixture", null)));
+        QuickstartBrowser browser = new(catalog, new([Stack()]), [], interaction, new(interaction));
+
+        QuickstartBrowseResult result = await browser.BrowseAsync(new() { AllowSelection = true }, CancellationToken.None);
+
+        result.Outcome.Should().Be(QuickstartBrowseOutcome.Selected);
+        result.Entry.Should().BeSameAs(entry);
+        stderr.Output.Should().Contain($"[red]Name[/] (id[bad]) [{status}]");
+        stdout.Output.Should().Contain("[red]Name[/]").And.Contain("id[bad]");
+    }
+
+    [Theory]
+    [InlineData(4, "Back")]
+    [InlineData(5, "Canceled")]
+    public async Task BrowseAsync_ProductionConsole_EmptyResultsDistinguishBackAndCancel(int down, string expected)
+    {
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        for (int i = 0; i < down; i++) stderr.Enqueue(ConsoleKey.DownArrow);
+        stderr.Enqueue(ConsoleKey.Enter);
+        SpectreInteractionService interaction = new(new DefaultTheme(), stdout, stderr);
+        IQuickstartCatalogService catalog = Substitute.For<IQuickstartCatalogService>();
+        catalog.SearchAsync(Arg.Any<QuickstartCatalogQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new QuickstartCatalog([], new(QuickstartCatalogOrigin.LocalFile, "fixture", null)));
+        QuickstartBrowser browser = new(catalog, new([Stack()]), [], interaction, new(interaction));
+
+        QuickstartBrowseResult result = await browser.BrowseAsync(new(), CancellationToken.None);
+
+        result.Outcome.ToString().Should().Be(expected);
+        result.Entry.Should().BeNull();
+        stderr.Output.Should().Contain("No templates match");
+    }
+
     [Fact]
     public async Task BrowseAsync_SingleLegacyResult_RequiresExplicitDetailSelectionAndReturnsToResults()
     {

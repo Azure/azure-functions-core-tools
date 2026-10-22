@@ -65,9 +65,8 @@ internal sealed class TemplateExecutionInteraction(ITemplateArgumentParser argum
     private async Task<string> SelectLiteralAsync(string title, IEnumerable<string> choices, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var rawByLabel = choices.ToDictionary(Markup.Escape, StringComparer.Ordinal);
-        string selected = await _interaction.PromptForSelectionAsync(Markup.Escape(title), rawByLabel.Keys, cancellationToken);
+        string selected = await _interaction.PromptForSelectionAsync(title, choices, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return rawByLabel.TryGetValue(selected, out string? raw) ? raw : selected;
+        return selected;
     }
 }
