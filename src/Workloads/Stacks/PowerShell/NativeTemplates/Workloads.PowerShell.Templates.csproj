@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <PackageId>Azure.Functions.Templates.PowerShell.Basic</PackageId>
+    <PackageType>FuncTemplate</PackageType>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <Description>Azure Functions CLI basic PowerShell project template.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- PowerShell files are inert template content, not NuGet installation hooks. -->
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="content/**" Pack="true" PackagePath="content/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Content Include="$(RepoRoot)LICENSE" Pack="true" PackagePath="/" />
+    <Content Include="README.md" Pack="true" PackagePath="/" />
+    <Content Include="../Templates/profile.ps1;../Templates/local.settings.json"
+      Pack="true" PackagePath="content/project/" />
+    <Content Include="../Templates/requirements.psd1" Pack="true" PackagePath="content/project/.template.config/" />
+  </ItemGroup>
+  <Target Name="StageNativeIgnoreFiles" BeforeTargets="_GetPackageFiles">
+    <Copy SourceFiles="../Templates/gitignore" DestinationFiles="$(IntermediateOutputPath)native/.gitignore" />
+    <ItemGroup>
+      <Content Include="$(IntermediateOutputPath)native/.gitignore" Pack="true" PackagePath="content/project/" />
+    </ItemGroup>
+  </Target>
+  <Target Name="WritePowerShellProjectProvenance" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <_PowerShellProjectSource Include="content/project/.template.config/template.json" PackageSourcePath="content/project/.template.config/template.json" />
+      <_PowerShellProjectSource Include="content/project/.template.config/func.host.json" PackageSourcePath="content/project/.template.config/func.host.json" />
+      <_PowerShellProjectSource Include="content/project/host.json" PackageSourcePath="content/project/host.json" />
+      <_PowerShellProjectSource Include="../Templates/profile.ps1" PackageSourcePath="content/project/profile.ps1" />
+      <_PowerShellProjectSource Include="../Templates/local.settings.json" PackageSourcePath="content/project/local.settings.json" />
+      <_PowerShellProjectSource Include="../Templates/gitignore" PackageSourcePath="content/project/.gitignore" />
+      <_PowerShellProjectSource Include="../Templates/requirements.psd1" PackageSourcePath="content/project/.template.config/requirements.psd1" />
+    </ItemGroup>
+    <GetFileHash Files="@(_PowerShellProjectSource)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_HashedPowerShellProjectSource" />
+    </GetFileHash>
+    <PropertyGroup>
+      <_PowerShellProjectSourceJson>@(_HashedPowerShellProjectSource->'{ &quot;path&quot;: &quot;%(PackageSourcePath)&quot;, &quot;sha256&quot;: &quot;%(FileHash)&quot; }', ',')</_PowerShellProjectSourceJson>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)powershell-project-provenance.json" Overwrite="true" Encoding="UTF-8"
+      Lines="{ &quot;schemaVersion&quot;: 1, &quot;packageId&quot;: &quot;$(PackageId)&quot;, &quot;packageVersion&quot;: &quot;$(PackageVersion)&quot;, &quot;identity&quot;: &quot;Azure.Functions.PowerShell.Basic&quot;, &quot;stack&quot;: &quot;powershell&quot;, &quot;language&quot;: &quot;PowerShell&quot;, &quot;sources&quot;: [$(_PowerShellProjectSourceJson)] }" />
+    <ItemGroup>
+      <Content Include="$(IntermediateOutputPath)powershell-project-provenance.json" Pack="true" PackagePath="provenance/powershell/project.json" />
+    </ItemGroup>
+  </Target>
+</Project>

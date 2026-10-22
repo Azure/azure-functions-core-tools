@@ -7,6 +7,10 @@
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>java</WorkloadAlias>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <BundledTemplatesProject>$(MSBuildProjectDirectory)/NativeTemplates/Workloads.Java.Templates.csproj</BundledTemplatesProject>
+    <BundledTemplatesPackageId>Azure.Functions.Templates.Java.Basic</BundledTemplatesPackageId>
+    <BundledTemplatesPackagePath>templates/java-basic.nupkg</BundledTemplatesPackagePath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,10 +19,15 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <ProjectReference Include="NativeTemplates/Workloads.Java.Templates.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <Compile Remove="NativeTemplates/**" />
+    <EmbeddedResource Remove="NativeTemplates/**" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Templates/**" />
   </ItemGroup>
+
+  <Import Project="$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets" />
 
 </Project>

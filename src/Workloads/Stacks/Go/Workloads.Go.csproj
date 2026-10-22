@@ -7,18 +7,28 @@
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>go</WorkloadAlias>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <BundledTemplatesProject>$(MSBuildProjectDirectory)/NativeTemplates/Workloads.Go.Templates.csproj</BundledTemplatesProject>
+    <BundledTemplatesPackageId>Azure.Functions.Templates.Go.Basic</BundledTemplatesPackageId>
+    <BundledTemplatesPackagePath>templates/go-basic.nupkg</BundledTemplatesPackagePath>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.Go.Tests" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+    <ProjectReference Include="NativeTemplates/Workloads.Go.Templates.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <Compile Remove="NativeTemplates/**" />
+    <EmbeddedResource Remove="NativeTemplates/**" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Templates/**" />
   </ItemGroup>
+
+  <Import Project="$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets" />
 
 </Project>

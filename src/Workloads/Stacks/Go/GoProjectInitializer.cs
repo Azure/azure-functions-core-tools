@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
-using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Commands;
@@ -144,33 +143,6 @@ internal sealed class GoProjectInitializer(GoProjectStack stack) : IProjectIniti
         };
     }
 
-    private static async Task<(int ExitCode, string Stderr)> DefaultRunGoModTidy(string workingDirectory, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var psi = new ProcessStartInfo("go", "mod tidy")
-            {
-                WorkingDirectory = workingDirectory,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return (-1, "Failed to start 'go' process.");
-            }
-
-            string stderr = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return (process.ExitCode, stderr);
-        }
-        catch (Exception ex)
-        {
-            // 'go' may not be installed; the scaffolded files are still valid.
-            return (-1, ex.Message);
-        }
-    }
+    internal static Task<(int ExitCode, string Stderr)> DefaultRunGoModTidy(string workingDirectory, CancellationToken cancellationToken)
+        => new GoProjectPreparation().RunGoModTidyAsync(workingDirectory, cancellationToken);
 }
