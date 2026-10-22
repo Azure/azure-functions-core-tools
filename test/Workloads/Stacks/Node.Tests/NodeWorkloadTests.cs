@@ -14,6 +14,7 @@ public class NodeWorkloadTests
     public void Configure_RegistersProjectInitializer()
     {
         ServiceCollection services = new();
+        services.AddSingleton(Substitute.For<IProjectInitializationReporter>());
         FunctionsCliBuilder builder = Substitute.For<FunctionsCliBuilder>();
         builder.Services.Returns(services);
 

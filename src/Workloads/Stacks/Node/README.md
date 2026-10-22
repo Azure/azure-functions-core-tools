@@ -16,6 +16,10 @@ func workload install node
 ## Status
 
 Preview. The existing initializer scaffolds v4 JavaScript/TypeScript projects.
+Dependency installation is best effort. If npm is unavailable or returns a
+failure, initialization retains the generated files and warns you to run
+`npm install` in the project directory. `--skip-npm-install` skips that step
+without a dependency warning.
 The stack artifact carries [two native basic project
 templates](NativeTemplates/README.md), registered locally during normal stack
 installation. All 33 owned function items are produced separately, including

@@ -3,12 +3,14 @@
 
 using System.Diagnostics;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Telemetry;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Invocation;
 using Azure.Functions.Cli.Workloads.Loading;
 using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Hosting;
@@ -57,6 +59,8 @@ internal static class WorkloadRegistration
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(paths);
         ArgumentNullException.ThrowIfNull(interaction);
+
+        services.TryAddSingleton<IProjectInitializationReporter>(new ProjectInitializationReporter(interaction));
 
         // The activity name doubles as the metric scope: WorkloadBootMetricListener
         // translates the stop event into cli.workload.boot_duration with the

@@ -62,6 +62,7 @@ internal static class CliHostFactory
         // OpenTelemetry pipeline) so flush + shutdown happen via host disposal.
         HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(null);
         builder.Services.AddSingleton(interaction);
+        builder.Services.AddSingleton<IProjectInitializationReporter, ProjectInitializationReporter>();
         builder.Services.AddSingleton<IPlatform, Platform>();
 
         var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
