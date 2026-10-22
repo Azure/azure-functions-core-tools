@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
 
 namespace Azure.Functions.Cli.Templates;
@@ -37,5 +38,12 @@ internal sealed record InitExecutionResult(string Kind, bool Succeeded)
 
     public TemplateInvocationResult? Invocation { get; init; }
 
+    public InitExistingProjectConfiguration? Configuration { get; init; }
+
     public static InitExecutionResult Reject(string kind, params string[] diagnostics) => new(kind, false) { Diagnostics = diagnostics };
+}
+
+internal sealed record InitExistingProjectConfiguration(string Root, string Stack, string Language, bool Repair, bool Written = false)
+{
+    public string Path => CliConfigurationPathsOptions.GetProjectConfigPath(new(Root));
 }

@@ -19,12 +19,13 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             {
                 result.Kind,
                 result.Succeeded,
-                targetDirectory = result.Context?.CommandDirectory.Info.FullName,
-                projectRoot = result.Context?.Project?.RootDirectory.Info.FullName,
-                stack = result.Context?.Project?.Stack,
-                language = result.Context?.Project?.Language,
+                targetDirectory = result.Context?.CommandDirectory.Info.FullName ?? result.Configuration?.Root,
+                projectRoot = result.Context?.Project?.RootDirectory.Info.FullName ?? result.Configuration?.Root,
+                stack = result.Context?.Project?.Stack ?? result.Configuration?.Stack,
+                language = result.Context?.Project?.Language ?? result.Configuration?.Language,
                 bundle = result.Context?.Bundle,
                 result.Diagnostics,
+                result.Configuration,
                 templates = result.Templates.Select(ProjectTemplate),
                 unavailableTemplates = result.UnavailableTemplates.Select(ProjectTemplate),
                 selectedTemplate = result.SelectedTemplate is { } selected ? ProjectTemplate(selected) : null,
@@ -68,6 +69,21 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
 
     private void RenderPlain(InitExecutionResult result)
     {
+        if (result.Configuration is { } configuration)
+        {
+            if (result.Kind is "adoptionPreviewed" or "repairPreviewed")
+            {
+                _interaction.WriteSectionHeader($"Preview: existing project {(configuration.Repair ? "repair" : "adoption")} (no files written)");
+            }
+            else if (configuration.Written)
+            {
+                _interaction.WriteSuccess($"Existing project {(configuration.Repair ? "repaired" : "adopted")} for {configuration.Stack}/{configuration.Language}.");
+            }
+
+            _interaction.WriteLine(line => line.Muted(configuration.Written ? "Updated configuration: " : "Planned configuration: ")
+                .Code(configuration.Path).Muted($" ({(configuration.Repair ? "Modify" : "Create")}: {configuration.Stack}/{configuration.Language})"));
+        }
+
         if (result.Kind == "previewed")
         {
             _interaction.WriteSectionHeader($"Preview: {result.SelectedTemplate!.Identity} (no files written)");

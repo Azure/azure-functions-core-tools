@@ -171,6 +171,12 @@ internal class PhysicalFileSystem : IFileSystem
     public IReadOnlyList<string> GetFiles(string directoryPath) =>
         Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
 
+    public IReadOnlyList<string> GetFileSystemEntries(string directoryPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directoryPath);
+        return Directory.GetFileSystemEntries(directoryPath);
+    }
+
     // ── Archive operations ──────────────────────────────────────────────────
 
     public void ExtractZip(string zipPath, string destinationDirectory) =>

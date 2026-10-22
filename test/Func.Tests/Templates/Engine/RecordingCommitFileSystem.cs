@@ -49,6 +49,7 @@ internal sealed class RecordingCommitFileSystem(IFileSystem basis) : IFileSystem
         => _basis.CopyDirectoryAsync(sourcePath, destinationPath, cancellationToken);
     public void DeleteDirectory(string path) => _basis.DeleteDirectory(path);
     public IReadOnlyList<string> GetFiles(string directoryPath) => _basis.GetFiles(directoryPath);
+    public IReadOnlyList<string> GetFileSystemEntries(string directoryPath) => _basis.GetFileSystemEntries(directoryPath);
     public void ExtractZip(string zipPath, string destinationDirectory) => _basis.ExtractZip(zipPath, destinationDirectory);
     public void ExtractTarGz(string tarGzPath, string destinationDirectory) => _basis.ExtractTarGz(tarGzPath, destinationDirectory);
     public Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken) => _basis.ComputeSha256Async(filePath, cancellationToken);

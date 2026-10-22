@@ -119,6 +119,15 @@ internal interface IFileSystem
     /// </summary>
     public IReadOnlyList<string> GetFiles(string directoryPath);
 
+    /// <summary>
+    /// Returns files and subdirectories immediately inside a directory, including hidden entries.
+    /// </summary>
+    /// <exception cref="ArgumentException">The directory path is null, empty or whitespace.</exception>
+    /// <exception cref="DirectoryNotFoundException">The directory is missing.</exception>
+    /// <exception cref="IOException">The directory entries could not be read.</exception>
+    /// <exception cref="UnauthorizedAccessException">The directory is not accessible.</exception>
+    public IReadOnlyList<string> GetFileSystemEntries(string directoryPath);
+
     // ── Archive operations ──────────────────────────────────────────────────
 
     /// <summary>

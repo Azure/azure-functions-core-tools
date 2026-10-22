@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
@@ -25,7 +27,10 @@ internal sealed class InitExecutionRunner(
     InitExecutionRenderer renderer,
     InitExecutionTargetInspector targets,
     Func<InstalledProjectStackCatalog> stackCatalog,
-    Func<TemplateProjectSupport> projectSupport) : IInitExecutionRunner
+    Func<TemplateProjectSupport> projectSupport,
+    IFileSystem fileSystem,
+    ILocalSettingsProvider localSettings,
+    IFunctionsProjectResolver projects) : IInitExecutionRunner
 {
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
@@ -35,6 +40,9 @@ internal sealed class InitExecutionRunner(
     private readonly InitExecutionTargetInspector _targets = targets ?? throw new ArgumentNullException(nameof(targets));
     private readonly Func<InstalledProjectStackCatalog> _stackCatalog = stackCatalog ?? throw new ArgumentNullException(nameof(stackCatalog));
     private readonly Func<TemplateProjectSupport> _projectSupport = projectSupport ?? throw new ArgumentNullException(nameof(projectSupport));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly ILocalSettingsProvider _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
+    private readonly IFunctionsProjectResolver _projects = projects ?? throw new ArgumentNullException(nameof(projects));
 
     public async Task<InitExecutionResult> ExecuteAsync(
         InitExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -61,10 +69,25 @@ internal sealed class InitExecutionRunner(
                 "Force cleanup is not qualified by this staged INIT consumer. Nothing was deleted; use a new empty target.");
         }
 
-        InitExecutionResult? targetFailure = CheckTarget(request.WorkingDirectory);
-        if (targetFailure is not null)
+        InitExecutionTarget target;
+        try
         {
-            return targetFailure;
+            target = await _targets.InspectAsync(request.WorkingDirectory, cancellationToken);
+        }
+        catch (JsonException exception)
+        {
+            return InitExecutionResult.Reject("invalidConfiguration",
+                $"Cannot read '.func/config.json'. Correct its JSON and stack fields before retrying. {exception.Message}");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return InitExecutionResult.Reject("invalidTarget", $"Cannot inspect the target directory or configuration. Check the path and access, then retry. {exception.Message}");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (target.State == InitExecutionTargetState.Unsupported)
+        {
+            return InitExecutionResult.Reject("unsupportedTarget", target.Diagnostic!);
         }
 
         InstalledProjectStackCatalog catalog;
@@ -79,6 +102,28 @@ internal sealed class InitExecutionRunner(
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        bool repair = target.State == InitExecutionTargetState.Configured
+            && target.Runtime is not null && target.Language is null
+            && catalog.FindStack(target.Runtime) is { SupportedLanguages.Count: > 1 };
+        if (target.State == InitExecutionTargetState.Configured && !repair)
+        {
+            return InitExecutionResult.Reject("alreadyInitialized",
+                "This directory already contains Functions CLI configuration. Nothing was changed; use a new target for project-template creation.");
+        }
+
+        bool existing = target.State == InitExecutionTargetState.Adoptable || repair;
+        if (existing && request.TemplateReference is not null)
+        {
+            return InitExecutionResult.Reject("templateOnExistingProject",
+                "--template cannot be used during adoption or repair. Reinitialization requires --force, which is not qualified by this staged consumer; nothing was changed.");
+        }
+
+        if (existing && (request.RawTemplateTokens.Count > 0 || request.Name is not null))
+        {
+            return InitExecutionResult.Reject("invalidExistingProjectArguments",
+                "Adoption and repair only update CLI configuration. Remove --name and template-specific arguments; no template is loaded.");
+        }
+
         if (catalog.Stacks.Count == 0)
         {
             return InitExecutionResult.Reject("noInstalledStacks", "Set up a stack with 'func setup --features <stack>' before initializing a project.");
@@ -102,6 +147,11 @@ internal sealed class InitExecutionRunner(
                     .SelectMany(stack => stack.SupportedLanguages).Distinct(StringComparer.OrdinalIgnoreCase))}.");
         }
 
+        if (existing)
+        {
+            return await ConfigureExistingAsync(request, target, repair, catalog, requestedStack, requestedLanguage, cancellationToken);
+        }
+
         TemplateEngineContext context = new(request.WorkingDirectory, new(request.WorkingDirectory, stack: null))
         {
             RequireCleanStore = request.DryRun,
@@ -123,6 +173,140 @@ internal sealed class InitExecutionRunner(
         bool Matches(string stack, string language) =>
             (requestedStack is null || string.Equals(stack, requestedStack.Stack, StringComparison.OrdinalIgnoreCase))
             && (requestedLanguage is null || string.Equals(language, requestedLanguage, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task<InitExecutionResult> ConfigureExistingAsync(InitExecutionRequest request, InitExecutionTarget target,
+        bool repair, InstalledProjectStackCatalog catalog, IProjectStack? requestedStack, string? requestedLanguage,
+        CancellationToken cancellationToken)
+    {
+        bool canPrompt = !request.NonInteractive && _interaction.IsInteractive;
+        string? runtime = repair ? target.Runtime : _localSettings.Get(request.WorkingDirectory.Info).WorkerRuntime?.Trim();
+        cancellationToken.ThrowIfCancellationRequested();
+        IProjectStack? declared = string.IsNullOrWhiteSpace(runtime) ? null : catalog.FindStack(runtime);
+        IProjectStack? selected = requestedStack ?? declared;
+        if (selected is not null && declared is not null && !string.Equals(selected.Stack, declared.Stack, StringComparison.OrdinalIgnoreCase))
+        {
+            return InitExecutionResult.Reject("projectStackConflict",
+                $"--stack '{request.ExplicitStack}' conflicts with the project's runtime '{runtime}'. Supply the matching stack; nothing was changed.");
+        }
+
+        if (selected is null && !string.IsNullOrWhiteSpace(runtime))
+        {
+            return InitExecutionResult.Reject("uninstalledProjectStack",
+                $"The project's runtime '{runtime}' has no installed stack. Run 'func setup --features <stack>' and retry.");
+        }
+
+        if (selected is null)
+        {
+            if (!canPrompt)
+            {
+                return InitExecutionResult.Reject("missingProjectStack",
+                    $"Couldn't detect the project's stack from local.settings.json. Supply --stack <{string.Join("|", catalog.Stacks.Select(stack => stack.Stack))}>; adoption never guesses a stack.");
+            }
+
+            selected = await _prompts.PickAsync("Adopting an existing project. Which stack is it?", catalog.Stacks,
+                stack => $"{stack.DisplayName} ({stack.Stack})", cancellationToken);
+        }
+
+        string? language = requestedLanguage;
+        cancellationToken.ThrowIfCancellationRequested();
+        ProjectResolutionResult resolution;
+        try
+        {
+            resolution = await _projects.ResolveProjectAsync(new(request.WorkingDirectory), cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return InitExecutionResult.Reject("invalidProjectMetadata",
+                $"Cannot read existing project metadata. Check the project files and access, then retry. {exception.Message}");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (resolution is ProjectResolutionResult.Resolved resolved)
+        {
+            if (!string.Equals(resolved.Project.StackName, selected.Stack, StringComparison.OrdinalIgnoreCase))
+            {
+                return InitExecutionResult.Reject("projectStackConflict",
+                    $"Existing files identify stack '{resolved.Project.StackName}', not '{selected.Stack}'. Supply matching project metadata; nothing was changed.");
+            }
+
+            language ??= resolved.Project.Language;
+        }
+        else if (resolution is ProjectResolutionResult.NotResolved { Failure: not null } failed)
+        {
+            return InitExecutionResult.Reject("invalidProjectMetadata", failed.Message);
+        }
+
+        string? canonicalLanguage = string.IsNullOrWhiteSpace(language) ? null : catalog.GetCanonicalLanguage(language);
+        if (language is not null && (canonicalLanguage is null
+            || !selected.SupportedLanguages.Contains(canonicalLanguage, StringComparer.OrdinalIgnoreCase)))
+        {
+            return InitExecutionResult.Reject("invalidProjectLanguage",
+                $"Language '{language ?? "(unavailable)"}' is not supported by stack '{selected.Stack}'. Supply --language with one of: {string.Join(", ", selected.SupportedLanguages)}.");
+        }
+
+        IReadOnlyList<string> supported = selected.SupportedLanguages;
+        if (canonicalLanguage is null && supported.Count > 1 && !canPrompt)
+        {
+            return InitExecutionResult.Reject("missingProjectLanguage",
+                $"Couldn't resolve the existing project's language. Supply --language <{string.Join("|", supported)}>; no configuration was written.");
+        }
+
+        language = canonicalLanguage ?? (supported.Count == 1 ? supported[0]
+            : await _prompts.PickAsync("Select the existing project's language:", supported, value => value, cancellationToken));
+        cancellationToken.ThrowIfCancellationRequested();
+        InitExistingProjectConfiguration configuration = new(request.WorkingDirectory.Info.FullName, selected.Stack, language, repair);
+        if (request.DryRun)
+        {
+            return new(repair ? "repairPreviewed" : "adoptionPreviewed", true) { Configuration = configuration };
+        }
+
+        try
+        {
+            string json;
+            if (repair)
+            {
+                InitExecutionTarget current = await _targets.InspectAsync(request.WorkingDirectory, cancellationToken);
+                if (current.State != InitExecutionTargetState.Configured || current.Runtime is null
+                    || catalog.FindStack(current.Runtime) != selected
+                    || current.Language is not null)
+                {
+                    return InitExecutionResult.Reject("targetChanged", "Project configuration changed during repair. Inspect it and retry; nothing was written.")
+                        with { Configuration = configuration };
+                }
+
+                json = ProjectConfigurationJson.MergeLanguage(current.ConfigurationJson!, language, selected.Stack);
+            }
+            else
+            {
+                if (_fileSystem.FileExists(configuration.Path))
+                {
+                    return InitExecutionResult.Reject("targetChanged", "Project configuration appeared during adoption. Inspect it and retry; the existing file was not replaced.")
+                        with { Configuration = configuration };
+                }
+
+                json = ProjectConfigurationJson.Create(selected.Stack, language);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (repair)
+            {
+                await _fileSystem.WriteAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            }
+            else
+            {
+                await _fileSystem.CreateAllTextAsync(configuration.Path, json + Environment.NewLine, cancellationToken);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return InitExecutionResult.Reject("configurationFailed",
+                $"Could not {(repair ? "repair" : "create")} '.func/config.json'. Check the input JSON, path and write access, then retry. The project was not completed. {exception.Message}")
+                with { Configuration = configuration };
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return new(repair ? "repaired" : "adopted", true) { Configuration = configuration with { Written = true } };
     }
 
     private async Task<InitExecutionResult> ExecuteAsync(Templater templater, InitExecutionRequest request,

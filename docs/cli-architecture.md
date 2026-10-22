@@ -86,7 +86,10 @@ for its grammar, dependency handoff and public-cutover exclusions.
 The unregistered `InitExecutionCommand` similarly composes installed PROJECT
 templates, shared strict parsing and mandatory CLI configuration in a protected
 flow for absent/empty targets. It does not replace public `init [path]` or change
-adoption, repair or scaffolding. See its [staged consumer boundary](func-init-execution/proposal.md#staged-installed-project-consumer).
+public adoption, repair or scaffolding. Its separate existing-root adoption and
+missing-language repair path reuses actual project metadata and atomic CLI
+configuration persistence without opening a template flow. Force cleanup remains
+unsupported. See its [staged consumer boundary](func-init-execution/proposal.md#staged-installed-project-consumer).
 
 ## Command Architecture
 

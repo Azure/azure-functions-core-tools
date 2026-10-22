@@ -3,7 +3,6 @@
 
 using System.CommandLine;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
@@ -629,23 +628,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             throw new InvalidOperationException("Existing project configuration was not replaced.");
         }
 
-        var stackConfig = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (!string.IsNullOrWhiteSpace(stack))
-        {
-            stackConfig[CliConfigurationNames.StackRuntimeKey] = stack;
-        }
-        if (!string.IsNullOrWhiteSpace(language))
-        {
-            stackConfig[CliConfigurationNames.StackLanguageKey] = language;
-        }
-
-        var payload = new Dictionary<string, object>(StringComparer.Ordinal);
-        if (stackConfig.Count > 0)
-        {
-            payload[CliConfigurationNames.StackSectionName] = stackConfig;
-        }
-
-        string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        string json = ProjectConfigurationJson.Create(stack, language);
         if (force)
         {
             await _fileSystem.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
@@ -670,13 +653,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         string path = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
         string existing = await _fileSystem.ReadAllTextIfExistsAsync(path, cancellationToken)
             ?? throw new FileNotFoundException("The project configuration to repair is missing.", path);
-        JsonObject root = JsonNode.Parse(existing) as JsonObject
-            ?? throw new JsonException("Project configuration must contain a JSON object.");
-        JsonObject stack = root[CliConfigurationNames.StackSectionName] as JsonObject
-            ?? throw new JsonException("Project configuration must contain a stack object.");
-        stack[CliConfigurationNames.StackLanguageKey] = language;
-
-        string json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        string json = ProjectConfigurationJson.MergeLanguage(existing, language);
         cancellationToken.ThrowIfCancellationRequested();
         await _fileSystem.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
     }
