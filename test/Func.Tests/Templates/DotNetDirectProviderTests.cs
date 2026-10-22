@@ -73,7 +73,7 @@ public sealed partial class DotNetDirectProviderTests(ITestOutputHelper testOutp
             (await selected.ReadPackageFileAsync(
                 $"content/ProjectTemplate-{(language == "C#" ? "CSharp" : "FSharp")}/.template.config/template.json", _deadline.Token))
                 .ToArray().Should().Equal(configBytes.ToArray());
-            var capture = await selected.CaptureNativePreparationAsync(request, new PhysicalFileSystem(), true, _deadline.Token);
+            var capture = await selected.CaptureNativePreparationAsync(request, true, _deadline.Token);
             capture.Failure.Should().BeNull();
             capture.Snapshot!.Source.Sha256.Should().Be(Hash(configBytes.Span));
             testOutput.WriteLine($"Selected {selected.Entry.Identity}; configuration SHA256 {Hash(configBytes.Span)}; explicit Framework {explicitFramework}");
@@ -147,7 +147,7 @@ public sealed partial class DotNetDirectProviderTests(ITestOutputHelper testOutp
         binding.SourceFingerprint.Should().Be(selected.ConfigurationSha256);
         binding.TargetFramework.Should().Be("net10.0");
         binding.RootNamespace.Should().Be("Imported.Actual.Namespace");
-        var capture = await selected.CaptureNativePreparationAsync(request, new PhysicalFileSystem(), true, _deadline.Token);
+        var capture = await selected.CaptureNativePreparationAsync(request, true, _deadline.Token);
         capture.Failure.Should().BeNull();
         var snapshot = capture.Snapshot!;
         snapshot.Source.Should().Be(new TemplateEffectSource(selected.Entry.Identity, selected.ConfigurationSourceIdentity!, selected.ConfigurationSha256!));
@@ -280,7 +280,7 @@ public sealed partial class DotNetDirectProviderTests(ITestOutputHelper testOutp
         var prepared = await fixture.Provider.PrepareAsync(ItemContext(fixture, selected, Parse(selected, []), "RetainedHttp"), _deadline.Token);
         prepared.Diagnostics.Should().BeEmpty();
         var request = prepared.Request!;
-        var captured = await selected.CaptureNativePreparationAsync(request, new PhysicalFileSystem(), true, _deadline.Token);
+        var captured = await selected.CaptureNativePreparationAsync(request, true, _deadline.Token);
         using var canceled = CancellationTokenSource.CreateLinkedTokenSource(_deadline.Token);
         fixture.Runner.BeforeCommand = _ =>
         {

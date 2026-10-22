@@ -355,7 +355,8 @@ public sealed class NativeDotNetProjectInvocationTests : IDisposable
 
         TemplateProjectSupport support = new(new(new([new DotNetProjectStack()])), new(writerFiles ?? new PhysicalFileSystem()))
         {
-            DotNetLayout = new(template.Identity, configuration.Fingerprint),
+            OwnedLayout = Azure.Functions.Cli.Templates.DotNet.DotNetProjectLayout.Qualify(template.Identity, configuration.Fingerprint,
+                configuration.Root.GetProperty("tags").GetProperty("language").GetString()!),
         };
         TemplateEngineSession session = new(new(WorkingDirectory.FromExplicit(_root)), hive);
         ProjectDependencyCapability capability = new(new(_runner), session, template, configuration, output, project);

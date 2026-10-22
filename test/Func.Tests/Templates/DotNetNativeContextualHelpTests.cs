@@ -110,10 +110,10 @@ public sealed class DotNetNativeContextualHelpTests : IDisposable
         ISelectedTemplateInvoker invoker = Substitute.For<ISelectedTemplateInvoker>();
         invoker.InvokeAsync(Arg.Any<TemplateInvocationRequest>(), Arg.Any<CancellationToken>())
             .Returns<TemplateInvocationResult>(_ => throw new InvalidOperationException("Help must not invoke the selected item."));
-        ResolvedTemplate selected = new(entry, invoker,
-            configurationSha256: fingerprint,
-            validateConfiguration: _ => Task.FromResult<TemplateInvocationResult?>(failure == "changed"
+        invoker.ValidateConfigurationAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<TemplateInvocationResult?>(failure == "changed"
                 ? new(TemplateInvocationStatus.TemplateChanged, [], "changed") : null));
+        ResolvedTemplate selected = new(entry, invoker, configurationSha256: fingerprint);
         projects.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
             .Returns(ProjectResolutionResults.NotResolved("The selected project is unavailable."));
         var directory = WorkingDirectory.FromExplicit(_root);

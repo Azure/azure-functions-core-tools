@@ -77,7 +77,11 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
         cancellationToken.ThrowIfCancellationRequested();
         NativeProjectLayoutQualification? qualification = _sources.Matches(source.Entry, source.Configuration.Fingerprint)
             && source.Entry.Type == TemplateType.Project && source.Entry.Language is "C#" or "F#"
-            ? new(source.Entry.Identity, source.Configuration.Fingerprint, new(0, Stack, source.Entry.Language)) : null;
+            ? DotNetProjectLayout.Qualify(source.Entry.Identity, source.Configuration.Fingerprint, source.Entry.Language) : null;
+        if (qualification is not null)
+        {
+            DotNetProjectLayout.Read(source.Configuration, qualification);
+        }
         return Task.FromResult(qualification);
     }
 
@@ -187,6 +191,10 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
                 return NativeTemplateInvocationPreparation.Reject(captured.Failure?.Diagnostic ?? "Native .NET project preparation did not produce a selected output plan.");
             }
 
+            TemplateConfigurationSnapshot configuration = selected.Configuration
+                ?? throw new InvalidOperationException("The selected .NET project configuration snapshot is missing.");
+            DotNetProjectLayout.ValidateCapture(configuration, snapshot.Effects, request.OutputDirectory.Info.FullName,
+                new(selected.Entry.Identity, configuration.Fingerprint, new(0, Stack, selected.Entry.Language!)), parameters);
             string[] projects = [.. snapshot.Effects.CreationResult.PrimaryOutputs.Select(output => output.Path)];
             if (projects.Length != 1)
             {
@@ -209,7 +217,8 @@ internal sealed class DotNetTemplateWorkflowProvider(DotNetTemplateSources sourc
                 request.OutputDirectory, snapshot.Source, snapshot.Effects.CreationResult, project);
             return await BindAsync(request, capability, planned, cancellationToken);
         }
-        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or DotnetCliException)
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or DotnetCliException
+            or InvalidTemplateMetadataException)
         {
             return NativeTemplateInvocationPreparation.Reject(exception.Message);
         }

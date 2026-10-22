@@ -144,6 +144,8 @@ The generic subset supports unconditional literal primary-output paths, the defa
 
 A configuration anchor can be another generated primary-output file when its resolved parent is an independently discovered host root. An anchor outside those roots is rejected before creation.
 
+The .NET compatibility workflow retains its pinned source-name, static `_gitignore` rename, explicit `net10.0` and exact project/source mapping checks in `DotNetProjectLayout`. It validates the captured raw configuration fingerprint without re-encoding decoded JSON. These language-specific checks run during compatibility qualification and captured preparation, not in the generic owned-project planner.
+
 Host roots and configuration anchors must correspond to regular files in the captured native output image, not just reported native effects. Native placeholder directory effects cannot establish a `host.json` root or serve as a primary-output configuration anchor. Directory effects used in either role are rejected before real installation. A declared but ungenerated `host.json` cannot establish a Functions project root.
 
 Preview reports template and configuration effects without writing. Creation finalizes configuration in declaration order through the existing atomic writer. A finalization failure preserves generated files and completed configuration writes, reports completed roots and fails the invocation. Actual invocation refuses existing user configuration even with file-conflict force. A force preview can inspect an occupied target without writing; only the public runner's confirmed cleanup removes the old configuration before actual native invocation. Adoption and repair bypass template discovery.

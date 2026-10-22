@@ -26,8 +26,8 @@ public sealed partial class BundledNodeTemplateTests
         if (metadata != "missing")
         {
             await _files.CreateAllTextAsync(metadataPath, metadata == "valid"
-                ? """{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place"}"""
-                : """{"schemaVersion":1,"installMethod":"standalone","updatePolicy":"in-place","unexpected":true}""",
+                ? """{"schemaVersion":1,"updatePolicy":"in-place"}"""
+                : """{"schemaVersion":1,"updatePolicy":"in-place","unexpected":true}""",
                 CancellationToken.None);
         }
 

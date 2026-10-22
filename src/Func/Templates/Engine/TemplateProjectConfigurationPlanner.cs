@@ -75,6 +75,7 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         ArgumentNullException.ThrowIfNull(qualification);
         Require(string.Equals(configuration.Fingerprint, qualification.ConfigurationFingerprint, StringComparison.OrdinalIgnoreCase),
             "The selected project configuration does not match its source qualification.");
+        qualification.ValidateConfiguration?.Invoke(configuration);
         try
         {
             JsonElement root = configuration.Root;
@@ -109,8 +110,10 @@ internal sealed class TemplateProjectConfigurationPlanner(InstalledProjectStackC
         IReadOnlyList<TemplateFileChange> changes, IReadOnlySet<string> directoryOutputs, NativeProjectLayoutQualification qualification,
         IReadOnlyDictionary<string, string?> parameters, ICreationEffects mapping)
     {
+        ArgumentNullException.ThrowIfNull(qualification);
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentNullException.ThrowIfNull(mapping);
+        qualification.ValidateCapture?.Invoke(configuration, mapping, outputDirectory, parameters);
         IReadOnlyList<TemplateProjectConfigurationDeclaration> declarations = ReadOwnedLayout(configuration, qualification);
         IReadOnlyList<TemplateProjectConfigurationPlan> plans = CreatePlans(declarations, creation, outputDirectory, changes, directoryOutputs, nativeOwnedLayout: true);
         Require(HasNativeMapping(mapping, declarations[0].Path, plans[0].PrimaryOutput, outputDirectory),

@@ -331,6 +331,21 @@ internal sealed partial class TemplateInvocationCoordinator(
         {
             return configured with { Effects = effectPreview, Capture = capture };
         }
+        outputFailure = GetOutputDiagnostic(image, configurationPlans);
+        if (outputFailure is not null || image.Files.Any(file => !_engine.FileSystem.FileExists(image.GetTarget(file))
+                || _engine.FileSystem.DirectoryExists(image.GetTarget(file)))
+            || image.Directories.Any(directory => !_engine.FileSystem.DirectoryExists(image.GetTarget(directory))
+                || _engine.FileSystem.FileExists(image.GetTarget(directory))))
+        {
+            string failure = outputFailure ?? "Native outputs changed before dependency execution.";
+            return configured with
+            {
+                Status = TemplateInvocationStatus.EffectFailure,
+                Diagnostic = failure,
+                Effects = effectPreview with { Kind = "preflightFailed", Succeeded = false, Diagnostics = [failure] },
+                Capture = capture,
+            };
+        }
         if (policy is not null && effectPreview.Plan.Effects.All(effect => effect is TemplateEditorNoOpEffect))
         {
             return configured with
@@ -375,7 +390,9 @@ internal sealed partial class TemplateInvocationCoordinator(
         return configured with
         {
             Status = applied.Succeeded ? TemplateInvocationStatus.Success : TemplateInvocationStatus.EffectFailure,
-            Diagnostic = applied.Succeeded ? null : "Native files were generated and retained, but controlled effects did not complete. " + string.Join(" ", applied.Diagnostics),
+            Diagnostic = applied.Succeeded ? null : project is not null
+                ? "Native project files and CLI configuration were generated, but controlled dependencies did not complete. " + string.Join(" ", applied.Diagnostics)
+                : "Native files were generated and retained, but controlled effects did not complete. " + string.Join(" ", applied.Diagnostics),
             Effects = applied,
             Capture = capture,
         };

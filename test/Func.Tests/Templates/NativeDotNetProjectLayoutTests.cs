@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Templates.DotNet;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads.DotNet;
 using Microsoft.TemplateEngine.Abstractions;
@@ -35,7 +36,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
             dryRun: true, cancellationToken: CancellationToken.None);
         preview.Status.Should().Be(CreationResultStatus.Success);
 
-        IReadOnlyList<TemplateProjectConfigurationPlan> plans = _planner.CreateDotNetPlans(
+        IReadOnlyList<TemplateProjectConfigurationPlan> plans = CreateDotNetPlans(
             source.Configuration.Content, preview.CreationEffects!, source.Output, source.Qualification, parameters);
 
         TemplateProjectConfigurationPlan plan = plans.Should().ContainSingle().Subject;
@@ -88,7 +89,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         JsonObject configuration = JsonNode.Parse(source.Configuration.Content)!.AsObject();
         configuration["sources"] = JsonNode.Parse(sources);
         string candidate = configuration.ToJsonString();
-        Action action = () => _planner.ReadDotNetLayout(candidate, Qualify(source.Template.Identity, candidate));
+        Action action = () => ReadDotNetLayout(candidate, Qualify(source.Template.Identity, candidate));
 
         action.Should().Throw<InvalidTemplateMetadataException>().WithMessage("*static _gitignore*");
         Directory.Exists(source.Output).Should().BeFalse();
@@ -140,7 +141,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         }
 
         string candidate = root.ToJsonString();
-        Action action = () => _planner.ReadDotNetLayout(candidate, Qualify(source.Template.Identity, candidate));
+        Action action = () => ReadDotNetLayout(candidate, Qualify(source.Template.Identity, candidate));
         action.Should().Throw<InvalidTemplateMetadataException>();
     }
 
@@ -154,7 +155,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         using NativeProject source = await OpenProjectAsync("CSharp");
         ITemplateCreationResult preview = await source.PreviewAsync();
         Dictionary<string, string?> parameters = framework is null ? [] : new() { ["Framework"] = framework };
-        Action action = () => _planner.CreateDotNetPlans(source.Configuration.Content, preview.CreationEffects!,
+        Action action = () => CreateDotNetPlans(source.Configuration.Content, preview.CreationEffects!,
             source.Output, source.Qualification, parameters);
 
         action.Should().Throw<InvalidTemplateMetadataException>().WithMessage("*explicit Framework*net10.0*");
@@ -167,10 +168,10 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
     public async Task QualifiedLayout_SelectionChanged_Refuses(string mismatch)
     {
         using NativeProject source = await OpenProjectAsync("CSharp");
-        DotNetProjectLayoutQualification qualification = new(
+        NativeProjectLayoutQualification qualification = new(
             mismatch == "identity" ? "Other.Template" : source.Template.Identity,
-            mismatch == "fingerprint" ? new string('0', 64) : source.Configuration.Fingerprint);
-        Action action = () => _planner.ReadDotNetLayout(source.Configuration.Content, qualification);
+            mismatch == "fingerprint" ? new string('0', 64) : source.Configuration.Fingerprint, source.Qualification.Anchor);
+        Action action = () => ReadDotNetLayout(source.Configuration.Content, qualification);
 
         action.Should().Throw<InvalidTemplateMetadataException>().WithMessage("*match*");
     }
@@ -191,7 +192,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
             "host" => !change.TargetRelativePath.EndsWith("host.json", StringComparison.Ordinal),
             _ => !change.TargetRelativePath.EndsWith(".gitignore", StringComparison.Ordinal),
         })]);
-        Action action = () => _planner.CreateDotNetPlans(source.Configuration.Content, effects, source.Output,
+        Action action = () => CreateDotNetPlans(source.Configuration.Content, effects, source.Output,
             source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" });
 
         action.Should().Throw<InvalidTemplateMetadataException>();
@@ -215,7 +216,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         ICreationEffects effects = Substitute.For<ICreationEffects>();
         effects.CreationResult.Returns(result);
         effects.FileChanges.Returns(preview.CreationEffects.FileChanges);
-        Action action = () => _planner.CreateDotNetPlans(source.Configuration.Content, effects, source.Output,
+        Action action = () => CreateDotNetPlans(source.Configuration.Content, effects, source.Output,
             source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" });
 
         action.Should().Throw<InvalidTemplateMetadataException>();
@@ -248,7 +249,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         effects.FileChanges.Returns(corruption == "wrongSource"
             ? [.. preview.CreationEffects.FileChanges.Where(file => !file.TargetRelativePath.EndsWith(".csproj", StringComparison.Ordinal)), change]
             : [.. preview.CreationEffects.FileChanges, change]);
-        Action action = () => _planner.CreateDotNetPlans(source.Configuration.Content, effects, source.Output,
+        Action action = () => CreateDotNetPlans(source.Configuration.Content, effects, source.Output,
             source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" });
 
         action.Should().Throw<InvalidTemplateMetadataException>();
@@ -260,7 +261,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
     {
         using NativeProject source = await OpenProjectAsync("FSharp");
         ITemplateCreationResult preview = await source.PreviewAsync();
-        TemplateProjectConfigurationPlan plan = _planner.CreateDotNetPlans(source.Configuration.Content, preview.CreationEffects!,
+        TemplateProjectConfigurationPlan plan = CreateDotNetPlans(source.Configuration.Content, preview.CreationEffects!,
             source.Output, source.Qualification, new Dictionary<string, string?> { ["Framework"] = "net10.0" }).Single();
         Directory.CreateDirectory(Path.GetDirectoryName(plan.ConfigurationPath)!);
         File.WriteAllText(plan.PrimaryOutput, "generated project");
@@ -280,7 +281,7 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
     [InlineData("Template", "short")]
     public void Qualification_InvalidArguments_Throws(string? identity, string? fingerprint)
     {
-        Action action = () => new DotNetProjectLayoutQualification(identity!, fingerprint!);
+        Action action = () => new NativeProjectLayoutQualification(identity!, fingerprint!, new(0, "dotnet", "C#"));
 
         action.Should().Throw<ArgumentException>();
     }
@@ -290,11 +291,11 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
     {
         Action[] actions =
         [
-            () => _planner.ReadDotNetLayout(null!, new("Template", new string('a', 64))),
-            () => _planner.ReadDotNetLayout("{}", null!),
-            () => _planner.CreateDotNetPlans("{}", null!, _root, new("Template", new string('a', 64)), new Dictionary<string, string?>()),
-            () => _planner.CreateDotNetPlans("{}", Substitute.For<ICreationEffects>(), "", new("Template", new string('a', 64)), new Dictionary<string, string?>()),
-            () => _planner.CreateDotNetPlans("{}", Substitute.For<ICreationEffects>(), _root, new("Template", new string('a', 64)), null!),
+            () => ReadDotNetLayout(null!, new("Template", new string('a', 64), new(0, "dotnet", "C#"))),
+            () => ReadDotNetLayout("{}", null!),
+            () => CreateDotNetPlans("{}", null!, _root, new("Template", new string('a', 64), new(0, "dotnet", "C#")), new Dictionary<string, string?>()),
+            () => CreateDotNetPlans("{}", Substitute.For<ICreationEffects>(), "", new("Template", new string('a', 64), new(0, "dotnet", "C#")), new Dictionary<string, string?>()),
+            () => CreateDotNetPlans("{}", Substitute.For<ICreationEffects>(), _root, new("Template", new string('a', 64), new(0, "dotnet", "C#")), null!),
         ];
 
         foreach (Action action in actions)
@@ -303,8 +304,78 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
         }
     }
 
-    private static DotNetProjectLayoutQualification Qualify(string identity, string content)
-        => new(identity, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content))));
+    [Fact]
+    public async Task Qualification_RawConfigurationFingerprint_DoesNotReencodeDecodedContent()
+    {
+        using NativeProject source = await OpenProjectAsync("CSharp");
+        byte[] original = [.. Encoding.UTF8.Preamble, .. Encoding.UTF8.GetBytes(source.Configuration.Content)];
+        TemplateConfigurationSnapshot configuration = source.Configuration with
+        {
+            Fingerprint = Convert.ToHexString(SHA256.HashData(original)),
+        };
+        NativeProjectLayoutQualification qualification = new(source.Template.Identity, configuration.Fingerprint, source.Qualification.Anchor);
+
+        DotNetProjectLayout.Read(configuration, qualification).Should().ContainSingle();
+
+        Directory.Exists(source.Output).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("Python")]
+    public void CompatibilityQualification_InvalidLanguage_Throws(string? language)
+    {
+        Action action = () => DotNetProjectLayout.Qualify("Template", new string('a', 64), language!);
+
+        action.Should().Throw<ArgumentException>().WithParameterName("language");
+    }
+
+    [Fact]
+    public void CompatibilityLayout_NullDependencies_ThrowProgrammerErrors()
+    {
+        TemplateConfigurationSnapshot configuration = Configuration("{}");
+        NativeProjectLayoutQualification qualification = new("Template", new string('a', 64), new(0, "dotnet", "C#"));
+        ICreationEffects effects = Substitute.For<ICreationEffects>();
+        Action[] actions =
+        [
+            () => DotNetProjectLayout.Read(null!, qualification),
+            () => DotNetProjectLayout.Read(configuration, null!),
+            () => DotNetProjectLayout.ValidateCapture(configuration, null!, _root, qualification, new Dictionary<string, string?>()),
+            () => DotNetProjectLayout.ValidateCapture(configuration, effects, null!, qualification, new Dictionary<string, string?>()),
+            () => DotNetProjectLayout.ValidateCapture(configuration, effects, _root, qualification, null!),
+        ];
+
+        foreach (Action action in actions)
+        {
+            action.Should().Throw<ArgumentException>();
+        }
+    }
+
+    private static IReadOnlyList<TemplateProjectConfigurationDeclaration> ReadDotNetLayout(
+        string content, NativeProjectLayoutQualification qualification)
+        => DotNetProjectLayout.Read(Configuration(content), qualification);
+
+    private IReadOnlyList<TemplateProjectConfigurationPlan> CreateDotNetPlans(string content, ICreationEffects effects, string output,
+        NativeProjectLayoutQualification qualification, IReadOnlyDictionary<string, string?> parameters)
+    {
+        TemplateConfigurationSnapshot configuration = Configuration(content);
+        DotNetProjectLayout.ValidateCapture(configuration, effects, output, qualification, parameters);
+        return _planner.CreateOwnedPlans(configuration, effects.CreationResult, output,
+            Array.AsReadOnly<TemplateFileChange>(
+                [.. effects.FileChanges.Select(change => TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind))]),
+            new HashSet<string>(), qualification, parameters, effects);
+    }
+
+    private static TemplateConfigurationSnapshot Configuration(string content)
+        => new(content, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content))), TemplateType.Project, []);
+
+    private static NativeProjectLayoutQualification Qualify(string identity, string content)
+    {
+        TemplateConfigurationSnapshot configuration = Configuration(content);
+        return new(identity, configuration.Fingerprint, new(0, "dotnet", configuration.Root.GetProperty("tags").GetProperty("language").GetString()!));
+    }
 
     private async Task<NativeProject> OpenProjectAsync(string language)
     {
@@ -327,7 +398,8 @@ public sealed class NativeDotNetProjectLayoutTests : IDisposable
     private sealed record NativeProject(TemplateEngineSession Session, ITemplateInfo Template,
         TemplateConfigurationSnapshot Configuration, string Output) : IDisposable
     {
-        public DotNetProjectLayoutQualification Qualification => new(Template.Identity, Configuration.Fingerprint);
+        public NativeProjectLayoutQualification Qualification => new(Template.Identity, Configuration.Fingerprint,
+            new(0, "dotnet", Configuration.Root.GetProperty("tags").GetProperty("language").GetString()!));
 
         public void Dispose() => Session.Dispose();
 

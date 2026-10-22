@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Microsoft.TemplateEngine.Abstractions;
+
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
@@ -31,4 +33,8 @@ internal sealed record NativeProjectLayoutQualification
     public Native.NativeTemplateProjectAnchor Anchor { get; }
 
     internal NativeTemplatePolicyCandidate? Policy { get; init; }
+
+    internal Action<TemplateConfigurationSnapshot>? ValidateConfiguration { get; init; }
+
+    internal Action<TemplateConfigurationSnapshot, ICreationEffects, string, IReadOnlyDictionary<string, string?>>? ValidateCapture { get; init; }
 }
