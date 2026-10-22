@@ -9,7 +9,16 @@ namespace Azure.Functions.Cli.Workloads.Install;
 internal interface IWorkloadDeploymentService
 {
     public bool HasBundledTemplates(WorkloadEntry entry);
-    public Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Prepares hashes only after the installed metadata, declared payload root and entry point match the registry.
+    /// </summary>
+    /// <remarks>
+    /// Entry-point existence preserves the loader's install-root-first lookup and legacy tools/any fallback.
+    /// Check-only preparation refuses pending native recovery without restoring retained state.
+    /// </remarks>
+    /// <exception cref="Discovery.InvalidWorkloadException">The retained payload is damaged or conflicts with its registry entry.</exception>
+    public Task<PreparedWorkloadReuse> PrepareReuseAsync(WorkloadEntry entry, CancellationToken cancellationToken, bool checkOnly = false);
     /// <summary>
     /// Revalidates the leased registry and payload, optionally checking native registration without registering packages.
     /// </summary>

@@ -218,8 +218,11 @@ public sealed class NativeItemCompatibilityTests
             DefaultName = defaultName,
             ConstraintEvaluation = new(TemplateConstraintEvaluationStatus.Eligible, []),
         };
-        return new(entry, (_, _) => Task.FromResult(new TemplateInvocationResult(TemplateInvocationStatus.Success, [])),
-            validateConfiguration: _ => Task.FromResult<TemplateInvocationResult?>(null));
+        var invoker = Substitute.For<ISelectedTemplateInvoker>();
+        invoker.InvokeAsync(Arg.Any<TemplateInvocationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new TemplateInvocationResult(TemplateInvocationStatus.Success, []));
+        invoker.ValidateConfigurationAsync(Arg.Any<CancellationToken>()).Returns((TemplateInvocationResult?)null);
+        return new(entry, invoker);
     }
 
     private static TemplateCandidateParseResult Arguments() => new("Controlled", new Dictionary<string, string?>(), [], [], [], []);

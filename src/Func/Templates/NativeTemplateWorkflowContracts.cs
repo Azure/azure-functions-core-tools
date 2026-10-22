@@ -33,7 +33,14 @@ internal sealed record NativeItemHelpProjection(
 /// Identifies a mounted project candidate before layout qualification without creating another template session.
 /// </summary>
 internal sealed record NativeProjectTemplateSource(TemplateCatalogEntry Entry, TemplateConfigurationSnapshot Configuration,
-    string ConfigurationSourceIdentity, Func<string, CancellationToken, Task<ReadOnlyMemory<byte>>> ReadPackageFileAsync);
+    string ConfigurationSourceIdentity, Func<string, CancellationToken, Task<ReadOnlyMemory<byte>>> ReadPackageFileAsync)
+{
+    internal string? PackageMountPoint { get; init; }
+
+    internal Func<CancellationToken, Task<TemplateInvocationResult?>>? RevalidateAsync { get; init; }
+
+    internal object? SessionIdentity { get; init; }
+}
 
 /// <summary>
 /// Supplies CLI-owned item compatibility and selected-source invocation preparation for one installed stack.
@@ -72,11 +79,11 @@ internal interface INativeProjectWorkflowProvider
 
     public INativeProjectPreparation? Preparation => null;
 
-    public Task<DotNetProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
+    public Task<NativeProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(source);
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult<DotNetProjectLayoutQualification?>(null);
+        return Task.FromResult<NativeProjectLayoutQualification?>(null);
     }
 
     public Task<NativeTemplateInvocationPreparation> PrepareAsync(NativeProjectWorkflowContext context, CancellationToken cancellationToken)

@@ -15,6 +15,7 @@ using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Tests.Templates.Engine;
 using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -272,22 +273,36 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         }
     }
 
-    [Fact]
-    public async Task ProjectPreparation_NonzeroOwnedOutcome_PreservesCreatedProjectWithoutSuccess()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ProjectPreparation_ReturnedOutcome_PreservesDiagnosticsAndLedgerThroughLateCancellation(bool succeeded, bool lateCancellation)
     {
         await InstallAsync();
+        using CancellationTokenSource cancellation = new();
         var preparation = Substitute.For<INativeProjectPreparation>();
         preparation.PreviewAsync(Arg.Any<NativeProjectPreparationContext>(), Arg.Any<CancellationToken>())
             .Returns(new NativeProjectPreparationPreview(true, [new(NativeProjectPreparationOperation.NodeNpmInstall, false)], []));
+        TemplateEditorNoOpEffect editor = new(new("Controlled.Project", "owned-helper", new('A', 64)));
+        NativeTemplateEffectResult ledger = new("applied", true, new(WorkingDirectory.FromExplicit(Project), [editor]), [editor], [], ["Owned helper result"]);
+        NativeProjectPreparationResult returned = new(succeeded, ["Owned preparation diagnostic: original stderr"], ledger);
         preparation.CompleteAsync(Arg.Any<NativeProjectPreparationContext>(), Arg.Any<NativeProjectPreparationPreview>(), Arg.Any<CancellationToken>())
-            .Returns(new NativeProjectPreparationResult(false, ["Owned preparation exited 7: original stderr"]));
+            .Returns(_ =>
+            {
+                if (lateCancellation) cancellation.Cancel();
+                return returned;
+            });
         using var harness = CreateHarness(preparation: preparation);
 
-        int exit = await InvokeAsync(harness.Adapter.ParseInitInvocation(harness.CreateInit(), [Project, "-s", "node", "-l", "js"],
-            new("controlled-project", NonInteractive: true, JsonOutput: true)));
+        var parsed = harness.Adapter.ParseInitInvocation(harness.CreateInit(), [Project, "-s", "node", "-l", "js"],
+            new("controlled-project", NonInteractive: true, JsonOutput: true));
+        int exit = await parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
 
-        exit.Should().Be(1);
-        AssertJsonKind("partialPreparation");
+        exit.Should().Be(succeeded ? 0 : 1);
+        AssertJsonKind(succeeded ? "created" : "partialPreparation");
+        harness.InitResult!.Preparation!.Completion.Should().BeSameAs(returned);
+        harness.InitResult.Preparation.Completion!.Effects.Should().BeSameAs(ledger);
         File.Exists(Path.Combine(Project, ".func", "config.json")).Should().BeTrue();
         File.Exists(Path.Combine(Project, "host.json")).Should().BeTrue();
         _interaction.AllOutput.Should().Contain("original stderr").And.NotContain("SUCCESS:");
@@ -307,6 +322,33 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
 
         exit.Should().Be(1);
         AssertJsonKind("preparationUnavailable");
+        Directory.Exists(Project).Should().BeFalse();
+        await preparation.DidNotReceive().CompleteAsync(Arg.Any<NativeProjectPreparationContext>(),
+            Arg.Any<NativeProjectPreparationPreview>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("body")]
+    [InlineData("configuration")]
+    public async Task ProjectPreparation_SourceChangesAfterPreview_RefusesBeforeCurrentCreateAndPreparation(string changed)
+    {
+        await InstallAsync();
+        var preparation = Substitute.For<INativeProjectPreparation>();
+        preparation.PreviewAsync(Arg.Any<NativeProjectPreparationContext>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            string file = changed == "body" ? Path.Combine(_root, "package", "project", "project.txt")
+                : Path.Combine(_root, "package", "project", ".template.config", "template.json");
+            File.AppendAllText(file, changed == "body" ? "changed" : "\n ");
+            return new NativeProjectPreparationPreview(true, [new(NativeProjectPreparationOperation.NodeNpmInstall, false)], []);
+        });
+        using var harness = CreateHarness(preparation: preparation);
+
+        int exit = await InvokeAsync(harness.Adapter.ParseInitInvocation(harness.CreateInit(), [Project],
+            new("controlled-project", NonInteractive: true, JsonOutput: true)));
+
+        exit.Should().Be(1, _interaction.AllOutput);
+        harness.InitResult!.Invocation!.Status.Should().Be(TemplateInvocationStatus.TemplateChanged);
+        harness.InitResult.Invocation.HasCommittedOutput.Should().BeFalse();
         Directory.Exists(Project).Should().BeFalse();
         await preparation.DidNotReceive().CompleteAsync(Arg.Any<NativeProjectPreparationContext>(),
             Arg.Any<NativeProjectPreparationPreview>(), Arg.Any<CancellationToken>());
@@ -378,6 +420,43 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task ProjectPreparation_PartialNativeInstallation_DoesNotStartPreparationOrInventConfiguration()
+    {
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        List<string> committed = [];
+        var files = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterMove = path =>
+            {
+                committed.Add(path);
+                cancellation.Cancel();
+            },
+        };
+        var preparation = Substitute.For<INativeProjectPreparation>();
+        preparation.PreviewAsync(Arg.Any<NativeProjectPreparationContext>(), Arg.Any<CancellationToken>())
+            .Returns(new NativeProjectPreparationPreview(true, [new(NativeProjectPreparationOperation.NodeNpmInstall, false)], []));
+        using var harness = CreateHarness(preparation: preparation, fileSystem: files);
+        var parsed = harness.Adapter.ParseInitInvocation(harness.CreateInit(), [Project],
+            new("controlled-project", NonInteractive: true, JsonOutput: true));
+
+        int exit = await parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
+
+        exit.Should().Be(1);
+        harness.InitResult!.Invocation!.Status.Should().Be(TemplateInvocationStatus.Failed);
+        harness.InitResult.Invocation.HasCommittedOutput.Should().BeTrue();
+        harness.InitResult.Invocation.ConfiguredProjects.Should().BeEmpty();
+        harness.InitResult.Invocation.Changes.Select(change => Path.GetFullPath(Path.Combine(Project, change.Path)))
+            .Should().Equal(Project, committed.Should().ContainSingle().Subject);
+        harness.InitResult.Invocation.Changes.Should().OnlyContain(change => change.Kind == TemplateFileChangeKind.Create);
+        File.Exists(committed[0]).Should().BeTrue();
+        File.Exists(Path.Combine(Project, ".func", "config.json")).Should().BeFalse();
+        harness.InitResult.Preparation!.Completion.Should().BeNull();
+        await preparation.DidNotReceive().CompleteAsync(Arg.Any<NativeProjectPreparationContext>(),
+            Arg.Any<NativeProjectPreparationPreview>(), Arg.Any<CancellationToken>());
+    }
+
     [Theory]
     [InlineData(false, false, false)]
     [InlineData(false, true, false)]
@@ -385,7 +464,9 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
     [InlineData(true, true, false)]
     [InlineData(false, false, true)]
     [InlineData(false, true, true)]
-    public async Task Adapter_NewCommittedCreationThenCancellation_RendersNativeResult(bool noOutputs, bool json, bool afterRunner)
+    [InlineData(true, false, true, true)]
+    [InlineData(true, true, true, true)]
+    public async Task Adapter_NewCommittedCreationThenCancellation_RendersNativeResult(bool noOutputs, bool json, bool afterRunner, bool existingTarget = false)
     {
         await InstallBasicNodeAsync();
         if (noOutputs)
@@ -397,10 +478,18 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         }
 
         using CancellationTokenSource cancellation = new();
-        var native = new CancelingNativeFactory(Path.Combine(Home, "templates"), cancellation, "created");
-        using var harness = CreateHarness(templateFactory: afterRunner ? null : native,
+        var files = new RecordingCommitFileSystem(new PhysicalFileSystem())
+        {
+            AfterMove = path => { if (!afterRunner && !noOutputs && path == Path.Combine(Target, "Committed.js")) cancellation.Cancel(); },
+            AfterCreateDirectory = path => { if (!afterRunner && noOutputs && path == Target) cancellation.Cancel(); },
+        };
+        using var harness = CreateHarness(fileSystem: files,
             afterNew: afterRunner ? _ => cancellation.Cancel() : null);
         await CreateBasicProjectAsync(harness);
+        if (existingTarget)
+        {
+            Directory.CreateDirectory(Target);
+        }
         int beforeOutput = _interaction.Lines.Count;
         int? exit = null;
         var parsed = harness.Adapter.ParseNewInvocation(harness.CreateNew(),
@@ -416,11 +505,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         }
         harness.NewResult!.Invocation!.Status.Should().Be(TemplateInvocationStatus.Success);
         harness.NewResult.Invocation.Changes.Should().HaveCount(noOutputs ? 0 : 1);
-        if (!afterRunner)
-        {
-            native.NativeResult!.Status.Should().Be(CreationResultStatus.Success);
-            native.NativeResult.CreationEffects!.FileChanges.Should().HaveCount(noOutputs ? 0 : 1);
-        }
+        harness.NewResult.Invocation.HasCommittedOutput.Should().Be(!existingTarget);
         cancellation.IsCancellationRequested.Should().BeTrue();
         failure.Should().BeNull("a native committed result must reach the adapter renderer even for zero outputs");
         exit.Should().Be(0);
@@ -636,7 +721,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
     }
 
     [Fact]
-    public async Task Adapter_InitCancellationBeforeConfigurationCommit_PreservesNativeFilesWithoutRendering()
+    public async Task Adapter_InitCancellationBeforeConfigurationCommit_PreservesAndRendersActualNativeSubset()
     {
         await InstallBasicNodeAsync();
         using CancellationTokenSource cancellation = new();
@@ -645,14 +730,16 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         var parsed = harness.Adapter.ParseInitInvocation(harness.CreateInit(), [Project, "--no-bundles"],
             new("Azure.Functions.Node.Basic.JavaScript", NonInteractive: true, JsonOutput: true));
 
-        Func<Task> act = () => parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
+        int exit = await parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
 
-        (await act.Should().ThrowAsync<OperationCanceledException>()).Which.CancellationToken.Should().Be(cancellation.Token);
+        exit.Should().Be(1);
         File.Exists(Path.Combine(Project, "host.json")).Should().BeTrue();
         File.Exists(Path.Combine(Project, ".func", "config.json")).Should().BeFalse();
         files.CommittedConfigurations.Should().BeEmpty();
-        harness.InitResult.Should().BeNull();
-        _interaction.AllOutput.Should().NotContain("JSON:").And.NotContain("SUCCESS:");
+        harness.InitResult!.Invocation!.HasCommittedOutput.Should().BeTrue();
+        harness.InitResult.Invocation.Status.Should().Be(TemplateInvocationStatus.ConfigurationFailure);
+        harness.InitResult.Invocation.ConfiguredProjects.Should().BeEmpty();
+        _interaction.AllOutput.Should().Contain("JSON:").And.NotContain("SUCCESS:");
     }
 
     [Theory]
@@ -710,7 +797,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         workflow.Stack.Returns("dotnet");
         workflow.Handles(Arg.Any<TemplateCatalogEntry>()).Returns(call => call.Arg<TemplateCatalogEntry>().Identity == identity);
         workflow.QualifyLayoutAsync(Arg.Any<NativeProjectTemplateSource>(), Arg.Any<CancellationToken>())
-            .Returns(new DotNetProjectLayoutQualification(identity, fingerprint));
+            .Returns(new NativeProjectLayoutQualification(identity, fingerprint, new(0, "dotnet", "C#")));
         workflow.PrepareAsync(Arg.Any<NativeProjectWorkflowContext>(), Arg.Any<CancellationToken>())
             .Returns(call => NativeTemplateInvocationPreparation.Ready(call.Arg<NativeProjectWorkflowContext>().Invocation with
             {
@@ -1096,6 +1183,13 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
 
         public override void MoveFile(string sourcePath, string destinationPath, bool overwrite = false)
         {
+            bool configuration = Path.GetFileName(destinationPath) == "config.json"
+                && Path.GetFileName(Path.GetDirectoryName(destinationPath)) == ".func";
+            if (!configuration)
+            {
+                base.MoveFile(sourcePath, destinationPath, overwrite);
+                return;
+            }
             if (cancelBeforeCommit && cancellation is not null)
             {
                 cancellation.Cancel();
@@ -1120,18 +1214,18 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
 
         public Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
             CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
-            => Task.FromResult(new Templater(new CancelingNativeSession(context, hive, snapshot, null, cancellation, boundary,
+            => Task.FromResult(TemplateFixtures.CreateTemplater(new CancelingNativeSession(context, hive, snapshot, cancellation, boundary,
                 result => NativeResult = result)));
 
         public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
             TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
-            => Task.FromResult(new Templater(new TemplateEngineSession(context, hive, snapshot, projectSupport)));
+            => Task.FromResult(TemplateFixtures.CreateTemplater(new TemplateEngineSession(context, hive, snapshot), projectSupport: projectSupport));
     }
 
     private sealed class CancelingNativeSession(TemplateEngineContext context, string hive,
-        TemplateConstraintEvaluationSnapshot availability, TemplateProjectSupport? support,
+        TemplateConstraintEvaluationSnapshot availability,
         CancellationTokenSource cancellation, string boundary, Action<ITemplateCreationResult> observe)
-        : TemplateEngineSession(context, hive, availability, support)
+        : TemplateEngineSession(context, hive, availability)
     {
         protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
             InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
@@ -1151,7 +1245,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
             {
                 result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
             }
-            if (dryRun == (boundary == "preview"))
+            if (!dryRun)
             {
                 observe(result);
                 await cancellation.CancelAsync();

@@ -111,7 +111,8 @@ internal sealed class BasicAcquisitionFixture : IDisposable
 
     public async Task<IReadOnlyList<TemplateCatalogEntry>> ReadTemplatesAsync()
     {
-        using var templater = new Templater(await Templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(Root)), CancellationToken.None));
+        using var templater = await new TemplaterFactory(Templates, _fileSystem)
+            .CreateAsync(new(WorkingDirectory.FromExplicit(Root)), CancellationToken.None);
         return await templater.ListAsync(TemplateType.Item, CancellationToken.None);
     }
 
@@ -168,6 +169,35 @@ internal sealed class BasicAcquisitionFixture : IDisposable
         Ownership.OtherEntries[$"{id}/1.0.0/{hash}"] = new(Source, null);
     }
 
+    public void AddNativeArtifact(BasicTemplateArtifact artifact, string archive)
+    {
+        _archives[Key(artifact.PackageId, artifact.Version.ToNormalizedString())] = archive;
+        var definitions = new JsonArray();
+        foreach (var definition in artifact.Templates)
+        {
+            var role = artifact.ContentRoles.Single(content => content.Identity == definition.Identity).Role;
+            definitions.Add(new JsonObject
+            {
+                ["path"] = definition.Path,
+                ["identity"] = definition.Identity,
+                ["type"] = definition.Type,
+                ["contentRole"] = role == NativeTemplateContentRole.Function ? "function" : "additional-project",
+            });
+        }
+        var root = JsonNode.Parse(Catalog.Json)!;
+        root["artifacts"]!.AsArray().Add(new JsonObject
+        {
+            ["packageId"] = artifact.PackageId,
+            ["version"] = artifact.Version.ToNormalizedString(),
+            ["source"] = artifact.Source,
+            ["sha256"] = artifact.Sha256,
+            ["contentRevision"] = artifact.ContentRevision,
+            ["basicOnly"] = false,
+            ["templates"] = definitions,
+        });
+        Catalog.Json = root.ToJsonString();
+    }
+
     public void Dispose() => Directory.Delete(Root, recursive: true);
 
     private string ReadFixtureJson()
@@ -219,7 +249,7 @@ internal sealed class BasicAcquisitionFixture : IDisposable
             WriteEntry(zip, $"{physical}.nuspec", Nuspec(physical, version, WorkloadPackageTypes.RuntimeIdentifierPackage, "kind:content rid:test-rid"));
             WriteEntry(zip, "workload.json",
                 $$"""{"$schema":"{{WorkloadManifestSchema.PackageManifestV1Schema}}","kind":"content","runtimeIdentifier":"test-rid"}""");
-            WriteEntry(zip, "tools/any/fixture.txt", "Installation fixture, not an activated stack implementation.");
+            WriteEntry(zip, "tools/test-rid/fixture.txt", "Installation fixture, not an activated stack implementation.");
         }
 
         _archives[Key(id, version)] = pointer;

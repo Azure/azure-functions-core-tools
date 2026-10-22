@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Security.Cryptography;
+using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
@@ -116,6 +118,72 @@ public sealed class NativeMsBuildSessionBindingTests : IDisposable
         File.Exists(Path.Combine(Output, "bound.txt")).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Invoke_FSharpRepair_UsesActualCapturedBytesBeforeInstallAndRechecksExistingProject(bool wrongGeneratedHash, bool changedProject)
+    {
+        string package = Path.Combine(_root, "fsharp");
+        System.IO.Directory.CreateDirectory(Path.Combine(package, ".template.config"));
+        System.IO.Directory.CreateDirectory(Output);
+        string project = Path.Combine(Output, "Selected.fsproj");
+        string program = Path.Combine(Output, "Program.fs");
+        string generated = Path.Combine(Output, "Handler.fs");
+        File.WriteAllText(project, "<Project />");
+        File.WriteAllText(program, "module Program");
+        const string body = "module Handler";
+        File.WriteAllText(Path.Combine(package, "Handler.fs"), body);
+        File.WriteAllText(Path.Combine(package, ".template.config", "template.json"), """
+            {"identity":"Controlled.FSharp","name":"FSharp","shortName":"controlled-fsharp",
+             "tags":{"type":"item","language":"F#"},"primaryOutputs":[{"path":"Handler.fs"}]}
+            """);
+        string hive = Path.Combine(_root, "hive");
+        await TemplateFixtures.InstallAsync(package, hive);
+        using Templater templater = TemplateFixtures.CreateTemplater(new(new(Directory, new(Directory, "dotnet", "F#")), hive));
+        var selected = (await templater.ResolveGroupAsync("Controlled.FSharp", TemplateType.Item)).Group![0];
+        var capability = Capability();
+        TemplateEffectSource source = new(selected.Entry.Identity, selected.ConfigurationSourceIdentity!, selected.ConfigurationSha256!);
+        string projectHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(project)));
+        TemplateFSharpCompileEffect repair = new(source, project, projectHash, [program],
+            [new(generated, wrongGeneratedHash ? new('A', 64) : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(body))))]);
+        capability.ValidateAsync(Arg.Any<NativeTemplateEffectPlan>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var plan = call.Arg<NativeTemplateEffectPlan>();
+            plan.NativeCapture.Should().NotBeNull();
+            Encoding.UTF8.GetString(plan.NativeCapture!.ExpandedFiles["Handler.fs"].Span).Should().Be(body);
+            if (changedProject) File.AppendAllText(project, "changed");
+            IReadOnlyList<string> diagnostics = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(project))) == repair.ExpectedProjectSha256
+                ? [] : ["Project changed."];
+            return diagnostics;
+        });
+        capability.ExecuteAsync(Arg.Any<TemplateEffect>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            call.Arg<TemplateEffect>().Should().Be(repair);
+            File.ReadAllText(generated).Should().Be(body);
+            return new TemplateEffectExecutionResult(true, []);
+        });
+
+        var result = await selected.InvokeAsync(new(Directory, new Dictionary<string, string?>(), "Handler")
+        {
+            MsBuildBindings = new(project, selected.Entry.Identity, selected.ConfigurationSourceIdentity!, selected.ConfigurationSha256!, "net10.0", "Functions"),
+            EffectSupport = new(Directory, project, capability, Confirmed: true) { FSharpRepair = repair },
+        }, CancellationToken.None);
+
+        result.Status.Should().Be(wrongGeneratedHash ? TemplateInvocationStatus.InvalidTemplate
+            : changedProject ? TemplateInvocationStatus.EffectFailure : TemplateInvocationStatus.Success, result.Diagnostic);
+        File.Exists(generated).Should().Be(!wrongGeneratedHash && !changedProject);
+        if (wrongGeneratedHash)
+        {
+            capability.ReceivedCalls().Should().BeEmpty();
+        }
+        else if (!changedProject)
+        {
+            result.Effects!.CompletedEffects.Should().Equal(repair);
+        }
+        File.ReadAllText(project).Should().Be(changedProject ? "<Project />changed" : "<Project />");
+    }
+
     public void Dispose()
     {
         if (System.IO.Directory.Exists(_root))
@@ -161,6 +229,6 @@ public sealed class NativeMsBuildSessionBindingTests : IDisposable
             """);
         string hive = Path.Combine(_root, "hive");
         await TemplateFixtures.InstallAsync(package, hive, CancellationToken.None);
-        return new(new TemplateEngineSession(new(Directory, new(Directory, "dotnet", "C#")), hive));
+        return TemplateFixtures.CreateTemplater(new TemplateEngineSession(new(Directory, new(Directory, "dotnet", "C#")), hive));
     }
 }

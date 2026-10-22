@@ -31,7 +31,7 @@ internal sealed class PreparedBasicTemplate(BasicTemplateArtifact artifact, Temp
 }
 
 /// <summary>
-/// Provisional basic-only lifecycle adapter. Installs qualified archives but never replaces an incumbent or infers user ownership.
+/// Installs qualified archives through the protected native lifecycle without replacing an incumbent or inferring user ownership.
 /// </summary>
 internal sealed class BasicTemplateLifecycle(ITemplateStore store, IBasicPackagePayloadSource payloadSource,
     IBasicArtifactInspector inspector, IBasicTemplateOwnership ownership, IFileSystem fileSystem) : IBasicTemplateLifecycle
@@ -53,7 +53,12 @@ internal sealed class BasicTemplateLifecycle(ITemplateStore store, IBasicPackage
 
         using TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken);
         BasicTemplateArtifact? installed = await FindReusableAsync(session, plan.PackageId, plan.Candidates, cancellationToken);
-        return new(installed ?? plan.Candidates[0], installed is not null);
+        BasicTemplateArtifact? retained = installed is null
+            ? await FindRetainedCandidateAsync(plan.PackageId, plan.Candidates, cancellationToken)
+            : null;
+        BasicTemplateArtifact selected = installed ?? retained ?? plan.Candidates[0];
+        await CheckNativeIdentitiesAsync(session, selected, cancellationToken);
+        return new(selected, installed is not null);
     }
 
     public async Task<bool> EnsureAsync(BasicTemplateArtifact artifact, TemplateEngineContext context, bool offline, CancellationToken cancellationToken)
@@ -72,8 +77,14 @@ internal sealed class BasicTemplateLifecycle(ITemplateStore store, IBasicPackage
         ArgumentNullException.ThrowIfNull(selection);
         ArgumentNullException.ThrowIfNull(context);
         BasicTemplateArtifact artifact = selection.Artifact;
+        if (artifact.ContentRoles.Count > 0 && _ownership is not INativeTemplateOwnership)
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.OwnershipUnavailable,
+                "Required external native content needs lifecycle-owned durable provenance. No package was acquired or installed.");
+        }
         using (TemplateEngineSession reader = await _store.OpenReadAsync(context, cancellationToken))
         {
+            await CheckNativeIdentitiesAsync(reader, artifact, cancellationToken);
             if (await FindReusableAsync(reader, artifact.PackageId, [artifact], cancellationToken) is not null)
             {
                 return new(artifact, null, null);
@@ -143,12 +154,25 @@ internal sealed class BasicTemplateLifecycle(ITemplateStore store, IBasicPackage
         bool reused = false;
         await transaction.ExecuteAsync(async (session, token) =>
         {
+            await CheckNativeIdentitiesAsync(session, artifact, token);
             reused = await FindReusableAsync(session, artifact.PackageId, [artifact], token) is not null;
             if (!reused)
             {
                 await InstallAsync(session, prepared.Archive, token);
             }
-        }, (session, token) => ValidateInstalledAsync(session, artifact, token), cancellationToken);
+        }, async (session, token) =>
+        {
+            await ValidateInstalledAsync(session, artifact, token);
+            if (!reused && artifact.ContentRoles.Count > 0)
+            {
+                if (_ownership is not INativeTemplateOwnership recorder)
+                {
+                    throw new BasicAcquisitionException(BasicAcquisitionFailure.OwnershipUnavailable,
+                        "Native provenance ownership changed after preparation. No unowned registration can be committed.");
+                }
+                await recorder.RecordAsync(artifact, token);
+            }
+        }, cancellationToken);
         return reused;
     }
 
@@ -160,6 +184,7 @@ internal sealed class BasicTemplateLifecycle(ITemplateStore store, IBasicPackage
         session.CheckStoreDiagnostics();
         if (matches.Length == 0)
         {
+            await FindRetainedCandidateAsync(id, candidates, cancellationToken);
             return null;
         }
 
@@ -191,6 +216,44 @@ internal sealed class BasicTemplateLifecycle(ITemplateStore store, IBasicPackage
         return candidate;
     }
 
+    private async Task<BasicTemplateArtifact?> FindRetainedCandidateAsync(string id, IReadOnlyList<BasicTemplateArtifact> candidates,
+        CancellationToken cancellationToken)
+    {
+        if (!candidates.Any(candidate => candidate.ContentRoles.Count > 0) || _ownership is not INativeTemplateOwnership ownership)
+        {
+            return null;
+        }
+        NativeTemplateOwnerReceipt? receipt = await ownership.GetRetainedAsync(id, cancellationToken);
+        if (receipt is null)
+        {
+            return null;
+        }
+        BasicTemplateArtifact? candidate = candidates.SingleOrDefault(artifact =>
+            artifact.Version.ToNormalizedString() == receipt.Version && artifact.Source == receipt.Source
+            && string.Equals(artifact.Sha256, receipt.Sha256, StringComparison.OrdinalIgnoreCase));
+        return candidate ?? throw Conflict(id,
+            "Retained lifecycle provenance pins different bytes, version or source. No automatic replacement is authorized, even while its package is absent.");
+    }
+
+    private async Task CheckNativeIdentitiesAsync(TemplateEngineSession session, BasicTemplateArtifact artifact,
+        CancellationToken cancellationToken)
+    {
+        if (artifact.ContentRoles.Count == 0)
+        {
+            return;
+        }
+        IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, cancellationToken);
+        IManagedTemplatePackage[] owned = [.. packages.Where(package =>
+            string.Equals(package.Identifier, artifact.PackageId, StringComparison.OrdinalIgnoreCase))];
+        IReadOnlyList<ITemplateInfo> templates = await session.PackageManager.GetTemplatesAsync(cancellationToken);
+        session.CheckStoreDiagnostics();
+        if (templates.Any(template => artifact.Templates.Any(expected => expected.Identity == template.Identity)
+            && !owned.Any(package => package.MountPointUri == template.MountPointUri)))
+        {
+            throw Conflict(artifact.PackageId, "Another native package owns a required template identity. No replacement or adoption is authorized.");
+        }
+    }
+
     private async Task ValidateInstalledAsync(TemplateEngineSession session, BasicTemplateArtifact artifact, CancellationToken cancellationToken)
     {
         IReadOnlyList<IManagedTemplatePackage> packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, cancellationToken);
@@ -202,6 +265,21 @@ internal sealed class BasicTemplateLifecycle(ITemplateStore store, IBasicPackage
 
         await _inspector.ValidateAsync(matches[0].MountPointUri, artifact, cancellationToken);
         IReadOnlyList<ITemplateInfo> templates = await session.PackageManager.GetTemplatesAsync(cancellationToken);
+        if (artifact.ContentRoles.Count > 0)
+        {
+            try
+            {
+                foreach (ITemplateInfo template in templates.Where(template => template.MountPointUri == matches[0].MountPointUri))
+                {
+                    FuncHostTemplateMetadataReader.Read(template);
+                }
+            }
+            catch (InvalidTemplateMetadataException exception)
+            {
+                throw new BasicAcquisitionException(BasicAcquisitionFailure.InvalidArtifact,
+                    $"The qualified native host metadata for '{artifact.PackageId}' is invalid: {exception.Message}", exception);
+            }
+        }
         string[] identities = [.. templates.Where(template => template.MountPointUri == matches[0].MountPointUri).Select(template => template.Identity)];
         session.CheckStoreDiagnostics();
         if (identities.Length != artifact.Templates.Count || artifact.Templates.Any(template => !identities.Contains(template.Identity, StringComparer.Ordinal)))

@@ -113,6 +113,11 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
                     _interaction.WriteHint(diagnostic);
                 }
             }
+            if (preparation.Completion?.Effects is { } preparationEffects)
+            {
+                RenderDependencyEffects("Completed preparation effects", preparationEffects.CompletedEffects);
+                RenderDependencyEffects("Failed preparation effects", preparationEffects.FailedEffects);
+            }
         }
 
         foreach (string diagnostic in result.Diagnostics)
@@ -208,7 +213,7 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             {
                 foreach (TemplateGeneratedFSharpFile file in compile.GeneratedFiles)
                 {
-                    _interaction.WriteLine(line => line.Muted("Include before Program.fs: ").Code(file.Path));
+                    _interaction.WriteLine(line => line.Muted($"Include before {Path.GetFileName(compile.EvaluatedCompileOrder[^1])}: ").Code(file.Path));
                 }
             }
         }
@@ -216,8 +221,8 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
 
     private static IReadOnlyList<TemplateFileChange> GetCompletedChanges(TemplateInvocationResult? invocation)
     {
-        // Pre-create conflicts can carry preview changes without writing them.
-        return invocation is { Status: TemplateInvocationStatus.Success or TemplateInvocationStatus.ConfigurationFailure or TemplateInvocationStatus.EffectFailure }
+        // Preview and pre-create conflicts may report paths without committing them.
+        return invocation is { HasCommittedOutput: true }
             ? invocation.Changes
             : [];
     }
@@ -253,10 +258,28 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             {
                 planned = preparation.Preview.Operations.Select(step => new { operation = step.Operation.ToString(), step.Skipped }),
                 preparation.Preview.Diagnostics,
-                completion = preparation.Completion,
+                completion = ProjectPreparationCompletion(preparation.Completion),
             };
         }
 
+        return projected;
+    }
+
+    private static object? ProjectPreparationCompletion(NativeProjectPreparationResult? completion)
+    {
+        if (completion is null)
+        {
+            return null;
+        }
+        Dictionary<string, object> projected = new()
+        {
+            ["succeeded"] = completion.Succeeded,
+            ["diagnostics"] = completion.Diagnostics,
+        };
+        if (completion.Effects is { } effects)
+        {
+            projected["effects"] = NewExecutionRenderer.ProjectEffects(effects);
+        }
         return projected;
     }
 

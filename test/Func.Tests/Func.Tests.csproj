@@ -15,9 +15,21 @@
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <Target Name="RecordCliProductOutput" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="ResolveProjectReferences">
+    <ItemGroup>
+      <_CliProductAssembly Include="@(_ResolvedProjectReferencePaths)" Condition="'%(_ResolvedProjectReferencePaths.Filename)' == 'func'" />
+      <AssemblyMetadata Include="CliProductAssemblyPath" Value="%(_CliProductAssembly.FullPath)" />
+    </ItemGroup>
+    <Error Condition="'@(_CliProductAssembly)' == ''" Text="Could not resolve the normal CLI product output for process tests." />
+  </Target>
+
   <ItemGroup>
     <EmbeddedResource Include="Update/Fixtures/version.json" LogicalName="Azure.Functions.Cli.Tests.Update.Fixtures.version.json" />
     <EmbeddedResource Include="Templates/Acquisition/Fixtures/basic-companions.json" LogicalName="Azure.Functions.Cli.Tests.Templates.Acquisition.basic-companions.json" />
+    <EmbeddedResource Include="Templates/Fixtures/LegacyNativePolicyBoundary/LegacyNativePolicyBoundary.bin"
+                      LogicalName="Azure.Functions.Cli.Tests.LegacyNativePolicyBoundary.bin" />
+    <EmbeddedResource Include="Templates/Fixtures/OriginalEightPolicy/OriginalEightPolicy.nupkg.bin"
+                      LogicalName="Azure.Functions.Cli.Tests.OriginalEightPolicy.nupkg.bin" />
   </ItemGroup>
 
   <!-- Test fixtures: built and copied to output as content; loaded via reflection. -->

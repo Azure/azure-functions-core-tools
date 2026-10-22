@@ -3,23 +3,19 @@
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
+/// <summary>
+/// Binds an eligible selected template to invocation within its owning templater's live session.
+/// </summary>
 internal sealed class ResolvedTemplate
 {
-    private readonly Func<TemplateInvocationRequest, CancellationToken, Task<TemplateInvocationResult>> _invoke;
-    private readonly Func<string, CancellationToken, Task<ReadOnlyMemory<byte>>>? _readPackageFile;
-    private readonly Func<CancellationToken, Task<TemplateInvocationResult?>>? _validateConfiguration;
-    private readonly Func<TemplateInvocationRequest, Common.IFileSystem, bool, CancellationToken, Task<NativeTemplatePreparationResult>>? _prepare;
+    private readonly ISelectedTemplateInvoker _invoker;
 
-    internal ResolvedTemplate(TemplateCatalogEntry entry, Func<TemplateInvocationRequest, CancellationToken, Task<TemplateInvocationResult>> invoke,
-        Func<string, CancellationToken, Task<ReadOnlyMemory<byte>>>? readPackageFile = null, string? configurationSha256 = null,
-        Func<CancellationToken, Task<TemplateInvocationResult?>>? validateConfiguration = null, string? configurationSourceIdentity = null,
-        Func<TemplateInvocationRequest, Common.IFileSystem, bool, CancellationToken, Task<NativeTemplatePreparationResult>>? prepare = null)
+    internal ResolvedTemplate(TemplateCatalogEntry entry, ISelectedTemplateInvoker invoker,
+        string? configurationSha256 = null, string? configurationSourceIdentity = null,
+        string? packageMountPoint = null, TemplateConfigurationSnapshot? configuration = null, object? invocationOwner = null)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        _invoke = invoke ?? throw new ArgumentNullException(nameof(invoke));
-        _readPackageFile = readPackageFile;
-        _validateConfiguration = validateConfiguration;
-        _prepare = prepare;
+        _invoker = invoker ?? throw new ArgumentNullException(nameof(invoker));
         if (entry.ConstraintEvaluation.Status != TemplateConstraintEvaluationStatus.Eligible
             || entry.MetadataDiagnostic is not null || entry.ProjectConfigurationDiagnostic is not null)
         {
@@ -29,6 +25,9 @@ internal sealed class ResolvedTemplate
         Entry = entry;
         ConfigurationSha256 = configurationSha256;
         ConfigurationSourceIdentity = configurationSourceIdentity;
+        PackageMountPoint = packageMountPoint;
+        Configuration = configuration;
+        InvocationOwner = invocationOwner ?? invoker;
     }
 
     public TemplateCatalogEntry Entry { get; }
@@ -39,28 +38,11 @@ internal sealed class ResolvedTemplate
 
     public string? ConfigurationSourceIdentity { get; }
 
-    internal Task<NativeTemplatePreparationResult> CaptureNativePreparationAsync(TemplateInvocationRequest request,
-        Common.IFileSystem fileSystem, bool expandFiles, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(fileSystem);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (request.Parameters.Keys.Any(key => !Parameters.Any(parameter => parameter.CanonicalName == key)))
-        {
-            return Task.FromResult(new NativeTemplatePreparationResult(null,
-                new(TemplateInvocationStatus.InvalidArguments, [], "Preparation values must use declared canonical parameter names.")));
-        }
+    internal string? PackageMountPoint { get; }
 
-        request = request with { Parameters = new Dictionary<string, string?>(request.Parameters, StringComparer.Ordinal) };
-        return (_prepare ?? throw new InvalidOperationException("Native selected-source preparation is not available."))(
-            request, fileSystem, expandFiles, cancellationToken);
-    }
+    internal TemplateConfigurationSnapshot? Configuration { get; }
 
-    internal Task<TemplateInvocationResult?> ValidateConfigurationAsync(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return (_validateConfiguration ?? throw new InvalidOperationException("Selected configuration validation is not available."))(cancellationToken);
-    }
+    internal object InvocationOwner { get; }
 
     internal Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(string relativePath, CancellationToken cancellationToken)
     {
@@ -71,7 +53,25 @@ internal sealed class ResolvedTemplate
             throw new ArgumentException("Supply an exact package-relative source path without traversal.", nameof(relativePath));
         }
 
-        return (_readPackageFile ?? throw new InvalidOperationException("Selected-package source access is not available."))(relativePath, cancellationToken);
+        return _invoker.ReadPackageFileAsync(relativePath, cancellationToken);
+    }
+
+    internal Task<TemplateInvocationResult?> ValidateConfigurationAsync(CancellationToken cancellationToken)
+        => _invoker.ValidateConfigurationAsync(cancellationToken);
+
+    internal Task<NativeTemplatePreparationResult> CaptureNativePreparationAsync(TemplateInvocationRequest request,
+        bool expandFiles, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (request.Parameters.Keys.Any(key => !Parameters.Any(parameter => parameter.CanonicalName == key)))
+        {
+            return Task.FromResult(new NativeTemplatePreparationResult(null,
+                new(TemplateInvocationStatus.InvalidArguments, [], "Preparation values must use declared canonical parameter names.")));
+        }
+
+        return _invoker.CaptureAsync(request with { Parameters = new Dictionary<string, string?>(request.Parameters, StringComparer.Ordinal) },
+            expandFiles, cancellationToken);
     }
 
     public Task<TemplateInvocationResult> InvokeAsync(TemplateInvocationRequest request, CancellationToken cancellationToken = default)
@@ -86,6 +86,6 @@ internal sealed class ResolvedTemplate
         }
 
         request = request with { Parameters = new Dictionary<string, string?>(request.Parameters, StringComparer.Ordinal) };
-        return _invoke(request, cancellationToken);
+        return _invoker.InvokeAsync(request, cancellationToken);
     }
 }

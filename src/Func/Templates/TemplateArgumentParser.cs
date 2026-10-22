@@ -11,7 +11,7 @@ using Azure.Functions.Cli.Templates.Engine;
 namespace Azure.Functions.Cli.Templates;
 
 /// <summary>
-/// Performs strict candidate-specific scalar parsing for both template commands.
+/// Parses and validates arguments against a single template's parameter definitions.
 /// </summary>
 internal sealed class TemplateArgumentParser : ITemplateArgumentParser
 {
@@ -49,7 +49,8 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
         foreach (TemplateArgumentParameter parameter in parameters)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // System.CommandLine splits colon-bearing fallback aliases before inline values.
+            // Use simple option names internally because System.CommandLine treats
+            // the colon in aliases like --param:Name as a value separator.
             Option<string?> option = new($"--template-parameter-{options.Count}")
             {
                 Arity = ArgumentArity.ExactlyOne,
@@ -74,7 +75,7 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
             return Result();
         }
 
-        // Supply the root prefix ourselves so the engine never elides a matching token from the user's template tail.
+        // Add the command name first so the parser won't mistake the first user argument for it and skip it.
         ParseResult parsed = parser.Parse([parser.Name, .. parserTokens], new ParserConfiguration
         {
             EnablePosixBundling = false,
@@ -174,7 +175,7 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
             }
             else if (parameter.Definition.DefaultValue is { } defaultValue)
             {
-                // Required defaults must be supplied explicitly to the native engine.
+                // Pass defaults for required parameters explicitly. The template engine won't apply them automatically.
                 AddValue(parameter, defaultValue, isDefault: true);
             }
 
@@ -265,10 +266,9 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
             }
 
             provenance.Add((sourceIndex, TokenType.Argument));
-            // Unknown option-like tokens otherwise become string values. Literal dash-prefixed values use inline syntax.
-            if (token.StartsWith('-') && !long.TryParse(token, out _)
-                && !double.TryParse(token, NumberStyles.Float, CultureInfo.CurrentCulture, out _)
-                && !double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            // Reject unknown options instead of letting the parser treat them as values.
+            // Pass values such as "-literal" using --option=-literal.
+            if (IsOptionLikeToken(token))
             {
                 AddInvalid($"Unrecognized template option '{token}'. Use an effective template alias, or inline syntax for a dash-prefixed literal value.", [sourceIndex]);
             }
@@ -363,6 +363,11 @@ internal sealed class TemplateArgumentParser : ITemplateArgumentParser
 
         bool IsReserved(string alias) => reserved.Contains(alias) || reserved.Contains(alias.TrimStart('-'));
     }
+
+    internal static bool IsOptionLikeToken(string token)
+        => token.StartsWith('-') && !long.TryParse(token, out _)
+            && !double.TryParse(token, NumberStyles.Float, CultureInfo.CurrentCulture, out _)
+            && !double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
 
     private static bool IsValidAliasName(string? name)
         => !string.IsNullOrEmpty(name) && !name.StartsWith('-')

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Templates.Acquisition;
 
 namespace Azure.Functions.Cli.Commands.Setup;
 
@@ -79,6 +80,19 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
 
             payload["version"] = result.Version;
             payload["message"] = result.Message;
+            if (result.NativeAcquisition is { } native)
+            {
+                payload["association_revision"] = native.Revision;
+                payload["source"] = native.Source;
+                payload["native_failure"] = native.Failure?.ToString();
+                payload["completed"] = native.Completed.Select((step, index) => new Dictionary<string, object?>
+                {
+                    ["role"] = index == 0 ? "selected-stack" : "external-native",
+                    ["package_id"] = step.PackageId,
+                    ["version"] = step.Version,
+                    ["reused"] = step.Reused,
+                }).ToArray();
+            }
             if (result.Warning is not null)
             {
                 payload["warning"] = result.Warning;
@@ -219,6 +233,16 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
             ["name"] = dependency.Name,
             ["version_range"] = dependency.RangeText,
         };
+        if (dependency.TemplateDelivery == SetupTemplateDelivery.ExternalNative)
+        {
+            payload["template_delivery"] = "external-native";
+            payload["required_roles"] = dependency.RequiredNativeRoles.Select(role => role switch
+            {
+                NativeTemplateContentRole.Function => "function",
+                NativeTemplateContentRole.AdditionalProject => "additional-project",
+                _ => throw new ArgumentOutOfRangeException(nameof(dependency)),
+            }).ToArray();
+        }
 
         string? packageId = GetPackageId(dependency);
         if (packageId is not null)
@@ -230,7 +254,8 @@ internal sealed class SetupRenderer(IInteractionService interaction, SetupOutput
     }
 
     private static string? GetPackageId(SetupDependency dependency)
-        => dependency.Kind == SetupDependencyKind.Runtime ? null : dependency.ResolvedPackageId ?? dependency.PackageId;
+        => dependency.Kind == SetupDependencyKind.Runtime || dependency.TemplateDelivery == SetupTemplateDelivery.ExternalNative
+            ? null : dependency.ResolvedPackageId ?? dependency.PackageId;
 
     private static string ToDependencyKindText(SetupDependencyKind kind)
         => kind switch

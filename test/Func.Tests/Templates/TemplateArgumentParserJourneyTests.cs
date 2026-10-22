@@ -74,6 +74,36 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     }
 
     [Fact]
+    public async Task Parse_InstalledAuthoredDefault_SeparatesExplicitOriginWithoutChangingNativeOutput()
+    {
+        await InstallAsync();
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "provenance"));
+        using var templater = await CreateTemplaterAsync(output);
+        var selected = (await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
+        string[] raw = ["--greeting", "same content", "-p:f", "true"];
+        var before = SnapshotProject();
+
+        var omitted = Parse(selected, raw);
+        var explicitValue = Parse(selected, [.. raw, "--param:AuthLevel=anonymous"]);
+
+        explicitValue.ValuesByCanonicalName.Should().BeEquivalentTo(omitted.ValuesByCanonicalName);
+        omitted.ExplicitParameterNames.Should().BeEquivalentTo("Greeting", "Feature");
+        explicitValue.ExplicitParameterNames.Should().BeEquivalentTo("Greeting", "Feature", "AuthLevel");
+        var omittedPreview = await selected.InvokeAsync(new(output, omitted.ValuesByCanonicalName, "Origin", DryRun: true), CancellationToken.None);
+        var explicitPreview = await selected.InvokeAsync(new(output, explicitValue.ValuesByCanonicalName, "Origin", DryRun: true), CancellationToken.None);
+        omittedPreview.Status.Should().Be(TemplateInvocationStatus.Success);
+        explicitPreview.Status.Should().Be(TemplateInvocationStatus.Success);
+        explicitPreview.Changes.Should().BeEquivalentTo(omittedPreview.Changes);
+        SnapshotProject().Should().BeEquivalentTo(before);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
+
+        var created = await selected.InvokeAsync(new(output, explicitValue.ValuesByCanonicalName, "Origin"), CancellationToken.None);
+
+        created.Status.Should().Be(TemplateInvocationStatus.Success);
+        File.ReadAllText(Path.Combine(output.Info.FullName, "Origin.txt")).Should().StartWith("Origin|same content|anonymous|True|");
+    }
+
+    [Fact]
     public async Task Parse_MissingVisibleRequired_RemainsSelectableAndCompletionIsAuthoritative()
     {
         await InstallAsync();
@@ -155,7 +185,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     {
         await InstallAsync();
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "controls"));
-        var templater = await CreateTemplaterAsync(output);
+        using var templater = await CreateTemplaterAsync(output);
         var wrongType = await templater.ResolveGroupAsync("Func.Tests.Parser.Project", TemplateType.Item, CancellationToken.None);
         var group = (await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None)).Group!;
         var selected = group[0];
@@ -252,6 +282,25 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         }
     }
 
+    [Fact]
+    public void SnapshotProject_EmptyParentDirectory_DetectsChangesWithoutFileChanges()
+    {
+        string project = Path.Combine(_root, "project");
+        Directory.CreateDirectory(project);
+        File.WriteAllText(Path.Combine(project, "host.json"), "{}");
+        var before = SnapshotProject();
+
+        string parent = Directory.CreateDirectory(Path.Combine(project, "functions")).FullName;
+        var after = SnapshotProject();
+
+        after.Should().ContainKey("functions");
+        after["functions"].Should().BeNull();
+        after["host.json"].Should().Be(before["host.json"]);
+        before.Should().NotContainKey("functions");
+        Directory.Delete(parent);
+        SnapshotProject().Should().BeEquivalentTo(before);
+    }
+
     private TemplateCandidateParseResult Parse(ResolvedTemplate template, IReadOnlyList<string> raw,
         IReadOnlyDictionary<string, string?>? completed = null)
         => _parser.Parse(new(template.Entry.Identity, template.Parameters, _reserved, raw, completed));
@@ -264,12 +313,21 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         TemplateConstraintEvaluationSnapshot snapshot = new([new("node-package", NuGetVersion.Parse("1.0.0"), ["node"], usable)]);
         var store = new TemplateStore(new CliConfigurationPathsOptions(Path.Combine(_root, "home")),
             new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance);
-        return await new TemplaterFactory(store).CreateAsync(context, snapshot, CancellationToken.None);
+        return await new TemplaterFactory(store, new PhysicalFileSystem()).CreateAsync(context, snapshot, CancellationToken.None);
     }
 
-    private Dictionary<string, string> SnapshotProject()
-        => Directory.GetFiles(Path.Combine(_root, "project"), "*", SearchOption.AllDirectories)
-            .ToDictionary(path => Path.GetRelativePath(Path.Combine(_root, "project"), path), File.ReadAllText);
+    private Dictionary<string, string?> SnapshotProject()
+    {
+        string project = Path.Combine(_root, "project");
+        var snapshot = Directory.GetDirectories(project, "*", SearchOption.AllDirectories)
+            .ToDictionary(path => Path.GetRelativePath(project, path), _ => (string?)null);
+        foreach (string file in Directory.GetFiles(project, "*", SearchOption.AllDirectories))
+        {
+            snapshot.Add(Path.GetRelativePath(project, file), File.ReadAllText(file));
+        }
+
+        return snapshot;
+    }
 
     private async Task InstallAsync(string scalarType = "string", bool requireBundle = false)
     {

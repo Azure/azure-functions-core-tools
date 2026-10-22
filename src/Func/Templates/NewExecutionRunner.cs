@@ -22,7 +22,7 @@ internal sealed class NewExecutionRunner(
     ITemplateArgumentParser arguments,
     IInteractionService interaction,
     TemplateExecutionInteraction prompts,
-    NativeTemplateWorkflowRegistry? workflows = null) : INewExecutionRunner
+    NativeTemplateWorkflowRegistry? workflows = null, WorkloadNativeTemplatePolicies? policies = null) : INewExecutionRunner
 {
     private readonly INewExecutionContextResolver _contexts = contexts ?? throw new ArgumentNullException(nameof(contexts));
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
@@ -30,6 +30,7 @@ internal sealed class NewExecutionRunner(
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly TemplateExecutionInteraction _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
     private readonly NativeTemplateWorkflowRegistry? _workflows = workflows;
+    private readonly WorkloadNativeTemplatePolicies? _policies = policies;
 
     public async Task<NewExecutionResult> ExecuteAsync(
         NewExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -53,9 +54,9 @@ internal sealed class NewExecutionRunner(
             return NewExecutionResult.Reject("invalidName", "Supply a nonempty --name.");
         }
 
-        if (request.List && (request.RawTemplateTokens.Count > 0 || request.DryRun))
+        if (request.List && (request.RawTemplateTokens.Count > 0 || request.DryRun || request.Force || request.Name is not null))
         {
-            return NewExecutionResult.Reject("invalidListArguments", "Use --list without template arguments or --dry-run.");
+            return NewExecutionResult.Reject("invalidListArguments", "Use --list without template arguments, --name, --force or --dry-run.");
         }
 
         bool canPrompt = !request.NonInteractive && _interaction.IsInteractive;
@@ -67,11 +68,12 @@ internal sealed class NewExecutionRunner(
         }
 
         TemplateEngineContext context = resolved.Context ?? throw new InvalidOperationException("Context resolution returned no outcome.");
+        context = context with { RequireCleanStore = request.DryRun || request.List };
         using Templater templater = await _factory.CreateAsync(context, availability, cancellationToken,
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
         NewExecutionResult result = await ExecuteAsync(templater, request, canPrompt, cancellationToken);
-        if (request.DryRun || !result.HasCompletedCreation)
+        if (request.DryRun || !result.HasReturnedCreationResult)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -212,6 +214,32 @@ internal sealed class NewExecutionRunner(
                 "This item declares an internal role and cannot be invoked as an ordinary function template.") with { SelectedTemplate = selected.Entry };
         }
 
+        if (_policies is not null)
+        {
+            try
+            {
+                WorkloadNativeTemplatePolicyAdapter? owned = await _policies.FindAsync(selected, cancellationToken);
+                if (owned is not null)
+                {
+                    provider = owned;
+                    compatibility = owned;
+                    selectedEffects = owned;
+                }
+            }
+            catch (InvalidTemplateMetadataException exception)
+            {
+                return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
+            }
+            catch (IOException exception)
+            {
+                return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
+            }
+        }
+
         NativeSelectedItemBinding? effectBinding = null;
         if (selectedEffects is { } effectSupport)
         {
@@ -266,7 +294,11 @@ internal sealed class NewExecutionRunner(
         cancellationToken.ThrowIfCancellationRequested();
         var invocationRequest = new TemplateInvocationRequest(
             request.WorkingDirectory, final.ValuesByCanonicalName,
-            itemName?.Name ?? request.Name ?? (provider is null ? null : selected.Entry.DefaultName), request.DryRun, request.Force);
+            itemName?.Name ?? request.Name ?? (provider is null ? null : selected.Entry.DefaultName), request.DryRun, request.Force)
+        {
+            ExplicitParameterNames = final.ExplicitParameterNames,
+            ArgumentSource = new(selected.Entry.Identity, selected.Parameters, request.ReservedAliases, request.RawTemplateTokens),
+        };
         if (provider is not null)
         {
             NativeTemplateInvocationPreparation prepared = await provider.PrepareAsync(
@@ -292,10 +324,22 @@ internal sealed class NewExecutionRunner(
             };
         }
 
-        TemplateInvocationResult? effectInvocation = selectedEffects is not null && effectBinding is not null
-            ? await selectedEffects.InvokeAsync(templater, selected, effectBinding, invocationRequest, cancellationToken) : null;
-        cancellationToken.ThrowIfCancellationRequested();
-        TemplateInvocationResult invocation = effectInvocation ?? await selected.InvokeAsync(invocationRequest, cancellationToken);
+        TemplateInvocationResult invocation;
+        try
+        {
+            TemplateInvocationResult? effectInvocation = selectedEffects is not null && effectBinding is not null
+                ? await selectedEffects.InvokeAsync(templater, selected, effectBinding, invocationRequest, cancellationToken) : null;
+            if (effectInvocation is null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            invocation = effectInvocation ?? await selected.InvokeAsync(invocationRequest, cancellationToken);
+        }
+        catch (OperationCanceledException exception) when (exception.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey] is string)
+        {
+            _interaction.WriteWarning((string)exception.Data[NativeTemplateEffectWorkflow.CancellationDiagnosticKey]!);
+            throw;
+        }
         bool success = invocation.Status == TemplateInvocationStatus.Success;
 
         NewExecutionResult result = new(success ? request.DryRun ? "previewed" : "created" : "invocationFailed", success)
@@ -306,7 +350,7 @@ internal sealed class NewExecutionRunner(
             ItemName = itemName,
             Diagnostics = invocation.Diagnostic is null ? [] : [invocation.Diagnostic],
         };
-        if (request.DryRun || !result.HasCompletedCreation)
+        if (request.DryRun || !result.HasReturnedCreationResult)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }

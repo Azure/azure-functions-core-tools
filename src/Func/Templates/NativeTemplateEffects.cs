@@ -27,12 +27,16 @@ internal sealed record TemplateEditorNoOpEffect(TemplateEffectSource Source) : T
 /// <summary>
 /// Holds a copied, ordered internal effect plan; it grants no production execution permission.
 /// </summary>
-internal sealed class NativeTemplateEffectPlan(WorkingDirectory outputDirectory, IReadOnlyList<TemplateEffect> effects)
+internal sealed class NativeTemplateEffectPlan(WorkingDirectory outputDirectory, IReadOnlyList<TemplateEffect> effects,
+    Engine.NativeTemplatePreparationSnapshot? nativeCapture = null)
 {
     public WorkingDirectory OutputDirectory { get; } = outputDirectory ?? throw new ArgumentNullException(nameof(outputDirectory));
 
     public IReadOnlyList<TemplateEffect> Effects { get; } =
         Array.AsReadOnly<TemplateEffect>([.. effects ?? throw new ArgumentNullException(nameof(effects))]);
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Engine.NativeTemplatePreparationSnapshot? NativeCapture { get; } = nativeCapture;
 }
 
 internal sealed record NativeTemplateEffectPlanningResult(NativeTemplateEffectPlan? Plan, IReadOnlyList<string> Diagnostics);
@@ -54,7 +58,8 @@ internal sealed record NativeTemplateEffectResult(
 internal interface INativeTemplateEffectCapability
 {
     /// <summary>
-    /// Rejects every unsupported effect and validates selected source hashes, target snapshots, paths and occupancy without mutation.
+    /// Rejects unsupported effects and validates selected sources, targets and occupancy without mutation.
+    /// Uses the immutable native capture for prospective generated files, not a live project that has not been installed.
     /// </summary>
     public Task<IReadOnlyList<string>> ValidateAsync(NativeTemplateEffectPlan plan, CancellationToken cancellationToken);
 

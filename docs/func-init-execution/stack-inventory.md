@@ -118,7 +118,7 @@ invocations without this hook and project name behavior are unchanged.
 | --- | --- |
 | Python items | Preserve the original job's create-target selection independently from append target selection. The optional selected-item hook renders an exact source-bound hidden helper through the same native session into owned temporary output before planning append; never force-overwrite the app. Real Python asset/owned-executor composition remains a separate gate. The raw catalog's blueprint branches are not automatically CLI-selected. |
 | .NET items | Use actual MSBuild-evaluated framework/namespace and native-evaluated, ordered package-reference/restore actions against an exact project. Source generation alone is not `dotnet new` parity; package addition itself can restore. Preserve inherited secondary-restore failures rather than claiming every original action succeeds. |
-| .NET projects | Preserve `net10.0` and exact upstream inputs. Current project topology/source-name guards still block unqualified upstream layouts; the bridge does not relax them. |
+| .NET projects | Preserve workload-qualified framework, source-name and layout conventions against exact upstream inputs. The owning workload must supply a source declaration before catalog eligibility. Missing required policy refuses rather than falling back to generic creation. |
 | Node initialization | Preserve default `npm install` and `--skip-npm-install`. Host preparation is not a substitute: `SkipBuild` still permits dependency installation. |
 | Go initialization | Preserve default `go mod tidy` and its skip option. The old initializer ignores exit/stderr; the staged workflow must report nonzero/partial results explicitly before activation. |
 | Java initialization | Generate the existing Maven project; do not add a Maven invocation to init. |
@@ -127,8 +127,8 @@ invocations without this hook and project name behavior are unchanged.
 | Force/configuration | Keep current refusal, adoption, repair and user-owned source/config preservation controls. Destructive init force remains unqualified by the staged runner. |
 
 `NativeTemplateEffectPlanner` consumes native **evaluated** actions, not raw
-conditions. Its internal plans cover append, the conditional PowerShell
-create-only file, exact package references/restores and an explicit editor no-op.
+conditions. Its internal plans cover append, source-qualified create-only
+content, exact package references/restores and an explicit editor no-op.
 Unknown actions reject the entire plan even when `continueOnError` is set.
 `NativeTemplateEffectWorkflow` requires an explicitly injected capability that
 preflights every source hash, target snapshot, path and occupancy before mutation
@@ -139,7 +139,7 @@ registered, default native-session denial remains intact, and no arbitrary shell
 transactional rollback or universal concurrency guarantee is introduced.
 
 `TemplateInvocationRequest.EffectSupport` is an explicit internal opt-in for
-generic ITEM invocations and bounded, explicitly source-qualified .NET project
+generic ITEM invocations and bounded, explicitly source-qualified project
 layouts. Native preview supplies evaluated actions; all effects are planned and
 preflighted before native generation, confirmation is required, and effects run
 only after generated files pass the existing path/kind checks. Effect failure
@@ -186,12 +186,59 @@ preserved and preparation may be incomplete; it does not return success, invent
 a completed-effects result or claim rollback. Pre-create and default no-prep
 cancellation are unchanged.
 
+### Workload-owned native policy
+
+`FunctionsCliBuilder.AddNativeTemplatePolicy<TPolicy>()` registers the single
+shared boundary in `Abstractions/Templates/Native`. The host captures the actual
+loaded runtime owner. A stack name, matching version, source prefix or
+workload-created source object is not ownership authority. Admission validates
+the selected physical runtime and its loaded policy/stack, installed payload,
+native archive and retained provenance. External content retains the schema 2
+selected logical/physical stack, channel, source, Functions CLI native host ABI,
+required role and exact receipt/artifact digest checks. Runtime and content
+versions need not be equal.
+
+For an owned project, `ValidateProjectAsync` runs before the optional
+`DescribeProjectLayoutAsync`. A required layout declaration supplies the
+authored primary-output index and installed canonical stack/language before
+catalog listing, resolution and init eligibility. The host replays that same
+declaration for creation and joins it to the actual captured regular output and
+host root. Capture cannot invent replacement catalog metadata. Legitimate
+unhandled generic templates keep their existing metadata path.
+
+The native policy registry, policy instances, templater factory and NEW runner
+share the existing command scope. Every invocation, including preview and
+create, receives fresh lifetime-bound source and captured-image views. Captured
+canonical values include completed defaults, strict reparsing, explicit option
+provenance and the accepted project binding. Returned collections are copied.
+Package-relative original source hashes and generated byte hashes remain
+distinct. Source reads and revalidation expire with the invocation.
+Default reparsing retains original raw explicit input and host prompt answers,
+passing only non-explicit canonical values as completions. Layout association
+uses the captured raw configuration fingerprint, not a hash reconstructed from
+decoded JSON, so an unchanged encoding BOM does not invalidate its source pin.
+
+Append remains the only public workload execution transport. Package, restore,
+compile and create-only methods qualify existing roles but do not execute them.
+Those roles require the exact existing host-composed internal executor and
+confirmation privately paired to the same owner and invocation, or refuse
+before the first native/configuration install. A plain request capability or a
+clean qualifier result is insufficient. No production loaded non-append
+executor is registered in this layer. Editor no-op and append ledger success
+do not imply a native/configuration physical commit.
+
+The additive builder method and policy methods retain explicit unsupported
+defaults for old compiled builders and original eight-type policies on the new
+host. A workload using the new boundary still requires a host containing it.
+There is no reverse compatibility claim, all-stack policy migration, public
+activation or production publisher qualification.
+
 ### Bounded F# workflow repair
 
 The internal, explicit `NativeTemplateInvocationEffects.FSharpRepair` contract
 carries a selected-source/configuration fingerprint, exact `.fsproj` and
-expected project digest, evaluated root-file compile sequence ending in
-`Program.fs`, and hashed native-generated `.fs` files. The qualified planner
+expected project digest, an owner-qualified evaluated root-file compile
+sequence and hashed native-generated `.fs` files. The qualified planner
 matches those files against actual native `Create` effects and evaluated primary
 outputs, then places a required compile-update effect before package/restore
 actions. Unknown actions, mismatched source/project/file sets, overwrites and
@@ -199,7 +246,10 @@ unqualified sequences refuse the whole plan. Preview reports the compile plan
 without applying it; update failure prevents later dependency operations and
 does not erase generated outputs.
 
-The owned .NET updater validates the actual MSBuild sequence, project/source
+Insertion remains immediately before the last owner-qualified evaluated
+include, which is excluded from generated-file additions. This is not
+permission for a nonterminal insertion or a different project rewrite.
+The owned updater validates the actual MSBuild sequence, project/source
 digests and supported XML/file shape and performs the surgical project edit.
 The shared seam neither edits project files nor infers a project by scanning.
 The pinned F# restore action has no arguments; only the explicit selected

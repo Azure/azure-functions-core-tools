@@ -177,19 +177,17 @@ internal sealed class NativeTemplateEffectPlanner
                     || compile.EvaluatedCompileOrder.Count == 0 || compile.GeneratedFiles.Count == 0
                     || compile.EvaluatedCompileOrder.Any(path => !IsRootFSharpFile(path, projectRoot))
                     || compile.EvaluatedCompileOrder.Select(Path.GetFullPath).Distinct(comparer).Count() != compile.EvaluatedCompileOrder.Count
-                    || !SamePath(compile.EvaluatedCompileOrder[^1], Path.Combine(projectRoot, "Program.fs"))
                     || compile.GeneratedFiles.Any(file => file is null || !IsRootFSharpFile(file.Path, projectRoot)
-                        || !IsSha256(file.Sha256) || SamePath(file.Path, Path.Combine(projectRoot, "Program.fs")))
+                        || !IsSha256(file.Sha256) || SamePath(file.Path, compile.EvaluatedCompileOrder[^1]))
                     || compile.GeneratedFiles.Select(file => Path.GetFullPath(file.Path)).Distinct(comparer).Count() != compile.GeneratedFiles.Count)
                 {
-                    diagnostics.Add("F# compile repair requires one exact .fsproj digest, a unique root-file compile sequence ending in Program.fs, and hashed native-generated root .fs files.");
+                    diagnostics.Add("Compile repair requires an exact project digest, a unique root-file sequence and hashed generated files excluding its terminal include.");
                 }
             }
 
-            if (effect is TemplateCreateFileEffect create && (create.Content is null
-                || !string.Equals(Path.GetFileName(create.TargetPath), "requirements.psd1", StringComparison.Ordinal)))
+            if (effect is TemplateCreateFileEffect create && create.Content is null)
             {
-                diagnostics.Add("This staged create-only effect is qualified only for workload-owned PowerShell requirements.psd1 content.");
+                diagnostics.Add("Create-only effects require source-qualified generated content.");
             }
         }
 

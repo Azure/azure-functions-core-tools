@@ -1,17 +1,23 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
+
 namespace Azure.Functions.Cli.Templates.Engine;
 
-internal sealed class TemplaterFactory(ITemplateStore store) : ITemplaterFactory
+internal sealed class TemplaterFactory(ITemplateStore store, IFileSystem fileSystem,
+    WorkloadNativeTemplatePolicies? policies = null) : ITemplaterFactory
 {
     private readonly ITemplateStore _store = store ?? throw new ArgumentNullException(nameof(store));
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly WorkloadNativeTemplatePolicies? _policies = policies;
 
     public async Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken,
         Action<TemplateStoreWaitReason>? waiting = null)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return new(await _store.OpenReadAsync(context, cancellationToken, waiting: waiting));
+        TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken, waiting: waiting);
+        return new(session, new(session, _fileSystem, policies: _policies));
     }
 
     public async Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
@@ -19,7 +25,8 @@ internal sealed class TemplaterFactory(ITemplateStore store) : ITemplaterFactory
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(snapshot);
-        return new(await _store.OpenReadAsync(context, cancellationToken, snapshot, waiting: waiting));
+        TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken, snapshot, waiting: waiting);
+        return new(session, new(session, _fileSystem, policies: _policies));
     }
 
     public async Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
@@ -28,6 +35,7 @@ internal sealed class TemplaterFactory(ITemplateStore store) : ITemplaterFactory
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(projectSupport);
-        return new(await _store.OpenReadAsync(context, cancellationToken, snapshot, projectSupport, waiting));
+        TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken, snapshot, waiting: waiting);
+        return new(session, new(session, _fileSystem, projectSupport, _policies));
     }
 }

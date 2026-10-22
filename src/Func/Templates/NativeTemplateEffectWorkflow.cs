@@ -8,6 +8,8 @@ namespace Azure.Functions.Cli.Templates;
 /// </summary>
 internal sealed class NativeTemplateEffectWorkflow
 {
+    internal const string CancellationDiagnosticKey = "NativeTemplateEffectCancellation";
+
     public async Task<NativeTemplateEffectResult> ExecuteAsync(NativeTemplateEffectPlan plan,
         INativeTemplateEffectCapability? capability, bool dryRun, bool confirmed, CancellationToken cancellationToken)
     {
@@ -47,6 +49,11 @@ internal sealed class NativeTemplateEffectWorkflow
         List<string> diagnostics = [];
         foreach (TemplateEffect effect in plan.Effects)
         {
+            if (cancellationToken.IsCancellationRequested && completed.Count + failed.Count > 0)
+            {
+                diagnostics.Add("Cancellation stopped the plan before remaining effects started. Returned outcomes and retained output were preserved.");
+                return new("incomplete", false, plan, completed.AsReadOnly(), failed.AsReadOnly(), diagnostics.AsReadOnly());
+            }
             cancellationToken.ThrowIfCancellationRequested();
             if (effect is TemplateEditorNoOpEffect)
             {
@@ -54,10 +61,20 @@ internal sealed class NativeTemplateEffectWorkflow
                 continue;
             }
 
-            TemplateEffectExecutionResult result = await capability.ExecuteAsync(effect, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
+            TemplateEffectExecutionResult result;
+            try
+            {
+                result = await capability.ExecuteAsync(effect, cancellationToken);
+            }
+            catch (OperationCanceledException exception)
+            {
+                exception.Data[CancellationDiagnosticKey] =
+                    $"Controlled effects were canceled after {completed.Count} completed and {failed.Count} failed effects. "
+                    + $"The current '{effect.GetType().Name}' outcome is unknown. Retained output was not rolled back.";
+                throw;
+            }
             diagnostics.AddRange(result.Diagnostics);
-            if (result.Succeeded)
+            if (result.Succeeded && !result.TargetMayHaveChanged)
             {
                 completed.Add(effect);
             }
@@ -71,9 +88,15 @@ internal sealed class NativeTemplateEffectWorkflow
                     break;
                 }
             }
+            if (cancellationToken.IsCancellationRequested && completed.Count + failed.Count < plan.Effects.Count)
+            {
+                diagnostics.Add("Cancellation stopped the plan before remaining effects started. Returned outcomes and retained output were preserved.");
+                return new("incomplete", false, plan, completed.AsReadOnly(), failed.AsReadOnly(), diagnostics.AsReadOnly());
+            }
         }
 
-        return new(failed.Count == 0 ? "applied" : "partialFailure", failed.Count == 0,
+        bool succeeded = failed.Count == 0 && completed.Count == plan.Effects.Count;
+        return new(succeeded ? "applied" : "partialFailure", succeeded,
             plan, completed.AsReadOnly(), failed.AsReadOnly(), diagnostics.AsReadOnly());
     }
 }

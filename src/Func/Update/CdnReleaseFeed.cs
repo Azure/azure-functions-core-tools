@@ -16,17 +16,18 @@ namespace Azure.Functions.Cli.Update;
 /// rate limits and authentication requirements.
 /// </summary>
 internal sealed partial class CdnReleaseFeed(
-    HttpClient httpClient,
+    IHttpClientFactory httpClientFactory,
     ILogger<CdnReleaseFeed> logger) : IReleaseFeed
 {
     internal const string ManifestPath = "public/cli/v5/version.json";
 
-    private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     private readonly ILogger<CdnReleaseFeed> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<Release> GetLatestAsync(bool includePrerelease, CancellationToken cancellationToken)
     {
-        VersionManifest manifest = await FetchManifestAsync(cancellationToken);
+        using HttpClient httpClient = _httpClientFactory.CreateClient(UpdateRegistration.HttpClientName);
+        VersionManifest manifest = await FetchManifestAsync(httpClient, cancellationToken);
 
         if (includePrerelease)
         {
@@ -43,7 +44,7 @@ internal sealed partial class CdnReleaseFeed(
                     $"Error reading version manifest from '{ManifestPath}': no valid version found");
             }
 
-            return await CreateReleaseAsync(best, BuildDownloadUri(best, RuntimeInformation.RuntimeIdentifier), cancellationToken);
+            return await CreateReleaseAsync(httpClient, best, BuildDownloadUri(best, RuntimeInformation.RuntimeIdentifier), cancellationToken);
         }
         else
         {
@@ -59,7 +60,7 @@ internal sealed partial class CdnReleaseFeed(
                     $"Error reading version manifest from '{ManifestPath}': invalid version '{manifest.Stable}'");
             }
 
-            return await CreateReleaseAsync(version, BuildDownloadUri(version, RuntimeInformation.RuntimeIdentifier), cancellationToken);
+            return await CreateReleaseAsync(httpClient, version, BuildDownloadUri(version, RuntimeInformation.RuntimeIdentifier), cancellationToken);
         }
     }
 
@@ -67,11 +68,13 @@ internal sealed partial class CdnReleaseFeed(
     {
         ArgumentNullException.ThrowIfNull(version);
 
+        using HttpClient httpClient = _httpClientFactory.CreateClient(UpdateRegistration.HttpClientName);
         Uri downloadUri = BuildDownloadUri(version, RuntimeInformation.RuntimeIdentifier);
 
         // Verify the artifact exists on CDN with a HEAD request.
         using var request = new HttpRequestMessage(HttpMethod.Head, downloadUri);
         using HttpResponseMessage response = await SendAsync(
+            httpClient,
             request,
             $"checking version {version}",
             cancellationToken);
@@ -92,14 +95,22 @@ internal sealed partial class CdnReleaseFeed(
                 $"Error checking version {version} at '{downloadUri}': {response.StatusCode}", ex);
         }
 
-        return await CreateReleaseAsync(version, downloadUri, cancellationToken);
+        return await CreateReleaseAsync(httpClient, version, downloadUri, cancellationToken);
     }
 
-    private async Task<Release> CreateReleaseAsync(SemVersion version, Uri downloadUri, CancellationToken cancellationToken)
+    private async Task<Release> CreateReleaseAsync(
+        HttpClient httpClient,
+        SemVersion version,
+        Uri downloadUri,
+        CancellationToken cancellationToken)
     {
         string sidecarPath = $"{downloadUri}.sha256";
         using var request = new HttpRequestMessage(HttpMethod.Get, sidecarPath);
-        using HttpResponseMessage response = await SendAsync(request, $"reading checksum sidecar '{sidecarPath}'", cancellationToken);
+        using HttpResponseMessage response = await SendAsync(
+            httpClient,
+            request,
+            $"reading checksum sidecar '{sidecarPath}'",
+            cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -159,10 +170,11 @@ internal sealed partial class CdnReleaseFeed(
         return new Release(version, downloadUri) { Sha256Checksum = entry[..64] };
     }
 
-    private async Task<VersionManifest> FetchManifestAsync(CancellationToken cancellationToken)
+    private async Task<VersionManifest> FetchManifestAsync(HttpClient httpClient, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, ManifestPath);
         using HttpResponseMessage response = await SendAsync(
+            httpClient,
             request,
             "reading the version manifest",
             cancellationToken);
@@ -216,13 +228,14 @@ internal sealed partial class CdnReleaseFeed(
     }
 
     private async Task<HttpResponseMessage> SendAsync(
+        HttpClient httpClient,
         HttpRequestMessage request,
         string operation,
         CancellationToken cancellationToken)
     {
         try
         {
-            return await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            return await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {

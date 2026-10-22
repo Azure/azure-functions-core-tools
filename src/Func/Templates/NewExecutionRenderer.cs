@@ -60,6 +60,10 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
         if (result.Kind == "listed")
         {
             _interaction.WriteSectionHeader("Installed item templates");
+            if (result.Templates.Count == 0)
+            {
+                _interaction.WriteHint("No installed item templates match. Run 'func new --list' without filters to inspect available items.");
+            }
         }
         else if (result.Kind == "previewed")
         {
@@ -134,7 +138,7 @@ internal sealed class NewExecutionRenderer(IInteractionService interaction)
                     {
                         foreach (TemplateGeneratedFSharpFile file in compile.GeneratedFiles)
                         {
-                            _interaction.WriteLine(line => line.Muted("Include before Program.fs: ").Code(file.Path));
+                            _interaction.WriteLine(line => line.Muted($"Include before {Path.GetFileName(compile.EvaluatedCompileOrder[^1])}: ").Code(file.Path));
                         }
                     }
                 }

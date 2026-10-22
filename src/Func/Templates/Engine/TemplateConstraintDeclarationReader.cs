@@ -11,12 +11,6 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </summary>
 internal static class TemplateConstraintDeclarationReader
 {
-    private static readonly JsonDocumentOptions _options = new()
-    {
-        AllowTrailingCommas = true,
-        CommentHandling = JsonCommentHandling.Skip,
-    };
-
     /// <summary>
     /// Parses declarations and optionally checks NuGet host-sharing metadata supplied by the caller.
     /// </summary>
@@ -25,16 +19,15 @@ internal static class TemplateConstraintDeclarationReader
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        try
-        {
-            using var document = JsonDocument.Parse(configuration, _options);
-            return ReadRoot(document.RootElement, packageTypes);
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidTemplateMetadataException("template.json is not valid JSON.", exception);
-        }
+        return ReadRoot(TemplateConfigurationSnapshot.ParseRoot(configuration), packageTypes);
     }
+
+    /// <summary>
+    /// Validates declarations from an owned captured host view without reparsing its raw text.
+    /// </summary>
+    /// <exception cref="InvalidTemplateMetadataException">The configuration or a constraint declaration is invalid.</exception>
+    public static IReadOnlyList<TemplateConstraintDeclaration> Read(JsonElement configuration, IReadOnlyCollection<string>? packageTypes = null)
+        => ReadRoot(configuration, packageTypes);
 
     private static IReadOnlyList<TemplateConstraintDeclaration> ReadRoot(JsonElement root, IReadOnlyCollection<string>? packageTypes)
     {

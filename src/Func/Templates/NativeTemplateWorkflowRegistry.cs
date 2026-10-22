@@ -71,12 +71,12 @@ internal sealed class NativeTemplateWorkflowRegistry(
         return selected;
     }
 
-    public Task<DotNetProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
+    public Task<NativeProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(source);
         cancellationToken.ThrowIfCancellationRequested();
         INativeProjectWorkflowProvider? provider = FindProject(source.Entry);
-        return provider is null ? Task.FromResult<DotNetProjectLayoutQualification?>(null) : provider.QualifyLayoutAsync(source, cancellationToken);
+        return provider is null ? Task.FromResult<NativeProjectLayoutQualification?>(null) : provider.QualifyLayoutAsync(source, cancellationToken);
     }
 
     internal static string? InvocationDiagnostic(TemplateInvocationRequest original, TemplateInvocationRequest prepared,

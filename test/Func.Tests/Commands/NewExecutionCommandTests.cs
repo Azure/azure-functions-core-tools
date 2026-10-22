@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using NSubstitute;
@@ -288,6 +289,88 @@ public sealed class NewExecutionCommandTests
         await _runner.Received(1).ExecuteAsync(Arg.Is<NewExecutionRequest>(request =>
             request.WorkingDirectory.Info.FullName == Path.Combine(Directory.GetCurrentDirectory(), "nested-consumer-binding")
                 && request.WorkingDirectory.WasExplicit), _availability, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("successNoOutput", false, true)]
+    [InlineData("partialEffects", false, true)]
+    [InlineData("incompleteEffects", false, true)]
+    [InlineData("partialNative", false, true)]
+    [InlineData("uncommittedFailure", false, false)]
+    [InlineData("previewEffects", false, false)]
+    [InlineData("preview", false, false)]
+    [InlineData("listed", false, false)]
+    [InlineData("refused", false, false)]
+    [InlineData("invalidCreated", false, false)]
+    [InlineData("successNoOutput", true, false)]
+    [InlineData("partialEffects", true, false)]
+    public async Task Invoke_ReturnedOutcomeThenCancellation_PreservesAuthoritativeResultNotPreviewOrRefusal(
+        string outcome, bool dryRun, bool preserveResult)
+    {
+        using CancellationTokenSource cancellation = new();
+        var (root, _) = CreateCommand();
+        var directory = WorkingDirectory.FromExplicit(Path.Combine(Path.GetTempPath(), "staged-new-result-control"));
+        TemplateRestoreEffect restore = new(new("Selected", "owned", new('A', 64)), Path.Combine(directory.Info.FullName, "Selected.csproj"), false);
+        NativeTemplateEffectResult effects = new(outcome == "partialEffects" ? "partialFailure" : outcome == "previewEffects" ? "previewed" : "incomplete",
+            outcome == "previewEffects", new(directory, [restore]), [], outcome == "partialEffects" ? [restore] : [], ["Returned diagnostic"]);
+        NewExecutionResult result = outcome switch
+        {
+            "successNoOutput" => new("created", true) { Invocation = new(TemplateInvocationStatus.Success, []) },
+            "partialEffects" or "incompleteEffects" or "previewEffects" => new("invocationFailed", false)
+            {
+                Invocation = new(TemplateInvocationStatus.EffectFailure, []) { Effects = effects },
+            },
+            "partialNative" => new("invocationFailed", false)
+            {
+                Invocation = new(TemplateInvocationStatus.Failed, [new("written.txt", TemplateFileChangeKind.Create)]) { HasCommittedOutput = true },
+            },
+            "uncommittedFailure" => new("invocationFailed", false) { Invocation = new(TemplateInvocationStatus.Failed, []) },
+            "preview" => new("previewed", true) { Invocation = new(TemplateInvocationStatus.Success, []) },
+            "listed" => new("listed", true),
+            "refused" => NewExecutionResult.Reject("refused", "No mutation"),
+            "invalidCreated" => new("created", true) { Invocation = new(TemplateInvocationStatus.Failed, []) { HasCommittedOutput = true } },
+            _ => throw new ArgumentException("Unknown control.", nameof(outcome)),
+        };
+        CancellationToken observedToken = default;
+        _runner.ExecuteAsync(Arg.Any<NewExecutionRequest>(), _availability, Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            observedToken = call.Arg<CancellationToken>();
+            cancellation.Cancel();
+            return result;
+        });
+        var parsed = Parse(root, ["timer", "--output", "json", .. dryRun ? new[] { "--dry-run" } : []]);
+        int? exit = null;
+
+        Exception? failure = await Record.ExceptionAsync(async () =>
+            exit = await parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token));
+
+        if (preserveResult)
+        {
+            failure.Should().BeNull();
+            exit.Should().Be(result.Succeeded ? 0 : 1);
+            _interaction.AllOutput.Should().Contain("JSON:").And.Contain($"\"kind\":\"{result.Kind}\"");
+        }
+        else
+        {
+            failure.Should().BeAssignableTo<OperationCanceledException>().Which.CancellationToken.Should().Be(observedToken);
+            _interaction.AllOutput.Should().NotContain("JSON:");
+        }
+    }
+
+    [Fact]
+    public async Task Invoke_RunnerThrowsCancellation_PreservesOriginalExceptionWithoutInventingResult()
+    {
+        using CancellationTokenSource cancellation = new();
+        var original = new OperationCanceledException("Runner canceled", cancellation.Token);
+        var (root, _) = CreateCommand();
+        _runner.ExecuteAsync(Arg.Any<NewExecutionRequest>(), _availability, Arg.Any<CancellationToken>())
+            .Returns<Task<NewExecutionResult>>(_ => throw original);
+        var parsed = Parse(root, ["timer", "--output", "json"]);
+
+        Func<Task> act = () => parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
+
+        (await act.Should().ThrowAsync<OperationCanceledException>()).Which.Should().BeSameAs(original);
+        _interaction.AllOutput.Should().NotContain("JSON:");
     }
 
     private (RootCommand Root, NewExecutionCommand Command) CreateCommand()

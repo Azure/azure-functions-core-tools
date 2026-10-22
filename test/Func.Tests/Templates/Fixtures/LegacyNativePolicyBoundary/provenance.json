@@ -1,0 +1,9 @@
+{
+  "purpose": "Unchanged compiled old builder and workload, consumed with new shared Abstractions. Not a newly recompiled old-shaped source test.",
+  "compiledAgainstSource": "ebe9d5c179b25df3f533ef3db67ffbfef26026b8",
+  "oldAbstractionsSha256": "988b7bb0a617ccc632d38883e0f0b205fe9f110affdf386872b84a68a2f64467",
+  "fixtureSha256": "c10671fd8592d2807c44cf2da01e87527e1ae24b54fd47cbc1082907e8c3ccb4",
+  "fixtureBytes": 5120,
+  "producer": "dotnet build LegacyBoundary.csproj -c Release, net10.0, AssemblyName LegacyNativePolicyBoundary, DebugType none. References frozen pre-policy Azure.Functions.Cli.Abstractions.dll and its Microsoft.Extensions.DependencyInjection.Abstractions and System.CommandLine contracts. LegacyBoundary.cs.txt preserves the source. The normal test build does not rebuild this binary.",
+  "compatibility": "Old compiled builder and workload on new host only. A new policy workload requires a host whose Abstractions includes the new types and builder method. This fixture does not claim new workload compatibility with old hosts."
+}

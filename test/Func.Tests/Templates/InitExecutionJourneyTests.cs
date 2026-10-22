@@ -15,11 +15,15 @@ using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Console;
+using Azure.Functions.Cli.Tests.Templates.Engine;
 using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Edge.Template;
 using NSubstitute;
 using NuGet.Versioning;
 
@@ -118,6 +122,170 @@ public sealed class InitExecutionJourneyTests : IDisposable
         harness.Result.Context.Project.Language.Should().BeNull();
         _interaction.AllOutput.Should().NotContain("SELECT:").And.NotContain("INPUT:");
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_DryRunPendingJournal_RefusesWithoutRecoveryOrNativeBootstrap(bool corrupt)
+    {
+        WriteProject("valid", Low);
+        await InstallAsync();
+        var files = new PhysicalFileSystem();
+        var storeLock = Substitute.For<ITemplateStoreLock>();
+        storeLock.AcquireAsync(Arg.Any<string>(), Arg.Any<TemplateStoreAccess>(), Arg.Any<CancellationToken>(),
+            Arg.Any<Action<TemplateStoreWaitReason>?>()).Returns(call => new FileTemplateStoreLock().AcquireAsync(
+                call.Arg<string>(), call.Arg<TemplateStoreAccess>(), call.Arg<CancellationToken>(),
+                call.Arg<Action<TemplateStoreWaitReason>?>()));
+        var loggers = Substitute.For<ILoggerFactory>();
+        var store = new TemplateStore(new(Home), files, storeLock, loggers);
+        files.CopyDirectory(store.Hive, store.Backup);
+        File.WriteAllText(Path.Combine(store.Hive, "uncommitted.txt"), "Preserve until an owning lifecycle recovers.");
+        File.WriteAllText(store.Journal, corrupt ? "corrupt" : "present");
+        var hive = StoreBytes(store.Hive);
+        var backup = StoreBytes(store.Backup);
+        byte[] journal = File.ReadAllBytes(store.Journal);
+        var harness = CreateHarness(templateFactory: new TemplaterFactory(store, files));
+
+        var failure = await Record.ExceptionAsync(() =>
+            harness.InvokeAsync([Target, "--template", Low, "--dry-run", "--output", "json"]));
+
+        StoreBytes(store.Hive).Should().BeEquivalentTo(hive);
+        StoreBytes(store.Backup).Should().BeEquivalentTo(backup);
+        File.ReadAllBytes(store.Journal).Should().Equal(journal);
+        Directory.Exists(Target).Should().BeFalse();
+        failure.Should().BeOfType<TemplateStoreRecoveryRequiredException>().Which.Message.Should().Contain("owning lifecycle");
+        harness.Factory.Contexts.Should().ContainSingle().Which.RequireCleanStore.Should().BeTrue();
+        harness.Factory.Templaters.Should().BeEmpty();
+        loggers.DidNotReceive().CreateLogger(Arg.Any<string>());
+        await storeLock.DidNotReceive().AcquireAsync(Arg.Any<string>(), TemplateStoreAccess.Write,
+            Arg.Any<CancellationToken>(), Arg.Any<Action<TemplateStoreWaitReason>?>());
+        harness.Result.Should().BeNull();
+        _interaction.AllOutput.Should().NotContain("JSON:").And.NotContain("SUCCESS:");
+    }
+
+    [Fact]
+    public async Task Command_DryRunCleanStore_PreservesLiveHiveAndTarget()
+    {
+        WriteProject("valid", Low);
+        await InstallAsync();
+        var before = StoreBytes(Path.Combine(Home, "templates"));
+        var harness = CreateHarness();
+
+        int exit = await harness.InvokeAsync([Target, "--template", Low, "--dry-run", "--output", "json"]);
+
+        exit.Should().Be(0);
+        harness.Result!.Context!.RequireCleanStore.Should().BeTrue();
+        StoreBytes(Path.Combine(Home, "templates")).Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+        AssertJson("previewed", planned: 1, completed: 0);
+        await AssertDisposedAsync(harness.Factory);
+    }
+
+    [Fact]
+    public async Task Command_CreatePendingJournal_RetainsOrdinaryRecoveryAndConfiguration()
+    {
+        WriteProject("valid", Low);
+        await InstallAsync();
+        var files = new PhysicalFileSystem();
+        var store = new TemplateStore(new(Home), files, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        files.CopyDirectory(store.Hive, store.Backup);
+        var backup = StoreBytes(store.Backup);
+        string uncommitted = Path.Combine(store.Hive, "uncommitted.txt");
+        File.WriteAllText(uncommitted, "Unfinished store mutation.");
+        File.WriteAllText(store.Journal, "present");
+        var harness = CreateHarness();
+
+        int exit = await harness.InvokeAsync([Target, "--template", Low, "--output", "json"]);
+
+        exit.Should().Be(0);
+        harness.Result!.Context!.RequireCleanStore.Should().BeFalse();
+        harness.Result.Invocation!.HasCommittedOutput.Should().BeTrue();
+        File.Exists(uncommitted).Should().BeFalse();
+        File.Exists(store.Journal).Should().BeFalse();
+        StoreBytes(store.Backup).Should().BeEquivalentTo(backup);
+        File.Exists(Path.Combine(Target, "host.json")).Should().BeTrue();
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
+        AssertJson("created", planned: 1, completed: 1);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_PrivateNativeSuccessThenCancellation_DoesNotClaimRealCreation(bool dryRun)
+    {
+        WriteProject("valid", Low);
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        var factory = new CancelAfterCaptureFactory(Path.Combine(Home, "templates"), cancellation);
+        var harness = CreateHarness(templateFactory: factory);
+        string[] flags = dryRun ? ["--dry-run"] : [];
+
+        var failure = await Record.ExceptionAsync(() =>
+            harness.InvokeAsync([Target, "--template", Low, "--output", "json", .. flags], cancellation.Token));
+
+        failure.Should().BeAssignableTo<OperationCanceledException>();
+        factory.NativeStatus.Should().Be(CreationResultStatus.Success);
+        factory.NativeCalls.Should().Be(1);
+        Directory.Exists(Target).Should().BeFalse();
+        harness.Result.Should().BeNull();
+        _interaction.AllOutput.Should().NotContain("JSON:").And.NotContain("SUCCESS:");
+        await AssertDisposedAsync(harness.Factory);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_RealNativeMoveThenCancellation_RetainsPartialOutputWithoutConfiguration(bool json)
+    {
+        WriteProject("valid", Low);
+        await InstallAsync();
+        using CancellationTokenSource cancellation = new();
+        List<string> committed = [];
+        var files = new PhysicalFileSystem();
+        var installation = new RecordingCommitFileSystem(files)
+        {
+            AfterMove = path =>
+            {
+                committed.Add(path);
+                cancellation.Cancel();
+            },
+        };
+        var store = new TemplateStore(new(Home), files, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        var writer = WriterFileSystem();
+        var harness = CreateHarness(writerFileSystem: writer, templateFactory: new TemplaterFactory(store, installation));
+        int? exit = null;
+
+        var failure = await Record.ExceptionAsync(async () => exit = await harness.InvokeAsync(
+            [Target, "--template", Low, "--output", json ? "json" : "plain"], cancellation.Token));
+
+        committed.Should().ContainSingle();
+        File.Exists(committed[0]).Should().BeTrue();
+        failure.Should().BeNull("the current producer reports a non-successful result with already committed real output");
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("invocationFailed");
+        harness.Result.Succeeded.Should().BeFalse();
+        harness.Result.Invocation!.Status.Should().Be(TemplateInvocationStatus.Failed);
+        harness.Result.Invocation.HasCommittedOutput.Should().BeTrue();
+        harness.Result.Invocation.Changes.Should().Contain(change =>
+            Path.GetFullPath(Path.Combine(Target, change.Path)) == committed[0]);
+        harness.Result.Invocation.ConfiguredProjects.Should().BeEmpty();
+        harness.Result.Preview!.ProjectConfigurations.Should().ContainSingle();
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeFalse();
+        await writer.DidNotReceive().CreateAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        _interaction.AllOutput.Should().NotContain("SUCCESS:");
+        if (json)
+        {
+            AssertJson("invocationFailed", planned: 1, completed: 0);
+            using var document = JsonDocument.Parse(_interaction.Lines.Single(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]);
+            document.RootElement.GetProperty("invocation").GetProperty("completedChanges").GetArrayLength().Should().BeGreaterThan(0);
+        }
+        else
+        {
+            _interaction.AllOutput.Should().Contain("Completed effects");
+        }
+
+        await AssertDisposedAsync(harness.Factory);
     }
 
     [Fact]
@@ -502,13 +670,23 @@ public sealed class InitExecutionJourneyTests : IDisposable
         });
         var harness = CreateHarness(writerFileSystem: fileSystem);
 
-        Func<Task> act = () => harness.InvokeAsync([Target, "--template", "Func.Init.Multi"], cancellation.Token);
+        int? exit = null;
+        var failure = await Record.ExceptionAsync(async () =>
+            exit = await harness.InvokeAsync([Target, "--template", "Func.Init.Multi", "--output", "json"], cancellation.Token));
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        failure.Should().BeNull("native output is already committed, so cancellation must retain the partial result");
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("partialInitialization");
+        harness.Result.Succeeded.Should().BeFalse();
+        harness.Result.Invocation!.HasCommittedOutput.Should().BeTrue();
+        harness.Result.Invocation.ConfiguredProjects.Should().BeEmpty();
+        harness.Result.Invocation.Changes.Should().Contain(change =>
+            Path.GetFullPath(Path.Combine(Target, change.Path)) == Path.Combine(Target, "worker", "host.json"));
+        File.Exists(config).Should().BeFalse();
         await fileSystem.DidNotReceive().CreateAllTextAsync(Path.Combine(Target, "worker", ".func", "config.json"),
             Arg.Any<string>(), Arg.Any<CancellationToken>());
         File.Exists(Path.Combine(Target, "worker", "host.json")).Should().BeTrue();
-        harness.Result.Should().BeNull();
+        AssertJson("partialInitialization", planned: 2, completed: 0);
         _interaction.AllOutput.Should().NotContain("SUCCESS:");
         await AssertDisposedAsync(harness.Factory);
     }
@@ -637,16 +815,23 @@ public sealed class InitExecutionJourneyTests : IDisposable
         CancelAfterConfigurationCommitFileSystem fileSystem = new(cancellation, cancelOnCommit: 1);
         var harness = CreateHarness(writerFileSystem: fileSystem);
 
-        var failure = await Record.ExceptionAsync(() =>
-            harness.InvokeAsync([Target, "--template", "Func.Init.Multi", "--output", "json"], cancellation.Token));
+        int? exit = null;
+        var failure = await Record.ExceptionAsync(async () =>
+            exit = await harness.InvokeAsync([Target, "--template", "Func.Init.Multi", "--output", "json"], cancellation.Token));
 
         fileSystem.CommittedConfigurations.Should().Equal(Path.Combine(Target, "api", ".func", "config.json"));
         File.Exists(Path.Combine(Target, "api", ".func", "config.json")).Should().BeTrue();
         File.ReadAllText(Path.Combine(Target, "worker", "host.json")).Should().Be("""{"version":"2.0"}""");
         Directory.Exists(Path.Combine(Target, "worker", ".func")).Should().BeFalse();
-        failure.Should().BeAssignableTo<OperationCanceledException>();
-        harness.Result.Should().BeNull();
-        _interaction.AllOutput.Should().NotContain("JSON:").And.NotContain("SUCCESS:");
+        failure.Should().BeNull("the current native producer preserves committed output and finalized roots on cancellation");
+        exit.Should().Be(1);
+        harness.Result!.Kind.Should().Be("partialInitialization");
+        harness.Result.Succeeded.Should().BeFalse();
+        harness.Result.Invocation!.HasCommittedOutput.Should().BeTrue();
+        harness.Result.Invocation.ConfiguredProjects.Should().Equal(Path.Combine(Target, "api"));
+        AssertJson("partialInitialization", planned: 2, completed: 1);
+        _interaction.Lines.Count(line => line.StartsWith("JSON: ", StringComparison.Ordinal)).Should().Be(1);
+        _interaction.AllOutput.Should().NotContain("SUCCESS:");
         await AssertDisposedAsync(harness.Factory);
     }
 
@@ -1077,7 +1262,8 @@ public sealed class InitExecutionJourneyTests : IDisposable
     }
 
     private Harness CreateHarness(IInteractionService? interaction = null, IFileSystem? writerFileSystem = null,
-        IReadOnlyList<IProjectStack>? additionalStacks = null, Action<InitExecutionResult>? afterRunnerReturn = null)
+        IReadOnlyList<IProjectStack>? additionalStacks = null, Action<InitExecutionResult>? afterRunnerReturn = null,
+        ITemplaterFactory? templateFactory = null)
     {
         interaction ??= _interaction;
         ServiceCollection services = new();
@@ -1104,8 +1290,9 @@ public sealed class InitExecutionJourneyTests : IDisposable
         services.AddSingleton<InstalledProjectStackCatalog>();
         services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
         services.AddTemplatesOrchestrator();
-        var factory = new RecordingFactory(new TemplaterFactory(new TemplateStore(
-            new CliConfigurationPathsOptions(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance)));
+        var factory = new RecordingFactory(templateFactory ?? new TemplaterFactory(new TemplateStore(
+            new CliConfigurationPathsOptions(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance),
+            new PhysicalFileSystem()));
         services.AddSingleton<ITemplaterFactory>(factory);
         if (writerFileSystem is not null)
         {
@@ -1224,6 +1411,9 @@ public sealed class InitExecutionJourneyTests : IDisposable
     private Dictionary<string, string> SnapshotHome() => Directory.GetFiles(Path.Combine(Home, "templates"), "*", SearchOption.AllDirectories)
         .ToDictionary(path => Path.GetRelativePath(Home, path), File.ReadAllText);
 
+    private static Dictionary<string, string> StoreBytes(string path) => Directory.GetFiles(path, "*", SearchOption.AllDirectories)
+        .ToDictionary(file => Path.GetRelativePath(path, file), file => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(file))));
+
     private void AssertJson(string kind, int planned, int completed)
     {
         using var json = JsonDocument.Parse(_interaction.Lines.Last(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]);
@@ -1334,6 +1524,48 @@ public sealed class InitExecutionJourneyTests : IDisposable
             var templater = await inner.CreateProjectAsync(context, snapshot, projectSupport, cancellationToken, waiting);
             Templaters.Add(templater);
             return templater;
+        }
+
+    }
+
+    private sealed class CancelAfterCaptureFactory(string hive, CancellationTokenSource cancellation) : ITemplaterFactory
+    {
+        private CancelAfterCaptureSession? _session;
+
+        public CreationResultStatus? NativeStatus => _session?.NativeStatus;
+        public int NativeCalls => _session?.NativeCalls ?? 0;
+
+        public Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken,
+            Action<TemplateStoreWaitReason>? waiting = null)
+            => throw new InvalidOperationException("INIT requires a project-capable flow.");
+
+        public Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+            CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
+            => throw new InvalidOperationException("INIT requires a project-capable flow.");
+
+        public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+            TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _session = new(context, hive, snapshot, cancellation);
+            return Task.FromResult(TemplateFixtures.CreateTemplater(_session, projectSupport: projectSupport));
+        }
+    }
+
+    private sealed class CancelAfterCaptureSession(TemplateEngineContext context, string hive,
+        TemplateConstraintEvaluationSnapshot snapshot, CancellationTokenSource cancellation) : TemplateEngineSession(context, hive, snapshot)
+    {
+        public CreationResultStatus? NativeStatus { get; private set; }
+        public int NativeCalls { get; private set; }
+
+        protected override async Task<ITemplateCreationResult> InstantiateAsync(ITemplateInfo template, TemplateInvocationRequest request,
+            InputDataSet parameters, bool dryRun, CancellationToken cancellationToken)
+        {
+            NativeCalls++;
+            var result = await base.InstantiateAsync(template, request, parameters, dryRun, cancellationToken);
+            NativeStatus = result.Status;
+            await cancellation.CancelAsync();
+            return result;
         }
     }
 }

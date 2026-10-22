@@ -292,7 +292,11 @@ The exclusive scope snapshots the entire hive, without interpreting `packages.js
 
 Failure invalidates the original engine before restoring prior files. Once restoration starts it uses an uncanceled token so cancellation cannot publish a half-restored hive. A fresh private engine environment is then constructed against the restored state; old catalogs and capabilities are not transferred. The caller inspects `TemplateStoreWriteSession.State` (`Committed`, `Restored`, or `RecoveryRequired`) and `RecoverySessionRecreated` after failure and starts any later runtime flow through the factory. `Restored` with `RecoverySessionRecreated == false` distinguishes successful disk restoration from failed environment recreation; that recreation failure still escapes. A scope is single-use and refuses disposal while its transaction or recovery is running. Restore failure leaves the journal and backup for repair/retry. New readers release their read lease, acquire exclusive recovery ownership, restore an armed interrupted transaction, and only then create an engine. A corrupt or incomplete armed snapshot fails closed. Backup cleanup is deferred to the next writer; runtime copies use existing best-effort temporary-directory cleanup.
 
+If mutation, validation or cache rebuilding fails and cleanup or recovery also fails, the transaction reports an `AggregateException` containing the original failures in occurrence order. A lone failure, including cancellation after successful recovery, retains its original exception and stack. Failed disk restoration keeps the journal for the next owner to retry. Failed environment recreation after successful restoration remains distinguishable through `Restored` and `RecoverySessionRecreated == false`.
+
 Execution claim, completion and disposal use one synchronized lifetime state machine. An overlapping execution is rejected, disposal cannot release the exclusive lease during mutation or recovery, and the disposed transition prevents a later execution from starting. The lifetime gate is not held across native work, callbacks or awaits. Cross-process cancellation tests use a parent signal after the child's waiting phase, not a timer that can expire before readiness.
+
+Read-only consumers set `TemplateEngineContext.RequireCleanStore` before opening the factory flow. A pending recovery journal then raises `TemplateStoreRecoveryRequiredException` under shared admission, before native bootstrap, private copying or exclusive recovery. The live hive, journal and backup remain unchanged. Clean-store readers retain the normal private-cache and shared-lease lifetime. Ordinary runtime and explicit lifecycle callers keep their existing recovery behavior. This boundary does not activate public preview or install commands.
 
 Qualification remains pinned to Microsoft.TemplateEngine **10.0.301** (upstream tag commit `a397da1b5747f31a7d91d024609c6e529679b694`). Its global provider removes an incumbent before replacement acquisition; its package manager logs and swallows cache-write failures. Private Windows hives exercise those actual paths, successful replacement and fresh invocation, cancellation after removal, byte-hash restoration of registration/archive/cache, first-install failure, repeated operations, and stale capability rejection. Owned separate Windows processes exercise overlapping readers, reader churn behind a queued writer, canceled ticket removal, reader termination, and recovery before listing after writer termination. Linux/macOS execution, network/feed failures, hostile filesystem mutation, power-loss durability, and general third-party provider behavior are not established by that evidence.
 
@@ -362,6 +366,14 @@ before stack deployment without alternate-feed fallback. A local installed stack
 source path is not a companion feed. This repair path uses the ordinary approved
 HTTP(S) feed and does not define direct-local-stack acquisition policy.
 
+The user selected **stage first, then lease and revalidate**. Private stack and
+companion preparation finishes before workload admission. Under the shared
+workload operation the runner rereads installed rows, replans retained ranges,
+rechecks selected artifacts, source and ownership, and validates prepared bytes
+before any live stack effect. A changed plan returns a conflict instead of
+downloading another payload or prompting under the operation. The capability is
+held through companion commit or template recovery and disposal.
+
 Installed companion reuse requires actual native managed-package identity/version,
 archive validation, and lifecycle-owned source/pin evidence keyed to that exact
 artifact. The default unavailable ownership implementation fails closed; installed
@@ -388,9 +400,10 @@ and the actual cause/source diagnostics. Source argument handling is scoped to t
 source-provider call. Malformed nuspec XML/version data is classified as an invalid
 artifact at inspection, not a source conflict. Known stack feed HTTP/protocol
 failures and transport timeouts are classified around installation; caller
-cancellation stays distinct and unrelated argument errors escape. A successful
-stack row remains after companion failure, so a
-new process reconstructs its requirements before considering another stack. A
+cancellation stays distinct and unrelated argument errors escape. A companion
+transport or preflight failure before admission now leaves a fresh stack
+uninstalled. After verified stack commit, a later companion failure retains that
+stack so a new process reconstructs its requirements before considering another. A
 removed stack contributes none; reinstalling its mapped version restores the
 requirement. Cancellation stops further operations and the protected store owns
 active template recovery. Earlier successful packages are not uninstalled.
@@ -400,43 +413,127 @@ payload rather than querying feeds. A separately injected verified local provide
 can supply exact offline bytes without changing approval.
 
 Public command integration, publisher-qualified production rows, historical upgrade
-coverage, real lifecycle source/pin provenance, concurrent workload-acquisition
-serialization, complete lifecycle replacement/update/uninstall, and cross-platform
-qualification remain separate gates. The runner observes workload state but does
-not add a cross-store transaction or serialize another process changing workloads
-after planning. Curated registration/proof/grammar remains #5640/#5653/#5651; no
+coverage, real lifecycle source/pin provenance, complete lifecycle
+replacement/update/uninstall, and cross-platform qualification remain separate
+gates. Participating workload writers now share admission and authoritative
+revalidation, but this is not a cross-store transaction or a guarantee for
+nonparticipating processes. Curated registration/proof/grammar remains #5640/#5653/#5651; no
 curated preinstallation, general scanner or second sample registry is introduced.
 This increment is not M5 or production acquisition completion.
 
-### Unresolved shared workload mutation protocol
+### Staged hybrid setup
 
-The single-writer fixture journey does not qualify concurrent workload state.
-`BasicAcquisitionRunner` reads an installed snapshot before planning;
-`WorkloadDeploymentService.InstallAsync` can later replace the physical directory
-and call `SaveWorkloadAsync` or move logical ownership. `WorkloadStore` reads,
-modifies and atomically renames the registry without a lease spanning that
-read-modify-write. Two writers can therefore publish stale aggregate state or add
-a disjoint retained requirement after acquisition has planned. Atomic file
-replacement prevents partial serialization, not lost updates or stale planning.
-The new composition inherits and exposes that risk. The template-hive lease does
-not protect workload directories or the workload registry.
+`NativeTemplateSetupRegistration.AddNativeTemplateSetup` composes the native
+setup foundation explicitly. The default CLI host does not call it. Public
+setup retains its legacy route, and public init/new activation is unchanged.
+An explicitly planned native dependency cannot fall back to an optional or
+versionless templates workload when native support or qualification is missing.
 
-Before production activation or landing as a concurrent-safe acquisition feature,
-the workload/lifecycle owners must agree a cohesive protocol covering every local
-and catalog install, update, uninstall, explicit/logical ownership attach/remove/
-move, and direct registry save/remove/replace, including setup and this runner.
-No acquisition-private lock can establish safety while other mutators ignore it.
-Francisco's lifecycle/store review is required, coordinated with workload owners.
-The next protocol proposal must answer:
+Bundled stack readiness and required external native readiness are separate
+dependency results. `SetupRunner` carries the actual successful stack result
+into its corresponding native dependency within each profile scope. Native
+planning uses that physical owner and its logical pointer attribution, exact
+version and catalog origin. Profiles retain their host, worker, bundle and
+supported runtime constraints. They cannot supply publication authority.
 
-1. Which authoritative workload lease or snapshot revision spans validation and
-   deployment, and how do every mutator and retained-row reader participate?
-2. What is the global order between workload ownership and template read/write
-   admission? Can slow payload acquisition happen before admission with a
-   mandatory recheck, without deadlock or accepting a changed requirement?
-3. What completed-state and recovery evidence survives cancellation/process death
-   after stack persistence or during companion commit, and which owner repairs it
-   without silently removing a working stack or publishing a stale registry?
+The existing acquisition reader also supports schema version 2. Stack mappings
+retain literal package IDs, compatible version ranges and approved sources.
+They add `hostIdentifier`, `engineHostVersions` and explicit `channels`.
+`hostIdentifier` must be `func`. The version range describes the actual FUNC
+native host version, including prerelease bounds, not the separately versioned
+Microsoft.TemplateEngine package. The opt-in composition binds the same
+assembly version source used by `FuncTemplateEngineHost`, independently of
+version-command test overrides.
 
-These are unresolved landing/activation questions, not a locking implementation
-or a claim that `Completed` guarantees concurrent machine-wide consistency.
+Each companion has explicit `requiredRoles`. Every complete raw template
+inventory entry has `contentRole`, either `function` with native type `item` or
+`additional-project` with native type `project`. Content role does not grant
+executable ownership or permission to bypass native constraints, configuration
+actions or invocation guards. The artifact still needs an exact version,
+source, SHA-256 and content revision. Compatible ranges select only those exact
+qualified artifacts, not future unreviewed bytes. Legacy basic-only records
+cannot satisfy these roles.
+
+The normal explicit, environment and default source selection is resolved once.
+A conflicting effective source is not silently replaced by the stored origin.
+The native path keeps the selected catalog origin rather than silently changing
+feeds. A local archive path is not a native feed binding. An explicit channel is
+not replaced with stable. Without a channel restriction, candidates must still
+match the publisher's approved channels and the caller's prerelease policy.
+Retained stacks sharing an external package constrain its ranges, source and
+host policy. An unrelated package is not an implicit repair target.
+
+Before admission, native setup validates the selected runtime metadata, declared
+payload root and entry-point file, then stages every required archive privately.
+This is not assembly activation or type-load qualification. Under the existing workload operation
+it rechecks the selected owner, source, payload hashes and retained requirements.
+Native registration, discovered host metadata and complete inventory checks use
+the existing protected template lifecycle. Package and template identity
+collisions refuse replacement or adoption.
+
+Native source, digest and exact-version pins live in provenance receipts under
+the existing template hive. They participate in its snapshot, commit and
+recovery, not another installed-template registry. A missing package remains
+missing even if its receipt survives. Repair retains a compatible recorded pin
+and refuses conflicting bytes, versions or sources. Reuse does not rewrite the
+receipt. Failed receipt writes roll back native registration. Completed packages
+remain in the result ledger after a later failure or cancellation.
+
+Check mode validates without payload acquisition, registration or pending-state
+recovery. Both preparation and final reads require a clean native store.
+Ordinary legacy repair keeps the owning store's existing recovery behavior.
+Structured native setup results distinguish selected-stack completion from
+external artifact completion and retain association revision and source.
+Finished results remain visible if cancellation is observed at the return
+boundary, without starting the next dependency or reporting whole-setup success.
+
+The production resource remains deliberately empty and unqualified. Concrete
+publisher-owned native release identities, ranges, digests and inventories are
+still required. The current Node bundle also still includes HTTP items.
+Project-only bundled starter assets and separately released function catalog
+assets remain the Node catalog owner's producer work. Shared packaging remains
+its owning layer's work. Scoped real package fixtures exercise composition and
+staged creation, not production qualification, public activation or live host
+execution. Schema version 1 prototype behavior remains separately covered.
+
+### Participating workload mutation
+
+The existing coordination feature is relocated into this acquisition layer so
+its own source supplies the shared workload operation rather than depending on a
+later PR. Install, update, uninstall, reuse that attaches or moves ownership,
+prune selection/removal and all registry writers either acquire the operation or
+receive the same explicit capability. It is bound to the physical workload home
+and registry. Prune resolves current versions only after admission. Standalone
+registry writers hold admission through their read-modify-write, avoiding stale
+aggregate replacement by another participant.
+
+Lock order is workload before template. Advisory readers and private preparation
+are disposed or completed before admission. The existing protected template
+transaction remains responsible for actual-content checks, commit and recovery.
+No second template lock, automatic package replacement or whole-machine rollback
+is introduced.
+
+Workload mutation flushes a dirty intent before changing live directories or the
+registry and verifies persisted state before clearing it. A killed or failed
+writer with ambiguous state blocks subsequent mutation with recovery-required
+guidance. It does not automatically reconcile payloads or erase the intent.
+Completed stacks remain installed after later template failure; interrupted
+template work uses its existing recovery journal.
+
+Prepared workload reuse also requires installed metadata, the declared portable
+or RID payload root and any entry-point assembly to match the registry before
+hashes become verification evidence. A stable hash of a damaged installation is
+not readiness. Entry-point lookup preserves the loader's install-root-relative
+path first, then its legacy `tools/any` fallback. This checks existence, not
+assembly activation or type loadability. Failed payload deletion retains the dirty
+intent, including when the filesystem reports success but the directory remains. Uninstall presents
+known coordination failures as user errors while preserving their causes.
+Unexpected implementation errors and cancellation are not converted to success.
+
+This writer protocol does not cover old CLIs, nonparticipating inventory/runtime
+readers, hostile alias changes or unsupported locking backends. Ordinary workload
+verbs do not gain a new global companion-compatibility policy. Atomic registry
+rename is still byte-level replacement, not atomic payload-plus-registry rollback.
+The detailed participating contract and process qualification live in
+`proposed/workload-spec.md` section 6.8. Owner review and platform qualification
+remain distinct from implementing the own-source coordination boundary.

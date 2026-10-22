@@ -17,7 +17,7 @@ internal interface IBasicArtifactInspector
 }
 
 /// <summary>
-/// Checks exact archive bytes and the complete raw template inventory against reviewed basic-content evidence.
+/// Checks exact archive bytes and the complete raw template inventory against qualified content evidence.
 /// </summary>
 internal sealed class BasicArtifactInspector(IFileSystem fileSystem) : IBasicArtifactInspector
 {
@@ -56,7 +56,7 @@ internal sealed class BasicArtifactInspector(IFileSystem fileSystem) : IBasicArt
                 || configurations.Distinct(StringComparer.OrdinalIgnoreCase).Count() != configurations.Length
                 || artifact.Templates.Any(template => !configurations.Contains(template.Path, StringComparer.Ordinal)))
             {
-                throw Invalid(artifact, "The complete template inventory differs from the reviewed basic-only inventory.");
+                throw Invalid(artifact, "The complete template inventory differs from the qualified inventory.");
             }
 
             foreach (BasicTemplateDefinition template in artifact.Templates)
