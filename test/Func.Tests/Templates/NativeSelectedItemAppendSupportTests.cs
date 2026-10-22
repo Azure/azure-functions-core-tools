@@ -193,7 +193,7 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
                 kind == "incomplete" ? [first, new TemplateAppendFileEffect(pin, Target, "\nnot-started", digest)] : [first]);
             NativeTemplateEffectResult ledger = await new NativeTemplateEffectWorkflow()
                 .ExecuteAsync(plan, capability, dryRun: false, confirmed: true, call.Arg<CancellationToken>());
-            return new TemplateInvocationResult(ledger.Succeeded ? TemplateInvocationStatus.Success : TemplateInvocationStatus.EffectFailure,
+            return (TemplateInvocationResult?)new TemplateInvocationResult(ledger.Succeeded ? TemplateInvocationStatus.Success : TemplateInvocationStatus.EffectFailure,
                 [], ledger.Succeeded ? null : "Controlled workflow did not complete.") { Effects = ledger };
         });
         var contexts = Substitute.For<INewExecutionContextResolver>();
