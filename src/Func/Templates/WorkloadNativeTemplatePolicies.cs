@@ -20,6 +20,8 @@ internal sealed class WorkloadNativeTemplatePolicies(
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
     private readonly Dictionary<SourceKey, NativeTemplatePolicyCandidate> _candidates = [];
 
+    public bool HasPolicyForStack(string stack) => _admission.HasPolicyForStack(stack);
+
     public async Task<NativeTemplatePolicyCandidate?> QualifyProjectAsync(
         NativeProjectTemplateSource source, bool requireLayout, CancellationToken cancellationToken)
     {
@@ -40,7 +42,7 @@ internal sealed class WorkloadNativeTemplatePolicies(
         NativeTemplatePolicyCandidate? candidate = await GetCandidateAsync(selected.Entry, configuration,
             selected.ConfigurationSourceIdentity, selected.PackageMountPoint, selected.ReadPackageFileAsync,
             selected.ValidateConfigurationAsync, requireLayout: false, cancellationToken, selected.InvocationOwner);
-        return candidate is null ? null : new(candidate, this, _files, _interaction, _arguments);
+        return candidate is null ? null : new(candidate, FindAsync, _files, _interaction, _arguments);
     }
 
     internal async Task<NativeTemplatePolicyCandidate?> GetCandidateAsync(

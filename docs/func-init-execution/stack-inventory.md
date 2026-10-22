@@ -233,6 +233,16 @@ host. A workload using the new boundary still requires a host containing it.
 There is no reverse compatibility claim, all-stack policy migration, public
 activation or production publisher qualification.
 
+The Python stack registers its bundled-source validation, original defaults
+and append capability through this boundary. Core no longer compiles Python
+template implementations or source-links its executor. The shared NEW route
+uses policy registration only to reach selection; the exact selected source
+must still pass runtime-owner admission before compatibility or append.
+Unowned items refuse rather than falling back to plain native creation.
+Python's existing basic-project configuration action and no-pip/no-venv
+behavior remain unchanged. Other stacks' core adapters are not migrated by
+this change.
+
 ### Bounded F# workflow repair
 
 The internal, explicit `NativeTemplateInvocationEffects.FSharpRepair` contract

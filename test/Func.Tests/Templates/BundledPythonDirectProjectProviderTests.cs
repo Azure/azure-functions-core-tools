@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Python;
+using Azure.Functions.Cli.Workloads.Python;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -19,7 +19,7 @@ public sealed partial class BundledPythonTemplateTests
         await InstallAsync();
         using var templater = CreateTemplater();
         var selected = (await templater.ResolveGroupAsync("basic", TemplateType.Project)).Group!.Single();
-        var provider = new PythonProjectWorkflowProvider(new PythonTemplateSourceReader());
+        var provider = CreatePythonProvider();
         var source = await ReadDirectProjectSourceAsync(selected);
         var context = DirectProjectContext(templater, selected);
 
@@ -33,7 +33,10 @@ public sealed partial class BundledPythonTemplateTests
         qualification.Should().BeNull();
         ((INativeProjectWorkflowProvider)provider).Preparation.Should().BeNull();
         prepared.Diagnostics.Should().BeEmpty();
-        prepared.Request.Should().BeSameAs(context.Invocation);
+        prepared.Request!.OutputDirectory.Should().Be(context.Invocation.OutputDirectory);
+        prepared.Request.Name.Should().Be(context.Invocation.Name);
+        prepared.Request.Parameters.Should().BeEquivalentTo(context.Invocation.Parameters);
+        prepared.Request.PolicyCandidate.Should().NotBeNull();
         Directory.Exists(context.Invocation.OutputDirectory.Info.FullName).Should().BeFalse();
         var created = await selected.InvokeAsync(prepared.Request!, CancellationToken.None);
         created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
@@ -87,7 +90,7 @@ public sealed partial class BundledPythonTemplateTests
         await InstallAsync();
         using var templater = CreateTemplater();
         var selected = (await templater.ResolveGroupAsync("basic", TemplateType.Project)).Group!.Single();
-        var provider = new PythonProjectWorkflowProvider(new PythonTemplateSourceReader());
+        var provider = CreatePythonProvider();
         var source = await ReadDirectProjectSourceAsync(selected);
         var context = DirectProjectContext(templater, selected);
 
@@ -110,7 +113,7 @@ public sealed partial class BundledPythonTemplateTests
         await InstallAsync();
         using var templater = CreateTemplater();
         var selected = (await templater.ResolveGroupAsync("basic", TemplateType.Project)).Group!.Single();
-        var provider = new PythonProjectWorkflowProvider(new PythonTemplateSourceReader());
+        var provider = CreatePythonProvider();
         var source = await ReadDirectProjectSourceAsync(selected);
         var context = DirectProjectContext(templater, selected);
         using CancellationTokenSource cancellation = new();
@@ -127,16 +130,18 @@ public sealed partial class BundledPythonTemplateTests
     [Fact]
     public async Task DirectProjectProvider_NullContracts_AreRejected()
     {
-        Action construct = () => new PythonProjectWorkflowProvider(null!);
-        var provider = new PythonProjectWorkflowProvider(new PythonTemplateSourceReader());
+        Action construct = () => new PythonTemplatePolicy(null!, new PythonTemplateAppendExecutor(), new());
+        var provider = CreatePythonPolicy();
         Action handles = () => provider.Handles(null!);
-        Func<Task> qualify = () => provider.QualifyLayoutAsync(null!, CancellationToken.None);
-        Func<Task> prepare = () => provider.PrepareAsync(null!, CancellationToken.None);
+        Func<Task> qualify = () => provider.ValidateProjectAsync(null!, CancellationToken.None);
+        Func<Task> prepare = () => provider.QualifyInvocationAsync(null!, CancellationToken.None);
+        Func<Task> capture = () => provider.QualifyCapturedOutputAsync(null!, CancellationToken.None);
 
         construct.Should().Throw<ArgumentNullException>();
         handles.Should().Throw<ArgumentNullException>();
         await qualify.Should().ThrowAsync<ArgumentNullException>();
         await prepare.Should().ThrowAsync<ArgumentNullException>();
+        await capture.Should().ThrowAsync<ArgumentNullException>();
     }
 
     private static async Task<NativeProjectTemplateSource> ReadDirectProjectSourceAsync(

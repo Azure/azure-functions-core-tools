@@ -4,11 +4,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-#if FUNC_PYTHON_TEMPLATE_HELPERS
-namespace Azure.Functions.Cli.Templates.Python.Shared;
-#else
 namespace Azure.Functions.Cli.Workloads.Python;
-#endif
 
 /// <summary>
 /// Preserves an existing Python app's bytes while applying one hash-bound function-body append.

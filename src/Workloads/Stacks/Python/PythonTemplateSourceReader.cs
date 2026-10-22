@@ -4,14 +4,15 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Native;
 using Azure.Functions.Cli.Templates.V2;
 using NuGet.Versioning;
 
-namespace Azure.Functions.Cli.Templates.Python;
+namespace Azure.Functions.Cli.Workloads.Python;
 
 internal sealed record PythonTemplateSource(
-    NativeSelectedItemBinding Binding, NativeTemplateLegacyContract? Compatibility, TemplateEffectSource HelperSource);
+    NativeItemPolicyDescription Description, NativeTemplateSourceStamp HelperSource);
 
 /// <summary>
 /// Qualifies Python item metadata and original prompts only through the selected native package's mounted source reader.
@@ -33,22 +34,17 @@ internal sealed class PythonTemplateSourceReader
     /// <exception cref="JsonException">Owned JSON is malformed.</exception>
     /// <exception cref="IOException">An owned package source cannot be read.</exception>
     /// <exception cref="UnauthorizedAccessException">An owned package source cannot be accessed.</exception>
-    public async Task<PythonTemplateSource> ReadAsync(ResolvedTemplate selected, CancellationToken cancellationToken)
+    public async Task<PythonTemplateSource> ReadAsync(NativeTemplateSource selected, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selected);
         cancellationToken.ThrowIfCancellationRequested();
-        TemplateCatalogEntry entry = selected.Entry;
-        if (entry.Type != TemplateType.Item || entry.Language != "Python" || entry.Package is not { } package
-            || package.Identifier != PackageId || package.Version is null)
+        if (selected.IsProject || selected.Language != "Python" || selected.PackageId != PackageId
+            || string.IsNullOrWhiteSpace(selected.PackageVersion))
         {
             throw Invalid("The selected item is not a Python item from the physical Python native package.");
         }
 
-        TemplateInvocationResult? changed = await selected.ValidateConfigurationAsync(cancellationToken);
-        if (changed is not null)
-        {
-            throw Invalid(changed.Diagnostic ?? "The selected Python configuration changed.");
-        }
+        await selected.RevalidateAsync(cancellationToken);
 
         ReadOnlyMemory<byte> manifest = await selected.ReadPackageFileAsync(ManifestPath, cancellationToken);
         using JsonDocument document = Parse(manifest);
@@ -56,16 +52,16 @@ internal sealed class PythonTemplateSourceReader
         RequireKeys(root, ["schemaVersion", "packageId", "version", "sources", "project", "applications"]);
         Require(Property(root, "schemaVersion") is { ValueKind: JsonValueKind.Number } schemaElement
             && schemaElement.TryGetInt32(out int schema) && schema == 1, "Unsupported Python source map schema.");
-        Require(Text(root, "packageId") == package.Identifier && NuGetVersion.TryParse(Text(root, "version"), out NuGetVersion? declared)
-            && NuGetVersion.TryParse(package.Version, out NuGetVersion? installed) && declared == installed,
+        Require(Text(root, "packageId") == selected.PackageId && NuGetVersion.TryParse(Text(root, "version"), out NuGetVersion? declared)
+            && NuGetVersion.TryParse(selected.PackageVersion, out NuGetVersion? installed) && declared == installed,
             "The Python source map does not match the selected package ID/version.");
         JsonElement[] applications = [.. Array(root, "applications")];
         Require(applications.Length == 25, "The Python source map requires its complete original item inventory.");
         string[] originals = [.. applications.Select(item => Text(item, "templateIdentity"))];
         string[] helpers = [.. applications.Select(item => Text(Property(item, "appendHelper"), "templateIdentity"))];
         Require(originals.Concat(helpers).Distinct(StringComparer.Ordinal).Count() == 50, "Python original/helper identities must be unique.");
-        JsonElement[] matches = [.. applications.Where(item => Text(item, "templateIdentity") == entry.Identity
-            || Text(Property(item, "appendHelper"), "templateIdentity") == entry.Identity)];
+        JsonElement[] matches = [.. applications.Where(item => Text(item, "templateIdentity") == selected.Identity
+            || Text(Property(item, "appendHelper"), "templateIdentity") == selected.Identity)];
         Require(matches.Length == 1, "The selected Python identity has no unique source-qualified application mapping.");
         JsonElement application = matches[0];
         JsonElement helper = Property(application, "appendHelper");
@@ -74,10 +70,10 @@ internal sealed class PythonTemplateSourceReader
         RequireKeys(helper, ["templateIdentity", "role", "configuration", "configurationSha256", "source", "sourceSha256", "expectedOutput", "expectedOutputKind"]);
         string originalIdentity = Text(application, "templateIdentity");
         string helperIdentity = Text(helper, "templateIdentity");
-        bool internalHelper = entry.Identity == helperIdentity;
+        bool internalHelper = selected.Identity == helperIdentity;
         Require(helperIdentity == originalIdentity + ".Append"
-            && entry.DeclaredInternalRole == (internalHelper ? "python-append-helper" : null)
-            && (!internalHelper || entry.IsHidden), "The selected Python helper role or identity changed.");
+            && selected.InternalRole == (internalHelper ? "python-append-helper" : null)
+            && (!internalHelper || selected.IsHidden), "The selected Python helper role or identity changed.");
 
         Dictionary<string, ReadOnlyMemory<byte>> sources = new(StringComparer.Ordinal);
         JsonElement[] descriptors = [.. Array(root, "sources")];
@@ -117,7 +113,7 @@ internal sealed class PythonTemplateSourceReader
             && raw.Actions is not null && raw.Actions.All(action => action is not null),
             "Python original jobs, inputs or actions are invalid.");
         string stem = raw.Id[..^"-Python".Length];
-        Require(entry.ShortNames.SequenceEqual(internalHelper ? ["__python-append-" + stem] : [raw.Id], StringComparer.Ordinal),
+        Require(selected.ShortNames.SequenceEqual(internalHelper ? ["__python-append-" + stem] : [raw.Id], StringComparer.Ordinal),
             "Python selected aliases differ from the exact original/helper source mapping.");
         string configurationPath = $"content/items/{stem}/.template.config/template.json";
         string helperConfigurationPath = $"content/append/{stem}/.template.config/template.json";
@@ -169,7 +165,7 @@ internal sealed class PythonTemplateSourceReader
             == Text(application, "createSourceSha256")
             && Hash(Encoding.UTF8.GetBytes(raw.Files["function_body.py"].Replace("$(FUNCTION_NAME_INPUT)", "__FUNCTION_NAME__", StringComparison.Ordinal)))
             == Text(helper, "sourceSha256"), "Python generated source hashes differ from the original owned function bodies.");
-        Require(entry.IsHidden == (internalHelper || _hiddenIds.Contains(raw.Id, StringComparer.Ordinal)), "Python original/helper hidden metadata changed.");
+        Require(selected.IsHidden == (internalHelper || _hiddenIds.Contains(raw.Id, StringComparer.Ordinal)), "Python original/helper hidden metadata changed.");
         ValidateChannelsAndBindings(sources, raw.Id, native.RootElement);
 
         Dictionary<string, UserPromptDoc> prompts = rawPrompts.ToDictionary(item => item.Id!, StringComparer.OrdinalIgnoreCase);
@@ -182,32 +178,32 @@ internal sealed class PythonTemplateSourceReader
         V2Input[] nameInputs = [.. (jobs[0].Inputs ?? []).Where(input => input.AssignTo == "$(FUNCTION_NAME_INPUT)")];
         Require(nameInputs.Length <= 1, "Python source declares multiple function name inputs.");
         string expectedDefault = projected.DefaultFunctionName ?? raw.Id;
-        Require(entry.DefaultName == expectedDefault && entry.Name == projected.DisplayName, "Python native name/default differs from its original source.");
-        NativeTemplateValidationRule[] rules = [.. projected.Metadata.UserPrompts.Where(prompt =>
+        Require(selected.DefaultName == expectedDefault && selected.DisplayName == projected.DisplayName, "Python native name/default differs from its original source.");
+        TemplateUserPrompt[] rules = [.. projected.Metadata.UserPrompts.Where(prompt =>
             (jobs[0].Inputs ?? []).Any(input => input.ParamId == prompt.Id
-                && input.AssignTo is not ("$(APP_FILENAME)" or "$(FUNCTION_NAME_INPUT)")))
-            .Select(prompt => new NativeTemplateValidationRule(prompt.Id, prompt))];
-        Require(entry.Parameters.Count == rules.Length, "Python native parameter inventory differs from the original create job.");
-        foreach (NativeTemplateValidationRule rule in rules)
+                && input.AssignTo is not ("$(APP_FILENAME)" or "$(FUNCTION_NAME_INPUT)")))];
+        Require(selected.CanonicalParameters.Count == rules.Length, "Python native parameter inventory differs from the original create job.");
+        foreach (TemplateUserPrompt rule in rules)
         {
-            TemplateParameterDefinition? parameter = entry.Parameters.SingleOrDefault(item => item.CanonicalName == rule.CanonicalName);
-            Require(parameter is not null && parameter.DefaultValue == rule.Prompt.DefaultValue && parameter.IsRequired == rule.Prompt.IsRequired
-                && parameter.DataType == rule.Prompt.DataType && parameter.Choices.Select(choice => choice.Value).SequenceEqual(rule.Prompt.Choices ?? []),
-                $"Python native parameter '{rule.CanonicalName}' differs from its original default/required/choice contract.");
+            TemplateUserPrompt? parameter = selected.CanonicalParameters.SingleOrDefault(item => item.Id == rule.Id);
+            Require(parameter is not null && parameter.DefaultValue == rule.DefaultValue && parameter.IsRequired == rule.IsRequired
+                && parameter.DataType == rule.DataType && (parameter.Choices ?? []).SequenceEqual(rule.Choices ?? []),
+                $"Python native parameter '{rule.Id}' differs from its original default/required/choice contract.");
         }
 
         TemplateUserPrompt? functionName = nameInputs.Length == 0 ? null
             : projected.Metadata.UserPrompts.SingleOrDefault(prompt => prompt.Id == nameInputs[0].ParamId);
-        TemplateEffectSource helperSource = new(helperIdentity, helperSourcePath, Text(helper, "sourceSha256"));
-        NativeItemAppendMapping mapping = new(package, Text(application, "configurationSha256"),
+        NativeTemplateSourceStamp helperSource = new(helperIdentity, helperSourcePath, Text(helper, "sourceSha256"));
+        NativeTemplateAppendMapping mapping = new(
             new(originalIdentity, ManifestPath, Hash(manifest)), new(originalIdentity, createSourcePath, Text(application, "createSourceSha256")),
             "function_app.py", "function_app.py", helperIdentity, Text(helper, "configurationSha256"), helperSource, "function_body.py");
-        NativeTemplateLegacyContract contract = new(new(entry.Identity, ManifestPath, Hash(manifest)), package, expectedDefault, functionName, null, rules);
+        NativeItemPolicyDescription description = new(internalHelper, internalHelper ? null : new(selected.Identity, ManifestPath, Hash(manifest)),
+            internalHelper ? null : expectedDefault, internalHelper ? null : functionName, internalHelper ? [] : rules, internalHelper ? null : mapping, []);
         cancellationToken.ThrowIfCancellationRequested();
-        return new(new(internalHelper, internalHelper ? null : mapping, []), internalHelper ? null : contract, helperSource);
+        return new(description, helperSource);
     }
 
-    private async Task<ReadOnlyMemory<byte>> ReadVerifiedAsync(ResolvedTemplate selected, string path, string sha256, CancellationToken cancellationToken)
+    private async Task<ReadOnlyMemory<byte>> ReadVerifiedAsync(NativeTemplateSource selected, string path, string sha256, CancellationToken cancellationToken)
     {
         Require(!Path.IsPathRooted(path) && !path.Contains('\\') && path.Split('/').All(part => part is not ("" or "." or "..")),
             "Python sources require exact package-relative paths.");
@@ -217,27 +213,26 @@ internal sealed class PythonTemplateSourceReader
         return bytes;
     }
 
-    internal async Task ValidateProjectAsync(TemplateCatalogEntry entry, string configurationSha256,
-        Func<string, CancellationToken, Task<ReadOnlyMemory<byte>>> readSource, CancellationToken cancellationToken)
+    internal async Task ValidateProjectAsync(NativeTemplateSource selected, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(entry);
-        ArgumentNullException.ThrowIfNull(readSource);
-        ArgumentException.ThrowIfNullOrWhiteSpace(configurationSha256);
+        ArgumentNullException.ThrowIfNull(selected);
         cancellationToken.ThrowIfCancellationRequested();
-        Require(entry.Type == TemplateType.Project && entry.Identity == "Azure.Functions.Python.Basic" && entry.Language == "Python"
-            && entry.Package is { Identifier: PackageId, Version: not null }, "The selected project is not the exact packaged Python basic template.");
-        using JsonDocument document = Parse(await readSource(ManifestPath, cancellationToken));
+        await selected.RevalidateAsync(cancellationToken);
+        Require(selected.IsProject && selected.Identity == "Azure.Functions.Python.Basic" && selected.Language == "Python"
+            && selected.PackageId == PackageId && !string.IsNullOrWhiteSpace(selected.PackageVersion),
+            "The selected project is not the exact packaged Python basic template.");
+        using JsonDocument document = Parse(await selected.ReadPackageFileAsync(ManifestPath, cancellationToken));
         JsonElement root = document.RootElement;
         RequireKeys(root, ["schemaVersion", "packageId", "version", "sources", "project", "applications"]);
         Require(Property(root, "schemaVersion") is { ValueKind: JsonValueKind.Number } schemaElement
             && schemaElement.TryGetInt32(out int schema) && schema == 1, "Unsupported Python source map schema.");
-        Require(Text(root, "packageId") == entry.Package!.Identifier
+        Require(Text(root, "packageId") == selected.PackageId
             && NuGetVersion.TryParse(Text(root, "version"), out NuGetVersion? version)
-            && NuGetVersion.TryParse(entry.Package.Version, out NuGetVersion? installed) && version == installed,
+            && NuGetVersion.TryParse(selected.PackageVersion, out NuGetVersion? installed) && version == installed,
             "Python project provenance does not match the selected package/version.");
         JsonElement project = Property(root, "project");
         RequireKeys(project, ["templateIdentity", "sources"]);
-        Require(Text(project, "templateIdentity") == entry.Identity, "Python project mapping names another template.");
+        Require(Text(project, "templateIdentity") == selected.Identity, "Python project mapping names another template.");
         string[] paths = ["content/project/.template.config/template.json", "content/project/.template.config/func.host.json",
             "content/project/host.json", "content/project/function_app.py", "content/project/requirements.txt",
             "content/project/getting_started.md", "content/project/local.settings.json", "content/project/.gitignore"];
@@ -248,16 +243,16 @@ internal sealed class PythonTemplateSourceReader
             JsonElement[] source = [.. descriptors.Where(item => Text(item, "path") == path)];
             Require(source.Length == 1, $"Python project requires one source '{path}'.");
             RequireKeys(source[0], ["path", "sha256"]);
-            ReadOnlyMemory<byte> bytes = await readSource(path, cancellationToken);
+            ReadOnlyMemory<byte> bytes = await selected.ReadPackageFileAsync(path, cancellationToken);
             string digest = Text(source[0], "sha256");
             Require(digest.Length == 64 && digest.All(char.IsAsciiHexDigit) && string.Equals(Hash(bytes), digest, StringComparison.OrdinalIgnoreCase),
                 $"Python project source '{path}' changed.");
             if (path == paths[0])
             {
-                Require(string.Equals(digest, configurationSha256, StringComparison.OrdinalIgnoreCase),
+                Require(string.Equals(digest, selected.ConfigurationSha256, StringComparison.OrdinalIgnoreCase),
                     "Python project configuration fingerprint differs from the owned mapping.");
                 using JsonDocument config = Parse(bytes);
-                Require(Text(config.RootElement, "identity") == entry.Identity
+                Require(Text(config.RootElement, "identity") == selected.Identity
                     && Text(Property(config.RootElement, "tags"), "language") == "Python"
                     && Text(Property(config.RootElement, "tags"), "type") == "project",
                     "Python project configuration identity/type/language changed.");

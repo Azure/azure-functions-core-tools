@@ -10,7 +10,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Python;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -115,7 +114,7 @@ public sealed partial class BundledPythonTemplateTests
         {
             using var templater = CreateTemplater(await ReadBundleAsync(channel.GetProperty("channel").GetString()!));
             var selected = (await templater.ResolveGroupAsync(id, TemplateType.Item)).Group!.Single();
-            var source = await new PythonTemplateSourceReader().ReadAsync(selected, CancellationToken.None);
+            var source = await new PythonPolicyTestReader().ReadAsync(selected, CancellationToken.None);
             var rule = source.Compatibility!.Rules.Single(item => item.CanonicalName == canonicalName);
             using var prompts = JsonDocument.Parse(await selected.ReadPackageFileAsync("source/userPrompts.json", CancellationToken.None));
             var owned = prompts.RootElement.EnumerateArray().Single(item => item.GetProperty("id").GetString() == ownedPromptId);
@@ -182,7 +181,7 @@ public sealed partial class BundledPythonTemplateTests
         await InstallAsync();
         using var templater = CreateTemplater(await ReadBundleAsync("stable"));
         var selected = (await templater.ResolveGroupAsync("EventHubTrigger-Python", TemplateType.Item)).Group!.Single();
-        var readerSource = new PythonTemplateSourceReader();
+        var readerSource = new PythonPolicyTestReader();
         var provider = CreatePythonProvider();
         var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(),
             ["--eventhub-trigger-eventhub-name", "orders-1._x"]));

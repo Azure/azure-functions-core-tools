@@ -41,6 +41,12 @@ internal sealed class NativeTemplatePolicyAdmission(
     private readonly BasicAcquisitionPlanner? _planner = planner;
     private readonly IBundledTemplateInstaller? _bundledTemplates = bundledTemplates;
 
+    public bool HasPolicyForStack(string stack)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+        return _registrations.Any(registration => string.Equals(registration.Policy.Stack, stack, StringComparison.OrdinalIgnoreCase));
+    }
+
     public async Task<BoundNativeTemplatePolicy?> TryBindAsync(
         TemplateCatalogEntry entry, string mountPoint, CancellationToken cancellationToken, bool required = false)
     {

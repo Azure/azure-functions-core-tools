@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Python;
 using Azure.Functions.Cli.Templates.V2;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -32,7 +31,7 @@ public sealed partial class BundledPythonTemplateTests
         await InstallAsync();
         using var templater = CreateTemplater(await ReadBundleAsync(channel));
         var selected = (await templater.ResolveGroupAsync(id, TemplateType.Item)).Group!.Single();
-        var reader = new PythonTemplateSourceReader();
+        var reader = new PythonPolicyTestReader();
         var source = await reader.ReadAsync(selected, CancellationToken.None);
         var mapping = source.Binding.Append!;
         var helper = (await templater.ResolveGroupAsync(mapping.HelperIdentity, TemplateType.Item)).Group!.Single();

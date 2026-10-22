@@ -97,11 +97,9 @@ internal sealed class NewExecutionRunner(
     {
         string language = templater.Context.Project!.Language!;
         INativeItemWorkflowProvider? provider = _workflows?.FindItem(templater.Context.Project.Stack!);
-        if (_workflows is not null && provider is null)
+        if (_workflows is not null && provider is null && _policies?.HasPolicyForStack(templater.Context.Project.Stack!) != true)
         {
-            return NewExecutionResult.Reject("workflowUnavailable",
-                $"Stack '{templater.Context.Project.Stack}' does not supply a first-party function-item workflow. "
-                + "Use the stack's project tooling to add functions; no project files were changed.");
+            return MissingWorkflow(templater.Context.Project.Stack!);
         }
 
         INativeItemCompatibility? compatibility = provider?.Compatibility ?? (_workflows is null ? request.ItemCompatibility : null);
@@ -253,6 +251,11 @@ internal sealed class NewExecutionRunner(
             }
         }
 
+        if (_workflows is not null && provider is null)
+        {
+            return MissingWorkflow(templater.Context.Project.Stack!);
+        }
+
         NativeSelectedItemBinding? effectBinding = null;
         if (selectedEffects is { } effectSupport)
         {
@@ -311,6 +314,7 @@ internal sealed class NewExecutionRunner(
         {
             ExplicitParameterNames = final.ExplicitParameterNames,
             ArgumentSource = new(selected.Entry.Identity, selected.Parameters, request.ReservedAliases, request.RawTemplateTokens),
+            PolicyEffectsConfirmed = true,
         };
         if (provider is not null)
         {
@@ -387,4 +391,8 @@ internal sealed class NewExecutionRunner(
     }
 
     private static string GroupIdentity(TemplateCatalogEntry entry) => entry.GroupIdentity ?? entry.Identity;
+
+    private static NewExecutionResult MissingWorkflow(string stack) => NewExecutionResult.Reject("workflowUnavailable",
+        $"Stack '{stack}' does not supply a function-item workflow. "
+        + "Use the stack's project tooling to add functions; no project files were changed.");
 }
