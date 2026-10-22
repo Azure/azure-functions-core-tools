@@ -58,13 +58,13 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Description = "Re-initialize the directory: deletes its contents (except .git) before scaffolding the new project."
     };
 
-    public Option<bool> GuidedOption { get; } = new("--guided") { Description = "Opt in to staged installed-template selection and qualified quickstart discovery. Does not replace ordinary init." };
+    public Option<bool> GuidedOption { get; } = new("--guided") { Description = "Opt in to staged installed-template selection; --quickstart implies this route. Does not replace ordinary init." };
 
-    public Option<string?> QuickstartOption { get; } = new("--quickstart") { Description = "Exact discovery catalog ID for --guided; never a template identity or implicit install.", Arity = ArgumentArity.ExactlyOne };
+    public Option<string?> QuickstartOption { get; } = new("--quickstart") { Description = "Exact discovery catalog ID; implies --guided and authorization for its qualified acquisition plan.", Arity = ArgumentArity.ExactlyOne };
 
     public Option<string?> TemplateOption { get; } = new("--template", "-t") { Description = "Installed project-template identity for --guided. Unknown references never trigger acquisition.", Arity = ArgumentArity.ExactlyOne };
 
-    public Option<bool> AcquireQuickstartOption { get; } = new("--acquire-quickstart") { Description = "Explicit script authorization to acquire the exact qualified --quickstart plan and create its project. Requires --guided." };
+    public Option<bool> AcquireQuickstartOption { get; } = new("--acquire-quickstart") { Description = "Explicit authorization for the exact qualified --quickstart plan; redundant when --quickstart is supplied." };
 
     public Option<bool> DryRunOption { get; } = new("--dry-run") { Description = "With --guided, preview installed payloads without writes. Missing payloads produce metadata intent only." };
 
@@ -72,7 +72,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<string[]> TemplateArgumentOption { get; } = new("--template-argument")
     {
-        Description = "One raw native token, repeated in order (e.g. --template-argument=--symbol --template-argument=value). Requires an explicit path, --guided and --template or --quickstart.",
+        Description = "One raw native token, repeated in order (e.g. --template-argument=--symbol --template-argument=value). Requires an explicit path and --guided with --template, or --quickstart.",
         Arity = ArgumentArity.OneOrMore,
         AllowMultipleArgumentsPerToken = false,
         Hidden = true,
@@ -159,14 +159,17 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        bool guided = parseResult.GetValue(GuidedOption);
+        string? quickstartId = parseResult.GetValue(QuickstartOption);
+        bool quickstartSelected = quickstartId is not null;
+        bool guided = parseResult.GetValue(GuidedOption) || quickstartSelected;
+        bool authorizeAcquisition = parseResult.GetValue(AcquireQuickstartOption) || quickstartSelected;
         string[] nativeTokens = parseResult.GetValue(TemplateArgumentOption) ?? [];
         if (nativeTokens.Length > 0)
         {
             if (!guided || (parseResult.GetValue(TemplateOption) is null && parseResult.GetValue(QuickstartOption) is null)
                 || parseResult.GetResult(PathArgument!)?.Tokens.Count != 1)
             {
-                _interaction.WriteError("--template-argument requires an explicit target path, --guided and an installed --template identity or --quickstart catalog ID. It cannot be used with the Basic initializer menu.");
+                _interaction.WriteError("--template-argument requires an explicit target path and either --guided with an installed --template identity or a --quickstart catalog ID. It cannot be used with the Basic initializer menu.");
                 return 1;
             }
         }
@@ -207,8 +210,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             InitExecutionResult result;
             try
             {
-                result = await _guided.ExecuteAsync(new(request, parseResult.GetValue(QuickstartOption),
-                    parseResult.GetValue(AcquireQuickstartOption)), cancellationToken);
+                result = await _guided.ExecuteAsync(new(request, quickstartId, authorizeAcquisition), cancellationToken);
             }
             catch (Exception exception) when (exception is BasicAcquisitionException or TemplateStoreRecoveryRequiredException
                 or WorkloadRecoveryRequiredException or WorkloadPlanChangedException or InvalidWorkloadException

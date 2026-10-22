@@ -265,7 +265,6 @@ public sealed class GuidedInitCommandTests
     [InlineData("--dry-run")]
     [InlineData("--non-interactive")]
     [InlineData("--acquire-quickstart")]
-    [InlineData("--quickstart", "sample")]
     [InlineData("--template", "unknown")]
     public async Task GuidedOptions_WithoutOptIn_RejectWithoutCallingCoordinatorOrCreatingTarget(params string[] arguments)
     {
@@ -280,6 +279,24 @@ public sealed class GuidedInitCommandTests
         exit.Should().Be(1);
         interaction.AllOutput.Should().Contain("--guided");
         coordinator.ReceivedCalls().Should().BeEmpty();
+        Directory.Exists(target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task QuickstartOption_ImplicatesGuidedRoutingAndAcquisitionAuthorization()
+    {
+        var interaction = new TestInteractionService();
+        var coordinator = Substitute.For<IQuickstartInitCoordinator>();
+        coordinator.ExecuteAsync(Arg.Any<QuickstartInitRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new InitExecutionResult("fixtureBoundary", true));
+        RootCommand root = [Command(interaction, coordinator)];
+        string target = Path.Combine(Path.GetTempPath(), "func-quickstart-implied-" + Guid.NewGuid().ToString("N"));
+
+        int exit = await root.Parse(["init", target, "--quickstart", "sample"]).InvokeAsync();
+
+        exit.Should().Be(0);
+        await coordinator.Received(1).ExecuteAsync(Arg.Is<QuickstartInitRequest>(request =>
+            request.QuickstartId == "sample" && request.AuthorizeAcquisition), Arg.Any<CancellationToken>());
         Directory.Exists(target).Should().BeFalse();
     }
 
@@ -333,8 +350,9 @@ public sealed class GuidedInitCommandTests
     {
         var command = Command(new(), Substitute.For<IQuickstartInitCoordinator>());
 
-        command.GuidedOption.Description.Should().Contain("staged").And.Contain("ordinary init");
-        command.AcquireQuickstartOption.Description.Should().Contain("Explicit script authorization").And.Contain("--quickstart");
+        command.GuidedOption.Description.Should().Contain("staged").And.Contain("--quickstart").And.Contain("ordinary init");
+        command.QuickstartOption.Description.Should().Contain("implies --guided").And.Contain("authorization");
+        command.AcquireQuickstartOption.Description.Should().Contain("Explicit authorization").And.Contain("--quickstart");
         command.TemplateOption.Description.Should().Contain("never trigger acquisition");
         command.DryRunOption.Description.Should().Contain("without writes");
         command.TemplateArgumentOption.Description.Should().Contain("--template-argument=--symbol").And.Contain("explicit path");
@@ -353,7 +371,7 @@ public sealed class GuidedInitCommandTests
         interaction.AllOutput.Should().Contain("--guided").And.Contain("--acquire-quickstart").And.Contain("--template");
         interaction.AllOutput.Should().NotContain("--template-argument");
         interaction.AllOutput.Should().Contain("func init MyApp").And.Contain("Quickstarts need no template parameters");
-        interaction.AllOutput.Should().Contain("staged");
+        interaction.AllOutput.Should().Contain("staged").And.Contain("implies --guided");
     }
 
     [Fact]

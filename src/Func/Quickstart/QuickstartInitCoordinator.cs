@@ -294,7 +294,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
             if (!interactive && !request.AuthorizeAcquisition)
             {
                 return InitExecutionResult.Reject("acquisitionAuthorizationRequired",
-                    "Scripts must explicitly pass --acquire-quickstart with --quickstart to authorize this exact qualified acquisition and creation plan. --guided alone is not consent.");
+                    "This exact acquisition plan is not authorized. In scripts, supply --quickstart; --guided alone is not consent.");
             }
             if (interactive && !await _interaction.ConfirmAsync("Acquire the exact plan above, then preview project creation?", false, false, cancellationToken))
             {

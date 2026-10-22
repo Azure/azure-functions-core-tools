@@ -126,50 +126,53 @@ public sealed partial class ArtifactBindingJourneyTests
         journey.Payload.Requested.Should().BeEmpty();
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NativeArguments_PublicScriptQuickstart_RequiresSeparateAcquisitionAuthorization(bool authorize)
+    [Fact]
+    public async Task NativeArguments_PublicQuickstart_AuthorizesAcquisitionWithoutRedundantFlags()
     {
         await SeedAsync("parameters", installTemplates: false);
         GuidedInteraction interaction = new(false, [], []);
         var journey = Guided(interaction);
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
-        string[] authorization = authorize ? ["--acquire-quickstart"] : [];
 
-        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture", "--non-interactive",
-            .. authorization, "--template-argument=--required", "--template-argument=script",
+        int exit = await root.Parse(["init", Target, "--stack", "node", "--quickstart", "fixture", "--non-interactive",
+            "--template-argument=--required", "--template-argument=script",
             "--template-argument=--greeting", "--template-argument=selected",
             "--template-argument=--enabled", "--template-argument=false"]).InvokeAsync();
 
-        if (authorize)
-        {
-            exit.Should().Be(0, interaction.AllOutput);
-            journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
-            journey.Lifecycle.ObservedFreshBinding.Should().BeTrue();
-            File.Exists(journey.Lifecycle.Prepared!.Archive).Should().BeFalse();
-            File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should()
-                .Be("script|selected|False|1|plain|default-stack|default-init|target");
-            File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
-        }
-        else
-        {
-            exit.Should().Be(1);
-            journey.Payload.Requested.Should().BeEmpty();
-            Directory.Exists(Target).Should().BeFalse();
-            interaction.AllOutput.Should().Contain("Scripts must explicitly pass --acquire-quickstart");
-        }
+        exit.Should().Be(0, interaction.AllOutput);
+        journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
+        journey.Lifecycle.ObservedFreshBinding.Should().BeTrue();
+        File.Exists(journey.Lifecycle.Prepared!.Archive).Should().BeFalse();
+        File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should()
+            .Be("script|selected|False|1|plain|default-stack|default-init|target");
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
     }
 
     [Fact]
-    public async Task NativeArguments_PublicResponseExpandedValuesCannotAuthorizeAcquisition()
+    public async Task QuickstartOption_InteractiveRouteKeepsSeparateAcquisitionAndCreationConfirmations()
     {
-        await SeedAsync("parameters", installTemplates: false);
+        await SeedAsync(installTemplates: false);
+        GuidedInteraction interaction = new(true, [], [true, false]);
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, "--stack", "node", "--quickstart", "fixture"]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.Confirmations.Should().Equal(false, false);
+        journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
+        (await _ownership.GetRetainedAsync(PackageId, CancellationToken.None)).Should().NotBeNull();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task NativeArguments_PublicResponseExpandedValuesCannotNominateQuickstart()
+    {
+        await SeedAsync(installTemplates: false);
         string flags = Path.Combine(_root, "authorization.rsp");
         string response = Path.Combine(_root, "init.rsp");
-        File.WriteAllText(flags, "--template-argument=--acquire-quickstart");
-        File.WriteAllText(response, $"\"{Target}\" --guided --stack node --quickstart fixture --non-interactive "
-            + $"--template-argument=--required --template-argument=supplied @{flags}");
+        File.WriteAllText(flags, "--template-argument=--quickstart --template-argument=fixture");
+        File.WriteAllText(response, $"\"{Target}\" --guided --stack node --non-interactive @{flags}");
         GuidedInteraction interaction = new(false, [], []);
         var journey = Guided(interaction);
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
@@ -179,7 +182,7 @@ public sealed partial class ArtifactBindingJourneyTests
         exit.Should().Be(1);
         journey.Payload.Requested.Should().BeEmpty();
         Directory.Exists(Target).Should().BeFalse();
-        interaction.AllOutput.Should().Contain("Scripts must explicitly pass --acquire-quickstart");
+        interaction.AllOutput.Should().Contain("--quickstart catalog ID");
     }
 
     [Fact]
@@ -701,6 +704,21 @@ public sealed partial class ArtifactBindingJourneyTests
     }
 
     [Fact]
+    public async Task Coordinator_UnapprovedQuickstartPlan_DoesNotAcquireInScript()
+    {
+        await SeedAsync(installTemplates: false);
+        var journey = Guided(new(false, [], []));
+
+        var result = await journey.Coordinator.ExecuteAsync(
+            new(GuidedRequest() with { NonInteractive = true }, "fixture"), CancellationToken.None);
+
+        result.Kind.Should().Be("acquisitionAuthorizationRequired");
+        result.Diagnostics.Should().Contain(message => message.Contains("supply --quickstart", StringComparison.Ordinal));
+        journey.Payload.Requested.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Guided_PublicDirectUnknownTemplate_DoesNotDiscoverOrAcquire()
     {
         await SeedAsync(installTemplates: false);
@@ -733,31 +751,19 @@ public sealed partial class ArtifactBindingJourneyTests
         File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact");
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Guided_NominatedOwnedUpdate_RequiresConsentAndTransitionsExactPackageBeforeCreation(bool authorize)
+    [Fact]
+    public async Task QuickstartOption_AuthorizesQualifiedOwnedUpdateBeforeCreation()
     {
         (NativeTemplateOwnerProof oldReceipt, string oldArchive) = await NominateOwnedUpdateAsync();
         string digest = _selection.Artifact.Sha256;
         var interaction = new GuidedInteraction(false, [], []);
         var journey = Guided(interaction);
-        var before = TemplateState();
 
-        var result = await journey.Coordinator.ExecuteAsync(new(GuidedRequest(), "fixture", authorize), CancellationToken.None);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        int exit = await root.Parse(["init", Target, "--stack", "node", "--quickstart", "fixture", "--non-interactive"]).InvokeAsync();
 
+        exit.Should().Be(0, interaction.AllOutput);
         interaction.AllOutput.Should().Contain("1.0.0").And.Contain("1.0.1");
-        if (!authorize)
-        {
-            result.Kind.Should().Be("acquisitionAuthorizationRequired", interaction.AllOutput);
-            journey.Payload.Requested.Should().BeEmpty();
-            TemplateState().Should().Equal(before);
-            (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None)).Should().Be(oldReceipt);
-            Directory.Exists(Target).Should().BeFalse();
-            return;
-        }
-
-        result.Kind.Should().Be("created", interaction.AllOutput);
         journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.1");
         journey.Lifecycle.Prepared!.Update.Should().NotBeNull();
         journey.Lifecycle.Prepared.Update!.Before.Receipt.Should().Be(oldReceipt.Receipt);

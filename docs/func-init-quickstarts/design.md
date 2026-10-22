@@ -53,20 +53,24 @@ then propagates command cancellation after acquisition cleanup. It never starts
 project creation or claims rollback.
 
 Scripts must select a stack and either an installed template or a catalog ID.
-Choosing guided mode is not acquisition authorization.
+Choosing guided mode alone is not acquisition authorization. Supplying
+`--quickstart` implies guided routing and authorizes its exact qualified
+acquisition plan.
 
 ```text
 func init MyConnector --guided --stack node --template <installed-full-identity> --non-interactive
-func init MyConnector --guided --stack node --quickstart <exact-catalog-id> --acquire-quickstart --non-interactive
+func init MyConnector --stack node --quickstart <exact-catalog-id> --non-interactive
 func init MyConnector --guided --stack node --template <installed-full-identity> --dry-run
 ```
 
-`--acquire-quickstart` authorizes the displayed independently qualified exact
-acquisition and creation plan in scripts. It requires `--quickstart` and cannot
-authorize an installed `--template`. Interactive invocations still prompt.
-An unknown installed reference never starts discovery or acquisition.
-`--quickstart` and `--template` cannot be combined. All these options require
-`--guided`; they do not redirect ordinary init.
+`--quickstart` authorizes only the displayed independently qualified exact
+acquisition and creation plan; no separate `--guided` or
+`--acquire-quickstart` is needed. The explicit flags remain accepted when
+supplied. Interactive invocations still prompt. An unknown installed reference
+never starts discovery or acquisition. `--quickstart` and `--template` cannot be
+combined. `--template`, `--dry-run` and `--non-interactive` still require
+`--guided`; `--quickstart` implies it. These options do not redirect ordinary
+init.
 
 Dry-run never acquires, registers, repairs, recovers or cleans. A discovery
 selection without installed payload reports metadata intent and a diagnostic,
@@ -84,9 +88,9 @@ general help, following the existing hidden-option convention. Arbitrary native
 parameter tokens are available through repeated `--template-argument=<token>`
 options on the public guided adapter. Each occurrence supplies exactly one raw
 token, in order, to the existing selected-template parser. An explicit target
-path, `--guided`, and either `--template` or `--quickstart` are required. This
-does not add optional parameter entry to the default interactive menu or pass
-native arguments to Basic. Required native values can still be prompted
+path and either `--guided` with `--template` or `--quickstart` are required.
+This does not add optional parameter entry to the default interactive menu or
+pass native arguments to Basic. Required native values can still be prompted
 interactively; scripts fail if they are unresolved.
 
 ```text
@@ -261,7 +265,8 @@ This change composes those capabilities at the `func init` command boundary. It 
 
 - Define workload constraint JSON, range semantics, feed lookup, or remediation algorithms.
 - Define the configuration action identifier or its serialized argument syntax.
-- Build the browse page, remote catalog, package search, or implicit install flow.
+- Build the browse page, remote catalog, package search, or an install flow
+  outside an explicit qualified `--quickstart` selection.
 - Create a distinct quickstart or solution template type.
 - Recursively adopt existing multi-project solutions.
 - Roll back scaffolded content after a configuration I/O failure.
