@@ -2,15 +2,13 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Node;
-using Azure.Functions.Cli.Templates.V2;
-using Azure.Functions.Cli.Workloads.Node;
+using Azure.Functions.Cli.Templates.Native;
+using Azure.Functions.Cli.Workloads.Node.Native;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -20,7 +18,7 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task SourceQualifier_AllActualOwnedItems_PinsOriginalAndNativeSourcesWithoutChoosingOutputDirectories()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallNodeAuthoringCatalogAsync();
         string metadataRoot = Path.Combine(_root, "layout-bundle");
         Directory.CreateDirectory(Path.Combine(metadataRoot, "bin"));
         File.WriteAllText(Path.Combine(metadataRoot, "bin", "extensions.json"), NodeBridgeExtensions);
@@ -29,21 +27,21 @@ public sealed partial class BundledNodeTemplateTests
         var context = new TemplateEngineContext(WorkingDirectory.FromExplicit(_root), bundle: bundle, enableBundleBindingConstraints: true);
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         using var session = await _templates.OpenReadAsync(context, CancellationToken.None, availability);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         foreach (var raw in ReadNodeSource().Templates)
         {
             var selected = (await templater.ResolveGroupAsync(raw.Id!, TemplateType.Item, CancellationToken.None)).Group!.Single();
+            using var source = new NodePolicySourceFixture(selected, FunctionArchive);
 
-            var source = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
+            var qualified = await new NodeItemSource().ReadAsync(source, CancellationToken.None);
 
-            source.Sources.Should().HaveCount(8);
-            foreach (var pin in source.Sources)
+            qualified.Sources.Should().HaveCount(8);
+            foreach (var pin in qualified.Sources)
             {
                 pin.TemplateIdentity.Should().Be(selected.Entry.Identity);
-                var bytes = await selected.ReadPackageFileAsync(pin.Identity, CancellationToken.None);
+                var bytes = await source.ReadPackageFileAsync(pin.RelativePath, CancellationToken.None);
                 pin.Sha256.Should().Be(Convert.ToHexString(SHA256.HashData(bytes.Span)));
             }
-            source.Sources.Should().Contain(source.ContentSource);
         }
         Directory.Exists(Path.Combine(_root, "src")).Should().BeFalse();
     }
@@ -62,12 +60,12 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("src//functions/$(FUNCTION_NAME_INPUT).js")]
     public async Task SourceQualifier_UnqualifiedOriginalPath_RefusesInsteadOfGuessing(string path)
     {
-        NodeItemSource source = await ReadQualifiedSourceAsync();
-        source.Template.Actions!.Single(action => action.Type == "WriteToFile").FilePath = path;
+        using var source = await ReadQualifiedSourceAsync();
+        source.ChangeOriginal(raw => raw["actions"]!.AsArray().Single(action => action!["type"]!.GetValue<string>() == "WriteToFile")!["filePath"] = path);
 
-        Action qualify = () => NodeItemSourceQualifier.Validate(source, "JavaScript");
+        Func<Task> qualify = () => new NodeItemSource().ReadAsync(source, CancellationToken.None);
 
-        qualify.Should().Throw<InvalidDataException>();
+        await qualify.Should().ThrowAsync<InvalidDataException>();
         Directory.Exists(Path.Combine(_root, "src")).Should().BeFalse();
     }
 
@@ -86,39 +84,53 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("foreignIntentBinding")]
     public async Task SourceQualifier_ChangedActionOrBodyAssociation_Refuses(string corruption)
     {
-        NodeItemSource source = await ReadQualifiedSourceAsync();
-        var raw = source.Template;
-        if (corruption == "secondWrite") raw.Actions!.Add(new V2Action { Name = "extra", Type = "WriteToFile", FilePath = "extra.js" });
-        else if (corruption == "duplicateAction") raw.Jobs![0].Actions![1] = raw.Jobs[0].Actions![0];
-        else if (corruption == "wrongJob") raw.Jobs![0].Type = "AppendToFile";
-        else if (corruption == "unmatchedBody") raw.Actions![1].Source = "$(OTHER_CONTENT)";
-        else if (corruption == "changedBody") raw.Files!["function.js"] += "\nchanged";
-        else if (corruption == "nativeBody") source = source with { Content = Encoding.UTF8.GetBytes("different native source") };
-        else if (corruption == "foreignContentPath") source = source with { ContentPath = "content/foreign/funcNodeItem.js" };
+        using var source = await ReadQualifiedSourceAsync();
+        if (corruption is "secondWrite" or "duplicateAction" or "wrongJob" or "unmatchedBody" or "changedBody")
+        {
+            source.ChangeOriginal(raw =>
+            {
+                if (corruption == "secondWrite") raw["actions"]!.AsArray().Add(new JsonObject { ["name"] = "extra", ["type"] = "WriteToFile", ["filePath"] = "extra.js" });
+                else if (corruption == "duplicateAction") raw["jobs"]![0]!["actions"]![1] = raw["jobs"]![0]!["actions"]![0]!.DeepClone();
+                else if (corruption == "wrongJob") raw["jobs"]![0]!["type"] = "AppendToFile";
+                else if (corruption == "unmatchedBody") raw["actions"]![1]!["source"] = "$(OTHER_CONTENT)";
+                else raw["files"]!["function.js"] = raw["files"]!["function.js"]!.GetValue<string>() + "\nchanged";
+            });
+        }
+        else if (corruption == "nativeBody")
+        {
+            source.ChangeNativeBody();
+        }
         else
         {
-            var config = JsonNode.Parse(source.Configuration.Span)!;
-            if (corruption == "nativeNameDirectory") config["preferNameDirectory"] = true;
-            else if (corruption == "nativeFileRename") config["symbols"]!["timerTrigger-schedule"]!["fileRename"] = "funcNodeItem";
-            else if (corruption == "userIntentParameter") config["symbols"]!["InvocationOutputIntent"]!["type"] = "parameter";
-            else if (corruption == "foreignIntentBinding") config["symbols"]!["InvocationOutputIntent"]!["binding"] = "host:WorkingDirectory";
-            else config["sourceName"] = "OtherNativeName";
-            source = source with { Configuration = Encoding.UTF8.GetBytes(config.ToJsonString()) };
+            source.ChangeConfiguration(config =>
+            {
+                if (corruption == "nativeNameDirectory") config["preferNameDirectory"] = true;
+                else if (corruption == "nativeFileRename") config["symbols"]!["timerTrigger-schedule"]!["fileRename"] = "funcNodeItem";
+                else if (corruption == "userIntentParameter") config["symbols"]!["InvocationOutputIntent"]!["type"] = "parameter";
+                else if (corruption == "foreignIntentBinding") config["symbols"]!["InvocationOutputIntent"]!["binding"] = "host:WorkingDirectory";
+                else if (corruption == "foreignContentPath") config["sourceName"] = "../foreign";
+                else config["sourceName"] = "OtherNativeName";
+            });
         }
 
-        Action qualify = () => NodeItemSourceQualifier.Validate(source, "JavaScript");
+        Func<Task> qualify = () => new NodeItemSource().ReadAsync(source, CancellationToken.None);
 
-        qualify.Should().Throw<InvalidDataException>();
+        await qualify.Should().ThrowAsync<InvalidDataException>();
     }
 
     [Fact]
     public async Task SourceQualifier_Arguments_RejectInvalidSourceAndLanguage()
     {
-        Action missing = () => NodeItemSourceQualifier.Validate(null!, "JavaScript");
-        missing.Should().Throw<ArgumentNullException>();
-        NodeItemSource source = await ReadQualifiedSourceAsync();
-        Action invalidLanguage = () => NodeItemSourceQualifier.Validate(source, "js");
-        invalidLanguage.Should().Throw<InvalidDataException>();
+        Func<Task> missing = () => new NodeItemSource().ReadAsync(null!, CancellationToken.None);
+        await missing.Should().ThrowAsync<ArgumentNullException>();
+        using var source = await ReadQualifiedSourceAsync();
+        source.LanguageOverride = "js";
+        Func<Task> invalidLanguage = () => new NodeItemSource().ReadAsync(source, CancellationToken.None);
+        await invalidLanguage.Should().ThrowAsync<InvalidDataException>();
+        source.LanguageOverride = null;
+        source.Dispose();
+        Func<Task> expired = () => new NodeItemSource().ReadAsync(source, CancellationToken.None);
+        await expired.Should().ThrowAsync<ObjectDisposedException>();
     }
 
     [Theory]
@@ -126,37 +138,29 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData(true)]
     public async Task SourceQualifier_ProviderBothModes_EmitsOnlyGenericSourcePinsWithoutChangingRequestedTarget(bool legacy)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
-        var commandDirectory = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "literal-nested"));
-        var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
-        using var session = await _templates.OpenReadAsync(new(commandDirectory), CancellationToken.None, availability);
-        using var templater = new Templater(session);
-        var selected = (await templater.ResolveGroupAsync("HttpTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
-        var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));
-        var command = NodeComposedItem(commandDirectory.Info.FullName, "HttpTrigger-JavaScript") with
-        {
-            OutputIntent = legacy ? NativeItemOutputIntent.LegacyWorkflowRelative : NativeItemOutputIntent.LiteralOutput,
-        };
-        var invocation = new TemplateInvocationRequest(commandDirectory, arguments.ValuesByCanonicalName, "QualifiedFunction");
-        var provider = new NodeTemplateWorkflowProvider(_interaction, _files, new NodeNpmInstaller());
+        using var source = await ReadQualifiedSourceAsync();
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", legacy ? "legacy-nested" : "literal-nested"));
+        var values = source.CanonicalParameters.ToDictionary(parameter => parameter.Id, parameter => parameter.DefaultValue, StringComparer.Ordinal);
+        var invocation = new NodePolicyInvocationFixture(source, output, values);
+        NativeTemplatePolicy policy = new NodeNativeTemplatePolicy();
 
-        var prepared = await provider.PrepareAsync(new(templater, selected, arguments, command, invocation), CancellationToken.None);
+        var prepared = await policy.QualifyInvocationAsync(invocation, CancellationToken.None);
 
-        prepared.Request!.OutputDirectory.Should().BeSameAs(invocation.OutputDirectory);
-        prepared.Request.Name.Should().Be(invocation.Name);
-        prepared.Request.Parameters.Should().BeSameAs(invocation.Parameters);
-        prepared.Diagnostics.Should().BeEmpty();
-        prepared.Request.SourceSnapshot.Should().NotBeNull();
-        Directory.Exists(commandDirectory.Info.FullName).Should().BeFalse();
+        prepared.Succeeded.Should().BeTrue();
+        prepared.RequiredSources.Should().HaveCount(8);
+        prepared.CanonicalDefaults.Should().BeEmpty();
+        prepared.ProjectBinding.Should().BeNull();
+        invocation.OutputDirectory.Should().BeSameAs(output);
+        Directory.Exists(output.Info.FullName).Should().BeFalse();
     }
 
-    private async Task<NodeItemSource> ReadQualifiedSourceAsync()
+    private async Task<NodePolicySourceFixture> ReadQualifiedSourceAsync()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallNodeAuthoringCatalogAsync();
         var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
         using var session = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None, availability);
-        using var templater = new Templater(session);
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("TimerTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
-        return await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
+        return new(selected, FunctionArchive);
     }
 }

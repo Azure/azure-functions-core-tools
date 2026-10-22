@@ -16,12 +16,16 @@ func workload install node
 ## Status
 
 Preview. The existing initializer scaffolds v4 JavaScript/TypeScript projects.
-The stack artifact also carries [native basic project and Node item
+The stack artifact carries [two native basic project
 templates](NativeTemplates/README.md), registered locally during normal stack
-installation. Their staged command journey is not a public `init`/`new` switch;
+installation. All 33 owned function items are produced separately, including
+both HTTP languages and hidden known-ID entries. The Node workload qualifies
+their selected sources through the neutral loaded-owner policy boundary.
+The separate package identity does not grant production publisher or external
+association authority. Their staged command journey is not a public `init`/`new` switch;
 creation-time npm actions and destructive bundled lifecycle operations remain
-explicit limitations. The full owned JavaScript/TypeScript item catalog is
-packaged, including hidden known-ID entries. Extension-dependent items remain
+explicit limitations. Preparation ownership migration also requires the neutral
+post-configuration completion contract. Extension-dependent items remain
 unavailable until binding-aware bundle eligibility is qualified; packaging is
 not a claim of per-channel workflow availability.
 

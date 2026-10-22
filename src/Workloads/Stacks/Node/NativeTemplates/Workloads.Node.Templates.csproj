@@ -5,7 +5,7 @@
     <PackageId>Azure.Functions.Templates.Node.Basic</PackageId>
     <PackageType>FuncTemplate</PackageType>
     <NoDefaultExcludes>true</NoDefaultExcludes>
-    <Description>Azure Functions CLI Node.js v4 project and JavaScript/TypeScript item templates.</Description>
+    <Description>Azure Functions CLI Node.js v4 basic project templates.</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
@@ -13,7 +13,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="content/**" Pack="true" PackagePath="content/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Content Include="content/**" Exclude="content/http-*/**" Pack="true" PackagePath="content/%(RecursiveDir)%(Filename)%(Extension)" />
     <Content Include="$(RepoRoot)LICENSE" Pack="true" PackagePath="/" />
     <Content Include="README.md" Pack="true" PackagePath="/" />
     <Content Include="../Templates/package-js.json" Pack="true" PackagePath="content/project-js/package.json" />
@@ -37,7 +37,7 @@
     </PropertyGroup>
     <RemoveDir Directories="$(_NodeItemOutput)" />
     <RemoveDir Directories="$(_NodeProvenanceOutput)" />
-    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/Convert-NodeItemTemplates.ps1&quot; -SourceDirectory &quot;$(_NodeItemSource)&quot; -OutputDirectory &quot;$(_NodeItemOutput)&quot; -ProvenanceDirectory &quot;$(_NodeProvenanceOutput)&quot; -PackageId &quot;$(PackageId)&quot; -PackageVersion &quot;$(PackageVersion)&quot;" />
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/Convert-NodeItemTemplates.ps1&quot; -SourceDirectory &quot;$(_NodeItemSource)&quot; -OutputDirectory &quot;$(_NodeItemOutput)&quot; -ProvenanceDirectory &quot;$(_NodeProvenanceOutput)&quot; -PackageId &quot;$(PackageId)&quot; -PackageVersion &quot;$(PackageVersion)&quot; -ContentRole Project" />
     <ItemGroup>
       <_NodeItem Include="$(_NodeItemOutput)**/*">
         <Pack>true</Pack>

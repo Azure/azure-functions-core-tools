@@ -7,7 +7,8 @@ param(
     [Parameter(Mandatory = $true)] [string] $OutputDirectory,
     [Parameter(Mandatory = $true)] [string] $ProvenanceDirectory,
     [Parameter(Mandatory = $true)] [string] $PackageId,
-    [Parameter(Mandatory = $true)] [string] $PackageVersion
+    [Parameter(Mandatory = $true)] [string] $PackageVersion,
+    [ValidateSet('All', 'Project', 'Function')] [string] $ContentRole = 'All'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,6 +41,7 @@ function ConvertTo-OptionName([string] $value) {
 }
 
 foreach ($template in $templates) {
+    if ($ContentRole -eq 'Project') { continue }
     $id = [string] $template.id
     if ($id -notmatch '^[A-Za-z0-9]+-(JavaScript|TypeScript)$' -or -not $seen.Add($id)) {
         throw "Invalid or duplicate Node template id '$id'."
@@ -163,7 +165,7 @@ $sources = @($sourceFiles | ForEach-Object {
     [System.IO.File]::Copy($source, $destination, $true)
     @{ path = "provenance/node/v2/$_"; sha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash }
 })
-$mappings = @($templates | ForEach-Object {
+$mappings = @($templates | Where-Object { $ContentRole -ne 'Project' } | ForEach-Object {
     $id = $_.id
     if ($httpIds -contains $id) {
         $language = if ($id -eq 'HttpTrigger-JavaScript') { 'JavaScript' } else { 'TypeScript' }
@@ -197,7 +199,7 @@ $mappings = @($templates | ForEach-Object {
         }
     }
 })
-$projects = @('project-js', 'project-ts') | ForEach-Object {
+$projects = @('project-js', 'project-ts') | Where-Object { $ContentRole -ne 'Function' } | ForEach-Object {
     $directory = Join-Path $PSScriptRoot "content/$_"
     $configurationPath = Join-Path $directory '.template.config/template.json'
     $configuration = Get-Content -LiteralPath $configurationPath -Raw | ConvertFrom-Json -AsHashtable

@@ -7,8 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
+    <ProjectReference Include="$(SrcRoot)Func/Func.csproj" Aliases="global,CliHost" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/NativeTemplates/Workloads.Node.FunctionTemplates.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../Fixtures/Templates.Tests.StoreProcess/Templates.Tests.StoreProcess.csproj"
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../Fixtures/Workloads.Tests.OperationProcess/Workloads.Tests.OperationProcess.csproj"
@@ -86,6 +87,8 @@
   <Target Name="PackBundledNodeForTests" AfterTargets="Build">
     <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" Targets="Pack"
       Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-node-artifacts" />
+    <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Node/NativeTemplates/Workloads.Node.FunctionTemplates.csproj" Targets="Pack"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)node-function-artifacts" />
   </Target>
 
 </Project>

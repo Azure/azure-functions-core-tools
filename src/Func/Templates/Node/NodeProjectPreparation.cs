@@ -2,12 +2,11 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using System.Security.Cryptography;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads.Node;
 using NuGet.Versioning;
-
-using static Azure.Functions.Cli.Templates.Node.NodeItemCompatibility;
 
 namespace Azure.Functions.Cli.Templates.Node;
 
@@ -16,6 +15,8 @@ namespace Azure.Functions.Cli.Templates.Node;
 /// </summary>
 internal sealed class NodeProjectPreparation(IFileSystem fileSystem, NodeNpmInstaller npmInstaller) : INativeProjectPreparation
 {
+    private const string PackageId = "Azure.Functions.Templates.Node.Basic";
+    private const string ManifestPath = "provenance/node/compatibility.json";
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly NodeNpmInstaller _npmInstaller = npmInstaller ?? throw new ArgumentNullException(nameof(npmInstaller));
 
@@ -133,4 +134,31 @@ internal sealed class NodeProjectPreparation(IFileSystem fileSystem, NodeNpmInst
     }
 
     private static NativeProjectPreparationPreview Invalid(string diagnostic) => new(false, [], [diagnostic]);
+
+    private static JsonElement Property(JsonElement element, string name)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out JsonElement value)
+            ? value : throw new InvalidDataException($"Node provenance is missing '{name}'.");
+
+    private static string Text(JsonElement element, string name)
+        => Property(element, name) is { ValueKind: JsonValueKind.String } value && value.GetString() is { Length: > 0 } text
+            ? text : throw new InvalidDataException($"Node provenance '{name}' must be a nonempty string.");
+
+    private static IEnumerable<JsonElement> Array(JsonElement element, string name)
+        => Property(element, name) is { ValueKind: JsonValueKind.Array } value
+            ? value.EnumerateArray() : throw new InvalidDataException($"Node provenance '{name}' must be an array.");
+
+    private static async Task<ReadOnlyMemory<byte>> ReadVerifiedAsync(ResolvedTemplate selected, JsonElement descriptor, CancellationToken cancellationToken)
+    {
+        string path = Text(descriptor, "path");
+        if (Path.IsPathRooted(path) || path.Contains('\\') || path.Split('/').Any(part => part is "" or "." or ".."))
+        {
+            throw new InvalidDataException("Node provenance requires exact package-relative source paths.");
+        }
+        ReadOnlyMemory<byte> bytes = await selected.ReadPackageFileAsync(path, cancellationToken);
+        if (!string.Equals(Convert.ToHexString(SHA256.HashData(bytes.Span)), Text(descriptor, "sha256"), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException($"The selected Node source '{path}' is missing or changed (SHA-256 mismatch).");
+        }
+        return bytes;
+    }
 }
