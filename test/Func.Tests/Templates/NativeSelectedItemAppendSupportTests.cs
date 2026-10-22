@@ -235,14 +235,33 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
             using var document = JsonDocument.Parse(line["JSON: ".Length..]);
             JsonElement invocation = document.RootElement.GetProperty("invocation");
             invocation.GetProperty("changes").GetArrayLength().Should().Be(0);
-            invocation.GetProperty("effects").GetProperty("kind").GetString().Should().Be(kind);
-            invocation.GetProperty("effects").GetProperty("completed").GetArrayLength().Should().Be(kind == "partialFailure" ? 0 : 1);
-            invocation.GetProperty("effects").GetProperty("failed").GetArrayLength().Should().Be(kind == "partialFailure" ? 1 : 0);
+            JsonElement rendered = invocation.GetProperty("effects");
+            rendered.GetProperty("kind").GetString().Should().Be(kind);
+            rendered.GetProperty("succeeded").GetBoolean().Should().Be(kind == "applied");
+            JsonElement[] planned = [.. rendered.GetProperty("planned").EnumerateArray()];
+            JsonElement[] completed = [.. rendered.GetProperty("completed").EnumerateArray()];
+            JsonElement[] failed = [.. rendered.GetProperty("failed").EnumerateArray()];
+            (string? Kind, string? TargetPath, string? TemplateIdentity, string? SourceIdentity, string? Sha256) expectedEffect =
+                (nameof(TemplateAppendFileEffect), Target, UserIdentity, selected.ConfigurationSourceIdentity, selected.ConfigurationSha256);
+            (JsonElement[] Effects, int Count)[] projections =
+                [(planned, kind == "incomplete" ? 2 : 1), (completed, kind == "partialFailure" ? 0 : 1), (failed, kind == "partialFailure" ? 1 : 0)];
+            foreach ((JsonElement[] projected, int count) in projections)
+            {
+                projected.Select(effect => (effect.GetProperty("kind").GetString(), effect.GetProperty("targetPath").GetString(),
+                    effect.GetProperty("source").GetProperty("templateIdentity").GetString(),
+                    effect.GetProperty("source").GetProperty("identity").GetString(),
+                    effect.GetProperty("source").GetProperty("sha256").GetString()))
+                    .Should().Equal(Enumerable.Repeat(expectedEffect, count));
+            }
+            planned.Length.Should().Be(ledger.Plan.Effects.Count);
+            (planned.Length - completed.Length - failed.Length).Should().Be(kind == "incomplete" ? 1 : 0);
             document.RootElement.TryGetProperty("hasCreationOutcome", out _).Should().BeFalse();
             document.RootElement.TryGetProperty("hasReturnedCreationResult", out _).Should().BeFalse();
         }
         else
         {
+            interaction.Lines.Where(line => line.StartsWith($"{nameof(TemplateAppendFileEffect)}: ", StringComparison.Ordinal))
+                .Should().Equal(Enumerable.Repeat($"{nameof(TemplateAppendFileEffect)}: {Target}", kind == "incomplete" ? 2 : 1));
             interaction.Lines.Should().ContainSingle(line => line.Contains("Exact returned workflow diagnostic.", StringComparison.Ordinal));
         }
         await factory.Received(1).CreateAsync(Arg.Any<TemplateEngineContext>(), Arg.Any<TemplateConstraintEvaluationSnapshot>(),
