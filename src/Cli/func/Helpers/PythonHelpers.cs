@@ -183,13 +183,13 @@ namespace Azure.Functions.Cli.Helpers
                 ColoredConsole.WriteLine(VerboseColor($"Found Python version {pythonVersion.Version} ({pythonVersion.ExecutablePath})."));
             }
 
-            // Python 3.[9|10|11|12] (supported)
+            // Python 3.[10|11|12|13|14] (supported)
             if (IsVersionSupported(pythonVersion))
             {
                 return;
             }
 
-            // Python 3.x (but not 3.[9|10|11|12]), not recommended, may fail. E.g.: 3.4, 3.5.
+            // Python 3.x (but not 3.[10|11|12|13|14]), not recommended, may fail. E.g.: 3.4, 3.5.
             if (pythonVersion.Major == 3)
             {
                 if (errorIfNotSupported)
@@ -234,7 +234,6 @@ namespace Azure.Functions.Cli.Helpers
             // Linux / OSX / Venv Interpreter Entrypoints
             var python3GetVersionTask = GetVersion("python3");
             var pythonGetVersionTask = GetVersion("python");
-            var python39GetVersionTask = GetVersion("python3.9");
             var python310GetVersionTask = GetVersion("python3.10");
             var python311GetVersionTask = GetVersion("python3.11");
             var python312GetVersionTask = GetVersion("python3.12");
@@ -246,7 +245,6 @@ namespace Azure.Functions.Cli.Helpers
                 await pyGetVersionTask,
                 await python3GetVersionTask,
                 await pythonGetVersionTask,
-                await python39GetVersionTask,
                 await python310GetVersionTask,
                 await python311GetVersionTask,
                 await python312GetVersionTask,
@@ -254,7 +252,7 @@ namespace Azure.Functions.Cli.Helpers
                 await python314GetVersionTask
             };
 
-            // Highest preference -- Go through the list, if we find the first python 3.6 or python 3.7 worker, we prioritize that.
+            // Highest preference -- Go through the list and prioritize the first supported Python worker.
             WorkerLanguageVersionInfo recommendedPythonWorker = versions.FirstOrDefault(w => IsVersionSupported(w));
             if (recommendedPythonWorker != null)
             {
@@ -325,7 +323,7 @@ namespace Azure.Functions.Cli.Helpers
             }
             catch (Exception)
             {
-                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.6 or 3.7 installed.");
+                throw new CliException("Unable to verify Python version. Please make sure you have Python 3.10, 3.11, 3.12, 3.13, or 3.14 installed.");
             }
 
             if (exitCode == 0)
@@ -596,8 +594,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
-                    case 9:
-                        return StaticResources.DockerfilePython39;
                     case 10:
                         return StaticResources.DockerfilePython310;
                     case 11:
@@ -611,7 +607,7 @@ namespace Azure.Functions.Cli.Helpers
                 }
             }
 
-            return StaticResources.DockerfilePython39;
+            return StaticResources.DockerfilePython310;
         }
 
         // Build environment images for building native dependencies for python function apps
@@ -621,8 +617,6 @@ namespace Azure.Functions.Cli.Helpers
             {
                 switch (info?.Minor)
                 {
-                    case 9:
-                        return (DockerImages.LinuxPython39ImageAmd64, false);
                     case 10:
                         return (DockerImages.LinuxPython310ImageAmd64, false);
                     case 11:
@@ -651,8 +645,7 @@ namespace Azure.Functions.Cli.Helpers
                     case 13:
                     case 12:
                     case 11:
-                    case 10:
-                    case 9: return true;
+                    case 10: return true;
                     default: return false;
                 }
             }
