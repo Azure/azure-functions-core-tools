@@ -23,12 +23,12 @@ internal sealed class WorkloadNativeTemplatePolicies(
     public bool HasPolicyForStack(string stack) => _admission.HasPolicyForStack(stack);
 
     public async Task<NativeTemplatePolicyCandidate?> QualifyProjectAsync(
-        NativeProjectTemplateSource source, bool requireLayout, CancellationToken cancellationToken)
+        NativeProjectTemplateSource source, bool requireLayout, CancellationToken cancellationToken, bool allowCoreLayoutFallback = false)
     {
         ArgumentNullException.ThrowIfNull(source);
         NativeTemplatePolicyCandidate? candidate = await GetCandidateAsync(source.Entry, source.Configuration,
             source.ConfigurationSourceIdentity, source.PackageMountPoint, source.ReadPackageFileAsync,
-            source.RevalidateAsync, requireLayout, cancellationToken, source.SessionIdentity);
+            source.RevalidateAsync, requireLayout, cancellationToken, source.SessionIdentity, allowCoreLayoutFallback);
         return candidate;
     }
 
@@ -49,7 +49,7 @@ internal sealed class WorkloadNativeTemplatePolicies(
         TemplateCatalogEntry entry, TemplateConfigurationSnapshot configuration, string sourceIdentity, string? mountPoint,
         Func<string, CancellationToken, Task<ReadOnlyMemory<byte>>> read,
         Func<CancellationToken, Task<TemplateInvocationResult?>>? revalidate,
-        bool requireLayout, CancellationToken cancellationToken, object? sessionIdentity = null)
+        bool requireLayout, CancellationToken cancellationToken, object? sessionIdentity = null, bool allowCoreLayoutFallback = false)
     {
         if (mountPoint is null || revalidate is null)
         {
@@ -69,10 +69,11 @@ internal sealed class WorkloadNativeTemplatePolicies(
                 await existing.RevalidateDeclarationAsync(cancellationToken);
                 return existing;
             }
-            BoundNativeTemplatePolicy? owner = await _admission.TryBindAsync(entry, mountPoint, cancellationToken, required: requireLayout);
+            BoundNativeTemplatePolicy? owner = await _admission.TryBindAsync(
+                entry, mountPoint, cancellationToken, required: requireLayout, allowCoreLayoutFallback);
             if (owner is null)
             {
-                if (requireLayout)
+                if (requireLayout && !allowCoreLayoutFallback)
                 {
                     throw new InvalidDataException("This project requires an authorized owning workload layout policy. Update the owning workload and Azure Functions CLI.");
                 }

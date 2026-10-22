@@ -84,7 +84,44 @@ public sealed partial class BundledPythonTemplateTests
         packageSource.ReceivedCalls().Should().BeEmpty("boot/creation uses only actually installed local packages");
     }
 
-    private async Task<(WorkloadPathsOptions Paths, string Home, IWorkloadPackageSource PackageSource)> InstallPythonRuntimeAsync(string prefix)
+    [Fact]
+    public async Task PythonBootFactory_RegisteredPythonPolicy_PreservesOtherStacksCoreProjectQualification()
+    {
+        var (paths, home, _) = await InstallPythonRuntimeAsync("mixed", includeDotNet: true);
+        NativeTemplateWorkflowHostFactory factory = new();
+        using var host = await factory.CreateAsync(Substitute.For<IInteractionService>(), paths, new(home), services =>
+        {
+            _loadedBootWorkload = services.Any(service => service.ImplementationInstance is RuntimeWorkloadInfo);
+            services.AddFirstPartyNativeWorkflows();
+        }, enableBundleBindingConstraints: true, CancellationToken.None);
+        using var invocation = host.CreateInvocation();
+        var registrations = invocation.Services.GetServices<WorkloadNativeTemplatePolicyRegistration>().ToArray();
+        registrations.Should().ContainSingle().Which.Policy.Stack.Should().Be("python");
+        var availability = await invocation.Services.GetRequiredService<INativeTemplateAvailability>().CaptureAsync(CancellationToken.None);
+        var workflows = invocation.Services.GetRequiredService<NativeTemplateWorkflowRegistry>();
+        var support = invocation.Services.GetRequiredService<TemplateProjectSupport>() with { QualifyLayoutAsync = workflows.QualifyLayoutAsync };
+        using var templater = await invocation.Services.GetRequiredService<ITemplaterFactory>().CreateProjectAsync(
+            new(WorkingDirectory.FromExplicit(Path.Combine(_root, "mixed-project"))), availability, support, CancellationToken.None);
+
+        var catalog = await templater.ListAsync(TemplateType.Project, CancellationToken.None);
+
+        var dotnet = catalog.Where(entry => entry.Package?.Identifier == "Azure.Functions.Templates.DotNet").ToArray();
+        dotnet.Should().NotBeEmpty();
+        foreach (var entry in dotnet)
+        {
+            entry.ProjectConfigurationDiagnostic.Should().BeNull(entry.Identity);
+            entry.ConstraintEvaluation.Status.Should().Be(TemplateConstraintEvaluationStatus.Eligible, entry.Identity);
+        }
+        var target = WorkingDirectory.FromExplicit(Path.Combine(_root, "mixed-preview"));
+        var preview = await invocation.Composer.ExecuteProjectAsync(new(target,
+            dotnet.First(entry => entry.Language == "C#").Identity, "MixedStack", "dotnet", "csharp",
+            false, true, true, false, [], new HashSet<string>()), CancellationToken.None);
+        preview.Succeeded.Should().BeTrue(string.Join(" ", preview.Diagnostics));
+        Directory.Exists(target.Info.FullName).Should().BeFalse();
+    }
+
+    private async Task<(WorkloadPathsOptions Paths, string Home, IWorkloadPackageSource PackageSource)> InstallPythonRuntimeAsync(
+        string prefix, bool includeDotNet = false)
     {
         PhysicalFileSystem files = new();
         WorkloadPathsOptions paths = new(Path.Combine(_root, prefix + "-workloads"));
@@ -102,6 +139,11 @@ public sealed partial class BundledPythonTemplateTests
             new WorkloadDeploymentService(paths, workloads, metadata, coordinator, files, bundles), coordinator, workloads, files);
         await installer.InstallFromPackageAsync(BuiltArchive);
         await installer.InstallFromPackageAsync(BuildMetadataOnlyPythonBundle());
+        if (includeDotNet)
+        {
+            var dotnet = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "bundled-dotnet-artifacts"), "*.nupkg").Single();
+            await installer.InstallFromPackageAsync(dotnet);
+        }
         return (paths, home, packageSource);
     }
 

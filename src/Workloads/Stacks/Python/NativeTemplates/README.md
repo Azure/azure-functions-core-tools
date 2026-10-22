@@ -198,6 +198,9 @@ it to the selected archive's installed payload, bundled ownership and
 provenance. A registered stack policy permits selection, not execution of an
 unowned template. A selected item without an admitted provider refuses
 instead of falling back to plain native creation.
+Other installed stacks retain their existing core project-layout qualifiers
+when no workload policy claims their bundled source. A refusing or invalid
+registered owner is never bypassed by that compatibility path.
 
 The workload reads through the host-issued `NativeTemplateSource`, retaining
 package/version checks, original and helper configuration/source hashes,

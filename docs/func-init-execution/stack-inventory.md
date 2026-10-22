@@ -242,6 +242,10 @@ Unowned items refuse rather than falling back to plain native creation.
 Python's existing basic-project configuration action and no-pip/no-venv
 behavior remain unchanged. Other stacks' core adapters are not migrated by
 this change.
+Their existing core project-layout qualifiers remain available when no
+workload policy claims the selected bundled source. A required policy that
+does claim its source must still qualify it; rejection does not fall back
+to a core qualifier.
 
 ### Bounded F# workflow repair
 

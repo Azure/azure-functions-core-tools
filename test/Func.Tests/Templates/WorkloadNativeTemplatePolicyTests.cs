@@ -207,6 +207,36 @@ public sealed partial class BundledNodeTemplateTests
         await expired.Should().ThrowAsync<ObjectDisposedException>();
     }
 
+    [Fact]
+    public async Task LoadedPolicy_CoreLayoutFallback_DoesNotBypassClaimedOwnerRefusal()
+    {
+        WorkloadEntry entry = await InstallPolicyFixtureAsync();
+        using ServiceProvider provider = await CreatePolicyServicesAsync();
+        using IServiceScope scope = provider.CreateScope();
+        var policy = scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicyRegistration>().Policy;
+        policy.GetType().GetProperty("Mode")!.SetValue(policy, "unhandled");
+        var fallbackCalled = false;
+        var support = scope.ServiceProvider.GetRequiredService<TemplateProjectSupport>() with
+        {
+            QualifyLayoutAsync = (source, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+                fallbackCalled = true;
+                return Task.FromResult<NativeProjectLayoutQualification?>(
+                    new(source.Entry.Identity, source.Configuration.Fingerprint, new(0, "fixture", "Fixture")));
+            },
+        };
+        var availability = new TemplateConstraintEvaluationSnapshot([new(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), entry.Aliases, true)]);
+        using var templater = await scope.ServiceProvider.GetRequiredService<ITemplaterFactory>().CreateProjectAsync(
+            new(WorkingDirectory.FromExplicit(Path.Combine(_root, "refused-owner"))), availability, support, CancellationToken.None);
+
+        var catalog = await templater.ListAsync(TemplateType.Project);
+
+        catalog.Single(candidate => candidate.Identity == "Fixture.Project").ProjectConfigurationDiagnostic.Should().Contain("does not handle");
+        fallbackCalled.Should().BeFalse("a claimed runtime policy must not be bypassed by a core layout qualifier");
+        Directory.Exists(Path.Combine(_root, "refused-owner")).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("missing-declaration")]
     [InlineData("wrong-index")]
