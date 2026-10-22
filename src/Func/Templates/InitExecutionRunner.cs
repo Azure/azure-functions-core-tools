@@ -32,7 +32,7 @@ internal sealed class InitExecutionRunner(
     IFileSystem fileSystem,
     ILocalSettingsProvider localSettings,
     IFunctionsProjectResolver projects,
-    NativeTemplateWorkflowRegistry? workflows = null) : IInitExecutionRunner
+    NativeTemplateWorkflowRegistry? workflows = null, WorkloadNativeTemplatePolicies? policies = null) : IInitExecutionRunner
 {
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
@@ -46,6 +46,7 @@ internal sealed class InitExecutionRunner(
     private readonly ILocalSettingsProvider _localSettings = localSettings ?? throw new ArgumentNullException(nameof(localSettings));
     private readonly IFunctionsProjectResolver _projects = projects ?? throw new ArgumentNullException(nameof(projects));
     private readonly NativeTemplateWorkflowRegistry? _workflows = workflows;
+    private readonly WorkloadNativeTemplatePolicies? _policies = policies;
 
     public async Task<InitExecutionResult> ExecuteAsync(
         InitExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -464,11 +465,24 @@ internal sealed class InitExecutionRunner(
         NativeProjectPreparationContext? preparationContext = null;
         NativeProjectPreparationOutcome? preparation = null;
         TemplateInvocationRequest invocationRequest = new(request.WorkingDirectory, final.ValuesByCanonicalName,
-            request.Name ?? (_workflows is null ? null : request.WorkingDirectory.Info.Name), DryRun: true);
+            request.Name ?? (_workflows is null ? null : request.WorkingDirectory.Info.Name), DryRun: true)
+        {
+            ExplicitParameterNames = final.ExplicitParameterNames,
+            ArgumentSource = new(selected.Entry.Identity, selected.Parameters, request.ReservedAliases, request.RawTemplateTokens),
+        };
         INativeProjectWorkflowProvider? provider;
         try
         {
-            provider = _workflows?.FindProject(selected.Entry);
+            provider = (_policies is null ? null : await _policies.FindAsync(selected, cancellationToken))
+                ?? _workflows?.FindProject(selected.Entry);
+        }
+        catch (IOException exception)
+        {
+            return InitExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry, ArgumentResults = [final] };
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return InitExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry, ArgumentResults = [final] };
         }
         catch (InvalidTemplateMetadataException exception)
         {
@@ -477,6 +491,10 @@ internal sealed class InitExecutionRunner(
                 SelectedTemplate = selected.Entry,
                 ArgumentResults = [final],
             };
+        }
+        if (provider is not null && invocationRequest.Name is null)
+        {
+            invocationRequest = invocationRequest with { Name = request.WorkingDirectory.Info.Name };
         }
         INativeProjectPreparation? projectPreparation = provider?.Preparation ?? (_workflows is null ? request.ProjectPreparation : null);
         if (provider is not null)

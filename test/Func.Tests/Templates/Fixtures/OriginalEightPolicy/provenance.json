@@ -1,0 +1,10 @@
+{
+  "purpose": "Unchanged original-eight-policy binary on the extended host. Compatibility fixture only, not a Python source migration or transferred runtime qualification.",
+  "originalHead": "ebe9d5c179b25df3f533ef3db67ffbfef26026b8",
+  "originalDirtySourceFingerprint": "21e70e4d59c4547804419a274c3d4329a65473c9141da80a6c3f8a2be22ddb4a",
+  "originalAbstractionsSha256": "2a6bd27e28aea1fe68ad4ff0ebb834a0f5ff77ecbb769d9e6be35802af44e3f3",
+  "packageSha256": "22c509492ed97b4dca1335cb32572a87a56b642563f0802070a4fa1e9a657b3d",
+  "pythonAssemblySha256": "55956f2dd22137fec8601aad64dafeae7cde1176997be9b54bc122c04c02220c",
+  "ownerHandoffReceiptSha256": "891f08dbd2b5d02082e17573a65c9f2fca0c9e0fdcd66146b3cda2b9952c7e50",
+  "rules": "Normal builds never rebuild or update this binary. Tests load it through the normal workload loader, share the new host Abstractions and check optional member defaults without executing its policy. No new-policy/old-host reverse compatibility claim."
+}

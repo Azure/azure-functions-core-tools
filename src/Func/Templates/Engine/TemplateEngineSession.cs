@@ -129,9 +129,16 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
             hostData = await hostReader.ReadToEndAsync(cancellationToken);
         }
 
+        string packageRoot = configurationFile.MountPoint.Root.FullPath.Replace('\\', '/').TrimEnd('/') + "/";
+        string mountedConfiguration = configurationFile.FullPath.Replace('\\', '/');
+        if (!mountedConfiguration.StartsWith(packageRoot, StringComparison.Ordinal))
+        {
+            throw new InvalidTemplateMetadataException("The configuration is outside its captured package mount.");
+        }
         return new(configuration, fingerprint, TemplateCatalogProjector.GetTemplateType(loaded), Array.AsReadOnly<ITemplateParameter>([.. loaded.ParameterDefinitions]))
         {
             DefaultName = loaded.DefaultName,
+            PackageConfigurationPath = mountedConfiguration[packageRoot.Length..],
             HostConfigPlace = hostFile?.FullPath,
             HostData = hostData,
         };

@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Native;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Azure.Functions.Cli.Workloads;
@@ -63,4 +64,12 @@ public abstract class FunctionsCliBuilder
     /// <typeparam name="TFactory">A concrete <see cref="IFunctionsProjectFactory"/>.</typeparam>
     public abstract void AddProjectFactory<TFactory>()
         where TFactory : class, IFunctionsProjectFactory;
+
+    /// <summary>
+    /// Registers a native template policy tagged with the calling runtime workload.
+    /// </summary>
+    /// <exception cref="NotSupportedException">The host does not support workload-native template policies.</exception>
+    public virtual void AddNativeTemplatePolicy<TPolicy>()
+        where TPolicy : NativeTemplatePolicy
+        => throw new NotSupportedException("This host does not support workload-native template policies. Update the Azure Functions CLI.");
 }

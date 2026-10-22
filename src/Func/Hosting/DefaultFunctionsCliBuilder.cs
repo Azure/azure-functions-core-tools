@@ -3,6 +3,8 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Native;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -84,6 +86,17 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Ru
             TFactory factory = ActivatorUtilities.GetServiceOrCreateInstance<TFactory>(sp);
             return new WorkloadProjectFactoryRegistration(workload, factory);
         });
+    }
+
+    public override void AddNativeTemplatePolicy<TPolicy>()
+    {
+        RuntimeWorkloadInfo owner = RequireWorkload();
+        if (typeof(TPolicy).IsAbstract)
+        {
+            throw new ArgumentException("A native template policy must be a concrete type.", nameof(TPolicy));
+        }
+        Services.AddWorkloadNativeTemplatePolicies();
+        Services.AddScoped(provider => new WorkloadNativeTemplatePolicyRegistration(owner, ActivatorUtilities.CreateInstance<TPolicy>(provider)));
     }
 
     private void RegisterCommandFactory(Func<IServiceProvider, FuncCommand> factory)

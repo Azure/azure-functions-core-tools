@@ -11,7 +11,8 @@ internal sealed class ResolvedTemplate
     private readonly ISelectedTemplateInvoker _invoker;
 
     internal ResolvedTemplate(TemplateCatalogEntry entry, ISelectedTemplateInvoker invoker,
-        string? configurationSha256 = null, string? configurationSourceIdentity = null)
+        string? configurationSha256 = null, string? configurationSourceIdentity = null,
+        string? packageMountPoint = null, TemplateConfigurationSnapshot? configuration = null, object? invocationOwner = null)
     {
         ArgumentNullException.ThrowIfNull(entry);
         _invoker = invoker ?? throw new ArgumentNullException(nameof(invoker));
@@ -24,6 +25,9 @@ internal sealed class ResolvedTemplate
         Entry = entry;
         ConfigurationSha256 = configurationSha256;
         ConfigurationSourceIdentity = configurationSourceIdentity;
+        PackageMountPoint = packageMountPoint;
+        Configuration = configuration;
+        InvocationOwner = invocationOwner ?? invoker;
     }
 
     public TemplateCatalogEntry Entry { get; }
@@ -33,6 +37,12 @@ internal sealed class ResolvedTemplate
     public string? ConfigurationSha256 { get; }
 
     public string? ConfigurationSourceIdentity { get; }
+
+    internal string? PackageMountPoint { get; }
+
+    internal TemplateConfigurationSnapshot? Configuration { get; }
+
+    internal object InvocationOwner { get; }
 
     internal Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(string relativePath, CancellationToken cancellationToken)
     {

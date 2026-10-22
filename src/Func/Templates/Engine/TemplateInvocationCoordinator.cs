@@ -15,11 +15,13 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// Coordinates selected-source checks, native preview and creation without owning the engine session.
 /// </summary>
 internal sealed partial class TemplateInvocationCoordinator(
-    ITemplateInvocationEngine engine, IFileSystem fileSystem, TemplateProjectSupport? projectSupport = null)
+    ITemplateInvocationEngine engine, IFileSystem fileSystem, TemplateProjectSupport? projectSupport = null,
+    WorkloadNativeTemplatePolicies? policies = null)
 {
     private readonly ITemplateInvocationEngine _engine = engine ?? throw new ArgumentNullException(nameof(engine));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly TemplateProjectSupport? _projectSupport = projectSupport;
+    private readonly WorkloadNativeTemplatePolicies? _policies = policies;
 
     public bool ProjectTemplatesEnabled => _projectSupport is not null;
 
@@ -30,9 +32,18 @@ internal sealed partial class TemplateInvocationCoordinator(
             throw new InvalidOperationException("Project templates are not enabled for this invocation flow.");
         }
 
-        return ProjectSupport(configuration)?.DotNetLayout is { } layout
-            ? _projectSupport.Planner.ReadDotNetLayout(configuration, layout)
+        return _projectSupport.OwnedLayout is { } layout
+            ? _projectSupport.Planner.ReadOwnedLayout(configuration, layout)
             : _projectSupport.Planner.Read(configuration);
+    }
+
+    internal IReadOnlyList<TemplateProjectConfigurationDeclaration> ValidateProjectConfiguration(
+        ITemplateInfo template, TemplateConfigurationSnapshot configuration)
+    {
+        TemplateProjectSupport support = ProjectSupport(template, configuration)
+            ?? throw new InvalidOperationException("Project templates are not enabled for this invocation flow.");
+        return support.OwnedLayout is { } layout
+            ? support.Planner.ReadOwnedLayout(configuration.Content, layout) : support.Planner.Read(configuration.Content);
     }
 
     public void ThrowIfDisposed() => _engine.ThrowIfDisposed();
@@ -55,29 +66,52 @@ internal sealed partial class TemplateInvocationCoordinator(
             return configurationFailure;
         }
 
+        using NativeTemplatePolicySession? policy = request.PolicyCandidate is { } candidate
+            ? new(candidate, _engine.Context.Project?.RootDirectory ?? request.OutputDirectory, new TemplateArgumentParser()) : null;
+        if (policy is not null)
+        {
+            try
+            {
+                request = (await policy.PrepareAsync(request, cancellationToken)) with { RequireCapturedSources = true };
+                configurationFailure = await ValidateGuardedSourcesAsync(template, configuration, request, cancellationToken);
+                if (configurationFailure is not null)
+                {
+                    return configurationFailure;
+                }
+            }
+            catch (InvalidDataException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
+            catch (NotSupportedException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
+        }
+
         string? bindingFailure = QualifyBindings(template, configuration, request) ?? GetFSharpContextDiagnostic(template, configuration, request);
         if (bindingFailure is not null)
         {
             return new(TemplateInvocationStatus.InvalidArguments, [], bindingFailure);
         }
 
-        TemplateProjectSupport? project = configuration.Type == TemplateType.Project ? ProjectSupport(configuration.Content) : null;
+        TemplateProjectSupport? project = configuration.Type == TemplateType.Project ? ProjectSupport(template, configuration) : null;
         if (project is not null)
         {
             try
             {
-                ValidateProjectConfiguration(configuration.Content);
+                ValidateProjectConfiguration(template, configuration);
             }
             catch (InvalidTemplateMetadataException exception)
             {
                 return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
             }
-            if (project.DotNetLayout is not null && request.EffectSupport is null)
+            if (project.OwnedLayout is not null && request.EffectSupport is null && policy is null)
             {
                 return new(TemplateInvocationStatus.EffectFailure, [], "Qualified .NET project creation requires an explicit controlled dependency capability.");
             }
         }
-        else if (request.EffectSupport is null && configuration.Root.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
+        else if (request.EffectSupport is null && policy is null && configuration.Root.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
             && property.Value.ValueKind != JsonValueKind.Null && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
         {
             return new(TemplateInvocationStatus.Failed, [], "Item post-actions require a qualified dispatcher and are not supported by this invocation path.");
@@ -136,7 +170,7 @@ internal sealed partial class TemplateInvocationCoordinator(
         {
             _ = TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind);
         }
-        if (project is null && request.EffectSupport is null && effects.CreationResult.PostActions.Count != 0)
+        if (project is null && request.EffectSupport is null && policy is null && effects.CreationResult.PostActions.Count != 0)
         {
             return new(TemplateInvocationStatus.Failed, [], "Native creation produced unsupported item post-actions.");
         }
@@ -147,7 +181,7 @@ internal sealed partial class TemplateInvocationCoordinator(
         {
             return new(TemplateInvocationStatus.InvalidTemplate, [], captureFailure);
         }
-        bool guarded = request.SourceSnapshot is not null || request.EffectSupport is not null
+        bool guarded = request.SourceSnapshot is not null || request.EffectSupport is not null || policy is not null
             || request.ExpectedPreparation is not null || request.RequireCapturedSources;
         NativeTemplatePreparationSnapshot capture;
         try
@@ -168,10 +202,29 @@ internal sealed partial class TemplateInvocationCoordinator(
         {
             return new(TemplateInvocationStatus.InvalidTemplate, [], "A native source mapping is not bound to its exact selected package source pin.");
         }
-        request = request with { CapturedSources = capture.Sources };
+        request = request with { CapturedSources = Array.AsReadOnly<TemplateEffectSource>([.. request.CapturedSources, .. capture.Sources]) };
         if (request.ExpectedPreparation is { } expected && !SameCapture(expected, capture))
         {
             return new(TemplateInvocationStatus.TemplateChanged, [], "The actual native capture differs from the qualified preparation plan. Rerun preparation.");
+        }
+        if (policy is not null)
+        {
+            try
+            {
+                await policy.QualifyCaptureAsync(capture, cancellationToken);
+                if (policy.CompileRepair is not null)
+                {
+                    request = request with { PolicyCompileRepair = policy.CreateCompileRepair() };
+                }
+            }
+            catch (InvalidDataException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
+            catch (NotSupportedException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
         }
         IReadOnlyList<TemplateFileChange> changes = nativeChanges;
         IReadOnlyList<TemplateProjectConfigurationPlan> configurationPlans = [];
@@ -182,8 +235,8 @@ internal sealed partial class TemplateInvocationCoordinator(
                 HashSet<string> directories = new(image.Directories.Select(image.GetTarget),
                     Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
                 IReadOnlyList<TemplateFileChange> actual = DescribeActualOutputs(image, configuration, effects, includeExistingDirectories: true);
-                configurationPlans = project.DotNetLayout is { } layout
-                    ? project.Planner.CreateDotNetPlans(configuration.Content, effects.CreationResult, output, actual, directories,
+                configurationPlans = project.OwnedLayout is { } layout
+                    ? project.Planner.CreateOwnedPlans(configuration.Content, effects.CreationResult, output, actual, directories,
                         layout, request.Parameters, effects)
                     : project.Planner.CreatePlans(configuration.Content, effects.CreationResult, output, actual, directories);
                 if (configurationPlans.Any(project.Writer.ConfigurationExists))
@@ -210,9 +263,17 @@ internal sealed partial class TemplateInvocationCoordinator(
         try
         {
             effectPreview = await PlanEffectsAsync(template, configuration, request, image, capture.Effects, capture,
-                configurationPlans, project?.DotNetLayout is not null, cancellationToken);
+                configurationPlans, project?.OwnedLayout is not null, cancellationToken, policy);
         }
         catch (InvalidTemplateMetadataException exception)
+        {
+            return new(TemplateInvocationStatus.EffectFailure, [], exception.Message) { Capture = capture, ProjectConfigurations = configurationPlans };
+        }
+        catch (InvalidDataException exception)
+        {
+            return new(TemplateInvocationStatus.EffectFailure, [], exception.Message) { Capture = capture, ProjectConfigurations = configurationPlans };
+        }
+        catch (NotSupportedException exception)
         {
             return new(TemplateInvocationStatus.EffectFailure, [], exception.Message) { Capture = capture, ProjectConfigurations = configurationPlans };
         }
@@ -263,9 +324,22 @@ internal sealed partial class TemplateInvocationCoordinator(
 
         TemplateInvocationResult configured = project is null ? installed
             : await ConfigureAsync(template, configuration, project, image, configurationPlans, installed, request, cancellationToken);
-        if (configured.Status != TemplateInvocationStatus.Success || effectPreview is null || request.EffectSupport is not { } support)
+        if (configured.Status != TemplateInvocationStatus.Success || effectPreview is null)
         {
             return configured with { Effects = effectPreview, Capture = capture };
+        }
+        if (policy is not null && effectPreview.Plan.Effects.All(effect => effect is TemplateEditorNoOpEffect))
+        {
+            return configured with
+            {
+                Effects = effectPreview with { Kind = "applied", CompletedEffects = effectPreview.Plan.Effects },
+                Capture = capture,
+            };
+        }
+        NativeTemplateInvocationEffects? support = policy is null ? request.EffectSupport : policy.ExecutionSupport;
+        if (support is null)
+        {
+            throw new InvalidOperationException("The preflighted execution capability is missing.");
         }
         if (effectPreview.Plan.Effects.Count == 0)
         {

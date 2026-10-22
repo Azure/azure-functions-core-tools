@@ -423,7 +423,7 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
     }
 
     [Fact]
-    public void Planner_CreateOnlyQualificationAndBoundary_DoNotBroadenNativeProjectGuards()
+    public async Task Planner_CreateOnlyStructure_DoesNotGrantOwnerPolicyOrExecution()
     {
         var allowed = _planner.PlanFilesAndDependencies(Output,
             [new TemplateCreateFileEffect(Source, Path.Combine(Output.Info.FullName, "requirements.psd1"), "expanded")]);
@@ -433,8 +433,12 @@ public sealed class NativeTemplateEffectWorkflowTests : IDisposable
             [new TemplateAppendFileEffect(Source, Path.Combine(_root, "outside.py"), "expanded", new string('b', 64))]);
 
         allowed.Plan.Should().NotBeNull();
-        other.Plan.Should().BeNull();
+        other.Plan.Should().NotBeNull();
         outside.Plan.Should().BeNull();
+        NativeTemplateEffectResult refused = await _workflow.ExecuteAsync(other.Plan!, null, false, true, CancellationToken.None);
+        refused.Kind.Should().Be("capabilityRequired");
+        refused.Succeeded.Should().BeFalse();
+        Directory.Exists(Output.Info.FullName).Should().BeFalse();
     }
 
     public void Dispose()

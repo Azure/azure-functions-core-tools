@@ -213,7 +213,7 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             {
                 foreach (TemplateGeneratedFSharpFile file in compile.GeneratedFiles)
                 {
-                    _interaction.WriteLine(line => line.Muted("Include before Program.fs: ").Code(file.Path));
+                    _interaction.WriteLine(line => line.Muted($"Include before {Path.GetFileName(compile.EvaluatedCompileOrder[^1])}: ").Code(file.Path));
                 }
             }
         }

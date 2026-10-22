@@ -797,7 +797,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         workflow.Stack.Returns("dotnet");
         workflow.Handles(Arg.Any<TemplateCatalogEntry>()).Returns(call => call.Arg<TemplateCatalogEntry>().Identity == identity);
         workflow.QualifyLayoutAsync(Arg.Any<NativeProjectTemplateSource>(), Arg.Any<CancellationToken>())
-            .Returns(new DotNetProjectLayoutQualification(identity, fingerprint));
+            .Returns(new NativeProjectLayoutQualification(identity, fingerprint, new(0, "dotnet", "C#")));
         workflow.PrepareAsync(Arg.Any<NativeProjectWorkflowContext>(), Arg.Any<CancellationToken>())
             .Returns(call => NativeTemplateInvocationPreparation.Ready(call.Arg<NativeProjectWorkflowContext>().Invocation with
             {

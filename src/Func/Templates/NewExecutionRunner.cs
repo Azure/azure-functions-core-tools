@@ -22,7 +22,7 @@ internal sealed class NewExecutionRunner(
     ITemplateArgumentParser arguments,
     IInteractionService interaction,
     TemplateExecutionInteraction prompts,
-    NativeTemplateWorkflowRegistry? workflows = null) : INewExecutionRunner
+    NativeTemplateWorkflowRegistry? workflows = null, WorkloadNativeTemplatePolicies? policies = null) : INewExecutionRunner
 {
     private readonly INewExecutionContextResolver _contexts = contexts ?? throw new ArgumentNullException(nameof(contexts));
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
@@ -30,6 +30,7 @@ internal sealed class NewExecutionRunner(
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly TemplateExecutionInteraction _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
     private readonly NativeTemplateWorkflowRegistry? _workflows = workflows;
+    private readonly WorkloadNativeTemplatePolicies? _policies = policies;
 
     public async Task<NewExecutionResult> ExecuteAsync(
         NewExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -213,6 +214,32 @@ internal sealed class NewExecutionRunner(
                 "This item declares an internal role and cannot be invoked as an ordinary function template.") with { SelectedTemplate = selected.Entry };
         }
 
+        if (_policies is not null)
+        {
+            try
+            {
+                WorkloadNativeTemplatePolicyAdapter? owned = await _policies.FindAsync(selected, cancellationToken);
+                if (owned is not null)
+                {
+                    provider = owned;
+                    compatibility = owned;
+                    selectedEffects = owned;
+                }
+            }
+            catch (InvalidTemplateMetadataException exception)
+            {
+                return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
+            }
+            catch (IOException exception)
+            {
+                return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                return NewExecutionResult.Reject("workflowUnavailable", exception.Message) with { SelectedTemplate = selected.Entry };
+            }
+        }
+
         NativeSelectedItemBinding? effectBinding = null;
         if (selectedEffects is { } effectSupport)
         {
@@ -267,7 +294,11 @@ internal sealed class NewExecutionRunner(
         cancellationToken.ThrowIfCancellationRequested();
         var invocationRequest = new TemplateInvocationRequest(
             request.WorkingDirectory, final.ValuesByCanonicalName,
-            itemName?.Name ?? request.Name ?? (provider is null ? null : selected.Entry.DefaultName), request.DryRun, request.Force);
+            itemName?.Name ?? request.Name ?? (provider is null ? null : selected.Entry.DefaultName), request.DryRun, request.Force)
+        {
+            ExplicitParameterNames = final.ExplicitParameterNames,
+            ArgumentSource = new(selected.Entry.Identity, selected.Parameters, request.ReservedAliases, request.RawTemplateTokens),
+        };
         if (provider is not null)
         {
             NativeTemplateInvocationPreparation prepared = await provider.PrepareAsync(

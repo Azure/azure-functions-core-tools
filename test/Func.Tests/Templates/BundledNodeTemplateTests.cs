@@ -768,7 +768,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         return archive;
     }
 
-    private async Task<ServiceProvider> CreateServicesAsync()
+    private async Task<ServiceProvider> CreateServicesAsync(Action<IServiceCollection>? configure = null, bool validateScopes = false)
     {
         ServiceCollection services = new();
         services.AddLogging();
@@ -797,7 +797,8 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         services.AddSingleton<InstalledProjectStackCatalog>();
         services.AddSingleton<TemplateProjectSupport>();
         services.AddSingleton<ITemplateStore>(_templates);
-        return services.BuildServiceProvider();
+        configure?.Invoke(services);
+        return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = validateScopes, ValidateOnBuild = validateScopes });
     }
 
     private string CopyAndChange(string corruption)

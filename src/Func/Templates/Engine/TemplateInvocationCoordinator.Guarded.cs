@@ -11,8 +11,29 @@ namespace Azure.Functions.Cli.Templates.Engine;
 
 internal sealed partial class TemplateInvocationCoordinator
 {
-    private readonly Dictionary<string, DotNetProjectLayoutQualification> _projectLayouts = new(StringComparer.Ordinal);
+    private readonly Dictionary<SelectedSourceKey, NativeProjectLayoutQualification> _projectLayouts = [];
     private NativeMsBuildBindingSnapshot? _bindings;
+
+    internal async Task<TemplateInvocationResult> InvokeSelectedAsync(ITemplateInfo template, TemplateConfigurationSnapshot configuration,
+        TemplateCatalogEntry entry, TemplateInvocationRequest request, CancellationToken cancellationToken)
+    {
+        if (_policies is not null && request.PolicyCandidate is null)
+        {
+            try
+            {
+                NativeTemplatePolicyCandidate? candidate = await _policies.GetCandidateAsync(entry, configuration,
+                    $"{template.MountPointUri}::{template.ConfigPlace}", template.MountPointUri,
+                    (path, token) => ReadPackageFileAsync(template, path, token),
+                    token => ValidateSelectedConfigurationAsync(template, configuration, token), requireLayout: false, cancellationToken, _engine);
+                request = request with { PolicyCandidate = candidate };
+            }
+            catch (InvalidTemplateMetadataException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
+        }
+        return await InvokeAsync(template, configuration, request, cancellationToken);
+    }
 
     internal Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(ITemplateInfo template, string path, CancellationToken cancellationToken)
     {
@@ -24,13 +45,31 @@ internal sealed partial class TemplateInvocationCoordinator
         TemplateConfigurationSnapshot configuration, CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        if (_projectSupport?.QualifyLayoutAsync is not { } qualify)
+        if (_projectSupport is null)
         {
             return;
         }
-
-        DotNetProjectLayoutQualification? layout = await qualify(new(entry, configuration,
-            $"{template.MountPointUri}::{template.ConfigPlace}", (path, token) => ReadPackageFileAsync(template, path, token)), cancellationToken);
+        NativeProjectTemplateSource source = new(entry, configuration, $"{template.MountPointUri}::{template.ConfigPlace}",
+            (path, token) => ReadPackageFileAsync(template, path, token))
+        {
+            PackageMountPoint = template.MountPointUri,
+            RevalidateAsync = token => ValidateSelectedConfigurationAsync(template, configuration, token),
+            SessionIdentity = _engine,
+        };
+        bool requiresLayout = false;
+        try
+        {
+            _projectSupport.Planner.Read(configuration.Content);
+        }
+        catch (InvalidTemplateMetadataException)
+        {
+            requiresLayout = true;
+        }
+        NativeTemplatePolicyCandidate? owned = _policies is null ? null
+            : await _policies.QualifyProjectAsync(source, requiresLayout, cancellationToken);
+        NativeProjectLayoutQualification? layout = owned?.Project is { } anchor
+            ? new(entry.Identity, configuration.Fingerprint, anchor) { Policy = owned }
+            : owned is null && _projectSupport.QualifyLayoutAsync is { } qualify ? await qualify(source, cancellationToken) : null;
         cancellationToken.ThrowIfCancellationRequested();
         if (layout is not null)
         {
@@ -39,13 +78,19 @@ internal sealed partial class TemplateInvocationCoordinator
             {
                 throw new InvalidTemplateMetadataException("Project layout qualification does not match the exact mounted candidate.");
             }
-            _projectLayouts[configuration.Content] = layout;
+            _projectSupport.Planner.ReadOwnedLayout(configuration.Content, layout);
+            _projectLayouts[new(template.Identity, template.MountPointUri, template.ConfigPlace, configuration.Fingerprint,
+                configuration.HostConfigPlace, configuration.HostData)] = layout;
         }
     }
 
-    private TemplateProjectSupport? ProjectSupport(string content) => _projectSupport is { } support
-        && _projectLayouts.TryGetValue(content, out DotNetProjectLayoutQualification? layout)
-        ? support with { DotNetLayout = layout } : _projectSupport;
+    private TemplateProjectSupport? ProjectSupport(ITemplateInfo template, TemplateConfigurationSnapshot configuration) => _projectSupport is { } support
+        && _projectLayouts.TryGetValue(new(template.Identity, template.MountPointUri, template.ConfigPlace, configuration.Fingerprint,
+            configuration.HostConfigPlace, configuration.HostData), out NativeProjectLayoutQualification? layout)
+        ? support with { OwnedLayout = layout } : _projectSupport;
+
+    private sealed record SelectedSourceKey(string Identity, string Mount, string ConfigurationPath,
+        string ConfigurationSha256, string? HostPath, string? HostData);
 
     private async Task<TemplateInvocationResult?> ValidateGuardedSourcesAsync(ITemplateInfo template,
         TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request, CancellationToken cancellationToken)
@@ -54,6 +99,25 @@ internal sealed partial class TemplateInvocationCoordinator
         if (failure is not null)
         {
             return failure;
+        }
+        if (request.PolicyCandidate is { } policy)
+        {
+            try
+            {
+                await policy.RevalidateDeclarationAsync(cancellationToken);
+            }
+            catch (IOException exception)
+            {
+                return new(TemplateInvocationStatus.TemplateChanged, [], exception.Message);
+            }
+            catch (NotSupportedException exception)
+            {
+                return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                return new(TemplateInvocationStatus.TemplateChanged, [], exception.Message);
+            }
         }
         if (request.SourceSnapshot is { } snapshot && (configuration.Type != TemplateType.Item || snapshot.TemplateIdentity != template.Identity
             || !string.Equals(snapshot.ConfigurationSha256, configuration.Fingerprint, StringComparison.OrdinalIgnoreCase)))
@@ -100,13 +164,16 @@ internal sealed partial class TemplateInvocationCoordinator
             return null;
         }
         NativeTemplateInvocationEffects? effects = request.EffectSupport;
-        if (configuration.Type != TemplateType.Item || effects is null
-            || !string.Equals(_engine.Context.Project?.Stack, "dotnet", StringComparison.OrdinalIgnoreCase)
+        string? projectRoot = effects?.ProjectDirectory.Info.FullName ?? _engine.Context.Project?.RootDirectory.Info.FullName;
+        if (configuration.Type != TemplateType.Item || (effects is null && request.PolicyCandidate is null)
+            || projectRoot is null || _engine.Context.Project is null
             || snapshot.TemplateIdentity != template.Identity || snapshot.SourceIdentity != $"{template.MountPointUri}::{template.ConfigPlace}"
             || !string.Equals(snapshot.SourceFingerprint, configuration.Fingerprint, StringComparison.OrdinalIgnoreCase)
-            || !Path.IsPathFullyQualified(effects.ExactProjectPath)
-            || !SamePath(snapshot.ProjectFilePath, effects.ExactProjectPath)
-            || !SamePath(_engine.Context.Project!.RootDirectory.Info.FullName, effects.ProjectDirectory.Info.FullName))
+            || (effects is not null && (!Path.IsPathFullyQualified(effects.ExactProjectPath)
+                || !SamePath(snapshot.ProjectFilePath, effects.ExactProjectPath)))
+            || !SamePath(_engine.Context.Project.RootDirectory.Info.FullName, projectRoot)
+            || (request.PolicyCandidate is { } selectedPolicy
+                && !string.Equals(_engine.Context.Project.Stack, selectedPolicy.Admission.Registration.Policy.Stack, StringComparison.OrdinalIgnoreCase)))
         {
             return "The explicit MSBuild snapshot does not match the selected item, source or controlled project boundary.";
         }
@@ -136,10 +203,10 @@ internal sealed partial class TemplateInvocationCoordinator
 
     private string? GetFSharpContextDiagnostic(ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request)
         => request.EffectSupport?.FSharpRepair is not null
-            && (configuration.Type != TemplateType.Item || !template.TagsCollection.TryGetValue("language", out string? language) || language != "F#"
-                || !string.Equals(_engine.Context.Project?.Stack, "dotnet", StringComparison.OrdinalIgnoreCase) || _engine.Context.Project?.Language != "F#"
-                || request.MsBuildBindings?.TargetFramework != "net10.0" || Path.GetExtension(request.EffectSupport.ExactProjectPath) != ".fsproj")
-            ? "F# compile repair requires the selected F# item, an exact evaluated net10.0 .fsproj snapshot and its controlled dependency capability." : null;
+            && (configuration.Type != TemplateType.Item || request.MsBuildBindings is null
+                || !SamePath(request.MsBuildBindings.ProjectFilePath, request.EffectSupport.ExactProjectPath)
+                || Path.GetExtension(request.EffectSupport.ExactProjectPath) != ".fsproj")
+            ? "Compile repair requires the selected item, its exact evaluated project snapshot and controlled capability." : null;
 
     private string? ValidateCapturedAuthority(ITemplateInfo template, TemplateConfigurationSnapshot configuration,
         TemplateInvocationRequest request, TemplateOutputImage image, ICreationEffects effects)
@@ -181,7 +248,7 @@ internal sealed partial class TemplateInvocationCoordinator
             if (repair.GeneratedFiles.Any(file => !image.HasFile(file.Path)
                     || !string.Equals(HashCaptured(image, file.Path), file.Sha256, StringComparison.OrdinalIgnoreCase)))
             {
-                return "F# compile repair does not match the actual captured regular-file bytes and explicit net10.0 project binding.";
+                return "Compile repair does not match the actual captured regular-file bytes and evaluated project binding.";
             }
         }
         return null;
@@ -244,13 +311,35 @@ internal sealed partial class TemplateInvocationCoordinator
 
     private async Task<NativeTemplateEffectResult?> PlanEffectsAsync(ITemplateInfo template, TemplateConfigurationSnapshot configuration,
         TemplateInvocationRequest request, TemplateOutputImage image, ICreationEffects effects,
-        NativeTemplatePreparationSnapshot capture, IReadOnlyList<TemplateProjectConfigurationPlan> plans, bool qualifiedProject, CancellationToken cancellationToken)
+        NativeTemplatePreparationSnapshot capture, IReadOnlyList<TemplateProjectConfigurationPlan> plans, bool qualifiedProject,
+        CancellationToken cancellationToken, NativeTemplatePolicySession? policy = null)
     {
-        if (request.EffectSupport is not { } support)
+        NativeTemplateInvocationEffects? support = request.EffectSupport;
+        TemplateFSharpCompileEffect? repair = request.PolicyCompileRepair ?? support?.FSharpRepair;
+        if (policy is not null && !qualifiedProject && configuration.Type == TemplateType.Project && support is null
+            && repair is null && effects.CreationResult.PostActions.All(action => action.ActionId == Guid.Parse(TemplateProjectConfigurationPlanner.ConfigurationActionId)))
+        {
+            return null;
+        }
+        if (policy is not null && effects.CreationResult.PostActions.Count == 0 && repair is null)
+        {
+            return null;
+        }
+        if (policy is not null && repair is null && effects.CreationResult.PostActions.All(action =>
+            action.ActionId == NativeTemplateEffectPlanner.EditorActionId && action.ContinueOnError
+            && action.Args.Count == 1 && action.Args.TryGetValue("files", out string? files) && files == "0"))
+        {
+            TemplateEffectSource editorSource = new(template.Identity, $"{template.MountPointUri}::{template.ConfigPlace}", configuration.Fingerprint);
+            NativeTemplateEffectPlan editorPlan = new(policy.ProjectDirectory,
+                [.. effects.CreationResult.PostActions.Select(_ => new TemplateEditorNoOpEffect(editorSource))], capture);
+            await policy.QualifyEffectsAsync(editorPlan, cancellationToken);
+            return new("previewed", true, editorPlan, [], [], []);
+        }
+        if (support is null && policy is null)
         {
             if (qualifiedProject)
             {
-                throw new InvalidTemplateMetadataException("Qualified .NET project creation requires an explicit controlled dependency capability.");
+                throw new InvalidTemplateMetadataException("Qualified project creation requires an explicit controlled dependency capability.");
             }
             return null;
         }
@@ -258,23 +347,42 @@ internal sealed partial class TemplateInvocationCoordinator
         {
             throw new InvalidTemplateMetadataException("Controlled dependency effects require a qualified item or project layout.");
         }
-        ArgumentNullException.ThrowIfNull(support.Capability);
-        ArgumentNullException.ThrowIfNull(support.ProjectDirectory);
-        if (qualifiedProject && (plans.Count != 1 || !SamePath(support.ExactProjectPath, plans[0].PrimaryOutput)
-            || !SamePath(support.ProjectDirectory.Info.FullName, image.Output)))
+        WorkingDirectory projectDirectory = support?.ProjectDirectory ?? policy!.ProjectDirectory;
+        string? projectPath = support?.ExactProjectPath ?? policy?.ProjectBinding?.ProjectPath
+            ?? (plans.Count == 1 ? plans[0].PrimaryOutput : null);
+        if (projectPath is null)
         {
-            throw new InvalidTemplateMetadataException("Qualified .NET effects must target the captured project in the exact invocation root.");
+            throw new InvalidTemplateMetadataException("Dependency qualification requires an exact source-bound project path.");
+        }
+        if (qualifiedProject && (plans.Count != 1 || !SamePath(projectPath, plans[0].PrimaryOutput)
+            || !SamePath(projectDirectory.Info.FullName, image.Output)))
+        {
+            throw new InvalidTemplateMetadataException("Qualified effects must target the captured project in the exact invocation root.");
         }
         TemplateEffectSource source = new(template.Identity, $"{template.MountPointUri}::{template.ConfigPlace}", configuration.Fingerprint);
         NativeTemplateEffectPlanner planner = new();
-        NativeTemplateEffectPlanningResult plan = support.FSharpRepair is { } repair
-            ? planner.PlanFSharpItemDependencies(support.ProjectDirectory, source, effects, request.OutputDirectory, support.ExactProjectPath, repair)
-            : planner.PlanDependencies(support.ProjectDirectory, source, effects.CreationResult, support.ExactProjectPath);
+        NativeTemplateEffectPlanningResult plan = repair is not null
+            ? planner.PlanFSharpItemDependencies(projectDirectory, source, effects, request.OutputDirectory, projectPath, repair)
+            : planner.PlanDependencies(projectDirectory, source, effects.CreationResult, projectPath);
         if (plan.Plan is null)
         {
-            return new("invalidPlan", false, new(support.ProjectDirectory, []), [], [], plan.Diagnostics);
+            return new("invalidPlan", false, new(projectDirectory, []), [], [], plan.Diagnostics);
         }
         NativeTemplateEffectPlan capturedPlan = new(plan.Plan.OutputDirectory, plan.Plan.Effects, capture);
+        if (policy is not null)
+        {
+            await policy.QualifyEffectsAsync(capturedPlan, cancellationToken);
+            if (capturedPlan.Effects.All(effect => effect is TemplateEditorNoOpEffect))
+            {
+                return new("previewed", true, capturedPlan, [], [], []);
+            }
+            policy.BindExistingExecutor(request, projectDirectory, projectPath);
+            support = policy.ExecutionSupport;
+        }
+        if (support is null)
+        {
+            throw new InvalidTemplateMetadataException("No exact controlled executor is available for the requested role.");
+        }
         NativeTemplateEffectResult preview = await new NativeTemplateEffectWorkflow().ExecuteAsync(
             capturedPlan, support.Capability, dryRun: true, confirmed: false, cancellationToken);
         if (!request.DryRun && !support.Confirmed && preview.Succeeded)

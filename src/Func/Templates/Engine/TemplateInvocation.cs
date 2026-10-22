@@ -24,6 +24,18 @@ internal sealed record TemplateInvocationRequest(WorkingDirectory OutputDirector
     internal IReadOnlyList<TemplateEffectSource> CapturedSources { get; init; } = [];
 
     internal bool RequireCapturedSources { get; init; }
+
+    internal IReadOnlySet<string> ExplicitParameterNames { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+    internal TemplateArgumentParseRequest? ArgumentSource { get; init; }
+
+    internal NativeTemplatePolicyCandidate? PolicyCandidate { get; init; }
+
+    internal bool PolicyEffectsConfirmed { get; init; }
+
+    internal TemplateFSharpCompileEffect? PolicyCompileRepair { get; init; }
+
+    internal BoundNativeTemplateExecutor? OwnerExecutor { get; init; }
 }
 
 internal sealed record NativeTemplateInvocationEffects(
@@ -123,6 +135,8 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
 internal sealed record TemplateConfigurationSnapshot(string Content, string Fingerprint, TemplateType? Type, IReadOnlyList<ITemplateParameter> Parameters)
 {
     public string? DefaultName { get; init; }
+
+    internal string? PackageConfigurationPath { get; init; }
 
     public string Content { get; } = Content ?? throw new ArgumentNullException(nameof(Content));
 

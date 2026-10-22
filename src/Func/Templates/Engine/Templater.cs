@@ -115,8 +115,9 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
                 continue;
             }
 
-            items.Add(new(candidate.Entry, new SelectedTemplateInvoker(candidate.Template, candidate.Configuration!, _invocation),
-                candidate.Configuration!.Fingerprint, $"{candidate.Template.MountPointUri}::{candidate.Template.ConfigPlace}"));
+            items.Add(new(candidate.Entry, new SelectedTemplateInvoker(candidate.Template, candidate.Configuration!, _invocation, candidate.Entry),
+                candidate.Configuration!.Fingerprint, $"{candidate.Template.MountPointUri}::{candidate.Template.ConfigPlace}",
+                candidate.Template.MountPointUri, candidate.Configuration, _session));
         }
 
         TemplateGroup group = new(items.AsReadOnly(), diagnostics.AsReadOnly());
@@ -167,7 +168,7 @@ internal sealed class Templater(TemplateEngineSession session, TemplateInvocatio
                     try
                     {
                         await _invocation.QualifyProjectConfigurationAsync(template, entry, configuration, cancellationToken);
-                        entry = entry with { ProjectConfigurations = _invocation.ValidateProjectConfiguration(configuration.Content) };
+                        entry = entry with { ProjectConfigurations = _invocation.ValidateProjectConfiguration(template, configuration) };
                     }
                     catch (InvalidTemplateMetadataException exception)
                     {

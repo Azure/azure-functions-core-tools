@@ -9,7 +9,8 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// Binds native identity and captured configuration to the owning session's invocation coordinator.
 /// </summary>
 internal sealed class SelectedTemplateInvoker(
-    ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationCoordinator coordinator) : ISelectedTemplateInvoker
+    ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationCoordinator coordinator,
+    TemplateCatalogEntry? entry = null) : ISelectedTemplateInvoker
 {
     private readonly ITemplateInfo _template = template ?? throw new ArgumentNullException(nameof(template));
     private readonly TemplateConfigurationSnapshot _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -18,7 +19,8 @@ internal sealed class SelectedTemplateInvoker(
     public Task<TemplateInvocationResult> InvokeAsync(TemplateInvocationRequest request, CancellationToken cancellationToken)
     {
         _coordinator.ThrowIfDisposed();
-        return _coordinator.InvokeAsync(_template, _configuration, request, cancellationToken);
+        return entry is null ? _coordinator.InvokeAsync(_template, _configuration, request, cancellationToken)
+            : _coordinator.InvokeSelectedAsync(_template, _configuration, entry, request, cancellationToken);
     }
 
     public Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(string relativePath, CancellationToken cancellationToken)
