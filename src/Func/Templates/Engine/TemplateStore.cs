@@ -83,16 +83,23 @@ internal sealed class TemplateStore(CliConfigurationPathsOptions paths, IFileSys
     }
 
     public async Task<TemplateStoreWriteSession> OpenWriteAsync(TemplateEngineContext context, CancellationToken cancellationToken,
-        Action<TemplateStoreWaitReason>? waiting = null)
+        Action<TemplateStoreWaitReason>? waiting = null, bool requireCleanStore = false)
     {
         ArgumentNullException.ThrowIfNull(context);
         IDisposable lease = await _storeLock.AcquireAsync(ControlDirectory, TemplateStoreAccess.Write, cancellationToken, waiting);
         bool transferred = false;
         try
         {
-            await RecoverAsync(cancellationToken);
+            if (requireCleanStore)
+            {
+                ThrowIfRecoveryRequired();
+            }
+            else
+            {
+                await RecoverAsync(cancellationToken);
+            }
             cancellationToken.ThrowIfCancellationRequested();
-            TemplateStoreWriteSession session = new(this, context, lease);
+            TemplateStoreWriteSession session = new(this, context, lease, requireCleanStore);
             transferred = true;
             return session;
         }
@@ -105,8 +112,52 @@ internal sealed class TemplateStore(CliConfigurationPathsOptions paths, IFileSys
         }
     }
 
+    public bool IsPathInHive(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        string relative = Path.GetRelativePath(Path.GetFullPath(Hive), Path.GetFullPath(path));
+        return !Path.IsPathRooted(relative) && relative != ".."
+            && !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
+    }
+
+    internal void ThrowIfRecoveryRequired()
+    {
+        if (_fileSystem.FileExists(Journal))
+        {
+            throw new TemplateStoreRecoveryRequiredException();
+        }
+    }
+
     internal TemplateEngineSession CreateWriteEngine(TemplateEngineContext context)
         => new(context, Hive, diagnostics: new TemplateStoreEngineDiagnostics(_loggerFactory));
+
+    internal async Task<TemplateEngineSession> CreateAdmissionEngineAsync(TemplateEngineContext context,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfRecoveryRequired();
+        TempDirectory settings = _fileSystem.CreateTempDirectory(ControlDirectory);
+        bool transferred = false;
+        try
+        {
+            if (_fileSystem.DirectoryExists(Hive))
+            {
+                await _fileSystem.CopyDirectoryAsync(Hive, settings.Path, cancellationToken);
+            }
+
+            ThrowIfRecoveryRequired();
+            TemplateEngineSession engine = new(context, settings.Path, ownership: settings,
+                diagnostics: new TemplateStoreEngineDiagnostics(_loggerFactory));
+            transferred = true;
+            return engine;
+        }
+        finally
+        {
+            if (!transferred)
+            {
+                settings.Dispose();
+            }
+        }
+    }
 
     internal async Task<TemplateEngineSession> CreateRecoveryEngineAsync(TemplateEngineContext context)
     {

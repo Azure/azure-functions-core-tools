@@ -133,6 +133,13 @@ public sealed class BasicAcquisitionCoordinationTests
         public PreparedBasicTemplate? Prepared { get; private set; }
         public Task<BasicTemplateSelection> SelectAsync(BasicCompanionPlan plan, TemplateEngineContext context, CancellationToken cancellationToken)
             => inner.SelectAsync(plan, context, cancellationToken);
+        public Task<BasicTemplateSelection> SelectOwnedUpdateAsync(BasicCompanionPlan plan, BasicTemplateArtifact after,
+            string selectedProjectIdentity, NativeTemplateOwnerIdentity owner, string workloadInventory,
+            TemplateEngineContext context, CancellationToken cancellationToken)
+            => inner.SelectOwnedUpdateAsync(plan, after, selectedProjectIdentity, owner, workloadInventory, context, cancellationToken);
+        public Task<BasicTemplateSelection> RevalidateOwnedUpdateAsync(BasicCompanionPlan plan, BasicOwnedTemplateUpdate update,
+            TemplateEngineContext context, CancellationToken cancellationToken)
+            => inner.RevalidateOwnedUpdateAsync(plan, update, context, cancellationToken);
         public Task<bool> EnsureAsync(BasicTemplateArtifact artifact, TemplateEngineContext context, bool offline, CancellationToken cancellationToken)
             => inner.EnsureAsync(artifact, context, offline, cancellationToken);
         public async Task<PreparedBasicTemplate> PrepareAsync(BasicTemplateSelection selection, TemplateEngineContext context,

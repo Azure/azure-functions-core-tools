@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NuGet.Versioning;
 
@@ -316,6 +317,484 @@ public sealed class NativeTemplateOwnershipTests
         }
     }
 
+    [Fact]
+    public async Task OwnedUpdate_InstallsExactNewArchiveAndTransitionsReceiptThenRetriesReadOnly()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        BasicOwnedTemplateUpdate update = scenario.Update;
+        using PreparedBasicTemplate prepared = await scenario.Lifecycle.PrepareAsync(
+            new(update.After, false) { Update = update }, scenario.Context, false, CancellationToken.None);
+        Dictionary<string, string> beforeUpdate = scenario.Fixture.HiveHashes();
+
+        bool reused = await scenario.Lifecycle.CommitAsync(prepared, scenario.Context, CancellationToken.None);
+
+        reused.Should().BeFalse();
+        using (TemplateEngineSession reader = await scenario.Fixture.Templates.OpenReadAsync(scenario.Context, CancellationToken.None))
+        {
+            (await reader.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None))
+                .Should().ContainSingle().Which.Version.Should().Be("1.0.1");
+        }
+        Directory.GetFiles(Path.Combine(scenario.Fixture.Templates.Hive, "packages"), "*.nupkg")
+            .Select(Path.GetFileName).Should().ContainSingle().Which.Should().Contain("1.0.1");
+        NativeTemplateOwnerProof receipt = (await scenario.Owner.GetRetainedProofAsync(update.After.PackageId, CancellationToken.None))!;
+        receipt.Receipt.Version.Should().Be(update.After.Version.ToNormalizedString());
+        receipt.Receipt.ContentRevision.Should().Be(update.After.ContentRevision);
+        receipt.Receipt.PinnedVersion.Should().Be(update.After.Version.ToNormalizedString());
+        receipt.RawSha256.Should().Be(scenario.Owner.CreateProof(update.After).RawSha256);
+        scenario.Fixture.HiveHashes().Should().NotBeEquivalentTo(beforeUpdate);
+
+        BasicTemplateSelection retry = await scenario.Lifecycle.RevalidateOwnedUpdateAsync(scenario.Plan, update,
+            scenario.Context, CancellationToken.None);
+        retry.Installed.Should().BeTrue();
+        int openedPayloads = scenario.Payload.Opened.Count;
+        using PreparedBasicTemplate noOp = await scenario.Lifecycle.PrepareAsync(retry, scenario.Context, false, CancellationToken.None);
+        Dictionary<string, string> beforeRetry = scenario.Fixture.HiveHashes();
+        Dictionary<string, string> beforeRetryBackup = scenario.BackupHashes();
+
+        bool alreadyCompleted = await scenario.Lifecycle.CommitAsync(noOp, scenario.Context, CancellationToken.None);
+
+        alreadyCompleted.Should().BeTrue();
+        scenario.Payload.Opened.Should().HaveCount(openedPayloads);
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeRetry);
+        scenario.BackupHashes().Should().BeEquivalentTo(beforeRetryBackup);
+        File.Exists(scenario.Fixture.Templates.Journal).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("raw-bytes")]
+    [InlineData("content-revision")]
+    public async Task OwnedUpdate_AfterReceiptNearMatch_RefusesReadOnlyRetry(string change)
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        using PreparedBasicTemplate prepared = await scenario.Lifecycle.PrepareAsync(
+            new(scenario.Update.After, false) { Update = scenario.Update }, scenario.Context, false, CancellationToken.None);
+        await scenario.Lifecycle.CommitAsync(prepared, scenario.Context, CancellationToken.None);
+        if (change == "raw-bytes")
+        {
+            File.AppendAllText(scenario.ReceiptPath, " ");
+        }
+        else
+        {
+            JsonNode receipt = JsonNode.Parse(File.ReadAllText(scenario.ReceiptPath))!;
+            receipt["contentRevision"] = "different-after-revision";
+            File.WriteAllText(scenario.ReceiptPath, receipt.ToJsonString());
+        }
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        Dictionary<string, string> beforeBackup = scenario.BackupHashes();
+        int openedPayloads = scenario.Payload.Opened.Count;
+
+        Func<Task> retry = () => scenario.Lifecycle.RevalidateOwnedUpdateAsync(scenario.Plan, scenario.Update,
+            scenario.Context, CancellationToken.None);
+
+        (await retry.Should().ThrowAsync<BasicAcquisitionException>()).Which.Failure.Should().Be(BasicAcquisitionFailure.InstalledConflict);
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        scenario.BackupHashes().Should().BeEquivalentTo(beforeBackup);
+        scenario.Payload.Opened.Should().HaveCount(openedPayloads);
+        File.Exists(scenario.Fixture.Templates.Journal).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task OwnedUpdate_ReceiptByteDriftAfterPreparation_RefusesBeforeSnapshot()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        using PreparedBasicTemplate prepared = await scenario.Lifecycle.PrepareAsync(
+            new(scenario.Update.After, false) { Update = scenario.Update }, scenario.Context, false, CancellationToken.None);
+        string receiptPath = scenario.ReceiptPath;
+        File.AppendAllText(receiptPath, " ");
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        Dictionary<string, string> beforeBackup = scenario.BackupHashes();
+
+        Func<Task> commit = () => scenario.Lifecycle.CommitAsync(prepared, scenario.Context, CancellationToken.None);
+
+        (await commit.Should().ThrowAsync<BasicAcquisitionException>()).Which.Failure.Should().Be(BasicAcquisitionFailure.InstalledConflict);
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        scenario.BackupHashes().Should().BeEquivalentTo(beforeBackup);
+        File.Exists(scenario.Fixture.Templates.Journal).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("1.0.0")]
+    [InlineData("1.0.0+build")]
+    [InlineData("0.9.9")]
+    public async Task SelectOwnedUpdate_NonNewerReleaseVersion_RefusesWithoutMutation(string version)
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        BasicTemplateArtifact candidate = scenario.After with { Version = NuGetVersion.Parse(version) };
+        BasicCompanionPlan plan = scenario.Plan with
+        {
+            Versions = new(candidate.Version, true, candidate.Version, true),
+            Candidates = [candidate],
+        };
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        int openedPayloads = scenario.Payload.Opened.Count;
+
+        Func<Task> select = () => scenario.Lifecycle.SelectOwnedUpdateAsync(plan, candidate,
+            scenario.Update.Before.SelectedProjectIdentity!, scenario.Update.Before.Owner,
+            scenario.Update.Before.WorkloadInventory, scenario.Context, CancellationToken.None);
+
+        (await select.Should().ThrowAsync<BasicAcquisitionException>()).Which.Failure.Should().Be(BasicAcquisitionFailure.InstalledConflict);
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        scenario.Payload.Opened.Should().HaveCount(openedPayloads);
+    }
+
+    [Fact]
+    public async Task SelectOwnedUpdate_SourceSwitch_RefusesWithoutMutation()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        BasicTemplateArtifact candidate = scenario.After with { Source = "https://different.invalid/v3/index.json" };
+        BasicCompanionPlan plan = scenario.Plan with { Candidates = [candidate] };
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        int openedPayloads = scenario.Payload.Opened.Count;
+
+        Func<Task> select = () => scenario.Lifecycle.SelectOwnedUpdateAsync(plan, candidate,
+            scenario.Update.Before.SelectedProjectIdentity!, scenario.Update.Before.Owner,
+            scenario.Update.Before.WorkloadInventory, scenario.Context, CancellationToken.None);
+
+        (await select.Should().ThrowAsync<BasicAcquisitionException>()).Which.Failure.Should().Be(BasicAcquisitionFailure.InstalledConflict);
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        scenario.Payload.Opened.Should().HaveCount(openedPayloads);
+    }
+
+    [Fact]
+    public async Task SelectOwnedUpdate_SelectedProjectNotInIncumbentInventory_Refuses()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        BasicTemplateArtifact candidate = scenario.After with
+        {
+            Templates = [new("project/.template.config/template.json", "Fixture.Other.Project", "project")],
+            ContentRoles = [new("Fixture.Other.Project", NativeTemplateContentRole.AdditionalProject)],
+        };
+        BasicCompanionPlan plan = scenario.Plan with { Candidates = [candidate] };
+        int openedPayloads = scenario.Payload.Opened.Count;
+
+        Func<Task> select = () => scenario.Lifecycle.SelectOwnedUpdateAsync(plan, candidate,
+            "Fixture.Other.Project", scenario.Update.Before.Owner, scenario.Update.Before.WorkloadInventory,
+            scenario.Context, CancellationToken.None);
+
+        (await select.Should().ThrowAsync<BasicAcquisitionException>()).Which.Failure.Should().Be(BasicAcquisitionFailure.InstalledConflict);
+        scenario.Payload.Opened.Should().HaveCount(openedPayloads);
+    }
+
+    [Fact]
+    public async Task OwnedUpdate_PreparedArchiveByteDrift_RefusesBeforeSnapshot()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        using PreparedBasicTemplate prepared = await scenario.Lifecycle.PrepareAsync(
+            new(scenario.Update.After, false) { Update = scenario.Update }, scenario.Context, false, CancellationToken.None);
+        File.AppendAllText(prepared.Archive!, "staged archive drift");
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        Dictionary<string, string> beforeBackup = scenario.BackupHashes();
+
+        Func<Task> commit = () => scenario.Lifecycle.CommitAsync(prepared, scenario.Context, CancellationToken.None);
+
+        (await commit.Should().ThrowAsync<BasicAcquisitionException>()).Which.Failure.Should().Be(BasicAcquisitionFailure.PlanChanged);
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        scenario.BackupHashes().Should().BeEquivalentTo(beforeBackup);
+        File.Exists(scenario.Fixture.Templates.Journal).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task OwnedUpdate_PreparedArchiveSwappedWhileWaitingForWriter_RefusesBeforeSnapshot()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        PhysicalFileSystem files = new();
+        IFileSystem admissionFiles = Substitute.For<IFileSystem>();
+        admissionFiles.FileExists(Arg.Any<string>()).Returns(call => files.FileExists(call.Arg<string>()));
+        admissionFiles.DirectoryExists(Arg.Any<string>()).Returns(call => files.DirectoryExists(call.Arg<string>()));
+        admissionFiles.CreateTempDirectory(Arg.Any<string>()).Returns(call => files.CreateTempDirectory(call.Arg<string>()));
+        admissionFiles.CopyDirectoryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => files.CopyDirectoryAsync(call.ArgAt<string>(0), call.ArgAt<string>(1), call.Arg<CancellationToken>()));
+        admissionFiles.When(value => value.DeleteDirectory(scenario.Fixture.Templates.Backup))
+            .Do(_ => throw new InvalidOperationException("Snapshot must not begin or reach a mutation engine."));
+        TemplateStore guardedStore = new(new(Path.Combine(scenario.Fixture.Root, "cli-home")), admissionFiles,
+            new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        WriterWaitStore store = new(guardedStore);
+        BasicTemplateLifecycle lifecycle = new(store, scenario.Payload, new BasicArtifactInspector(files), scenario.Owner, files);
+        using PreparedBasicTemplate prepared = await lifecycle.PrepareAsync(
+            new(scenario.Update.After, false) { Update = scenario.Update }, scenario.Context, false, CancellationToken.None);
+        Directory.CreateDirectory(scenario.Fixture.Templates.Backup);
+        File.WriteAllText(Path.Combine(scenario.Fixture.Templates.Backup, "prior-backup.txt"), "Admission must not replace this backup.");
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        Dictionary<string, string> beforeBackup = scenario.BackupHashes();
+        using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(30));
+        using TemplateEngineSession blocker = await scenario.Fixture.Templates.OpenReadAsync(scenario.Context, cancellation.Token);
+
+        Task<bool> pending = lifecycle.CommitAsync(prepared, scenario.Context, cancellation.Token);
+        try
+        {
+            await store.Waiting.Task.WaitAsync(cancellation.Token);
+            pending.IsCompleted.Should().BeFalse();
+            File.AppendAllText(prepared.Archive!, "swapped after initial validation");
+        }
+        finally
+        {
+            blocker.Dispose();
+        }
+        Func<Task> commit = async () => await pending;
+
+        (await commit.Should().ThrowAsync<BasicAcquisitionException>()).Which.Failure.Should().Be(BasicAcquisitionFailure.PlanChanged);
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        scenario.BackupHashes().Should().BeEquivalentTo(beforeBackup, "refusal must precede snapshot and provider mutation, not restore afterward");
+        admissionFiles.DidNotReceive().DeleteDirectory(scenario.Fixture.Templates.Backup);
+        await admissionFiles.DidNotReceive().CopyDirectoryAsync(Arg.Any<string>(), scenario.Fixture.Templates.Backup, Arg.Any<CancellationToken>());
+        await admissionFiles.DidNotReceive().WriteAllTextAsync(scenario.Fixture.Templates.Journal, Arg.Any<string>(), Arg.Any<CancellationToken>());
+        File.Exists(scenario.Fixture.Templates.Journal).Should().BeFalse();
+        using TemplateEngineSession reader = await scenario.Fixture.Templates.OpenReadAsync(scenario.Context, CancellationToken.None);
+        (await reader.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None))
+            .Should().ContainSingle().Which.Version.Should().Be("1.0.0");
+    }
+
+    [Fact]
+    public async Task OwnedUpdate_PendingJournalAfterPreparation_RefusesBeforeRecoveryOrSnapshot()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        using PreparedBasicTemplate prepared = await scenario.Lifecycle.PrepareAsync(
+            new(scenario.Update.After, false) { Update = scenario.Update }, scenario.Context, false, CancellationToken.None);
+        PhysicalFileSystem files = new();
+        files.CopyDirectory(scenario.Fixture.Templates.Hive, scenario.Fixture.Templates.Backup);
+        string marker = Path.Combine(scenario.Fixture.Templates.Hive, "uncommitted-update.txt");
+        File.WriteAllText(marker, "Preserve the pending update state.");
+        File.WriteAllText(scenario.Fixture.Templates.Journal, "pending");
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        Dictionary<string, string> beforeBackup = scenario.BackupHashes();
+        byte[] beforeJournal = File.ReadAllBytes(scenario.Fixture.Templates.Journal);
+
+        Func<Task> commit = () => scenario.Lifecycle.CommitAsync(prepared, scenario.Context, CancellationToken.None);
+
+        await commit.Should().ThrowAsync<TemplateStoreRecoveryRequiredException>();
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        scenario.BackupHashes().Should().BeEquivalentTo(beforeBackup);
+        File.ReadAllBytes(scenario.Fixture.Templates.Journal).Should().Equal(beforeJournal);
+    }
+
+    [Fact]
+    public async Task OwnedUpdate_ValidationFailureAfterProviderRegistration_RestoresWholeHive()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        BasicArtifactInspector inner = new(new PhysicalFileSystem());
+        var failingInspector = new FailAfterUpdateValidationInspector(inner);
+        var lifecycle = new BasicTemplateLifecycle(scenario.Fixture.Templates, scenario.Payload, failingInspector,
+            scenario.Owner, new PhysicalFileSystem());
+        using PreparedBasicTemplate prepared = await lifecycle.PrepareAsync(
+            new(scenario.Update.After, false) { Update = scenario.Update }, scenario.Context, false, CancellationToken.None);
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        string beforeReceipt = File.ReadAllText(scenario.ReceiptPath);
+
+        Func<Task> commit = () => lifecycle.CommitAsync(prepared, scenario.Context, CancellationToken.None);
+
+        await commit.Should().ThrowAsync<IOException>().WithMessage("*after provider registration*");
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        File.ReadAllText(scenario.ReceiptPath).Should().Be(beforeReceipt);
+        File.Exists(scenario.Fixture.Templates.Journal).Should().BeFalse();
+        using TemplateEngineSession reader = await scenario.Fixture.Templates.OpenReadAsync(scenario.Context, CancellationToken.None);
+        (await reader.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None))
+            .Should().ContainSingle().Which.Version.Should().Be("1.0.0");
+    }
+
+    [Fact]
+    public async Task OwnedUpdate_CancellationAfterProviderRegistration_RestoresWholeHive()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        using var cancellation = new CancellationTokenSource();
+        BasicArtifactInspector inner = new(new PhysicalFileSystem());
+        var failingInspector = new FailAfterUpdateValidationInspector(inner, cancellation);
+        var lifecycle = new BasicTemplateLifecycle(scenario.Fixture.Templates, scenario.Payload, failingInspector,
+            scenario.Owner, new PhysicalFileSystem());
+        using PreparedBasicTemplate prepared = await lifecycle.PrepareAsync(
+            new(scenario.Update.After, false) { Update = scenario.Update }, scenario.Context, false, CancellationToken.None);
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        string beforeReceipt = File.ReadAllText(scenario.ReceiptPath);
+
+        Func<Task> commit = () => lifecycle.CommitAsync(prepared, scenario.Context, cancellation.Token);
+
+        await commit.Should().ThrowAsync<OperationCanceledException>();
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        File.ReadAllText(scenario.ReceiptPath).Should().Be(beforeReceipt);
+        File.Exists(scenario.Fixture.Templates.Journal).Should().BeFalse();
+        using TemplateEngineSession reader = await scenario.Fixture.Templates.OpenReadAsync(scenario.Context, CancellationToken.None);
+        (await reader.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None))
+            .Should().ContainSingle().Which.Version.Should().Be("1.0.0");
+    }
+
+    [Fact]
+    public async Task OwnedUpdate_PartialReceiptWriteFailure_RestoresArchiveProviderCacheAndReceipt()
+    {
+        using OwnedUpdateScenario scenario = await OwnedUpdateScenario.CreateAsync();
+        using PreparedBasicTemplate prepared = await scenario.Lifecycle.PrepareAsync(
+            new(scenario.Update.After, false) { Update = scenario.Update }, scenario.Context, false, CancellationToken.None);
+        Dictionary<string, string> beforeHive = scenario.Fixture.HiveHashes();
+        string beforeReceipt = File.ReadAllText(scenario.ReceiptPath);
+        scenario.FailReceiptWriteAfterPersist = true;
+
+        Func<Task> commit = () => scenario.Lifecycle.CommitAsync(prepared, scenario.Context, CancellationToken.None);
+
+        await commit.Should().ThrowAsync<IOException>().WithMessage("*owned receipt write failure*");
+        scenario.Fixture.HiveHashes().Should().BeEquivalentTo(beforeHive);
+        File.ReadAllText(scenario.ReceiptPath).Should().Be(beforeReceipt);
+        File.Exists(scenario.Fixture.Templates.Journal).Should().BeFalse();
+        using TemplateEngineSession reader = await scenario.Fixture.Templates.OpenReadAsync(scenario.Context, CancellationToken.None);
+        (await reader.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None))
+            .Should().ContainSingle().Which.Version.Should().Be("1.0.0");
+    }
+
+    private sealed class FailAfterUpdateValidationInspector(BasicArtifactInspector inner, CancellationTokenSource? cancellation = null)
+        : IBasicArtifactInspector, IBasicOwnedArchiveInspector
+    {
+        private int _afterValidations;
+
+        public async Task ValidateAsync(string archive, BasicTemplateArtifact artifact, CancellationToken cancellationToken)
+        {
+            await inner.ValidateAsync(archive, artifact, cancellationToken);
+            if (artifact.Version.ToNormalizedString() == "1.0.1" && Interlocked.Increment(ref _afterValidations) == 3)
+            {
+                if (cancellation is not null)
+                {
+                    await cancellation.CancelAsync();
+                    return;
+                }
+                throw new IOException("Injected failure after provider registration.");
+            }
+        }
+
+        public Task<BasicTemplateArchiveInventory> InspectOwnedArchiveAsync(string archive, NativeTemplateOwnerReceipt receipt,
+            CancellationToken cancellationToken)
+            => inner.InspectOwnedArchiveAsync(archive, receipt, cancellationToken);
+    }
+
+    private sealed class WriterWaitStore(ITemplateStore inner) : ITemplateStore
+    {
+        public TaskCompletionSource Waiting { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<TemplateEngineSession> OpenReadAsync(TemplateEngineContext context, CancellationToken cancellationToken,
+            TemplateConstraintEvaluationSnapshot? snapshot = null, Action<TemplateStoreWaitReason>? waiting = null)
+            => inner.OpenReadAsync(context, cancellationToken, snapshot, waiting);
+
+        public Task<TemplateStoreWriteSession> OpenWriteAsync(TemplateEngineContext context, CancellationToken cancellationToken,
+            Action<TemplateStoreWaitReason>? waiting = null, bool requireCleanStore = false)
+            => inner.OpenWriteAsync(context, cancellationToken, reason =>
+            {
+                Waiting.TrySetResult();
+                waiting?.Invoke(reason);
+            }, requireCleanStore);
+
+        public bool IsPathInHive(string path) => inner.IsPathInHive(path);
+    }
+
     private static BasicTemplateArtifact NativeArtifact(BasicAcquisitionFixture fixture, string version = "1.0.0")
         => fixture.Artifact(version) with { ContentRoles = [new("Fixture.Basic.Item", NativeTemplateContentRole.Function)] };
+
+    private sealed class OwnedUpdateScenario : IDisposable
+    {
+        private readonly PhysicalFileSystem _files = new();
+        private bool _disposed;
+
+        private OwnedUpdateScenario()
+        {
+            Fixture = new BasicAcquisitionFixture();
+            Context = new(WorkingDirectory.FromExplicit(Fixture.Root)) { RequireCleanStore = true };
+            Payload = new(_payloadArchives);
+            IFileSystem receiptFiles = Substitute.For<IFileSystem>();
+            receiptFiles.OpenReadIfExists(Arg.Any<string>()).Returns(call => _files.OpenReadIfExists(call.Arg<string>()));
+            receiptFiles.WriteAllTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(async call =>
+            {
+                await _files.WriteAllTextAsync(call.ArgAt<string>(0), call.ArgAt<string>(1), call.Arg<CancellationToken>());
+                if (FailReceiptWriteAfterPersist && string.Equals(call.ArgAt<string>(0), ReceiptPath,
+                    OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                {
+                    throw new IOException("The owned receipt write failure occurred after persistence.");
+                }
+            });
+            Owner = new(receiptFiles, new(Path.Combine(Fixture.Root, "cli-home")));
+            Lifecycle = new(Fixture.Templates, Payload, new BasicArtifactInspector(_files), Owner, _files);
+            Old = CreateArtifact("1.0.0", "old package content");
+            After = CreateArtifact("1.0.1", "new package content");
+            _payloadArchives[$"{Old.PackageId}/{Old.Version.ToNormalizedString()}"] = ArchivePath(Old.Version.ToNormalizedString());
+            _payloadArchives[$"{After.PackageId}/{After.Version.ToNormalizedString()}"] = ArchivePath(After.Version.ToNormalizedString());
+        }
+
+        private readonly Dictionary<string, string> _payloadArchives = new(StringComparer.OrdinalIgnoreCase);
+
+        public BasicAcquisitionFixture Fixture { get; }
+        public TemplateEngineContext Context { get; }
+        public FixturePayloadSource Payload { get; }
+        public NativeTemplateOwnership Owner { get; }
+        public BasicTemplateLifecycle Lifecycle { get; }
+        public BasicTemplateArtifact Old { get; }
+        public BasicTemplateArtifact After { get; }
+        public BasicOwnedTemplateUpdate Update { get; private set; } = null!;
+        public BasicCompanionPlan Plan { get; private set; } = null!;
+        public string ReceiptPath => Path.Combine(Fixture.Templates.Hive, ".native-template-owners", "fixture.update.json");
+        public bool FailReceiptWriteAfterPersist { get; set; }
+
+        public Dictionary<string, string> BackupHashes()
+            => Directory.Exists(Fixture.Templates.Backup)
+                ? Directory.GetFiles(Fixture.Templates.Backup, "*", SearchOption.AllDirectories).ToDictionary(
+                    path => Path.GetRelativePath(Fixture.Templates.Backup, path),
+                    path => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))))
+                : [];
+
+        public static async Task<OwnedUpdateScenario> CreateAsync()
+        {
+            OwnedUpdateScenario scenario = new();
+            try
+            {
+                await scenario.InitializeAsync();
+                return scenario;
+            }
+            catch
+            {
+                scenario.Dispose();
+                throw;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+                Fixture.Dispose();
+            }
+        }
+
+        private async Task InitializeAsync()
+        {
+            await Lifecycle.EnsureAsync(Old, Context, false, CancellationToken.None);
+            NativeTemplateOwnerIdentity owner = new("Fixture.Stack", "1.0.0", BasicAcquisitionFixture.Source);
+            string inventory = "selected-owner-workload-inventory";
+            Plan = new(After.PackageId, new(After.Version, true, After.Version, true), [After]);
+            BasicTemplateSelection selected = await Lifecycle.SelectOwnedUpdateAsync(Plan, After,
+                "Fixture.Update.Project", owner, inventory, Context, CancellationToken.None);
+            Update = selected.Update ?? throw new InvalidOperationException("The fixture did not produce an owned update proof.");
+        }
+
+        private BasicTemplateArtifact CreateArtifact(string version, string content)
+        {
+            string archive = ArchivePath(version);
+            using (ZipArchive zip = ZipFile.Open(archive, ZipArchiveMode.Create))
+            {
+                WriteEntry(zip, "Fixture.Update.nuspec",
+                    $$"""<?xml version="1.0"?><package><metadata><id>Fixture.Update</id><version>{{version}}</version><authors>fixture</authors><description>Owned update fixture.</description><packageTypes><packageType name="FuncTemplate" /></packageTypes></metadata></package>""");
+                WriteEntry(zip, "project/.template.config/template.json",
+                    """{"identity":"Fixture.Update.Project","name":"Owned update project","shortName":"fixture-update","tags":{"type":"project"}}""");
+                WriteEntry(zip, "project/.template.config/func.host.json", "{}");
+                WriteEntry(zip, "project/marker.txt", content);
+            }
+
+            string digest = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(archive)));
+            return new("Fixture.Update", NuGetVersion.Parse(version), BasicAcquisitionFixture.Source, digest,
+                $"fixture-{version}", [new("project/.template.config/template.json", "Fixture.Update.Project", "project")])
+            {
+                ContentRoles = [new("Fixture.Update.Project", NativeTemplateContentRole.AdditionalProject)],
+            };
+        }
+
+        private string ArchivePath(string version) => Path.Combine(Fixture.Root, $"Fixture.Update.{version}.nupkg");
+
+        private static void WriteEntry(ZipArchive archive, string path, string content)
+        {
+            using StreamWriter writer = new(archive.CreateEntry(path).Open());
+            writer.Write(content);
+        }
+    }
 }

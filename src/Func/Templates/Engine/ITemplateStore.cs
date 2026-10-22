@@ -10,5 +10,7 @@ internal interface ITemplateStore
         Action<TemplateStoreWaitReason>? waiting = null);
 
     public Task<TemplateStoreWriteSession> OpenWriteAsync(TemplateEngineContext context, CancellationToken cancellationToken,
-        Action<TemplateStoreWaitReason>? waiting = null);
+        Action<TemplateStoreWaitReason>? waiting = null, bool requireCleanStore = false);
+
+    public bool IsPathInHive(string path);
 }

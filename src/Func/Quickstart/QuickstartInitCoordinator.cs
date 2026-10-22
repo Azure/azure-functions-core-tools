@@ -384,6 +384,12 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         _interaction.WriteLine($"Bundled approval revision: {approval.Plan.Revision}; host: {qualified.Acquisition.NativeContext!.HostIdentifier} {qualified.Acquisition.NativeContext.EngineHostVersion}");
         foreach (BasicTemplateArtifact artifact in approval.Artifacts)
         {
+            BasicOwnedTemplateUpdate? update = approval.UpdateFor(artifact.PackageId);
+            if (update is not null)
+            {
+                _interaction.WriteLine($"Owned package update: {update.Before.Receipt.Version} -> {artifact.Version.ToNormalizedString()}");
+                _interaction.WriteLine($"Existing package SHA256: {update.Before.Receipt.Sha256}; receipt SHA256: {update.Before.ReceiptSha256}");
+            }
             _interaction.WriteLine($"Required package: {artifact.PackageId} {artifact.Version.ToNormalizedString()} from {artifact.Source}");
             _interaction.WriteLine($"SHA256: {artifact.Sha256}; content revision: {artifact.ContentRevision}");
             foreach (BasicTemplateDefinition template in artifact.Templates)
@@ -391,7 +397,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 _interaction.WriteLine($"Approved inventory: {template.Identity} ({template.Type}) at {template.Path}");
             }
         }
-        _interaction.WriteWarning("Remote project and workload declarations remain unverified claims. Native generation and required CLI configuration are previewed after exact acquisition, before interactive creation consent. No feed, pin or workload upgrade is authorized.");
+        _interaction.WriteWarning("Remote project and workload declarations remain unverified claims. Only the exact listed owned package updates are authorized. No workload upgrade is authorized. Native generation and required CLI configuration are previewed after exact acquisition, before interactive creation consent.");
     }
 
     private static InitExecutionResult Canceled() => InitExecutionResult.Reject("canceled", "Project template selection canceled before acquisition or project writes.");

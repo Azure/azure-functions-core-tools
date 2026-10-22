@@ -22,10 +22,16 @@ internal interface IBasicArchiveInspector
     public Task ValidateArchiveAsync(Stream archive, BasicTemplateArtifact artifact, CancellationToken cancellationToken);
 }
 
+internal interface IBasicOwnedArchiveInspector
+{
+    public Task<BasicTemplateArchiveInventory> InspectOwnedArchiveAsync(string archive, NativeTemplateOwnerReceipt receipt,
+        CancellationToken cancellationToken);
+}
+
 /// <summary>
 /// Checks exact archive bytes and the complete raw template inventory against qualified content evidence.
 /// </summary>
-internal sealed class BasicArtifactInspector(IFileSystem fileSystem) : IBasicArtifactInspector, IBasicArchiveInspector
+internal sealed class BasicArtifactInspector(IFileSystem fileSystem) : IBasicArtifactInspector, IBasicArchiveInspector, IBasicOwnedArchiveInspector
 {
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
@@ -101,8 +107,93 @@ internal sealed class BasicArtifactInspector(IFileSystem fileSystem) : IBasicArt
         }
     }
 
+    public async Task<BasicTemplateArchiveInventory> InspectOwnedArchiveAsync(string archive, NativeTemplateOwnerReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(archive);
+        ArgumentNullException.ThrowIfNull(receipt);
+        if (!NuGetVersion.TryParse(receipt.Version, out NuGetVersion? version))
+        {
+            throw Invalid(receipt.PackageId, receipt.Version, "The retained owner receipt has an invalid package version.");
+        }
+
+        using Stream stream = _fileSystem.OpenReadIfExists(archive)
+            ?? throw new FileNotFoundException("The owned template archive is missing.", archive);
+        BasicTemplateArtifact expected = new(receipt.PackageId, version, receipt.Source, receipt.Sha256, receipt.ContentRevision, []);
+        string[] files;
+        string[] packageTypes;
+        List<BasicTemplateDefinition> definitions = [];
+        try
+        {
+            using PackageArchiveReader reader = new(stream, leaveStreamOpen: true);
+            (string id, NuGetVersion actualVersion, string[] actualTypes) = ReadMetadata(reader, expected);
+            packageTypes = actualTypes;
+            if (!string.Equals(id, receipt.PackageId, StringComparison.OrdinalIgnoreCase) || actualVersion != version)
+            {
+                throw Invalid(receipt.PackageId, receipt.Version, "The owned archive metadata differs from its retained receipt.");
+            }
+
+            files = [.. (await reader.GetFilesAsync(cancellationToken)).Order(StringComparer.Ordinal)];
+            if (files.Distinct(StringComparer.Ordinal).Count() != files.Length)
+            {
+                throw Invalid(receipt.PackageId, receipt.Version, "The owned archive has duplicate file paths.");
+            }
+
+            string[] configurations = [.. files.Where(path =>
+                path.Equals(".template.config/template.json", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith("/.template.config/template.json", StringComparison.OrdinalIgnoreCase))];
+            if (configurations.Length == 0
+                || configurations.Distinct(StringComparer.OrdinalIgnoreCase).Count() != configurations.Length)
+            {
+                throw Invalid(receipt.PackageId, receipt.Version, "The owned archive has no unique complete template inventory.");
+            }
+
+            foreach (string path in configurations)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using Stream configurationStream = await reader.GetStreamAsync(path, cancellationToken);
+                using StreamReader text = new(configurationStream);
+                string configuration = await text.ReadToEndAsync(cancellationToken);
+                TemplateConstraintDeclarationReader.Read(configuration, packageTypes);
+                using var document = JsonDocument.Parse(configuration,
+                    new() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+                JsonElement root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object
+                    || !root.TryGetProperty("identity", out JsonElement identity) || identity.ValueKind != JsonValueKind.String
+                    || !root.TryGetProperty("tags", out JsonElement tags) || tags.ValueKind != JsonValueKind.Object
+                    || !tags.TryGetProperty("type", out JsonElement type) || type.ValueKind != JsonValueKind.String
+                    || type.GetString() is not ("item" or "project"))
+                {
+                    throw Invalid(receipt.PackageId, receipt.Version, $"Configuration '{path}' has invalid template identity or type metadata.");
+                }
+
+                definitions.Add(new(path, identity.GetString()!, type.GetString()!));
+            }
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or InvalidTemplateMetadataException
+            or NuGet.Packaging.Core.PackagingException)
+        {
+            throw new BasicAcquisitionException(BasicAcquisitionFailure.InvalidArtifact,
+                $"Owned archive '{receipt.PackageId}' {receipt.Version} has invalid template inventory: {exception.Message}", exception);
+        }
+
+        if (definitions.Select(template => template.Identity).Distinct(StringComparer.Ordinal).Count() != definitions.Count)
+        {
+            throw Invalid(receipt.PackageId, receipt.Version, "The owned archive has ambiguous template identities.");
+        }
+
+        BasicTemplateArtifact observed = expected with { Templates = definitions.AsReadOnly() };
+        stream.Position = 0;
+        await ValidateArchiveAsync(stream, observed, cancellationToken);
+        return new(receipt.PackageId, version.ToNormalizedString(), packageTypes, files,
+            Array.AsReadOnly<BasicTemplateDefinition>([.. definitions.OrderBy(template => template.Path, StringComparer.Ordinal)]));
+    }
+
     private static BasicAcquisitionException Invalid(BasicTemplateArtifact artifact, string reason)
         => new(BasicAcquisitionFailure.InvalidArtifact, $"Basic artifact '{artifact.PackageId}' {artifact.Version}: {reason}");
+
+    private static BasicAcquisitionException Invalid(string packageId, string version, string reason)
+        => new(BasicAcquisitionFailure.InvalidArtifact, $"Owned archive '{packageId}' {version}: {reason}");
 
     private static (string Id, NuGetVersion Version, string[] Types) ReadMetadata(PackageArchiveReader reader, BasicTemplateArtifact artifact)
     {

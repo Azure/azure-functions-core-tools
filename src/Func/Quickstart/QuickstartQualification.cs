@@ -80,16 +80,22 @@ internal sealed class QuickstartQualification(IBasicCompanionCatalog catalog, Ba
         }
         BasicTemplateArtifact nominated = matches[0];
         List<BasicTemplateArtifact> artifacts = [];
+        List<BasicTemplateSelection> selections = [];
+        string inventory = WorkloadStateSnapshot.Capture(installed);
         TemplateEngineContext context = new(query.Directory) { RequireCleanStore = true };
         foreach (BasicCompanionPlan companion in plan.Companions)
         {
             BasicCompanionPlan choices = companion.Candidates.Contains(nominated) ? companion with { Candidates = [nominated] } : companion;
-            BasicTemplateSelection selected = await _templates.SelectAsync(choices, context, cancellationToken);
+            BasicTemplateSelection selected = string.Equals(choices.PackageId, nominated.PackageId, StringComparison.OrdinalIgnoreCase)
+                ? await _templates.SelectOwnedUpdateAsync(choices, nominated, selection.TemplateIdentity, query.Owner, inventory, context, cancellationToken)
+                : await _templates.SelectAsync(choices, context, cancellationToken);
             artifacts.Add(selected.Artifact);
+            selections.Add(selected);
         }
         BasicAcquisitionApproval approval = new(plan, artifacts.AsReadOnly())
         {
-            WorkloadInventory = WorkloadStateSnapshot.Capture(installed),
+            WorkloadInventory = inventory,
+            Updates = [.. selections.Where(selected => selected.Update is not null).Select(selected => selected.Update!)],
         };
         approval.Validate(plan);
         return new(request with { Approval = approval }, selection);

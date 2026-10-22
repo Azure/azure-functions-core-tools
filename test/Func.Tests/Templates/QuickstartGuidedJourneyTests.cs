@@ -734,6 +734,168 @@ public sealed partial class ArtifactBindingJourneyTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Guided_NominatedOwnedUpdate_RequiresConsentAndTransitionsExactPackageBeforeCreation(bool authorize)
+    {
+        (NativeTemplateOwnerProof oldReceipt, string oldArchive) = await NominateOwnedUpdateAsync();
+        string digest = _selection.Artifact.Sha256;
+        var interaction = new GuidedInteraction(false, [], []);
+        var journey = Guided(interaction);
+        var before = TemplateState();
+
+        var result = await journey.Coordinator.ExecuteAsync(new(GuidedRequest(), "fixture", authorize), CancellationToken.None);
+
+        interaction.AllOutput.Should().Contain("1.0.0").And.Contain("1.0.1");
+        if (!authorize)
+        {
+            result.Kind.Should().Be("acquisitionAuthorizationRequired", interaction.AllOutput);
+            journey.Payload.Requested.Should().BeEmpty();
+            TemplateState().Should().Equal(before);
+            (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None)).Should().Be(oldReceipt);
+            Directory.Exists(Target).Should().BeFalse();
+            return;
+        }
+
+        result.Kind.Should().Be("created", interaction.AllOutput);
+        journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.1");
+        journey.Lifecycle.Prepared!.Update.Should().NotBeNull();
+        journey.Lifecycle.Prepared.Update!.Before.Receipt.Should().Be(oldReceipt.Receipt);
+        journey.Lifecycle.Prepared.Update.Before.ReceiptSha256.Should().Be(oldReceipt.RawSha256);
+        journey.Lifecycle.ObservedFreshBinding.Should().BeTrue();
+        File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("updated exact project");
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
+        File.Exists(oldArchive).Should().BeFalse();
+        string installed = await OwnedProjectArchiveAsync();
+        Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(installed))).Should().Be(digest);
+        NativeTemplateOwnerProof receipt = (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None))!;
+        receipt.Receipt.Should().Be(new NativeTemplateOwnerReceipt(PackageId, "1.0.1", digest, Source, "owned-update-after", "1.0.1"));
+        receipt.RawSha256.Should().Be(_ownership.CreateProof(journey.Lifecycle.Prepared.Artifact).RawSha256);
+        using TemplateEngineSession reader = await _templates.OpenReadAsync(Context, CancellationToken.None);
+        (await reader.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None))
+            .Where(package => package.Identifier == PackageId).Should().ContainSingle().Which.Version.Should().Be("1.0.1");
+        (await reader.PackageManager.GetTemplatesAsync(CancellationToken.None))
+            .Where(template => template.MountPointUri == installed).Select(template => template.Identity)
+            .Should().BeEquivalentTo([Identity, "Fixture.Sibling.Project"]);
+        File.Exists(_templates.Journal).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ApprovedOwnedUpdate_LaterCompanionFails_RetainsCommittedUpdateAndRetriesOnlyIncompletePackage()
+    {
+        await NominateOwnedUpdateAsync();
+        const string otherId = "Fixture.Required.Functions";
+        string otherArchive = Path.Combine(_root, "required-functions.nupkg");
+        using (var zip = ZipFile.Open(otherArchive, ZipArchiveMode.Create))
+        {
+            Write(zip, otherId + ".nuspec", $$"""
+                <?xml version="1.0"?><package><metadata><id>{{otherId}}</id><version>1.0.0</version><authors>fixture</authors>
+                <description>Required closure evidence only.</description><packageTypes><packageType name="FuncTemplate"/></packageTypes></metadata></package>
+                """);
+            Write(zip, "function/.template.config/template.json",
+                """{"identity":"Fixture.Required.Function","name":"Required function","shortName":"fixture-required","tags":{"type":"item"}}""");
+            Write(zip, "function/value.txt", "required function content");
+        }
+        string otherDigest = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(otherArchive)));
+        JsonNode document = JsonNode.Parse(_catalog.Json)!;
+        document["stacks"]![0]!["companions"]!.AsArray().Add(JsonNode.Parse($$"""
+            {"packageId":"{{otherId}}","versions":"[1.0.0]","requiredRoles":["function"]}
+            """));
+        document["artifacts"]!.AsArray().Add(JsonNode.Parse($$"""
+            {"packageId":"{{otherId}}","version":"1.0.0","source":"{{Source}}","sha256":"{{otherDigest}}",
+             "contentRevision":"required-function-only","basicOnly":false,"templates":[
+               {"path":"function/.template.config/template.json","identity":"Fixture.Required.Function","type":"item","contentRole":"function"}]}
+            """));
+        _catalog.Json = document.ToJsonString();
+        var journey = Guided(new(false, [], []), additionalPayloads: new Dictionary<string, string>
+        {
+            [$"{otherId}/1.0.0"] = otherArchive,
+        });
+        QuickstartCatalogEntry nomination = (await journey.Catalog.SearchAsync(new(), CancellationToken.None)).Entries.Single();
+        WorkloadEntry owner = (await _workloads.GetWorkloadsAsync(CancellationToken.None)).Single();
+        QualifiedQuickstart qualified = await journey.Qualification.ResolveAsync(nomination,
+            new(DirectoryTarget, _selection.Owner), owner, CancellationToken.None);
+        journey.Lifecycle.CommitFailure = new IOException("The required companion failed before mutation.");
+        journey.Lifecycle.CommitFailurePackageId = otherId;
+
+        BasicAcquisitionResult partial = await journey.Acquisition.RunAsync(qualified.Acquisition, CancellationToken.None);
+
+        partial.Status.Should().Be(BasicAcquisitionStatus.PartialFailure);
+        partial.Failure.Should().Be(BasicAcquisitionFailure.InstallFailed);
+        partial.Completed.Should().Contain(step => step.PackageId == PackageId && step.Version == "1.0.1" && !step.Reused);
+        partial.Completed.Should().NotContain(step => step.PackageId == otherId);
+        NativeTemplateOwnerProof committedReceipt = (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None))!;
+        committedReceipt.Receipt.Version.Should().Be("1.0.1");
+        (await _ownership.GetRetainedAsync(otherId, CancellationToken.None)).Should().BeNull();
+        var beforeRetry = TemplateState();
+        int payloads = journey.Payload.Requested.Count;
+
+        BasicAcquisitionResult repeatedPartial = await journey.Acquisition.RunAsync(qualified.Acquisition, CancellationToken.None);
+
+        repeatedPartial.Status.Should().Be(BasicAcquisitionStatus.PartialFailure);
+        repeatedPartial.Completed.Should().Contain(step => step.PackageId == PackageId && step.Reused);
+        journey.Payload.Requested.Skip(payloads).Should().Equal($"{otherId}/1.0.0");
+        TemplateState().Should().Equal(beforeRetry);
+        (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None)).Should().Be(committedReceipt);
+        journey.Lifecycle.CommitFailure = null;
+        payloads = journey.Payload.Requested.Count;
+
+        BasicAcquisitionResult completed = await journey.Acquisition.RunAsync(qualified.Acquisition, CancellationToken.None);
+
+        completed.Status.Should().Be(BasicAcquisitionStatus.Completed);
+        completed.Completed.Should().Contain(step => step.PackageId == PackageId && step.Reused);
+        completed.Completed.Should().Contain(step => step.PackageId == otherId && !step.Reused);
+        journey.Payload.Requested.Skip(payloads).Should().Equal($"{otherId}/1.0.0");
+        (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None)).Should().Be(committedReceipt);
+        (await _ownership.GetRetainedAsync(otherId, CancellationToken.None))!.Sha256.Should().Be(otherDigest);
+        File.Exists(_templates.Journal).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("owner-inventory")]
+    [InlineData("authority")]
+    [InlineData("required-range")]
+    public async Task ApprovedOwnedUpdate_AfterCommitContextDrifts_RefusesRetryWithoutPayloadOrNativeMutation(string change)
+    {
+        await NominateOwnedUpdateAsync();
+        var journey = Guided(new(false, [], []));
+        QuickstartCatalogEntry nomination = (await journey.Catalog.SearchAsync(new(), CancellationToken.None)).Entries.Single();
+        WorkloadEntry owner = (await _workloads.GetWorkloadsAsync(CancellationToken.None)).Single();
+        QualifiedQuickstart qualified = await journey.Qualification.ResolveAsync(nomination,
+            new(DirectoryTarget, _selection.Owner), owner, CancellationToken.None);
+        (await journey.Acquisition.RunAsync(qualified.Acquisition, CancellationToken.None)).Status.Should().Be(BasicAcquisitionStatus.Completed);
+        var beforeRetry = TemplateState();
+        int payloads = journey.Payload.Requested.Count;
+        if (change == "owner-inventory")
+        {
+            JsonNode entry = JsonSerializer.SerializeToNode(owner, WorkloadJsonContext.Default.WorkloadEntry)!;
+            entry["aliases"] = JsonNode.Parse("""["node","changed-owner-inventory"]""");
+            await _workloads.SaveWorkloadAsync(JsonSerializer.Deserialize(entry, WorkloadJsonContext.Default.WorkloadEntry)!, CancellationToken.None);
+        }
+        else
+        {
+            JsonNode document = JsonNode.Parse(_catalog.Json)!;
+            if (change == "authority")
+            {
+                document["revision"] = "different-approved-authority";
+            }
+            else
+            {
+                document["stacks"]![0]!["companions"]![0]!["versions"] = "[1.0.1,2.0.0)";
+            }
+            _catalog.Json = document.ToJsonString();
+        }
+
+        BasicAcquisitionResult result = await journey.Acquisition.RunAsync(qualified.Acquisition, CancellationToken.None);
+
+        result.Failure.Should().Be(BasicAcquisitionFailure.PlanChanged);
+        result.Completed.Should().NotContain(step => step.PackageId == PackageId);
+        journey.Payload.Requested.Should().HaveCount(payloads);
+        TemplateState().Should().Equal(beforeRetry);
+        File.Exists(_templates.Journal).Should().BeFalse();
+    }
+
+    [Theory]
     [InlineData(BundleChannel.Preview)]
     [InlineData(BundleChannel.Experimental)]
     public async Task Guided_NullChannelNomination_UsesExactQualifiedPrereleaseWithoutTreatingItAsStable(BundleChannel channel)
@@ -983,17 +1145,57 @@ public sealed partial class ArtifactBindingJourneyTests
         Directory.Exists(Target).Should().BeFalse();
     }
 
+    private async Task<(NativeTemplateOwnerProof Receipt, string OldArchive)> NominateOwnedUpdateAsync()
+    {
+        await SeedAsync(installTemplates: false);
+        var initial = Guided(new(false, [], []));
+        BasicTemplateArtifact old = (await _catalog.LoadAsync(CancellationToken.None)).Artifacts.Single();
+        await initial.Lifecycle.EnsureAsync(old, Context, false, CancellationToken.None);
+        NativeTemplateOwnerProof receipt = (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None))!;
+        string oldArchive = await OwnedProjectArchiveAsync();
+        string archive = Path.Combine(_root, "exact.nupkg");
+        using (var zip = ZipFile.Open(archive, ZipArchiveMode.Update))
+        {
+            zip.GetEntry(PackageId + ".nuspec")!.Delete();
+            Write(zip, PackageId + ".nuspec", $$"""
+                <?xml version="1.0"?><package><metadata><id>{{PackageId}}</id><version>1.0.1</version><authors>fixture</authors>
+                <description>Owned update evidence only.</description><packageTypes><packageType name="FuncTemplate"/></packageTypes></metadata></package>
+                """);
+            zip.GetEntry("exact/value.txt")!.Delete();
+            Write(zip, "exact/value.txt", "updated exact project");
+        }
+        string digest = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(archive)));
+        JsonNode document = JsonNode.Parse(_catalog.Json)!;
+        document["revision"] = "owned-update-fixture-only";
+        document["stacks"]![0]!["companions"]![0]!["versions"] = "[1.0.1]";
+        document["artifacts"]![0]!["version"] = "1.0.1";
+        document["artifacts"]![0]!["sha256"] = digest;
+        document["artifacts"]![0]!["contentRevision"] = "owned-update-after";
+        _catalog.Json = document.ToJsonString();
+        _selection = _selection with { Artifact = new(PackageId, "1.0.1", digest) };
+        return (receipt, oldArchive);
+    }
+
+    private async Task<string> OwnedProjectArchiveAsync()
+    {
+        using TemplateEngineSession reader = await _templates.OpenReadAsync(Context, CancellationToken.None);
+        return (await reader.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None))
+            .Single(package => package.Identifier == PackageId).MountPointUri;
+    }
+
     private InitExecutionRequest GuidedRequest() => new(DirectoryTarget, null, null, "node", null, false, false, false, false,
         [], new HashSet<string>(StringComparer.Ordinal));
 
     private (QuickstartInitCoordinator Coordinator, FixturePayloadSource Payload, TrackingLifecycle Lifecycle,
         IQuickstartCatalogService Catalog, QuickstartQualification Qualification, BasicAcquisitionRunner Acquisition)
-        Guided(GuidedInteraction interaction, IFileSystem? installation = null, IBoundInitScopeFactory? scopes = null)
-        => CreateGuided(interaction, installation, scopes);
+        Guided(GuidedInteraction interaction, IFileSystem? installation = null, IBoundInitScopeFactory? scopes = null,
+            IReadOnlyDictionary<string, string>? additionalPayloads = null)
+        => CreateGuided(interaction, installation, scopes, additionalPayloads);
 
     private (QuickstartInitCoordinator Coordinator, FixturePayloadSource Payload, TrackingLifecycle Lifecycle,
         IQuickstartCatalogService Catalog, QuickstartQualification Qualification, BasicAcquisitionRunner Acquisition)
-        CreateGuided(IInteractionService interaction, IFileSystem? installation = null, IBoundInitScopeFactory? scopes = null)
+        CreateGuided(IInteractionService interaction, IFileSystem? installation = null, IBoundInitScopeFactory? scopes = null,
+            IReadOnlyDictionary<string, string>? additionalPayloads = null)
     {
         IBoundInitScopeFactory scopeFactory = scopes ?? _scopes;
         var source = Substitute.For<IQuickstartCatalogSource>();
@@ -1007,10 +1209,18 @@ public sealed partial class ArtifactBindingJourneyTests
             new([remote.Entry]), [new(remote.Entry, package.RootElement.Clone())], new(QuickstartCatalogOrigin.LocalFile, "fixture-only", null)));
         var catalog = new QuickstartCatalogService(source);
         var renderer = new QuickstartCatalogRenderer(interaction);
-        var payload = new FixturePayloadSource(new(StringComparer.OrdinalIgnoreCase)
+        Dictionary<string, string> archives = new(StringComparer.OrdinalIgnoreCase)
         {
             [$"{PackageId}/{_selection.Artifact.Version}"] = Path.Combine(_root, "exact.nupkg"),
-        });
+        };
+        if (additionalPayloads is not null)
+        {
+            foreach (var item in additionalPayloads)
+            {
+                archives.Add(item.Key, item.Value);
+            }
+        }
+        var payload = new FixturePayloadSource(archives);
         var lifecycle = new TrackingLifecycle(new BasicTemplateLifecycle(_templates, payload, new BasicArtifactInspector(_files), _ownership, _files));
         var version = Substitute.For<ICliVersionProvider>();
         version.Version.Returns(AssemblyCliVersionProvider.Instance.Version);
@@ -1178,6 +1388,7 @@ public sealed partial class ArtifactBindingJourneyTests
         public PreparedBasicTemplate? Prepared { get; private set; }
         public bool ObservedFreshBinding { get; set; }
         public IOException? CommitFailure { get; set; }
+        public string? CommitFailurePackageId { get; set; }
         public Action? Selecting { get; set; }
         public Action? PreparedAction { get; set; }
         public Task<BasicTemplateSelection> SelectAsync(BasicCompanionPlan plan, TemplateEngineContext context, CancellationToken cancellationToken)
@@ -1185,6 +1396,16 @@ public sealed partial class ArtifactBindingJourneyTests
             Selecting?.Invoke();
             return inner.SelectAsync(plan, context, cancellationToken);
         }
+        public Task<BasicTemplateSelection> SelectOwnedUpdateAsync(BasicCompanionPlan plan, BasicTemplateArtifact after,
+            string selectedProjectIdentity, NativeTemplateOwnerIdentity owner, string workloadInventory,
+            TemplateEngineContext context, CancellationToken cancellationToken)
+        {
+            Selecting?.Invoke();
+            return inner.SelectOwnedUpdateAsync(plan, after, selectedProjectIdentity, owner, workloadInventory, context, cancellationToken);
+        }
+        public Task<BasicTemplateSelection> RevalidateOwnedUpdateAsync(BasicCompanionPlan plan, BasicOwnedTemplateUpdate update,
+            TemplateEngineContext context, CancellationToken cancellationToken)
+            => inner.RevalidateOwnedUpdateAsync(plan, update, context, cancellationToken);
         public Task<bool> EnsureAsync(BasicTemplateArtifact artifact, TemplateEngineContext context, bool offline, CancellationToken cancellationToken)
             => inner.EnsureAsync(artifact, context, offline, cancellationToken);
         public async Task<PreparedBasicTemplate> PrepareAsync(BasicTemplateSelection selection, TemplateEngineContext context, bool offline, CancellationToken cancellationToken)
@@ -1194,7 +1415,8 @@ public sealed partial class ArtifactBindingJourneyTests
             return Prepared;
         }
         public Task<bool> CommitAsync(PreparedBasicTemplate prepared, TemplateEngineContext context, CancellationToken cancellationToken)
-            => CommitFailure is null ? inner.CommitAsync(prepared, context, cancellationToken) : throw CommitFailure;
+            => CommitFailure is null || (CommitFailurePackageId is not null && CommitFailurePackageId != prepared.Artifact.PackageId)
+                ? inner.CommitAsync(prepared, context, cancellationToken) : throw CommitFailure;
         public Task RevalidatePreparedAsync(PreparedBasicTemplate prepared, TemplateEngineContext context, CancellationToken cancellationToken)
             => inner.RevalidatePreparedAsync(prepared, context, cancellationToken);
     }

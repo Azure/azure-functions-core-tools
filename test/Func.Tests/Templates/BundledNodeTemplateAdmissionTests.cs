@@ -558,12 +558,14 @@ public sealed partial class BundledNodeTemplateTests
             => inner.OpenReadAsync(context, cancellationToken, snapshot, waiting);
 
         public Task<TemplateStoreWriteSession> OpenWriteAsync(TemplateEngineContext context, CancellationToken cancellationToken,
-            Action<TemplateStoreWaitReason>? waiting = null)
+            Action<TemplateStoreWaitReason>? waiting = null, bool requireCleanStore = false)
             => inner.OpenWriteAsync(context, cancellationToken, reason =>
             {
                 Waiting.TrySetResult();
                 waiting?.Invoke(reason);
-            });
+            }, requireCleanStore);
+
+        public bool IsPathInHive(string path) => inner.IsPathInHive(path);
     }
 
     private sealed class AdmissionObservedLock(ITemplateStoreLock inner) : ITemplateStoreLock
