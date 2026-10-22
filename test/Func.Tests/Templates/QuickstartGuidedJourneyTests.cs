@@ -322,16 +322,32 @@ public sealed partial class ArtifactBindingJourneyTests
         projection.Catalog.Entries.Should().BeEmpty();
         projection.Installed.Should().Contain(item => item.Entry.Identity == Identity && item.Selection != null);
 
-        var secondTarget = WorkingDirectory.FromExplicit(Path.Combine(_root, "second"));
-        var repeated = Guided(new(true, ["exact"], [true]));
-        var installed = await repeated.Coordinator.ExecuteAsync(new(GuidedRequest() with
-        {
-            WorkingDirectory = secondTarget,
-        }), CancellationToken.None);
-        installed.Kind.Should().Be("created");
+        var before = TemplateState();
+        var secondTarget = Path.Combine(_root, "second");
+        GuidedInteraction repeatedInteraction = new(true, ["first", "exact"], [true]);
+        var repeated = Guided(repeatedInteraction);
+        IProjectInitializer initializer = NodeInitializer();
+        RootCommand secondRoot = [GuidedCommand(repeated.Coordinator, repeatedInteraction, [initializer])];
+
+        int installed = await secondRoot.Parse(["init", secondTarget]).InvokeAsync();
+
+        installed.Should().Be(0, repeatedInteraction.AllOutput);
         journey.Payload.Requested.Should().HaveCount(1, "installed selection never re-acquires");
         repeated.Payload.Requested.Should().BeEmpty();
-        File.ReadAllText(Path.Combine(secondTarget.Info.FullName, "value.txt")).Should().Be("exact");
+        repeated.Lifecycle.Prepared.Should().BeNull();
+        repeatedInteraction.Confirmations.Should().Equal([false], "only creation requires confirmation on repeat installed selection");
+        repeatedInteraction.SelectionTitles.Should().HaveCount(2);
+        repeatedInteraction.SelectionTitles[0].Should().Be("Select a project stack:");
+        repeatedInteraction.SelectionChoices[1].Should().Contain(option => option.Contains(Identity, StringComparison.Ordinal));
+        TemplateState().Should().BeEquivalentTo(before);
+        File.ReadAllText(Path.Combine(secondTarget, "value.txt")).Should().Be("exact");
+        File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact", "the repeat must use the fresh target");
+        using var configuration = JsonDocument.Parse(File.ReadAllText(Path.Combine(secondTarget, ".func", "config.json")));
+        configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+        configuration.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be("JavaScript");
+        using IWorkloadOperation operation = await new FileWorkloadOperationCoordinator(_paths).AcquireAsync(CancellationToken.None);
+        operation.Validate(_paths);
+        await initializer.DidNotReceive().InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
