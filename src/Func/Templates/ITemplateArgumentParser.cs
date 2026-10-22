@@ -6,7 +6,7 @@ using Azure.Functions.Cli.Templates.Engine;
 namespace Azure.Functions.Cli.Templates;
 
 /// <summary>
-/// Parses untouched template tokens against one candidate's projected schema without changing the command graph.
+/// Parses the original arguments using one template's parameter definitions, without adding options to the public CLI commands.
 /// </summary>
 internal interface ITemplateArgumentParser
 {
