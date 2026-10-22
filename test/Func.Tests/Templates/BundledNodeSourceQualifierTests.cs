@@ -82,10 +82,16 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("nativeNameDirectory")]
     [InlineData("userIntentParameter")]
     [InlineData("foreignIntentBinding")]
+    [InlineData("numericContinueOnError")]
+    [InlineData("nullContinueOnError")]
+    [InlineData("numericNameRequired")]
+    [InlineData("stringNameDirectory")]
+    [InlineData("nativeSymbolType")]
     public async Task SourceQualifier_ChangedActionOrBodyAssociation_Refuses(string corruption)
     {
         using var source = await ReadQualifiedSourceAsync();
-        if (corruption is "secondWrite" or "duplicateAction" or "wrongJob" or "unmatchedBody" or "changedBody")
+        if (corruption is "secondWrite" or "duplicateAction" or "wrongJob" or "unmatchedBody" or "changedBody"
+            or "numericContinueOnError" or "nullContinueOnError" or "numericNameRequired")
         {
             source.ChangeOriginal(raw =>
             {
@@ -93,6 +99,9 @@ public sealed partial class BundledNodeTemplateTests
                 else if (corruption == "duplicateAction") raw["jobs"]![0]!["actions"]![1] = raw["jobs"]![0]!["actions"]![0]!.DeepClone();
                 else if (corruption == "wrongJob") raw["jobs"]![0]!["type"] = "AppendToFile";
                 else if (corruption == "unmatchedBody") raw["actions"]![1]!["source"] = "$(OTHER_CONTENT)";
+                else if (corruption == "numericContinueOnError") raw["actions"]![1]!["continueOnError"] = 42;
+                else if (corruption == "nullContinueOnError") raw["actions"]![1]!["continueOnError"] = null;
+                else if (corruption == "numericNameRequired") raw["jobs"]![0]!["inputs"]![0]!["required"] = 42;
                 else raw["files"]!["function.js"] = raw["files"]!["function.js"]!.GetValue<string>() + "\nchanged";
             });
         }
@@ -109,6 +118,8 @@ public sealed partial class BundledNodeTemplateTests
                 else if (corruption == "userIntentParameter") config["symbols"]!["InvocationOutputIntent"]!["type"] = "parameter";
                 else if (corruption == "foreignIntentBinding") config["symbols"]!["InvocationOutputIntent"]!["binding"] = "host:WorkingDirectory";
                 else if (corruption == "foreignContentPath") config["sourceName"] = "../foreign";
+                else if (corruption == "stringNameDirectory") config["preferNameDirectory"] = "false";
+                else if (corruption == "nativeSymbolType") config["symbols"]!["timerTrigger-schedule"] = 42;
                 else config["sourceName"] = "OtherNativeName";
             });
         }

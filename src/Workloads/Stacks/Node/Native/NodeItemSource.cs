@@ -152,8 +152,9 @@ internal sealed class NodeItemSource
         string[] names = [.. Items(job, "actions").Select(value => value.GetString()
             ?? throw Invalid("An original Node action name is missing."))];
         JsonElement[] actions = [.. Items(original, "actions")];
+        JsonElement files = Property(original, "files");
         if (Text(job, "type") != "CreateNewApp" || names.Length != 2 || names.Distinct(StringComparer.Ordinal).Count() != 2
-            || actions.Length != 2 || Property(original, "files").EnumerateObject().Count() != 1)
+            || actions.Length != 2 || files.ValueKind != JsonValueKind.Object || files.EnumerateObject().Count() != 1)
         {
             throw Invalid("The original Node item requires an unambiguous single-file CreateNewApp action graph.");
         }
@@ -179,7 +180,8 @@ internal sealed class NodeItemSource
             || contentPath != configurationPath[..^suffix.Length] + "/" + sourceName + extension
             || Text(intent, "type") != "bind" || Text(intent, "binding") != "host:func:item-output-intent"
             || config.TryGetProperty("additionalConfigFiles", out _) || OptionalBool(config, "preferNameDirectory")
-            || symbols.EnumerateObject().Any(symbol => symbol.Value.TryGetProperty("fileRename", out _)))
+            || symbols.EnumerateObject().Any(symbol => symbol.Value.ValueKind != JsonValueKind.Object
+                || symbol.Value.TryGetProperty("fileRename", out _)))
         {
             throw Invalid("The native Node source is not the owned single-file layout and host-bound invocation intent.");
         }
@@ -214,23 +216,40 @@ internal sealed class NodeItemSource
         JsonElement prompt = Single(prompts.EnumerateArray(), value => Text(value, "id") == id, $"Original Node prompt '{id}' is ambiguous.");
         string? value = input.TryGetProperty("defaultValue", out JsonElement ownDefault) ? Scalar(ownDefault)
             : prompt.TryGetProperty("defaultValue", out JsonElement inherited) ? Scalar(inherited) : null;
-        string[]? choices = prompt.TryGetProperty("enum", out JsonElement options)
-            ? [.. options.EnumerateArray().Select(option => Text(option, "value"))] : null;
-        string? regex = prompt.TryGetProperty("validators", out JsonElement validators) && validators.GetArrayLength() > 0
-            ? Text(validators[0], "expression") : null;
+        string[]? choices = prompt.TryGetProperty("enum", out JsonElement options) && options.ValueKind != JsonValueKind.Null
+            ? [.. Items(prompt, "enum").Select(option => Text(option, "value")).Where(value => !string.IsNullOrWhiteSpace(value))] : null;
+        JsonElement[] validators = prompt.TryGetProperty("validators", out JsonElement rules) && rules.ValueKind != JsonValueKind.Null
+            ? [.. Items(prompt, "validators")] : [];
+        string? regex = validators.Length > 0 ? Text(validators[0], "expression") : null;
         return new(id, prompt.TryGetProperty("label", out JsonElement label) ? Resolve(Scalar(label)!, resources) : null,
             choices is { Length: > 0 } ? "choice" : "string", value, choices,
-            OptionalBool(input, "required") || OptionalBool(prompt, "required"), regex, null, null);
+            OptionalBool(input, "required") || OptionalBool(prompt, "required", allowNull: true), regex, null, null);
     }
 
-    private static string? Scalar(JsonElement value) => value.ValueKind == JsonValueKind.Null ? null
-        : value.ValueKind == JsonValueKind.String ? value.GetString() : value.GetRawText();
+    private static string? Scalar(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString(),
+        JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => value.GetRawText(),
+        _ => null,
+    };
 
     private static string Resolve(string value, JsonElement resources)
         => value.StartsWith('$') && resources.TryGetProperty(value[1..], out JsonElement resolved) ? resolved.GetString()! : value;
 
-    private static bool OptionalBool(JsonElement value, string name)
-        => value.TryGetProperty(name, out JsonElement property) && property.ValueKind == JsonValueKind.True;
+    private static bool OptionalBool(JsonElement value, string name, bool allowNull = false)
+    {
+        if (!value.TryGetProperty(name, out JsonElement property))
+        {
+            return false;
+        }
+        return property.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null when allowNull => false,
+            _ => throw Invalid($"Node source '{name}' must be a boolean."),
+        };
+    }
 
     private static void RequireUniqueIds(JsonElement values)
     {
