@@ -94,7 +94,8 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
 
         if (parseResult.UnmatchedTokens.Any(token =>
             string.Equals(token, "--output", StringComparison.Ordinal)
-            || token.StartsWith("--output=", StringComparison.Ordinal)))
+            || token.StartsWith("--output=", StringComparison.Ordinal)
+            || token.StartsWith("--output:", StringComparison.Ordinal)))
         {
             throw new GracefulException(
                 "The '--output' rendering option is no longer supported. Use '--format' instead.",

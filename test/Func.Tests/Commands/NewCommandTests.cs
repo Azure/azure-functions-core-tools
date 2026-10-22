@@ -58,6 +58,7 @@ public class NewCommandTests
     [Theory]
     [InlineData("--output", "json")]
     [InlineData("--output=json")]
+    [InlineData("--output:json")]
     public void NewCommand_RemovedOutputOption_ReportsUnrecognizedOption(params string[] args)
     {
         var command = new NewCommand(_runner, _templateOptions);
@@ -71,6 +72,7 @@ public class NewCommandTests
     [Theory]
     [InlineData("--output", "json")]
     [InlineData("--output=json")]
+    [InlineData("--output:json")]
     public async Task NewCommand_RemovedOutputOptionWithExplicitPath_RejectsBeforeDispatch(params string[] args)
     {
         var command = new NewCommand(_runner, _templateOptions);
