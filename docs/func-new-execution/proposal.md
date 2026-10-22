@@ -116,8 +116,12 @@ completed create result through both runner boundaries and command rendering,
 including a legitimate zero-output success. This is limited to the created
 phase of a non-dry-run invocation. Preview, pre-create decisions, conflicts,
 unsuccessful native returns and cancellation thrown during creation retain their
-existing cancellation behavior. File effects or a non-null invocation alone do
-not establish completion.
+existing cancellation behavior when no real output was committed. If cancellation
+interrupts a multi-file install after an entry is committed, the consumer retains
+the returned failure, actual installed changes and diagnostic through both runner
+boundaries and command rendering. It still reports failure and exits nonzero.
+The producer's committed-output marker establishes this partial outcome, not a
+diagnostic, planned effects or a non-null invocation.
 
 Public cutover still requires production native `FuncTemplate` inventory and
 package lifecycle/trust wiring; .NET/Node/Python restore/build/start/invocation
