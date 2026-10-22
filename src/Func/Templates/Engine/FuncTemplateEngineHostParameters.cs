@@ -14,6 +14,11 @@ namespace Azure.Functions.Cli.Templates.Engine;
 internal static class FuncTemplateEngineHostParameters
 {
     /// <summary>
+    /// Immutable item invocation intent; templates own the corresponding output layout.
+    /// </summary>
+    public const string ItemOutputIntent = "func:item-output-intent";
+
+    /// <summary>
     /// Resolved project root directory.
     /// </summary>
     public const string ProjectRoot = "func:project-root";

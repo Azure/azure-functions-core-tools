@@ -17,7 +17,14 @@ internal sealed record NewExecutionRequest(
     bool List,
     bool JsonOutput,
     IReadOnlyList<string> RawTemplateTokens,
-    IReadOnlySet<string> ReservedAliases);
+    IReadOnlySet<string> ReservedAliases)
+{
+    public NativeItemOutputIntent OutputIntent { get; init; } = NativeItemOutputIntent.LiteralOutput;
+
+    public INativeItemCompatibility? ItemCompatibility { get; init; }
+
+    public INativeSelectedItemEffects? SelectedItemEffects { get; init; }
+}
 
 internal sealed record NewExecutionResult(string Kind, bool Succeeded)
 {
@@ -32,6 +39,8 @@ internal sealed record NewExecutionResult(string Kind, bool Succeeded)
     public TemplateCatalogEntry? SelectedTemplate { get; init; }
 
     public TemplateInvocationResult? Invocation { get; init; }
+
+    public NativeItemCompatibilityResult? ItemName { get; init; }
 
     internal bool HasCompletedCreation => Kind == "created" && Succeeded && Invocation?.Status == TemplateInvocationStatus.Success;
 

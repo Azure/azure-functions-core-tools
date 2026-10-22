@@ -18,12 +18,21 @@ internal sealed record TemplateEngineContext
     public TemplateEngineContext(
         WorkingDirectory commandDirectory,
         TemplateEngineProjectContext? project = null,
-        TemplateEngineBundleContext? bundle = null)
+        TemplateEngineBundleContext? bundle = null,
+        bool enableBundleBindingConstraints = false,
+        NativeItemOutputIntent itemOutputIntent = NativeItemOutputIntent.LiteralOutput)
     {
         ArgumentNullException.ThrowIfNull(commandDirectory);
+        if (itemOutputIntent is not (NativeItemOutputIntent.LiteralOutput or NativeItemOutputIntent.LegacyWorkflowRelative))
+        {
+            throw new ArgumentOutOfRangeException(nameof(itemOutputIntent));
+        }
+
         CommandDirectory = commandDirectory;
         Project = project;
         Bundle = bundle;
+        EnableBundleBindingConstraints = enableBundleBindingConstraints;
+        ItemOutputIntent = itemOutputIntent;
     }
 
     public WorkingDirectory CommandDirectory { get; }
@@ -33,6 +42,12 @@ internal sealed record TemplateEngineContext
     public TemplateEngineBundleContext? Bundle { get; }
 
     public bool RequireCleanStore { get; init; }
+
+    internal bool EnableBundleBindingConstraints { get; }
+
+    public NativeItemOutputIntent ItemOutputIntent { get; }
+
+    internal string ItemOutputIntentValue => ItemOutputIntent == NativeItemOutputIntent.LiteralOutput ? "literal" : "legacy";
 }
 
 /// <summary>
@@ -76,7 +91,7 @@ internal sealed record TemplateEngineProjectContext
 /// </summary>
 internal sealed record TemplateEngineBundleContext
 {
-    public TemplateEngineBundleContext(string id, string version)
+    public TemplateEngineBundleContext(string id, string version, string? path = null, TemplateBundleBindingCapabilities? bindings = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
@@ -88,6 +103,17 @@ internal sealed record TemplateEngineBundleContext
         Id = id;
         Version = version;
         ResolvedVersion = resolvedVersion;
+        if (path is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
+            if (!System.IO.Path.IsPathFullyQualified(path))
+            {
+                throw new ArgumentException("The resolved bundle path must be absolute.", nameof(path));
+            }
+        }
+
+        Path = path is null ? null : System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(path));
+        Bindings = bindings;
     }
 
     public string Id { get; }
@@ -95,4 +121,8 @@ internal sealed record TemplateEngineBundleContext
     public string Version { get; }
 
     public NuGetVersion ResolvedVersion { get; }
+
+    internal string? Path { get; }
+
+    internal TemplateBundleBindingCapabilities? Bindings { get; }
 }

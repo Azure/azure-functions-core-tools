@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.ObjectModel;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates.Engine;
 
@@ -20,13 +21,15 @@ internal sealed class NewExecutionRunner(
     ITemplaterFactory factory,
     ITemplateArgumentParser arguments,
     IInteractionService interaction,
-    TemplateExecutionInteraction prompts) : INewExecutionRunner
+    TemplateExecutionInteraction prompts,
+    NativeTemplateWorkflowRegistry? workflows = null) : INewExecutionRunner
 {
     private readonly INewExecutionContextResolver _contexts = contexts ?? throw new ArgumentNullException(nameof(contexts));
     private readonly ITemplaterFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ITemplateArgumentParser _arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly TemplateExecutionInteraction _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
+    private readonly NativeTemplateWorkflowRegistry? _workflows = workflows;
 
     public async Task<NewExecutionResult> ExecuteAsync(
         NewExecutionRequest request, TemplateConstraintEvaluationSnapshot availability, CancellationToken cancellationToken)
@@ -36,6 +39,10 @@ internal sealed class NewExecutionRunner(
         ArgumentNullException.ThrowIfNull(request.RawTemplateTokens);
         ArgumentNullException.ThrowIfNull(request.ReservedAliases);
         cancellationToken.ThrowIfCancellationRequested();
+        if (request.OutputIntent is not (NativeItemOutputIntent.LiteralOutput or NativeItemOutputIntent.LegacyWorkflowRelative))
+        {
+            return NewExecutionResult.Reject("invalidOutputIntent", "The item invocation intent is not supported.");
+        }
         if (request.TemplateReference is not null && string.IsNullOrWhiteSpace(request.TemplateReference))
         {
             return NewExecutionResult.Reject("invalidTemplateReference", "Supply a nonempty template identity or short name.");
@@ -77,6 +84,14 @@ internal sealed class NewExecutionRunner(
         Templater templater, NewExecutionRequest request, bool canPrompt, CancellationToken cancellationToken)
     {
         string language = templater.Context.Project!.Language!;
+        INativeItemWorkflowProvider? provider = _workflows?.FindItem(templater.Context.Project.Stack!);
+        if (_workflows is not null && provider is null)
+        {
+            return NewExecutionResult.Reject("workflowUnavailable", "No CLI-owned native item workflow is composed for the selected installed stack.");
+        }
+
+        INativeItemCompatibility? compatibility = provider?.Compatibility ?? (_workflows is null ? request.ItemCompatibility : null);
+        INativeSelectedItemEffects? selectedEffects = provider?.Effects ?? (_workflows is null ? request.SelectedItemEffects : null);
         List<TemplateGroup> groups = [];
         List<TemplateCandidateParseResult> parsed = [];
         List<TemplateCatalogEntry> considered = [];
@@ -84,7 +99,7 @@ internal sealed class NewExecutionRunner(
         {
             IReadOnlyList<TemplateCatalogEntry> catalog = await templater.ListAsync(TemplateType.Item, cancellationToken);
             considered.AddRange(catalog.Where(entry => !entry.IsHidden));
-            TemplateCatalogEntry[] visible = [.. catalog.Where(entry => !entry.IsHidden
+            TemplateCatalogEntry[] visible = [.. catalog.Where(entry => !entry.IsHidden && entry.DeclaredInternalRole is null
                 && entry.MetadataDiagnostic is null && entry.ConstraintEvaluation.Status == TemplateConstraintEvaluationStatus.Eligible
                 && string.Equals(entry.Language, language, StringComparison.OrdinalIgnoreCase))];
             if (request.List)
@@ -192,6 +207,25 @@ internal sealed class NewExecutionRunner(
             selected = narrowed[0];
         }
 
+        if (selected.Entry.DeclaredInternalRole is not null)
+        {
+            return NewExecutionResult.Reject("internalTemplate",
+                "This item declares an internal role and cannot be invoked as an ordinary function template.") with { SelectedTemplate = selected.Entry };
+        }
+
+        NativeSelectedItemBinding? effectBinding = null;
+        if (selectedEffects is { } effectSupport)
+        {
+            effectBinding = await effectSupport.ResolveAsync(selected, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (effectBinding.InternalExpansionOnly || effectBinding.Diagnostics.Count > 0)
+            {
+                return NewExecutionResult.Reject("internalTemplate",
+                    effectBinding.InternalExpansionOnly ? ["This item is an internal expansion helper, not an ordinary function template."]
+                        : [.. effectBinding.Diagnostics]) with { SelectedTemplate = selected.Entry };
+            }
+        }
+
         TemplateCandidateParseResult initial = parsed.Single(result => result.TemplateIdentity == selected.Entry.Identity);
         if (initial.MissingRequiredParameters.Count > 0 && !canPrompt)
         {
@@ -214,15 +248,63 @@ internal sealed class NewExecutionRunner(
             };
         }
 
+        NativeItemCompatibilityResult? itemName = null;
+        if (compatibility is not null)
+        {
+            itemName = await compatibility.ResolveAsync(selected, final, request.Name, canPrompt, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!itemName.Succeeded)
+            {
+                return NewExecutionResult.Reject("invalidLegacyInput", [.. itemName.Diagnostics]) with
+                {
+                    SelectedTemplate = selected.Entry,
+                    ArgumentResults = [final],
+                    ItemName = itemName,
+                };
+            }
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
-        TemplateInvocationResult invocation = await selected.InvokeAsync(new(
-            request.WorkingDirectory, final.ValuesByCanonicalName, request.Name, request.DryRun, request.Force), cancellationToken);
+        var invocationRequest = new TemplateInvocationRequest(
+            request.WorkingDirectory, final.ValuesByCanonicalName,
+            itemName?.Name ?? request.Name ?? (provider is null ? null : selected.Entry.DefaultName), request.DryRun, request.Force);
+        if (provider is not null)
+        {
+            NativeTemplateInvocationPreparation prepared = await provider.PrepareAsync(
+                new(templater, selected, final, request, invocationRequest), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            string? diagnostic = prepared.Request is null ? null : NativeTemplateWorkflowRegistry.InvocationDiagnostic(invocationRequest, prepared.Request, final);
+            if (prepared.Request is null || prepared.Diagnostics.Count > 0 || diagnostic is not null)
+            {
+                return NewExecutionResult.Reject("workflowPreparationFailed",
+                    [.. prepared.Diagnostics, .. diagnostic is null ? [] : new[] { diagnostic }]) with
+                {
+                    SelectedTemplate = selected.Entry,
+                    ArgumentResults = [final],
+                    ItemName = itemName,
+                };
+            }
+
+            invocationRequest = prepared.Request;
+            final = final with
+            {
+                ValuesByCanonicalName = new ReadOnlyDictionary<string, string?>(
+                    new Dictionary<string, string?>(invocationRequest.Parameters, StringComparer.Ordinal)),
+            };
+        }
+
+        TemplateInvocationResult? effectInvocation = selectedEffects is not null && effectBinding is not null
+            ? await selectedEffects.InvokeAsync(templater, selected, effectBinding, invocationRequest, cancellationToken) : null;
+        cancellationToken.ThrowIfCancellationRequested();
+        TemplateInvocationResult invocation = effectInvocation ?? await selected.InvokeAsync(invocationRequest, cancellationToken);
         bool success = invocation.Status == TemplateInvocationStatus.Success;
+
         NewExecutionResult result = new(success ? request.DryRun ? "previewed" : "created" : "invocationFailed", success)
         {
             SelectedTemplate = selected.Entry,
             ArgumentResults = [final],
             Invocation = invocation,
+            ItemName = itemName,
             Diagnostics = invocation.Diagnostic is null ? [] : [invocation.Diagnostic],
         };
         if (request.DryRun || !result.HasCompletedCreation)

@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.ObjectModel;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Azure.Functions.Cli.Common;
@@ -20,6 +22,7 @@ internal sealed class TemplateInvocationCoordinator(
     private readonly ITemplateInvocationEngine _engine = engine ?? throw new ArgumentNullException(nameof(engine));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly TemplateProjectSupport? _projectSupport = projectSupport;
+    private readonly Dictionary<string, DotNetProjectLayoutQualification> _projectLayouts = new(StringComparer.Ordinal);
 
     public bool ProjectTemplatesEnabled => _projectSupport is not null;
 
@@ -30,8 +33,43 @@ internal sealed class TemplateInvocationCoordinator(
             throw new InvalidOperationException("Project templates are not enabled for this invocation flow.");
         }
 
-        return _projectSupport.Planner.Read(configuration);
+        return ProjectSupport(configuration)?.DotNetLayout is { } layout
+            ? _projectSupport.Planner.ReadDotNetLayout(configuration, layout)
+            : _projectSupport.Planner.Read(configuration);
     }
+
+    internal async Task QualifyProjectConfigurationAsync(ITemplateInfo template, TemplateCatalogEntry entry,
+        TemplateConfigurationSnapshot configuration, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_projectSupport?.QualifyLayoutAsync is not { } qualify)
+        {
+            return;
+        }
+
+        NativeProjectTemplateSource source = new(entry, configuration, $"{template.MountPointUri}::{template.ConfigPlace}",
+            (path, token) => _engine.ReadPackageFileAsync(template, path, token));
+        DotNetProjectLayoutQualification? layout = await qualify(source, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (layout is not null)
+        {
+            if (layout.TemplateIdentity != entry.Identity
+                || !string.Equals(layout.ConfigurationFingerprint, configuration.Fingerprint, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidTemplateMetadataException("Project layout qualification does not match the exact mounted candidate.");
+            }
+
+            _projectLayouts[configuration.Content] = layout;
+        }
+    }
+
+    private TemplateProjectSupport? ProjectSupport(string configuration) => _projectSupport is { } support
+        && _projectLayouts.TryGetValue(configuration, out DotNetProjectLayoutQualification? layout)
+        ? support with { DotNetLayout = layout } : _projectSupport;
 
     public void ThrowIfDisposed() => _engine.ThrowIfDisposed();
 
@@ -47,13 +85,39 @@ internal sealed class TemplateInvocationCoordinator(
         ArgumentNullException.ThrowIfNull(request.Parameters);
         ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
-        TemplateInvocationResult? configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+        TemplateInvocationResult? configurationFailure = await ValidateInvocationSourceAsync(template, configuration, request.SourceSnapshot, cancellationToken);
         if (configurationFailure is not null)
         {
             return configurationFailure;
         }
 
-        TemplateProjectSupport? project = configuration.Type == TemplateType.Project ? _projectSupport : null;
+        string? bindingFailure = _engine.QualifyMsBuildBindings(template, configuration, request);
+        if (bindingFailure is not null)
+        {
+            return new(TemplateInvocationStatus.InvalidArguments, [], bindingFailure);
+        }
+
+        if (request.EffectSupport?.FSharpRepair is not null
+            && (configuration.Type != TemplateType.Item
+                || !template.TagsCollection.TryGetValue("language", out string? language) || language != "F#"
+                || !string.Equals(_engine.Context.Project?.Stack, "dotnet", StringComparison.OrdinalIgnoreCase)
+                || _engine.Context.Project?.Language != "F#"
+                || request.MsBuildBindings?.TargetFramework != "net10.0"
+                || Path.GetExtension(request.EffectSupport.ExactProjectPath) != ".fsproj"))
+        {
+            return new(TemplateInvocationStatus.InvalidArguments, [],
+                "F# compile repair requires the selected F# item, an exact evaluated net10.0 .fsproj snapshot and its controlled dependency capability.");
+        }
+
+        if ((request.EffectSupport is not null || request.SourceSnapshot is not null)
+            && TemplateOutputPathValidator.GetDiagnostic(configuration.Content,
+                _engine.GetPopulatedParameters(template, configuration, request), _engine.Context) is { } topologyFailure)
+        {
+            return new(TemplateInvocationStatus.InvalidTemplate, [], topologyFailure);
+        }
+
+        TemplateProjectSupport? project = configuration.Type == TemplateType.Project ? ProjectSupport(configuration.Content) : null;
+        bool qualifiedDotNetProject = project?.DotNetLayout is not null;
         if (project is not null)
         {
             try
@@ -64,8 +128,14 @@ internal sealed class TemplateInvocationCoordinator(
             {
                 return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
             }
+
+            if (qualifiedDotNetProject && request.EffectSupport is null)
+            {
+                return new(TemplateInvocationStatus.EffectFailure, [], "Qualified .NET project creation requires an explicit controlled dependency capability.");
+            }
         }
-        else if (configuration.Root.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
+        else if ((configuration.Type != TemplateType.Item || request.EffectSupport is null)
+            && configuration.Root.EnumerateObject().Any(property => string.Equals(property.Name, "postActions", StringComparison.OrdinalIgnoreCase)
             && property.Value.ValueKind != JsonValueKind.Null && (property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 0)))
         {
             return new(TemplateInvocationStatus.Failed, [], "Item post-actions require a qualified dispatcher and are not supported by this invocation path.");
@@ -113,13 +183,25 @@ internal sealed class TemplateInvocationCoordinator(
         {
             _ = TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind);
         }
-        if (project is null && native.CreationResult.PostActions.Count != 0)
+        if (project is null && request.EffectSupport is null && native.CreationResult.PostActions.Count != 0)
         {
             return new(TemplateInvocationStatus.Failed, [], "Native creation produced unsupported item post-actions.");
         }
 
+        if (request.SourceSnapshot is { } sourceSnapshot
+            && (GetDirectoryOutputs(configuration, native.CreationEffects).Count > 0
+                || !MatchesOutputSources(sourceSnapshot, native.CreationEffects.FileChanges)
+                || image.Files.Count != native.CreationEffects.FileChanges.Count
+                || image.Files.Any(path => !native.CreationEffects.FileChanges.Any(change =>
+                    string.Equals(image.GetRelative(image.GetTarget(change.TargetRelativePath)), path,
+                        Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)))))
+        {
+            return new(TemplateInvocationStatus.InvalidTemplate, [], "Owned source qualification requires exactly the selected regular-file sources, not placeholder directories or extra outputs.");
+        }
+
         IReadOnlyList<TemplateFileChange> nativeChanges = DescribeActualOutputs(image, configuration, native.CreationEffects);
         IReadOnlyList<TemplateFileChange> changes = nativeChanges;
+        NativeTemplateEffectResult? effectPreview = null;
         IReadOnlyList<TemplateProjectConfigurationPlan> configurationPlans = [];
         if (project is not null)
         {
@@ -127,9 +209,12 @@ internal sealed class TemplateInvocationCoordinator(
             {
                 HashSet<string> directories = new(image.Directories.Select(image.GetTarget),
                     Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-                configurationPlans = project.Planner.CreatePlans(
-                    configuration.Content, native.CreationResult, output,
-                    DescribeActualOutputs(image, configuration, native.CreationEffects, includeExistingDirectories: true), directories);
+                IReadOnlyList<TemplateFileChange> actualOutputs =
+                    DescribeActualOutputs(image, configuration, native.CreationEffects, includeExistingDirectories: true);
+                configurationPlans = project.DotNetLayout is { } layout
+                    ? project.Planner.CreateDotNetPlans(configuration.Content, native.CreationEffects, output, layout, request.Parameters,
+                        actualOutputs, directories)
+                    : project.Planner.CreatePlans(configuration.Content, native.CreationResult, output, actualOutputs, directories);
                 if (configurationPlans.Any(project.Writer.ConfigurationExists))
                 {
                     return new(TemplateInvocationStatus.FileConflict, changes, TemplateProjectConfigurationWriter.ExistingConfigurationDiagnostic)
@@ -150,12 +235,61 @@ internal sealed class TemplateInvocationCoordinator(
             }
         }
 
+        if ((configuration.Type == TemplateType.Item || qualifiedDotNetProject) && request.EffectSupport is { } effectSupport)
+        {
+            ArgumentNullException.ThrowIfNull(effectSupport.ProjectDirectory);
+            ArgumentNullException.ThrowIfNull(effectSupport.Capability);
+            if (qualifiedDotNetProject)
+            {
+                StringComparer comparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+                if (!Path.IsPathFullyQualified(effectSupport.ExactProjectPath)
+                    || !comparer.Equals(Path.GetFullPath(effectSupport.ExactProjectPath), configurationPlans.Single().PrimaryOutput)
+                    || !comparer.Equals(Path.TrimEndingDirectorySeparator(effectSupport.ProjectDirectory.Info.FullName),
+                        Path.TrimEndingDirectorySeparator(output)))
+                {
+                    return new(TemplateInvocationStatus.EffectFailure, [],
+                        "Qualified .NET dependency effects must target the native-generated project in the exact invocation root.")
+                    {
+                        ProjectConfigurations = configurationPlans,
+                    };
+                }
+            }
+
+            TemplateEffectSource selectedSource = new(template.Identity, $"{template.MountPointUri}::{template.ConfigPlace}", configuration.Fingerprint);
+            NativeTemplateEffectPlanner planner = new();
+            NativeTemplateEffectPlanningResult planned = effectSupport.FSharpRepair is { } repair
+                ? planner.PlanFSharpItemDependencies(effectSupport.ProjectDirectory, selectedSource, native.CreationEffects,
+                    request.OutputDirectory, effectSupport.ExactProjectPath, repair)
+                : planner.PlanDependencies(effectSupport.ProjectDirectory, selectedSource, native.CreationResult,
+                    qualifiedDotNetProject ? configurationPlans.Single().PrimaryOutput : effectSupport.ExactProjectPath);
+            if (planned.Plan is null)
+            {
+                return new(TemplateInvocationStatus.EffectFailure, [], string.Join(" ", planned.Diagnostics));
+            }
+
+            effectPreview = await new NativeTemplateEffectWorkflow().ExecuteAsync(planned.Plan,
+                effectSupport.Capability, dryRun: true, confirmed: false, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!effectPreview.Succeeded)
+            {
+                return new(TemplateInvocationStatus.EffectFailure, [], string.Join(" ", effectPreview.Diagnostics)) { Effects = effectPreview };
+            }
+
+            if (!request.DryRun && !effectSupport.Confirmed)
+            {
+                return new(TemplateInvocationStatus.EffectFailure, [], "The controlled effect plan was not confirmed; no native files or effects were applied.")
+                {
+                    Effects = effectPreview with { Kind = "declined", Succeeded = false },
+                };
+            }
+        }
+
         string? outputFailure = GetOutputDiagnostic(image, configurationPlans);
         if (outputFailure is not null)
         {
             return new(TemplateInvocationStatus.Failed, [], outputFailure) { ProjectConfigurations = configurationPlans };
         }
-        configurationFailure = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+        configurationFailure = await ValidateInvocationSourceAsync(template, configuration, request.SourceSnapshot, cancellationToken);
         if (configurationFailure is not null)
         {
             return configurationFailure with { ProjectConfigurations = configurationPlans };
@@ -167,6 +301,7 @@ internal sealed class TemplateInvocationCoordinator(
             return new(TemplateInvocationStatus.Success, changes, requiresForce ? "Actual creation requires explicit file-conflict force." : null)
             {
                 ProjectConfigurations = configurationPlans,
+                Effects = effectPreview,
             };
         }
         if (requiresForce)
@@ -174,16 +309,211 @@ internal sealed class TemplateInvocationCoordinator(
             return new(TemplateInvocationStatus.FileConflict, changes, "Template would change existing files. Explicit file-conflict force is required.")
             {
                 ProjectConfigurations = configurationPlans,
+                Effects = effectPreview,
             };
         }
 
         TemplateInvocationResult installed = await InstallAsync(template, configuration, request, image, nativeChanges, cancellationToken);
-        if (installed.Status != TemplateInvocationStatus.Success || project is null)
+        installed = installed with { ProjectConfigurations = configurationPlans, Effects = effectPreview };
+        if (installed.Status != TemplateInvocationStatus.Success)
         {
-            return installed with { ProjectConfigurations = configurationPlans };
+            return installed;
         }
 
-        return await ConfigureAsync(template, configuration, project, image, configurationPlans, installed, cancellationToken);
+        if (project is not null)
+        {
+            installed = await ConfigureAsync(template, configuration, project, image, configurationPlans, installed, cancellationToken);
+            installed = installed with { Effects = effectPreview };
+            if (installed.Status != TemplateInvocationStatus.Success)
+            {
+                return installed;
+            }
+        }
+
+        if (effectPreview is not null && request.EffectSupport is { } effects)
+        {
+            string? effectDiagnostic = GetOutputDiagnostic(image, configurationPlans);
+            HashSet<string> directoryOutputs = new(image.Directories,
+                Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+            if (effectDiagnostic is not null || nativeChanges.Any(change => !HasExpectedOutputKind(output, change, directoryOutputs)))
+            {
+                effectDiagnostic ??= "Native outputs changed before dependency execution.";
+                return installed with
+                {
+                    Status = TemplateInvocationStatus.EffectFailure,
+                    Diagnostic = effectDiagnostic,
+                    Effects = effectPreview with { Kind = "preflightFailed", Succeeded = false, Diagnostics = [effectDiagnostic] },
+                };
+            }
+
+            NativeTemplateEffectResult applied = await new NativeTemplateEffectWorkflow().ExecuteAsync(
+                effectPreview.Plan, effects.Capability, dryRun: false, confirmed: effects.Confirmed, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return installed with
+            {
+                Status = applied.Succeeded ? TemplateInvocationStatus.Success : TemplateInvocationStatus.EffectFailure,
+                Diagnostic = applied.Succeeded ? null : qualifiedDotNetProject
+                    ? "Native project files and CLI configuration were generated, but controlled dependencies did not complete. "
+                        + string.Join(" ", applied.Diagnostics)
+                    : "Native template files were generated, but controlled effects did not complete. "
+                        + string.Join(" ", applied.Diagnostics),
+                Effects = applied,
+            };
+        }
+
+        return installed;
+    }
+
+    internal async Task<NativeTemplatePreparationResult> CaptureNativePreparationAsync(ITemplateInfo template,
+        TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request, IFileSystem fileSystem,
+        bool expandFiles, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(fileSystem);
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        TemplateInvocationResult? invalid = await ValidateInvocationSourceAsync(template, configuration, request.SourceSnapshot, cancellationToken);
+        if (invalid is not null)
+        {
+            return new(null, invalid);
+        }
+
+        string? diagnostic = _engine.QualifyMsBuildBindings(template, configuration, request)
+            ?? TemplateOutputPathValidator.GetDiagnostic(configuration.Content,
+                _engine.GetPopulatedParameters(template, configuration, request), _engine.Context);
+        if (diagnostic is not null)
+        {
+            return Failed(diagnostic);
+        }
+
+        ITemplateCreationResult preview = await _engine.InstantiateAsync(template, request,
+            CreateInputData(configuration.Parameters, request.Parameters), true, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (preview.Status != CreationResultStatus.Success || preview.CreationEffects is null)
+        {
+            return Failed(preview.ErrorMessage ?? "Native preparation did not report evaluated creation effects.");
+        }
+
+        ICreationEffects effects = preview.CreationEffects;
+        using var sourceConfiguration = new MemoryStream(Encoding.UTF8.GetBytes(configuration.Content));
+        string? sourcePlaceholder = TemplateConfigModel.FromStream(sourceConfiguration).PlaceholderFilename;
+        IReadOnlyList<string> sourcePlaceholders = string.IsNullOrWhiteSpace(sourcePlaceholder) ? ["-.-", "_._"] : [sourcePlaceholder];
+        if (request.SourceSnapshot is { } snapshot && (!MatchesOutputSources(snapshot, effects.FileChanges)
+            || effects.FileChanges.OfType<IFileChange2>().Any(change => sourcePlaceholders.Contains(Path.GetFileName(change.SourceRelativePath), StringComparer.Ordinal))))
+        {
+            return Failed("Native preparation does not match the qualified regular-file sources.");
+        }
+
+        TemplateFileChange[] changes =
+            [.. effects.FileChanges.Select(change => TemplateFileChange.FromNative(change.TargetRelativePath, change.ChangeKind))];
+        diagnostic = ValidateOutputPaths(request.OutputDirectory.Info.FullName, changes);
+        if (diagnostic is not null)
+        {
+            return Failed(diagnostic);
+        }
+
+        Dictionary<string, ReadOnlyMemory<byte>> expanded = new(StringComparer.Ordinal);
+        if (expandFiles)
+        {
+            if (string.IsNullOrWhiteSpace(request.Name) || effects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create))
+            {
+                return Failed("Private native expansion requires an explicit effective name and create-only native outputs.");
+            }
+
+            using TempDirectory temporary = fileSystem.CreateTempDirectory();
+            var output = WorkingDirectory.FromExplicit(temporary.Path);
+            TemplateInvocationRequest expansionRequest = request with { OutputDirectory = output, EffectSupport = null, MsBuildBindings = null };
+            diagnostic = ValidateOutputPaths(output.Info.FullName, changes);
+            if (diagnostic is not null)
+            {
+                return Failed(diagnostic);
+            }
+
+            // Native instantiation reports post-actions but does not dispatch them.
+            invalid = await ValidateInvocationSourceAsync(template, configuration, request.SourceSnapshot, cancellationToken);
+            if (invalid is not null)
+            {
+                return new(null, invalid);
+            }
+
+            ITemplateCreationResult created = await _engine.InstantiateAsync(template, expansionRequest,
+                CreateInputData(configuration.Parameters, expansionRequest.Parameters), false, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            HashSet<string> directories = new(effects.FileChanges.OfType<IFileChange2>()
+                .Where(change => sourcePlaceholders.Contains(Path.GetFileName(change.SourceRelativePath), StringComparer.Ordinal))
+                .Select(change => change.TargetRelativePath), StringComparer.Ordinal);
+            if (created.Status != CreationResultStatus.Success || created.CreationEffects is null
+                || !created.CreationEffects.FileChanges.Select(change => change.TargetRelativePath).Order(StringComparer.Ordinal)
+                    .SequenceEqual(effects.FileChanges.Select(change => change.TargetRelativePath).Order(StringComparer.Ordinal), StringComparer.Ordinal)
+                || created.CreationEffects.FileChanges.Any(change => change.ChangeKind != ChangeKind.Create)
+                || (request.SourceSnapshot is { } expandedSources && !MatchesOutputSources(expandedSources, created.CreationEffects.FileChanges))
+                || ValidateOutputPaths(output.Info.FullName, changes) is not null
+                || changes.Any(change => !HasExpectedOutputKind(output.Info.FullName, change, directories)))
+            {
+                return Failed("Private native expansion did not produce the exact previewed source output paths.");
+            }
+
+            foreach (IFileChange change in created.CreationEffects.FileChanges)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string path = Path.GetFullPath(Path.Combine(output.Info.FullName, change.TargetRelativePath));
+                if (fileSystem.FileExists(path))
+                {
+                    using Stream stream = _engine.FileSystem.OpenRead(path);
+                    using MemoryStream content = new();
+                    await stream.CopyToAsync(content, cancellationToken);
+                    expanded.Add(change.TargetRelativePath, content.ToArray());
+                }
+                else if (!fileSystem.DirectoryExists(path))
+                {
+                    return Failed("Private native expansion contains a missing or unsupported output kind.");
+                }
+            }
+
+            StringComparer comparer = Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            string[] expectedFiles = [.. expanded.Keys.Select(path => Path.GetFullPath(Path.Combine(output.Info.FullName, path))).Order(comparer)];
+            if (!fileSystem.GetFiles(output.Info.FullName).Select(Path.GetFullPath).Order(comparer).SequenceEqual(expectedFiles, comparer))
+            {
+                return Failed("Private native expansion produced unexpected source files.");
+            }
+
+            HashSet<string> allowed = new(comparer);
+            foreach (TemplateFileChange change in changes)
+            {
+                for (string? path = Path.GetFullPath(Path.Combine(output.Info.FullName, change.Path));
+                    path is not null && !comparer.Equals(path, output.Info.FullName); path = Path.GetDirectoryName(path))
+                {
+                    allowed.Add(path);
+                }
+            }
+
+            Queue<string> inspect = new([output.Info.FullName]);
+            while (inspect.TryDequeue(out string? directory))
+            {
+                foreach (string entry in fileSystem.GetFileSystemEntries(directory))
+                {
+                    if (!allowed.Contains(Path.GetFullPath(entry)))
+                    {
+                        return Failed("Private native expansion produced unexpected source entries.");
+                    }
+
+                    if (fileSystem.DirectoryExists(entry))
+                    {
+                        inspect.Enqueue(entry);
+                    }
+                }
+            }
+        }
+
+        invalid = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return invalid is null ? new(new(new(template.Identity, $"{template.MountPointUri}::{template.ConfigPlace}", configuration.Fingerprint),
+            effects, new ReadOnlyDictionary<string, ReadOnlyMemory<byte>>(expanded)), null) : new(null, invalid);
+
+        static NativeTemplatePreparationResult Failed(string message) =>
+            new(null, new(TemplateInvocationStatus.InvalidTemplate, [], message));
     }
 
     private string? GetOutputDiagnostic(TemplateOutputImage image, IReadOnlyList<TemplateProjectConfigurationPlan> plans)
@@ -349,7 +679,7 @@ internal sealed class TemplateInvocationCoordinator(
                 .ThenBy(path => path, StringComparer.Ordinal))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                TemplateInvocationResult? invalidSource = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+                TemplateInvocationResult? invalidSource = await ValidateInvocationSourceAsync(template, configuration, request.SourceSnapshot, cancellationToken);
                 if (invalidSource is not null)
                 {
                     return CompletedResult(invalidSource.Status, completed, invalidSource.Diagnostic);
@@ -384,7 +714,7 @@ internal sealed class TemplateInvocationCoordinator(
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                TemplateInvocationResult? invalidSource = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+                TemplateInvocationResult? invalidSource = await ValidateInvocationSourceAsync(template, configuration, request.SourceSnapshot, cancellationToken);
                 if (invalidSource is not null)
                 {
                     return CompletedResult(invalidSource.Status, completed, invalidSource.Diagnostic);
@@ -455,7 +785,122 @@ internal sealed class TemplateInvocationCoordinator(
             .Select(change => change.TargetRelativePath), StringComparer.Ordinal);
     }
 
-    private async Task<TemplateInvocationResult?> ValidateSelectedConfigurationAsync(
+    private async Task<TemplateInvocationResult?> ValidateInvocationSourceAsync(ITemplateInfo template,
+        TemplateConfigurationSnapshot configuration, NativeTemplateSourceSnapshot? snapshot, CancellationToken cancellationToken)
+    {
+        TemplateInvocationResult? invalid = await ValidateSelectedConfigurationAsync(template, configuration, cancellationToken);
+        if (invalid is not null || snapshot is null)
+        {
+            return invalid;
+        }
+
+        if (configuration.Type != TemplateType.Item || snapshot.TemplateIdentity != template.Identity
+            || !string.Equals(snapshot.ConfigurationSha256, configuration.Fingerprint, StringComparison.OrdinalIgnoreCase))
+        {
+            return new(TemplateInvocationStatus.InvalidTemplate, [], "Source qualification is not bound to the exact selected item configuration.");
+        }
+
+        foreach (TemplateEffectSource pin in snapshot.Sources)
+        {
+            ReadOnlyMemory<byte> source;
+            try
+            {
+                source = await _engine.ReadPackageFileAsync(template, pin.Identity, cancellationToken);
+            }
+            catch (FileNotFoundException exception)
+            {
+                return new(TemplateInvocationStatus.TemplateChanged, [], exception.Message);
+            }
+
+            if (!string.Equals(Convert.ToHexString(SHA256.HashData(source.Span)), pin.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                return new(TemplateInvocationStatus.TemplateChanged, [], "A selected package source changed. Rerun selection.");
+            }
+        }
+
+        return null;
+    }
+
+    private static bool MatchesOutputSources(NativeTemplateSourceSnapshot snapshot, IEnumerable<IFileChange> changes)
+    {
+        IFileChange[] files = [.. changes];
+        return files.Length == snapshot.Outputs.Count
+            && files.All(change => change.ChangeKind is ChangeKind.Create or ChangeKind.Change or ChangeKind.Overwrite
+                && change is IFileChange2 source && snapshot.Outputs.Count(expected =>
+                NativeTemplateSourceSnapshot.Normalize(expected.SourceRelativePath) == NativeTemplateSourceSnapshot.Normalize(source.SourceRelativePath)) == 1)
+            && files.OfType<IFileChange2>().Select(file => NativeTemplateSourceSnapshot.Normalize(file.SourceRelativePath)).Distinct(StringComparer.Ordinal).Count() == files.Length
+            && files.Select(file => file.TargetRelativePath).Distinct(StringComparer.Ordinal).Count() == files.Length;
+    }
+
+    private bool HasExpectedOutputKind(string output, TemplateFileChange change, HashSet<string> directoryOutputs)
+    {
+        string path = Path.GetFullPath(Path.Combine(output, change.Path));
+        bool file = _engine.FileSystem.FileExists(path);
+        bool directory = _engine.FileSystem.DirectoryExists(path);
+        if (change.Kind == TemplateFileChangeKind.Delete)
+        {
+            return !file && !directory;
+        }
+
+        return directoryOutputs.Contains(change.Path) || directoryOutputs.Contains(Path.GetRelativePath(output, path))
+            ? directory && !file : file && !directory;
+    }
+
+    private string? ValidateOutputPaths(string output, IReadOnlyList<TemplateFileChange> changes)
+    {
+        foreach (TemplateFileChange change in changes)
+        {
+            string? path = Path.GetFullPath(Path.Combine(output, change.Path));
+            string target = path;
+            string relative = Path.GetRelativePath(output, path);
+            if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            {
+                return "Template output escapes the requested output directory.";
+            }
+
+            // The requested output directory is the boundary; linked parents do not redirect individual template paths.
+            while (path is not null && !string.Equals(Path.TrimEndingDirectorySeparator(path), Path.TrimEndingDirectorySeparator(output), StringComparison.Ordinal))
+            {
+                try
+                {
+                    FileAttributes attributes = _engine.FileSystem.GetFileAttributes(path);
+                    if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        return "Template output uses a symbolic link or reparse point. Choose an unlinked output directory.";
+                    }
+
+                    if (!string.Equals(path, target, StringComparison.Ordinal) && (attributes & FileAttributes.Directory) == 0)
+                    {
+                        return "A template output directory ancestor is an existing file. Choose an output directory without file collisions.";
+                    }
+                }
+                catch (FileNotFoundException)
+                {
+                    path = Path.GetDirectoryName(path);
+                    continue;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    path = Path.GetDirectoryName(path);
+                    continue;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return "Template output path cannot be checked safely.";
+                }
+                catch (IOException)
+                {
+                    return "Template output path cannot be checked safely.";
+                }
+
+                path = Path.GetDirectoryName(path);
+            }
+        }
+
+        return null;
+    }
+
+    internal async Task<TemplateInvocationResult?> ValidateSelectedConfigurationAsync(
         ITemplateInfo template, TemplateConfigurationSnapshot configuration, CancellationToken cancellationToken)
     {
         TemplateConfigurationSnapshot current;

@@ -12,11 +12,23 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </summary>
 internal interface ITemplateInvocationEngine
 {
+    public TemplateEngineContext Context { get; }
+
     public IPhysicalFileSystem FileSystem { get; }
 
     public void ThrowIfDisposed();
 
     public Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken);
+
+    public Task<ReadOnlyMemory<byte>> ReadPackageFileAsync(ITemplateInfo template, string relativePath, CancellationToken cancellationToken);
+
+    public string? QualifyMsBuildBindings(ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request);
+
+    public IReadOnlyDictionary<string, object> GetPopulatedParameters(
+        ITemplateInfo template, TemplateConfigurationSnapshot configuration, TemplateInvocationRequest request);
+
+    public Task<ITemplateCreationResult> InstantiateAsync(
+        ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, bool dryRun, CancellationToken cancellationToken);
 
     public Task<ITemplateCreationResult> RenderImageAsync(
         ITemplateInfo template, TemplateInvocationRequest request, InputDataSet parameters, TemplateOutputImage image, CancellationToken cancellationToken);

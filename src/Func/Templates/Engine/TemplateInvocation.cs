@@ -11,7 +11,20 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <summary>
 /// Supplies canonical parameter values and output intent for one selected template invocation.
 /// </summary>
-internal sealed record TemplateInvocationRequest(WorkingDirectory OutputDirectory, IReadOnlyDictionary<string, string?> Parameters, string? Name = null, bool DryRun = false, bool Force = false);
+internal sealed record TemplateInvocationRequest(WorkingDirectory OutputDirectory, IReadOnlyDictionary<string, string?> Parameters, string? Name = null, bool DryRun = false, bool Force = false)
+{
+    public NativeTemplateInvocationEffects? EffectSupport { get; init; }
+
+    public NativeMsBuildBindingSnapshot? MsBuildBindings { get; init; }
+
+    public NativeTemplateSourceSnapshot? SourceSnapshot { get; init; }
+}
+
+internal sealed record NativeTemplateInvocationEffects(
+    WorkingDirectory ProjectDirectory, string ExactProjectPath, INativeTemplateEffectCapability Capability, bool Confirmed)
+{
+    public TemplateFSharpCompileEffect? FSharpRepair { get; init; }
+}
 
 /// <summary>
 /// Distinguishes invocation outcomes without discarding their diagnostics or reported changes.
@@ -28,6 +41,7 @@ internal enum TemplateInvocationStatus
     InvalidTemplate,
     EngineFailure,
     ConfigurationFailure,
+    EffectFailure,
 }
 
 /// <summary>
@@ -40,6 +54,7 @@ internal enum TemplateFileChangeKind
     Change,
     Overwrite,
     Delete,
+    Append,
 }
 
 /// <summary>
@@ -67,6 +82,7 @@ internal sealed record TemplateFileChange(string Path, TemplateFileChangeKind Ki
         TemplateFileChangeKind.Change => "Change",
         TemplateFileChangeKind.Overwrite => "Overwrite",
         TemplateFileChangeKind.Delete => "Delete",
+        TemplateFileChangeKind.Append => "Append",
         _ => throw new ArgumentOutOfRangeException(nameof(Kind), Kind, "Unsupported internal template file-change kind."),
     };
 }
@@ -85,6 +101,8 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
     /// Distinguishes completed real output from a preview or a conflict plan without changing the serialized result.
     /// </summary>
     internal bool HasCommittedOutput { get; init; }
+
+    public NativeTemplateEffectResult? Effects { get; init; }
 }
 
 /// <summary>
@@ -102,6 +120,8 @@ internal sealed record TemplateConfigurationSnapshot(string Content, string Fing
     /// Owns the parsed host view independently of any disposable parsing document.
     /// </summary>
     public JsonElement Root { get; } = ParseRoot(Content);
+
+    public string? DefaultName { get; init; }
 
     /// <summary>
     /// Identifies the selected or fallback mounted host file, or null when neither exists.
