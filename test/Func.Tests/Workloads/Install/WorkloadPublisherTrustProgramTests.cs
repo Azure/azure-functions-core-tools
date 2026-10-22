@@ -72,7 +72,7 @@ public sealed class WorkloadPublisherTrustProgramTests(ITestOutputHelper output)
         reused.StandardError.Should().Contain("latest available version (1.1.0)");
         (await File.ReadAllBytesAsync(oldSource)).Should().Equal(oldBytes);
         (await File.ReadAllBytesAsync(newSource)).Should().Equal(newBytes);
-        Directory.GetDirectories(Path.Combine(Root, CliProcessTestRunner.StateDirectoryName, "temp"), "func-workload-trust-*")
+        Directory.GetDirectories(Path.Combine(Root, CliProcessTestRunner.StateDirectoryName), "func-workload-trust-*", SearchOption.AllDirectories)
             .Should().BeEmpty();
 
         Task<CliProcessTestRunner.CliResult> RunAsync(string[] args)
