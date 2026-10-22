@@ -67,6 +67,29 @@ internal sealed record BasicTemplateArtifact(string PackageId, NuGetVersion Vers
 internal sealed record NativeTemplateContentDeclaration(string Identity, NativeTemplateContentRole Role);
 
 internal sealed record BasicTemplateDefinition(string Path, string Identity, string Type);
+
+internal sealed record BasicTemplateArchiveInventory(string PackageId, string Version, IReadOnlyList<string> PackageTypes,
+    IReadOnlyList<string> Files, IReadOnlyList<BasicTemplateDefinition> Templates)
+{
+    public IReadOnlyList<string> PackageTypes { get; init => field = Array.AsReadOnly(
+        [.. value ?? throw new ArgumentNullException(nameof(value))]); } = Array.AsReadOnly(
+        [.. PackageTypes ?? throw new ArgumentNullException(nameof(PackageTypes))]);
+
+    public IReadOnlyList<string> Files { get; init => field = Array.AsReadOnly(
+        [.. value ?? throw new ArgumentNullException(nameof(value))]); } = Array.AsReadOnly(
+        [.. Files ?? throw new ArgumentNullException(nameof(Files))]);
+
+    public IReadOnlyList<BasicTemplateDefinition> Templates { get; init => field = Array.AsReadOnly(
+        [.. value ?? throw new ArgumentNullException(nameof(value))]); } = Array.AsReadOnly(
+        [.. Templates ?? throw new ArgumentNullException(nameof(Templates))]);
+}
+
+internal sealed record BasicTemplateOwnedState(NativeTemplateOwnerReceipt Receipt, string ReceiptSha256, string ArchivePath,
+    BasicTemplateArchiveInventory Archive, NativeTemplateOwnerIdentity Owner, string WorkloadInventory,
+    string? SelectedProjectIdentity);
+
+internal sealed record BasicOwnedTemplateUpdate(BasicTemplateOwnedState Before, BasicTemplateArtifact After);
+
 internal sealed record BasicCompanionPlan(string PackageId, VersionRange Versions, IReadOnlyList<BasicTemplateArtifact> Candidates)
 {
     public IReadOnlyList<BasicTemplateArtifact> Candidates { get; init => field = Freeze(value); } = Freeze(Candidates);

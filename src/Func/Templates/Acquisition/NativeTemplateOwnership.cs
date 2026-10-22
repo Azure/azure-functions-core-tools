@@ -3,6 +3,8 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
+using System.Text;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using NuGet.Packaging;
@@ -14,6 +16,9 @@ internal interface INativeTemplateOwnership : IBasicTemplateOwnership
 {
     public Task RecordAsync(BasicTemplateArtifact artifact, CancellationToken cancellationToken);
     public Task<NativeTemplateOwnerReceipt?> GetRetainedAsync(string packageId, CancellationToken cancellationToken);
+    public Task<NativeTemplateOwnerProof?> GetRetainedProofAsync(string packageId, CancellationToken cancellationToken);
+    public NativeTemplateOwnerProof CreateProof(BasicTemplateArtifact artifact);
+    public Task TransitionAsync(NativeTemplateOwnerProof expected, BasicTemplateArtifact artifact, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -30,11 +35,12 @@ internal sealed class NativeTemplateOwnership(IFileSystem fileSystem, CliConfigu
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
         ArgumentException.ThrowIfNullOrWhiteSpace(sha256);
         ValidateHash(sha256);
-        NativeTemplateOwnerReceipt? receipt = await GetRetainedAsync(packageId, cancellationToken);
-        if (receipt is null)
+        NativeTemplateOwnerProof? proof = await GetRetainedProofAsync(packageId, cancellationToken);
+        if (proof is null)
         {
             return null;
         }
+        NativeTemplateOwnerReceipt receipt = proof.Receipt;
         if (receipt.Version != version || !string.Equals(receipt.Sha256, sha256, StringComparison.OrdinalIgnoreCase))
         {
             throw Conflict(packageId);
@@ -43,14 +49,22 @@ internal sealed class NativeTemplateOwnership(IFileSystem fileSystem, CliConfigu
     }
 
     public async Task<NativeTemplateOwnerReceipt?> GetRetainedAsync(string packageId, CancellationToken cancellationToken)
+        => (await GetRetainedProofAsync(packageId, cancellationToken))?.Receipt;
+
+    public async Task<NativeTemplateOwnerProof?> GetRetainedProofAsync(string packageId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
-        string? json = await _fileSystem.ReadAllTextIfExistsAsync(ReceiptPath(packageId), cancellationToken);
-        if (json is null)
+        using Stream? stream = _fileSystem.OpenReadIfExists(ReceiptPath(packageId));
+        if (stream is null)
         {
             return null;
         }
 
+        using MemoryStream raw = new();
+        await stream.CopyToAsync(raw, cancellationToken);
+        byte[] bytes = raw.ToArray();
+        using StreamReader text = new(new MemoryStream(bytes), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        string json = await text.ReadToEndAsync(cancellationToken);
         NativeTemplateOwnerReceipt receipt;
         try
         {
@@ -79,13 +93,15 @@ internal sealed class NativeTemplateOwnership(IFileSystem fileSystem, CliConfigu
         }
         try
         {
-            return receipt with { Source = BasicCompanionManifestReader.Source(receipt.Source) };
+            receipt = receipt with { Source = BasicCompanionManifestReader.Source(receipt.Source) };
         }
         catch (BasicAcquisitionException exception)
         {
             throw new BasicAcquisitionException(BasicAcquisitionFailure.InstalledConflict,
                 $"Native provenance for '{packageId}' has an invalid source. Preserve the store and use its owning lifecycle to repair it.", exception);
         }
+
+        return new(receipt, Convert.ToHexStringLower(SHA256.HashData(bytes)));
     }
 
     public async Task RecordAsync(BasicTemplateArtifact artifact, CancellationToken cancellationToken)
@@ -100,8 +116,7 @@ internal sealed class NativeTemplateOwnership(IFileSystem fileSystem, CliConfigu
             throw new ArgumentException("Native provenance requires an explicit qualified external content role.", nameof(artifact));
         }
         string version = artifact.Version.ToNormalizedString();
-        NativeTemplateOwnerReceipt receipt = new(artifact.PackageId, version, artifact.Sha256,
-            BasicCompanionManifestReader.Source(artifact.Source), artifact.ContentRevision, version);
+        NativeTemplateOwnerReceipt receipt = CreateProof(artifact).Receipt;
         NativeTemplateOwnerReceipt? retained = await GetRetainedAsync(artifact.PackageId, cancellationToken);
         if (retained is not null)
         {
@@ -114,6 +129,47 @@ internal sealed class NativeTemplateOwnership(IFileSystem fileSystem, CliConfigu
         }
         await _fileSystem.WriteAllTextAsync(ReceiptPath(artifact.PackageId),
             JsonSerializer.Serialize(receipt, NativeTemplateOwnershipJsonContext.Default.NativeTemplateOwnerReceipt), cancellationToken);
+    }
+
+    public NativeTemplateOwnerProof CreateProof(BasicTemplateArtifact artifact)
+    {
+        ArgumentNullException.ThrowIfNull(artifact);
+        ArgumentNullException.ThrowIfNull(artifact.Version);
+        ArgumentException.ThrowIfNullOrWhiteSpace(artifact.ContentRevision);
+        ValidateHash(artifact.Sha256);
+        string version = artifact.Version.ToNormalizedString();
+        NativeTemplateOwnerReceipt receipt = new(artifact.PackageId, version, artifact.Sha256,
+            BasicCompanionManifestReader.Source(artifact.Source), artifact.ContentRevision, version);
+        byte[] bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(receipt,
+            NativeTemplateOwnershipJsonContext.Default.NativeTemplateOwnerReceipt));
+        return new(receipt, Convert.ToHexStringLower(SHA256.HashData(bytes)));
+    }
+
+    public async Task TransitionAsync(NativeTemplateOwnerProof expected, BasicTemplateArtifact artifact,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        ArgumentNullException.ThrowIfNull(artifact);
+        if (!string.Equals(expected.Receipt.PackageId, artifact.PackageId, StringComparison.OrdinalIgnoreCase)
+            || expected.Receipt.Source != BasicCompanionManifestReader.Source(artifact.Source)
+            || !NuGetVersion.TryParse(expected.Receipt.Version, out NuGetVersion? oldVersion)
+            || NuGet.Versioning.VersionComparer.VersionRelease.Compare(artifact.Version, oldVersion) <= 0
+            || artifact.ContentRoles.Count == 0)
+        {
+            throw Conflict(artifact.PackageId);
+        }
+
+        NativeTemplateOwnerProof? actual = await GetRetainedProofAsync(artifact.PackageId, cancellationToken);
+        if (actual is null || actual.Receipt != expected.Receipt
+            || !string.Equals(actual.RawSha256, expected.RawSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw Conflict(artifact.PackageId);
+        }
+
+        NativeTemplateOwnerProof replacement = CreateProof(artifact);
+        string json = JsonSerializer.Serialize(replacement.Receipt,
+            NativeTemplateOwnershipJsonContext.Default.NativeTemplateOwnerReceipt);
+        await _fileSystem.WriteAllTextAsync(ReceiptPath(artifact.PackageId), json, cancellationToken);
     }
 
     private string ReceiptPath(string packageId)
@@ -140,6 +196,8 @@ internal sealed class NativeTemplateOwnership(IFileSystem fileSystem, CliConfigu
 
 internal sealed record NativeTemplateOwnerReceipt(string PackageId, string Version, string Sha256, string Source,
     string ContentRevision, string? PinnedVersion);
+
+internal sealed record NativeTemplateOwnerProof(NativeTemplateOwnerReceipt Receipt, string RawSha256);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(NativeTemplateOwnerReceipt))]

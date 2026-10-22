@@ -37,9 +37,12 @@ are displayed before an explicit default-no acquisition confirmation.
 Consent binds the complete resolved candidate plan, selected exact archives and
 workload inventory. The existing acquisition runner revalidates these before
 preparation and writer admission. Changed plans fail instead of selecting another
-version. It does not upgrade workloads, change feeds or replace existing native
-package ownership. Acquisition must finish successfully and release prepared
-payloads, reuse evidence and leases before a new bound init scope opens.
+version. An explicitly consented owned-package update can replace a proven
+CLI-owned archive with a strictly newer qualified release for the same package,
+source and current workload owner, as described below. Ordinary acquisition does
+not replace conflicting native ownership, upgrade workloads or change feeds.
+Acquisition must finish successfully and release prepared payloads, reuse evidence
+and leases before a new bound init scope opens.
 Fresh runtime registration and exact installed artifact verification remain
 mandatory. Native preview and mandatory project configuration share the same
 selected flow and completed parameters. Interactive creation requires a second
@@ -176,12 +179,36 @@ evidence. If external proof is unavailable, only complete independent bundled
 proof can authorize a bundled selection. A missing external receipt is not
 bundled authority, and unmatched projects retain their external diagnostic.
 
-Owned A1 to A2 installation remains **blocked** in this layer. Pinning a newer
-nomination is not an upgrade implementation. Existing version and ownership
-replacement guards remain unchanged. A separate dependent layer needs explicit
-before and after consent and a reviewed engine archive plus receipt transition
-inside the existing snapshot and recovery boundary. No production authority,
-feed publication, general force or legacy removal is enabled here.
+### Explicit owned-package updates
+
+The dependent update layer supports an explicitly consented A1 to A2 transition
+for the same package, source and independently verified current workload owner.
+The selected full project identity must exist in both inventories. A2 must have
+strictly newer NuGet release precedence, not merely different build metadata.
+The old version need not remain eligible under the current mapping, but its actual
+unique CLI-owned archive, complete inventory, pin and strict receipt must agree.
+A2 independently satisfies current authority and all genuine required companions.
+Consent freezes both BEFORE and AFTER proof and the complete plan, choices and
+owner inventory. No-intent acquisition and ordinary ownership guards are unchanged.
+
+Under the existing exclusive store lease, updates refuse a pending recovery
+journal without recovering or replacing the backup. Isolated pre-snapshot
+admission checks the incumbent and raw receipt bytes to classify exact BEFORE,
+exact approved AFTER or conflict. BEFORE also requires exact staged new bytes and
+no native identity collisions. Only exact BEFORE enters the existing snapshot,
+provider replacement, full expected-old receipt transition, validation and commit
+sequence. Precommit failure
+uses whole-hive recovery, including archive, provider, cache and receipt.
+
+Exact approved AFTER is an independently verified read-only retry with no payload
+fetch, provider or receipt mutation, cache rewrite or journal arming. Near matches
+refuse. Results remain per package. If A commits and B fails, A remains completed;
+retry can reuse exact A AFTER and attempt only incomplete B under unchanged consent
+and authority. No mapping-wide atomicity or durable consent token is introduced.
+
+This transition does not permit adoption, downgrade, source or workload switching,
+workload upgrades or a force bypass. It adds no public option and enables no
+production authority, feed publication, general force or legacy removal.
 
 ### Qualification limits
 

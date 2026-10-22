@@ -13,6 +13,9 @@ internal sealed record BasicAcquisitionApproval(BasicAcquisitionPlan Plan, IRead
     public IReadOnlyList<BasicTemplateArtifact> Artifacts { get; } = BasicCompanionPlan.Freeze(
         Artifacts ?? throw new ArgumentNullException(nameof(Artifacts)));
 
+    public IReadOnlyList<BasicOwnedTemplateUpdate> Updates { get; init => field = Array.AsReadOnly(
+        (value ?? throw new ArgumentNullException(nameof(value))).ToArray()); } = [];
+
     public string? WorkloadInventory { get; init; }
 
     public void Validate(BasicAcquisitionPlan current)
@@ -30,7 +33,16 @@ internal sealed record BasicAcquisitionApproval(BasicAcquisitionPlan Plan, IRead
                 && pair.First.Candidates.Count == pair.Second.Candidates.Count
                 && pair.First.Candidates.Zip(pair.Second.Candidates).All(candidate => Same(candidate.First, candidate.Second)))
             || Artifacts.Count != current.Companions.Count
-            || current.Companions.Any(companion => Artifacts.Count(artifact => companion.Candidates.Any(candidate => Same(candidate, artifact))) != 1))
+            || current.Companions.Any(companion => Artifacts.Count(artifact => companion.Candidates.Any(candidate => Same(candidate, artifact))) != 1)
+            || Updates.Select(update => update.After.PackageId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != Updates.Count
+            || Updates.Any(update => !Artifacts.Any(artifact => Same(update.After, artifact))
+                || Plan.Owner is null || Plan.Owner != update.Before.Owner
+                || WorkloadInventory is null || WorkloadInventory != update.Before.WorkloadInventory
+                || string.IsNullOrWhiteSpace(update.Before.SelectedProjectIdentity)
+                || !update.After.ContentRoles.Any(role => role.Identity == update.Before.SelectedProjectIdentity
+                    && role.Role == NativeTemplateContentRole.AdditionalProject)
+                || !NuGet.Versioning.NuGetVersion.TryParse(update.Before.Archive.Version, out NuGet.Versioning.NuGetVersion? beforeVersion)
+                || NuGet.Versioning.VersionComparer.VersionRelease.Compare(update.After.Version, beforeVersion) <= 0))
         {
             throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
                 "The qualified acquisition plan changed after consent. Select and approve it again; no alternate artifact is authorized.");
@@ -43,6 +55,9 @@ internal sealed record BasicAcquisitionApproval(BasicAcquisitionPlan Plan, IRead
         BasicTemplateArtifact artifact = Artifacts.Single(artifact => companion.Candidates.Any(candidate => Same(candidate, artifact)));
         return companion with { Candidates = [artifact] };
     }
+
+    public BasicOwnedTemplateUpdate? UpdateFor(string packageId)
+        => Updates.SingleOrDefault(update => string.Equals(update.After.PackageId, packageId, StringComparison.OrdinalIgnoreCase));
 
     internal static bool Same(BasicTemplateArtifact left, BasicTemplateArtifact right)
         => left.PackageId == right.PackageId && left.Version == right.Version && left.Source == right.Source

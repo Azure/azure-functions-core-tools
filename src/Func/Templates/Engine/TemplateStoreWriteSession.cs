@@ -9,16 +9,19 @@ internal enum TemplateStoreTransactionState
     Committed,
     Restored,
     RecoveryRequired,
+    NoOp,
 }
 
 /// <summary>
 /// Runs one validated mutation under exclusive ownership, invalidating native capabilities before restoration.
 /// </summary>
-internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEngineContext context, IDisposable lease) : IDisposable
+internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEngineContext context, IDisposable lease,
+    bool requireCleanStore = false) : IDisposable
 {
     private readonly TemplateStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));
     private readonly IDisposable _lease = lease ?? throw new ArgumentNullException(nameof(lease));
+    private readonly bool _requireCleanStore = requireCleanStore;
     private readonly object _lifetimeGate = new();
     private LifetimeState _lifetime;
 
@@ -31,7 +34,8 @@ internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEng
     /// Failures propagate after restoration; inspect <see cref="State"/> for the recovery outcome.
     /// </summary>
     public async Task ExecuteAsync(Func<TemplateEngineSession, CancellationToken, Task> mutate,
-        Func<TemplateEngineSession, CancellationToken, Task> validate, CancellationToken cancellationToken)
+        Func<TemplateEngineSession, CancellationToken, Task> validate, CancellationToken cancellationToken,
+        Func<TemplateEngineSession, CancellationToken, Task<bool>>? admitBeforeSnapshot = null)
     {
         ArgumentNullException.ThrowIfNull(mutate);
         ArgumentNullException.ThrowIfNull(validate);
@@ -48,6 +52,25 @@ internal sealed class TemplateStoreWriteSession(TemplateStore store, TemplateEng
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (_requireCleanStore)
+            {
+                _store.ThrowIfRecoveryRequired();
+            }
+            if (admitBeforeSnapshot is not null)
+            {
+                using TemplateEngineSession admission = await _store.CreateAdmissionEngineAsync(_context, cancellationToken);
+                bool proceed = await admitBeforeSnapshot(admission, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!proceed)
+                {
+                    State = TemplateStoreTransactionState.NoOp;
+                    return;
+                }
+            }
+            if (_requireCleanStore)
+            {
+                _store.ThrowIfRecoveryRequired();
+            }
             await _store.SnapshotAsync(cancellationToken);
             State = TemplateStoreTransactionState.RecoveryRequired;
             TemplateEngineSession? engine = null;

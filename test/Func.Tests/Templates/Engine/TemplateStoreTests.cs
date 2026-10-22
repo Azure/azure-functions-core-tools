@@ -660,6 +660,55 @@ public sealed class TemplateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task StrictWriterAdmission_PendingJournal_RefusesBeforeRecoveryOrSnapshot()
+    {
+        var store = Store();
+        await InstallAsync(store);
+        var physical = new PhysicalFileSystem();
+        physical.CopyDirectory(store.Hive, store.Backup);
+        File.WriteAllText(Path.Combine(store.Hive, "uncommitted.txt"), "Preserve pending state.");
+        File.WriteAllText(store.Journal, "present");
+        var beforeHive = Bytes(store.Hive);
+        var beforeBackup = Bytes(store.Backup);
+        var beforeJournal = File.ReadAllBytes(store.Journal);
+        var loggerFactory = Substitute.For<ILoggerFactory>();
+
+        Func<Task> write = async () =>
+        {
+            using var unexpected = await new TemplateStore(new(_root), physical, new FileTemplateStoreLock(), loggerFactory)
+                .OpenWriteAsync(Context(), CancellationToken.None,
+                requireCleanStore: true);
+        };
+
+        await write.Should().ThrowAsync<TemplateStoreRecoveryRequiredException>();
+
+        Bytes(store.Hive).Should().BeEquivalentTo(beforeHive);
+        Bytes(store.Backup).Should().BeEquivalentTo(beforeBackup);
+        File.ReadAllBytes(store.Journal).Should().Equal(beforeJournal);
+        loggerFactory.DidNotReceive().CreateLogger(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task WriterAdmission_NoOp_DoesNotSnapshotOrArmRecovery()
+    {
+        var store = Store();
+        await InstallAsync(store);
+        var before = Bytes(store.Hive);
+        using var transaction = await store.OpenWriteAsync(Context(), CancellationToken.None, requireCleanStore: true);
+
+        await transaction.ExecuteAsync(
+            (_, _) => throw new InvalidOperationException("A read-only no-op must not mutate."),
+            (_, _) => throw new InvalidOperationException("A read-only no-op must not validate a mutation."),
+            CancellationToken.None,
+            (_, _) => Task.FromResult(false));
+
+        transaction.State.Should().Be(TemplateStoreTransactionState.NoOp);
+        Bytes(store.Hive).Should().BeEquivalentTo(before);
+        Directory.Exists(store.Backup).Should().BeFalse();
+        File.Exists(store.Journal).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ReadOnlyAdmission_CleanStore_PreservesLiveBytesAndRetainsSharedLease()
     {
         var store = Store();

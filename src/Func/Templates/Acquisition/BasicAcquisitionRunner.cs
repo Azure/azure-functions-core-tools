@@ -94,7 +94,11 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             List<BasicTemplateSelection> selected = [];
             foreach (BasicCompanionPlan companion in plan.Companions)
             {
-                selected.Add(await _templates.SelectAsync(request.Approval?.Bind(companion) ?? companion, context, cancellationToken));
+                BasicCompanionPlan bound = request.Approval?.Bind(companion) ?? companion;
+                BasicOwnedTemplateUpdate? update = request.Approval?.UpdateFor(companion.PackageId);
+                selected.Add(update is null
+                    ? await _templates.SelectAsync(bound, context, cancellationToken)
+                    : await _templates.RevalidateOwnedUpdateAsync(bound, update, context, cancellationToken));
             }
             if (request.NativeContext is not null)
             {
@@ -156,8 +160,9 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
             BasicAcquisitionPlan currentPlan = _planner.Plan(currentManifest, request, installed, source)
                 ?? throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged, "The prepared mapping no longer applies. Re-run explicit repair.");
             request.Approval?.Validate(currentPlan);
-            foreach (BasicTemplateSelection selection in selected)
+            for (int index = 0; index < selected.Count; index++)
             {
+                BasicTemplateSelection selection = selected[index];
                 BasicCompanionPlan companion = currentPlan.Companions.Single(c =>
                     string.Equals(c.PackageId, selection.Artifact.PackageId, StringComparison.OrdinalIgnoreCase));
                 if (!companion.Candidates.Any(candidate => BasicAcquisitionApproval.Same(candidate, selection.Artifact)))
@@ -166,12 +171,16 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
                         "Retained requirements now require different qualified bytes. Re-run explicit repair; no replacement was downloaded under the lease.");
                 }
 
-                BasicTemplateSelection actual = await _templates.SelectAsync(request.Approval?.Bind(companion) ?? companion, context, cancellationToken);
+                BasicOwnedTemplateUpdate? update = request.Approval?.UpdateFor(companion.PackageId);
+                BasicTemplateSelection actual = update is null
+                    ? await _templates.SelectAsync(request.Approval?.Bind(companion) ?? companion, context, cancellationToken)
+                    : await _templates.RevalidateOwnedUpdateAsync(request.Approval!.Bind(companion), update, context, cancellationToken);
                 if (!BasicAcquisitionApproval.Same(actual.Artifact, selection.Artifact) || (selection.Installed && !actual.Installed))
                 {
                     throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
                         "Companion content or ownership changed after preparation. Re-run explicit repair.");
                 }
+                selected[index] = actual;
             }
 
             foreach (PreparedBasicTemplate prepared in preparedTemplates)
