@@ -85,7 +85,7 @@ public class ForceConfirmationRegressionTests(ITestOutputHelper output)
 
         await AssertForceConfirmationAsync(service => new QuickstartCommand(
                 new QuickstartListCommand(service, resolver, manifestService, [provider]),
-                new QuickstartInfoCommand(service, resolver, manifestService),
+                new QuickstartInfoCommand(service, resolver, Substitute.For<IQuickstartCatalogService>(), new(service)),
                 service, resolver, manifestService, scaffolder, [provider]),
             stdoutInput, stdoutAnsi, stderrInput, stderrAnsi, response, CancellationToken.None);
 

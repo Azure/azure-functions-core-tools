@@ -26,21 +26,25 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
 
     private readonly IInteractionService _interaction;
     private readonly IQuickstartProviderResolver _resolver;
-    private readonly IQuickstartManifestService _manifestService;
+    private readonly IQuickstartCatalogService _catalogService;
+    private readonly QuickstartCatalogRenderer _renderer;
 
     public QuickstartInfoCommand(
         IInteractionService interaction,
         IQuickstartProviderResolver resolver,
-        IQuickstartManifestService manifestService)
+        IQuickstartCatalogService catalogService,
+        QuickstartCatalogRenderer renderer)
         : base("info", "Show detailed information about a template.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(resolver);
-        ArgumentNullException.ThrowIfNull(manifestService);
+        ArgumentNullException.ThrowIfNull(catalogService);
+        ArgumentNullException.ThrowIfNull(renderer);
 
         _interaction = interaction;
         _resolver = resolver;
-        _manifestService = manifestService;
+        _catalogService = catalogService;
+        _renderer = renderer;
 
         Arguments.Add(TemplateIdArgument);
         Options.Add(JsonOption);
@@ -51,21 +55,23 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
         string templateId = parseResult.GetValue(TemplateIdArgument)!;
         bool json = parseResult.GetValue(JsonOption);
 
-        QuickstartManifest manifest = await _interaction.ShowStatusAsync(
+        QuickstartCatalog catalog = await _interaction.ShowStatusAsync(
             QuickstartMessages.FetchingCatalogStatus,
-            _manifestService.GetManifestAsync,
+            ct => _catalogService.SearchAsync(new(), ct),
             cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        QuickstartEntry? entry = manifest.Entries.FirstOrDefault(e =>
-            string.Equals(e.Id, templateId, StringComparison.OrdinalIgnoreCase));
+        QuickstartCatalogEntry? item = catalog.Entries.FirstOrDefault(e =>
+            string.Equals(e.Entry.Id, templateId, StringComparison.OrdinalIgnoreCase));
 
-        if (entry is null)
+        if (item is null)
         {
             _interaction.WriteError(
                 $"Template '{templateId}' not found. " + QuickstartMessages.TemplateNotFoundHint);
             return 1;
         }
 
+        QuickstartEntry entry = item.Entry;
         IQuickstartProvider? provider = _resolver.FindProviderForLanguage(entry.Language);
         string displayLanguage = provider?.GetDisplayLanguage(entry.Language) ?? entry.Language;
 
@@ -86,36 +92,8 @@ internal sealed class QuickstartInfoCommand : FuncCliCommand
             return 0;
         }
 
-        _interaction.WriteLine(l => l.Heading($"{entry.DisplayName}"));
-        _interaction.WriteLine(l => l.Muted($"  ID:        {entry.Id}"));
-        _interaction.WriteLine(l => l.Muted($"  Language:  {displayLanguage}"));
-        _interaction.WriteLine(l => l.Muted($"  Resource:  {entry.Resource}"));
-        _interaction.WriteLine(l => l.Muted($"  IaC:       {entry.Iac ?? "none"}"));
-        _interaction.WriteLine(l => l.Muted($"  Git Ref:   {entry.GitRef ?? "-"}"));
-        _interaction.WriteLine(l => l.Muted($"  Repo:      {entry.RepositoryUrl}"));
-        _interaction.WriteLine(l => l.Muted($"  Path:      {entry.FolderPath}"));
-
-        if (entry.ShortDescription is not null)
-        {
-            _interaction.WriteBlankLine();
-            _interaction.WriteLine(l => l.Plain(entry.ShortDescription));
-        }
-
-        if (entry.LongDescription is not null)
-        {
-            _interaction.WriteBlankLine();
-            _interaction.WriteLine(l => l.Plain(entry.LongDescription));
-        }
-
-        if (entry.WhatsIncluded is { Count: > 0 })
-        {
-            _interaction.WriteBlankLine();
-            _interaction.WriteLine(l => l.Heading(QuickstartMessages.WhatsIncludedHeading));
-            foreach (string item in entry.WhatsIncluded)
-            {
-                _interaction.WriteLine(l => l.Muted($"{QuickstartMessages.StepBullet}{item}"));
-            }
-        }
+        _renderer.WriteProvenance(catalog.Provenance);
+        _renderer.WriteDetails(item, displayLanguage);
 
         _interaction.WriteBlankLine();
         string stack = provider?.Stack ?? entry.Language.ToLowerInvariant();

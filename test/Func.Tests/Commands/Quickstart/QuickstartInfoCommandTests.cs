@@ -12,9 +12,15 @@ public class QuickstartInfoCommandTests
 {
     private readonly TestInteractionService _interaction = new();
     private readonly IQuickstartProviderResolver _resolver = Substitute.For<IQuickstartProviderResolver>();
-    private readonly IQuickstartManifestService _manifestService = Substitute.For<IQuickstartManifestService>();
+    private readonly IQuickstartCatalogService _catalogService = Substitute.For<IQuickstartCatalogService>();
 
-    private QuickstartInfoCommand CreateCommand() => new(_interaction, _resolver, _manifestService);
+    private QuickstartInfoCommand CreateCommand() => new(_interaction, _resolver, _catalogService, new(_interaction));
+
+    private void SetEntries(params QuickstartEntry[] entries) =>
+        _catalogService.SearchAsync(Arg.Any<QuickstartCatalogQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new QuickstartCatalog(
+                entries.Select(entry => new QuickstartCatalogEntry(entry, QuickstartPackageMetadataStatus.Absent, null, null)).ToList(),
+                new(QuickstartCatalogOrigin.LocalFile, "test manifest", null)));
 
     [Fact]
     public void QuickstartInfoCommand_HasJsonOption()
@@ -34,8 +40,7 @@ public class QuickstartInfoCommandTests
     [Fact]
     public async Task Info_NotFound_ReturnsOne()
     {
-        _manifestService.GetManifestAsync(Arg.Any<CancellationToken>())
-            .Returns(new QuickstartManifest([]));
+        SetEntries();
 
         int exit = await InvokeAsync(CreateCommand(), "nonexistent");
 
@@ -47,8 +52,7 @@ public class QuickstartInfoCommandTests
     public async Task Info_FormattedOutput_ShowsEntryDetails()
     {
         QuickstartEntry entry = QuickstartTestHelpers.CreateEntry();
-        _manifestService.GetManifestAsync(Arg.Any<CancellationToken>())
-            .Returns(new QuickstartManifest([entry]));
+        SetEntries(entry);
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
         _resolver.FindProviderForLanguage("Python").Returns(provider);
@@ -67,8 +71,7 @@ public class QuickstartInfoCommandTests
     public async Task Info_Json_EmitsJsonInsteadOfFormatted()
     {
         QuickstartEntry entry = QuickstartTestHelpers.CreateEntry();
-        _manifestService.GetManifestAsync(Arg.Any<CancellationToken>())
-            .Returns(new QuickstartManifest([entry]));
+        SetEntries(entry);
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
         _resolver.FindProviderForLanguage("Python").Returns(provider);
@@ -89,8 +92,7 @@ public class QuickstartInfoCommandTests
     public async Task Info_Json_NoProvider_FallsBackToRawLanguage()
     {
         QuickstartEntry entry = QuickstartTestHelpers.CreateEntry(language: "FSharp");
-        _manifestService.GetManifestAsync(Arg.Any<CancellationToken>())
-            .Returns(new QuickstartManifest([entry]));
+        SetEntries(entry);
 
         _resolver.FindProviderForLanguage("FSharp").Returns((IQuickstartProvider?)null);
 
@@ -105,8 +107,7 @@ public class QuickstartInfoCommandTests
     public async Task Info_Json_NullIac_DefaultsToNone()
     {
         QuickstartEntry entry = QuickstartTestHelpers.CreateEntry(iac: null);
-        _manifestService.GetManifestAsync(Arg.Any<CancellationToken>())
-            .Returns(new QuickstartManifest([entry]));
+        SetEntries(entry);
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
         _resolver.FindProviderForLanguage("Python").Returns(provider);
@@ -123,8 +124,7 @@ public class QuickstartInfoCommandTests
     public async Task Info_CaseInsensitiveIdLookup()
     {
         QuickstartEntry entry = QuickstartTestHelpers.CreateEntry();
-        _manifestService.GetManifestAsync(Arg.Any<CancellationToken>())
-            .Returns(new QuickstartManifest([entry]));
+        SetEntries(entry);
 
         IQuickstartProvider provider = QuickstartTestHelpers.CreateProvider();
         _resolver.FindProviderForLanguage("Python").Returns(provider);

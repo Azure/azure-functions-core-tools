@@ -58,6 +58,36 @@ Only declared Functions project configuration actions participate in Func topolo
 
 ### Package installation remains explicit
 
+#### Read-only browse presentation
+
+The internal `IQuickstartBrowser.BrowseAsync(QuickstartBrowseRequest, CancellationToken)`
+is registered with DI for a later guided init caller. It does not add a public
+command or connect to init yet. It returns no template selector or authorization.
+It resolves stack IDs and aliases from installed `IProjectStack` capabilities,
+using the existing quickstart provider only to bridge legacy language spelling.
+The selected stack filters discovery metadata, not producer-declared project
+topology. No package name is used to infer a stack or exclude installed content.
+
+Interactive browsing lists metadata statuses, opens details only after explicit
+selection (even for a single result), and supports back, cancel, search, resource
+and IaC filter changes. Clearing filters retains the caller's stack/language
+context. Empty results remain navigable. Noninteractive browsing prints results
+without prompting or choosing a template and requires an explicit stack when
+multiple capabilities are installed. Catalog failures and cancellation propagate
+to the caller rather than becoming empty success.
+
+The same renderer enriches human-readable `func quickstart info <id>` with
+transport provenance, package metadata diagnostics and explicitly unverified
+package claims. Legacy list/info JSON shapes and the source scaffolding command
+remain unchanged. Evidence references and opaque project/workload summaries are
+displayed as claims only, never fetched or interpreted as approval. Stale metadata
+is visibly identified. The only permitted writes are those of the existing
+manifest metadata cache.
+
+Exact-artifact ownership, approval, consent, acquisition and fresh-init selection
+remain subsequent integration gates. This browser neither opens the installed
+template store nor provides an install/create action.
+
 #### Internal catalog preparation
 
 The CLI has an internal read-only catalog adapter alongside the legacy manifest
