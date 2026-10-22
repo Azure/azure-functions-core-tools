@@ -57,10 +57,14 @@ internal sealed class QuickstartQualification(IBasicCompanionCatalog catalog, Ba
         {
             throw Unqualified("The live stack owner is no longer uniquely installed. Select it again.");
         }
-        BasicAcquisitionRequest request = new(owner.LogicalPackage?.PackageId ?? owner.PackageId, stackVersion, query.Directory,
+        string stackId = owner.LogicalPackage?.PackageId ?? owner.PackageId;
+        NativeTemplateSelection selection = new(reference.TemplateIdentity,
+            new(reference.PackageId, reference.Version, digest.Digest), reference.Source, query.Owner, query.Channel);
+        BasicAcquisitionRequest request = new(stackId, stackVersion, query.Directory,
             reference.Source, IncludePrerelease: advertisedVersion.IsPrerelease)
         {
             NativeContext = new(owner, FuncTemplateEngineHost.Identifier, hostVersion, query.Channel, [NativeTemplateContentRole.AdditionalProject]),
+            OptionalChoices = BasicAcquisitionPlanner.IsOptional(manifest, stackId, stackVersion, reference.PackageId) ? [selection] : [],
         };
         BasicAcquisitionPlan plan = _planner.Plan(manifest, request, installed, reference.Source)
             ?? throw Unqualified("No qualified native association covers the selected stack.");
@@ -88,9 +92,7 @@ internal sealed class QuickstartQualification(IBasicCompanionCatalog catalog, Ba
             WorkloadInventory = WorkloadStateSnapshot.Capture(installed),
         };
         approval.Validate(plan);
-        return new(request with { Approval = approval },
-            new(reference.TemplateIdentity, new(nominated.PackageId, nominated.Version.ToNormalizedString(), nominated.Sha256),
-                nominated.Source, query.Owner, query.Channel));
+        return new(request with { Approval = approval }, selection);
     }
 
     private static BasicAcquisitionException Unqualified(string message) => new(BasicAcquisitionFailure.MissingMapping, message);

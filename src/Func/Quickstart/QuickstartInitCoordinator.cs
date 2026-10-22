@@ -80,6 +80,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         bool interactive = !input.NonInteractive && _interaction.IsInteractive;
         QualifiedQuickstart? qualified = null;
         NativeTemplateSelection? installedSelection = null;
+        BundledBasicSelection? bundledSelection = null;
         string? installedIdentity = input.TemplateReference;
         string stackName;
         QuickstartInstalledQuery query;
@@ -147,7 +148,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 {
                     using Templater flow = await _templates.CreateProjectAsync(new(input.WorkingDirectory) { RequireCleanStore = true },
                         scope.Availability, scope.Support, cancellationToken);
-                    installed = await flow.ProjectArtifactsAsync(scope.Verifier, query.Owner, query.Channel, cancellationToken);
+                    installed = await flow.ProjectArtifactsAsync(scope.Verifier, query.Owner, query.Channel, cancellationToken, scope.BundledVerifier);
                 }
                 catch (TemplateStoreRecoveryRequiredException) when (request.OfferBasicSelection)
                 {
@@ -175,6 +176,8 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                         : $"language {item.Entry.Language ?? "unspecified"}";
                     string binding = item.Selection is { } selection
                         ? $"bound to {selection.Owner.PackageId} {selection.Owner.Version}"
+                        : item.BundledSelection is { } bundled
+                        ? $"bundled by {bundled.Owner.PackageId} {bundled.Owner.Version}"
                         : "native binding not proven";
                     string package = item.Entry.Package is { } packageInfo
                         ? $"package {packageInfo.Identifier}"
@@ -201,6 +204,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                     {
                         installedIdentity = selected.Entry.Identity;
                         installedSelection = selected.Selection;
+                        bundledSelection = selected.BundledSelection;
                     }
                     else if (choice == Browse)
                     {
@@ -275,6 +279,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         {
             TemplateReference = qualified?.Selection.TemplateIdentity ?? installedIdentity,
             ArtifactBinding = qualified?.Selection ?? installedSelection,
+            BundledBinding = bundledSelection,
             RefreshCapabilities = true,
             ConfirmCreation = interactive,
         };

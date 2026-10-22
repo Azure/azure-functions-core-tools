@@ -47,6 +47,11 @@ internal sealed class BasicAcquisitionRunner(IBasicCompanionCatalog catalog, Bas
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (request.OptionalChoices.Count > 0 && request.Approval is null)
+            {
+                throw new BasicAcquisitionException(BasicAcquisitionFailure.PlanChanged,
+                    "Optional choices are selection intent, not acquisition consent. Approve the complete exact plan before acquiring packages.");
+            }
             BasicCompanionManifest manifest = await _catalog.LoadAsync(cancellationToken);
             revision = manifest.Revision;
             IReadOnlyList<WorkloadEntry> installed = await _workloads.GetWorkloadsAsync(cancellationToken);

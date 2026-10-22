@@ -9,7 +9,7 @@ using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates.Acquisition;
 
-public sealed class NativeTemplateAssociationTests
+public sealed partial class NativeTemplateAssociationTests
 {
     [Fact]
     public void Plan_ExplicitNativeAssociation_AllowsIndependentCompanionVersion()

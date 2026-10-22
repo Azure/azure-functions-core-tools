@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads.Storage;
+using Azure.Functions.Cli.Workloads.Install;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -17,6 +18,32 @@ namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed class ArtifactBindingContractTests
 {
+    [Theory]
+    [InlineData("bundles")]
+    [InlineData("workloads")]
+    [InlineData("fileSystem")]
+    public void BundledVerifier_NullDependency_RejectsProgrammerError(string dependency)
+    {
+        Action construct = () => _ = new BundledBasicArtifactVerifier(
+            dependency == "bundles" ? null! : Substitute.For<IBundledTemplateInstaller>(),
+            dependency == "workloads" ? null! : Substitute.For<IWorkloadStore>(),
+            dependency == "fileSystem" ? null! : Substitute.For<IFileSystem>());
+
+        construct.Should().Throw<ArgumentNullException>().WithParameterName(dependency);
+    }
+
+    [Fact]
+    public void BundledVerifier_NullSnapshotInputs_RejectsProgrammerError()
+    {
+        var verifier = new BundledBasicArtifactVerifier(Substitute.For<IBundledTemplateInstaller>(),
+            Substitute.For<IWorkloadStore>(), Substitute.For<IFileSystem>());
+        Action entries = () => verifier.ForInventory(null!, new Dictionary<NativeTemplateOwnerIdentity, string>());
+        Action directories = () => verifier.ForInventory([], null!);
+
+        entries.Should().Throw<ArgumentNullException>().WithParameterName("entries");
+        directories.Should().Throw<ArgumentNullException>().WithParameterName("runtimeDirectories");
+    }
+
     [Theory]
     [InlineData("catalog")]
     [InlineData("planner")]

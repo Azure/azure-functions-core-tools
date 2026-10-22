@@ -115,6 +115,7 @@ internal sealed class NativeTemplateArtifactVerifier(IBasicCompanionCatalog cata
         BasicAcquisitionRequest request = new(id, version, session.Context.CommandDirectory, selection.Source)
         {
             IncludePrerelease = selectedArtifactIsPrerelease,
+            OptionalChoices = BasicAcquisitionPlanner.IsOptional(manifest, id, version, selection.Artifact.PackageId) ? [selection] : [],
             NativeContext = new(owner, FuncTemplateEngineHost.Identifier, NuGetVersion.Parse(AssemblyCliVersionProvider.Instance.Version),
                 selection.Channel, [NativeTemplateContentRole.AdditionalProject]),
         };

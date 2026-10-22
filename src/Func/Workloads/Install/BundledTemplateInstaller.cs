@@ -30,6 +30,10 @@ internal interface IBundledTemplateInstaller
     public Task<WorkloadInstallResult> CommitAsync(PreparedBundledTemplates prepared,
         Func<CancellationToken, Task<WorkloadInstallResult>> admitWorkload, CancellationToken cancellationToken);
     public Task ValidateInstalledAsync(PreparedBundledTemplates prepared, CancellationToken cancellationToken);
+    public Task<IReadOnlyList<BasicTemplateArtifact>> ReadDeclarationsAsync(string directory, BundledTemplateOrigin origin,
+        CancellationToken cancellationToken);
+    public Task<BasicTemplateArtifact> GetValidatedEvidenceAsync(TemplateEngineSession session, BundledTemplateOrigin origin,
+        BasicTemplateArtifact expected, CancellationToken cancellationToken);
 }
 
 internal sealed record BundledTemplateOrigin(string PackageId, string Version, string Sha256, string Source,
@@ -75,64 +79,30 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
         {
             throw Invalid("Validated physical workload origin is required.");
         }
-        string? json = await _fileSystem.ReadAllTextIfExistsAsync(Path.Combine(directory, ManifestName), cancellationToken);
-        if (json is null)
+        if (await _fileSystem.ReadAllTextIfExistsAsync(Path.Combine(directory, ManifestName), cancellationToken) is null)
         {
             return null;
         }
-
-        BundledTemplatesManifest manifest;
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-            RejectDuplicates(document.RootElement);
-            manifest = JsonSerializer.Deserialize(json, BundledTemplateJsonContext.Default.BundledTemplatesManifest)
-                ?? throw Invalid("The manifest must be an object.");
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidWorkloadException($"Invalid {ManifestName}: {exception.Message}", exception);
-        }
-
-        if (manifest.SchemaVersion != 1 || manifest.Assets is null || manifest.Assets.Count == 0)
-        {
-            throw Invalid("A schemaVersion 1 manifest requires at least one asset.");
-        }
-
+        BundledTemplatesManifest manifest = await ReadManifestAsync(directory, cancellationToken);
+        IReadOnlyList<BasicTemplateArtifact> declarations = Declarations(manifest, origin);
         TempDirectory staging = _fileSystem.CreateTempDirectory();
         try
         {
             List<(string Archive, BasicTemplateArtifact Artifact)> assets = [];
-            HashSet<string> paths = new(StringComparer.OrdinalIgnoreCase);
-            HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
-            HashSet<string> identities = new(StringComparer.Ordinal);
-            foreach (BundledTemplateAsset asset in manifest.Assets)
+            for (int index = 0; index < declarations.Count; index++)
             {
-                if (asset is null || !IsRelativeAsset(asset.Path) || !paths.Add(asset.Path)
-                    || string.IsNullOrWhiteSpace(asset.PackageId) || !Regex.IsMatch(asset.PackageId, @"\A[A-Za-z0-9_.-]+\z")
-                    || !ids.Add(asset.PackageId) || !NuGetVersion.TryParse(asset.Version, out NuGetVersion? version)
-                    || asset.Sha256 is null || !Regex.IsMatch(asset.Sha256, @"\A[0-9a-fA-F]{64}\z")
-                    || asset.Templates is null || asset.Templates.Count == 0
-                    || asset.Templates.Any(template => template is null || string.IsNullOrWhiteSpace(template.Identity)
-                        || !identities.Add(template.Identity) || template.Type is not ("project" or "item")
-                        || string.IsNullOrWhiteSpace(template.Path)))
-                {
-                    throw Invalid("Asset paths, identities, versions, digests and complete template inventories must be valid and unique.");
-                }
-
-                string archive = Path.Combine(staging.Path, $"{assets.Count}.nupkg");
+                string archive = Path.Combine(staging.Path, $"{index}.nupkg");
                 try
                 {
-                    _fileSystem.CopyFile(Path.Combine(directory, asset.Path.Replace('/', Path.DirectorySeparatorChar)), archive);
+                    _fileSystem.CopyFile(Path.Combine(directory, manifest.Assets[index].Path.Replace('/', Path.DirectorySeparatorChar)), archive);
                 }
                 catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
                 {
-                    throw new InvalidWorkloadException($"Declared bundled archive '{asset.Path}' for '{asset.PackageId}' is missing. " +
+                    throw new InvalidWorkloadException($"Declared bundled archive '{manifest.Assets[index].Path}' for '{declarations[index].PackageId}' is missing. " +
                         "Preserve the installation and request explicit repair using its original complete workload artifact.", exception);
                 }
-                BasicTemplateArtifact artifact = new(asset.PackageId, version, origin.Source, asset.Sha256, origin.Sha256, asset.Templates);
+                BasicTemplateArtifact artifact = declarations[index];
                 await ValidateArtifactAsync(archive, artifact, cancellationToken);
-
                 assets.Add((archive, artifact));
             }
 
@@ -167,6 +137,99 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
             staging.Dispose();
             throw;
         }
+    }
+
+    private async Task<BundledTemplatesManifest> ReadManifestAsync(string directory, CancellationToken cancellationToken)
+    {
+        string? json = await _fileSystem.ReadAllTextIfExistsAsync(Path.Combine(directory, ManifestName), cancellationToken);
+        if (json is null)
+        {
+            throw Invalid("The declared bundled-template manifest is missing. Preserve the installation and request explicit repair.");
+        }
+
+        BundledTemplatesManifest manifest;
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            RejectDuplicates(document.RootElement);
+            manifest = JsonSerializer.Deserialize(json, BundledTemplateJsonContext.Default.BundledTemplatesManifest)
+                ?? throw Invalid("The manifest must be an object.");
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidWorkloadException($"Invalid {ManifestName}: {exception.Message}", exception);
+        }
+
+        if (manifest.SchemaVersion != 1 || manifest.Assets is null || manifest.Assets.Count == 0)
+        {
+            throw Invalid("A schemaVersion 1 manifest requires at least one asset.");
+        }
+
+        return manifest;
+    }
+
+    public async Task<IReadOnlyList<BasicTemplateArtifact>> ReadDeclarationsAsync(string directory, BundledTemplateOrigin origin,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        ArgumentNullException.ThrowIfNull(origin);
+        if (string.IsNullOrWhiteSpace(origin.PackageId) || !NuGetVersion.TryParse(origin.Version, out _)
+            || string.IsNullOrWhiteSpace(origin.Source) || origin.Sha256 is null || !Regex.IsMatch(origin.Sha256, @"\A[0-9a-fA-F]{64}\z"))
+        {
+            throw Invalid("Validated physical workload origin is required.");
+        }
+        BundledTemplatesManifest manifest = await ReadManifestAsync(directory, cancellationToken);
+        IReadOnlyList<BasicTemplateArtifact> declarations = Declarations(manifest, origin);
+        for (int index = 0; index < declarations.Count; index++)
+        {
+            string archive = Path.Combine(directory, manifest.Assets[index].Path.Replace('/', Path.DirectorySeparatorChar));
+            await ValidateArtifactAsync(archive, declarations[index], cancellationToken);
+        }
+        return declarations;
+    }
+
+    private static IReadOnlyList<BasicTemplateArtifact> Declarations(BundledTemplatesManifest manifest, BundledTemplateOrigin origin)
+    {
+        List<BasicTemplateArtifact> assets = [];
+        HashSet<string> paths = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> identities = new(StringComparer.Ordinal);
+        foreach (BundledTemplateAsset asset in manifest.Assets)
+        {
+            if (asset is null || !IsRelativeAsset(asset.Path) || !paths.Add(asset.Path)
+                || string.IsNullOrWhiteSpace(asset.PackageId) || !Regex.IsMatch(asset.PackageId, @"\A[A-Za-z0-9_.-]+\z")
+                || !ids.Add(asset.PackageId) || !NuGetVersion.TryParse(asset.Version, out NuGetVersion? version)
+                || asset.Sha256 is null || !Regex.IsMatch(asset.Sha256, @"\A[0-9a-fA-F]{64}\z")
+                || asset.Templates is null || asset.Templates.Count == 0
+                || asset.Templates.Any(template => template is null || string.IsNullOrWhiteSpace(template.Identity)
+                    || !identities.Add(template.Identity) || template.Type is not ("project" or "item")
+                    || string.IsNullOrWhiteSpace(template.Path)))
+            {
+                throw Invalid("Asset paths, identities, versions, digests and complete template inventories must be valid and unique.");
+            }
+
+            BasicTemplateArtifact artifact = new(asset.PackageId, version, origin.Source, asset.Sha256, origin.Sha256, asset.Templates);
+            assets.Add(artifact);
+        }
+        return BasicCompanionPlan.Freeze(assets);
+    }
+
+    public async Task<BasicTemplateArtifact> GetValidatedEvidenceAsync(TemplateEngineSession session, BundledTemplateOrigin origin,
+        BasicTemplateArtifact expected, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(origin);
+        ArgumentNullException.ThrowIfNull(expected);
+        session.ThrowIfDisposed();
+        if (!session.Context.RequireCleanStore)
+        {
+            throw Invalid("Bundled evidence requires a clean read-only native scope.");
+        }
+        if (!await CheckIncumbentAsync(session, origin, expected, cancellationToken))
+        {
+            throw Invalid($"Required package '{expected.PackageId}' is not registered. Request explicit workload repair.");
+        }
+        return expected with { };
     }
 
     public async Task<WorkloadInstallResult> CommitAsync(PreparedBundledTemplates prepared,
@@ -256,6 +319,11 @@ internal sealed class BundledTemplateInstaller(ITemplateStore store, IBasicArtif
         BundledTemplateOwner? owner;
         try
         {
+            if (receipt is not null)
+            {
+                using var document = JsonDocument.Parse(receipt);
+                RejectDuplicates(document.RootElement);
+            }
             owner = receipt is null ? null : JsonSerializer.Deserialize(receipt, BundledTemplateJsonContext.Default.BundledTemplateOwner);
         }
         catch (JsonException exception)

@@ -19,13 +19,14 @@ namespace Azure.Functions.Cli.Hosting;
 /// Rebuilds bound-init capabilities from one post-acquisition workload registration, not the original command container.
 /// </summary>
 internal sealed class BoundInitScopeFactory(WorkloadPathsOptions paths, IWorkloadStore workloads, IInteractionService interaction,
-    IFileSystem fileSystem, NativeTemplateArtifactVerifier verifier) : IBoundInitScopeFactory
+    IFileSystem fileSystem, NativeTemplateArtifactVerifier verifier, BundledBasicArtifactVerifier? bundledVerifier = null) : IBoundInitScopeFactory
 {
     private readonly WorkloadPathsOptions _paths = paths ?? throw new ArgumentNullException(nameof(paths));
     private readonly IWorkloadStore _workloads = workloads ?? throw new ArgumentNullException(nameof(workloads));
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
     private readonly NativeTemplateArtifactVerifier _verifier = verifier ?? throw new ArgumentNullException(nameof(verifier));
+    private readonly BundledBasicArtifactVerifier? _bundledVerifier = bundledVerifier;
 
     public async Task<BoundInitScope> CreateAsync(CancellationToken cancellationToken)
     {
@@ -46,6 +47,7 @@ internal sealed class BoundInitScopeFactory(WorkloadPathsOptions paths, IWorkloa
         {
             cancellationToken.ThrowIfCancellationRequested();
             List<WorkloadEntry> usableRuntimeOwners = [];
+            Dictionary<NativeTemplateOwnerIdentity, string> runtimeDirectories = [];
             foreach (RuntimeWorkloadInfo runtime in loaded.OfType<RuntimeWorkloadInfo>())
             {
                 WorkloadEntry[] matches = [.. entries.Where(entry => entry.Kind == WorkloadKind.Workload
@@ -54,6 +56,7 @@ internal sealed class BoundInitScopeFactory(WorkloadPathsOptions paths, IWorkloa
                 if (matches.Length == 1)
                 {
                     usableRuntimeOwners.Add(matches[0]);
+                    runtimeDirectories.Add(NativeTemplateOwnerIdentity.FromEntry(matches[0]), runtime.InstallDirectory);
                 }
             }
             TemplateConstraintEvaluationSnapshot availability = new([.. entries.Select(entry =>
@@ -88,6 +91,7 @@ internal sealed class BoundInitScopeFactory(WorkloadPathsOptions paths, IWorkloa
                 provider.GetRequiredService<TemplateProjectSupport>(), _verifier.ForInventory(entries, usableRuntimeOwners), lifetime)
             {
                 StackOwners = owners,
+                BundledVerifier = _bundledVerifier?.ForInventory(entries, runtimeDirectories),
             };
         }
         catch

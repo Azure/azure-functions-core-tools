@@ -26,6 +26,8 @@ internal sealed class BoundInitScope(TemplateConstraintEvaluationSnapshot availa
     public TemplateProjectSupport Support { get; } = support ?? throw new ArgumentNullException(nameof(support));
     public NativeTemplateArtifactVerifier Verifier { get; } = verifier ?? throw new ArgumentNullException(nameof(verifier));
 
+    public BundledBasicArtifactVerifier? BundledVerifier { get; init; }
+
     public IReadOnlyDictionary<string, WorkloadEntry> StackOwners { get; init; } = new Dictionary<string, WorkloadEntry>();
 
     public void Dispose() => _lifetime.Dispose();

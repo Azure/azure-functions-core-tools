@@ -32,7 +32,7 @@ internal sealed class QuickstartInstalledTemplates(ITemplaterFactory templates, 
         using Templater templater = await _templates.CreateProjectAsync(new(query.Directory) { RequireCleanStore = true },
             scope.Availability, scope.Support, cancellationToken);
         IReadOnlyList<InstalledTemplateArtifact> installed = await templater.ProjectArtifactsAsync(
-            scope.Verifier, query.Owner, query.Channel, cancellationToken);
+            scope.Verifier, query.Owner, query.Channel, cancellationToken, scope.BundledVerifier);
         cancellationToken.ThrowIfCancellationRequested();
         return new(catalog with
         {

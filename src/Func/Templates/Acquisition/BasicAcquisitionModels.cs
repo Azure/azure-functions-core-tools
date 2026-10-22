@@ -22,12 +22,25 @@ internal sealed record BasicStackMapping(string PackageId, VersionRange Versions
 internal sealed record BasicCompanionRequirement(string PackageId, VersionRange Versions)
 {
     public IReadOnlyList<NativeTemplateContentRole> RequiredRoles { get; init; } = [];
+
+    public BasicCompanionKind Kind { get; init; }
+}
+
+internal enum BasicCompanionKind
+{
+    Required,
+    Optional,
 }
 
 internal sealed record NativeTemplateAssociationPolicy(string HostIdentifier, VersionRange EngineHostVersions, IReadOnlyList<BundleChannel> Channels);
 
 internal sealed record NativeTemplateAssociationContext(WorkloadEntry SelectedStack, string HostIdentifier,
-    NuGetVersion EngineHostVersion, BundleChannel? Channel, IReadOnlyList<NativeTemplateContentRole> RequiredRoles);
+    NuGetVersion EngineHostVersion, BundleChannel? Channel, IReadOnlyList<NativeTemplateContentRole> RequiredRoles)
+{
+    public IReadOnlyList<NativeTemplateContentRole> RequiredRoles { get; init => field = Array.AsReadOnly(
+        (value ?? throw new ArgumentNullException(nameof(value))).ToArray()); } = Array.AsReadOnly(
+        (RequiredRoles ?? throw new ArgumentNullException(nameof(RequiredRoles))).ToArray());
+}
 
 internal enum NativeTemplateContentRole
 {
@@ -38,20 +51,56 @@ internal enum NativeTemplateContentRole
 internal sealed record BasicTemplateArtifact(string PackageId, NuGetVersion Version, string Source, string Sha256,
     string ContentRevision, IReadOnlyList<BasicTemplateDefinition> Templates)
 {
-    public IReadOnlyList<NativeTemplateContentDeclaration> ContentRoles { get; init; } = [];
+    public IReadOnlyList<BasicTemplateDefinition> Templates
+    {
+        get;
+        init => field = Array.AsReadOnly<BasicTemplateDefinition>([.. value ?? throw new ArgumentNullException(nameof(value))]);
+    } = Array.AsReadOnly<BasicTemplateDefinition>([.. Templates ?? throw new ArgumentNullException(nameof(Templates))]);
+
+    public IReadOnlyList<NativeTemplateContentDeclaration> ContentRoles
+    {
+        get;
+        init => field = Array.AsReadOnly<NativeTemplateContentDeclaration>([.. value ?? throw new ArgumentNullException(nameof(value))]);
+    } = [];
 }
 
 internal sealed record NativeTemplateContentDeclaration(string Identity, NativeTemplateContentRole Role);
 
 internal sealed record BasicTemplateDefinition(string Path, string Identity, string Type);
-internal sealed record BasicCompanionPlan(string PackageId, VersionRange Versions, IReadOnlyList<BasicTemplateArtifact> Candidates);
+internal sealed record BasicCompanionPlan(string PackageId, VersionRange Versions, IReadOnlyList<BasicTemplateArtifact> Candidates)
+{
+    public IReadOnlyList<BasicTemplateArtifact> Candidates { get; init => field = Freeze(value); } = Freeze(Candidates);
 
-internal sealed record BasicAcquisitionPlan(string Revision, string Source, IReadOnlyList<BasicCompanionPlan> Companions);
+    internal static IReadOnlyList<BasicTemplateArtifact> Freeze(IReadOnlyList<BasicTemplateArtifact> artifacts)
+    {
+        ArgumentNullException.ThrowIfNull(artifacts);
+        return Array.AsReadOnly<BasicTemplateArtifact>([.. artifacts]);
+    }
+}
+
+internal sealed record BasicAcquisitionPlan(string Revision, string Source, IReadOnlyList<BasicCompanionPlan> Companions)
+{
+    public IReadOnlyList<BasicCompanionPlan> Companions { get; } = Array.AsReadOnly(
+        (Companions ?? throw new ArgumentNullException(nameof(Companions))).ToArray());
+
+    public IReadOnlyList<NativeTemplateSelection> OptionalChoices { get; init => field = Array.AsReadOnly(
+        (value ?? throw new ArgumentNullException(nameof(value))).ToArray()); } = [];
+
+    public NativeTemplateOwnerIdentity? Owner { get; init; }
+    public string? HostIdentifier { get; init; }
+    public NuGetVersion? EngineHostVersion { get; init; }
+    public BundleChannel? Channel { get; init; }
+    public IReadOnlyList<NativeTemplateContentRole> RequiredRoles { get; init => field = Array.AsReadOnly(
+        (value ?? throw new ArgumentNullException(nameof(value))).ToArray()); } = [];
+}
 
 internal sealed record BasicAcquisitionRequest(string StackPackageId, NuGetVersion StackVersion, WorkingDirectory Directory,
     string? Source = null, bool Check = false, bool Offline = false, bool IncludePrerelease = false)
 {
     public NativeTemplateAssociationContext? NativeContext { get; init; }
+
+    public IReadOnlyList<NativeTemplateSelection> OptionalChoices { get; init => field = Array.AsReadOnly(
+        (value ?? throw new ArgumentNullException(nameof(value))).ToArray()); } = [];
 
     public BasicAcquisitionApproval? Approval { get; init; }
 }
