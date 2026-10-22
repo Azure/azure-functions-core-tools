@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -77,11 +78,19 @@ internal sealed record TemplateEngineBundleContext
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        if (!NuGetVersion.TryParse(version, out NuGetVersion? resolvedVersion))
+        {
+            throw new ArgumentException("The resolved bundle version must be a NuGet version, not a version range.", nameof(version));
+        }
+
         Id = id;
         Version = version;
+        ResolvedVersion = resolvedVersion;
     }
 
     public string Id { get; }
 
     public string Version { get; }
+
+    public NuGetVersion ResolvedVersion { get; }
 }

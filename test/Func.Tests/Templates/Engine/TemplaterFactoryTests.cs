@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
+using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -28,7 +29,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Create_BindsTheSuppliedContext()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem());
         TemplateEngineContext context = Context("command");
 
         using Templater templater = factory.Create(context);
@@ -40,7 +41,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_ReadsTemplatesFromTemplatesDirectoryUnderFuncHome()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem());
 
         using Templater templater = factory.Create(Context("command"));
         IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
@@ -52,7 +53,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_EachCallReturnsAnIndependentTemplater()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem());
         Templater first = factory.Create(Context("first"));
         using Templater second = factory.Create(Context("second"));
 
@@ -65,19 +66,62 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Create_NullContext_Throws()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem());
 
         Action act = () => factory.Create(null!);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("context");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Create_SuppliedSnapshot_ControlsConstraintEligibility(bool usable)
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteJourneyPackage(_root), Path.Combine(Home, "templates"));
+        ITemplaterFactory factory = new TemplaterFactory(new(Home), new PhysicalFileSystem());
+        var snapshot = new TemplateConstraintEvaluationSnapshot([new("node-package", NuGetVersion.Parse("1.0"), ["node"], usable)]);
+
+        using Templater templater = factory.Create(Context("snapshot"), snapshot);
+        var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+
+        entries.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(usable
+            ? TemplateConstraintEvaluationStatus.Eligible
+            : TemplateConstraintEvaluationStatus.Restricted);
+    }
+
+    [Fact]
+    public void Create_SnapshotOverloadNullContext_Throws()
+    {
+        ITemplaterFactory factory = new TemplaterFactory(new(Home), new PhysicalFileSystem());
+        Action action = () => factory.Create(null!, new([]));
+
+        action.Should().Throw<ArgumentNullException>().WithParameterName("context");
+    }
+
+    [Fact]
+    public void Create_NullSnapshot_Throws()
+    {
+        ITemplaterFactory factory = new TemplaterFactory(new(Home), new PhysicalFileSystem());
+        Action action = () => factory.Create(Context("snapshot"), null!);
+
+        action.Should().Throw<ArgumentNullException>().WithParameterName("snapshot");
+    }
+
     [Fact]
     public void Constructor_NullConfigurationPaths_Throws()
     {
-        Action act = () => _ = new TemplaterFactory(null!);
+        Action act = () => _ = new TemplaterFactory(null!, new PhysicalFileSystem());
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("configurationPaths");
+    }
+
+    [Fact]
+    public void Constructor_NullFileSystem_Throws()
+    {
+        Action create = () => _ = new TemplaterFactory(new(Home), null!);
+
+        create.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
     }
 
     private async Task InstallFixturesUnderHomeAsync()
