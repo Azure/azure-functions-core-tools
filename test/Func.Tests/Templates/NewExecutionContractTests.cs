@@ -146,4 +146,31 @@ public sealed class NewExecutionContractTests
 
         result.HasCompletedCreation.Should().Be(completed);
     }
+
+    [Theory]
+    [InlineData("created", true, "Success", false, true)]
+    [InlineData("created", false, "Success", false, false)]
+    [InlineData("created", true, "Failed", true, false)]
+    [InlineData("invocationFailed", false, "Failed", true, true)]
+    [InlineData("invocationFailed", false, "EngineFailure", true, true)]
+    [InlineData("invocationFailed", false, "FileConflict", true, true)]
+    [InlineData("invocationFailed", false, "Failed", false, false)]
+    [InlineData("invocationFailed", false, "FileConflict", false, false)]
+    [InlineData("invocationFailed", true, "Failed", true, false)]
+    [InlineData("invocationFailed", false, null, true, false)]
+    [InlineData("previewed", true, "Success", true, false)]
+    [InlineData("listed", true, "Success", true, false)]
+    [InlineData("invalidArguments", false, "Failed", true, false)]
+    public void CreationOutcome_PreservesCommittedFailureWithoutTreatingPlansAsCompletion(
+        string kind, bool succeeded, string? status, bool committed, bool retained)
+    {
+        NewExecutionResult result = new(kind, succeeded)
+        {
+            Invocation = status is not null ? new(Enum.Parse<TemplateInvocationStatus>(status),
+                [new("planned.txt", TemplateFileChangeKind.Create)], "A diagnostic is not proof of commitment.")
+                { HasCommittedOutput = committed } : null,
+        };
+
+        result.HasCreationOutcome.Should().Be(retained);
+    }
 }

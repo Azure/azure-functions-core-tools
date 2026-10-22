@@ -54,6 +54,65 @@ public sealed class InitExecutionJourneyTests : IDisposable
     private string Home => Path.Combine(_root, "home");
     private string Package => Path.Combine(_root, "package");
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Runner_ProductionRegistrations_PreviewsOrCreatesWithPairedSupport(bool dryRun)
+    {
+        WriteProject("composition", Low, parameters: Parameters);
+        await InstallAsync();
+        var before = SnapshotHome();
+        var builder = CliHostFactory.CreateBuilder(_interaction);
+        builder.Services.AddSingleton(new CliConfigurationPathsOptions(Home));
+        new NodeWorkload().Configure(new DefaultFunctionsCliBuilder(builder.Services, TestWorkloads.CreateInfo("Controlled.Node")));
+        ServiceProvider provider = builder.Services.BuildServiceProvider();
+        _providers.Add(provider);
+        var scope = provider.CreateScope();
+        _scopes.Add(scope);
+        var runner = scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>();
+        InitExecutionRequest request = new(WorkingDirectory.FromExplicit(Target), Low, "ComposedProject", "node", "javascript",
+            false, true, dryRun, false, ["--Greeting", "Hello", "--Auth", "function", "--Enabled", "true"],
+            new HashSet<string>(StringComparer.Ordinal));
+
+        var result = await runner.ExecuteAsync(request,
+            new([new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true)]), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        result.Kind.Should().Be(dryRun ? "previewed" : "created");
+        result.SelectedTemplate!.Identity.Should().Be(Low);
+        result.Context!.Project!.RootDirectory.Info.FullName.Should().Be(Target);
+        result.Context.Project.Stack.Should().BeNull();
+        result.Context.Project.Language.Should().BeNull();
+        result.Preview!.Status.Should().Be(TemplateInvocationStatus.Success);
+        result.Preview.ProjectConfigurations.Should()
+            .Equal(new TemplateProjectConfigurationPlan(Path.Combine(Target, "host.json"), "node", "JavaScript"));
+        result.Preview.ConfiguredProjects.Should().BeEmpty();
+        var support = provider.GetRequiredService<TemplateProjectSupport>();
+        support.Planner.Should().BeSameAs(provider.GetRequiredService<TemplateProjectConfigurationPlanner>());
+        support.Writer.Should().BeSameAs(provider.GetRequiredService<TemplateProjectConfigurationWriter>());
+        scope.ServiceProvider.GetRequiredService<TemplateProjectSupport>().Should().BeSameAs(support);
+        provider.GetRequiredService<Func<TemplateProjectSupport>>()().Should().BeSameAs(support);
+        provider.GetRequiredService<ITemplaterFactory>().Should().BeOfType<TemplaterFactory>();
+        if (dryRun)
+        {
+            result.Invocation.Should().BeNull();
+            Directory.Exists(Target).Should().BeFalse();
+            SnapshotHome().Should().BeEquivalentTo(before);
+        }
+        else
+        {
+            result.Invocation!.Status.Should().Be(TemplateInvocationStatus.Success);
+            result.Invocation.HasCommittedOutput.Should().BeTrue();
+            result.Invocation.ConfiguredProjects.Should().Equal(Target);
+            File.ReadAllText(Path.Combine(Target, "host.json")).Should().Be("""{"version":"2.0"}""");
+            File.ReadAllText(Path.Combine(Target, "context.txt")).Should()
+                .Be($"ComposedProject|Hello|function|True|leave|{Target}|{Target}|no-stack|no-language");
+            using var configuration = JsonDocument.Parse(File.ReadAllText(Path.Combine(Target, ".func", "config.json")));
+            configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+            configuration.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be("JavaScript");
+        }
+    }
+
     [Fact]
     public async Task Command_RealInstalledProject_PreviewsThenCreatesCanonicalConfigurationAndReadableProject()
     {
@@ -1299,7 +1358,6 @@ public sealed class InitExecutionJourneyTests : IDisposable
             services.AddSingleton(new TemplateProjectConfigurationWriter(writerFileSystem));
         }
 
-        services.AddSingleton<TemplateProjectSupport>();
         int supportRequests = 0;
         int catalogRequests = 0;
         services.AddSingleton<Func<InstalledProjectStackCatalog>>(provider => () =>
