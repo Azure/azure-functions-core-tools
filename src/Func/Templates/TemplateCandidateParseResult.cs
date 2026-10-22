@@ -7,7 +7,8 @@ using Azure.Functions.Cli.Templates.Engine;
 namespace Azure.Functions.Cli.Templates;
 
 /// <summary>
-/// Carries canonical values, effective aliases and distinct invalid-input, authoring and unresolved-required diagnostics.
+/// Contains values keyed by canonical template parameter name, the aliases used for parsing, input errors,
+/// template-definition errors, and required parameters still missing values.
 /// </summary>
 internal sealed record TemplateCandidateParseResult(
     string TemplateIdentity,
@@ -22,13 +23,14 @@ internal sealed record TemplateCandidateParseResult(
     public bool IsArgumentCompatible => InvalidInputDiagnostics.Count == 0 && DefinitionDiagnostics.Count == 0;
 
     /// <summary>
-    /// Gets whether this projected schema is complete. Native preview still performs authoritative engine validation.
+    /// Gets whether parsing succeeded and all required parameters have values.
+    /// The template engine still validates them during preview.
     /// </summary>
     public bool IsComplete => IsArgumentCompatible && MissingRequiredParameters.Count == 0;
 }
 
 /// <summary>
-/// Pairs a canonical definition with the aliases used consistently by parsing, help and required-value prompting.
+/// Stores a template parameter definition and its aliases for parsing, help, and prompts.
 /// </summary>
 internal sealed record TemplateArgumentParameter(TemplateParameterDefinition Definition, string LongAlias, string? ShortAlias);
 
