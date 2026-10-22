@@ -7,11 +7,27 @@
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Workloads/Sdk/Workloads.Sdk.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/DotNet/Workloads.DotNet.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(TestRoot)Fixtures/Workloads.Tests.BundledTemplates/Workloads.Tests.BundledTemplates.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Build.Framework" />
     <PackageReference Include="Microsoft.Build.Utilities.Core" />
   </ItemGroup>
+
+  <Target Name="PackBundledTemplatesForTests" AfterTargets="Build">
+    <Delete Files="$(OutDir)bundled-templates-artifacts/node/Azure.Functions.Cli.Workloads.Node.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.win-x64.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture-repeat/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture-repeat/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.win-x64.7.8.9-pack-fixture.nupkg" />
+    <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" Targets="Pack" BuildInParallel="false"
+      Properties="Configuration=$(Configuration);NoBuild=true;PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/node" />
+    <!-- Solution references can build this unlisted fixture as Debug. Pack must build its requested configuration and RIDs. -->
+    <MSBuild Projects="$(TestRoot)Fixtures/Workloads.Tests.BundledTemplates/Workloads.Tests.BundledTemplates.csproj" Targets="Pack" BuildInParallel="false"
+      Properties="Configuration=$(Configuration);PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture" />
+    <MSBuild Projects="$(TestRoot)Fixtures/Workloads.Tests.BundledTemplates/Workloads.Tests.BundledTemplates.csproj" Targets="Pack" BuildInParallel="false"
+      Properties="Configuration=$(Configuration);PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture-repeat" />
+    <Delete Files="$(OutDir)bundled-templates-artifacts/fixture-interleaved/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture-interleaved/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.win-x64.7.8.9-pack-fixture.nupkg;$(OutDir)bundled-templates-artifacts/fixture-interleaved-other/Azure.Functions.Cli.Workloads.Tests.BundledTemplates.win-x64.8.9.10-pack-interleaving.nupkg" />
+    <MSBuild Projects="$(TestRoot)Fixtures/Workloads.Tests.BundledTemplates/Workloads.Tests.BundledTemplates.csproj" Targets="Pack" BuildInParallel="false"
+      Properties="Configuration=$(Configuration);PackageVersion=7.8.9-pack-fixture;PackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture-interleaved;InterleavedPackageVersion=8.9.10-pack-interleaving;InterleavedPackageOutputPath=$(OutDir)bundled-templates-artifacts/fixture-interleaved-other" />
+  </Target>
 
 </Project>

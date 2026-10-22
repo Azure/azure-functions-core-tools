@@ -12,5 +12,6 @@
   <Import Project="$(MSBuildThisFileDirectory)WorkloadDebug.targets" />
 
   <Import Project="$(MSBuildThisFileDirectory)Workloads/Workload.targets" Condition="'$(PackAsWorkload)' == 'true'" />
+  <Import Project="$(MSBuildThisFileDirectory)Workloads/Workload.BundledTemplates.targets" Condition="'$(_BundledTemplatesArchiveToProduce)' != ''" />
 
 </Project>

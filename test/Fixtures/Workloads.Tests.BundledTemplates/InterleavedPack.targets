@@ -1,0 +1,9 @@
+<Project>
+  <!-- Complete another version's real pack before the first outer archive consumes its declaration and native bytes. -->
+  <Target Name="InterleaveBundledTemplatesPack" AfterTargets="_PackBundledTemplates"
+    Condition="'$(WorkloadKind)' == 'workload' AND '$(InterleavedPackageVersion)' != ''">
+    <Error Condition="'$(InterleavedPackageOutputPath)' == ''" Text="InterleavedPackageOutputPath must be set for the pack regression fixture." />
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Pack" BuildInParallel="false"
+      Properties="Configuration=$(Configuration);PackageVersion=$(InterleavedPackageVersion);PackageOutputPath=$(InterleavedPackageOutputPath);InterleavedPackageVersion=" />
+  </Target>
+</Project>
