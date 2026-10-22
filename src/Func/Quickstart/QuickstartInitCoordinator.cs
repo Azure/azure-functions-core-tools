@@ -104,8 +104,13 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
             {
                 return InitExecutionResult.ContinueWithLegacyInitializer();
             }
-            IProjectStack? stack = await SelectStackAsync(scope.Catalog, input.ExplicitStack, interactive,
+            (IProjectStack? Stack, bool Canceled) stackSelection = await SelectStackAsync(scope.Catalog, input.ExplicitStack, interactive,
                 nativeStacks, ownedStacks, cancellationToken);
+            if (request.OfferBasicSelection && stackSelection.Canceled)
+            {
+                return DefaultSelectionCanceled();
+            }
+            IProjectStack? stack = stackSelection.Stack;
             if (stack is null)
             {
                 if (request.OfferBasicSelection)
@@ -299,30 +304,30 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         return await _init.ExecuteAsync(execution, new([]), cancellationToken);
     }
 
-    private async Task<IProjectStack?> SelectStackAsync(InstalledProjectStackCatalog catalog, string? requested,
+    private async Task<(IProjectStack? Stack, bool Canceled)> SelectStackAsync(InstalledProjectStackCatalog catalog, string? requested,
         bool interactive, IReadOnlySet<string>? nativeStacks, IReadOnlySet<string>? ownedStacks, CancellationToken cancellationToken)
     {
         if (requested is not null)
         {
             if (string.IsNullOrWhiteSpace(requested))
             {
-                return null;
+                return (null, false);
             }
             IProjectStack? found = catalog.FindStack(requested);
-            return found is not null && (nativeStacks is null || nativeStacks.Contains(found.Stack))
-                && (ownedStacks is null || ownedStacks.Contains(found.Stack)) ? found : null;
+            return (found is not null && (nativeStacks is null || nativeStacks.Contains(found.Stack))
+                && (ownedStacks is null || ownedStacks.Contains(found.Stack)) ? found : null, false);
         }
         IProjectStack[] available = [.. catalog.Stacks.Where(stack =>
             (nativeStacks is null || nativeStacks.Contains(stack.Stack))
             && (ownedStacks is null || ownedStacks.Contains(stack.Stack)))];
         if (!interactive || available.Length == 0)
         {
-            return null;
+            return (null, false);
         }
         Dictionary<string, IProjectStack> choices = available.ToDictionary(stack => $"{stack.DisplayName} ({stack.Stack})", StringComparer.Ordinal);
         string selected = await _interaction.PromptForSelectionAsync("Select a project stack:", choices.Keys.Append(Cancel), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return choices.GetValueOrDefault(selected);
+        return selected == Cancel ? (null, true) : (choices.GetValueOrDefault(selected), false);
     }
 
     private void WritePlan(QualifiedQuickstart qualified, InitExecutionRequest input)
@@ -349,4 +354,7 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
     }
 
     private static InitExecutionResult Canceled() => InitExecutionResult.Reject("canceled", "Guided init canceled before acquisition or project writes.");
+
+    private static InitExecutionResult DefaultSelectionCanceled()
+        => InitExecutionResult.Reject("canceled", "Project template selection canceled before acquisition or project writes.");
 }

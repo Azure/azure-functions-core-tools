@@ -1,9 +1,18 @@
 ## Current staged integration
 
-`func init MyConnector --guided` opts into stack selection, installed project
-templates and **Browse more templates**. Ordinary `func init MyConnector` still
-uses the existing workload initializer. This is not the default-init migration.
-The existing `func quickstart` commands remain available.
+An eligible interactive fresh-target `func init MyConnector` now offers stack
+selection, **Basic Functions app**, visible installed project templates and
+**Browse more templates**. Basic delegates to the existing workload initializer
+with the original parsed arguments. Installed templates and Browse use the
+existing coordinator, with exact binding and qualified acquisition where
+applicable. Canceling either selection stops before project creation.
+
+The default menu requires a uniquely owned installed native stack. Scripts,
+initializer-specific options, `--force`, existing or nonempty targets, and
+unsupported or unavailable ownership retain the legacy initializer dispatch.
+Explicit `--guided` remains the opt-in adapter for its staged flags; this narrow
+default-dispatch layer does not migrate all initializer parameters or force
+semantics. The existing `func quickstart` commands remain available.
 
 The guided route uses the same browser, with an explicit **Use this template**
 result. Default browsing remains read-only and never selects even a single
@@ -55,12 +64,12 @@ Dry-run never acquires, registers, repairs, recovers or cleans. A discovery
 selection without installed payload reports metadata intent and a diagnostic,
 not a fictitious engine preview. Use an installed `--template` for native
 dry-run. Guided init rejects nonempty targets, adoption, repair and `--force`
-before acquisition or cleanup. The ordinary path retains its existing adoption,
-repair, force and workload-option behavior, including response files. Guided
-init does not accept workload initializer options. Arbitrary native parameter
-tokens remain supported by the separate staged `InitExecutionCommand`, not by
-this public opt-in adapter. Required native values can be prompted interactively;
-scripts fail if they are unresolved.
+before acquisition or cleanup. The legacy initializer path retains its existing
+adoption, repair, force and workload-option behavior, including response files.
+Guided init does not accept workload initializer options. Arbitrary native
+parameter tokens remain supported by the separate staged
+`InitExecutionCommand`, not by this public opt-in adapter. Required native
+values can be prompted interactively; scripts fail if they are unresolved.
 
 **Remaining gates.** The bundled production authority is still unqualified and
 contains no approved quickstart associations. Production acquisition therefore
