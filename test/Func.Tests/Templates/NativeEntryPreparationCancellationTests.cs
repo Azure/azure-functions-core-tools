@@ -127,7 +127,7 @@ public sealed partial class BundledNodeTemplateTests
         public INativeProjectPreparation Preparation { get; } = new ReviewObservedPreparation(inner.Preparation, observer);
         public bool Handles(TemplateCatalogEntry entry) => inner.Handles(entry);
 
-        public Task<DotNetProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
+        public Task<NativeProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
             => ((INativeProjectWorkflowProvider)inner).QualifyLayoutAsync(source, cancellationToken);
 
         public Task<NativeTemplateInvocationPreparation> PrepareAsync(NativeProjectWorkflowContext context, CancellationToken cancellationToken)
