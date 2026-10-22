@@ -32,15 +32,20 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
     private readonly TemplatePackageManager _packageManager;
     private readonly TemplateConstraintManager _constraintManager;
     private readonly TemplateCreator _creator;
+    private readonly IDisposable? _ownership;
+    private readonly TemplateStoreEngineDiagnostics? _diagnostics;
     private bool _disposed;
 
-    public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null)
+    public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, TemplateConstraintEvaluationSnapshot? snapshot = null,
+        IDisposable? ownership = null, TemplateStoreEngineDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
 
         Context = context;
-        _host = new(context, snapshot);
+        _ownership = ownership;
+        _diagnostics = diagnostics;
+        _host = new(context, snapshot, diagnostics);
         _settings = new(_host, settingsLocation: settingsLocation);
         _packageManager = new(_settings);
         _constraintManager = new(_settings);
@@ -66,6 +71,22 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
             return _packageManager;
         }
     }
+
+    internal async Task RebuildCacheAsync(CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _packageManager.RebuildTemplateCacheAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        _diagnostics?.ThrowIfCacheFailed();
+        string cache = Path.Combine(_settings.Paths.HostVersionSettingsDir, "templatecache.json");
+        if (!_settings.Host.FileSystem.FileExists(cache))
+        {
+            throw new IOException("The template engine did not persist its rebuilt cache.");
+        }
+    }
+
+    internal void CheckStoreDiagnostics() => _diagnostics?.ThrowIfCacheFailed();
 
     public virtual async Task<TemplateConfigurationSnapshot> ReadConfigurationAsync(ITemplateInfo template, CancellationToken cancellationToken)
     {
@@ -240,8 +261,27 @@ internal class TemplateEngineSession : ITemplateInvocationEngine, IDisposable
         }
 
         _disposed = true;
-        _constraintManager.Dispose();
-        _packageManager.Dispose();
-        _settings.Dispose();
+        try
+        {
+            _constraintManager.Dispose();
+        }
+        finally
+        {
+            try
+            {
+                _packageManager.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    _settings.Dispose();
+                }
+                finally
+                {
+                    _ownership?.Dispose();
+                }
+            }
+        }
     }
 }

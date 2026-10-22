@@ -11,14 +11,16 @@ internal interface ITemplaterFactory
     /// <summary>
     /// Creates a templater bound to <paramref name="context"/>. The caller disposes it when the command is finished.
     /// </summary>
-    public Templater Create(TemplateEngineContext context);
+    public Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken,
+        Action<TemplateStoreWaitReason>? waiting = null);
 
-    public Templater Create(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot);
+    public Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+        CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null);
 
     /// <summary>
     /// Creates an internal project-enabled flow; production commands and DI do not activate this staged path yet.
     /// </summary>
     /// <exception cref="ArgumentNullException">The context, availability snapshot or paired project support is null.</exception>
-    public Templater CreateProject(
-        TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot, TemplateProjectSupport projectSupport);
+    public Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+        TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null);
 }

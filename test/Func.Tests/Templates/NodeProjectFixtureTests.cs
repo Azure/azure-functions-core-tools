@@ -144,7 +144,8 @@ public sealed class NodeProjectFixtureTests : IDisposable
     public void Constructor_NullDependency_Throws(string dependency)
     {
         var output = WorkingDirectory.FromExplicit(_root);
-        using var templater = new TemplaterFactory(new(Path.Combine(_root, "home")), new PhysicalFileSystem()).Create(new(output));
+        using var session = new TemplateEngineSession(new(output), Path.Combine(_root, "home"));
+        using var templater = TemplateFixtures.CreateTemplater(session);
         var template = Selected(Substitute.For<ISelectedTemplateInvoker>());
 
         Action create = () => _ = new NodeProjectFixture(dependency == "templater" ? null! : templater,
@@ -190,7 +191,8 @@ public sealed class NodeProjectFixtureTests : IDisposable
     private NodeProjectFixture ControlledFixture(ISelectedTemplateInvoker invoker)
     {
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "generated"));
-        var templater = new TemplaterFactory(new(Path.Combine(_root, "home")), new PhysicalFileSystem()).Create(new(output));
+        var session = new TemplateEngineSession(new(output), Path.Combine(_root, "home"));
+        var templater = TemplateFixtures.CreateTemplater(session);
         return new(templater, Selected(invoker), output);
     }
 

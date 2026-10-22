@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
 using NSubstitute;
 using NuGet.Versioning;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -29,12 +30,12 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Fact]
-    public void Create_BindsTheSuppliedContext()
+    public async Task Create_BindsTheSuppliedContext()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem());
+        TemplaterFactory factory = Factory();
         TemplateEngineContext context = Context("command");
 
-        using Templater templater = factory.Create(context);
+        using Templater templater = await factory.CreateAsync(context, CancellationToken.None);
 
         templater.Context.Should().BeSameAs(context);
     }
@@ -43,9 +44,9 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_ReadsTemplatesFromTemplatesDirectoryUnderFuncHome()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem());
+        TemplaterFactory factory = Factory();
 
-        using Templater templater = factory.Create(Context("command"));
+        using Templater templater = await factory.CreateAsync(Context("command"), CancellationToken.None);
         IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
 
         entries.Should().Contain(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity);
@@ -55,9 +56,9 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_EachCallReturnsAnIndependentTemplater()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem());
-        Templater first = factory.Create(Context("first"));
-        using Templater second = factory.Create(Context("second"));
+        TemplaterFactory factory = Factory();
+        Templater first = await factory.CreateAsync(Context("first"), CancellationToken.None);
+        using Templater second = await factory.CreateAsync(Context("second"), CancellationToken.None);
 
         first.Dispose();
         IReadOnlyList<TemplateCatalogEntry> entries = await second.ListAsync(TemplateType.Item, CancellationToken.None);
@@ -66,13 +67,13 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Fact]
-    public void Create_NullContext_Throws()
+    public async Task Create_NullContext_Throws()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem());
+        TemplaterFactory factory = Factory();
 
-        Action act = () => factory.Create(null!);
+        Func<Task> act = () => factory.CreateAsync(null!, CancellationToken.None);
 
-        act.Should().Throw<ArgumentNullException>().WithParameterName("context");
+        await act.Should().ThrowAsync<ArgumentNullException>().WithParameterName("context");
     }
 
     [Theory]
@@ -81,10 +82,10 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_SuppliedSnapshot_ControlsConstraintEligibility(bool usable)
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteJourneyPackage(_root), Path.Combine(Home, "templates"));
-        ITemplaterFactory factory = new TemplaterFactory(new(Home), new PhysicalFileSystem());
+        ITemplaterFactory factory = Factory();
         var snapshot = new TemplateConstraintEvaluationSnapshot([new("node-package", NuGetVersion.Parse("1.0"), ["node"], usable)]);
 
-        using Templater templater = factory.Create(Context("snapshot"), snapshot);
+        using Templater templater = await factory.CreateAsync(Context("snapshot"), snapshot, CancellationToken.None);
         var entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
 
         entries.Should().ContainSingle().Which.ConstraintEvaluation.Status.Should().Be(usable
@@ -93,28 +94,28 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Fact]
-    public void Create_SnapshotOverloadNullContext_Throws()
+    public async Task Create_SnapshotOverloadNullContext_Throws()
     {
-        ITemplaterFactory factory = new TemplaterFactory(new(Home), new PhysicalFileSystem());
-        Action action = () => factory.Create(null!, new([]));
+        ITemplaterFactory factory = Factory();
+        Func<Task> action = () => factory.CreateAsync(null!, new([]), CancellationToken.None);
 
-        action.Should().Throw<ArgumentNullException>().WithParameterName("context");
+        await action.Should().ThrowAsync<ArgumentNullException>().WithParameterName("context");
     }
 
     [Fact]
-    public void Create_NullSnapshot_Throws()
+    public async Task Create_NullSnapshot_Throws()
     {
-        ITemplaterFactory factory = new TemplaterFactory(new(Home), new PhysicalFileSystem());
-        Action action = () => factory.Create(Context("snapshot"), null!);
+        ITemplaterFactory factory = Factory();
+        Func<Task> action = () => factory.CreateAsync(Context("snapshot"), null!, CancellationToken.None);
 
-        action.Should().Throw<ArgumentNullException>().WithParameterName("snapshot");
+        await action.Should().ThrowAsync<ArgumentNullException>().WithParameterName("snapshot");
     }
 
     [Fact]
     public async Task CreateProject_ExplicitSupport_EnablesOnlyTheProjectFlow()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), Path.Combine(Home, "templates"));
-        ITemplaterFactory factory = new TemplaterFactory(new(Home), new PhysicalFileSystem());
+        ITemplaterFactory factory = Factory();
         var initializer = Substitute.For<IProjectStack>();
         initializer.Stack.Returns("python");
         initializer.DisplayName.Returns("Python");
@@ -123,8 +124,8 @@ public sealed class TemplaterFactoryTests : IDisposable
         TemplateProjectConfigurationPlanner planner = new(new([initializer]));
         TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
 
-        using Templater project = factory.CreateProject(Context("project"), new([]), new(planner, writer));
-        using Templater ordinary = factory.Create(Context("ordinary"));
+        using Templater project = await factory.CreateProjectAsync(Context("project"), new([]), new(planner, writer), CancellationToken.None);
+        using Templater ordinary = await factory.CreateAsync(Context("ordinary"), CancellationToken.None);
         var eligible = await project.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
         var gated = await ordinary.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
 
@@ -153,7 +154,7 @@ public sealed class TemplaterFactoryTests : IDisposable
         itemConfiguration["constraints"]!["bundle"] = System.Text.Json.Nodes.JsonNode.Parse("""{"type":"func-bundle","args":"[4.20,5.0)"}""");
         File.WriteAllText(itemPath, itemConfiguration.ToJsonString());
         await TemplateFixtures.InstallAsync(itemPackage, Path.Combine(Home, "templates"));
-        ITemplaterFactory factory = new TemplaterFactory(new(Home), new PhysicalFileSystem());
+        ITemplaterFactory factory = Factory();
         var stack = Substitute.For<IProjectStack>();
         stack.Stack.Returns("python");
         stack.DisplayName.Returns("Python");
@@ -162,8 +163,9 @@ public sealed class TemplaterFactoryTests : IDisposable
         TemplateProjectConfigurationPlanner planner = new(new([stack]));
         var context = new TemplateEngineContext(Context("composed").CommandDirectory,
             bundle: bundleVersion is null ? null : new("bundle", bundleVersion));
-        using Templater templater = factory.CreateProject(context, new([new("python-package", NuGetVersion.Parse("1.0"), ["python"], usable)]),
-            new(planner, new(new PhysicalFileSystem())));
+        using Templater templater = await factory.CreateProjectAsync(context,
+            new([new("python-package", NuGetVersion.Parse("1.0"), ["python"], usable)]),
+            new(planner, new(new PhysicalFileSystem())), CancellationToken.None);
 
         var result = await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
         var item = await templater.ResolveGroupAsync("Func.Tests.Journey", TemplateType.Item, CancellationToken.None);
@@ -193,33 +195,143 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Theory]
-    [InlineData("context")]
-    [InlineData("snapshot")]
-    [InlineData("projectSupport")]
-    public void CreateProject_NullDependency_Throws(string argument)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CreateProject_ProtectedFlow_PreservesPreviewConfigurationOwnershipAndLease(bool occupied)
     {
-        ITemplaterFactory factory = new TemplaterFactory(new(Home), new PhysicalFileSystem());
-        TemplateProjectConfigurationPlanner planner = new(new([]));
-        TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteProjectJourneyPackage(_root), Path.Combine(Home, "templates"));
+        var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "protected-project"));
+        var configPath = CliConfigurationPathsOptions.GetProjectConfigPath(output.Info);
+        const string userConfiguration = "{\"stack\":{\"runtime\":\"user-owned\"},\"custom\":true}";
+        if (occupied)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
+            File.WriteAllText(configPath, userConfiguration);
+        }
 
-        Action create = () => factory.CreateProject(argument == "context" ? null! : Context("project"),
-            argument == "snapshot" ? null! : new([]), argument == "projectSupport" ? null! : new(planner, writer));
+        var hive = Path.Combine(Home, "templates");
+        var before = Directory.GetFiles(hive, "*", SearchOption.AllDirectories)
+            .ToDictionary(path => Path.GetRelativePath(hive, path),
+                path => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))));
+        var store = new TemplateStore(new(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        var context = new TemplateEngineContext(output, bundle: new("bundle", "4.35.0"));
+        using var templater = await new TemplaterFactory(store, new PhysicalFileSystem()).CreateProjectAsync(context, new([]), ProjectSupport(), CancellationToken.None);
+        var selected = (await templater.ResolveGroupAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None)).Group![0];
+        using var cancellation = new CancellationTokenSource();
+        var waiting = new TaskCompletionSource<TemplateStoreWaitReason>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pendingWriter = store.OpenWriteAsync(context, cancellation.Token, reason => waiting.TrySetResult(reason));
+        try
+        {
+            (await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10))).Should().Be(TemplateStoreWaitReason.ActiveReaders);
+            var request = new TemplateInvocationRequest(output, new Dictionary<string, string?>(), DryRun: true, Force: true);
 
-        create.Should().Throw<ArgumentNullException>().WithParameterName(argument);
+            var preview = await selected.InvokeAsync(request, CancellationToken.None);
+
+            preview.Status.Should().Be(occupied ? TemplateInvocationStatus.FileConflict : TemplateInvocationStatus.Success);
+            File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeFalse();
+            if (occupied)
+            {
+                File.ReadAllText(configPath).Should().Be(userConfiguration);
+            }
+            else
+            {
+                Directory.Exists(output.Info.FullName).Should().BeFalse();
+            }
+
+            var created = await selected.InvokeAsync(request with { DryRun = false }, CancellationToken.None);
+
+            created.Status.Should().Be(occupied ? TemplateInvocationStatus.FileConflict : TemplateInvocationStatus.Success);
+            pendingWriter.IsCompleted.Should().BeFalse();
+            if (occupied)
+            {
+                File.ReadAllText(configPath).Should().Be(userConfiguration);
+                File.Exists(Path.Combine(output.Info.FullName, "host.json")).Should().BeFalse();
+                created.ConfiguredProjects.Should().BeEmpty();
+            }
+            else
+            {
+                using var configuration = System.Text.Json.JsonDocument.Parse(File.ReadAllText(configPath));
+                configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("python");
+                configuration.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be("Python");
+                created.ConfiguredProjects.Should().Equal(output.Info.FullName);
+            }
+
+            Directory.GetFiles(hive, "*", SearchOption.AllDirectories)
+                .ToDictionary(path => Path.GetRelativePath(hive, path),
+                    path => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))))
+                .Should().BeEquivalentTo(before);
+            templater.Dispose();
+            using var writer = await pendingWriter.WaitAsync(TimeSpan.FromSeconds(10));
+            Func<Task> stale = () => selected.InvokeAsync(request, CancellationToken.None);
+            await stale.Should().ThrowAsync<ObjectDisposedException>();
+        }
+        finally
+        {
+            await cancellation.CancelAsync();
+        }
     }
 
     [Fact]
-    public void Constructor_NullConfigurationPaths_Throws()
+    public async Task CreateProject_ForwardsPairedSupportContextAndCancellationToProtectedStore()
+    {
+        var store = Substitute.For<ITemplateStore>();
+        var context = new TemplateEngineContext(Context("forwarding").CommandDirectory, bundle: new("bundle", "4.35.0"));
+        var availability = new TemplateConstraintEvaluationSnapshot([]);
+        var support = ProjectSupport();
+        using var cancellation = new CancellationTokenSource();
+        Action<TemplateStoreWaitReason> waiting = _ => { };
+        using var engine = new TemplateEngineSession(context, Path.Combine(_root, "isolated"), availability);
+        store.OpenReadAsync(context, cancellation.Token, availability, waiting).Returns(engine);
+
+        using var templater = await new TemplaterFactory(store, new PhysicalFileSystem()).CreateProjectAsync(context, availability, support, cancellation.Token, waiting);
+
+        await store.Received(1).OpenReadAsync(context, cancellation.Token, availability, waiting);
+        templater.Context.Should().BeSameAs(context);
+        templater.Context.Bundle.Should().BeSameAs(context.Bundle);
+    }
+
+    [Theory]
+    [InlineData("context")]
+    [InlineData("snapshot")]
+    [InlineData("projectSupport")]
+    public async Task CreateProject_NullDependency_Throws(string argument)
+    {
+        ITemplaterFactory factory = Factory();
+        TemplateProjectConfigurationPlanner planner = new(new([]));
+        TemplateProjectConfigurationWriter writer = new(new PhysicalFileSystem());
+
+        Func<Task> create = () => factory.CreateProjectAsync(argument == "context" ? null! : Context("project"),
+            argument == "snapshot" ? null! : new([]), argument == "projectSupport" ? null! : new(planner, writer), CancellationToken.None);
+
+        await create.Should().ThrowAsync<ArgumentNullException>().WithParameterName(argument);
+    }
+
+    [Fact]
+    public void Constructor_NullStore_Throws()
     {
         Action act = () => _ = new TemplaterFactory(null!, new PhysicalFileSystem());
 
-        act.Should().Throw<ArgumentNullException>().WithParameterName("configurationPaths");
+        act.Should().Throw<ArgumentNullException>().WithParameterName("store");
+    }
+
+    private TemplaterFactory Factory()
+        => new(new TemplateStore(new CliConfigurationPathsOptions(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(),
+            NullLoggerFactory.Instance), new PhysicalFileSystem());
+
+    private static TemplateProjectSupport ProjectSupport()
+    {
+        var stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns("python");
+        stack.DisplayName.Returns("Python");
+        stack.SupportedLanguages.Returns(["Python"]);
+        stack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>> { ["python"] = ["py"] });
+        return new(new(new([stack])), new(new PhysicalFileSystem()));
     }
 
     [Fact]
     public void Constructor_NullFileSystem_Throws()
     {
-        Action create = () => _ = new TemplaterFactory(new(Home), null!);
+        Action create = () => _ = new TemplaterFactory(Substitute.For<ITemplateStore>(), null!);
 
         create.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
     }

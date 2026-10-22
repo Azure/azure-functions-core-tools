@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NuGet.Versioning;
 
@@ -62,9 +63,10 @@ public sealed class NodeProjectFixture : IDisposable
         var output = WorkingDirectory.FromExplicit(Path.Combine(parentDirectory, "generated"));
         TemplateProjectConfigurationPlanner planner = new(new([stack]));
         PhysicalFileSystem fileSystem = new();
-        ITemplaterFactory factory = new TemplaterFactory(new(home), fileSystem);
+        TemplateStore store = new(new(home), fileSystem, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        ITemplaterFactory factory = new TemplaterFactory(store, fileSystem);
         TemplateConstraintEvaluationSnapshot snapshot = new([new("node-package", NuGetVersion.Parse("1.0"), ["node"], true)]);
-        Templater templater = factory.CreateProject(new(output), snapshot, new(planner, new(fileSystem)));
+        Templater templater = await factory.CreateProjectAsync(new(output), snapshot, new(planner, new(fileSystem)), cancellationToken);
         try
         {
             TemplateResolutionResult resolution = await templater.ResolveGroupAsync(

@@ -5,6 +5,7 @@ using Azure.Functions.Cli.Common;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.PhysicalFileSystem;
 using Microsoft.TemplateEngine.Edge;
+using Microsoft.Extensions.Logging;
 
 using OrchestratorComponents = Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components;
 
@@ -27,8 +28,10 @@ internal class FuncTemplateEngineHost : DefaultTemplateEngineHost, ITemplateEngi
 
     private readonly TemplateEngineContext _context;
 
-    public FuncTemplateEngineHost(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot? snapshot = null)
-        : base(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), CreateComponents(context, snapshot))
+    public FuncTemplateEngineHost(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot? snapshot = null,
+        ILoggerFactory? loggerFactory = null)
+        : base(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), CreateComponents(context, snapshot),
+            loggerFactory: loggerFactory)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         InvocationFileSystem = new(FileSystem);

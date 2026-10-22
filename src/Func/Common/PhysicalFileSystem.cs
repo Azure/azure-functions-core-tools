@@ -141,6 +141,33 @@ internal class PhysicalFileSystem : IFileSystem
     public void DeleteDirectory(string path) =>
         Directory.Delete(path, recursive: true);
 
+    public async Task CopyDirectoryAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        cancellationToken.ThrowIfCancellationRequested();
+        DirectoryInfo source = new(sourcePath);
+        Directory.CreateDirectory(destinationPath);
+        foreach (FileInfo file in source.GetFiles())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string destination = Path.Combine(destinationPath, file.Name);
+            await using (FileStream input = file.OpenRead())
+            {
+                await using FileStream output = new(destination, FileMode.Create, FileAccess.Write, FileShare.None);
+                await input.CopyToAsync(output, cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            File.SetLastWriteTimeUtc(destination, file.LastWriteTimeUtc);
+        }
+
+        foreach (DirectoryInfo directory in source.GetDirectories())
+        {
+            await CopyDirectoryAsync(directory.FullName, Path.Combine(destinationPath, directory.Name), cancellationToken);
+        }
+    }
+
     public IReadOnlyList<string> GetFiles(string directoryPath) =>
         Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
 

@@ -45,6 +45,8 @@ internal sealed class RecordingCommitFileSystem(IFileSystem basis) : IFileSystem
     public TempDirectory CreateTempDirectory() => _basis.CreateTempDirectory();
     public TempDirectory CreateTempDirectory(string parentDirectory) => _basis.CreateTempDirectory(parentDirectory);
     public void CopyDirectory(string sourcePath, string destinationPath) => _basis.CopyDirectory(sourcePath, destinationPath);
+    public Task CopyDirectoryAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken)
+        => _basis.CopyDirectoryAsync(sourcePath, destinationPath, cancellationToken);
     public void DeleteDirectory(string path) => _basis.DeleteDirectory(path);
     public IReadOnlyList<string> GetFiles(string directoryPath) => _basis.GetFiles(directoryPath);
     public void ExtractZip(string zipPath, string destinationDirectory) => _basis.ExtractZip(zipPath, destinationDirectory);

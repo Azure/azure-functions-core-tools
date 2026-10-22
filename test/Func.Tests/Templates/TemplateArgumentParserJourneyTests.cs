@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.Extensions.Logging.Abstractions;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -27,7 +28,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "functions", "nested"));
         string[] raw = ["--greeting=Hello from parser", "-p:f", "true"];
         string[] unchanged = [.. raw];
-        using var templater = CreateTemplater(output);
+        using var templater = await CreateTemplaterAsync(output);
         var resolution = await templater.ResolveGroupAsync(ShortName, TemplateType.Item, CancellationToken.None);
         var original = resolution.Group!;
         var language = original.FilterByLanguage("javascript");
@@ -77,7 +78,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     {
         await InstallAsync();
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "provenance"));
-        using var templater = CreateTemplater(output);
+        using var templater = await CreateTemplaterAsync(output);
         var selected = (await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         string[] raw = ["--greeting", "same content", "-p:f", "true"];
         var before = SnapshotProject();
@@ -107,7 +108,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     {
         await InstallAsync();
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "completion"));
-        using var templater = CreateTemplater(output);
+        using var templater = await CreateTemplaterAsync(output);
         var selected = (await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var raw = new[] { "--param:AuthLevel", "function", "-p:f", "false" };
         var before = SnapshotProject();
@@ -142,7 +143,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     {
         await InstallAsync();
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "rejected"));
-        using var templater = CreateTemplater(output);
+        using var templater = await CreateTemplaterAsync(output);
         var original = (await templater.ResolveGroupAsync(ShortName, TemplateType.Item, CancellationToken.None)).Group!;
         var before = SnapshotProject();
 
@@ -163,7 +164,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     {
         await InstallAsync();
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "default-control"));
-        using var templater = CreateTemplater(output);
+        using var templater = await CreateTemplaterAsync(output);
         var selected = (await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None)).Group![0];
         var parsed = Parse(selected, ["--greeting", "control", "-p:f", "false"]);
 
@@ -184,7 +185,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     {
         await InstallAsync();
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "controls"));
-        using var templater = CreateTemplater(output);
+        using var templater = await CreateTemplaterAsync(output);
         var wrongType = await templater.ResolveGroupAsync("Func.Tests.Parser.Project", TemplateType.Item, CancellationToken.None);
         var group = (await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None)).Group!;
         var selected = group[0];
@@ -197,7 +198,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         wrongType.Status.Should().Be(TemplateResolutionStatus.WrongType);
         wrongType.Group.Should().BeNull();
         await invoke.Should().ThrowAsync<ObjectDisposedException>();
-        using var restricted = CreateTemplater(output, usable: false);
+        using var restricted = await CreateTemplaterAsync(output, usable: false);
         var unavailable = await restricted.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None);
         unavailable.Status.Should().Be(TemplateResolutionStatus.Unavailable);
         unavailable.Group.Should().BeEmpty();
@@ -212,7 +213,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     {
         await InstallAsync(requireBundle: true);
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "bundle-control"));
-        using var templater = CreateTemplater(output, bundleVersion: bundleVersion);
+        using var templater = await CreateTemplaterAsync(output, bundleVersion: bundleVersion);
         var before = SnapshotProject();
 
         var resolution = await templater.ResolveGroupAsync(LowIdentity, TemplateType.Item, CancellationToken.None);
@@ -258,7 +259,7 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
     {
         await InstallAsync(type);
         var output = WorkingDirectory.FromExplicit(Path.Combine(_root, "project", "scalar-control"));
-        using var templater = CreateTemplater(output);
+        using var templater = await CreateTemplaterAsync(output);
         var selected = (await templater.ResolveGroupAsync("Func.Tests.Parser.Scalar", TemplateType.Item, CancellationToken.None)).Group![0];
         var raw = new[] { "--Scalar=" + value };
         var before = SnapshotProject();
@@ -304,13 +305,15 @@ public sealed class TemplateArgumentParserJourneyTests : IDisposable
         IReadOnlyDictionary<string, string?>? completed = null)
         => _parser.Parse(new(template.Entry.Identity, template.Parameters, _reserved, raw, completed));
 
-    private Templater CreateTemplater(WorkingDirectory output, bool usable = true, string? bundleVersion = "4.35.0")
+    private async Task<Templater> CreateTemplaterAsync(WorkingDirectory output, bool usable = true, string? bundleVersion = "4.35.0")
     {
         TemplateEngineContext context = new(output,
             new(WorkingDirectory.FromExplicit(Path.Combine(_root, "project")), "node", "JavaScript"),
             bundleVersion is null ? null : new("Microsoft.Azure.Functions.ExtensionBundle", bundleVersion));
         TemplateConstraintEvaluationSnapshot snapshot = new([new("node-package", NuGetVersion.Parse("1.0.0"), ["node"], usable)]);
-        return new TemplaterFactory(new CliConfigurationPathsOptions(Path.Combine(_root, "home")), new PhysicalFileSystem()).Create(context, snapshot);
+        var store = new TemplateStore(new CliConfigurationPathsOptions(Path.Combine(_root, "home")),
+            new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance);
+        return await new TemplaterFactory(store, new PhysicalFileSystem()).CreateAsync(context, snapshot, CancellationToken.None);
     }
 
     private Dictionary<string, string?> SnapshotProject()

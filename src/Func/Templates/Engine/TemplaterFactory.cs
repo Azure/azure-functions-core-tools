@@ -1,48 +1,39 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
-internal sealed class TemplaterFactory(CliConfigurationPathsOptions configurationPaths, IFileSystem fileSystem) : ITemplaterFactory
+internal sealed class TemplaterFactory(ITemplateStore store, IFileSystem fileSystem) : ITemplaterFactory
 {
-    /// <summary>
-    /// Sub-directory (under the func home) that holds the engine's settings,
-    /// installed template packages, and caches.
-    /// </summary>
-    private const string SettingsDirectoryName = "templates";
-
-    private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
+    private readonly ITemplateStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
-    public Templater Create(TemplateEngineContext context)
+    public async Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken,
+        Action<TemplateStoreWaitReason>? waiting = null)
     {
         ArgumentNullException.ThrowIfNull(context);
-
-        string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        TemplateEngineSession session = new(context, settingsLocation);
-        return new Templater(session, new(session, _fileSystem));
+        TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken, waiting: waiting);
+        return new(session, new(session, _fileSystem));
     }
 
-    public Templater Create(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot)
+    public async Task<Templater> CreateAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+        CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(snapshot);
-        string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        TemplateEngineSession session = new(context, settingsLocation, snapshot);
-        return new Templater(session, new(session, _fileSystem));
+        TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken, snapshot, waiting: waiting);
+        return new(session, new(session, _fileSystem));
     }
 
-    public Templater CreateProject(
-        TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot, TemplateProjectSupport projectSupport)
+    public async Task<Templater> CreateProjectAsync(TemplateEngineContext context, TemplateConstraintEvaluationSnapshot snapshot,
+        TemplateProjectSupport projectSupport, CancellationToken cancellationToken, Action<TemplateStoreWaitReason>? waiting = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(projectSupport);
-        string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        TemplateEngineSession session = new(context, settingsLocation, snapshot);
+        TemplateEngineSession session = await _store.OpenReadAsync(context, cancellationToken, snapshot, waiting: waiting);
         return new(session, new(session, _fileSystem, projectSupport));
     }
 }

@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.Extensions.Logging.Abstractions;
 using Azure.Functions.Cli.Tests.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.TemplateEngine.Abstractions;
