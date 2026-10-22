@@ -259,7 +259,7 @@ public sealed class QuickstartCatalogTests
         {
             Subcommands =
             {
-                info ? new QuickstartInfoCommand(interaction, resolver, fixture.Source)
+                info ? new QuickstartInfoCommand(interaction, resolver, fixture.Catalog, new(interaction))
                     : new QuickstartListCommand(interaction, resolver, fixture.Source, [provider]),
             },
         };
@@ -502,6 +502,58 @@ public sealed class QuickstartCatalogTests
     public void Constructor_NullSource_RejectsDependency()
     {
         FluentActions.Invoking(() => new QuickstartCatalogService(null!)).Should().Throw<ArgumentNullException>();
+    }
+
+    [Theory]
+    [InlineData(null, "Absent")]
+    [InlineData("null", "Null")]
+    [InlineData("{}", "Invalid")]
+    [InlineData("{\"schemaVersion\":2}", "Unsupported")]
+    [InlineData(Reference, "Unverified")]
+    public async Task Info_HumanOutput_UsesCatalogDiagnosticsWithoutFetchingPayloads(string? metadata, string expected)
+    {
+        using Fixture fixture = new(Manifest(Entry("sample", metadata)), QuickstartCatalogOrigin.Download);
+        TestInteractionService interaction = new();
+        IQuickstartProviderResolver resolver = Substitute.For<IQuickstartProviderResolver>();
+        resolver.FindProviderForLanguage("Python").Returns((IQuickstartProvider?)null);
+        RootCommand root = new()
+        {
+            Subcommands = { new QuickstartInfoCommand(interaction, resolver, fixture.Catalog, new(interaction)) },
+        };
+
+        int exit = await root.Parse(["info", "sample"]).InvokeAsync();
+
+        exit.Should().Be(0);
+        interaction.AllOutput.Should().Contain(expected).And.Contain("Download").And.Contain("unverified");
+        interaction.AllOutput.Should().NotContain("JSON:");
+        fixture.Handler.Requests.Should().Equal(ManifestUrl);
+        if (metadata == Reference)
+        {
+            interaction.AllOutput.Should().Contain("Claimed package").And.Contain("Example.Templates");
+        }
+    }
+
+    [Fact]
+    public async Task Info_HumanOutput_ShowsConflictAndStaleTransportWithoutHidingLegacyEntry()
+    {
+        using Fixture fixture = new(Manifest(Entry("sample", Reference), Entry("sample", null)), QuickstartCatalogOrigin.StaleCache);
+        TestInteractionService interaction = new();
+        IQuickstartProviderResolver resolver = Substitute.For<IQuickstartProviderResolver>();
+        resolver.FindProviderForLanguage("Python").Returns((IQuickstartProvider?)null);
+        RootCommand root = new()
+        {
+            Subcommands =
+            {
+                new QuickstartInfoCommand(interaction, resolver, fixture.Catalog, new(interaction)),
+            },
+        };
+
+        int exit = await root.Parse(["info", "sample"]).InvokeAsync();
+
+        exit.Should().Be(0);
+        interaction.AllOutput.Should().Contain("Conflicting").And.Contain("stale").And.Contain("sample");
+        interaction.AllOutput.Should().Contain("Catalog IDs or template package ownership conflict");
+        fixture.Handler.Requests.Should().Equal(ManifestUrl);
     }
 
     private static IProjectStack CreateStack()

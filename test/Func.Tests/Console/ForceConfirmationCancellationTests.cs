@@ -63,7 +63,7 @@ public class ForceConfirmationCancellationTests
                 .Returns(_ => { scaffolded = true; return Task.CompletedTask; });
             command = new QuickstartCommand(
                 new QuickstartListCommand(interaction, resolver, manifestService, [provider]),
-                new QuickstartInfoCommand(interaction, resolver, manifestService),
+                new QuickstartInfoCommand(interaction, resolver, Substitute.For<IQuickstartCatalogService>(), new(interaction)),
                 interaction, resolver, manifestService, scaffolder, [provider]);
         }
         else

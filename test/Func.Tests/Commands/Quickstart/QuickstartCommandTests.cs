@@ -17,7 +17,7 @@ public class QuickstartCommandTests
     private QuickstartCommand CreateCommand(params IQuickstartProvider[] providers)
     {
         var listCmd = new QuickstartListCommand(_interaction, _resolver, _manifestService, providers);
-        var infoCmd = new QuickstartInfoCommand(_interaction, _resolver, _manifestService);
+        var infoCmd = new QuickstartInfoCommand(_interaction, _resolver, Substitute.For<IQuickstartCatalogService>(), new(_interaction));
         return new QuickstartCommand(listCmd, infoCmd, _interaction, _resolver, _manifestService, _scaffolder, providers);
     }
 

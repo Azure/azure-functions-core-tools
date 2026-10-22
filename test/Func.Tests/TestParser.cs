@@ -130,6 +130,8 @@ internal static class TestParser
 
         // Quickstart: stub manifest service, scaffolder, and resolver so the command resolves.
         services.AddSingleton(Substitute.For<IQuickstartManifestService>());
+        services.AddSingleton(Substitute.For<IQuickstartCatalogService>());
+        services.AddSingleton<QuickstartCatalogRenderer>();
         services.AddSingleton(Substitute.For<IQuickstartScaffolder>());
         services.AddSingleton(Substitute.For<IQuickstartProviderResolver>());
 

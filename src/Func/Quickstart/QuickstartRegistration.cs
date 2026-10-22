@@ -51,6 +51,8 @@ internal static class QuickstartRegistration
         services.AddSingleton<IQuickstartManifestService>(sp => sp.GetRequiredService<QuickstartManifestService>());
         services.AddSingleton<IQuickstartCatalogSource>(sp => sp.GetRequiredService<QuickstartManifestService>());
         services.AddSingleton<IQuickstartCatalogService, QuickstartCatalogService>();
+        services.AddSingleton<QuickstartCatalogRenderer>();
+        services.AddSingleton<IQuickstartBrowser, QuickstartBrowser>();
         services.AddSingleton<IQuickstartProviderResolver, QuickstartProviderResolver>();
 
         return services;
