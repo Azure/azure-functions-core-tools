@@ -1,9 +1,9 @@
 ## 1. Constraint Types
 
-- [ ] 1.1 Add the `func-workload` constraint factory over the usable workload snapshot and installed workload list, excluding workloads rejected by applicable compatibility or activation checks, retaining their CLI-owned diagnostics, validating names, matching aliases and package IDs case-insensitively, and checking NuGet version ranges with the workload catalog's prerelease rule.
+- [ ] 1.1 Add the `func-workload` constraint factory over the usable workload snapshot and installed-only diagnostics, requiring runtime loading and initialization success, excluding rejected/failed entries without activating older runtime fallbacks, validating names, matching aliases and package IDs case-insensitively, and checking NuGet version ranges with the workload catalog's prerelease rule.
 - [ ] 1.2 Add the `func-bundle` constraint factory that compares its optional identity and version range with `func:bundle-id` and `func:bundle-version`.
 - [ ] 1.3 Register the func constraint factories with each command's engine session through dependency injection, and leave out the .NET SDK `sdk-version` and `workload` factories.
-- [ ] 1.4 Add tests for string, object, alternative, and missing arguments, names with spaces, leading dashes, or a `.nupkg` suffix, published IDs of platform-specific workloads, bare, bracketed, floating, prerelease, and invalid ranges, runtime and content workload versions, installed workloads rejected by compatibility checks or unable to load, missing and mismatched bundles, `os` and `host` results, and evaluation without project context. Include a preview workload satisfying a stable numeric minimum and a preview CLI failing a stable `host` minimum.
+- [ ] 1.4 Add tests for string, object, alternative, and missing arguments, names with spaces, leading dashes, or a `.nupkg` suffix, published IDs of platform-specific workloads, bare, bracketed, floating, prerelease, and invalid ranges, runtime and content workload versions, installed workloads rejected by compatibility checks, load failures, initialization failures after loading, no older runtime fallback, missing and mismatched bundles, `os` and `host` results, and evaluation without project context. Include a preview workload satisfying a stable numeric minimum and a preview CLI failing a stable `host` minimum.
 
 ## 2. Evaluation Results
 
