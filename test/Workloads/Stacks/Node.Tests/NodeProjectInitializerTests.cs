@@ -119,6 +119,11 @@ public class NodeProjectInitializerTests : IDisposable
         names.Should().Contain("--no-bundles");
         names.Should().Contain("--bundles-channel");
         names.Should().Contain("--skip-npm-install");
+        options.Should().OnlyContain(option =>
+            option.Description != null &&
+            !string.IsNullOrWhiteSpace(option.Description) &&
+            !option.Description.Contains('\r') &&
+            !option.Description.Contains('\n'));
     }
 
     [Fact]

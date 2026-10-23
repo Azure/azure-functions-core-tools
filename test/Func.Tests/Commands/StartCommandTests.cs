@@ -127,11 +127,26 @@ public class StartCommandTests : IDisposable
         optionNames.Should().Contain("--profile");
         optionNames.Should().Contain("--host-version");
         optionNames.Should().Contain("--offline");
-        optionNames.Should().Contain("--output");
+        optionNames.Should().Contain("--format");
         optionNames.Should().Contain("--no-tui");
         optionNames.Should().Contain("--log-file");
         optionNames.Should().Contain("--demo");
         optionNames.Should().Contain("--pause-on-error");
+        optionNames.Should().NotContain("--output");
+    }
+
+    [Theory]
+    [InlineData("--output", "plain")]
+    [InlineData("--output=plain")]
+    public void StartCommand_RemovedOutputOption_ReportsUnrecognizedOption(params string[] args)
+    {
+        var root = TestParser.CreateRoot(_interaction);
+
+        ParseResult result = root.Parse(["start", _tempDir, .. args]);
+
+        result.Errors.Should().Contain(error =>
+            error.Message.Contains("Unrecognized", StringComparison.Ordinal)
+            && error.Message.Contains("--output", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -193,14 +208,14 @@ public class StartCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task StartCommand_InvalidOutputMode_ThrowsGracefulException()
+    public async Task StartCommand_InvalidFormatMode_ThrowsGracefulException()
     {
         var root = TestParser.CreateRoot(_interaction);
-        var result = root.Parse($"start \"{_tempDir}\" --output=bogus");
+        var result = root.Parse($"start \"{_tempDir}\" --format=bogus");
 
         var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
         var ex = (await FluentActions.Awaiting(() => result.InvokeAsync(config)).Should().ThrowAsync<GracefulException>()).Which;
-        ex.Message.Should().Contain("--output");
+        ex.Message.Should().Contain("--format");
         ex.Message.Should().Contain("bogus");
     }
 
@@ -224,7 +239,7 @@ public class StartCommandTests : IDisposable
             services.AddSingleton(_initializationRunner);
         });
         var root = Parser.CreateCommand(services);
-        string commandLine = $"start \"{_tempDir}\" --output={outputMode} --profile flex --host-version 4.900.0 --offline "
+        string commandLine = $"start \"{_tempDir}\" --format={outputMode} --profile flex --host-version 4.900.0 --offline "
             + "--no-build --enable-auth --port 9090 --functions HttpTrigger "
             + "--cors http://localhost,http://example --cors-credentials";
         var result = root.Parse(commandLine);
@@ -233,7 +248,7 @@ public class StartCommandTests : IDisposable
 
         exitCode.Should().Be(0);
         string[] expectedWarnings = outputMode == "compact"
-            ? ["WARNING: Interactive input or ANSI output is unavailable; falling back to --output=plain."]
+            ? ["WARNING: Interactive input or ANSI output is unavailable; falling back to --format=plain."]
             : [];
         _interaction.Lines.Where(line => line.StartsWith("WARNING:", StringComparison.Ordinal)).Should().Equal(expectedWarnings);
         await _initializationRunner.Received(1).RunAsync(
@@ -276,7 +291,7 @@ public class StartCommandTests : IDisposable
             _shortcutLabels,
             _platform);
         var root = new RootCommand { cmd };
-        var result = root.Parse($"start \"{_tempDir}\" --output=plain --demo");
+        var result = root.Parse($"start \"{_tempDir}\" --format=plain --demo");
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
@@ -308,7 +323,7 @@ public class StartCommandTests : IDisposable
         options.Get(Arg.Any<string>()).Returns(startupOptions);
         var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options, _shortcutLabels, _platform);
         var root = new RootCommand { cmd };
-        var result = root.Parse($"start \"{_tempDir}\" --output=plain");
+        var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
@@ -343,7 +358,7 @@ public class StartCommandTests : IDisposable
         var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options, _shortcutLabels, _platform);
         var root = new RootCommand { cmd };
         string projectDirectory = Environment.CurrentDirectory;
-        var result = root.Parse($"start \"{projectDirectory}\" --output=plain");
+        var result = root.Parse($"start \"{projectDirectory}\" --format=plain");
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
@@ -375,7 +390,7 @@ public class StartCommandTests : IDisposable
             _shortcutLabels,
             _platform);
         var root = new RootCommand { cmd };
-        var result = root.Parse($"start \"{_tempDir}\" --output=plain");
+        var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
@@ -407,7 +422,7 @@ public class StartCommandTests : IDisposable
             _shortcutLabels,
             _platform);
         var root = new RootCommand { cmd };
-        var result = root.Parse($"start \"{_tempDir}\" --output=plain");
+        var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
@@ -443,7 +458,7 @@ public class StartCommandTests : IDisposable
             _shortcutLabels,
             _platform);
         var root = new RootCommand { cmd };
-        var result = root.Parse($"start \"{_tempDir}\" --output=plain");
+        var result = root.Parse($"start \"{_tempDir}\" --format=plain");
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 

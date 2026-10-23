@@ -126,7 +126,7 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
     }
 
     /// <summary>
-    /// Renders the <c>func new --list --output json</c> envelope (single
+    /// Renders the <c>func new --list --format json</c> envelope (single
     /// object, not NDJSON — list is a finite, ordered query). Shape:
     /// <c>{ stack, language, templates: [...] }</c>. Each template entry
     /// carries the public-facing fields plus the per-prompt option schema

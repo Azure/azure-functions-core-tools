@@ -92,7 +92,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
 
             if (json)
             {
-                args.Add("--output=JSON");
+                args.Add("--format=JSON");
             }
 
             // The rejected .net spelling fails inside setup, before any profile or package lookup.
@@ -174,18 +174,18 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
 
     [Theory]
     [Trait("Category", "Integration")]
-    [InlineData(0, true, "--version", "setup", "--output")]
-    [InlineData(0, true, "--version", "setup", "--check=false", "--output")]
-    [InlineData(0, false, "--version", "setup", "--check=true", "--output")]
-    [InlineData(0, true, "--help", "setup", "--output")]
-    [InlineData(1, true, "setup", "--output")]
-    [InlineData(0, false, "--version", "setup", "--output=json")]
+    [InlineData(0, true, "--version", "setup", "--format")]
+    [InlineData(0, true, "--version", "setup", "--check=false", "--format")]
+    [InlineData(0, false, "--version", "setup", "--check=true", "--format")]
+    [InlineData(0, true, "--help", "setup", "--format")]
+    [InlineData(1, true, "setup", "--format")]
+    [InlineData(0, false, "--version", "setup", "--format=json")]
     [InlineData(0, true, "--version", "setup", "--install-policy")]
     [InlineData(0, true, "--version")]
-    [InlineData(0, true, "--version", "setup", "--output=json", "--output=plain")]
+    [InlineData(0, true, "--version", "setup", "--format=json", "--format=plain")]
     [InlineData(0, true, "--version", "setup", "--check=true", "--check=false")]
-    [InlineData(0, false, "--version", "setup", "--check=true", "--check=false", "--output=json")]
-    [InlineData(0, true, "[suggest]", "setup", "--output")]
+    [InlineData(0, false, "--version", "setup", "--check=true", "--check=false", "--format=json")]
+    [InlineData(0, true, "[suggest]", "setup", "--format")]
     public async Task Program_ParserAction_PreservesDispatchAndAdvisoryPolicy(int expectedExit, bool advisory, params string[] args)
     {
         string directory = Path.Combine(Path.GetTempPath(), $"func-setup-parser-{Guid.NewGuid():N}");
@@ -206,7 +206,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
             result.ExitCode.Should().Be(expectedExit);
             result.StandardError.Should().NotContain("unexpected error");
             if (expectedExit == 0) result.StandardError.Should().BeEmpty();
-            else result.StandardError.Should().Contain("Required argument missing for option:").And.Contain("--output");
+            else result.StandardError.Should().Contain("Required argument missing for option:").And.Contain("--format");
 
             if (args.Contains("--version"))
             {
@@ -216,7 +216,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
                 using StringReader lines = new(result.StandardOutput);
                 lines.ReadLine().Should().Be(expectedVersion);
             }
-            else if (!args.Contains("[suggest]")) result.StandardOutput.Should().Contain("func setup").And.Contain("--output");
+            else if (!args.Contains("[suggest]")) result.StandardOutput.Should().Contain("func setup").And.Contain("--format");
 
             result.StandardOutput.Contains("A newer version", StringComparison.Ordinal).Should().Be(advisory);
             result.StandardOutput.Contains(CachedVersion, StringComparison.Ordinal).Should().Be(advisory);

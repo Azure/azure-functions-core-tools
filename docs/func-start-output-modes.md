@@ -9,17 +9,17 @@
 
 ## Choosing a mode
 
-Use `--output=<mode>` to force a mode:
+Use `--format=<mode>` to force a mode:
 
 ```powershell
-func start --output=compact
-func start --output=plain
-func start --output=json
+func start --format=compact
+func start --format=plain
+func start --format=json
 ```
 
-`--no-tui` is an alias for `--output=plain`.
+`--no-tui` is an alias for `--format=plain`.
 
-When `--output` is omitted, `func start` auto-selects the mode:
+When `--format` is omitted, `func start` auto-selects the mode:
 
 | Condition | Selected mode |
 |-----------|---------------|
@@ -27,7 +27,7 @@ When `--output` is omitted, `func start` auto-selects the mode:
 | Non-interactive stdout, redirected output, or CI | `plain` |
 
 `json` is never selected automatically. Programmatic consumers and AI agents
-should opt in with `--output=json`.
+should opt in with `--format=json`.
 
 If `compact` is requested but stdout cannot host an interactive live display,
 the command downgrades to `plain` and writes a one-line notice to stderr.
