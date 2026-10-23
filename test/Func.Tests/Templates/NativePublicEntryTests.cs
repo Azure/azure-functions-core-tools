@@ -283,9 +283,9 @@ public sealed partial class BundledNodeTemplateTests
         if (marker == "host.json") output.AllOutput.Should().Contain("Existing project adopted");
     }
 
-    private async Task InstallEntryFunctionJourneyAsync()
+    private async Task InstallEntryFunctionJourneyAsync(string? functionArchive = null)
     {
-        await InstallOwnedNodeJourneyAsync();
+        await InstallOwnedNodeJourneyAsync(functionArchive);
         _source.ClearReceivedCalls();
     }
 

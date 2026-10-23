@@ -90,10 +90,10 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     internal static (string Workload, string Functions, string Version) CurrentNodeJourneyArtifacts
         => (BuiltArchive, FunctionArchive, NodeArtifactVersion);
 
-    internal async Task<TemplateConstraintEvaluationSnapshot> InstallOwnedNodeJourneyAsync()
+    internal async Task<TemplateConstraintEvaluationSnapshot> InstallOwnedNodeJourneyAsync(string? functionArchive = null)
     {
         WorkloadEntry entry = await InstallAssociationStackAsync();
-        _ownedJourneyCatalog = new(entry, FunctionArchive);
+        _ownedJourneyCatalog = new(entry, functionArchive ?? FunctionArchive);
         BasicAcquisitionResult result = await _ownedJourneyCatalog.InstallAsync(_templates, _workloads, _paths, _installer, _files,
             AdmissionDeployment(new FileWorkloadOperationCoordinator(_paths)), Home, _root);
         result.Status.Should().Be(BasicAcquisitionStatus.Completed, result.Message);

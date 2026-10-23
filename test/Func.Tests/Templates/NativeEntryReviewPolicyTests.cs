@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Commands;
@@ -92,7 +94,7 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("required", "missingRequired")]
     public async Task StagedReview_JsonAloneInInteractiveTerminal_NeverPromptsAtAnyCompletionBoundary(string boundary, string kind)
     {
-        string project = await CreateReviewProjectAsync();
+        string project = await CreateReviewProjectAsync(requiredValue: boundary == "required");
         string[] selector = ["-t", "HttpTrigger-JavaScript"];
         if (boundary == "template")
         {
@@ -105,21 +107,6 @@ public sealed partial class BundledNodeTemplateTests
             configuration["profiles"] = new JsonArray("flex", "linux-premium");
             configuration.AsObject().Remove("defaultProfile");
             File.WriteAllText(path, configuration.ToJsonString());
-        }
-        else
-        {
-            string package = Path.Combine(_root, "review-required-template");
-            Directory.CreateDirectory(Path.Combine(package, ".template.config"));
-            File.WriteAllText(Path.Combine(package, ".template.config", "template.json"), """
-                {
-                  "identity":"Func.Tests.ReviewRequired","name":"Review required item","shortName":"review-required",
-                  "tags":{"type":"item","language":"JavaScript"},
-                  "symbols":{"RequiredValue":{"type":"parameter","datatype":"string","isRequired":true}}
-                }
-                """);
-            File.WriteAllText(Path.Combine(package, "review.txt"), "required-value fixture");
-            await TemplateFixtures.InstallAsync(package, Path.Combine(Home, "templates"), CancellationToken.None);
-            selector = ["-t", "Func.Tests.ReviewRequired"];
         }
 
         var before = Directory.GetFiles(project, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
@@ -146,6 +133,60 @@ public sealed partial class BundledNodeTemplateTests
         document.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
         checks.Should().Be(0);
         stderr.Output.Should().NotContain("unexpected error").And.NotContain("func5");
+    }
+
+    [Theory]
+    [InlineData("host-version")]
+    [InlineData("unowned-source")]
+    public async Task StagedReview_UnadmittedHostOrSource_RefusesWithoutPromptOrProjectWrites(string refusal)
+    {
+        string project = await CreateReviewProjectAsync();
+        string template = "HttpTrigger-JavaScript";
+        if (refusal == "unowned-source")
+        {
+            string package = Path.Combine(_root, "review-required-template");
+            Directory.CreateDirectory(Path.Combine(package, ".template.config"));
+            File.WriteAllText(Path.Combine(package, ".template.config", "template.json"), """
+                {
+                  "identity":"Func.Tests.ReviewRequired","name":"Review required item","shortName":"review-required",
+                  "tags":{"type":"item","language":"JavaScript"},
+                  "symbols":{"RequiredValue":{"type":"parameter","datatype":"string","isRequired":true}}
+                }
+                """);
+            File.WriteAllText(Path.Combine(package, "review.txt"), "required-value fixture");
+            await TemplateFixtures.InstallAsync(package, Path.Combine(Home, "templates"), CancellationToken.None);
+            template = "Func.Tests.ReviewRequired";
+        }
+        var before = Directory.GetFiles(project, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+        using BufferedConsole stdout = new(true, true, noColor: true);
+        using BufferedConsole stderr = new(true, true, noColor: true);
+        SpectreInteractionService interaction = new(new DefaultTheme(), stdout, stderr);
+        int checks = 0;
+
+        int exit = await new NativeCliEntryPoint().ExecuteAsync(["new", project, "-t", template, "--format=json"],
+            interaction, _paths, new(Home), CancellationToken.None, services =>
+            {
+                TrackEntryContexts(services);
+                if (refusal == "host-version") services.AddSingleton(ReviewPrereleaseVersion("5.0.0-review"));
+            }, _ =>
+            {
+                checks++;
+                return Task.FromResult<string?>("9999.0.0");
+            });
+
+        exit.Should().Be(1);
+        using var document = JsonDocument.Parse(stdout.Output);
+        document.RootElement.GetProperty("kind").GetString().Should().Be("workflowUnavailable");
+        document.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
+        Directory.GetFiles(project, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes)
+            .Should().BeEquivalentTo(before);
+        stdout.Reads.Should().Be(0);
+        stderr.Reads.Should().Be(0);
+        checks.Should().Be(0);
+        if (refusal == "host-version")
+        {
+            stdout.Output.Should().Contain("does not support the actual").And.Contain("5.0.0-review");
+        }
     }
 
     [Theory]
@@ -257,9 +298,9 @@ public sealed partial class BundledNodeTemplateTests
         stderr.Reads.Should().Be(0);
     }
 
-    private async Task<string> CreateReviewProjectAsync()
+    private async Task<string> CreateReviewProjectAsync(bool requiredValue = false)
     {
-        await InstallEntryFunctionJourneyAsync();
+        await InstallEntryFunctionJourneyAsync(requiredValue ? ReviewRequiredFunctionArchive() : null);
         string project = Path.Combine(_root, "review-project");
         int exit = await new NativeCliEntryPoint().ExecuteAsync(
             ["init", project, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"],
@@ -268,11 +309,39 @@ public sealed partial class BundledNodeTemplateTests
         return project;
     }
 
-    private static ICliVersionProvider ReviewPrereleaseVersion()
+    private string ReviewRequiredFunctionArchive()
     {
+        string archive = Path.Combine(_root, "review-required-functions.nupkg");
+        File.Copy(FunctionArchive, archive);
+        using var package = ZipFile.Open(archive, ZipArchiveMode.Update);
+        const string path = "content/http-js/.template.config/template.json";
+        var configurationEntry = package.GetEntry(path)!;
+        JsonNode configuration;
+        using (Stream input = configurationEntry.Open()) configuration = JsonNode.Parse(input)!;
+        configuration["symbols"]!["RequiredValue"] = JsonNode.Parse(
+            """{"type":"parameter","datatype":"string","isRequired":true}""");
+        byte[] content = Encoding.UTF8.GetBytes(configuration.ToJsonString());
+        configurationEntry.Delete();
+        using (Stream output = package.CreateEntry(path).Open()) output.Write(content);
+        var provenanceEntry = package.GetEntry("provenance/node/compatibility.json")!;
+        JsonNode provenance;
+        using (Stream input = provenanceEntry.Open()) provenance = JsonNode.Parse(input)!;
+        UpdateFixtureSourcePins(provenance, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = content })
+            .Should().Be(1);
+        provenanceEntry.Delete();
+        using (StreamWriter output = new(package.CreateEntry("provenance/node/compatibility.json").Open()))
+        {
+            output.Write(provenance.ToJsonString());
+        }
+        return archive;
+    }
+
+    private static ICliVersionProvider ReviewPrereleaseVersion(string? value = null)
+    {
+        string actual = value ?? AssemblyCliVersionProvider.Instance.Version;
         var version = Substitute.For<ICliVersionProvider>();
-        version.Version.Returns("5.0.0-review");
-        version.InformationalVersion.Returns("5.0.0-review");
+        version.Version.Returns(actual);
+        version.InformationalVersion.Returns(actual);
         version.IsPrerelease.Returns(true);
         return version;
     }
