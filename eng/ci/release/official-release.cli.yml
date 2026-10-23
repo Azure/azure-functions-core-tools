@@ -1,3 +1,10 @@
+parameters:
+- name: npmPackageNames
+  type: object
+  default:
+  - azure-functions-core-tools
+  - azure-functions-cli
+
 resources:
   repositories:
   - repository: 1es
@@ -42,8 +49,9 @@ extends:
       - template: /eng/ci/templates/jobs/build.yml@self
         parameters:
           sign: false
-          # npm packaging is disabled; do not publish or consume drop_npm.
-          artifacts: ['publish']
+          artifacts: ['publish', 'npm']
+          npmPackageDirectory: eng/tools/publish-tools/npm
+          npmPackageNames: ${{ parameters.npmPackageNames }}
           projects: |
             src/Func/Func.csproj
             test/Func.Tests/Func.Tests.csproj
@@ -55,7 +63,7 @@ extends:
       - template: /eng/ci/templates/jobs/stage-cli-artifacts.yml@self
         parameters:
           sign: true
-          includeNpmPackage: false
+          includeNpmPackage: true
 
     - stage: ApproveRelease
       displayName: Approve CLI release
@@ -82,4 +90,4 @@ extends:
       - template: /ci/publish-cli.yml@eng
         parameters:
           version: $(Build.BuildNumber)
-          npmPackageNames: []
+          npmPackageNames: ${{ parameters.npmPackageNames }}
