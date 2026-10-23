@@ -122,6 +122,9 @@ the returned failure, actual installed changes and diagnostic through both runne
 boundaries and command rendering. It still reports failure and exits nonzero.
 The producer's committed-output marker establishes this partial outcome, not a
 diagnostic, planned effects or a non-null invocation.
+Composed item workflows also retain returned applied, partial-failure or
+incomplete controlled-effect ledgers when those effects do not create native
+files. A planned effect alone does not establish such an outcome.
 
 Public cutover still requires production native `FuncTemplate` inventory and
 package lifecycle/trust wiring; .NET/Node/Python restore/build/start/invocation

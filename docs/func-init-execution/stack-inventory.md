@@ -258,8 +258,10 @@ are not authority for this new owned path.
 Completion receives a host-issued `NativeTemplateCreatedProject` only after
 actual native and mandatory configuration success. It exposes the actual
 captured output, canonical configuration path and copied finalized configuration
-bytes. Revalidation checks the owner/source, current generated file kinds and
-bytes, unlinked target and unchanged configuration. This is not atomic against
+bytes. Revalidation checks the owner/source, current generated or explicitly preserved
+file kinds and bytes, unlinked target and unchanged configuration. Preserved
+inputs retain their admitted user bytes rather than requiring rendered defaults
+to overwrite them. This is not atomic against
 external changes and does not constrain subsequent workload helper mutations.
 Completion authorization is consumed once before the workload callback.
 The first configuration read must exactly match the successful writer's
@@ -273,8 +275,9 @@ Returned success or failure is recorded before late cancellation. Failure is
 Thrown cancellation preserves the original exception and retained-output warning.
 Skipped preparation remains explicit and does not claim a process ran.
 No logical plan, skipped result or helper outcome creates a native physical
-commit marker. Production Node policy/helper qualification remains with its
-workload owner, and the public native route remains off.
+commit marker. The consolidated public native route uses the owning Node
+workload for this preparation. Independently acquired function content still
+requires its separately qualified association.
 
 ### Bounded F# workflow repair
 
