@@ -416,7 +416,18 @@ public sealed partial class ArtifactBindingJourneyTests
         QuickstartCatalog duplicate = original with { Entries = Array.AsReadOnly<QuickstartCatalogEntry>([first, second]) };
         IQuickstartCatalogService catalog = Substitute.For<IQuickstartCatalogService>();
         catalog.SearchAsync(Arg.Any<QuickstartCatalogQuery>(), Arg.Any<CancellationToken>()).Returns(duplicate);
-        QuickstartBrowseResult result = await BrowseWithBoundScopeAsync(catalog, interaction, journey.Qualification);
+        QuickstartBrowseResult result;
+        try
+        {
+            result = await BrowseWithBoundScopeAsync(catalog, interaction, journey.Qualification);
+            await catalog.Received(1).SearchAsync(Arg.Is<QuickstartCatalogQuery>(query =>
+                query.LegacyStack != null && query.LegacyStack.GetType().Assembly.IsCollectible), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            // Recorded search queries retain their runtime stack and prevent its load context from unloading.
+            catalog.ClearReceivedCalls();
+        }
 
         result.Outcome.Should().Be(QuickstartBrowseOutcome.Selected);
         result.Entry.Should().Be(second);
