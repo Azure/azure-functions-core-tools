@@ -57,7 +57,7 @@ internal sealed class InstallHostWorkloadInitializationStep(
                 exact: true,
                 force: false,
                 progress: null,
-                cancellationToken);
+                cancellationToken: cancellationToken);
         }
         catch (WorkloadPackageNotFoundException ex)
         {

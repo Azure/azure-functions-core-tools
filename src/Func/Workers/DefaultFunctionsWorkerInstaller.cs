@@ -66,7 +66,7 @@ internal sealed class DefaultFunctionsWorkerInstaller(
             exact: true,
             force: false,
             progress: null,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         IFunctionsWorker worker = ResolveInstalledWorker(workerId, packageId, versionRange, result, cancellationToken);
         return new FunctionsWorkerInstallResult(worker, result);

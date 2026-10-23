@@ -55,6 +55,11 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         Description = "Overwrite an existing install of the same id and version.",
     };
 
+    public Option<bool> AllowUntrustedOption { get; } = new("--allow-untrusted")
+    {
+        Description = "Bypass publisher trust verification for explicitly trusted development packages.",
+    };
+
     public Option<bool> ExactOption { get; } = new("--exact", "-e")
     {
         Description = "Disable alias matching. <id> must be the literal package id.",
@@ -83,6 +88,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         Options.Add(IncludePrereleaseOption);
         Options.Add(ExactOption);
         Options.Add(ForceOption);
+        Options.Add(AllowUntrustedOption);
     }
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
@@ -93,6 +99,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         bool? includePrerelease = parseResult.GetValue(IncludePrereleaseOption);
         bool exact = parseResult.GetValue(ExactOption);
         bool force = parseResult.GetValue(ForceOption);
+        bool allowUntrusted = parseResult.GetValue(AllowUntrustedOption);
 
         if (EffectivePrerelease(includePrerelease))
         {
@@ -106,7 +113,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             // prompt entirely. Non-interactive contexts treat the prompt as
             // a decline and exit non-zero with the same hint. Local .nupkg
             // installs bypass the check since the resolver path differs.
-            int? earlyExit = await HandleAlreadyInstalledAsync(workload, exact, source, includePrerelease, cancellationToken);
+            int? earlyExit = await HandleAlreadyInstalledAsync(workload, exact, source, includePrerelease, allowUntrusted, cancellationToken);
             if (earlyExit is { } code)
             {
                 return code;
@@ -124,7 +131,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                     var progress = new WorkloadInstallProgressAdapter(ctx);
 
                     return LooksLikeLocalPackagePath(workload)
-                        ? await _installer.InstallFromPackageAsync(workload, force, progress, ct)
+                        ? await _installer.InstallFromPackageAsync(workload, force, progress, allowUntrusted, ct)
                         : await _installer.InstallFromCatalogAsync(
                             workload,
                             string.IsNullOrEmpty(versionText) ? null : NuGetVersion.Parse(versionText),
@@ -133,6 +140,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                             exact,
                             force,
                             progress,
+                            allowUntrusted,
                             ct);
                 },
                 cancellationToken);
@@ -191,6 +199,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         bool exact,
         string? source,
         bool? includePrerelease,
+        bool allowUntrusted,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
@@ -261,7 +270,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        return await DispatchToUpdateAsync(updateIdentifier, source, includePrerelease, cancellationToken);
+        return await DispatchToUpdateAsync(updateIdentifier, source, includePrerelease, allowUntrusted, cancellationToken);
     }
 
     private static GracefulException CreateAmbiguousInstalledAlias(string identifier, IReadOnlyList<string> packageIds)
@@ -279,9 +288,14 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         string packageId,
         string? source,
         bool? includePrerelease,
+        bool allowUntrusted,
         CancellationToken cancellationToken)
     {
         var args = new List<string> { packageId };
+        if (allowUntrusted)
+        {
+            args.Add("--allow-untrusted");
+        }
         if (!string.IsNullOrEmpty(source))
         {
             args.Add("--source");

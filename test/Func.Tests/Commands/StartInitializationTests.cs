@@ -267,7 +267,7 @@ public class StartInitializationTests : IDisposable
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>())
+                cancellationToken: Arg.Any<CancellationToken>())
             .Returns(Task.FromException<WorkloadInstallResult>(
                 new InvalidOperationException("Host workload installation should be bypassed.")));
         HostProcessStartContext? capturedStartContext = null;
@@ -692,7 +692,7 @@ public class StartInitializationTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -1311,7 +1311,7 @@ public class StartInitializationTests : IDisposable
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>())
+                cancellationToken: Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 string packageId = callInfo.ArgAt<string>(0);

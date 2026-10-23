@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Workloads.Install;
 
 /// <summary>
 /// Coordinates installing and uninstalling workloads on disk and in the
-/// global workload registry.
+/// global workload registry. Newly acquired archives are verified before inspection or extraction.
 /// </summary>
 internal interface IWorkloadInstaller
 {
@@ -19,6 +19,7 @@ internal interface IWorkloadInstaller
     /// and recorded in the global registry; the source <c>.nupkg</c> is left untouched.
     /// </summary>
     /// <param name="nupkgPath">Path to a <c>.nupkg</c> on disk.</param>
+    /// <param name="allowUntrusted">Explicitly bypass publisher trust checks, but not workload format or identity checks.</param>
     /// <param name="force">
     /// When <c>true</c>, an existing install of the same id+version is removed
     /// before extraction.
@@ -38,13 +39,12 @@ internal interface IWorkloadInstaller
     /// <paramref name="force"/> is <c>false</c>.
     /// </exception>
     public Task<WorkloadInstallResult> InstallFromPackageAsync(string nupkgPath, bool force = false,
-        IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default);
+        IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Resolves <paramref name="packageId"/> against the configured catalog,
-    /// downloads the matching <c>.nupkg</c> to a temp file, and routes it
-    /// through <see cref="InstallFromPackageAsync"/> so disk + registry
-    /// behaviour matches local installs exactly.
+    /// downloads and verifies each newly acquired archive, and deploys it.
+    /// Compatible installed-content reuse does not retroactively verify historical content.
     /// </summary>
     /// <param name="packageId">
     /// User-supplied package id or alias; case-insensitive. Treated as a
@@ -67,6 +67,7 @@ internal interface IWorkloadInstaller
     /// <paramref name="packageId"/> as a literal package id.
     /// </param>
     /// <param name="force">Forwarded to <see cref="InstallFromPackageAsync"/>.</param>
+    /// <param name="allowUntrusted">Explicitly bypass publisher trust checks for newly acquired archives only.</param>
     /// <param name="cancellationToken">Token to cancel resolve, download, and install.</param>
     /// <exception cref="WorkloadPackageNotFoundException">
     /// No version matched on any configured source.
@@ -76,7 +77,8 @@ internal interface IWorkloadInstaller
     /// <c>false</c>.
     /// </exception>
     public Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
-        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default);
+        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// In-place version swap for an installed workload (spec §6.4). Stages
@@ -98,17 +100,19 @@ internal interface IWorkloadInstaller
     /// Default is <c>false</c> per spec; <c>--major</c> on the command sets
     /// it to <c>true</c>.
     /// </param>
+    /// <param name="allowUntrusted">Explicitly bypass publisher trust checks for newly acquired archives only.</param>
     /// <param name="cancellationToken">Token propagated to catalog + I/O.</param>
     /// <exception cref="InvalidOperationException">
     /// <paramref name="packageId"/> is not installed, or
     /// <paramref name="targetInstalledVersion"/> is not present.
     /// </exception>
     public Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
-        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default);
+        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
+        CancellationToken cancellationToken = default);
 
     public Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
         bool? includePrerelease, bool allowMajor, WorkloadOwnershipKind ownership, IProgress<WorkloadInstallProgress>? progress = null,
-        CancellationToken cancellationToken = default);
+        bool allowUntrusted = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Removes the install directory and registry entry for

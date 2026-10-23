@@ -231,7 +231,7 @@ public class HostWorkloadResolverTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>())
+                cancellationToken: Arg.Any<CancellationToken>())
             .Returns(installResult);
         var step = new InstallHostWorkloadInitializationStep(installer, CreateWorkloadPaths(), _hostPackageId, "4.1000.0");
         StartInitializationStepContext context = NewStepContext(step, offline: false);
@@ -265,7 +265,7 @@ public class HostWorkloadResolverTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>())
+                cancellationToken: Arg.Any<CancellationToken>())
             .Returns(Task.FromException<WorkloadInstallResult>(new WorkloadPackageNotFoundException("missing host")));
         var step = new InstallHostWorkloadInitializationStep(installer, CreateWorkloadPaths(), _hostPackageId, "4.1000.0");
         StartInitializationStepContext context = NewStepContext(step, offline: false);
