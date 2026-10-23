@@ -136,7 +136,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
 
         if (all)
         {
-            return await UpdateAllAsync(source, includePrerelease, allowMajor, cancellationToken, allowUntrusted);
+            return await UpdateAllAsync(source, includePrerelease, allowMajor, allowUntrusted, cancellationToken);
         }
 
         UpdateTarget target = await ResolveInstalledTargetAsync(identifier!, exact, cancellationToken);
@@ -147,8 +147,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
             source,
             includePrerelease,
             allowMajor,
-            cancellationToken,
-            allowUntrusted);
+            allowUntrusted,
+            cancellationToken);
     }
 
     private async Task<UpdateTarget> ResolveInstalledTargetAsync(string identifier, bool exact, CancellationToken cancellationToken)
@@ -196,8 +196,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         string? source,
         bool? includePrerelease,
         bool allowMajor,
-        CancellationToken cancellationToken,
-        bool allowUntrusted)
+        bool allowUntrusted,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -210,8 +210,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                     includePrerelease,
                     allowMajor,
                     new WorkloadInstallProgressAdapter(ctx),
-                    ct,
-                    allowUntrusted),
+                    allowUntrusted,
+                    ct),
                 cancellationToken);
 
             RenderSingle(result);
@@ -235,7 +235,7 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         }
     }
 
-    private async Task<int> UpdateAllAsync(string? source, bool? includePrerelease, bool allowMajor, CancellationToken cancellationToken, bool allowUntrusted)
+    private async Task<int> UpdateAllAsync(string? source, bool? includePrerelease, bool allowMajor, bool allowUntrusted, CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         IReadOnlyList<UpdateTarget> targets = BuildUpdateAllTargets(installed);
@@ -260,8 +260,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                         includePrerelease,
                         allowMajor,
                         new WorkloadInstallProgressAdapter(ctx),
-                        ct,
-                        allowUntrusted),
+                        allowUntrusted,
+                        ct),
                     cancellationToken);
                 RenderSingle(result);
             }
@@ -332,8 +332,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
         bool? includePrerelease,
         bool allowMajor,
         IProgress<WorkloadInstallProgress>? progress,
-        CancellationToken cancellationToken,
-        bool allowUntrusted)
+        bool allowUntrusted,
+        CancellationToken cancellationToken)
         => target.Ownership == WorkloadOwnershipKind.Logical
             ? _installer.UpdateAsync(
                 target.PackageId,
@@ -343,8 +343,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 allowMajor,
                 WorkloadOwnershipKind.Logical,
                 progress,
-                cancellationToken,
-                allowUntrusted)
+                allowUntrusted,
+                cancellationToken)
             : _installer.UpdateAsync(
                 target.PackageId,
                 targetInstalledVersion,
@@ -352,8 +352,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                 includePrerelease,
                 allowMajor,
                 progress,
-                cancellationToken,
-                allowUntrusted);
+                allowUntrusted,
+                cancellationToken);
 
     private static GracefulException CreateAmbiguousInstalledAlias(string identifier, IReadOnlyList<string> packageIds)
         => new(

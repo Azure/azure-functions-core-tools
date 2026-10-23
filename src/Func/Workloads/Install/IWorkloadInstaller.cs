@@ -39,7 +39,7 @@ internal interface IWorkloadInstaller
     /// <paramref name="force"/> is <c>false</c>.
     /// </exception>
     public Task<WorkloadInstallResult> InstallFromPackageAsync(string nupkgPath, bool force = false,
-        IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default, bool allowUntrusted = false);
+        IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Resolves <paramref name="packageId"/> against the configured catalog,
@@ -77,8 +77,8 @@ internal interface IWorkloadInstaller
     /// <c>false</c>.
     /// </exception>
     public Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
-        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default,
-        bool allowUntrusted = false);
+        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// In-place version swap for an installed workload (spec §6.4). Stages
@@ -107,12 +107,12 @@ internal interface IWorkloadInstaller
     /// <paramref name="targetInstalledVersion"/> is not present.
     /// </exception>
     public Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
-        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default,
-        bool allowUntrusted = false);
+        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
+        CancellationToken cancellationToken = default);
 
     public Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
         bool? includePrerelease, bool allowMajor, WorkloadOwnershipKind ownership, IProgress<WorkloadInstallProgress>? progress = null,
-        CancellationToken cancellationToken = default, bool allowUntrusted = false);
+        bool allowUntrusted = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Removes the install directory and registry entry for

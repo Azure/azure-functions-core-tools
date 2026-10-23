@@ -113,7 +113,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             // prompt entirely. Non-interactive contexts treat the prompt as
             // a decline and exit non-zero with the same hint. Local .nupkg
             // installs bypass the check since the resolver path differs.
-            int? earlyExit = await HandleAlreadyInstalledAsync(workload, exact, source, includePrerelease, cancellationToken, allowUntrusted);
+            int? earlyExit = await HandleAlreadyInstalledAsync(workload, exact, source, includePrerelease, allowUntrusted, cancellationToken);
             if (earlyExit is { } code)
             {
                 return code;
@@ -131,7 +131,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                     var progress = new WorkloadInstallProgressAdapter(ctx);
 
                     return LooksLikeLocalPackagePath(workload)
-                        ? await _installer.InstallFromPackageAsync(workload, force, progress, ct, allowUntrusted)
+                        ? await _installer.InstallFromPackageAsync(workload, force, progress, allowUntrusted, ct)
                         : await _installer.InstallFromCatalogAsync(
                             workload,
                             string.IsNullOrEmpty(versionText) ? null : NuGetVersion.Parse(versionText),
@@ -140,8 +140,8 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
                             exact,
                             force,
                             progress,
-                            ct,
-                            allowUntrusted);
+                            allowUntrusted,
+                            ct);
                 },
                 cancellationToken);
 
@@ -199,8 +199,8 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         bool exact,
         string? source,
         bool? includePrerelease,
-        CancellationToken cancellationToken,
-        bool allowUntrusted)
+        bool allowUntrusted,
+        CancellationToken cancellationToken)
     {
         IReadOnlyList<WorkloadEntry> installed = await _store.GetWorkloadsAsync(cancellationToken);
         if (installed.Count == 0)
@@ -270,7 +270,7 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
             return null;
         }
 
-        return await DispatchToUpdateAsync(updateIdentifier, source, includePrerelease, cancellationToken, allowUntrusted);
+        return await DispatchToUpdateAsync(updateIdentifier, source, includePrerelease, allowUntrusted, cancellationToken);
     }
 
     private static GracefulException CreateAmbiguousInstalledAlias(string identifier, IReadOnlyList<string> packageIds)
@@ -288,8 +288,8 @@ internal sealed class WorkloadInstallCommand : FuncCliCommand
         string packageId,
         string? source,
         bool? includePrerelease,
-        CancellationToken cancellationToken,
-        bool allowUntrusted)
+        bool allowUntrusted,
+        CancellationToken cancellationToken)
     {
         var args = new List<string> { packageId };
         if (allowUntrusted)

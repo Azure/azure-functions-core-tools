@@ -23,7 +23,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         packageTrust ?? throw new ArgumentNullException(nameof(packageTrust));
 
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(string nupkgPath, bool force = false,
-        IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default, bool allowUntrusted = false)
+        IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nupkgPath);
 
@@ -53,8 +53,8 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     }
 
     public async Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
-        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default,
-        bool allowUntrusted = false)
+        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         progress?.Report(new WorkloadInstallProgress(
@@ -106,21 +106,21 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     }
 
     public async Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
-        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default,
-        bool allowUntrusted = false)
-        => await UpdateAsync(packageId, targetInstalledVersion, source, includePrerelease, allowMajor, WorkloadOwnershipKind.Explicit, progress, cancellationToken, allowUntrusted);
+        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
+        CancellationToken cancellationToken = default)
+        => await UpdateAsync(packageId, targetInstalledVersion, source, includePrerelease, allowMajor, WorkloadOwnershipKind.Explicit, progress, allowUntrusted, cancellationToken);
 
     public async Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
         bool? includePrerelease, bool allowMajor, WorkloadOwnershipKind ownership,
-        IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default, bool allowUntrusted = false)
+        IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
 
         return ownership == WorkloadOwnershipKind.Logical
             ? await UpdateLogicalAsync(
-                packageId, targetInstalledVersion, source, includePrerelease, allowMajor, progress, cancellationToken, allowUntrusted)
+                packageId, targetInstalledVersion, source, includePrerelease, allowMajor, progress, allowUntrusted, cancellationToken)
             : await UpdateExplicitAsync(
-                packageId, targetInstalledVersion, source, includePrerelease, allowMajor, progress, cancellationToken, allowUntrusted);
+                packageId, targetInstalledVersion, source, includePrerelease, allowMajor, progress, allowUntrusted, cancellationToken);
     }
 
     public async Task<bool> UninstallAsync(string packageId, string version, CancellationToken cancellationToken = default)
@@ -136,7 +136,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     }
 
     private async Task<WorkloadUpdateResult> UpdateExplicitAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
-        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken, bool allowUntrusted)
+        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, bool allowUntrusted, CancellationToken cancellationToken)
     {
         WorkloadEntry currentEntry = await _deploymentService.GetUpdateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, cancellationToken);
         var currentVersion = NuGetVersion.Parse(currentEntry.PackageVersion);
@@ -162,7 +162,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     }
 
     private async Task<WorkloadUpdateResult> UpdateLogicalAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
-        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken, bool allowUntrusted)
+        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, bool allowUntrusted, CancellationToken cancellationToken)
     {
         WorkloadEntry currentEntry = await _deploymentService.GetUpdateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, cancellationToken);
         LogicalPackage currentLogical = currentEntry.LogicalPackage!;

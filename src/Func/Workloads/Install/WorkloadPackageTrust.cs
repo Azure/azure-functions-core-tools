@@ -17,6 +17,9 @@ internal class WorkloadPackageTrust : IWorkloadPackageTrust
     private const string RootResource = "Azure.Functions.Cli.Workloads.Install.trusted-roots.pem";
     private const string CodeSigningOid = "1.3.6.1.5.5.7.3.3";
     private const string TimestampingOid = "1.3.6.1.5.5.7.3.8";
+    private const string LifetimeSigningOid = "1.3.6.1.4.1.311.10.3.13";
+
+    protected virtual bool SupportsOfflineRevocation => !OperatingSystem.IsMacOS();
 
     public async Task<WorkloadPackageSnapshot> AcquireAsync(string path, bool allowUntrusted, CancellationToken cancellationToken)
     {
@@ -122,19 +125,31 @@ internal class WorkloadPackageTrust : IWorkloadPackageTrust
                     throw Reject("The validated author certificate does not identify Microsoft Corporation.");
                 }
 
-                X509Certificate2Collection extraStore = [];
-                extraStore.AddRange(signature.SignedCms.Certificates);
-                extraStore.AddRange(roots);
-                SignatureVerifySettings signatureSettings = new(
-                    allowIllegal: false, allowUntrusted: true, allowUnknownRevocation: true,
-                    reportUnknownRevocation: false, reportUntrustedRoot: false, revocationMode: RevocationMode.Offline);
-                SignatureVerificationSummary summary = signature.Verify(timestamp!, signatureSettings,
-                    NuGet.Common.HashAlgorithmName.SHA256, extraStore);
-                if (summary.Status != SignatureVerificationStatus.Valid)
+                signature.SignerInfo.CheckSignature(verifySignatureOnly: true);
+                if (!CertificateUtility.IsSignatureAlgorithmSupported(author)
+                    || !CertificateUtility.IsCertificatePublicKeyValid(author)
+                    || CertificateUtility.HasExtendedKeyUsage(author, LifetimeSigningOid)
+                    || CertificateUtility.IsCertificateValidityPeriodInTheFuture(author))
                 {
                     throw Reject("The NuGet author signature or certificate is invalid.");
                 }
 
+                // macOS treats Offline as Online. Keep its validation on the explicit NoCheck chains.
+                if (SupportsOfflineRevocation)
+                {
+                    X509Certificate2Collection extraStore = [];
+                    extraStore.AddRange(signature.SignedCms.Certificates);
+                    extraStore.AddRange(roots);
+                    SignatureVerifySettings signatureSettings = new(
+                        allowIllegal: false, allowUntrusted: true, allowUnknownRevocation: true,
+                        reportUnknownRevocation: false, reportUntrustedRoot: false, revocationMode: RevocationMode.Offline);
+                    SignatureVerificationSummary summary = signature.Verify(timestamp!, signatureSettings,
+                        NuGet.Common.HashAlgorithmName.SHA256, extraStore);
+                    if (summary.Status != SignatureVerificationStatus.Valid)
+                    {
+                        throw Reject("The NuGet author signature or certificate is invalid.");
+                    }
+                }
             }
             finally
             {

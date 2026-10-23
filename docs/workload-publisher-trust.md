@@ -34,9 +34,14 @@ at the verified timestamp. An expired certificate without a qualifying timestamp
 does not qualify. Multiple timestamps are rejected rather than selecting one
 implicitly.
 
-The CLI does not perform online OCSP/CRL revocation checks. NuGet author
-verification uses offline revocation mode; known cached revocation failures may
-still reject an archive. Repository-signature fallback and remote root-bundle
+The CLI does not perform online OCSP/CRL revocation checks. Custom author and
+timestamp chains disable revocation checks and certificate downloads. On Windows
+and Linux, additional NuGet author verification uses offline revocation mode;
+known cached revocation failures may still reject an archive. On macOS, where
+offline revocation is treated as online, that additional chain build is omitted.
+Cryptographic signature verification and author-certificate algorithm, key,
+purpose, validity, and lifetime-signing restrictions still apply. This is not a
+live revocation guarantee. Repository-signature fallback and remote root-bundle
 rotation are not supported.
 
 ## Explicit development installs and updates

@@ -291,7 +291,7 @@ public sealed class SetupRunnerProfileLifecycleTests
                 });
             PackageInstaller.InstallFromCatalogAsync(Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
                 Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>()).Returns(async call =>
+                cancellationToken: Arg.Any<CancellationToken>()).Returns(async call =>
                 {
                     string id = call.ArgAt<string>(0);
                     string version = call.ArgAt<NuGetVersion>(1).ToNormalizedString();

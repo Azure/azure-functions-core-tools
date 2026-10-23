@@ -477,19 +477,37 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
     }
 
     private static X509Certificate2 CreateAuthor(X509Certificate2 root, string subject, bool expired = false, bool timestamping = false,
-        int keySize = 2048, DateTimeOffset? notBefore = null, DateTimeOffset? notAfter = null)
-        => CreateAuthor(root, new X500DistinguishedName(subject), expired, timestamping, keySize, notBefore, notAfter);
+        int keySize = 2048, DateTimeOffset? notBefore = null, DateTimeOffset? notAfter = null, bool lifetimeSigning = false,
+        string? revocationUrl = null, bool weakCertificateSignature = false)
+        => CreateAuthor(root, new X500DistinguishedName(subject), expired, timestamping, keySize, notBefore, notAfter,
+            lifetimeSigning, revocationUrl, weakCertificateSignature);
 
     private static X509Certificate2 CreateAuthor(X509Certificate2 root, X500DistinguishedName subject, bool expired = false,
-        bool timestamping = false, int keySize = 2048, DateTimeOffset? notBefore = null, DateTimeOffset? notAfter = null)
+        bool timestamping = false, int keySize = 2048, DateTimeOffset? notBefore = null, DateTimeOffset? notAfter = null,
+        bool lifetimeSigning = false, string? revocationUrl = null, bool weakCertificateSignature = false)
     {
         using var key = RSA.Create(keySize);
-        CertificateRequest request = new(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        CertificateRequest request = new(subject, key,
+            weakCertificateSignature ? HashAlgorithmName.SHA1 : HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
-        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(timestamping ? "1.3.6.1.5.5.7.3.8" : "1.3.6.1.5.5.7.3.3")], true));
-        using X509Certificate2 certificate = request.Create(root, notBefore ?? DateTimeOffset.UtcNow.AddDays(-1),
-            notAfter ?? (expired ? DateTimeOffset.UtcNow.AddHours(-12) : DateTimeOffset.UtcNow.AddDays(1)), RandomNumberGenerator.GetBytes(16));
+        OidCollection purposes = [new Oid(timestamping ? "1.3.6.1.5.5.7.3.8" : "1.3.6.1.5.5.7.3.3")];
+        if (lifetimeSigning)
+        {
+            purposes.Add(new Oid("1.3.6.1.4.1.311.10.3.13"));
+        }
+
+        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(purposes, true));
+        if (revocationUrl is not null)
+        {
+            request.CertificateExtensions.Add(CertificateRevocationListBuilder.BuildCrlDistributionPointExtension([revocationUrl]));
+        }
+        DateTimeOffset start = notBefore ?? DateTimeOffset.UtcNow.AddDays(-1);
+        DateTimeOffset end = notAfter ?? (expired ? DateTimeOffset.UtcNow.AddHours(-12) : DateTimeOffset.UtcNow.AddDays(1));
+        byte[] serial = RandomNumberGenerator.GetBytes(16);
+        using X509Certificate2 certificate = weakCertificateSignature
+            ? request.Create(root.SubjectName, new Sha1CertificateSignatureGenerator(root), start, end, serial)
+            : request.Create(root, start, end, serial);
         return certificate.CopyWithPrivateKey(key);
     }
 
@@ -565,8 +583,10 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
         return signed;
     }
 
-    private sealed class TestRootTrust(X509Certificate2 root, Action? onLoad = null) : WorkloadPackageTrust
+    private sealed class TestRootTrust(X509Certificate2 root, Action? onLoad = null, bool? supportsOfflineRevocation = null) : WorkloadPackageTrust
     {
+        protected override bool SupportsOfflineRevocation => supportsOfflineRevocation ?? base.SupportsOfflineRevocation;
+
         protected override X509Certificate2Collection LoadRoots()
         {
             onLoad?.Invoke();

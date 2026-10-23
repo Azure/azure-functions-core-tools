@@ -28,10 +28,10 @@ public sealed class WorkloadTrustCommandTests
         var options = Options.Create(new WorkloadCatalogOptions());
         var result = new WorkloadInstallResult(new WorkloadEntry { PackageId = "test.workload", PackageVersion = "1.0.0" }, false);
         installer.InstallFromPackageAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>(), Arg.Any<bool>()).Returns(result);
+            Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(result);
         installer.InstallFromCatalogAsync(Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(),
             Arg.Any<bool?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>(), Arg.Any<bool>()).Returns(result);
+            Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(result);
         WorkloadInstallCommand command = new(interaction, installer, store,
             new WorkloadUpdateCommand(interaction, installer, store, options), options);
         List<string> args = [local ? "test.nupkg" : "test.workload"];
@@ -46,12 +46,12 @@ public sealed class WorkloadTrustCommandTests
         if (local)
         {
             await installer.Received(1).InstallFromPackageAsync("test.nupkg", false,
-                Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>(), allowUntrusted);
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(), allowUntrusted, Arg.Any<CancellationToken>());
         }
         else
         {
             await installer.Received(1).InstallFromCatalogAsync("test.workload", null, null, null, false, false,
-                Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>(), allowUntrusted);
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(), allowUntrusted, Arg.Any<CancellationToken>());
         }
     }
 
@@ -77,10 +77,10 @@ public sealed class WorkloadTrustCommandTests
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
         var result = new WorkloadUpdateResult(entry, "1.0.0", true);
         installer.UpdateAsync(Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(), Arg.Any<bool?>(),
-            Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>(), Arg.Any<bool>()).Returns(result);
+            Arg.Any<bool>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(result);
         installer.UpdateAsync(Arg.Any<string>(), Arg.Any<NuGetVersion?>(), Arg.Any<string?>(), Arg.Any<bool?>(),
             Arg.Any<bool>(), Arg.Any<WorkloadOwnershipKind>(), Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>(), Arg.Any<bool>()).Returns(result);
+            Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(result);
         WorkloadUpdateCommand command = new(new TestInteractionService(), installer, store, Options.Create(new WorkloadCatalogOptions()));
         string id = logical ? "test.pointer" : "test.workload";
         List<string> args = [all ? "--all" : id];
@@ -95,12 +95,12 @@ public sealed class WorkloadTrustCommandTests
         if (logical)
         {
             await installer.Received(1).UpdateAsync(id, null, null, null, false, WorkloadOwnershipKind.Logical,
-                Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>(), allowUntrusted);
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(), allowUntrusted, Arg.Any<CancellationToken>());
         }
         else
         {
             await installer.Received(1).UpdateAsync(id, null, null, null, false,
-                Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>(), allowUntrusted);
+                Arg.Any<IProgress<WorkloadInstallProgress>?>(), allowUntrusted, Arg.Any<CancellationToken>());
         }
     }
 
@@ -115,7 +115,7 @@ public sealed class WorkloadTrustCommandTests
         WorkloadEntry entry = new() { PackageId = "test.workload", PackageVersion = "1.0.0" };
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
         installer.UpdateAsync("test.workload", null, null, null, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>(), allowUntrusted).Returns(new WorkloadUpdateResult(entry, "1.0.0", true));
+            cancellationToken: Arg.Any<CancellationToken>(), allowUntrusted: allowUntrusted).Returns(new WorkloadUpdateResult(entry, "1.0.0", true));
         InteractiveInteraction interaction = new();
         WorkloadInstallCommand command = new(interaction, installer, store,
             new WorkloadUpdateCommand(interaction, installer, store, options), options);
@@ -129,7 +129,7 @@ public sealed class WorkloadTrustCommandTests
 
         exit.Should().Be(0);
         await installer.Received(1).UpdateAsync("test.workload", null, null, null, false,
-            Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>(), allowUntrusted);
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>(), allowUntrusted: allowUntrusted);
     }
 
     [Fact]
@@ -147,10 +147,10 @@ public sealed class WorkloadTrustCommandTests
         WorkloadEntry accepted = new() { PackageId = "good.workload", PackageVersion = "1.0.0" };
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([rejected, accepted]);
         installer.UpdateAsync("bad.pointer", null, null, null, false, WorkloadOwnershipKind.Logical,
-            Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>(), false).Returns(Task.FromException<WorkloadUpdateResult>(
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>(), allowUntrusted: false).Returns(Task.FromException<WorkloadUpdateResult>(
                 new InvalidWorkloadException("publisher verification failed")));
         installer.UpdateAsync(accepted.PackageId, null, null, null, false, Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>(), false)
+            cancellationToken: Arg.Any<CancellationToken>(), allowUntrusted: false)
             .Returns(new WorkloadUpdateResult(accepted, "1.0.0", true));
         TestInteractionService interaction = new();
         WorkloadUpdateCommand command = new(interaction, installer, store, Options.Create(new WorkloadCatalogOptions()));
@@ -161,7 +161,7 @@ public sealed class WorkloadTrustCommandTests
         interaction.Lines.Should().Contain(line => line.StartsWith("ERROR:", StringComparison.Ordinal)
             && line.Contains("bad.pointer", StringComparison.Ordinal) && line.Contains("publisher verification failed", StringComparison.Ordinal));
         await installer.Received(1).UpdateAsync(accepted.PackageId, null, null, null, false,
-            Arg.Any<IProgress<WorkloadInstallProgress>?>(), Arg.Any<CancellationToken>(), false);
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(), cancellationToken: Arg.Any<CancellationToken>(), allowUntrusted: false);
     }
 
     private static Task<int> InvokeAsync(Command command, List<string> args)
