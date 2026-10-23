@@ -152,10 +152,11 @@ public sealed partial class ArtifactBindingJourneyTests : IDisposable
         await SeedAsync(channel: BundleChannel.Experimental);
         QuickstartCatalog catalog = new([Remote()], new(QuickstartCatalogOrigin.LocalFile, null, null));
 
-        var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(catalog,
+        var projection = await new QuickstartInstalledTemplates(Factory, _scopes, Guided(new(false, [], [])).Qualification).ProjectAsync(catalog,
             new(DirectoryTarget, _selection.Owner, BundleChannel.Experimental), CancellationToken.None);
 
         projection.Catalog.Entries.Should().BeEmpty();
+        projection.ActionableEntries.Should().ContainSingle().Which.Availability.Should().Be(QuickstartAvailability.Installed);
         projection.Installed.Should().Contain(item => item.Entry.Identity == Identity
             && item.Selection != null && item.Selection.Channel == BundleChannel.Experimental);
         catalog.Entries.Single().MetadataStatus.Should().Be(QuickstartPackageMetadataStatus.Unverified);
@@ -167,10 +168,11 @@ public sealed partial class ArtifactBindingJourneyTests : IDisposable
         await SeedAsync(channel: BundleChannel.Experimental);
         QuickstartCatalog catalog = new([Remote()], new(QuickstartCatalogOrigin.LocalFile, null, null));
 
-        var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(catalog,
+        var projection = await new QuickstartInstalledTemplates(Factory, _scopes, Guided(new(false, [], [])).Qualification).ProjectAsync(catalog,
             new(DirectoryTarget, _selection.Owner), CancellationToken.None);
 
         projection.Catalog.Entries.Should().BeEmpty();
+        projection.ActionableEntries.Should().ContainSingle().Which.Availability.Should().Be(QuickstartAvailability.Installed);
         projection.Installed.Should().Contain(item => item.Entry.Identity == Identity
             && item.Selection != null && item.Selection.Channel == null);
         catalog.Entries.Single().MetadataStatus.Should().Be(QuickstartPackageMetadataStatus.Unverified);
@@ -305,7 +307,7 @@ public sealed partial class ArtifactBindingJourneyTests : IDisposable
     }
 
     [Fact]
-    public async Task Projection_QualifiedCurrentInstallation_OmitsOnlyExactRemoteDuplicateAndPreservesUnverifiedStatus()
+    public async Task Projection_QualifiedCurrentInstallationShowsVerifiedStateAndPreservesCatalogClaims()
     {
         await SeedAsync();
         var exact = Remote();
@@ -322,28 +324,82 @@ public sealed partial class ArtifactBindingJourneyTests : IDisposable
         QuickstartCatalog catalog = new(entries, new(QuickstartCatalogOrigin.LocalFile, null, null));
         var before = HiveBytes();
 
-        var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(catalog,
+        var projection = await new QuickstartInstalledTemplates(Factory, _scopes, Guided(new(false, [], [])).Qualification).ProjectAsync(catalog,
             new(DirectoryTarget, _selection.Owner), CancellationToken.None);
 
-        projection.Catalog.Entries.Should().Equal(entries.Skip(1));
-        projection.Catalog.Entries.Where(entry => entry.MetadataStatus != QuickstartPackageMetadataStatus.Conflicting)
-            .Should().OnlyContain(entry => entry.MetadataStatus == QuickstartPackageMetadataStatus.Unverified);
+        projection.Catalog.Entries.Should().BeEmpty();
+        projection.ActionableEntries.Should().ContainSingle().Which.Availability.Should().Be(QuickstartAvailability.Installed);
         projection.Installed.Should().Contain(item => item.Entry.Identity == Identity && item.Selection != null);
+        catalog.Entries.Should().Equal(entries);
+        catalog.Entries.Select(entry => entry.MetadataStatus).Should().Equal([
+            QuickstartPackageMetadataStatus.Unverified,
+            QuickstartPackageMetadataStatus.Unverified,
+            QuickstartPackageMetadataStatus.Unverified,
+            QuickstartPackageMetadataStatus.Unverified,
+            QuickstartPackageMetadataStatus.Unverified,
+            QuickstartPackageMetadataStatus.Unverified,
+            QuickstartPackageMetadataStatus.Conflicting,
+        ]);
         HiveBytes().Should().BeEquivalentTo(before);
         Directory.Exists(Target).Should().BeFalse();
     }
 
     [Fact]
-    public async Task Projection_EmptyAuthorityOrUnknownOwnership_KeepsRemoteRowsWithExplicitDiagnostics()
+    public async Task Projection_QualifiedUninstalledNomination_IsAvailableToInstallWithoutPayloadOrWrites()
+    {
+        await SeedAsync(installTemplates: false);
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        QuickstartCatalog catalog = new([Remote()], new(QuickstartCatalogOrigin.LocalFile, null, null));
+        var before = HiveBytes();
+
+        QuickstartInstalledProjection projection = await new QuickstartInstalledTemplates(Factory, _scopes,
+            journey.Qualification).ProjectAsync(catalog, new(DirectoryTarget, _selection.Owner), CancellationToken.None);
+
+        projection.ActionableEntries.Should().ContainSingle().Which.Availability
+            .Should().Be(QuickstartAvailability.AvailableToInstall);
+        projection.Catalog.Entries.Should().ContainSingle();
+        projection.ExcludedCount.Should().Be(0);
+        journey.Payload.Requested.Should().BeEmpty();
+        journey.Lifecycle.Prepared.Should().BeNull();
+        interaction.Confirmations.Should().BeEmpty();
+        HiveBytes().Should().BeEquivalentTo(before);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Projection_QualifiedOwnedUpdate_IsUpdateAvailableWithoutPreparingOrCommitting()
+    {
+        await NominateOwnedUpdateAsync();
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction);
+        QuickstartCatalog catalog = new([Remote()], new(QuickstartCatalogOrigin.LocalFile, null, null));
+
+        QuickstartInstalledProjection projection = await new QuickstartInstalledTemplates(Factory, _scopes,
+            journey.Qualification).ProjectAsync(catalog, new(DirectoryTarget, _selection.Owner), CancellationToken.None);
+
+        projection.ActionableEntries.Should().ContainSingle().Which.Availability
+            .Should().Be(QuickstartAvailability.UpdateAvailable);
+        projection.Catalog.Entries.Should().ContainSingle();
+        projection.ExcludedCount.Should().Be(0);
+        journey.Payload.Requested.Should().BeEmpty();
+        journey.Lifecycle.Prepared.Should().BeNull();
+        interaction.Confirmations.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Projection_EmptyAuthorityOrUnknownOwnership_ExcludesRowsAndRetainsDiagnostics()
     {
         await SeedAsync();
         _catalog.Json = """{"schemaVersion":2,"revision":"empty-production-control","stacks":[],"artifacts":[]}""";
         QuickstartCatalog catalog = new([Remote()], new(QuickstartCatalogOrigin.LocalFile, null, null));
 
-        var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(catalog,
+        var projection = await new QuickstartInstalledTemplates(Factory, _scopes, Guided(new(false, [], [])).Qualification).ProjectAsync(catalog,
             new(DirectoryTarget, _selection.Owner), CancellationToken.None);
 
-        projection.Catalog.Entries.Should().Equal(catalog.Entries);
+        projection.Catalog.Entries.Should().BeEmpty();
+        projection.ExcludedCount.Should().Be(1);
         projection.Installed.Should().OnlyContain(item => item.Selection == null && item.Diagnostic != null);
     }
 
@@ -356,7 +412,7 @@ public sealed partial class ArtifactBindingJourneyTests : IDisposable
         var before = HiveBytes();
         QuickstartCatalog catalog = new([Remote()], new(QuickstartCatalogOrigin.LocalFile, null, null));
 
-        Func<Task> project = () => new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(catalog,
+        Func<Task> project = () => new QuickstartInstalledTemplates(Factory, _scopes, Guided(new(false, [], [])).Qualification).ProjectAsync(catalog,
             new(DirectoryTarget, _selection.Owner), CancellationToken.None);
 
         await project.Should().ThrowAsync<TemplateStoreRecoveryRequiredException>();
@@ -629,7 +685,7 @@ public sealed partial class ArtifactBindingJourneyTests : IDisposable
         await SeedAsync("constraint");
         QuickstartCatalog catalog = new([Remote()], new(QuickstartCatalogOrigin.LocalFile, null, null));
 
-        var result = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(catalog,
+        var result = await new QuickstartInstalledTemplates(Factory, _scopes, Guided(new(false, [], [])).Qualification).ProjectAsync(catalog,
             new(DirectoryTarget, _selection.Owner), CancellationToken.None);
 
         result.Catalog.Entries.Should().BeEmpty("only a duplicate installation is suppressed, not its eligibility diagnosis");

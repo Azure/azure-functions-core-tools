@@ -28,7 +28,7 @@ public sealed class GuidedInitCommandTests
         string target = Path.Combine(Path.GetTempPath(), "func-native-unused-" + Guid.NewGuid().ToString("N"));
         string[] raw = ["--greeting", "hello world", "--enabled=false", "--param:Stack", "custom", "-p:i", "literal", "--value", "@literal"];
 
-        var parsed = root.Parse(["init", target, "--guided", "--stack", "node", "--template", "Fixture.Full.Identity",
+        var parsed = root.Parse(["init", target, "--stack", "node", "--template", "Fixture.Full.Identity",
             "--name", "Project with spaces", .. raw.Select(token => "--template-argument=" + token)], new() { EnablePosixBundling = false });
         int exit = await parsed.InvokeAsync();
 
@@ -55,7 +55,7 @@ public sealed class GuidedInitCommandTests
             string target = Path.Combine(rootPath, "new project");
             string nested = Path.Combine(rootPath, "nested.rsp");
             string response = Path.Combine(rootPath, "init.rsp");
-            File.WriteAllText(nested, "--guided --stack node --template Fixture.Full.Identity --non-interactive");
+            File.WriteAllText(nested, "--stack node --template Fixture.Full.Identity --non-interactive");
             File.WriteAllText(response, $"\"{target}\" @{nested} --template-argument=--greeting --template-argument \"hello world\" "
                 + $"--template-argument=--value --template-argument=@{nested} --template-argument=--enabled=false "
                 + "--template-argument=--path --template-argument \"C:\\fixtures\\new folder\"");
@@ -97,9 +97,9 @@ public sealed class GuidedInitCommandTests
         string[] tokens = mode switch
         {
             "legacy" => [target],
-            "menu" => [target, "--guided"],
-            "omitted-target" => ["--guided", "--template", "installed"],
-            _ => [target, "--guided", "--template", "installed", "--initializer-option"],
+            "menu" => [target],
+            "omitted-target" => ["--template", "installed"],
+            _ => [target, "--template", "installed", "--initializer-option"],
         };
 
         int exit = await root.Parse(["init", .. tokens, "--template-argument=--greeting", "--template-argument=hello"]).InvokeAsync();
@@ -122,7 +122,7 @@ public sealed class GuidedInitCommandTests
         RootCommand root = [command];
         string target = Path.Combine(Path.GetTempPath(), "func-native-typo-" + Guid.NewGuid().ToString("N"));
 
-        var parsed = root.Parse(["init", target, "--guided", "--template", "installed", unknown,
+        var parsed = root.Parse(["init", target, "--template", "installed", unknown,
             "--template-argument=--greeting", "--template-argument=hello"],
             new() { EnablePosixBundling = false });
         int exit = await parsed.InvokeAsync();
@@ -139,7 +139,7 @@ public sealed class GuidedInitCommandTests
     {
         RootCommand root = [Command(new(), Substitute.For<IQuickstartInitCoordinator>())];
 
-        var parsed = root.Parse(["init", "--guided", "--template", "installed", "--", "--greeting", "hello"]);
+        var parsed = root.Parse(["init", "--template", "installed", "--", "--greeting", "hello"]);
 
         parsed.Errors.Should().Contain(error => error.Message.Contains("Unrecognized option '--greeting'", StringComparison.Ordinal));
     }
@@ -157,7 +157,7 @@ public sealed class GuidedInitCommandTests
                 .Returns(new InitExecutionResult("fixtureBoundary", true));
             RootCommand root = [Command(new(), coordinator)];
 
-            int exit = await root.Parse(["init", Path.Combine(rootPath, "target"), "--guided", "--template", "installed",
+            int exit = await root.Parse(["init", Path.Combine(rootPath, "target"), "--template", "installed",
                 "--template-argument=--greeting", "--template-argument=@" + response]).InvokeAsync();
 
             exit.Should().Be(0);
@@ -183,7 +183,7 @@ public sealed class GuidedInitCommandTests
             string response = Path.Combine(rootPath, "init.rsp");
             File.WriteAllText(flags, "--template-argument=--acquire-quickstart --template-argument=--guided --template-argument=--stack --template-argument=injected");
             File.WriteAllText(nested, $"--template-argument=--greeting --template-argument \"nested words\" @{flags}");
-            File.WriteAllText(response, $"\"{Path.Combine(rootPath, "target")}\" --guided --stack node --quickstart fixture @{nested}");
+            File.WriteAllText(response, $"\"{Path.Combine(rootPath, "target")}\" --stack node --quickstart fixture @{nested}");
             var coordinator = Substitute.For<IQuickstartInitCoordinator>();
             coordinator.ExecuteAsync(Arg.Any<QuickstartInitRequest>(), Arg.Any<CancellationToken>())
                 .Returns(new InitExecutionResult("fixtureBoundary", true));
@@ -193,7 +193,7 @@ public sealed class GuidedInitCommandTests
 
             exit.Should().Be(0);
             await coordinator.Received(1).ExecuteAsync(Arg.Is<QuickstartInitRequest>(request =>
-                !request.AuthorizeAcquisition && request.QuickstartId == "fixture" && request.Init.ExplicitStack == "node"
+                request.AuthorizeAcquisition && request.QuickstartId == "fixture" && request.Init.ExplicitStack == "node"
                 && request.Init.RawTemplateTokens.SequenceEqual(new[] { "--greeting", "nested words", "--acquire-quickstart", "--guided", "--stack", "injected" })),
                 Arg.Any<CancellationToken>());
         }
@@ -210,7 +210,7 @@ public sealed class GuidedInitCommandTests
         try
         {
             string response = Path.Combine(rootPath, "init.rsp");
-            File.WriteAllText(response, $"target --guided --template installed --template-argument @{Path.Combine(rootPath, "missing.rsp")}");
+            File.WriteAllText(response, $"target --template installed --template-argument @{Path.Combine(rootPath, "missing.rsp")}");
             RootCommand root = [Command(new(), Substitute.For<IQuickstartInitCoordinator>())];
 
             var parsed = root.Parse(["init", "@" + response]);
@@ -232,7 +232,7 @@ public sealed class GuidedInitCommandTests
             string nested = Path.Combine(rootPath, "tail.rsp");
             string response = Path.Combine(rootPath, "init.rsp");
             File.WriteAllText(nested, "-- --greeting \"quoted words\"");
-            File.WriteAllText(response, $"target --guided --template installed @{nested}");
+            File.WriteAllText(response, $"target --template installed @{nested}");
             RootCommand root = [Command(new(), Substitute.For<IQuickstartInitCoordinator>())];
 
             var parsed = root.Parse(["init", "@" + response]);
@@ -256,44 +256,58 @@ public sealed class GuidedInitCommandTests
     {
         RootCommand root = [Command(new(), Substitute.For<IQuickstartInitCoordinator>())];
 
-        var parsed = root.Parse(["init", "target", "--guided", "--template", "installed", .. arguments]);
+        var parsed = root.Parse(["init", "target", "--template", "installed", .. arguments]);
 
         parsed.Errors.Should().NotBeEmpty();
     }
 
-    [Theory]
-    [InlineData("--dry-run")]
-    [InlineData("--non-interactive")]
-    [InlineData("--acquire-quickstart")]
-    [InlineData("--quickstart", "sample")]
-    [InlineData("--template", "unknown")]
-    public async Task GuidedOptions_WithoutOptIn_RejectWithoutCallingCoordinatorOrCreatingTarget(params string[] arguments)
+    [Fact]
+    public async Task QuickstartOption_RoutesAndAuthorizesAcquisition()
     {
         var interaction = new TestInteractionService();
         var coordinator = Substitute.For<IQuickstartInitCoordinator>();
-        var command = Command(interaction, coordinator);
-        RootCommand root = [command];
-        string target = Path.Combine(Path.GetTempPath(), "func-guided-unused-" + Guid.NewGuid().ToString("N"));
+        coordinator.ExecuteAsync(Arg.Any<QuickstartInitRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new InitExecutionResult("fixtureBoundary", true));
+        RootCommand root = [Command(interaction, coordinator)];
+        string target = Path.Combine(Path.GetTempPath(), "func-quickstart-implied-" + Guid.NewGuid().ToString("N"));
 
-        int exit = await root.Parse(["init", target, .. arguments]).InvokeAsync();
+        int exit = await root.Parse(["init", target, "--quickstart", "sample"]).InvokeAsync();
 
+        exit.Should().Be(0);
+        await coordinator.Received(1).ExecuteAsync(Arg.Is<QuickstartInitRequest>(request =>
+            request.QuickstartId == "sample" && request.AuthorizeAcquisition), Arg.Any<CancellationToken>());
+        Directory.Exists(target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RemovedGuidedOption_RejectsWithoutDispatchOrTargetMutation()
+    {
+        var interaction = new TestInteractionService();
+        var coordinator = Substitute.For<IQuickstartInitCoordinator>();
+        RootCommand root = [Command(interaction, coordinator)];
+        string target = Path.Combine(Path.GetTempPath(), "func-retired-guided-" + Guid.NewGuid().ToString("N"));
+
+        var parsed = root.Parse(["init", target, "--guided", "--quickstart", "sample"]);
+        int exit = await parsed.InvokeAsync();
+
+        parsed.Errors.Should().Contain(error => error.Message.Contains("--guided", StringComparison.Ordinal));
         exit.Should().Be(1);
-        interaction.AllOutput.Should().Contain("--guided");
         coordinator.ReceivedCalls().Should().BeEmpty();
         Directory.Exists(target).Should().BeFalse();
     }
 
     [Theory]
+    [InlineData("--guided")]
     [InlineData("--yes")]
     [InlineData("--install")]
     [InlineData("--source", "https://unreviewed.invalid")]
     [InlineData("--package", "Unreviewed.Package")]
     [InlineData("-guided")]
-    public void RetiredOrUnknownAuthorizationGrammar_IsStrictlyRejected(params string[] arguments)
+    public void UnsupportedAuthorizationGrammar_IsStrictlyRejected(params string[] arguments)
     {
         RootCommand root = [Command(new(), Substitute.For<IQuickstartInitCoordinator>())];
 
-        var parsed = root.Parse(["init", "--guided", .. arguments], new() { EnablePosixBundling = false });
+        var parsed = root.Parse(["init", .. arguments], new() { EnablePosixBundling = false });
 
         parsed.Errors.Should().NotBeEmpty();
     }
@@ -305,7 +319,7 @@ public sealed class GuidedInitCommandTests
         var coordinator = Substitute.For<IQuickstartInitCoordinator>();
         RootCommand root = [Command(interaction, coordinator)];
 
-        int exit = await root.Parse(["init", "--guided", "--template", "installed", "--acquire-quickstart"]).InvokeAsync();
+        int exit = await root.Parse(["init", "--template", "installed", "--acquire-quickstart"]).InvokeAsync();
 
         exit.Should().Be(1);
         coordinator.ReceivedCalls().Should().BeEmpty();
@@ -313,7 +327,7 @@ public sealed class GuidedInitCommandTests
     }
 
     [Fact]
-    public async Task GuidedRoute_WithInitializerSpecificOption_RejectsInsteadOfIgnoringIt()
+    public async Task TemplateRoute_WithInitializerSpecificOption_RejectsInsteadOfIgnoringIt()
     {
         var interaction = new TestInteractionService();
         var coordinator = Substitute.For<IQuickstartInitCoordinator>();
@@ -321,7 +335,7 @@ public sealed class GuidedInitCommandTests
         command.Options.Add(new Option<bool>("--initializer-option"));
         RootCommand root = [command];
 
-        int exit = await root.Parse(["init", "--guided", "--initializer-option"]).InvokeAsync();
+        int exit = await root.Parse(["init", "--template", "installed", "--initializer-option"]).InvokeAsync();
 
         exit.Should().Be(1);
         coordinator.ReceivedCalls().Should().BeEmpty();
@@ -329,12 +343,13 @@ public sealed class GuidedInitCommandTests
     }
 
     [Fact]
-    public void Help_DescribesStagedScopeAndSeparateAcquisitionAuthorization()
+    public void Help_DescribesTemplateAndAcquisitionAuthorization()
     {
         var command = Command(new(), Substitute.For<IQuickstartInitCoordinator>());
 
-        command.GuidedOption.Description.Should().Contain("staged").And.Contain("ordinary init");
-        command.AcquireQuickstartOption.Description.Should().Contain("Explicit script authorization").And.Contain("--quickstart");
+        command.Options.Should().NotContain(option => option.Aliases.Contains("--guided"));
+        command.QuickstartOption.Description.Should().Contain("qualified acquisition").And.Contain("project creation");
+        command.AcquireQuickstartOption.Description.Should().Contain("Explicit authorization").And.Contain("--quickstart");
         command.TemplateOption.Description.Should().Contain("never trigger acquisition");
         command.DryRunOption.Description.Should().Contain("without writes");
         command.TemplateArgumentOption.Description.Should().Contain("--template-argument=--symbol").And.Contain("explicit path");
@@ -342,7 +357,7 @@ public sealed class GuidedInitCommandTests
     }
 
     [Fact]
-    public async Task PublicHelp_RendersOptInAndAcquisitionGrammarWithoutDispatch()
+    public async Task PublicHelp_RendersTemplateAndAcquisitionGrammarWithoutDispatch()
     {
         var interaction = new TestInteractionService();
         var root = TestParser.CreateRoot(interaction);
@@ -350,10 +365,11 @@ public sealed class GuidedInitCommandTests
         int exit = await root.Parse(["init", "--help"]).InvokeAsync();
 
         exit.Should().Be(0);
-        interaction.AllOutput.Should().Contain("--guided").And.Contain("--acquire-quickstart").And.Contain("--template");
+        interaction.AllOutput.Should().NotContain("--guided");
+        interaction.AllOutput.Should().Contain("--acquire-quickstart").And.Contain("--template");
         interaction.AllOutput.Should().NotContain("--template-argument");
         interaction.AllOutput.Should().Contain("func init MyApp").And.Contain("Quickstarts need no template parameters");
-        interaction.AllOutput.Should().Contain("staged");
+        interaction.AllOutput.Should().Contain("Exact discovery catalog ID").And.Contain("authorization");
     }
 
     [Fact]
@@ -364,7 +380,7 @@ public sealed class GuidedInitCommandTests
         {
             string target = Path.Combine(rootPath, "new-project");
             string response = Path.Combine(rootPath, "init.rsp");
-            File.WriteAllText(response, $"\"{target}\" --guided --stack node --quickstart fixture --acquire-quickstart --non-interactive");
+            File.WriteAllText(response, $"\"{target}\" --stack node --quickstart fixture --acquire-quickstart --non-interactive");
             var coordinator = Substitute.For<IQuickstartInitCoordinator>();
             coordinator.ExecuteAsync(Arg.Any<QuickstartInitRequest>(), Arg.Any<CancellationToken>())
                 .Returns(new InitExecutionResult("fixtureBoundary", true));
@@ -392,7 +408,7 @@ public sealed class GuidedInitCommandTests
             .Returns(new InitExecutionResult("fixtureBoundary", true));
         FuncRootCommand root = [Command(new(), coordinator)];
 
-        int exit = await root.Parse(["init", "--guided", "--stack", "node", "--template", "installed", "--verbose"]).InvokeAsync();
+        int exit = await root.Parse(["init", "--stack", "node", "--template", "installed", "--verbose"]).InvokeAsync();
 
         exit.Should().Be(0);
         await coordinator.Received(1).ExecuteAsync(Arg.Is<QuickstartInitRequest>(request =>

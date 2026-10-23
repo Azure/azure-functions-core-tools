@@ -12,4 +12,6 @@ internal sealed record InstalledTemplateArtifact(TemplateCatalogEntry Entry,
     Acquisition.NativeTemplateSelection? Selection, string? Diagnostic)
 {
     public Acquisition.BundledBasicSelection? BundledSelection { get; init; }
+
+    public Exception? Failure { get; init; }
 }

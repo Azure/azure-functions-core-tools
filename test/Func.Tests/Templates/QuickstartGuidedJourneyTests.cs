@@ -44,7 +44,7 @@ public sealed partial class ArtifactBindingJourneyTests
         var command = GuidedCommand(journey.Coordinator, interaction);
         command.Options.Add(new Option<string>("--initializer-option", "-i"));
         RootCommand root = [command];
-        string[] arguments = ["init", Target, "--guided", "--stack", "node", "--language", "JavaScript", "--template", Identity,
+        string[] arguments = ["init", Target, "--language", "JavaScript", "--template", Identity,
             "--name", "Project with spaces", "--non-interactive"];
         string[] raw = ["--required", "supplied", "--greeting", "hello world", "--enabled=false", "--count", "42",
             "--flavor", "bold", "--param:Stack", "native-stack", "-p:i", "native-init"];
@@ -94,7 +94,7 @@ public sealed partial class ArtifactBindingJourneyTests
         RootCommand root = [command];
         var before = TemplateState();
 
-        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--template", Identity, "--non-interactive",
+        int exit = await root.Parse(["init", Target, "--template", Identity, "--non-interactive",
             "--template-argument=--required", "--template-argument=supplied",
             .. suffix.Select(token => "--template-argument=" + token)]).InvokeAsync();
 
@@ -116,7 +116,7 @@ public sealed partial class ArtifactBindingJourneyTests
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
         var before = TemplateState();
 
-        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--template", missingRequired ? Identity : "Fixture.Missing",
+        int exit = await root.Parse(["init", Target, "--template", missingRequired ? Identity : "Fixture.Missing",
             "--non-interactive", "--template-argument=--greeting", "--template-argument=optional"]).InvokeAsync();
 
         exit.Should().Be(1);
@@ -126,50 +126,53 @@ public sealed partial class ArtifactBindingJourneyTests
         journey.Payload.Requested.Should().BeEmpty();
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NativeArguments_PublicScriptQuickstart_RequiresSeparateAcquisitionAuthorization(bool authorize)
+    [Fact]
+    public async Task NativeArguments_PublicQuickstart_AuthorizesAcquisitionWithoutRedundantFlags()
     {
         await SeedAsync("parameters", installTemplates: false);
         GuidedInteraction interaction = new(false, [], []);
         var journey = Guided(interaction);
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
-        string[] authorization = authorize ? ["--acquire-quickstart"] : [];
 
-        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture", "--non-interactive",
-            .. authorization, "--template-argument=--required", "--template-argument=script",
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--non-interactive",
+            "--template-argument=--required", "--template-argument=script",
             "--template-argument=--greeting", "--template-argument=selected",
             "--template-argument=--enabled", "--template-argument=false"]).InvokeAsync();
 
-        if (authorize)
-        {
-            exit.Should().Be(0, interaction.AllOutput);
-            journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
-            journey.Lifecycle.ObservedFreshBinding.Should().BeTrue();
-            File.Exists(journey.Lifecycle.Prepared!.Archive).Should().BeFalse();
-            File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should()
-                .Be("script|selected|False|1|plain|default-stack|default-init|target");
-            File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
-        }
-        else
-        {
-            exit.Should().Be(1);
-            journey.Payload.Requested.Should().BeEmpty();
-            Directory.Exists(Target).Should().BeFalse();
-            interaction.AllOutput.Should().Contain("Scripts must explicitly pass --acquire-quickstart");
-        }
+        exit.Should().Be(0, interaction.AllOutput);
+        journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
+        journey.Lifecycle.ObservedFreshBinding.Should().BeTrue();
+        File.Exists(journey.Lifecycle.Prepared!.Archive).Should().BeFalse();
+        File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should()
+            .Be("script|selected|False|1|plain|default-stack|default-init|target");
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
     }
 
     [Fact]
-    public async Task NativeArguments_PublicResponseExpandedValuesCannotAuthorizeAcquisition()
+    public async Task QuickstartOption_InteractiveRouteKeepsSeparateAcquisitionAndCreationConfirmations()
     {
-        await SeedAsync("parameters", installTemplates: false);
+        await SeedAsync(installTemplates: false);
+        GuidedInteraction interaction = new(true, [], [true, false]);
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture"]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.Confirmations.Should().Equal(false, false);
+        journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
+        (await _ownership.GetRetainedAsync(PackageId, CancellationToken.None)).Should().NotBeNull();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task NativeArguments_PublicResponseExpandedValuesCannotNominateQuickstart()
+    {
+        await SeedAsync(installTemplates: false);
         string flags = Path.Combine(_root, "authorization.rsp");
         string response = Path.Combine(_root, "init.rsp");
-        File.WriteAllText(flags, "--template-argument=--acquire-quickstart");
-        File.WriteAllText(response, $"\"{Target}\" --guided --stack node --quickstart fixture --non-interactive "
-            + $"--template-argument=--required --template-argument=supplied @{flags}");
+        File.WriteAllText(flags, "--template-argument=--quickstart --template-argument=fixture");
+        File.WriteAllText(response, $"\"{Target}\" --stack node --non-interactive @{flags}");
         GuidedInteraction interaction = new(false, [], []);
         var journey = Guided(interaction);
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
@@ -179,7 +182,7 @@ public sealed partial class ArtifactBindingJourneyTests
         exit.Should().Be(1);
         journey.Payload.Requested.Should().BeEmpty();
         Directory.Exists(Target).Should().BeFalse();
-        interaction.AllOutput.Should().Contain("Scripts must explicitly pass --acquire-quickstart");
+        interaction.AllOutput.Should().Contain("--quickstart catalog ID");
     }
 
     [Fact]
@@ -191,7 +194,7 @@ public sealed partial class ArtifactBindingJourneyTests
         string response = Path.Combine(_root, "init.rsp");
         File.WriteAllText(literal, "--acquire-quickstart --stack wrong");
         File.WriteAllText(nested, "--template-argument=--required --template-argument=from-response");
-        File.WriteAllText(response, $"\"{Target}\" --guided --stack node --template {Identity} --non-interactive @{nested} "
+        File.WriteAllText(response, $"\"{Target}\" --stack node --template {Identity} --non-interactive @{nested} "
             + $"--template-argument=--greeting \"--template-argument=@{literal}\"");
         GuidedInteraction interaction = new(false, [], []);
         var journey = Guided(interaction);
@@ -216,7 +219,7 @@ public sealed partial class ArtifactBindingJourneyTests
         var journey = Guided(interaction);
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
 
-        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--template", Identity, "--non-interactive",
+        int exit = await root.Parse(["init", Target, "--template", Identity, "--non-interactive",
             "--template-argument=--required", "--template-argument=supplied", "--template-argument=--greeting=" + value]).InvokeAsync();
 
         exit.Should().Be(0, interaction.AllOutput);
@@ -272,7 +275,7 @@ public sealed partial class ArtifactBindingJourneyTests
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
         string[] flags = mode switch { "force" => ["--force"], "dry-run" => ["--dry-run"], _ => [] };
 
-        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture", "--acquire-quickstart",
+        int exit = await root.Parse(["init", Target, "--stack", "node", "--quickstart", "fixture", "--acquire-quickstart",
             "--non-interactive", .. flags, "--template-argument=--required", "--template-argument=supplied"]).InvokeAsync();
 
         exit.Should().Be(1);
@@ -318,10 +321,18 @@ public sealed partial class ArtifactBindingJourneyTests
         interaction.AllOutput.Should().Contain("unverified claims");
         interaction.AllOutput.Should().NotContain("Select a project stack:");
         interaction.AllOutput.Should().Contain("Basic Functions app");
+        interaction.SelectionTitles.Should().Contain("Select a qualified template:");
+        interaction.SelectionChoices[1].Should().Contain("Fixture (fixture) — Available to install");
+        interaction.SelectionChoices.SelectMany(choices => choices).Should().NotContain(choice =>
+            choice.StartsWith("View ", StringComparison.Ordinal)
+            || choice.Contains("Unverified", StringComparison.Ordinal)
+            || choice.Contains("Absent", StringComparison.Ordinal)
+            || choice.Contains("Conflicting", StringComparison.Ordinal));
 
-        var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(
+        var projection = await new QuickstartInstalledTemplates(Factory, _scopes, journey.Qualification).ProjectAsync(
             await journey.Catalog.SearchAsync(new(), CancellationToken.None), new(DirectoryTarget, _selection.Owner), CancellationToken.None);
         projection.Catalog.Entries.Should().BeEmpty();
+        projection.ActionableEntries.Should().ContainSingle().Which.Availability.Should().Be(QuickstartAvailability.Installed);
         projection.Installed.Should().Contain(item => item.Entry.Identity == Identity && item.Selection != null);
 
         var before = TemplateState();
@@ -387,10 +398,77 @@ public sealed partial class ArtifactBindingJourneyTests
 
         exit.Should().Be(0, interaction.AllOutput);
         interaction.SelectionTitles.Should().Equal("Select a project template for Node.js (node):",
-            "Browse templates (details only):", "Select a project template for Node.js (node):");
+            "Select a qualified template:", "Select a project template for Node.js (node):");
         journey.Payload.Requested.Should().BeEmpty();
         interaction.Confirmations.Should().BeEmpty();
         await initializer.Received(1).InitializeAsync(Arg.Any<InitContext>(), Arg.Any<ParseResult>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Browse_ActionableDuplicateLabelsRemainDistinctAndSelectTheExactQualifiedRow()
+    {
+        await SeedAsync(installTemplates: false);
+        GuidedInteraction interaction = new(true, ["second", "Use this template"], []);
+        var journey = Guided(interaction);
+        QuickstartCatalog original = await journey.Catalog.SearchAsync(new(), CancellationToken.None);
+        QuickstartCatalogEntry first = original.Entries.Single();
+        QuickstartCatalogEntry second = first with { Entry = first.Entry with { ShortDescription = "Second row" } };
+        QuickstartCatalog duplicate = original with { Entries = Array.AsReadOnly<QuickstartCatalogEntry>([first, second]) };
+        NonRetainingQuickstartCatalog catalog = new(duplicate);
+        QuickstartBrowseResult result = await BrowseWithBoundScopeAsync(catalog, interaction, journey.Qualification);
+
+        catalog.SawRuntimeStack.Should().BeTrue();
+        result.Outcome.Should().Be(QuickstartBrowseOutcome.Selected);
+        result.Entry.Should().Be(second);
+        interaction.SelectionChoices[0].Should().Contain(choice => choice.Contains("Available to install", StringComparison.Ordinal));
+        interaction.SelectionChoices[0].Distinct(StringComparer.Ordinal).Should().HaveCount(interaction.SelectionChoices[0].Length);
+        interaction.SelectionChoices.SelectMany(choices => choices).Should().NotContain(choice =>
+            choice.StartsWith("View ", StringComparison.Ordinal)
+            || choice.Contains("Unverified", StringComparison.Ordinal)
+            || choice.Contains("Absent", StringComparison.Ordinal)
+            || choice.Contains("Conflicting", StringComparison.Ordinal));
+        journey.Payload.Requested.Should().BeEmpty();
+        interaction.Confirmations.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    private sealed class NonRetainingQuickstartCatalog(QuickstartCatalog catalog) : IQuickstartCatalogService
+    {
+        private readonly QuickstartCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+
+        public bool SawRuntimeStack { get; private set; }
+
+        public Task<QuickstartCatalog> SearchAsync(QuickstartCatalogQuery query, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            cancellationToken.ThrowIfCancellationRequested();
+            // Retaining this query would keep the real runtime stack's load context alive through fixture teardown.
+            SawRuntimeStack = query.LegacyStack?.GetType().Assembly.IsCollectible == true;
+            return Task.FromResult(_catalog);
+        }
+    }
+
+    private async Task<QuickstartBrowseResult> BrowseWithBoundScopeAsync(IQuickstartCatalogService catalog,
+        GuidedInteraction interaction, QuickstartQualification qualification)
+    {
+        BoundInitScope? scope = await _scopes.CreateAsync(CancellationToken.None);
+        QuickstartBrowser? browser = null;
+        try
+        {
+            browser = new(catalog, scope.Catalog, [], interaction, new(interaction),
+                new(Factory, _scopes, qualification));
+            return await browser.BrowseAsync(new("node")
+            {
+                AllowSelection = true,
+                InstalledQuery = new(DirectoryTarget, _selection.Owner),
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            browser = null;
+            scope.Dispose();
+            scope = null;
+        }
     }
 
     [Theory]
@@ -421,7 +499,7 @@ public sealed partial class ArtifactBindingJourneyTests
 
         exit.Should().Be(1, stdout.Output + stderr.Output);
         stderr.Reads.Should().Be(back ? 10 : 8);
-        stderr.Output.Should().Contain("No templates match").And.Contain("Project template selection canceled")
+        stderr.Output.Should().Contain("No compatible templates are available").And.Contain("Project template selection canceled")
             .And.NotContain("Guided init canceled");
         TemplateState().Should().Equal(before);
         Directory.Exists(Target).Should().BeFalse();
@@ -435,17 +513,16 @@ public sealed partial class ArtifactBindingJourneyTests
     public async Task Guided_QuickstartUnavailableForSelectedStack_ReportsRequiredInstalledStackWithoutAcquisition(string id, string kind)
     {
         await SeedAsync(installTemplates: false);
-        var journey = Guided(new(false, [], []), scopes: new AdditionalStackScopeFactory(_scopes));
+        var journey = Guided(new(false, [], []), scopes: new AdditionalStackScopeFactory(_scopes, includeDotNetOwner: false));
         var before = TemplateState();
 
         var result = await journey.Coordinator.ExecuteAsync(
             new(GuidedRequest() with { ExplicitStack = "dotnet", NonInteractive = true }, id, true), CancellationToken.None);
 
-        result.Kind.Should().Be(kind);
+        result.Kind.Should().Be(id == "fixture" ? "ownerUnavailable" : kind);
         if (id == "fixture")
         {
-            result.Diagnostics.Should().Contain(message => message.Contains("not available for the selected stack 'dotnet'", StringComparison.Ordinal)
-                && message.Contains("--stack node", StringComparison.Ordinal));
+            result.Diagnostics.Should().Contain(message => message.Contains("no unique actual loaded runtime owner", StringComparison.Ordinal));
         }
         journey.Payload.Requested.Should().BeEmpty();
         Directory.Exists(Target).Should().BeFalse();
@@ -526,7 +603,8 @@ public sealed partial class ArtifactBindingJourneyTests
         var input = GuidedRequest() with { DryRun = mode == "dry-run", Force = mode == "force", NonInteractive = mode == "script" };
         var before = TemplateState();
 
-        var result = await journey.Coordinator.ExecuteAsync(new(input, mode == "script" ? "fixture" : null), CancellationToken.None);
+        var result = await journey.Coordinator.ExecuteAsync(new(input, mode == "script" ? "fixture" : null,
+            NativeStacks: new HashSet<string>(["node"], StringComparer.OrdinalIgnoreCase), OfferBasicSelection: true), CancellationToken.None);
 
         result.Kind.Should().Be(expected, interaction.AllOutput);
         journey.Payload.Opened.Should().BeEmpty();
@@ -701,6 +779,21 @@ public sealed partial class ArtifactBindingJourneyTests
     }
 
     [Fact]
+    public async Task Coordinator_UnapprovedQuickstartPlan_DoesNotAcquireInScript()
+    {
+        await SeedAsync(installTemplates: false);
+        var journey = Guided(new(false, [], []));
+
+        var result = await journey.Coordinator.ExecuteAsync(
+            new(GuidedRequest() with { NonInteractive = true }, "fixture"), CancellationToken.None);
+
+        result.Kind.Should().Be("acquisitionAuthorizationRequired");
+        result.Diagnostics.Should().Contain(message => message.Contains("select it with --quickstart", StringComparison.Ordinal));
+        journey.Payload.Requested.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Guided_PublicDirectUnknownTemplate_DoesNotDiscoverOrAcquire()
     {
         await SeedAsync(installTemplates: false);
@@ -713,7 +806,289 @@ public sealed partial class ArtifactBindingJourneyTests
         exit.Should().Be(1);
         journey.Payload.Opened.Should().BeEmpty();
         Directory.Exists(Target).Should().BeFalse();
-        interaction.AllOutput.Should().Contain("--guided");
+        interaction.AllOutput.Should().Contain("not installed").And.NotContain("--guided");
+    }
+
+    [Fact]
+    public async Task TemplateSelection_InfersUniqueCompatibleStackAfterSelection()
+    {
+        await SeedAsync("parameters");
+        GuidedInteraction interaction = new(true, [], [true]);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, "--template", Identity, "--template-argument=--required",
+            "--template-argument=supplied"]).InvokeAsync();
+
+        exit.Should().Be(0, interaction.AllOutput);
+        interaction.SelectionTitles.Should().BeEmpty();
+        interaction.Confirmations.Should().Equal(false);
+        File.ReadAllText(Path.Combine(Target, "parameters.txt")).Should().StartWith("supplied|");
+        journey.Payload.Requested.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task QuickstartSelection_NonInteractiveAmbiguityRequiresStackBeforeAcquisition()
+    {
+        await SeedAsync(installTemplates: false);
+        var interaction = new GuidedInteraction(false, [], []);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--non-interactive"]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("multiple qualified installed stack owners").And.Contain("--stack");
+        journey.Payload.Requested.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task QuickstartSelection_InteractiveAmbiguityPromptsForQualifiedStack()
+    {
+        await SeedAsync(installTemplates: false);
+        var interaction = new GuidedInteraction(true, ["first"], [true, true]);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture"]).InvokeAsync();
+
+        exit.Should().Be(0, interaction.AllOutput);
+        interaction.SelectionTitles.Should().ContainSingle().Which.Should().Be("Select the qualified project stack:");
+        interaction.SelectionChoices.Single().Should().Contain(option => option.Contains("node-alt", StringComparison.Ordinal));
+        interaction.Confirmations.Should().Equal(false, false);
+        journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
+        File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QuickstartSelection_SharedOwnerUsesInstalledProjectDeclarationsWhenAvailable(bool installed)
+    {
+        if (installed)
+        {
+            await SeedQualifiedInstalledQuickstartAsync();
+        }
+        else
+        {
+            await SeedAsync(installTemplates: false);
+        }
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--non-interactive"]).InvokeAsync();
+
+        journey.Payload.Requested.Should().BeEmpty();
+        journey.Payload.Opened.Should().BeEmpty();
+        interaction.SelectionTitles.Should().BeEmpty();
+        interaction.Confirmations.Should().BeEmpty();
+        TemplateState().Should().Equal(before);
+        if (installed)
+        {
+            exit.Should().Be(0, interaction.AllOutput);
+            journey.Lifecycle.Prepared.Should().NotBeNull();
+            journey.Lifecycle.Prepared!.Archive.Should().BeNull("the full plan reuses the verified installed payload without downloading");
+            journey.Lifecycle.Prepared.Update.Should().BeNull();
+            File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact");
+            using var configuration = JsonDocument.Parse(File.ReadAllText(Path.Combine(Target, ".func", "config.json")));
+            configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+        }
+        else
+        {
+            exit.Should().Be(1, interaction.AllOutput);
+            journey.Lifecycle.Prepared.Should().BeNull();
+            interaction.AllOutput.Should().Contain("multiple qualified installed stack owners").And.Contain("--stack");
+            Directory.Exists(Target).Should().BeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task QuickstartSelection_InstalledExplicitConflictingStackRefusesBeforeAcquisition()
+    {
+        await SeedQualifiedInstalledQuickstartAsync();
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--stack", "node-alt", "--non-interactive"]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("installed nominated project").And.NotContain("multiple qualified");
+        journey.Payload.Requested.Should().BeEmpty();
+        journey.Payload.Opened.Should().BeEmpty();
+        journey.Lifecycle.Prepared.Should().BeNull();
+        interaction.Confirmations.Should().BeEmpty();
+        TemplateState().Should().Equal(before);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task QuickstartSelection_InstalledUniqueStackPreservesSeparateConfirmations()
+    {
+        await SeedQualifiedInstalledQuickstartAsync();
+        GuidedInteraction interaction = new(true, [], [true, true]);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--language", "JavaScript"]).InvokeAsync();
+
+        exit.Should().Be(0, interaction.AllOutput);
+        interaction.SelectionTitles.Should().BeEmpty();
+        interaction.Confirmations.Should().Equal(false, false);
+        journey.Payload.Requested.Should().BeEmpty();
+        journey.Payload.Opened.Should().BeEmpty();
+        TemplateState().Should().Equal(before);
+        File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact");
+    }
+
+    [Theory]
+    [InlineData("metadata")]
+    [InlineData("constraint")]
+    [InlineData("receipt-source")]
+    [InlineData("receipt-hash")]
+    [InlineData("owner-source")]
+    [InlineData("bytes")]
+    public async Task QuickstartSelection_InstalledUnusableEvidenceNeverFallsBackToAcquisition(string change)
+    {
+        await SeedAsync(change is "metadata" or "constraint" ? change : null);
+        if (change is "receipt-source" or "receipt-hash")
+        {
+            string path = Path.Combine(_root, "cli", "templates", ".native-template-owners", PackageId.ToLowerInvariant() + ".json");
+            JsonNode receipt = JsonNode.Parse(File.ReadAllText(path))!;
+            receipt[change == "receipt-source" ? "source" : "sha256"] =
+                change == "receipt-source" ? "https://other.invalid/v3/index.json" : new string('a', 64);
+            File.WriteAllText(path, receipt.ToJsonString());
+        }
+        else if (change == "owner-source")
+        {
+            JsonNode authority = JsonNode.Parse(_catalog.Json)!;
+            authority["stacks"]![0]!["sources"] = new JsonArray("https://other.invalid/v3/index.json");
+            _catalog.Json = authority.ToJsonString();
+        }
+        else if (change == "bytes")
+        {
+            using FileStream archive = File.Open(await InstalledArchiveAsync(), FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            archive.WriteByte(0);
+        }
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--non-interactive"]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("no independently qualified installed stack candidate");
+        journey.Payload.Requested.Should().BeEmpty();
+        journey.Payload.Opened.Should().BeEmpty();
+        journey.Lifecycle.Prepared.Should().BeNull();
+        interaction.SelectionTitles.Should().BeEmpty();
+        interaction.Confirmations.Should().BeEmpty();
+        TemplateState().Should().Equal(before);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task QuickstartSelection_InstalledDirtyStorePropagatesWithoutAcquisitionOrRecovery()
+    {
+        await SeedQualifiedInstalledQuickstartAsync();
+        Directory.CreateDirectory(Path.GetDirectoryName(_templates.Journal)!);
+        File.WriteAllText(_templates.Journal, "{invalid");
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        var before = TemplateState();
+
+        Func<Task> execute = () => journey.Coordinator.ExecuteAsync(
+            new(GuidedRequest() with { ExplicitStack = null, NonInteractive = true }, "fixture", true), CancellationToken.None);
+
+        await execute.Should().ThrowAsync<TemplateStoreRecoveryRequiredException>();
+        journey.Payload.Requested.Should().BeEmpty();
+        journey.Payload.Opened.Should().BeEmpty();
+        interaction.Confirmations.Should().BeEmpty();
+        TemplateState().Should().Equal(before);
+        File.ReadAllText(_templates.Journal).Should().Be("{invalid");
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task QuickstartSelection_UninstalledUpdateAfterDoesNotInferFromInstalledBefore()
+    {
+        await NominateOwnedUpdateAsync();
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        var before = TemplateState();
+        NativeTemplateOwnerProof receipt = (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None))!;
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--non-interactive"]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("multiple qualified installed stack owners").And.Contain("--stack");
+        journey.Payload.Requested.Should().BeEmpty();
+        journey.Payload.Opened.Should().BeEmpty();
+        journey.Lifecycle.Prepared.Should().BeNull();
+        interaction.Confirmations.Should().BeEmpty();
+        TemplateState().Should().Equal(before);
+        (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None)).Should().Be(receipt);
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task QuickstartSelection_ExplicitConflictingStackNeverFallsBackToAnotherCandidate()
+    {
+        await SeedAsync(installTemplates: false);
+        var interaction = new GuidedInteraction(false, [], []);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--stack", "node-alt", "--non-interactive"]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("declarations conflict with the explicit stack/language filters");
+        journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
+        (await _ownership.GetRetainedAsync(PackageId, CancellationToken.None)).Should().NotBeNull();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InstalledTemplate_ExplicitConflictingStackDoesNotFallBackOrAcquire()
+    {
+        await SeedAsync("parameters");
+        var interaction = new GuidedInteraction(false, [], []);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, "--template", Identity, "--stack", "node-alt", "--non-interactive",
+            "--template-argument=--required", "--template-argument=supplied"]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("no uniquely owner-bound compatible project candidate");
+        journey.Payload.Requested.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("--dry-run")]
+    [InlineData("--non-interactive")]
+    public async Task TemplateBackedModifierWithoutSelector_RejectsBeforeStackPrompt(string modifier)
+    {
+        await SeedAsync("parameters");
+        var interaction = new GuidedInteraction(true, [], []);
+        var journey = Guided(interaction);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+
+        int exit = await root.Parse(["init", Target, modifier]).InvokeAsync();
+
+        exit.Should().Be(1, interaction.AllOutput);
+        interaction.AllOutput.Should().Contain("--template").And.Contain("--quickstart");
+        interaction.SelectionTitles.Should().BeEmpty();
+        journey.Payload.Requested.Should().BeEmpty();
+        Directory.Exists(Target).Should().BeFalse();
     }
 
     [Fact]
@@ -724,7 +1099,7 @@ public sealed partial class ArtifactBindingJourneyTests
         var journey = Guided(interaction);
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
 
-        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture",
+        int exit = await root.Parse(["init", Target, "--stack", "node", "--quickstart", "fixture",
             "--acquire-quickstart", "--non-interactive"]).InvokeAsync();
 
         exit.Should().Be(0, interaction.AllOutput);
@@ -733,31 +1108,19 @@ public sealed partial class ArtifactBindingJourneyTests
         File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact");
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Guided_NominatedOwnedUpdate_RequiresConsentAndTransitionsExactPackageBeforeCreation(bool authorize)
+    [Fact]
+    public async Task QuickstartOption_AuthorizesQualifiedOwnedUpdateBeforeCreation()
     {
         (NativeTemplateOwnerProof oldReceipt, string oldArchive) = await NominateOwnedUpdateAsync();
         string digest = _selection.Artifact.Sha256;
         var interaction = new GuidedInteraction(false, [], []);
         var journey = Guided(interaction);
-        var before = TemplateState();
 
-        var result = await journey.Coordinator.ExecuteAsync(new(GuidedRequest(), "fixture", authorize), CancellationToken.None);
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--non-interactive"]).InvokeAsync();
 
+        exit.Should().Be(0, interaction.AllOutput);
         interaction.AllOutput.Should().Contain("1.0.0").And.Contain("1.0.1");
-        if (!authorize)
-        {
-            result.Kind.Should().Be("acquisitionAuthorizationRequired", interaction.AllOutput);
-            journey.Payload.Requested.Should().BeEmpty();
-            TemplateState().Should().Equal(before);
-            (await _ownership.GetRetainedProofAsync(PackageId, CancellationToken.None)).Should().Be(oldReceipt);
-            Directory.Exists(Target).Should().BeFalse();
-            return;
-        }
-
-        result.Kind.Should().Be("created", interaction.AllOutput);
         journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.1");
         journey.Lifecycle.Prepared!.Update.Should().NotBeNull();
         journey.Lifecycle.Prepared.Update!.Before.Receipt.Should().Be(oldReceipt.Receipt);
@@ -1041,7 +1404,7 @@ public sealed partial class ArtifactBindingJourneyTests
             journey.Lifecycle.PreparedAction = cancellation.Cancel;
         }
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
-        Func<Task> invoke = () => root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture"])
+        Func<Task> invoke = () => root.Parse(["init", Target, "--quickstart", "fixture"])
             .InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
 
         var canceled = await invoke.Should().ThrowAsync<OperationCanceledException>();
@@ -1094,7 +1457,7 @@ public sealed partial class ArtifactBindingJourneyTests
         journey.Lifecycle.CommitFailure = new IOException("Injected template store write failure.");
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
 
-        int exit = await root.Parse(["init", Target, "--guided", "--stack", "node", "--quickstart", "fixture",
+        int exit = await root.Parse(["init", Target, "--stack", "node", "--quickstart", "fixture",
             "--acquire-quickstart", "--non-interactive"]).InvokeAsync(new() { EnableDefaultExceptionHandler = false }, CancellationToken.None);
 
         exit.Should().Be(1);
@@ -1143,6 +1506,14 @@ public sealed partial class ArtifactBindingJourneyTests
 
         await execute.Should().ThrowAsync<OperationCanceledException>();
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    private async Task SeedQualifiedInstalledQuickstartAsync()
+    {
+        await SeedAsync(installTemplates: false);
+        var initial = Guided(new(false, [], []));
+        BasicTemplateArtifact artifact = (await _catalog.LoadAsync(CancellationToken.None)).Artifacts.Single();
+        await initial.Lifecycle.EnsureAsync(artifact, Context, false, CancellationToken.None);
     }
 
     private async Task<(NativeTemplateOwnerProof Receipt, string OldArchive)> NominateOwnedUpdateAsync()
@@ -1237,7 +1608,7 @@ public sealed partial class ArtifactBindingJourneyTests
             () => throw new InvalidOperationException("Guided flow must refresh capabilities."),
             () => throw new InvalidOperationException("Guided flow must refresh project support."),
             _files, Substitute.For<ILocalSettingsProvider>(), Substitute.For<IFunctionsProjectResolver>(), new AcquisitionBoundaryScopes(scopeFactory, lifecycle));
-        var browser = new FreshBrowser(catalog, scopeFactory, Factory, interaction);
+        var browser = new FreshBrowser(catalog, scopeFactory, Factory, interaction, qualification);
         return (new(scopeFactory, Factory, browser, catalog, qualification, acquisition, init, new(_files), interaction, renderer),
             payload, lifecycle, catalog, qualification, acquisition);
     }
@@ -1342,6 +1713,7 @@ public sealed partial class ArtifactBindingJourneyTests
             return Task.FromResult(selected switch
             {
                 "first" => options[0],
+                "second" => options[1],
                 "exact" => options.Single(option => option.Contains(Identity, StringComparison.Ordinal)),
                 "bundled-js" => options.Single(option => option.Contains("Azure.Functions.Node.Basic.JavaScript", StringComparison.Ordinal)),
                 _ => options.Single(option => option == selected),
@@ -1362,20 +1734,24 @@ public sealed partial class ArtifactBindingJourneyTests
         }
     }
 
-    private sealed class AdditionalStackScopeFactory(IBoundInitScopeFactory inner) : IBoundInitScopeFactory
+    private sealed class AdditionalStackScopeFactory(IBoundInitScopeFactory inner, string stackName = "dotnet",
+        string language = "C#", bool includeDotNetOwner = true) : IBoundInitScopeFactory
     {
         public async Task<BoundInitScope> CreateAsync(CancellationToken cancellationToken)
         {
             BoundInitScope scope = await inner.CreateAsync(cancellationToken);
             IProjectStack dotnet = Substitute.For<IProjectStack>();
-            dotnet.Stack.Returns("dotnet");
-            dotnet.DisplayName.Returns(".NET");
-            dotnet.WorkerRuntimeAliases.Returns(["dotnet"]);
-            dotnet.SupportedLanguages.Returns(["C#"]);
+            dotnet.Stack.Returns(stackName);
+            dotnet.DisplayName.Returns(stackName == "dotnet" ? ".NET" : stackName);
+            dotnet.WorkerRuntimeAliases.Returns([stackName]);
+            dotnet.SupportedLanguages.Returns([language]);
             dotnet.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>());
             var owners = scope.StackOwners.ToDictionary(pair => pair.Key, pair => pair.Value,
                 StringComparer.OrdinalIgnoreCase);
-            owners.Add("dotnet", scope.StackOwners["node"]);
+            if (includeDotNetOwner)
+            {
+                owners.Add(stackName, scope.StackOwners["node"]);
+            }
             return new(scope.Availability, new([.. scope.Catalog.Stacks, dotnet]), scope.Support, scope.Verifier, scope)
             {
                 StackOwners = owners,
@@ -1435,12 +1811,13 @@ public sealed partial class ArtifactBindingJourneyTests
     }
 
     private sealed class FreshBrowser(IQuickstartCatalogService catalog, IBoundInitScopeFactory scopes,
-        ITemplaterFactory templates, IInteractionService interaction) : IQuickstartBrowser
+        ITemplaterFactory templates, IInteractionService interaction, QuickstartQualification qualification) : IQuickstartBrowser
     {
         public async Task<QuickstartBrowseResult> BrowseAsync(QuickstartBrowseRequest request, CancellationToken cancellationToken)
         {
             using BoundInitScope scope = await scopes.CreateAsync(cancellationToken);
-            QuickstartBrowser browser = new(catalog, scope.Catalog, [], interaction, new(interaction), new(templates, scopes));
+            QuickstartBrowser browser = new(catalog, scope.Catalog, [], interaction, new(interaction),
+                new(templates, scopes, qualification));
             return await browser.BrowseAsync(request, cancellationToken);
         }
     }

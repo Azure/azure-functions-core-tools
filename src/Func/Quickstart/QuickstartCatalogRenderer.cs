@@ -49,6 +49,36 @@ internal sealed class QuickstartCatalogRenderer(IInteractionService interaction)
         _interaction.WriteHint("Discovery metadata only. No package or generated project topology has been verified.");
     }
 
+    public void WriteActionableResults(IReadOnlyList<QuickstartActionableEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        if (entries.Count == 0)
+        {
+            _interaction.WriteWarning("No compatible templates are available through this CLI for the current stack and filters. Change or clear the filters, or run 'func quickstart list' for catalog diagnostics.");
+            return;
+        }
+
+        _interaction.WriteTable(
+            ["Name", "Availability", "Stack", "Resource", "ID", "Package version", "Description"],
+            entries.Select(item => new[]
+            {
+                item.Entry.Entry.DisplayName,
+                item.Availability switch
+                {
+                    QuickstartAvailability.AvailableToInstall => "Available to install",
+                    QuickstartAvailability.Installed => "Installed",
+                    QuickstartAvailability.UpdateAvailable => "Update available",
+                    _ => throw new ArgumentOutOfRangeException(nameof(entries)),
+                },
+                item.Stack,
+                item.Entry.Entry.Resource,
+                item.Entry.Entry.Id,
+                item.Entry.PackageReference?.Version ?? "-",
+                item.Entry.Entry.ShortDescription ?? "-",
+            }));
+        _interaction.WriteHint("Only currently qualified templates are selectable. Acquisition and project creation still require their separate safeguards.");
+    }
+
     public void WriteDetails(QuickstartCatalogEntry item, string displayLanguage)
     {
         ArgumentNullException.ThrowIfNull(item);

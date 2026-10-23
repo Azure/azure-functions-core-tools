@@ -4,28 +4,46 @@ Start with `func init MyConnector`. Quickstarts are ordinary project templates
 with no user template parameters. An eligible interactive fresh target offers
 **Basic Functions app**, visible installed project templates and
 **Browse more templates**. Basic delegates to the existing workload initializer
-with the original parsed arguments. Installed templates and Browse use the
-existing coordinator, with exact binding and qualified acquisition where
-applicable. A sole eligible, uniquely owned installed native stack is selected
+with the original parsed arguments. `--template` selects only an installed
+project template. `--quickstart` selects an exact catalog ID and authorizes
+only its independently qualified acquisition plan. Both use the existing
+coordinator. A sole eligible, uniquely owned installed native stack is selected
 without an extra prompt and remains named in the template menu. Multiple eligible
 stacks still require selection. Explicit stack constraints are never overridden.
 Browse **Back** returns to the invoking template menu, including when no results
 match. **Cancel browsing** and **Cancel** stop before acquisition or project writes.
 
-The default menu requires a uniquely owned installed native stack. Scripts,
-initializer-specific options, `--force`, existing or nonempty targets, and
-unsupported or unavailable ownership retain the legacy initializer dispatch.
-Explicit `--guided` remains the opt-in adapter for its staged flags; this narrow
-default-dispatch layer does not migrate all initializer parameters or force
-semantics. The existing `func quickstart` commands remain available.
+Explicit selectors resolve before the stack is chosen. A unique candidate must
+have a real loaded workload owner and a verified installed binding or
+independently qualified quickstart plan. Installed templates must have valid
+project declarations supported by the selected stack. Quickstarts are qualified
+against each actual owner without treating catalog language or package claims
+as owner evidence. One candidate is selected without a stack prompt; multiple
+candidates prompt interactively and require `--stack` in scripts. No candidate
+fails before acquisition or project writes. When the exact nominated quickstart
+is already installed and independently bound, all of its actual project
+declarations also filter stack candidates. Missing payloads and not-yet-installed
+update versions retain owner-qualified ambiguity. An unusable installed binding
+is a refusal, not permission to download a replacement. After quickstart acquisition, the
+fresh template binding and every generated project configuration are validated
+again against the inferred stack before project effects.
 
-The guided route uses the same browser, with an explicit **Use this template**
-result. Default browsing remains read-only and never selects even a single
+The default menu requires a uniquely owned installed native stack. With no
+template selector, initializer-specific options, `--force`, existing or
+nonempty targets, and unsupported or unavailable ownership retain the legacy
+initializer dispatch. The existing `func quickstart` commands remain available.
+
+The default route uses the same browser, with an explicit **Use this template**
+result. Init browsing first qualifies each exact nomination against actual
+loaded stack owners and the existing project-configuration rules. It displays
+only currently actionable rows with friendly availability states; legacy,
+unqualified, unsupported and conflicting rows stay available through the
+diagnostic quickstart list and info commands, not as init choices. An installed
+duplicate can remain in the installed-template menu instead of appearing twice
+in Browse. Projection is read-only and never downloads packages or selects a
 result automatically. Search, resource and IaC filters remain available.
-Only independently verified exact installed duplicates are suppressed.
-Unknown installed proof stays visible with a diagnostic.
 
-Before downloading, guided init joins an advertised full identity, package,
+Before downloading, quickstart init joins an advertised full identity, package,
 version, HTTPS source and SHA256 to the independently bundled schema2 authority.
 The association must cover the actual loaded stack owner, physical and logical
 identity, source, host version, channel and `additional-project` role. It includes
@@ -52,29 +70,32 @@ Cancellation during acquisition reports retained-package and recovery diagnostic
 then propagates command cancellation after acquisition cleanup. It never starts
 project creation or claims rollback.
 
-Scripts must select a stack and either an installed template or a catalog ID.
-Choosing guided mode is not acquisition authorization.
+Scripts select an installed template or a catalog ID. `--template` never
+triggers discovery or acquisition. Supplying `--quickstart` authorizes only its
+exact qualified acquisition plan.
 
 ```text
-func init MyConnector --guided --stack node --template <installed-full-identity> --non-interactive
-func init MyConnector --guided --stack node --quickstart <exact-catalog-id> --acquire-quickstart --non-interactive
-func init MyConnector --guided --stack node --template <installed-full-identity> --dry-run
+func init MyConnector --template <installed-full-identity> --non-interactive
+func init MyConnector --quickstart <exact-catalog-id> --non-interactive
+func init MyConnector --template <installed-full-identity> --dry-run
 ```
 
-`--acquire-quickstart` authorizes the displayed independently qualified exact
-acquisition and creation plan in scripts. It requires `--quickstart` and cannot
-authorize an installed `--template`. Interactive invocations still prompt.
-An unknown installed reference never starts discovery or acquisition.
-`--quickstart` and `--template` cannot be combined. All these options require
-`--guided`; they do not redirect ordinary init.
+`--quickstart` authorizes only the displayed independently qualified exact
+acquisition and creation plan; no separate `--acquire-quickstart` is needed.
+That explicit authorization flag remains accepted. Interactive invocations
+still prompt. An unknown installed reference never starts discovery or
+acquisition. `--quickstart` and `--template` cannot be combined. Either selector
+routes to template-backed init. `--dry-run` and `--non-interactive` modify that
+selected flow and require a selector; they do not change ordinary no-selector
+`func init`.
 
 Dry-run never acquires, registers, repairs, recovers or cleans. A discovery
 selection without installed payload reports metadata intent and a diagnostic,
 not a fictitious engine preview. Use an installed `--template` for native
-dry-run. Guided init rejects nonempty targets, adoption, repair and `--force`
+dry-run. Template-backed init rejects nonempty targets, adoption, repair and `--force`
 before acquisition or cleanup. The legacy initializer path retains its existing
 adoption, repair, force and workload-option behavior, including response files.
-Guided init does not accept workload initializer options.
+Template-backed init does not accept workload initializer options.
 
 ### Advanced native-template compatibility
 
@@ -82,15 +103,15 @@ The general help and quickstart menus do not expose parameter editing.
 The advanced `--template-argument` option remains accepted but hidden from
 general help, following the existing hidden-option convention. Arbitrary native
 parameter tokens are available through repeated `--template-argument=<token>`
-options on the public guided adapter. Each occurrence supplies exactly one raw
-token, in order, to the existing selected-template parser. An explicit target
-path, `--guided`, and either `--template` or `--quickstart` are required. This
-does not add optional parameter entry to the default interactive menu or pass
-native arguments to Basic. Required native values can still be prompted
+options on the public template-backed init path. Each occurrence supplies
+exactly one raw token, in order, to the existing selected-template parser. An
+explicit target path and either `--template` or `--quickstart` are required.
+This does not add optional parameter entry to the default interactive menu or
+pass native arguments to Basic. Required native values can still be prompted
 interactively; scripts fail if they are unresolved.
 
 ```text
-func init MyConnector --guided --stack node --template <installed-full-identity> --non-interactive --template-argument=--greeting --template-argument="hello world" --template-argument=--enabled=false
+func init MyConnector --template <installed-full-identity> --non-interactive --template-argument=--greeting --template-argument="hello world" --template-argument=--enabled=false
 ```
 
 Use `=` on the host option for dash-prefixed and `@`-prefixed raw tokens.
@@ -224,7 +245,7 @@ Release readiness still requires independently producer-approved exact archive
 and schema2 association data, an actual production end-to-end run, alignment
 with the later `63b` policy/factory line, and cross-platform and hosted evidence.
 Legacy removal additionally requires replacement compatibility evidence and
-explicit removal approval. The explicit guided native-argument route is the
+explicit removal approval. The explicit template-backed native-argument route is the
 bounded parameter capability delivered here, not full default-menu parameter
 editing or initializer/force parity. Keep the legacy routes until their
 replacement conditions are satisfied.
@@ -261,7 +282,8 @@ This change composes those capabilities at the `func init` command boundary. It 
 
 - Define workload constraint JSON, range semantics, feed lookup, or remediation algorithms.
 - Define the configuration action identifier or its serialized argument syntax.
-- Build the browse page, remote catalog, package search, or implicit install flow.
+- Build the browse page, remote catalog, package search, or an install flow
+  outside an explicit qualified `--quickstart` selection.
 - Create a distinct quickstart or solution template type.
 - Recursively adopt existing multi-project solutions.
 - Roll back scaffolded content after a configuration I/O failure.
@@ -292,7 +314,7 @@ Only declared Functions project configuration actions participate in Func topolo
 #### Read-only browse presentation
 
 The internal `IQuickstartBrowser.BrowseAsync(QuickstartBrowseRequest, CancellationToken)`
-is registered with DI and reused by opt-in guided init. It does not add a
+is registered with DI and reused by template-backed init. It does not add a
 standalone browse command. Its default request returns no template nomination.
 `AllowSelection` enables an explicit nomination, never authorization.
 It resolves stack IDs and aliases from installed `IProjectStack` capabilities,
@@ -300,13 +322,15 @@ using the existing quickstart provider only to bridge legacy language spelling.
 The selected stack filters discovery metadata, not producer-declared project
 topology. No package name is used to infer a stack or exclude installed content.
 
-Interactive browsing lists metadata statuses, opens details only after explicit
-selection (even for a single result), and supports back, cancel, search, resource
-and IaC filter changes. Clearing filters retains the caller's stack/language
-context. Empty results remain navigable. Noninteractive browsing prints results
-without prompting or choosing a template and requires an explicit stack when
-multiple capabilities are installed. Catalog failures and cancellation propagate
-to the caller rather than becoming empty success.
+Diagnostic browsing lists metadata statuses and opens details only after
+explicit selection (even for a single result). Init selection first applies the
+qualified actionable projection described below, then offers exact rows and
+supports back, cancel, search, resource and IaC filter changes. Clearing filters
+retains the caller's stack/language context. Empty results remain navigable.
+Noninteractive diagnostic browsing prints results without prompting or choosing
+a template and requires an explicit stack when multiple capabilities are
+installed. Catalog failures and cancellation propagate to the caller rather
+than becoming empty success.
 
 Single-selection titles and choices are literal text at the console adapter.
 The selected value remains the original string, including brackets. Spectre
@@ -320,7 +344,7 @@ The same renderer enriches human-readable `func quickstart info <id>` with
 transport provenance, package metadata diagnostics and explicitly unverified
 package claims. Legacy list/info JSON shapes and the source scaffolding command
 remain unchanged. Entries with usable package and artifact metadata point to
-`func init <path> --guided --stack <stack> --quickstart <id> --dry-run` for
+`func init <path> --stack <stack> --quickstart <id> --dry-run` for
 read-only inspection, not a claim that remote acquisition is ready. Legacy or
 incomplete entries retain an explicitly labeled legacy source-scaffolder hint.
 Evidence references and opaque project/workload summaries are
@@ -328,9 +352,13 @@ displayed as claims only, never fetched or interpreted as approval. Stale metada
 is visibly identified. The only permitted writes are those of the existing
 manifest metadata cache.
 
-The default browser still neither opens the installed template store nor provides
-an install/create action. Only the opt-in guided caller enables nomination and
-composes the separate authority, consent, acquisition and creation gates above.
+The init browser uses a separate fresh, clean-store read flow to verify installed
+bindings and does not recover a pending journal. It never prepares or downloads
+payloads, installs or repairs packages, prompts for consent, or writes files.
+Cancellation, dirty journals, I/O/access failures and malformed global authority
+remain errors rather than empty-result fallbacks. The explicit `--quickstart`
+route composes the separate authority, consent, acquisition and creation gates
+above.
 
 #### Internal exact-artifact binding
 
@@ -338,7 +366,7 @@ The additive artifact-binding layer is opt-in through
 `AddNativeTemplateArtifactBinding`, alongside the staged native setup services.
 The registration helpers do not register a command, enable the default init
 route, populate production authority or authorize a producer rollout. The CLI
-host now composes these helpers for its explicit `--guided` route.
+host now composes these helpers for its selected-template route.
 
 `InitExecutionRequest.ArtifactBinding` carries a full ordinal template identity,
 package ID, normalized version, source and SHA-256 coordinates, plus the selected
@@ -375,14 +403,18 @@ preview, all-project configuration checks, target recheck and partial-output
 reporting remain shared with direct init. Bound invocations reject concurrent use
 of their session and cannot survive its disposal.
 
-An optional internal `QuickstartBrowseRequest.InstalledQuery` enables duplicate
-projection using a separate fresh, clean-store read flow. Remote rows are omitted
-only for the corresponding independently proven current installation with exact
-identity, package, version, source and digest. The remote reference stays
-unverified. Missing proof leaves the row visible with installed-proof diagnostics.
-Availability diagnostics remain present even for a proven duplicate that is
-currently restricted. This is not a new quickstart classification or a
-mixed-stack eligibility policy.
+An internal `QuickstartBrowseRequest.InstalledQuery` enables an init-actionable
+projection using a separate fresh, clean-store read flow. Each exact nomination
+is qualified against actual loaded stack owners before it can appear. Installed
+states require the exact identity, package, version, source, digest and owner
+binding plus usable project configurations. Update states require the existing
+approved strictly newer owned update for the nominated package. Available-to-
+install states require the complete qualified plan and no conflicting incumbent.
+Installed duplicates may be omitted from Browse because the installed-template
+menu already exposes them. Legacy, incomplete, unqualified, unsupported and
+conflicting registrations remain unchanged and stay available through diagnostic
+list/info commands. Friendly labels and exact row mappings preserve duplicate
+choices without exposing internal metadata statuses or synthetic view numbers.
 
 Browse projection and init dry-run require a clean native store. They do not
 install content or recover a pending journal. Ordinary unbound browse still does
@@ -399,8 +431,9 @@ not treated as stable.
 #### Internal catalog preparation
 
 The CLI has an internal read-only catalog adapter alongside the legacy manifest
-service. Legacy quickstart commands and the default init route are unchanged. Both views
-use the existing manifest URL, validation, local override, and metadata cache.
+service. Legacy quickstart commands remain unchanged; default init uses the
+adapter for discovery and the qualified selection projection described above.
+Both views use the existing manifest URL, validation, local override, and metadata cache.
 The public `QuickstartEntry` and legacy list/info JSON shapes are unchanged.
 
 For joint manifest/producer review, the adapter recognizes a proposed optional

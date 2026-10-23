@@ -117,8 +117,7 @@ public class QuickstartInfoCommandTests
         exit.Should().Be(0, _interaction.AllOutput);
         if (hasArtifact)
         {
-            string stackOption = providerAvailable ? " --stack python" : string.Empty;
-            _interaction.AllOutput.Should().Contain($"func init <path> --guided{stackOption} --quickstart http-py --dry-run")
+            _interaction.AllOutput.Should().Contain("func init <path> --quickstart http-py --dry-run")
                 .And.Contain("does not establish acquisition readiness").And.NotContain("Legacy source scaffolder:");
         }
         else

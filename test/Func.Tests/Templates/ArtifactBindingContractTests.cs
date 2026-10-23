@@ -83,11 +83,13 @@ public sealed class ArtifactBindingContractTests
     [Theory]
     [InlineData("templates")]
     [InlineData("scopes")]
+    [InlineData("qualification")]
     public void InstalledProjection_NullDependency_RejectsProgrammerError(string dependency)
     {
         Action construct = () => _ = new QuickstartInstalledTemplates(
             dependency == "templates" ? null! : Substitute.For<ITemplaterFactory>(),
-            dependency == "scopes" ? null! : Substitute.For<IBoundInitScopeFactory>());
+            dependency == "scopes" ? null! : Substitute.For<IBoundInitScopeFactory>(),
+            dependency == "qualification" ? null! : Qualification());
 
         construct.Should().Throw<ArgumentNullException>().WithParameterName(dependency);
     }
@@ -97,7 +99,7 @@ public sealed class ArtifactBindingContractTests
     {
         var templates = Substitute.For<ITemplaterFactory>();
         var scopes = Substitute.For<IBoundInitScopeFactory>();
-        QuickstartInstalledTemplates projection = new(templates, scopes);
+        QuickstartInstalledTemplates projection = new(templates, scopes, Qualification());
         QuickstartCatalog catalog = new([], new(QuickstartCatalogOrigin.LocalFile, null, null));
         QuickstartInstalledQuery query = new(WorkingDirectory.FromExplicit(Path.GetTempPath()), new("Owner", "1.0.0", "https://fixtures.invalid/v3/index.json"));
         Func<Task> nullCatalog = () => projection.ProjectAsync(null!, query, CancellationToken.None);
@@ -146,4 +148,8 @@ public sealed class ArtifactBindingContractTests
     private static NativeTemplateArtifactVerifier Verifier()
         => new(Substitute.For<IBasicCompanionCatalog>(), new(), Substitute.For<INativeTemplateOwnership>(),
             Substitute.For<IWorkloadStore>(), Substitute.For<IBasicArchiveInspector>());
+
+    private static QuickstartQualification Qualification()
+        => new(Substitute.For<IBasicCompanionCatalog>(), new(), Substitute.For<IBasicTemplateLifecycle>(),
+            Substitute.For<IWorkloadStore>(), Substitute.For<ICliVersionProvider>());
 }

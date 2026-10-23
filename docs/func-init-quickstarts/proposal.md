@@ -35,4 +35,6 @@ None.
 - Depends on `template-engine-post-actions` for the mandatory Functions project configuration action.
 - Depends on `template-package-install` for explicit package installation and on `azure-samples-template-pipeline` for packaged quickstart supply.
 - Requires corresponding package-authoring changes so synthesized and authored quickstarts declare workload requirements, project primary outputs, and configuration actions.
-- Does not define remote template search, a gallery implementation, implicit installation, package publication, workload acquisition, or multi-project adoption.
+- Does not define remote template search, a gallery implementation, installation
+  outside an explicit qualified `--quickstart` selection, package publication,
+  workload acquisition, or multi-project adoption.

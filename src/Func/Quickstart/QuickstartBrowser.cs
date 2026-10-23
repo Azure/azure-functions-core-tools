@@ -87,23 +87,6 @@ internal sealed class QuickstartBrowser(
                 ct => _catalog.SearchAsync(query, ct),
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (request.InstalledQuery is { } installedQuery)
-            {
-                if (_installed is null)
-                {
-                    _interaction.WriteWarning("Installed artifact proof is unavailable. Discovery entries remain visible and unverified.");
-                }
-                else
-                {
-                    QuickstartInstalledProjection projection = await _installed.ProjectAsync(results, installedQuery, cancellationToken);
-                    results = projection.Catalog;
-                    foreach (Templates.Engine.InstalledTemplateArtifact item in projection.Installed.Where(item => item.Diagnostic is not null))
-                    {
-                        _interaction.WriteWarning($"Installed template '{item.Entry.Identity}': {item.Diagnostic}");
-                    }
-                    _interaction.WriteHint("Only exact independently verified installed duplicates are omitted. Remote package metadata remains unverified.");
-                }
-            }
             if (language is not null)
             {
                 results = results with
@@ -113,31 +96,58 @@ internal sealed class QuickstartBrowser(
                         StringComparison.OrdinalIgnoreCase)).ToList().AsReadOnly(),
                 };
             }
+            QuickstartActionableEntry[]? actionable = null;
+            if (request.AllowSelection)
+            {
+                if (_installed is null || request.InstalledQuery is not { } installedQuery)
+                {
+                    _interaction.WriteError("The CLI cannot verify available templates for this selection. No unverified discovery entry can be selected.");
+                    return new(QuickstartBrowseOutcome.Canceled);
+                }
+
+                QuickstartInstalledProjection projection = await _installed.ProjectAsync(results,
+                    installedQuery with { Stack = stack.Stack, Language = language }, cancellationToken);
+                actionable = [.. projection.ActionableEntries.Where(item => item.Availability != QuickstartAvailability.Installed)];
+                results = results with { Entries = actionable.Select(item => item.Entry).ToList().AsReadOnly() };
+                if (projection.ExcludedCount > 0)
+                {
+                    _interaction.WriteHint($"{projection.ExcludedCount} discovery entries were excluded because they are not currently qualified for this CLI. Run 'func quickstart list' for catalog diagnostics.");
+                }
+            }
 
             _renderer.WriteProvenance(results.Provenance);
             _interaction.WriteHint($"Discovery stack filter: {stack.DisplayName}. This does not constrain generated project topology.");
             _interaction.WriteLine(line => line.Muted(
                 $"Language: {language ?? "all"}; search: {query.Search ?? "all"}; resource: {query.Resource ?? "all"}; IaC: {query.Iac ?? "all"}."));
-            _renderer.WriteResults(results.Entries);
+            if (actionable is null)
+            {
+                _renderer.WriteResults(results.Entries);
+            }
+            else
+            {
+                _renderer.WriteActionableResults(actionable);
+            }
             if (!_interaction.IsInteractive)
             {
                 return new(QuickstartBrowseOutcome.Canceled);
             }
 
-            // Ordinals disambiguate even duplicate catalog IDs without treating either as an owner.
-            Dictionary<string, QuickstartCatalogEntry> choices = [];
-            for (int i = 0; i < results.Entries.Count; i++)
-            {
-                QuickstartCatalogEntry item = results.Entries[i];
-                choices.Add($"View {i + 1}. {item.Entry.DisplayName} ({item.Entry.Id}) [{item.MetadataStatus}]", item);
-            }
+            Dictionary<string, QuickstartCatalogEntry> diagnosticChoices = actionable is null
+                ? CreateDiagnosticChoices(results.Entries)
+                : [];
+            Dictionary<string, QuickstartActionableEntry> actionableChoices = actionable is null
+                ? []
+                : CreateActionableChoices(actionable);
+            IEnumerable<string> choices = actionable is null ? diagnosticChoices.Keys : actionableChoices.Keys;
 
             string action = await _interaction.PromptForSelectionAsync(
-                "Browse templates (details only):",
-                choices.Keys.Concat([Search, Resource, Iac, Clear, Back, Cancel]),
+                request.AllowSelection ? "Select a qualified template:" : "Browse templates (details only):",
+                choices.Concat([Search, Resource, Iac, Clear, Back, Cancel]),
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (choices.TryGetValue(action, out QuickstartCatalogEntry? entry))
+            QuickstartCatalogEntry? entry = diagnosticChoices.GetValueOrDefault(action)
+                ?? actionableChoices.GetValueOrDefault(action)?.Entry;
+            if (entry is not null)
             {
                 _renderer.WriteDetails(entry, provider?.GetDisplayLanguage(entry.Entry.Language) ?? entry.Entry.Language);
                 string navigation = await _interaction.PromptForSelectionAsync(
@@ -176,6 +186,63 @@ internal sealed class QuickstartBrowser(
             }
         }
     }
+
+    private static Dictionary<string, QuickstartCatalogEntry> CreateDiagnosticChoices(IReadOnlyList<QuickstartCatalogEntry> entries)
+    {
+        Dictionary<string, QuickstartCatalogEntry> choices = new(StringComparer.Ordinal);
+        foreach (QuickstartCatalogEntry entry in entries)
+        {
+            string label = $"{entry.Entry.DisplayName} ({entry.Entry.Id})";
+            AddUniqueChoice(choices, label, entry, entry.Entry.Language, entry.Entry.Resource, entry.Entry.Iac,
+                entry.PackageReference?.PackageId, entry.PackageReference?.Version, entry.Entry.ShortDescription);
+        }
+        return choices;
+    }
+
+    private static Dictionary<string, QuickstartActionableEntry> CreateActionableChoices(IReadOnlyList<QuickstartActionableEntry> entries)
+    {
+        Dictionary<string, QuickstartActionableEntry> choices = new(StringComparer.Ordinal);
+        foreach (QuickstartActionableEntry candidate in entries)
+        {
+            QuickstartEntry entry = candidate.Entry.Entry;
+            string label = $"{entry.DisplayName} ({entry.Id}) — {AvailabilityLabel(candidate.Availability)}";
+            AddUniqueChoice(choices, label, candidate, entry.Language, entry.Resource, entry.Iac,
+                candidate.Entry.PackageReference?.PackageId, candidate.Entry.PackageReference?.Version,
+                $"{candidate.Stack}; {entry.ShortDescription}");
+        }
+        return choices;
+    }
+
+    private static void AddUniqueChoice<T>(Dictionary<string, T> choices, string label, T value,
+        string? language, string resource, string? iac, string? packageId, string? version, string? detail)
+    {
+        string unique = label;
+        if (choices.ContainsKey(unique))
+        {
+            unique += $" — {language ?? "unknown language"}, {resource}, IaC {iac ?? "none"}";
+        }
+        if (choices.ContainsKey(unique))
+        {
+            unique += $" — {packageId ?? "unknown package"} {version ?? "unknown version"}";
+        }
+        if (choices.ContainsKey(unique))
+        {
+            unique += $" — {detail ?? "duplicate catalog entry"}";
+        }
+        for (int duplicate = 2; choices.ContainsKey(unique); duplicate++)
+        {
+            unique = $"{label} — duplicate match {duplicate}";
+        }
+        choices.Add(unique, value);
+    }
+
+    private static string AvailabilityLabel(QuickstartAvailability availability) => availability switch
+    {
+        QuickstartAvailability.AvailableToInstall => "Available to install",
+        QuickstartAvailability.Installed => "Installed",
+        QuickstartAvailability.UpdateAvailable => "Update available",
+        _ => throw new ArgumentOutOfRangeException(nameof(availability)),
+    };
 
     private async Task<IProjectStack?> SelectStackAsync(string? requested, CancellationToken cancellationToken)
     {

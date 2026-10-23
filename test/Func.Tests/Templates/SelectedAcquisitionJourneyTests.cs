@@ -30,7 +30,7 @@ public sealed partial class ArtifactBindingJourneyTests
         exit.Should().Be(0, interaction.AllOutput);
         journey.Payload.Requested.Should().Equal($"{PackageId}/1.0.0");
         File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact");
-        var projection = await new QuickstartInstalledTemplates(Factory, _scopes).ProjectAsync(
+        var projection = await new QuickstartInstalledTemplates(Factory, _scopes, journey.Qualification).ProjectAsync(
             await journey.Catalog.SearchAsync(new(), CancellationToken.None), new(DirectoryTarget, _selection.Owner), CancellationToken.None);
         projection.Catalog.Entries.Should().BeEmpty();
         var expectedSelection = _selection with { Channel = null };
