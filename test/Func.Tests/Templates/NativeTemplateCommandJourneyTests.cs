@@ -1060,6 +1060,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();
         var installed = Substitute.For<IInstalledBundleWorkloads>();
         installed.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
+        services.AddSingleton(installed);
         services.AddSingleton<IExtensionBundleResolver>(new ExtensionBundleResolver(
             new InstalledBundleScanner(installed), NullBundleResolveTelemetry.Instance, NullLogger<ExtensionBundleResolver>.Instance));
         services.AddTemplatesOrchestrator();
