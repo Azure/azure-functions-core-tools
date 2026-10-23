@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.Text;
 using System.Text.Json;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
@@ -32,6 +33,8 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public sealed class NewExecutionJourneyTests : IDisposable
 {
     private const string Low = "Func.Consumer.Low";
+    private const string Partial = "Func.Consumer.Partial";
+    private const string PartialCancellationDiagnostic = "Template creation was canceled after the reported output entries were installed.";
     private readonly string _root = Path.Combine(Path.GetTempPath(), "func-consumer-" + Guid.NewGuid().ToString("N"));
     private readonly TestInteractionService _interaction = new();
     private readonly List<ServiceProvider> _providers = [];
@@ -1110,6 +1113,80 @@ public sealed class NewExecutionJourneyTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Command_CancellationAfterFirstOfMultipleInstalls_RendersCommittedFailureOnce(bool overwrite, bool json)
+    {
+        await InstallPartialOutputAsync(overwrite);
+        using CancellationTokenSource cancellation = new();
+        List<string> installed = [];
+        var harness = CreateHarness(templateFactory: PartialOutputFactory(cancellation, installed));
+        string[] force = overwrite ? ["--force"] : [];
+        int? exit = null;
+
+        Exception? failure = await Record.ExceptionAsync(async () => exit = await harness.InvokeAsync(
+            [Partial, "--path", Target, .. force, "--output", json ? "json" : "plain"], cancellation.Token));
+
+        string committed = AssertPartialOutput(installed, overwrite);
+        cancellation.IsCancellationRequested.Should().BeTrue();
+        failure.Should().BeNull("the native coordinator returned the failure with its already installed output");
+        exit.Should().Be(1);
+        AssertCommittedFailure(harness.Result!, committed, overwrite);
+        AssertCommittedFailureOutput(harness.Result!, json);
+        Func<Task> disposed = () => harness.Factory.Templaters.Single().ListAsync(TemplateType.Item);
+        await disposed.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Command_CancellationAfterRunnerReturnsCommittedFailure_PreservesNonzeroOutcome(bool json)
+    {
+        await InstallPartialOutputAsync(overwrite: false);
+        using CancellationTokenSource producerCancellation = new();
+        List<string> installed = [];
+        var context = new TemplateEngineContext(WorkingDirectory.FromExplicit(Target),
+            new(WorkingDirectory.FromExplicit(Project), "node", "JavaScript"));
+        using Templater templater = await PartialOutputFactory(producerCancellation, installed).CreateAsync(context, CancellationToken.None);
+        ResolvedTemplate selected = (await templater.ResolveGroupAsync(Partial, TemplateType.Item, CancellationToken.None)).Group![0];
+        TemplateInvocationResult invocation = await selected.InvokeAsync(
+            new(WorkingDirectory.FromExplicit(Target), new Dictionary<string, string?>()), producerCancellation.Token);
+        string committed = AssertPartialOutput(installed, overwrite: false);
+        NewExecutionResult outcome = new("invocationFailed", false)
+        {
+            Context = context,
+            SelectedTemplate = selected.Entry,
+            Invocation = invocation,
+            Diagnostics = [invocation.Diagnostic!],
+        };
+        AssertCommittedFailure(outcome, committed, overwrite: false);
+        using CancellationTokenSource commandCancellation = new();
+        var runner = Substitute.For<INewExecutionRunner>();
+        runner.ExecuteAsync(Arg.Any<NewExecutionRequest>(), Arg.Any<TemplateConstraintEvaluationSnapshot>(),
+            Arg.Any<CancellationToken>()).Returns(_ =>
+            {
+                commandCancellation.Cancel();
+                return outcome;
+            });
+        NewExecutionCommand command = new(runner, new(_interaction), new([]));
+        int? exit = null;
+
+        Exception? failure = await Record.ExceptionAsync(async () => exit = await command
+            .ParseInvocation([Partial, "--path", Target, "--output", json ? "json" : "plain"])
+            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }, commandCancellation.Token));
+
+        AssertPartialOutput(installed, overwrite: false).Should().Be(committed);
+        commandCancellation.IsCancellationRequested.Should().BeTrue();
+        failure.Should().BeNull("the command must render the actual committed failure returned by its runner");
+        exit.Should().Be(1);
+        AssertCommittedFailureOutput(outcome, json);
+        await runner.Received(1).ExecuteAsync(Arg.Any<NewExecutionRequest>(),
+            Arg.Any<TemplateConstraintEvaluationSnapshot>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Command_NativePreviewCompletesThenCancels_StillThrowsWithoutCreatingOutput(bool dryRun)
@@ -1454,6 +1531,111 @@ public sealed class NewExecutionJourneyTests : IDisposable
 
     private Dictionary<string, string> Snapshot() => Directory.GetFiles(Project, "*", SearchOption.AllDirectories)
         .ToDictionary(path => Path.GetRelativePath(Project, path), File.ReadAllText);
+
+    private async Task InstallPartialOutputAsync(bool overwrite)
+    {
+        WriteTemplate("partial", """
+            {"identity":"Func.Consumer.Partial","name":"Partial output","shortName":"partial-output",
+             "tags":{"type":"item","language":"JavaScript"}}
+            """, "first.txt", "first generated bytes");
+        File.WriteAllText(Path.Combine(_root, "package", "partial", "second.txt"), "second generated bytes");
+        await InstallAsync();
+        Directory.CreateDirectory(Target);
+        if (overwrite)
+        {
+            File.WriteAllText(Path.Combine(Target, "first.txt"), "first original bytes");
+            File.WriteAllText(Path.Combine(Target, "second.txt"), "second original bytes");
+        }
+    }
+
+    private TemplaterFactory PartialOutputFactory(CancellationTokenSource cancellation, List<string> installed)
+    {
+        var physical = new PhysicalFileSystem();
+        var files = new RecordingCommitFileSystem(physical)
+        {
+            AfterMove = path =>
+            {
+                installed.Add(path);
+                if (installed.Count == 1)
+                {
+                    cancellation.Cancel();
+                }
+            },
+        };
+        return new(new TemplateStore(new(Home), physical, new FileTemplateStoreLock(), NullLoggerFactory.Instance), files);
+    }
+
+    private string AssertPartialOutput(IReadOnlyList<string> installed, bool overwrite)
+    {
+        string committed = installed.Should().ContainSingle().Subject;
+        string[] targets = [Path.Combine(Target, "first.txt"), Path.Combine(Target, "second.txt")];
+        targets.Should().Contain(committed);
+        foreach (string target in targets)
+        {
+            string prefix = Path.GetFileNameWithoutExtension(target);
+            if (target == committed)
+            {
+                File.ReadAllBytes(target).Should().Equal(Encoding.UTF8.GetBytes($"{prefix} generated bytes"));
+            }
+            else if (overwrite)
+            {
+                File.ReadAllBytes(target).Should().Equal(Encoding.UTF8.GetBytes($"{prefix} original bytes"));
+            }
+            else
+            {
+                File.Exists(target).Should().BeFalse();
+            }
+        }
+
+        Directory.GetFiles(Target, "*", SearchOption.AllDirectories)
+            .Should().BeEquivalentTo(overwrite ? targets : [committed]);
+        Directory.GetDirectories(Target).Should().BeEmpty();
+        return committed;
+    }
+
+    private void AssertCommittedFailure(NewExecutionResult result, string committed, bool overwrite)
+    {
+        result.Kind.Should().Be("invocationFailed");
+        result.Succeeded.Should().BeFalse();
+        result.HasCompletedCreation.Should().BeFalse();
+        result.SelectedTemplate!.Identity.Should().Be(Partial);
+        result.Invocation!.Status.Should().Be(TemplateInvocationStatus.Failed);
+        result.Invocation.HasCommittedOutput.Should().BeTrue();
+        result.Invocation.Diagnostic.Should().Be(PartialCancellationDiagnostic);
+        result.Diagnostics.Should().Equal(PartialCancellationDiagnostic);
+        TemplateFileChange change = result.Invocation.Changes.Should().ContainSingle().Subject;
+        Path.GetFullPath(Path.Combine(Target, change.Path)).Should().Be(committed);
+        change.Kind.Should().Be(overwrite ? TemplateFileChangeKind.Overwrite : TemplateFileChangeKind.Create);
+    }
+
+    private void AssertCommittedFailureOutput(NewExecutionResult result, bool json)
+    {
+        _interaction.Lines.Should().NotContain(line => line.StartsWith("SUCCESS:", StringComparison.Ordinal));
+        if (json)
+        {
+            string record = _interaction.Lines.Should().ContainSingle(line => line.StartsWith("JSON: ", StringComparison.Ordinal)).Subject;
+            using var document = JsonDocument.Parse(record["JSON: ".Length..]);
+            document.RootElement.GetProperty("kind").GetString().Should().Be("invocationFailed");
+            document.RootElement.GetProperty("succeeded").GetBoolean().Should().BeFalse();
+            document.RootElement.GetProperty("diagnostics").EnumerateArray().Select(value => value.GetString())
+                .Should().Equal(PartialCancellationDiagnostic);
+            JsonElement invocation = document.RootElement.GetProperty("invocation");
+            invocation.GetProperty("status").GetString().Should().Be("Failed");
+            invocation.GetProperty("diagnostic").GetString().Should().Be(PartialCancellationDiagnostic);
+            JsonElement change = invocation.GetProperty("changes").EnumerateArray().Should().ContainSingle().Subject;
+            change.GetProperty("path").GetString().Should().Be(result.Invocation!.Changes[0].Path);
+            change.GetProperty("kind").GetString().Should().Be(result.Invocation.Changes[0].Kind.ToString());
+            document.RootElement.TryGetProperty("hasCompletedCreation", out _).Should().BeFalse();
+            document.RootElement.TryGetProperty("hasCreationOutcome", out _).Should().BeFalse();
+            invocation.TryGetProperty("hasCommittedOutput", out _).Should().BeFalse();
+            _interaction.Lines.Should().HaveCount(1);
+        }
+        else
+        {
+            _interaction.Lines.Should().Equal($"ERROR: {PartialCancellationDiagnostic}",
+                $"{result.Invocation!.Changes[0].Kind}: {result.Invocation.Changes[0].Path}");
+        }
+    }
 
     private static Dictionary<string, byte[]> StoreBytes(string directory)
         => Directory.Exists(directory)
