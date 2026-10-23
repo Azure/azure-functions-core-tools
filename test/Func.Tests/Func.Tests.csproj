@@ -14,6 +14,9 @@
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Go/Workloads.Go.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Java/Workloads.Java.csproj" />
     <ProjectReference Include="$(SrcRoot)Workloads/Stacks/PowerShell/Workloads.PowerShell.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/NativeTemplates/Workloads.Node.FunctionTemplates.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Workloads/Stacks/Node.Tests/Workloads.Node.Tests.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../Fixtures/Templates.Tests.StoreProcess/Templates.Tests.StoreProcess.csproj"
                       ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../Fixtures/Workloads.Tests.OperationProcess/Workloads.Tests.OperationProcess.csproj"
@@ -91,6 +94,8 @@
   <Target Name="PackBundledNodeForTests" AfterTargets="Build">
     <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" Targets="Pack"
       Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)bundled-node-artifacts" />
+    <MSBuild Projects="$(SrcRoot)Workloads/Stacks/Node/NativeTemplates/Workloads.Node.FunctionTemplates.csproj" Targets="Pack"
+      Properties="Configuration=$(Configuration);PackageOutputPath=$(OutDir)node-function-artifacts" />
   </Target>
 
   <Target Name="PackBundledDotNetForTests" AfterTargets="Build">

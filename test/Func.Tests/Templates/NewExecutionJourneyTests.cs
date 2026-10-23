@@ -44,6 +44,30 @@ public sealed class NewExecutionJourneyTests : IDisposable
     private string Home => Path.Combine(_root, "home");
 
     [Fact]
+    public async Task Command_ExplicitLegacyWorkflow_StillQualifiesAnUnownedInstalledItem()
+    {
+        await InstallAsync();
+        var workflow = Substitute.For<INativeItemWorkflowProvider>();
+        workflow.Stack.Returns("node");
+        workflow.Compatibility.Returns((INativeItemCompatibility)null!);
+        workflow.Effects.Returns((INativeSelectedItemEffects?)null);
+        workflow.PrepareAsync(Arg.Any<NativeItemWorkflowContext>(), Arg.Any<CancellationToken>())
+            .Returns(call => NativeTemplateInvocationPreparation.Ready(call.Arg<NativeItemWorkflowContext>().Invocation));
+        var harness = CreateHarness(configure: services =>
+        {
+            services.AddSingleton(workflow);
+            services.AddScoped<NativeTemplateWorkflowRegistry>();
+        });
+
+        int exit = await harness.InvokeAsync(["native-item", "--path", Target, "--name", "Legacy", "--output", "json",
+            "--greeting", "Hello", "--param:Auth", "function", "--feature", "true"]);
+
+        exit.Should().Be(0, _interaction.AllOutput);
+        File.Exists(Path.Combine(Target, "Legacy.txt")).Should().BeTrue();
+        await workflow.Received(1).PrepareAsync(Arg.Any<NativeItemWorkflowContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Command_InstalledItemPreviewThenCreate_UsesCanonicalInputsAndDistinctNestedContext()
     {
         await InstallAsync();
@@ -1283,12 +1307,16 @@ public sealed class NewExecutionJourneyTests : IDisposable
     }
 
     private Harness CreateHarness(IInteractionService? interaction = null, string? bundleVersion = "4.35.0",
-        ITemplaterFactory? templateFactory = null, Action<NewExecutionResult>? afterResult = null)
+        ITemplaterFactory? templateFactory = null, Action<NewExecutionResult>? afterResult = null,
+        Action<IServiceCollection>? configure = null)
     {
         interaction ??= _interaction;
         ServiceCollection services = new();
         services.AddLogging();
         services.AddSingleton(interaction);
+        services.AddSingleton<IProjectInitializationReporter, ProjectInitializationReporter>();
+        services.AddSingleton<InstalledProjectStackCatalog>();
+        services.AddSingleton<ICliVersionProvider>(AssemblyCliVersionProvider.Instance);
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddSingleton(new CliConfigurationPathsOptions(Home));
@@ -1314,6 +1342,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
             new CliConfigurationPathsOptions(Home), new PhysicalFileSystem(), new FileTemplateStoreLock(), NullLoggerFactory.Instance),
             new PhysicalFileSystem()));
         services.AddSingleton<ITemplaterFactory>(factory);
+        configure?.Invoke(services);
         ServiceProvider provider = services.BuildServiceProvider();
         _providers.Add(provider);
         var runner = new RecordingRunner(provider.GetRequiredService<INewExecutionRunner>(), afterResult);

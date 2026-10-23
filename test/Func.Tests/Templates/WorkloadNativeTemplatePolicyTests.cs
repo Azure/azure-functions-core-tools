@@ -249,7 +249,8 @@ public sealed partial class BundledNodeTemplateTests
         WorkloadEntry node = (await _installer.InstallFromPackageAsync(BuiltArchive)).Entry;
         using ServiceProvider provider = await CreatePolicyServicesAsync();
         using IServiceScope scope = provider.CreateScope();
-        NativeTemplatePolicy policy = scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicyRegistration>().Policy;
+        NativeTemplatePolicy policy = scope.ServiceProvider.GetServices<WorkloadNativeTemplatePolicyRegistration>()
+            .Single(registration => registration.Policy.Stack == "fixture").Policy;
         policy.GetType().GetProperty("Mode")!.SetValue(policy, "unhandled");
         string target = Path.Combine(_root, "ordinary-node-project");
         InitExecutionCommand command = new(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>(),

@@ -3,6 +3,7 @@
 
 using System.IO.Compression;
 using System.CommandLine;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -37,7 +38,8 @@ namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed partial class BundledNodeTemplateTests : IDisposable
 {
-    private readonly string _root = Directory.CreateTempSubdirectory("func-bundled-node-").FullName;
+    private readonly string _root;
+    private readonly string? _homeOverride;
     private readonly PhysicalFileSystem _files = new();
     private readonly IWorkloadPackageSource _source = Substitute.For<IWorkloadPackageSource>();
     private readonly WorkloadPathsOptions _paths;
@@ -47,9 +49,16 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     private readonly LiveInspector _inspector;
     private readonly TestInteractionService _interaction = new();
     private readonly List<Azure.Functions.Cli.Workloads.Loading.WorkloadLoadContext> _loadContexts = [];
+    private NodeFunctionCatalogFixture? _ownedJourneyCatalog;
 
-    public BundledNodeTemplateTests()
+    public BundledNodeTemplateTests() : this(Directory.CreateTempSubdirectory("func-bundled-node-").FullName)
     {
+    }
+
+    internal BundledNodeTemplateTests(string root, string? home = null)
+    {
+        _root = root ?? throw new ArgumentNullException(nameof(root));
+        _homeOverride = home;
         _paths = new(Path.Combine(_root, "workload-home"));
         var coordinator = new FileWorkloadOperationCoordinator(_paths);
         _workloads = new(_paths, coordinator);
@@ -71,8 +80,41 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
             coordinator, _workloads, _files);
     }
 
-    private string Home => Path.Combine(_root, "cli-home");
-    private static string BuiltArchive => Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "bundled-node-artifacts"), "*.nupkg").Single();
+    private string Home => _homeOverride ?? Path.Combine(_root, "cli-home");
+    private static string NodeArtifactVersion => typeof(Azure.Functions.Cli.Workloads.Node.NodeWorkload).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
+
+    private static string BuiltArchive => Path.Combine(AppContext.BaseDirectory, "bundled-node-artifacts",
+        $"Azure.Functions.Cli.Workloads.Node.{NodeArtifactVersion}.nupkg");
+
+    internal static (string Workload, string Functions, string Version) CurrentNodeJourneyArtifacts
+        => (BuiltArchive, FunctionArchive, NodeArtifactVersion);
+
+    internal async Task<TemplateConstraintEvaluationSnapshot> InstallOwnedNodeJourneyAsync()
+    {
+        WorkloadEntry entry = await InstallAssociationStackAsync();
+        _ownedJourneyCatalog = new(entry, FunctionArchive);
+        BasicAcquisitionResult result = await _ownedJourneyCatalog.InstallAsync(_templates, _workloads, _paths, _installer, _files,
+            AdmissionDeployment(new FileWorkloadOperationCoordinator(_paths)), Home, _root);
+        result.Status.Should().Be(BasicAcquisitionStatus.Completed, result.Message);
+        return new([new(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), entry.Aliases, true)]);
+    }
+
+    internal Task<ServiceProvider> CreateOwnedNodeJourneyServicesAsync(Action<IServiceCollection> configure)
+        => CreateServicesAsync(configure, nativeCatalog: _ownedJourneyCatalog
+            ?? throw new InvalidOperationException("Install the explicitly qualified Node journey before composing its services."));
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    internal IReadOnlyList<WeakReference> UnloadOwnedWorkloads()
+    {
+        WeakReference[] references = [.. _loadContexts.Select(context => new WeakReference(context))];
+        foreach (var context in _loadContexts)
+        {
+            context.Unload();
+        }
+        _loadContexts.Clear();
+        return references;
+    }
 
     [Fact]
     public async Task NullDependenciesAndInputs_AreRejectedAsProgrammerErrors()
@@ -120,12 +162,12 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         inner.NuspecReader.GetPackageTypes().Select(type => type.Name).Should().Equal("FuncTemplate");
         inner.GetFiles().Should().Contain("LICENSE", "content/project-js/.funcignore", "content/project-ts/.gitignore");
         asset.GetProperty("templates").EnumerateArray().Select(template => template.GetProperty("identity").GetString())
-            .Should().BeEquivalentTo(ReadNodeSource().Templates.Select(template => NativeNodeIdentity(template.Id!))
-                .Concat(["Azure.Functions.Node.Basic.JavaScript", "Azure.Functions.Node.Basic.TypeScript"]));
+            .Should().BeEquivalentTo(["Azure.Functions.Node.Basic.JavaScript", "Azure.Functions.Node.Basic.TypeScript"]);
         Read(inner, "content/project-js/package.json").Should().Contain("\"main\": \"src/functions/*.js\"", "\"@azure/functions\": \"^4.0.0\"");
         Read(inner, "content/project-ts/package.json").Should().Contain("\"main\": \"dist/src/functions/*.js\"", "\"build\": \"tsc\"");
-        Read(inner, "content/http-js/httpTrigger.js").Should().Contain("app.http('httpTrigger'", "return { body: `Hello, ${name}!` };").And.NotContain("function.json");
-        Read(inner, "content/http-ts/httpTrigger.ts").Should().Contain("Promise<HttpResponseInit>", "handler: httpTrigger");
+        using var functions = new PackageArchiveReader(FunctionArchive);
+        Read(functions, "content/http-js/httpTrigger.js").Should().Contain("app.http('httpTrigger'", "return { body: `Hello, ${name}!` };").And.NotContain("function.json");
+        Read(functions, "content/http-ts/httpTrigger.ts").Should().Contain("Promise<HttpResponseInit>", "handler: httpTrigger");
     }
 
     [Fact]
@@ -161,10 +203,13 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     public async Task StagedCommands_ActualInstalledBundle_PreviewAndCreateProjectThenHttpWithCanonicalConfiguration(
         string alias, string language, string extension, string main)
     {
-        var installed = await _installer.InstallFromPackageAsync(BuiltArchive);
-        using var provider = await CreateServicesAsync();
+        var entry = await InstallAssociationStackAsync();
+        var catalog = new NodeFunctionCatalogFixture(entry, FunctionArchive);
+        (await catalog.InstallAsync(_templates, _workloads, _paths, _installer, _files,
+            AdmissionDeployment(new FileWorkloadOperationCoordinator(_paths)), Home, _root)).Status.Should().Be(BasicAcquisitionStatus.Completed);
+        using var provider = await CreateNodePreparationServicesAsync((_, _) => Task.FromResult((0, "")), catalog: catalog);
         using var scope = provider.CreateScope();
-        var availability = new TemplateConstraintEvaluationSnapshot([new(installed.Entry.PackageId, NuGetVersion.Parse(installed.Entry.PackageVersion), ["node"], true)]);
+        var availability = new TemplateConstraintEvaluationSnapshot([new(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), ["node"], true)]);
         var init = new InitExecutionCommand(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>(),
             provider.GetRequiredService<InitExecutionRenderer>(), availability);
         string project = Path.Combine(_root, "app-" + alias);
@@ -778,7 +823,8 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         return archive;
     }
 
-    private async Task<ServiceProvider> CreateServicesAsync(Action<IServiceCollection>? configure = null, bool validateScopes = false)
+    private async Task<ServiceProvider> CreateServicesAsync(Action<IServiceCollection>? configure = null, bool validateScopes = false,
+        IBasicCompanionCatalog? nativeCatalog = null)
     {
         ServiceCollection services = new();
         services.AddLogging();
@@ -786,6 +832,12 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         services.AddSingleton<IFileSystem>(_files);
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddSingleton(new CliConfigurationPathsOptions(Home));
+        services.AddSingleton<ICliVersionProvider>(AssemblyCliVersionProvider.Instance);
+        services.AddSingleton<IWorkloadStore>(_workloads);
+        services.AddSingleton<IWorkloadPaths>(_paths);
+        services.AddSingleton<IWorkloadDeploymentService>(AdmissionDeployment(new FileWorkloadOperationCoordinator(_paths)));
+        services.AddSingleton<IBasicCompanionCatalog>(nativeCatalog ?? new BundledBasicCompanionCatalog(new BasicCompanionManifestReader()));
+        services.AddSingleton<BasicAcquisitionPlanner>();
         services.AddSingleton<ILocalSettingsProvider, LocalSettingsProvider>();
         services.AddSingleton<ICliConfigurationProvider, CliConfigurationProvider>();
         services.AddOptions();
@@ -801,6 +853,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();
         var bundles = Substitute.For<IInstalledBundleWorkloads>();
         bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([new InstalledBundleWorkload("4.35.0", Path.Combine(_root, "bundle"))]);
+        services.AddSingleton(bundles);
         services.AddSingleton<IExtensionBundleResolver>(new ExtensionBundleResolver(new InstalledBundleScanner(bundles),
             NullBundleResolveTelemetry.Instance, NullLogger<ExtensionBundleResolver>.Instance));
         services.AddTemplatesOrchestrator();
@@ -834,17 +887,25 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
             using (var inner = new ZipArchive(bytes, ZipArchiveMode.Update, leaveOpen: true))
             {
                 string path = corruption == "nestedType" ? "Azure.Functions.Templates.Node.Basic.nuspec"
-                    : corruption == "nestedHost" ? "content/http-js/.template.config/func.host.json"
-                    : "content/http-js/.template.config/template.json";
+                    : corruption == "nestedHost" ? "content/project-js/.template.config/func.host.json"
+                    : "content/project-js/.template.config/template.json";
                 var content = inner.GetEntry(path)!;
                 string text;
                 using (var reader = new StreamReader(content.Open()))
                 {
                     text = reader.ReadToEnd();
                 }
-                text = corruption == "nestedType" ? text.Replace("FuncTemplate", "FuncCliWorkload", StringComparison.Ordinal)
-                    : corruption == "nestedHost" ? """{"symbolInfo":42}"""
-                    : text.Replace("\"args\": \"node\"", "\"args\": 42", StringComparison.Ordinal);
+                if (corruption == "nestedConstraints")
+                {
+                    JsonNode configuration = JsonNode.Parse(text)!;
+                    configuration["constraints"]!["stack"] = new JsonObject { ["type"] = "func-workload", ["args"] = 42 };
+                    text = configuration.ToJsonString();
+                }
+                else
+                {
+                    text = corruption == "nestedType" ? text.Replace("FuncTemplate", "FuncCliWorkload", StringComparison.Ordinal)
+                        : """{"symbolInfo":42}""";
+                }
                 content.Delete();
                 using var output = new StreamWriter(inner.CreateEntry(path).Open());
                 output.Write(text);
@@ -861,7 +922,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
             case "digest": asset["sha256"] = new string('0', 64); break;
             case "path": asset["path"] = "tools/../../outside.nupkg"; break;
             case "identity": asset["packageId"] = "Another.Package"; break;
-            case "type": asset["templates"]![0]!["type"] = "project"; break;
+            case "type": asset["templates"]![0]!["type"] = asset["templates"]![0]!["type"]!.GetValue<string>() == "project" ? "item" : "project"; break;
             case "inventory": asset["templates"]!.AsArray().RemoveAt(0); break;
             case "schema": root["schemaVersion"] = 2; break;
         }
@@ -879,16 +940,14 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var context in _loadContexts)
-        {
-            context.Unload();
-        }
+        bool loadedWorkloads = _loadContexts.Count > 0;
+        UnloadOwnedWorkloads();
 
         try
         {
             Directory.Delete(_root, true);
         }
-        catch (UnauthorizedAccessException) when (_loadContexts.Count > 0)
+        catch (UnauthorizedAccessException) when (loadedWorkloads)
         {
             // Windows retains loaded workload DLLs until the test process exits; the test owns this temporary directory only.
         }

@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.IO.Compression;
+using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -14,7 +15,9 @@ using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Templates.Native;
 using Azure.Functions.Cli.Tests.Templates.Engine;
 using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
@@ -24,6 +27,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge.Template;
 using NSubstitute;
+using NuGet.Packaging;
 using NuGet.Versioning;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -34,11 +38,68 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "func-native-adapter-" + Guid.NewGuid().ToString("N"));
     private readonly TestInteractionService _interaction = new();
     private readonly List<ServiceProvider> _providers = [];
+    private BundledNodeTemplateTests? _ownedNode;
+    private TemplateConstraintEvaluationSnapshot? _ownedNodeAvailability;
 
     private string Home => Path.Combine(_root, "home");
     private string Project => Path.Combine(_root, "project");
     private string Target => Path.Combine(Project, "nested");
     private string LegacySourcePath => Path.Combine(_root, "package", "legacy-source.json");
+
+    [Fact]
+    public async Task Fixture_CurrentArtifactsAndQualifiedOwner_PreserveHistoricalPackagesAndSplitInventories()
+    {
+        var artifacts = BundledNodeTemplateTests.CurrentNodeJourneyArtifacts;
+        Path.GetFileName(artifacts.Workload).Should().Be($"Azure.Functions.Cli.Workloads.Node.{artifacts.Version}.nupkg");
+        Path.GetFileName(artifacts.Functions).Should().Be($"Azure.Functions.Templates.Node.Functions.{artifacts.Version}.nupkg");
+        Dictionary<string, string> archives = NodeArtifactHashes();
+        using (var workload = new PackageArchiveReader(artifacts.Workload))
+        {
+            workload.NuspecReader.GetId().Should().Be("Azure.Functions.Cli.Workloads.Node");
+            workload.NuspecReader.GetVersion().Should().Be(NuGetVersion.Parse(artifacts.Version));
+            using var declaration = JsonDocument.Parse(workload.GetStream("bundled-templates.json"));
+            JsonElement asset = declaration.RootElement.GetProperty("assets").EnumerateArray().Should().ContainSingle().Subject;
+            asset.GetProperty("packageId").GetString().Should().Be("Azure.Functions.Templates.Node.Basic");
+            asset.GetProperty("version").GetString().Should().Be(artifacts.Version);
+            asset.GetProperty("templates").GetArrayLength().Should().Be(2);
+            using var input = workload.GetStream(asset.GetProperty("path").GetString()!);
+            using var bytes = new MemoryStream();
+            input.CopyTo(bytes);
+            Convert.ToHexStringLower(SHA256.HashData(bytes.ToArray())).Should().Be(asset.GetProperty("sha256").GetString());
+            bytes.Position = 0;
+            using var basic = new PackageArchiveReader(bytes);
+            basic.GetFiles().Should().NotContain(path => path.StartsWith("content/http-", StringComparison.Ordinal)
+                || path.StartsWith("content/items/", StringComparison.Ordinal));
+        }
+        using (var functions = new PackageArchiveReader(artifacts.Functions))
+        {
+            functions.NuspecReader.GetId().Should().Be("Azure.Functions.Templates.Node.Functions");
+            functions.NuspecReader.GetVersion().Should().Be(NuGetVersion.Parse(artifacts.Version));
+            functions.GetFiles().Where(path => path.EndsWith("/.template.config/template.json", StringComparison.Ordinal))
+                .Should().HaveCount(33).And.Contain("content/http-js/.template.config/template.json", "content/http-ts/.template.config/template.json");
+            functions.GetFiles().Should().NotContain(path => path.StartsWith("content/project-", StringComparison.Ordinal));
+        }
+
+        await InstallBasicNodeAsync(owned: true);
+        using var harness = await CreateOwnedHarnessAsync();
+        var registration = harness.Services.GetServices<WorkloadNativeTemplatePolicyRegistration>()
+            .Single(value => value.Policy.Stack == "node");
+        var initializer = harness.Services.GetServices<IProjectInitializer>().Single(value => value.Stack == "node");
+        initializer.GetType().Assembly.Should().BeSameAs(registration.Policy.GetType().Assembly);
+        AssemblyLoadContext.GetLoadContext(initializer.GetType().Assembly).Should().BeSameAs(registration.Owner.LoadContext);
+        harness.Services.GetRequiredService<IProjectInitializationReporter>().Should().BeOfType<ProjectInitializationReporter>();
+        (await harness.Services.GetRequiredService<IBasicCompanionCatalog>().LoadAsync(CancellationToken.None))
+            .Revision.Should().Be("explicit-local-node-function-fixture");
+        var support = harness.Services.GetRequiredService<TemplateProjectSupport>();
+        support.Planner.Should().BeSameAs(harness.Services.GetRequiredService<TemplateProjectConfigurationPlanner>());
+        support.Writer.Should().BeSameAs(harness.Services.GetRequiredService<TemplateProjectConfigurationWriter>());
+        harness.Services.GetRequiredService<Func<TemplateProjectSupport>>()().Should().BeSameAs(support);
+        await CreateBasicProjectAsync(harness);
+        harness.InitResult!.Preparation!.Preview.OwnedPlan!.Skipped.Should().BeTrue();
+        harness.InitResult.Preparation.Completion!.OwnedCompletion!.TargetMayHaveChanged.Should().BeFalse();
+        NodeArtifactHashes().OrderBy(pair => pair.Key, StringComparer.Ordinal).Should()
+            .Equal(archives.OrderBy(pair => pair.Key, StringComparer.Ordinal));
+    }
 
     [Fact]
     public async Task PublicDefinitions_InstalledNativePreviewCreateAndItem_PreserveTargetContextAndConfiguration()
@@ -596,9 +657,9 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
     [InlineData("list")]
     public async Task Adapter_NewUncommittedResultThenCancellation_DoesNotRender(string outcome)
     {
-        await InstallBasicNodeAsync();
+        await InstallBasicNodeAsync(owned: true);
         using CancellationTokenSource cancellation = new();
-        using var harness = CreateHarness(afterNew: _ => cancellation.Cancel());
+        using var harness = await CreateOwnedHarnessAsync(afterNew: _ => cancellation.Cancel());
         await CreateBasicProjectAsync(harness);
         int beforeOutput = _interaction.Lines.Count;
         string[] selection = outcome == "list" ? ["--list"] : ["-t", outcome == "missing" ? "missing" : "Azure.Functions.Node.Http.JavaScript"];
@@ -620,10 +681,10 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
     [InlineData("throwBeforeCreate")]
     public async Task Adapter_NewNativeCancellationBeforeCommit_PropagatesWithoutRendering(string boundary)
     {
-        await InstallBasicNodeAsync();
+        await InstallBasicNodeAsync(owned: true);
         using CancellationTokenSource cancellation = new();
         var native = new CancelingNativeFactory(Path.Combine(Home, "templates"), cancellation, boundary);
-        using var harness = CreateHarness(templateFactory: native);
+        using var harness = await CreateOwnedHarnessAsync(templateFactory: native);
         await CreateBasicProjectAsync(harness);
         int beforeOutput = _interaction.Lines.Count;
         var parsed = harness.Adapter.ParseNewInvocation(harness.CreateNew(),
@@ -935,15 +996,32 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
 
     public void Dispose()
     {
-        foreach (ServiceProvider provider in _providers)
+        IReadOnlyList<WeakReference> owners = DisposeProvidersAndUnloadOwnedWorkloads();
+        for (int pass = 0; pass < 3 && owners.Any(owner => owner.IsAlive); pass++)
         {
-            provider.Dispose();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
         }
+        owners.Should().OnlyContain(owner => !owner.IsAlive, "the opt-in fixture must release every collectible workload before deleting its files");
 
         if (Directory.Exists(_root))
         {
             Directory.Delete(_root, recursive: true);
         }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private IReadOnlyList<WeakReference> DisposeProvidersAndUnloadOwnedWorkloads()
+    {
+        foreach (ServiceProvider provider in _providers)
+        {
+            provider.Dispose();
+        }
+        _providers.Clear();
+        IReadOnlyList<WeakReference> owners = _ownedNode?.UnloadOwnedWorkloads() ?? [];
+        _ownedNode = null;
+        return owners;
     }
 
     private Harness CreateHarness(bool itemCompatibility = false, INativeProjectPreparation? preparation = null,
@@ -954,9 +1032,11 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         ServiceCollection services = new();
         services.AddLogging();
         services.AddSingleton<Azure.Functions.Cli.Console.IInteractionService>(_interaction);
+        services.AddSingleton<IProjectInitializationReporter, ProjectInitializationReporter>();
         services.AddSingleton<IFileSystem>(fileSystem ?? new PhysicalFileSystem());
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddSingleton(new CliConfigurationPathsOptions(Home));
+        services.AddSingleton<ICliVersionProvider>(AssemblyCliVersionProvider.Instance);
         services.AddSingleton<ILocalSettingsProvider, LocalSettingsProvider>();
         services.AddSingleton<ICliConfigurationProvider, CliConfigurationProvider>();
         services.AddOptions();
@@ -981,6 +1061,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();
         var installed = Substitute.For<IInstalledBundleWorkloads>();
         installed.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
+        services.AddSingleton(installed);
         services.AddSingleton<IExtensionBundleResolver>(new ExtensionBundleResolver(
             new InstalledBundleScanner(installed), NullBundleResolveTelemetry.Instance, NullLogger<ExtensionBundleResolver>.Instance));
         services.AddTemplatesOrchestrator();
@@ -990,13 +1071,35 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         }
         services.AddSingleton<TemplateProjectSupport>();
         var provider = services.BuildServiceProvider();
+        return CompleteHarness(provider, new([new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true)]),
+            itemCompatibility, preparation, afterInit, afterNew);
+    }
+
+    private async Task<Harness> CreateOwnedHarnessAsync(
+        ITemplaterFactory? templateFactory = null, Action<NewExecutionResult>? afterNew = null)
+    {
+        BundledNodeTemplateTests fixture = _ownedNode ?? throw new InvalidOperationException("Install the owned Node fixture first.");
+        ServiceProvider provider = await fixture.CreateOwnedNodeJourneyServicesAsync(services =>
+        {
+            services.AddSingleton<Azure.Functions.Cli.Console.IInteractionService>(_interaction);
+            if (templateFactory is not null) services.AddSingleton(templateFactory);
+            services.AddScoped<NativeTemplateWorkflowRegistry>();
+        });
+        return CompleteHarness(provider, _ownedNodeAvailability!, false, null, null, afterNew);
+    }
+
+    private Harness CompleteHarness(ServiceProvider provider, TemplateConstraintEvaluationSnapshot availability,
+        bool itemCompatibility, INativeProjectPreparation? preparation,
+        Action<InitExecutionResult>? afterInit, Action<NewExecutionResult>? afterNew)
+    {
         _providers.Add(provider);
+        IInstalledBundleWorkloads installed = provider.GetRequiredService<IInstalledBundleWorkloads>();
         var scope = provider.CreateScope();
         var init = new RecordingInitRunner(scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>(), afterInit);
-        var items = new RecordingNewRunner(provider.GetRequiredService<INewExecutionRunner>(), afterNew);
+        var items = new RecordingNewRunner(scope.ServiceProvider.GetRequiredService<INewExecutionRunner>(), afterNew);
         var adapter = new NativeTemplateCommandAdapter(init, items, provider.GetRequiredService<InitExecutionRenderer>(),
             provider.GetRequiredService<NewExecutionRenderer>(),
-            new([new("Controlled.Node", NuGetVersion.Parse("1.0.0"), ["node"], true)]),
+            availability,
             itemCompatibility ? new NativeItemCompatibility(_interaction, entry => new(
                 new(entry.Entry.Identity, LegacySourcePath, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(LegacySource)))), entry.Entry.Package, null,
                 new("trigger-functionName", null, "string", null, null, true,
@@ -1010,20 +1113,31 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         return new(provider, scope, adapter, _interaction, installed, init, items);
     }
 
-    private async Task InstallBasicNodeAsync()
+    private async Task InstallBasicNodeAsync(bool owned = false)
     {
         Directory.CreateDirectory(_root);
-        string outerPath = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "bundled-node-artifacts"), "*.nupkg").Single();
-        using var outer = ZipFile.OpenRead(outerPath);
+        var artifacts = BundledNodeTemplateTests.CurrentNodeJourneyArtifacts;
+        if (owned)
+        {
+            _ownedNode = new(_root, Home);
+            _ownedNodeAvailability = await _ownedNode.InstallOwnedNodeJourneyAsync();
+            return;
+        }
+        using var outer = ZipFile.OpenRead(artifacts.Workload);
         string innerPath = Path.Combine(_root, "node-basic.nupkg");
         outer.GetEntry("tools/any/templates/node-basic.nupkg")!.ExtractToFile(innerPath);
         await TemplateFixtures.InstallAsync(innerPath, Path.Combine(Home, "templates"), CancellationToken.None);
     }
 
+    private static Dictionary<string, string> NodeArtifactHashes()
+        => new[] { "bundled-node-artifacts", "node-function-artifacts" }
+            .SelectMany(folder => Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, folder), "*.nupkg"))
+            .ToDictionary(path => path, path => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))), StringComparer.Ordinal);
+
     private async Task CreateBasicProjectAsync(Harness harness)
     {
         int exit = await InvokeAsync(harness.Adapter.ParseInitInvocation(harness.CreateInit(),
-            [Project, "-s", "node", "-l", "js", "--no-bundles"],
+            [Project, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"],
             new("Azure.Functions.Node.Basic.JavaScript", NonInteractive: true, JsonOutput: true)));
         exit.Should().Be(0, _interaction.AllOutput);
     }
@@ -1120,7 +1234,12 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
     private sealed class Harness(ServiceProvider provider, IServiceScope scope, NativeTemplateCommandAdapter adapter,
         TestInteractionService interaction, IInstalledBundleWorkloads installed, RecordingInitRunner init, RecordingNewRunner items) : IDisposable
     {
+        private ServiceProvider? _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+        private IServiceScope? _scope = scope ?? throw new ArgumentNullException(nameof(scope));
+
+        private ServiceProvider Provider => _provider ?? throw new ObjectDisposedException(nameof(Harness));
         public NativeTemplateCommandAdapter Adapter { get; } = adapter;
+        public IServiceProvider Services => (_scope ?? throw new ObjectDisposedException(nameof(Harness))).ServiceProvider;
 
         public InitExecutionResult? InitResult => init.Result;
 
@@ -1135,15 +1254,23 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         public NewCommand CreateNew() => new(LegacyNew, Substitute.For<INewCommandTemplateOptionProvider>());
 
         public InitCommand CreateInit() => new(interaction, new RecordingWorkloadHintRenderer(),
-            provider.GetRequiredService<ILocalSettingsProvider>(), provider.GetRequiredService<IFunctionsProjectResolver>(),
-            provider.GetRequiredService<IHostJsonBundleSectionReader>(), new InstalledBundleScanner(installed),
-            provider.GetRequiredService<IFileSystem>(), provider.GetServices<IProjectInitializer>());
+            Provider.GetRequiredService<ILocalSettingsProvider>(), Provider.GetRequiredService<IFunctionsProjectResolver>(),
+            Provider.GetRequiredService<IHostJsonBundleSectionReader>(), new InstalledBundleScanner(installed),
+            Provider.GetRequiredService<IFileSystem>(), Provider.GetServices<IProjectInitializer>());
 
-        public void Dispose() => scope.Dispose();
+        public void Dispose()
+        {
+            _scope?.Dispose();
+            _scope = null;
+            _provider = null;
+            init.Release();
+            items.Release();
+        }
     }
 
     private sealed class RecordingInitRunner(IInitExecutionRunner inner, Action<InitExecutionResult>? afterReturn) : IInitExecutionRunner
     {
+        private IInitExecutionRunner? _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         public InitExecutionResult? Result { get; private set; }
 
         public CancellationToken Token { get; private set; }
@@ -1153,14 +1280,22 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         {
             Result = null;
             Token = cancellationToken;
-            Result = await inner.ExecuteAsync(request, availability, cancellationToken);
+            Result = await (_inner ?? throw new ObjectDisposedException(nameof(RecordingInitRunner))).ExecuteAsync(request, availability, cancellationToken);
             afterReturn?.Invoke(Result);
             return Result;
+        }
+
+        public void Release()
+        {
+            Result = null;
+            _inner = null;
+            afterReturn = null;
         }
     }
 
     private sealed class RecordingNewRunner(INewExecutionRunner inner, Action<NewExecutionResult>? afterReturn) : INewExecutionRunner
     {
+        private INewExecutionRunner? _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         public NewExecutionResult? Result { get; private set; }
 
         public CancellationToken Token { get; private set; }
@@ -1170,9 +1305,16 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         {
             Result = null;
             Token = cancellationToken;
-            Result = await inner.ExecuteAsync(request, availability, cancellationToken);
+            Result = await (_inner ?? throw new ObjectDisposedException(nameof(RecordingNewRunner))).ExecuteAsync(request, availability, cancellationToken);
             afterReturn?.Invoke(Result);
             return Result;
+        }
+
+        public void Release()
+        {
+            Result = null;
+            _inner = null;
+            afterReturn = null;
         }
     }
 

@@ -25,7 +25,7 @@ public sealed partial class BundledNodeTemplateTests
         using var bindings = JsonDocument.Parse(File.ReadAllText(Path.Combine(NodeSourceDirectory(), "templates", "_bindings.json")));
         var paths = inner.GetFiles().Where(path => path.EndsWith("/.template.config/template.json", StringComparison.Ordinal)).ToArray();
 
-        paths.Should().HaveCount(legacy.Templates.Count + 2);
+        paths.Should().HaveCount(legacy.Templates.Count);
         foreach (var template in legacy.Templates)
         {
             var expected = V2TemplateProjection.Project(template, legacy, "node")!;
@@ -89,7 +89,7 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task CatalogInstall_ActualPhysicalWorkload_ReopensCompleteNativeMetadataWithoutLosingEmptyDefaults()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallNodeAuthoringCatalogAsync();
         var legacy = ReadNodeSource();
         using var services = await CreateServicesAsync();
         var stack = services.GetServices<IProjectStack>().Single(stack => stack.Stack == "node");
@@ -133,7 +133,7 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task CatalogNativeBackend_EveryOwnedItem_PreviewsAndCreatesSourceEquivalentFilesWithoutChangingExistingProject()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallNodeAuthoringCatalogAsync();
         var legacy = ReadNodeSource();
         using var session = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None);
         var nativeTemplates = await session.PackageManager.GetTemplatesAsync(CancellationToken.None);
@@ -207,7 +207,7 @@ public sealed partial class BundledNodeTemplateTests
     public async Task CatalogFacade_BuiltInItem_UsesLegacyAliasAndRefusesConflictsWithoutChangingUserSource(
         string language, string identity, string extension)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallNodeAuthoringCatalogAsync();
         string project = Directory.CreateDirectory(Path.Combine(_root, "project")).FullName;
         string target = Directory.CreateDirectory(Path.Combine(project, "src", "functions")).FullName;
         string existing = Path.Combine(target, "Existing" + extension);
@@ -249,7 +249,7 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("Microsoft.Azure.Functions.ExtensionBundle.Experimental", "4.35.0")]
     public async Task CatalogEligibility_UnqualifiedBindingConstraint_FailsClosedRatherThanInventingChannelSupport(string? bundleId, string? version)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallNodeAuthoringCatalogAsync();
         var snapshot = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0"), ["node"], true)]);
         var context = new TemplateEngineContext(WorkingDirectory.FromExplicit(_root),
             bundle: bundleId is null ? null : new(bundleId, version!));
@@ -309,11 +309,6 @@ public sealed partial class BundledNodeTemplateTests
 
     private static PackageArchiveReader ReadNodeArchive()
     {
-        using var outer = new PackageArchiveReader(BuiltArchive);
-        var bytes = new MemoryStream();
-        using var input = outer.GetStream("tools/any/templates/node-basic.nupkg");
-        input.CopyTo(bytes);
-        bytes.Position = 0;
-        return new(bytes);
+        return new(FunctionArchive);
     }
 }

@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Azure.Functions.Cli.Workloads.Node.Tests" />
+    <InternalsVisibleTo Include="Azure.Functions.Cli.Tests" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +24,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Templates/**" />
+    <PackageReference Include="NuGet.Versioning" />
   </ItemGroup>
 
   <Import Project="$(EngBuildRoot)Workloads/Workload.BundledTemplates.targets" />

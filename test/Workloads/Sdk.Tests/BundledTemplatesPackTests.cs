@@ -24,9 +24,8 @@ public sealed class BundledTemplatesPackTests
 
         PackageTypes(outer).Should().Equal("FuncCliWorkload");
         outer.GetEntry("tools/any/Azure.Functions.Cli.Workloads.Node.dll").Should().NotBeNull();
-        TemplateInventory(inner).Select(template => template.Identity).Should().Contain(
-            ["Azure.Functions.Node.Basic.JavaScript", "Azure.Functions.Node.Basic.TypeScript",
-            "Azure.Functions.Node.Http.JavaScript", "Azure.Functions.Node.Http.TypeScript"]);
+        TemplateInventory(inner).Select(template => template.Identity).Should().BeEquivalentTo(
+            ["Azure.Functions.Node.Basic.JavaScript", "Azure.Functions.Node.Basic.TypeScript"]);
         Read(inner, "content/project-js/package.json").Should().Contain("\"main\": \"src/functions/*.js\"", "\"@azure/functions\": \"^4.0.0\"");
         Read(inner, "content/project-ts/package.json").Should().Contain("\"main\": \"dist/src/functions/*.js\"", "\"build\": \"tsc\"");
         Read(inner, "README.md").Should().NotBeNullOrWhiteSpace();

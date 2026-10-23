@@ -14,12 +14,14 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// for JS or TS, merges the default extension bundle into <c>host.json</c>,
 /// and optionally runs <c>npm install</c>.
 /// </summary>
-internal sealed class NodeProjectInitializer(NodeProjectStack stack, NodeNpmInstaller npmInstaller) : IProjectInitializer
+internal sealed class NodeProjectInitializer(NodeProjectStack stack, NodeNpmInstaller npmInstaller, IProjectInitializationReporter reporter)
+    : IProjectInitializer
 {
     private const string ProjectNamePlaceholder = "__PROJECT_NAME__";
     private static readonly Assembly _assembly = typeof(NodeProjectInitializer).Assembly;
 
     private readonly NodeProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
+    private readonly IProjectInitializationReporter _reporter = reporter ?? throw new ArgumentNullException(nameof(reporter));
 
     public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
 
@@ -132,7 +134,11 @@ internal sealed class NodeProjectInitializer(NodeProjectStack stack, NodeNpmInst
         {
             // Best-effort. A failure (e.g. npm not installed) leaves the
             // scaffold in place; the user can run `npm install` manually.
-            await RunNpmInstall(root, cancellationToken).ConfigureAwait(false);
+            (int exitCode, _) = await RunNpmInstall(root, cancellationToken);
+            if (exitCode != 0)
+            {
+                _reporter.WriteWarning("Node dependencies were not installed. The generated project files were retained. Run 'npm install' in the project directory.");
+            }
         }
     }
 

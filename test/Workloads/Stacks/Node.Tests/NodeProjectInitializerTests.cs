@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Workloads.Node.Tests;
 
@@ -15,22 +16,29 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void Constructor_NullStack_Throws()
     {
-        FluentActions.Invoking(() => new NodeProjectInitializer(null!, new NodeNpmInstaller()))
+        FluentActions.Invoking(() => new NodeProjectInitializer(null!, new NodeNpmInstaller(), _reporter))
             .Should().ThrowExactly<ArgumentNullException>().WithParameterName("stack");
     }
 
     [Fact]
     public void Constructor_NullNpmInstaller_Throws()
     {
-        FluentActions.Invoking(() => new NodeProjectInitializer(new NodeProjectStack(), null!))
+        FluentActions.Invoking(() => new NodeProjectInitializer(new NodeProjectStack(), null!, _reporter))
             .Should().ThrowExactly<ArgumentNullException>().WithParameterName("npmInstaller");
+    }
+
+    [Fact]
+    public void Constructor_NullReporter_Throws()
+    {
+        FluentActions.Invoking(() => new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller(), null!))
+            .Should().ThrowExactly<ArgumentNullException>().WithParameterName("reporter");
     }
 
     [Fact]
     public async Task RunNpmInstall_DefaultDelegate_UsesInjectedOwnedHelperWithoutScaffolding()
     {
         var npm = new RecordingNpmInstaller();
-        NodeProjectInitializer initializer = new(new NodeProjectStack(), npm);
+        NodeProjectInitializer initializer = new(new NodeProjectStack(), npm, _reporter);
         using var cancellation = new CancellationTokenSource();
 
         (int ExitCode, string Stderr) result = await initializer.RunNpmInstall(_projectDir.FullName, cancellation.Token);
@@ -42,6 +50,7 @@ public class NodeProjectInitializerTests : IDisposable
     }
 
     private readonly DirectoryInfo _projectDir;
+    private readonly IProjectInitializationReporter _reporter = Substitute.For<IProjectInitializationReporter>();
 
     public NodeProjectInitializerTests()
     {
@@ -66,7 +75,7 @@ public class NodeProjectInitializerTests : IDisposable
     [Fact]
     public void Stack_IsNode()
     {
-        new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller()).Stack.Should().Be("node");
+        new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller(), _reporter).Stack.Should().Be("node");
     }
 
     [Theory]
@@ -81,7 +90,7 @@ public class NodeProjectInitializerTests : IDisposable
     [InlineData("unknown", "unknown")]
     public void NormalizeLanguage_ReturnsExpectedResult(string? input, string expected)
     {
-        new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller()).NormalizeLanguage(input).Should().Be(expected);
+        new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller(), _reporter).NormalizeLanguage(input).Should().Be(expected);
     }
 
     [Fact]
@@ -113,7 +122,7 @@ public class NodeProjectInitializerTests : IDisposable
     public void GetInitOptions_RegistersBundleAndNpmOptions()
     {
         RootCommand root = [];
-        IReadOnlyList<Option> options = new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller()).GetInitOptions(new InitOptionRegistry(root));
+        IReadOnlyList<Option> options = new NodeProjectInitializer(new NodeProjectStack(), new NodeNpmInstaller(), _reporter).GetInitOptions(new InitOptionRegistry(root));
         IReadOnlyList<string> names = [.. options.Select(o => o.Name)];
 
         names.Should().Contain("--no-bundles");
@@ -256,6 +265,7 @@ public class NodeProjectInitializerTests : IDisposable
         });
 
         npmCalls.Should().Be(0);
+        _reporter.DidNotReceive().WriteWarning(Arg.Any<string>());
     }
 
     [Fact]
@@ -267,6 +277,51 @@ public class NodeProjectInitializerTests : IDisposable
         });
 
         File.Exists(Path.Combine(_projectDir.FullName, "package.json")).Should().BeTrue();
+        _reporter.Received(1).WriteWarning(Arg.Is<string>(message => message.Contains("not installed") && message.Contains("npm install")));
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    [InlineData(-1, true)]
+    public async Task InitializeAsync_NpmOutcome_WarnsOnlyForFailureWithoutDumpingStderr(int exitCode, bool warning)
+    {
+        await RunAsync(language: null, force: false, configure: init =>
+            init.RunNpmInstall = (_, _) => Task.FromResult((exitCode, "[red]private dependency output/token[/]")));
+
+        if (warning)
+        {
+            _reporter.Received(1).WriteWarning("Node dependencies were not installed. The generated project files were retained. Run 'npm install' in the project directory.");
+        }
+        else
+        {
+            _reporter.DidNotReceive().WriteWarning(Arg.Any<string>());
+        }
+        File.Exists(Path.Combine(_projectDir.FullName, "package.json")).Should().BeTrue();
+        File.Exists(Path.Combine(_projectDir.FullName, "host.json")).Should().BeTrue();
+        Directory.Exists(Path.Combine(_projectDir.FullName, "src", "functions")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_LegacyCancellationResult_WarnsAndPreservesScaffoldSuccess()
+    {
+        using var cancellation = new CancellationTokenSource();
+        NodeNpmInstaller npm = Substitute.For<NodeNpmInstaller>();
+        npm.InstallAsync(_projectDir.FullName, cancellation.Token).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return (-1, "legacy cancellation");
+        });
+        NodeProjectInitializer initializer = new(new NodeProjectStack(), npm, _reporter);
+        RootCommand root = [];
+        initializer.GetInitOptions(new InitOptionRegistry(root));
+
+        await initializer.InitializeAsync(new(WorkingDirectory.FromExplicit(_projectDir.FullName), "test", null, false),
+            root.Parse([]), cancellation.Token);
+
+        File.Exists(Path.Combine(_projectDir.FullName, "package.json")).Should().BeTrue();
+        _reporter.Received(1).WriteWarning(Arg.Is<string>(message => message.Contains("npm install")));
+        await npm.DidNotReceive().InstallRequiredAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     private Task RunAsync(
@@ -276,7 +331,7 @@ public class NodeProjectInitializerTests : IDisposable
         string[]? args = null,
         Action<NodeProjectInitializer>? configure = null)
     {
-        NodeProjectInitializer initializer = new(new NodeProjectStack(), new NodeNpmInstaller())
+        NodeProjectInitializer initializer = new(new NodeProjectStack(), new NodeNpmInstaller(), _reporter)
         {
             // Stub by default so tests don't spawn real npm.
             RunNpmInstall = (_, _) => Task.FromResult((0, string.Empty)),

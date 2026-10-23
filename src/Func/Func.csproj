@@ -32,7 +32,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="../Workloads/Stacks/Node/NodeNpmInstaller.cs" Link="Templates/Node/NodeNpmInstaller.cs" />
     <Compile Include="../Workloads/Stacks/DotNet/Templates/DotNetProjectFileSelection.cs" Link="Templates/DotNet/Shared/DotNetProjectFileSelection.cs" />
     <Compile Include="../Workloads/Stacks/DotNet/Templates/DotNetTemplateFrameworks.cs" Link="Templates/DotNet/Shared/DotNetTemplateFrameworks.cs" />
     <Compile Include="../Workloads/Stacks/DotNet/Templates/DotNetTemplateProjectPreparation.cs" Link="Templates/DotNet/Shared/DotNetTemplateProjectPreparation.cs" />

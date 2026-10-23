@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Node.Native;
 using Microsoft.Extensions.DependencyInjection;
 
 [assembly: CliWorkload<Azure.Functions.Cli.Workloads.Node.NodeWorkload>()]
@@ -26,8 +27,10 @@ public sealed class NodeWorkload : Workload
         builder.Services.AddSingleton<NodeProjectStack>();
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<NodeProjectStack>());
         builder.Services.AddSingleton<NodeNpmInstaller>();
+        builder.Services.AddSingleton<NodeProjectPreparation>();
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, NodeQuickstartProvider>();
+        builder.AddNativeTemplatePolicy<NodeNativeTemplatePolicy>();
         builder.AddProjectFactory(new NodeProjectFactory());
     }
 }

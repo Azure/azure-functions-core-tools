@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.DotNet;
 using Azure.Functions.Cli.Templates.Go;
 using Azure.Functions.Cli.Templates.Java;
-using Azure.Functions.Cli.Templates.Node;
 using Azure.Functions.Cli.Templates.PowerShell;
 using Azure.Functions.Cli.Templates.Python;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,10 +20,6 @@ internal static class FirstPartyNativeWorkflowRegistration
     public static void AddFirstPartyNativeWorkflows(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddSingleton<Workloads.Node.NodeNpmInstaller>();
-        services.AddScoped<NodeTemplateWorkflowProvider>();
-        services.AddScoped<INativeItemWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
-        services.AddScoped<INativeProjectWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
         services.AddScoped<PythonTemplateSourceReader>();
         services.AddScoped<PythonItemCompatibility>();
         services.AddScoped<PythonShared.IPythonTemplateAppendExecutor, PythonShared.PythonTemplateAppendExecutor>();

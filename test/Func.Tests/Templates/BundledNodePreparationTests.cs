@@ -1,15 +1,17 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.CommandLine;
+using System.Runtime.Loader;
 using System.Text.Json;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
-using Azure.Functions.Cli.Templates.Node;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Templates.Native;
 using Azure.Functions.Cli.Workloads.Node;
+using Azure.Functions.Cli.Workloads.Node.Native;
+using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using NuGet.Versioning;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -17,156 +19,84 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public sealed partial class BundledNodeTemplateTests
 {
     [Theory]
-    [InlineData("js", false)]
-    [InlineData("js", true)]
-    [InlineData("ts", false)]
-    [InlineData("ts", true)]
-    public async Task Preparation_ActualNativeProject_PreviewDoesNotRunAndSkipIsExplicit(string language, bool skip)
+    [InlineData("missing-skip")]
+    [InlineData("invalid-skip")]
+    [InlineData("item")]
+    [InlineData("foreign-package")]
+    [InlineData("language-alias")]
+    [InlineData("language-mismatch")]
+    [InlineData("wrong-identity")]
+    public async Task NodePreparation_DirectOwnerPolicy_RefusesUnqualifiedSourceOrSkipBeforeHelper(string corruption)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        var source = Substitute.For<NativeTemplateSource>();
+        source.IsProject.Returns(corruption != "item");
+        source.PackageId.Returns(corruption == "foreign-package" ? "Foreign" : "Azure.Functions.Templates.Node.Basic");
+        source.Language.Returns(corruption == "language-alias" ? "js" : corruption == "language-mismatch" ? "TypeScript" : "JavaScript");
+        source.Identity.Returns(corruption == "wrong-identity" ? "Foreign" : "Azure.Functions.Node.Basic.JavaScript");
+        var invocation = Substitute.For<NativeTemplateInvocationContext>();
+        invocation.Source.Returns(source);
+        Dictionary<string, string?> values = [];
+        if (corruption != "missing-skip")
+        {
+            values["SkipNpmInstall"] = corruption == "invalid-skip" ? "invalid" : "false";
+        }
+        invocation.CanonicalValues.Returns(values);
+        var captured = Substitute.For<NativeTemplateCapturedOutput>();
+        captured.Invocation.Returns(invocation);
         var npm = Substitute.For<NodeNpmInstaller>();
-        using var bridge = await CreateNodeBridgeAsync(preparation: new NodeProjectPreparation(_files, npm));
-        string project = Path.Combine(_root, "project");
-        string[] skipTokens = skip ? ["--skip-npm-install"] : [];
-        string[] tokens = [project, "-s", "node", "-l", language, "--no-bundles", .. skipTokens];
 
-        (await InvokeNodeBridgeAsync(bridge.Adapter.ParseInitInvocation(bridge.InitCommand(), tokens,
-            new("basic", NonInteractive: true, DryRun: true, JsonOutput: true)))).Should().Be(0, _interaction.AllOutput);
+        var result = await new NodeProjectPreparation(npm).PreviewAsync(captured, CancellationToken.None);
 
-        bridge.Init.Last!.Kind.Should().Be("previewed");
-        bridge.Init.Last.Preparation!.Preview.Operations.Should().ContainSingle()
-            .Which.Should().Be(new NativeProjectPreparationStep(NativeProjectPreparationOperation.NodeNpmInstall, skip));
-        bridge.Init.Last.Preparation.Completion.Should().BeNull();
-        Directory.Exists(project).Should().BeFalse();
-        await npm.DidNotReceive().InstallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-
-        if (skip)
-        {
-            (await InvokeNodeBridgeAsync(bridge.Adapter.ParseInitInvocation(bridge.InitCommand(), tokens,
-                new("basic", NonInteractive: true, JsonOutput: true)))).Should().Be(0, _interaction.AllOutput);
-            bridge.Init.Last!.Preparation!.Completion!.Succeeded.Should().BeTrue();
-            bridge.Init.Last.Preparation.Completion.Diagnostics.Should().Contain("Skipped npm installation.");
-            File.Exists(Path.Combine(project, ".func", "config.json")).Should().BeTrue();
-            await npm.DidNotReceive().InstallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        }
-    }
-
-    [Theory]
-    [InlineData("js", 0, "")]
-    [InlineData("ts", 0, "npm warning preserved")]
-    [InlineData("js", 7, "npm controlled failure stderr")]
-    [InlineData("ts", -1, "npm executable could not start")]
-    public async Task Preparation_ControlledHelper_RunsAfterActualNativeFilesAndConfigurationAndReportsOutcome(
-        string language, int exitCode, string stderr)
-    {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
-        string project = Path.Combine(_root, "project");
-        var npm = Substitute.For<NodeNpmInstaller>();
-        npm.InstallAsync(project, Arg.Any<CancellationToken>()).Returns(call =>
-        {
-            call.ArgAt<string>(0).Should().Be(project);
-            File.Exists(Path.Combine(project, "host.json")).Should().BeTrue();
-            using var config = JsonDocument.Parse(File.ReadAllText(Path.Combine(project, ".func", "config.json")));
-            config.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
-            config.RootElement.GetProperty("stack").GetProperty("language").GetString()
-                .Should().Be(language == "js" ? "JavaScript" : "TypeScript");
-            using var package = JsonDocument.Parse(File.ReadAllText(Path.Combine(project, "package.json")));
-            package.RootElement.GetProperty("dependencies").GetProperty("@azure/functions").GetString().Should().Be("^4.0.0");
-            package.RootElement.GetProperty("main").GetString().Should().Be(language == "js" ? "src/functions/*.js" : "dist/src/functions/*.js");
-            File.Exists(Path.Combine(project, "tsconfig.json")).Should().Be(language == "ts");
-            Directory.GetFiles(Path.Combine(project, "src", "functions")).Should().BeEmpty();
-            File.WriteAllText(Path.Combine(project, "controlled-preparation.txt"), "controlled helper, not real npm execution");
-            return (exitCode, stderr);
-        });
-        using var bridge = await CreateNodeBridgeAsync(preparation: new NodeProjectPreparation(_files, npm));
-
-        int result = await InvokeNodeBridgeAsync(bridge.Adapter.ParseInitInvocation(bridge.InitCommand(),
-            [project, "-s", "node", "-l", language], new("basic", NonInteractive: true, JsonOutput: true)));
-
-        result.Should().Be(exitCode == 0 ? 0 : 1, _interaction.AllOutput);
-        bridge.Init.Last!.Kind.Should().Be(exitCode == 0 ? "created" : "partialPreparation");
-        bridge.Init.Last.Preparation!.Completion!.Succeeded.Should().Be(exitCode == 0);
-        File.Exists(Path.Combine(project, "controlled-preparation.txt")).Should().BeTrue();
-        File.Exists(Path.Combine(project, ".func", "config.json")).Should().BeTrue();
-        if (stderr.Length > 0)
-        {
-            bridge.Init.Last.Preparation.Completion.Diagnostics.Should().Contain(stderr);
-            _interaction.AllOutput.Should().Contain(stderr);
-        }
-        if (exitCode != 0)
-        {
-            bridge.Init.Last.Succeeded.Should().BeFalse();
-            bridge.Init.Last.Diagnostics.Should().Contain(diagnostic => diagnostic.Contains("retained", StringComparison.Ordinal));
-            _interaction.AllOutput.Should().NotContain("\"kind\":\"created\"").And.NotContain("SUCCESS:");
-        }
-        await npm.Received(1).InstallAsync(project, Arg.Any<CancellationToken>());
-    }
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task Preparation_ControlledCancellation_PropagatesOriginalTokenAndRetainsNativeProject(bool helperThrows)
-    {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
-        string project = Path.Combine(_root, "project");
-        using var cancellation = new CancellationTokenSource();
-        OperationCanceledException? original = null;
-        CancellationToken received = default;
-        var npm = Substitute.For<NodeNpmInstaller>();
-        npm.InstallAsync(project, Arg.Any<CancellationToken>()).Returns(call =>
-        {
-            received = call.Arg<CancellationToken>();
-            received.CanBeCanceled.Should().BeTrue();
-            File.Exists(Path.Combine(project, ".func", "config.json")).Should().BeTrue();
-            cancellation.Cancel();
-            original = new OperationCanceledException("controlled npm cancellation", received);
-            return helperThrows ? Task.FromException<(int ExitCode, string Stderr)>(original)
-                : Task.FromResult((-1, "legacy helper converted cancellation to a result"));
-        });
-        using var bridge = await CreateNodeBridgeAsync(preparation: new NodeProjectPreparation(_files, npm));
-        var parsed = bridge.Adapter.ParseInitInvocation(bridge.InitCommand(), [project, "-s", "node", "-l", "js"],
-            new("basic", NonInteractive: true, JsonOutput: true));
-
-        Func<Task> invoke = () => parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
-        var thrown = (await invoke.Should().ThrowAsync<OperationCanceledException>()).Which;
-
-        if (helperThrows)
-        {
-            thrown.Should().BeSameAs(original);
-        }
-        thrown.CancellationToken.Should().Be(received);
-        File.Exists(Path.Combine(project, "host.json")).Should().BeTrue();
-        File.Exists(Path.Combine(project, "package.json")).Should().BeTrue();
-        File.Exists(Path.Combine(project, ".func", "config.json")).Should().BeTrue();
-        _interaction.AllOutput.Should().Contain("Native project files and CLI configuration were created before stack preparation was canceled.")
-            .And.Contain("No rollback was attempted; preparation may be incomplete.");
-        _interaction.AllOutput.Should().NotContain("SUCCESS:").And.NotContain("\"kind\":\"created\"");
+        result.Succeeded.Should().BeFalse();
+        result.Diagnostics.Should().NotBeEmpty();
+        npm.ReceivedCalls().Should().BeEmpty();
+        await source.DidNotReceive().ReadPackageFileAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public void Preparation_NullDependencies_RejectProgrammerErrors()
+    public async Task NodePreparation_DirectOwnerPolicy_ValidatesNullAndCancellationContracts()
     {
-        Action files = () => new NodeProjectPreparation(null!, new NodeNpmInstaller());
-        Action npm = () => new NodeProjectPreparation(_files, null!);
-        files.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
-        npm.Should().Throw<ArgumentNullException>().WithParameterName("npmInstaller");
+        var preparation = new NodeProjectPreparation(Substitute.For<NodeNpmInstaller>());
+        Func<Task> missingPreview = () => preparation.PreviewAsync(null!, CancellationToken.None);
+        Func<Task> missingCreated = () => preparation.CompleteAsync(null!, new(true, false, []), CancellationToken.None);
+        Func<Task> missingPlan = () => preparation.CompleteAsync(Substitute.For<NativeTemplateCreatedProject>(), null!, CancellationToken.None);
+        await missingPreview.Should().ThrowAsync<ArgumentNullException>();
+        await missingCreated.Should().ThrowAsync<ArgumentNullException>();
+        await missingPlan.Should().ThrowAsync<ArgumentNullException>();
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        var captured = Substitute.For<NativeTemplateCapturedOutput>();
+
+        Func<Task> canceled = () => preparation.PreviewAsync(captured, cancellation.Token);
+
+        await canceled.Should().ThrowAsync<OperationCanceledException>();
+        captured.ReceivedCalls().Should().BeEmpty();
     }
 
     [Fact]
     public async Task Preparation_ActualSourcePreview_RefusesWrongTargetAndCannotRunBeforeNativeCreation()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
-        using var services = await CreateServicesAsync();
+        WorkloadEntry entry = await InstallAssociationStackAsync();
+        int calls = 0;
+        using var services = await CreateNodePreparationServicesAsync((_, _) =>
+        {
+            calls++;
+            return Task.FromResult((0, ""));
+        });
+        using var scope = services.CreateScope();
         var target = WorkingDirectory.FromExplicit(Path.Combine(_root, "project"));
-        var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
-        using var templater = await services.GetRequiredService<ITemplaterFactory>().CreateProjectAsync(new(target), availability,
-            services.GetRequiredService<TemplateProjectSupport>(), CancellationToken.None);
+        using var templater = await scope.ServiceProvider.GetRequiredService<ITemplaterFactory>().CreateProjectAsync(new(target),
+            Availability(entry), services.GetRequiredService<TemplateProjectSupport>(), CancellationToken.None);
         var selected = (await templater.ResolveGroupAsync("Azure.Functions.Node.Basic.JavaScript", TemplateType.Project, CancellationToken.None)).Group!.Single();
-        var values = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), [])).ValuesByCanonicalName;
-        var native = await selected.InvokeAsync(new(target, values, DryRun: true), CancellationToken.None);
-        var context = new NativeProjectPreparationContext(selected, target, values, native);
-        var npm = Substitute.For<NodeNpmInstaller>();
-        var preparation = new NodeProjectPreparation(_files, npm);
+        var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));
+        var provider = (await scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicies>().FindAsync(selected, CancellationToken.None))!;
+        var preparation = (WorkloadNativeProjectPreparation)provider.Preparation!;
+        var prepared = await provider.PrepareAsync(new NativeProjectWorkflowContext(templater, selected, arguments,
+            NodePreparationRequest(target.Info.FullName), new(target, arguments.ValuesByCanonicalName, DryRun: true)), CancellationToken.None);
+        var request = await preparation.BindInvocationAsync(prepared.Request!, CancellationToken.None);
+        var native = await selected.InvokeAsync(request, CancellationToken.None);
+        native.Status.Should().Be(TemplateInvocationStatus.Success, native.Diagnostic);
+        var context = new NativeProjectPreparationContext(selected, target, request.Parameters, native);
 
         var preview = await preparation.PreviewAsync(context, CancellationToken.None);
         var early = await preparation.CompleteAsync(context, preview, CancellationToken.None);
@@ -175,15 +105,209 @@ public sealed partial class BundledNodeTemplateTests
             TargetDirectory = WorkingDirectory.FromExplicit(Path.Combine(_root, "other-target")),
         }, CancellationToken.None);
 
-        preview.Succeeded.Should().BeTrue();
+        preview.Succeeded.Should().BeTrue(string.Join(" ", preview.Diagnostics));
         early.Succeeded.Should().BeFalse();
-        early.Diagnostics.Should().ContainSingle().Which.Should().Contain("must exist before npm");
+        early.Diagnostics.Should().ContainSingle().Which.Should().Contain("successful native and mandatory configuration");
         wrongTarget.Succeeded.Should().BeFalse();
         Directory.Exists(target.Info.FullName).Should().BeFalse();
-        await npm.DidNotReceive().InstallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        calls.Should().Be(0);
         Func<Task> noContext = () => preparation.PreviewAsync(null!, CancellationToken.None);
         await noContext.Should().ThrowAsync<ArgumentNullException>();
         Func<Task> noPreview = () => preparation.CompleteAsync(context, null!, CancellationToken.None);
         await noPreview.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Theory]
+    [InlineData("JavaScript", false, false)]
+    [InlineData("JavaScript", true, false)]
+    [InlineData("JavaScript", false, true)]
+    [InlineData("JavaScript", true, true)]
+    [InlineData("TypeScript", false, false)]
+    [InlineData("TypeScript", true, false)]
+    [InlineData("TypeScript", false, true)]
+    [InlineData("TypeScript", true, true)]
+    public async Task NodePreparation_ActualLoadedCapability_PreservesPreviewSkipAndConfigBeforeHelper(string language, bool skip, bool dryRun)
+    {
+        WorkloadEntry entry = await InstallAssociationStackAsync();
+        string target = Path.Combine(_root, "owned-node");
+        int calls = 0;
+        using ServiceProvider provider = await CreateNodePreparationServicesAsync((path, token) =>
+        {
+            calls++;
+            path.Should().Be(target);
+            token.ThrowIfCancellationRequested();
+            File.Exists(Path.Combine(path, "package.json")).Should().BeTrue();
+            File.Exists(Path.Combine(path, "host.json")).Should().BeTrue();
+            using var configuration = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(path, ".func", "config.json")));
+            configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+            configuration.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be(language);
+            return Task.FromResult((0, "owned deterministic stderr"));
+        });
+        using IServiceScope scope = provider.CreateScope();
+        var registration = scope.ServiceProvider.GetServices<WorkloadNativeTemplatePolicyRegistration>().Single(value => value.Policy.Stack == "node");
+        AssemblyLoadContext.GetLoadContext(registration.Policy.GetType().Assembly).Should().BeSameAs(registration.Owner.LoadContext);
+        registration.Policy.GetType().Assembly.GetName().Name.Should().Be("Azure.Functions.Cli.Workloads.Node");
+
+        InitExecutionResult result = await scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>().ExecuteAsync(
+            NodePreparationRequest(target, language, skip, dryRun), Availability(entry), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue(string.Join(" ", result.Diagnostics));
+        result.Preparation!.Preview.Operations.Should().BeEmpty();
+        result.Preparation.Preview.OwnedPlan.Should().NotBeNull();
+        result.Preparation.Preview.OwnedPlan!.Skipped.Should().Be(skip);
+        var capability = result.Preview!.ProjectPreparationCapture!.Owner.Capability;
+        capability.GetType().Assembly.Should().BeSameAs(registration.Policy.GetType().Assembly);
+        AssemblyLoadContext.GetLoadContext(capability.GetType().Assembly).Should().BeSameAs(registration.Owner.LoadContext);
+        Type helperType = capability.GetType().Assembly.GetType("Azure.Functions.Cli.Workloads.Node.NodeNpmInstaller", throwOnError: true)!;
+        object helper = scope.ServiceProvider.GetRequiredService(helperType);
+        ((int)helper.GetType().GetProperty("Calls")!.GetValue(helper)!).Should().Be(dryRun || skip ? 0 : 1);
+        calls.Should().Be(dryRun || skip ? 0 : 1);
+        Directory.Exists(target).Should().Be(!dryRun);
+        if (dryRun)
+        {
+            result.Preparation.Completion.Should().BeNull();
+        }
+        else
+        {
+            result.Invocation!.ConfiguredProjects.Should().Equal(target);
+            result.Preparation.Completion!.OwnedCompletion.Should().NotBeNull();
+            result.Preparation.Completion.OwnedCompletion!.TargetMayHaveChanged.Should().Be(!skip);
+            result.Preparation.Completion.Diagnostics.Should().Contain(skip ? "Skipped npm installation." : "owned deterministic stderr");
+        }
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(7)]
+    public async Task NodePreparation_NonzeroOwnedHelper_RetainsNativeAndConfigurationWithPartialLedger(int exitCode)
+    {
+        WorkloadEntry entry = await InstallAssociationStackAsync();
+        using ServiceProvider provider = await CreateNodePreparationServicesAsync((_, _) => Task.FromResult((exitCode, "owned helper failure")));
+        using IServiceScope scope = provider.CreateScope();
+        string target = Path.Combine(_root, "partial-node");
+
+        InitExecutionResult result = await scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>().ExecuteAsync(
+            NodePreparationRequest(target), Availability(entry), CancellationToken.None);
+
+        result.Succeeded.Should().BeFalse();
+        result.Kind.Should().Be("partialPreparation");
+        result.Invocation!.HasCommittedOutput.Should().BeTrue();
+        result.Invocation.ConfiguredProjects.Should().Equal(target);
+        result.Preparation!.Completion!.OwnedCompletion!.TargetMayHaveChanged.Should().BeTrue();
+        result.Preparation.Completion.Diagnostics.Should().Contain("owned helper failure");
+        File.Exists(Path.Combine(target, "package.json")).Should().BeTrue();
+        File.Exists(Path.Combine(target, ".func", "config.json")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task NodePreparation_RequiredHelperCancellation_PropagatesAndPreservesCommittedOutput()
+    {
+        WorkloadEntry entry = await InstallAssociationStackAsync();
+        using CancellationTokenSource cancellation = new();
+        OperationCanceledException original = new("owned npm cancellation", cancellation.Token);
+        using ServiceProvider provider = await CreateNodePreparationServicesAsync((_, _) =>
+        {
+            cancellation.Cancel();
+            return Task.FromException<(int, string)>(original);
+        });
+        using IServiceScope scope = provider.CreateScope();
+        string target = Path.Combine(_root, "canceled-node");
+
+        Func<Task> run = () => scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>().ExecuteAsync(
+            NodePreparationRequest(target), Availability(entry), cancellation.Token);
+
+        (await run.Should().ThrowAsync<OperationCanceledException>()).Which.Should().BeSameAs(original);
+        File.Exists(Path.Combine(target, "package.json")).Should().BeTrue();
+        File.Exists(Path.Combine(target, ".func", "config.json")).Should().BeTrue();
+        _interaction.AllOutput.Should().Contain("were created before").And.Contain("No rollback");
+    }
+
+    [Theory]
+    [InlineData("extra-fields")]
+    [InlineData("formatting")]
+    public async Task NodePreparation_ActualWriterReceiptMutation_RefusesBeforeOwnedHelper(string mutation)
+    {
+        WorkloadEntry entry = await InstallAssociationStackAsync();
+        int calls = 0;
+        using ServiceProvider provider = await CreateNodePreparationServicesAsync((_, _) =>
+        {
+            calls++;
+            return Task.FromResult((0, ""));
+        }, services => services.AddSingleton<IFileSystem>(new PreparationConfigurationSwapFiles(mutation)));
+        using IServiceScope scope = provider.CreateScope();
+        string target = Path.Combine(_root, "config-mutated-node");
+
+        InitExecutionResult result = await scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>().ExecuteAsync(
+            NodePreparationRequest(target), Availability(entry), CancellationToken.None);
+
+        result.Kind.Should().Be("partialInitialization");
+        result.Succeeded.Should().BeFalse();
+        result.Invocation!.HasCommittedOutput.Should().BeTrue();
+        result.Invocation.ConfiguredProjects.Should().Equal(target);
+        result.Preparation!.Completion.Should().BeNull();
+        calls.Should().Be(0);
+        File.Exists(Path.Combine(target, "package.json")).Should().BeTrue();
+        File.Exists(Path.Combine(target, ".func", "config.json")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task NodePreparation_DirectCreateAndRequestFallback_CannotSkipRequiredOwnerPhase()
+    {
+        WorkloadEntry entry = await InstallAssociationStackAsync();
+        int calls = 0;
+        using ServiceProvider provider = await CreateNodePreparationServicesAsync((_, _) =>
+        {
+            calls++;
+            return Task.FromResult((0, ""));
+        });
+        using IServiceScope scope = provider.CreateScope();
+        var target = WorkingDirectory.FromExplicit(Path.Combine(_root, "unbound-node"));
+        using var templater = await scope.ServiceProvider.GetRequiredService<ITemplaterFactory>().CreateProjectAsync(
+            new(target), Availability(entry), provider.GetRequiredService<TemplateProjectSupport>(), CancellationToken.None);
+        var selected = (await templater.ResolveGroupAsync("Azure.Functions.Node.Basic.JavaScript", TemplateType.Project, CancellationToken.None)).Group!.Single();
+
+        var direct = await selected.InvokeAsync(new(target, new Dictionary<string, string?> { ["SkipNpmInstall"] = "true" }, "Owned"), CancellationToken.None);
+        var fallback = Substitute.For<INativeProjectPreparation>();
+        var result = await scope.ServiceProvider.GetRequiredService<IInitExecutionRunner>().ExecuteAsync(
+            NodePreparationRequest(target.Info.FullName) with { ProjectPreparation = fallback }, Availability(entry), CancellationToken.None);
+
+        direct.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
+        direct.Diagnostic.Should().Contain("owner-bound project preparation");
+        result.Succeeded.Should().BeFalse();
+        result.Diagnostics.Should().ContainSingle().Which.Should().Contain("cannot be replaced");
+        fallback.ReceivedCalls().Should().BeEmpty();
+        calls.Should().Be(0);
+        Directory.Exists(target.Info.FullName).Should().BeFalse();
+    }
+
+    private static InitExecutionRequest NodePreparationRequest(string target, string language = "JavaScript", bool skip = false, bool dryRun = false)
+        => new(WorkingDirectory.FromExplicit(target), "basic", "OwnedNode", "node", language, false, true, dryRun, true,
+            ["--skip-npm-install", skip ? "true" : "false"], new HashSet<string>());
+
+    private Task<ServiceProvider> CreateNodePreparationServicesAsync(
+        Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> run, Action<IServiceCollection>? configure = null,
+        IBasicCompanionCatalog? catalog = null)
+        => CreateServicesAsync(services =>
+        {
+            ConfigureNodePreparationHelper(services, run);
+            services.AddScoped<NativeTemplateWorkflowRegistry>();
+            configure?.Invoke(services);
+        }, nativeCatalog: catalog);
+
+    private object ConfigureNodePreparationHelper(
+        IServiceCollection services, Func<string, CancellationToken, Task<(int ExitCode, string Stderr)>> run)
+    {
+        Type helperType = services.Single(descriptor => descriptor.ServiceType.FullName
+            == "Azure.Functions.Cli.Workloads.Node.NodeNpmInstaller").ServiceType;
+        var owner = AssemblyLoadContext.GetLoadContext(helperType.Assembly)!;
+        var testAssembly = owner.LoadFromAssemblyPath(Path.Combine(AppContext.BaseDirectory, "Azure.Functions.Cli.Workloads.Node.Tests.dll"));
+        Type substituteType = testAssembly.GetType("Azure.Functions.Cli.Workloads.Node.Tests.LoadedNodeNpmInstaller", throwOnError: true)!;
+        object helper = Activator.CreateInstance(substituteType, run)!;
+        helper.GetType().BaseType.Should().Be(helperType);
+        helperType.IsInstanceOfType(helper).Should().BeTrue();
+        AssemblyLoadContext.GetLoadContext(helper.GetType().Assembly).Should().BeSameAs(owner);
+        helper.GetType().Assembly.Should().NotBeSameAs(helperType.Assembly);
+        services.AddSingleton(helperType, helper);
+        return helper;
     }
 }

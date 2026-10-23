@@ -4,6 +4,11 @@ This first-party authoring slice ships `Azure.Functions.Templates.Node.Basic`
 **inside** the Node stack workload. Its version follows the stack build.
 It is not an independently released companion, NuGet dependency, or feed lookup.
 The package ID is an authoring choice, not a trust assertion.
+The bundled archive contains only the two basic projects. The separate
+`Workloads.Node.FunctionTemplates.csproj` produces
+`Azure.Functions.Templates.Node.Functions` with all 33 owned function items,
+including HTTP. This is an internal authoring identity, not a production
+publisher or acquisition approval. No production external association is added.
 
 `dotnet pack src/Workloads/Stacks/Node/Workloads.Node.csproj -c Release`
 uses the existing workload pack pipeline. The physical archive contains:
@@ -41,7 +46,7 @@ query/body/default name precedence, logging and greeting response, and the
 typed handler export. The same payloads are corroborated by the owned
 `main` `node-v4-templates.json` catalog at
 `831ae149a99f54aab6c8b88d32710b9d390d2216`, with its `%functionName%` token.
-No model-v3 `function.json` is emitted. The inner archive carries the
+No model-v3 `function.json` is emitted. The function archive carries the
 repository MIT `LICENSE` and this provenance document.
 
 Both project variants share `basic`; both item variants share `http`.
@@ -56,9 +61,10 @@ glob picks up the generated item.
 
 `Convert-NodeItemTemplates.ps1` projects the owned Node
 `Templates/Node/content/v2` source at pack time into native item configurations
-and source files under `content/items/` in the same inner archive. It reads
+and source files under `content/items/` in the separate function archive. It reads
 the existing jobs, prompts, resources and `_bindings.json`; there is no second
-maintained item catalog, template feed, or separate release. Changes to the
+maintained item catalog. Separate packaging does not qualify a template feed
+or publisher release. Changes to the
 job/action shape or missing binding/prompt metadata fail the pack.
 The existing basic projects and HTTP payloads/options are unchanged. HTTP
 metadata additionally declares its legacy IDs and display-name alias.
@@ -84,10 +90,9 @@ input where the payload uses it.
 The native parameter projection reserves `name` for the command; it does not
 carry the legacy function-name regex. The baseline staged facade also supplies
 the output-directory name as the native fallback when `--name` is omitted.
-Neither policy is changed globally. The unused command bridge can explicitly
-compose `NodeItemCompatibility` to obtain the original item's effective name
-and regex validation from its selected packaged source, with explicit input
-winning over the authored default.
+Neither policy is changed globally. The Node workload's `NodeNativeTemplatePolicy`
+supplies the original effective name and regex through the neutral compatibility
+bridge, with explicit input winning over the authored default.
 
 Extension-dependent items declare the existing `func-bundle` identity/version
 requirements plus a **provisional** `func-bundle-bindings` requirement containing
@@ -108,7 +113,7 @@ it does not bypass the production facade or claim an unavailable item is
 workflow-qualified. Separate facade checks cover timer preview/create, conflict
 refusal/source preservation and binding-dependent unavailability.
 
-## Selected-source compatibility in the unused bridge
+## Selected-source compatibility in the owning workload
 
 The inner archive additionally contains the byte-exact original
 `templates.json`, `_bindings.json`, `userPrompts.json` and `Resources.json`
@@ -118,11 +123,12 @@ identity, package ID/version, configuration, host metadata and payload hashes.
 These are internal qualification records, not a second catalog, release,
 user-supplied metadata policy or stable authoring ABI.
 
-The unregistered, CLI-internal `NodeItemCompatibility` provider reads those
-records only through the exact selected `ResolvedTemplate`'s mounted-package
-reader. It verifies the selected configuration fingerprint and actual bytes,
-reuses the original V2 prompt projection, and delegates validation/name origin
-to the shared compatibility helper. It never locates another archive by
+The Node workload registers `NodeNativeTemplatePolicy` through
+`FunctionsCliBuilder.AddNativeTemplatePolicy`. Its `NodeItemSource` reader
+accesses the host-issued `NativeTemplateSource` only after actual loaded-owner,
+selected runtime and retained external association admission. It verifies the
+raw configuration fingerprint, original prompts and actual package bytes, then
+delegates validation and name origin to the generic CLI bridge. It never locates another archive by
 package ID/version, trusts hash syntax without reading bytes, changes core
 name fallback, or invokes the legacy V2 file-writing backend.
 
@@ -138,14 +144,19 @@ existing-source preservation. Missing or altered mapped provenance, native
 payloads, package versions and configuration hashes refuse before generation.
 Public command routing and default service registration remain unchanged.
 
-`NodeTemplateWorkflowProvider` adapts the same CLI-owned item compatibility and
-project preparation to the shared invocation-scoped workflow contracts. Its
-project ownership check selects only the existing native Node package and
-canonical JavaScript/TypeScript project identities; the adapters still verify
-the actual selected archive bytes. Composition must supply the CLI-compiled
-`NodeNpmInstaller`, not the physical workload's same-named assembly type.
-The provider does not register itself, alter command routing, or add a second
-template catalog.
+The policy requires invocation and captured-output qualification. It retains
+all eight selected source pins, final canonical inputs and the one regular-file
+source association. The CLI keeps containment, capture, source lifetime,
+ownership, hash and output-installation safety generic. Registering the policy
+does not turn on native public commands or authorize missing production
+external acquisition data.
+
+`NodeProjectSource` also qualifies the selected canonical Node project's
+existing literal `host.json` configuration shape and package files. The generic
+CLI planner still verifies the actual root and mandatory configuration action.
+This path requests invocation qualification only, not a new owned-layout,
+dependency executor or npm completion callback. Other project shapes require
+additional owner support rather than a fallback or guessed execution policy.
 
 `BundledNodeWorkflowCompositionTests.cs` explicitly composes the production
 workflow registry, composer, native runners, captured workload availability and
@@ -183,10 +194,10 @@ The converter derives the static legacy target from the owned raw write action
 at pack time. The CLI does not calculate a Node output directory or evaluate
 the source conditions; the native engine does both from the authored config.
 
-`NodeItemSourceQualifier` retains the original single-job/action/body
+`NodeItemSource` retains the original single-job/action/body
 association and native configuration/payload checks without selecting a
-target. `NodeTemplateWorkflowProvider` supplies a directory-free generic
-source snapshot in both modes: exact selected identity/configuration hash,
+target. `NodeNativeTemplatePolicy` supplies directory-free generic
+source pins in both modes: exact selected identity/configuration hash,
 manifest, config, host, native body and all four original source-file pins,
 plus the expected native regular-file source. Shared engine guards revalidate
 these pins before preview and creation and reject extra/wrong-kind outputs.
@@ -231,25 +242,31 @@ the public `func init` / `func new` continue their existing paths. This package
 does not claim M3/M4 production completion or qualify other runtimes.
 
 Ordinary template-authored creation post-actions remain unsupported by the
-staged project path. A private bridge harness can explicitly supply
-`NodeProjectPreparation`, which plans the fixed `NodeNpmInstall` operation and
-honors the canonical `SkipNpmInstall` parameter (`--skip-npm-install`).
-Preview never starts npm; completion uses the existing owned npm helper only
-after native project files and mandatory CLI configuration exist. Nonzero
-results retain those files, preserve stderr, and report `partialPreparation`.
-Cancellation emits a retained-output warning, then propagates without claiming
-completion or rollback.
-No preparation provider is registered by default, and no arbitrary command
-string is accepted from a template.
+staged project path. The loaded Node policy declares required preparation for
+its Basic project package and supplies the workload-owned `NodeProjectPreparation`
+capability through the neutral typed preparation boundary. The workload owns
+source validation, the canonical `SkipNpmInstall` policy (`--skip-npm-install`)
+and fixed npm execution. Other stacks can provide the same neutral capability
+without adding a Core language dispatcher.
 
-The Node initializer's npm process logic is extracted once into internal
-`NodeNpmInstaller.cs`, compiled by the Node workload and source-linked by the
-CLI. The legacy delegate, best-effort result behavior, process arguments and
-cancellation/error semantics remain unchanged; there is no runtime reference
-between the CLI and physical stack assemblies. Controlled helper substitutes
-prove native init ordering/skip/failure behavior, not an actual dependency
-restore. A separate offline real-npm proof on a private dependency-free package
-does not qualify installation of a generated project's published dependencies.
+Preview never starts npm. Completion receives the host-issued created image and
+copied canonical configuration only after native files and mandatory CLI
+configuration have been committed and revalidated against the writer receipt.
+The host binds the exact loaded owner, source, invocation and one-use plan.
+Missing preparation cannot fall back to a request-supplied provider. Nonzero
+helper results retain committed files, preserve diagnostics and report
+`partialPreparation`. Cancellation propagates with a retained-output warning,
+without claiming completion or rollback.
+
+`NodeNpmInstaller.cs` is compiled only by the Node workload. Its strict native
+path drains both process streams and preserves cancellation. The legacy
+initializer retains its separate best-effort failure result and dependency
+warning. There is no CLI source link or runtime reference to the physical
+stack assembly, no public process-command API and no template-supplied command.
+Controlled helper substitutes prove source/configuration ordering and
+skip/failure/cancellation behavior, not actual dependency installation.
+The generic private compatibility bridge still retains its old operation enum
+for non-owned tests. Loaded Node preparation does not use that legacy route.
 
 The staged journey also explicitly calls the existing installed Node project's
 `PrepareForHostRunAsync`: restore missing `node_modules`, then compile TS via
@@ -330,19 +347,21 @@ are explicitly refused before destructive effects; an ownership/removal policy
 is future work. Undeclared legacy workloads retain their prior behavior.
 
 Release coordination must ship the supporting CLI before these stack artifacts.
-This layer retains the initializer and factory alongside the canonical installed
-`IProjectStack` metadata without duplicating it. Independent catalog releases are
-not prerequisites for local bundled registration. Required external acquisition
-has its own qualification inputs described below.
+This layer consumes the published `IProjectStack` metadata surface without
+duplicating it. Independent catalog releases are not prerequisites for local
+bundled registration. Required external acquisition has its own qualification
+inputs described below.
+The Node workload retains its initializer and factory alongside that metadata.
 
 ## Hybrid delivery boundary
 
-The intended distribution model keeps basic starters and language variants in
-the stack workload. Function and additional project templates belong to
-independently released native catalogs acquired compatibly by setup. The current
-artifact bundles the complete owned item catalog described above; separating
-those items into independently released catalogs remains producer work. This
-README describes the current bytes, not completed hybrid acquisition.
+The stack workload's actual bundled archive contains only the two basic
+projects. All 33 function items, including both HTTP languages and six hidden
+variants, are produced in the separate function archive. They remain available
+through explicitly qualified selected-owner associations in controlled tests.
+Function and additional project templates require independently qualified
+external acquisition. No fixture association is copied into production data,
+and missing required function content is not bundled-ready success.
 
 The shared installer and setup foundation must keep bundled readiness separate
 from required external readiness. CLI release owned association records must
@@ -372,11 +391,12 @@ qualification are unchanged.
 that outer artifact into private homes, and exercises the staged command
 contracts and ownership/failure/cancellation controls.
 
-The process fixture's `bundled-node` mode accepts a private root, project path,
+The historical process fixture's `bundled-node` mode accepts a private root, project path,
 `js|ts`, then actual locally built Node/host/worker/bundle archive paths. Set
 `FUNC_CLI_HOME` and `FUNC_CLI_WORKLOADS_HOME` to private directories first.
-It installs the supplied archives, opens a fresh actual workload host, previews
-then creates `basic` and `http`, and runs the installed Node preparation hook.
-The resulting project can be launched with public
-`func run <path> --offline --output plain`. Use private host ports and a
-controlled emulator with private data/endpoints when storage is required.
+It installs those archives and attempts the earlier `basic` then `http` journey.
+The current Basic archive contains only projects. This fixture does not supply
+the separate Functions archive or its qualified schema version 2 acquisition
+records, so that HTTP journey is blocked with the current producer split.
+Earlier source-specific Linux evidence does not qualify this current process
+journey, dependency preparation or a live backend.

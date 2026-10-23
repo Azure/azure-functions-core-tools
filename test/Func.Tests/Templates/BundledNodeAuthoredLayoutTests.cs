@@ -48,11 +48,7 @@ public sealed partial class BundledNodeTemplateTests
         string language, string extension, string? intent)
     {
         string archive = Path.Combine(_root, "authored-node.nupkg");
-        using (var outer = new PackageArchiveReader(BuiltArchive))
-        using (var output = File.Create(archive))
-        {
-            outer.GetStream("tools/any/templates/node-basic.nupkg").CopyTo(output);
-        }
+        File.Copy(FunctionArchive, archive);
         using var environment = new EngineEnvironmentSettings(new NodeAuthoredLayoutHost(intent), settingsLocation: Path.Combine(_root, "authored-hive"));
         using var packages = new TemplatePackageManager(environment);
         var installed = await packages.GetBuiltInManagedProvider(InstallationScope.Global).InstallAsync([new InstallRequest(archive)], CancellationToken.None);
@@ -91,11 +87,7 @@ public sealed partial class BundledNodeTemplateTests
     public async Task AuthoredLayout_SameInstalledHive_FreshIntentSessionsDoNotReusePreviousBranchOrUserOverride()
     {
         string archive = Path.Combine(_root, "authored-cache.nupkg");
-        using (var outer = new PackageArchiveReader(BuiltArchive))
-        using (var output = File.Create(archive))
-        {
-            outer.GetStream("tools/any/templates/node-basic.nupkg").CopyTo(output);
-        }
+        File.Copy(FunctionArchive, archive);
         string hive = Path.Combine(_root, "same-authored-hive");
         string?[] modes = ["literal", "legacy", null, "legacy", "literal"];
         for (int index = 0; index < modes.Length; index++)
