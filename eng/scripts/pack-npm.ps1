@@ -14,13 +14,13 @@ $PackageDirectory = (Resolve-Path -LiteralPath $PackageDirectory).Path
 $Version = $Version.Trim().TrimStart('v', 'V')
 
 # Packing needs no installed dependencies; prepack only copies repository metadata.
-npm version $Version --offline --ignore-scripts --no-git-tag-version --allow-same-version --prefix $PackageDirectory
+npm version $Version --offline --no-update-notifier --ignore-scripts --no-git-tag-version --allow-same-version --prefix $PackageDirectory
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to set npm package version to '$Version'."
 }
 
 foreach ($packageName in $PackageNames) {
-    npm pkg set "name=$packageName" --offline --prefix $PackageDirectory
+    npm pkg set "name=$packageName" --offline --no-update-notifier --prefix $PackageDirectory
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to set npm package name to '$packageName'."
     }
@@ -34,7 +34,7 @@ foreach ($packageName in $PackageNames) {
 
     $packageOutputDirectory = Join-Path $OutputDirectory $packageName
     New-Item -ItemType Directory -Path $packageOutputDirectory -Force | Out-Null
-    npm pack $PackageDirectory --offline --pack-destination $packageOutputDirectory
+    npm pack $PackageDirectory --offline --no-update-notifier --pack-destination $packageOutputDirectory
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to create the '$packageName' npm package."
     }

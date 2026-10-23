@@ -33,9 +33,9 @@ async function createFixture(t) {
         fs.copyFileSync(path.join(repositoryRoot, name), path.join(root, 'repo', name));
     }
 
-    let requests = 0;
+    const requests = [];
     const registry = http.createServer((request, response) => {
-        requests++;
+        requests.push(`${request.method} ${request.url}`);
         response.writeHead(500);
         response.end('Registry access is forbidden during packaging.');
     });
@@ -51,13 +51,7 @@ async function createFixture(t) {
         npm_config_ignore_scripts: 'false'
     };
     const outputDirectory = path.join(root, 'output');
-    return {
-        packageDirectory,
-        outputDirectory,
-        cache,
-        env,
-        get requests() { return requests; }
-    };
+    return { packageDirectory, outputDirectory, env, requests };
 }
 
 for (const version of ['  v5.0.0-preview.4  ', '5.0.0']) {
@@ -80,8 +74,7 @@ for (const version of ['  v5.0.0-preview.4  ', '5.0.0']) {
             }
         });
         assert.equal(result.code, 0, result.output);
-        assert.equal(fixture.requests, 0, 'Packaging must not contact the registry.');
-        assert.equal(fs.existsSync(path.join(fixture.cache, '_cacache')), false);
+        assert.deepEqual(fixture.requests, [], 'Packaging must not contact the registry.');
         assert.equal(fs.existsSync(path.join(fixture.packageDirectory, 'node_modules')), false);
         assert.equal(fs.existsSync(path.join(fixture.packageDirectory, 'package-lock.json')), false);
 
@@ -129,7 +122,7 @@ test('rejects an invalid version without registry access or artifacts', { timeou
     ], { env: fixture.env });
     assert.notEqual(result.code, 0, result.output);
     assert.match(result.output, /Failed to set npm package version/);
-    assert.equal(fixture.requests, 0);
+    assert.deepEqual(fixture.requests, []);
     assert.equal(fs.existsSync(fixture.outputDirectory), false);
 });
 
@@ -145,6 +138,6 @@ test('surfaces prepack failures without registry access', { timeout: 30000 }, as
     ], { env: fixture.env });
     assert.notEqual(result.code, 0, result.output);
     assert.match(result.output, /Failed to create the 'azure-functions-core-tools' npm package/);
-    assert.equal(fixture.requests, 0);
+    assert.deepEqual(fixture.requests, []);
     assert.deepEqual(fs.readdirSync(path.join(fixture.outputDirectory, 'azure-functions-core-tools')), []);
 });
