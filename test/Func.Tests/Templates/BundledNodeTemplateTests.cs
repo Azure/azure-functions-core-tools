@@ -38,7 +38,8 @@ namespace Azure.Functions.Cli.Tests.Templates;
 
 public sealed partial class BundledNodeTemplateTests : IDisposable
 {
-    private readonly string _root = Directory.CreateTempSubdirectory("func-bundled-node-").FullName;
+    private readonly string _root;
+    private readonly string? _homeOverride;
     private readonly PhysicalFileSystem _files = new();
     private readonly IWorkloadPackageSource _source = Substitute.For<IWorkloadPackageSource>();
     private readonly WorkloadPathsOptions _paths;
@@ -48,9 +49,16 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
     private readonly LiveInspector _inspector;
     private readonly TestInteractionService _interaction = new();
     private readonly List<Azure.Functions.Cli.Workloads.Loading.WorkloadLoadContext> _loadContexts = [];
+    private NodeFunctionCatalogFixture? _ownedJourneyCatalog;
 
-    public BundledNodeTemplateTests()
+    public BundledNodeTemplateTests() : this(Directory.CreateTempSubdirectory("func-bundled-node-").FullName)
     {
+    }
+
+    internal BundledNodeTemplateTests(string root, string? home = null)
+    {
+        _root = root ?? throw new ArgumentNullException(nameof(root));
+        _homeOverride = home;
         _paths = new(Path.Combine(_root, "workload-home"));
         var coordinator = new FileWorkloadOperationCoordinator(_paths);
         _workloads = new(_paths, coordinator);
@@ -71,12 +79,41 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
             coordinator, _workloads, _files);
     }
 
-    private string Home => Path.Combine(_root, "cli-home");
+    private string Home => _homeOverride ?? Path.Combine(_root, "cli-home");
     private static string NodeArtifactVersion => typeof(Azure.Functions.Cli.Workloads.Node.NodeWorkload).Assembly
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
 
     private static string BuiltArchive => Path.Combine(AppContext.BaseDirectory, "bundled-node-artifacts",
         $"Azure.Functions.Cli.Workloads.Node.{NodeArtifactVersion}.nupkg");
+
+    internal static (string Workload, string Functions, string Version) CurrentNodeJourneyArtifacts
+        => (BuiltArchive, FunctionArchive, NodeArtifactVersion);
+
+    internal async Task<TemplateConstraintEvaluationSnapshot> InstallOwnedNodeJourneyAsync()
+    {
+        WorkloadEntry entry = await InstallAssociationStackAsync();
+        _ownedJourneyCatalog = new(entry, FunctionArchive);
+        BasicAcquisitionResult result = await _ownedJourneyCatalog.InstallAsync(_templates, _workloads, _paths, _installer, _files,
+            AdmissionDeployment(new FileWorkloadOperationCoordinator(_paths)), Home, _root);
+        result.Status.Should().Be(BasicAcquisitionStatus.Completed, result.Message);
+        return new([new(entry.PackageId, NuGetVersion.Parse(entry.PackageVersion), entry.Aliases, true)]);
+    }
+
+    internal Task<ServiceProvider> CreateOwnedNodeJourneyServicesAsync(Action<IServiceCollection> configure)
+        => CreateServicesAsync(configure, nativeCatalog: _ownedJourneyCatalog
+            ?? throw new InvalidOperationException("Install the explicitly qualified Node journey before composing its services."));
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    internal IReadOnlyList<WeakReference> UnloadOwnedWorkloads()
+    {
+        WeakReference[] references = [.. _loadContexts.Select(context => new WeakReference(context))];
+        foreach (var context in _loadContexts)
+        {
+            context.Unload();
+        }
+        _loadContexts.Clear();
+        return references;
+    }
 
     [Fact]
     public async Task NullDependenciesAndInputs_AreRejectedAsProgrammerErrors()
@@ -806,6 +843,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();
         var bundles = Substitute.For<IInstalledBundleWorkloads>();
         bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([new InstalledBundleWorkload("4.35.0", Path.Combine(_root, "bundle"))]);
+        services.AddSingleton(bundles);
         services.AddSingleton<IExtensionBundleResolver>(new ExtensionBundleResolver(new InstalledBundleScanner(bundles),
             NullBundleResolveTelemetry.Instance, NullLogger<ExtensionBundleResolver>.Instance));
         services.AddTemplatesOrchestrator();
@@ -892,16 +930,14 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var context in _loadContexts)
-        {
-            context.Unload();
-        }
+        bool loadedWorkloads = _loadContexts.Count > 0;
+        UnloadOwnedWorkloads();
 
         try
         {
             Directory.Delete(_root, true);
         }
-        catch (UnauthorizedAccessException) when (_loadContexts.Count > 0)
+        catch (UnauthorizedAccessException) when (loadedWorkloads)
         {
             // Windows retains loaded workload DLLs until the test process exits; the test owns this temporary directory only.
         }
