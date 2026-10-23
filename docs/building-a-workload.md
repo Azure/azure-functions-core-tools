@@ -465,16 +465,23 @@ The auto-install mode only installs the workload you picked. For end-to-end
 runs (`func start`) you also need a host and the matching language worker
 installed, since workload installs are not transitive today. Three recipes:
 
-- **Everything in one go (recommended)**: `eng/scripts/debug-workloads.ps1`
-  drives `DeployForDebug` for every workload in the repo, installing into
-  `.debug-workloads/` so VS Code F5 finds them.
+- **Rebuild preinstalled workloads**: `eng/scripts/debug-workloads.ps1`
+  drives `DeployForDebug` for workloads in the repo, using
+  `.debug-workloads/` so VS Code F5 finds them. For unsigned local builds,
+  first pack and explicitly install every workload you intend to deploy with
+  `func workload install <path-to-nupkg> --allow-untrusted --force`, using
+  `FUNC_CLI_WORKLOADS_HOME` set to that same directory. Use the file-based
+  recipe below as a starting point.
   ```bash
-  pwsh ./eng/scripts/debug-workloads.ps1            # all 12 workloads
-  pwsh ./eng/scripts/debug-workloads.ps1 -Project Node   # iterate on one
-  pwsh ./eng/scripts/debug-workloads.ps1 -Clean     # wipe + reinstall
+  pwsh ./eng/scripts/debug-workloads.ps1                # rebuild all preinstalled workloads
+  pwsh ./eng/scripts/debug-workloads.ps1 -Project Node  # iterate on one preinstalled workload
   ```
-  After the first run, subsequent runs are copy-only (sub-second per
-  workload).
+  An existing install of each workload's current package ID/version is
+  required for the copy-only path. Missing installs trigger strict installation;
+  the script does not bypass publisher trust. `-Clean` removes the workloads
+  home before attempting installation, so it cannot bootstrap unsigned local
+  builds. After cleaning the home, explicitly preinstall those packages again
+  before rerunning without `-Clean`.
 - **Single language, file-based**: pack and install just what you need.
   ```bash
   dotnet pack src/Workloads/Host/Workloads.Host.csproj                -c Debug -o /tmp/funcpkgs
