@@ -416,15 +416,7 @@ public sealed partial class ArtifactBindingJourneyTests
         QuickstartCatalog duplicate = original with { Entries = Array.AsReadOnly<QuickstartCatalogEntry>([first, second]) };
         IQuickstartCatalogService catalog = Substitute.For<IQuickstartCatalogService>();
         catalog.SearchAsync(Arg.Any<QuickstartCatalogQuery>(), Arg.Any<CancellationToken>()).Returns(duplicate);
-        using BoundInitScope scope = await _scopes.CreateAsync(CancellationToken.None);
-        QuickstartBrowser browser = new(catalog, scope.Catalog, [], interaction, new(interaction),
-            new(Factory, _scopes, journey.Qualification));
-
-        QuickstartBrowseResult result = await browser.BrowseAsync(new("node")
-        {
-            AllowSelection = true,
-            InstalledQuery = new(DirectoryTarget, _selection.Owner),
-        }, CancellationToken.None);
+        QuickstartBrowseResult result = await BrowseWithBoundScopeAsync(catalog, interaction, journey.Qualification);
 
         result.Outcome.Should().Be(QuickstartBrowseOutcome.Selected);
         result.Entry.Should().Be(second);
@@ -438,6 +430,29 @@ public sealed partial class ArtifactBindingJourneyTests
         journey.Payload.Requested.Should().BeEmpty();
         interaction.Confirmations.Should().BeEmpty();
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    private async Task<QuickstartBrowseResult> BrowseWithBoundScopeAsync(IQuickstartCatalogService catalog,
+        GuidedInteraction interaction, QuickstartQualification qualification)
+    {
+        BoundInitScope? scope = await _scopes.CreateAsync(CancellationToken.None);
+        QuickstartBrowser? browser = null;
+        try
+        {
+            browser = new(catalog, scope.Catalog, [], interaction, new(interaction),
+                new(Factory, _scopes, qualification));
+            return await browser.BrowseAsync(new("node")
+            {
+                AllowSelection = true,
+                InstalledQuery = new(DirectoryTarget, _selection.Owner),
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            browser = null;
+            scope.Dispose();
+            scope = null;
+        }
     }
 
     [Theory]
