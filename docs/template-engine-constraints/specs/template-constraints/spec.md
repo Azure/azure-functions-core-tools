@@ -1,4 +1,79 @@
-## Purpose
+## Current P0 purpose
+
+Defines fail-closed semantic item admission through CLI-owned runtime facts and
+publisher requirements. The [current design](../../design.md) owns API and
+declaration details. These requirements are implemented and unit-tested as a
+foundation, not integrated with public commands, package loading or preparation.
+
+### Requirement: Runtime-owned current project facts
+
+The resolved project SHALL expose an optional read-only, cancellable facts
+operation with neutral CLI-owned types. Its default SHALL supply no facts or
+authority. Runtime owners SHALL interpret the actual project and distinguish
+Supported, Unsupported and Unknown capabilities. Facts SHALL bind the normalized
+root, runtime authority, operation capture ID and inspected-input fingerprint;
+their collections SHALL be immutable snapshots.
+
+#### Scenario: Runtime supplies no facts
+- **WHEN** a runtime does not implement authoritative facts
+- **THEN** item compatibility is Unknown and cannot permit preparation
+
+#### Scenario: Evidence is unrelated, insufficient or stale
+- **WHEN** the facts have another root, authority or capture, or are not authoritative
+- **THEN** compatibility is Unknown even if the snapshot reports Supported or Unsupported
+
+### Requirement: Bounded publisher requirements
+
+An item declaration SHALL use only `func-project-capabilities` with a nonempty
+conjunction of opaque IDs. Malformed or unsupported declared syntax SHALL fail
+before preparation. Absence SHALL remain distinguishable from malformed
+declarations and SHALL NOT imply compatibility. Requirements SHALL be
+snapshotted without runtime-name, language or version interpretation.
+
+#### Scenario: Declaration is malformed or empty
+- **WHEN** a declared requirement has invalid/duplicate IDs, empty arguments or malformed structure
+- **THEN** declaration validation fails rather than dropping requirements
+
+#### Scenario: Capability is unfamiliar
+- **WHEN** a publisher and runtime use the same unfamiliar valid opaque ID
+- **THEN** generic matching requires no runtime-specific implementation change
+
+### Requirement: Tri-state fail-closed matching
+
+Compatible SHALL require authoritative Supported evidence for every required
+ID. An uncontradicted authoritative Unsupported required fact SHALL establish
+Incompatible even when another required fact is missing or Unknown.
+Contradictory reports for any ID SHALL invalidate the facts snapshot as Unknown,
+even when the contradictory ID is not required.
+All other insufficient-evidence cases SHALL be Unknown. Only Compatible SHALL
+be eligible for later preparation.
+
+#### Scenario: Runtime or package labels appear to match
+- **WHEN** only stack, language, workload or package-version labels suggest compatibility
+- **THEN** compatibility remains Unknown without the required actual-project facts
+
+### Requirement: Admission evidence remains bound
+
+Admission SHALL retain immutable requirements/facts and their deterministic
+fingerprints, normalized root, authority, capture ID, outcome and diagnostics.
+Read-only revalidation SHALL invalidate changed project identity, requirements
+or evidence as Unknown and SHALL NOT promote a previous Unknown into Compatible.
+An admission value SHALL NOT itself authorize template execution.
+
+#### Scenario: Evidence changes after admission
+- **WHEN** the runtime evidence, facts or requirements fingerprint changes
+- **THEN** the old admission is invalid and a new decision is required
+
+#### Scenario: Caller mutates original collections
+- **WHEN** the caller changes collections used to construct requirements or facts
+- **THEN** the recorded admission and its evidence remain unchanged
+
+## Historical engine-constraint purpose
+
+The requirements below retain the earlier environmental workload/bundle
+constraint design. Their empty-constraints and eligibility rules do not waive
+the current semantic admission requirements. Shared lifecycle/preflight work
+is broader historical scope, not implemented by this foundation.
 
 Defines the func-specific template constraints, how templates declare them, how the CLI evaluates them, and the structured results commands receive.
 

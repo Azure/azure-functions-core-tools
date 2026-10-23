@@ -1,3 +1,31 @@
+## Current P0 implementation status
+
+The [current design](design.md) separates implementation from historical
+planning-artifact readiness.
+
+- [x] Add an optional runtime-owned facts seam at the resolved project boundary.
+- [x] Add strict, immutable `func-project-capabilities` item requirements.
+- [x] Add generic Compatible / Incompatible / Unknown matching with immutable evidence binding.
+- [x] Add read-only revalidation that invalidates changed evidence or requirements.
+- [x] Add focused contract, cancellation, mutation, neutrality and dependency-boundary tests.
+- [ ] Implement and qualify production runtime-owned facts.
+- [ ] Implement exact immutable package/reference intake and private engine registration.
+- [ ] Integrate strict declaration extraction, discovery and selection with semantic admission.
+- [ ] Implement actual-output capture and exact CLI configuration preparation.
+- [ ] Implement a single-use, create-only prepared operation without rerender or reserialization.
+- [ ] Integrate one candidate `init`/`new` graph and prove previous-route/artifact exclusion.
+- [ ] Qualify selected project/item content, an unfamiliar runtime, and the runtime journey.
+
+Local unit validation of the foundation does not complete independent
+implementation review or end-to-end qualification. No production runtime or
+public command adopts the new seam in this change.
+
+## Historical planning checklist (preserved)
+
+The checklist below tracks the earlier broad program. Checked specification
+artifacts are not completed product capabilities; its lifecycle and Quickstart
+scope is not a P0 implementation dependency.
+
 ## 1. Existing Focused Specifications
 
 - [x] 1.1 Track the completed `template-engine-integration` planning artifacts and its core integration responsibility.

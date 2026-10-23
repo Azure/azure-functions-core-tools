@@ -27,6 +27,25 @@ public abstract class FunctionsProject
 
     public abstract FunctionsWorkerReference WorkerReference { get; }
 
+    /// <summary>
+    /// Identifies the runtime owner of semantic project facts, or returns null when facts are unavailable.
+    /// </summary>
+    public virtual string? ProjectFactsAuthority => null;
+
+    /// <summary>
+    /// Captures current semantic facts from this project without modifying it. Returns null when unsupported.
+    /// </summary>
+    /// <remarks>
+    /// Implementations must inspect the actual project on each call and fingerprint all inputs used to establish facts.
+    /// Stack, language, and installed package versions alone are not authoritative semantic evidence.
+    /// </remarks>
+    public virtual ValueTask<ProjectFacts?> GetProjectFactsAsync(ProjectFactsContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<ProjectFacts?>(null);
+    }
+
     public virtual Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
