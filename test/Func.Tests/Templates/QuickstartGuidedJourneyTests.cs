@@ -883,13 +883,15 @@ public sealed partial class ArtifactBindingJourneyTests
 
         journey.Payload.Requested.Should().BeEmpty();
         journey.Payload.Opened.Should().BeEmpty();
-        journey.Lifecycle.Prepared.Should().BeNull();
         interaction.SelectionTitles.Should().BeEmpty();
         interaction.Confirmations.Should().BeEmpty();
         TemplateState().Should().Equal(before);
         if (installed)
         {
             exit.Should().Be(0, interaction.AllOutput);
+            journey.Lifecycle.Prepared.Should().NotBeNull();
+            journey.Lifecycle.Prepared!.Archive.Should().BeNull("the full plan reuses the verified installed payload without downloading");
+            journey.Lifecycle.Prepared.Update.Should().BeNull();
             File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact");
             using var configuration = JsonDocument.Parse(File.ReadAllText(Path.Combine(Target, ".func", "config.json")));
             configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
@@ -897,6 +899,7 @@ public sealed partial class ArtifactBindingJourneyTests
         else
         {
             exit.Should().Be(1, interaction.AllOutput);
+            journey.Lifecycle.Prepared.Should().BeNull();
             interaction.AllOutput.Should().Contain("multiple qualified installed stack owners").And.Contain("--stack");
             Directory.Exists(Target).Should().BeFalse();
         }
