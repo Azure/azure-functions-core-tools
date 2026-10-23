@@ -1036,6 +1036,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         services.AddSingleton<IFileSystem>(fileSystem ?? new PhysicalFileSystem());
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddSingleton(new CliConfigurationPathsOptions(Home));
+        services.AddSingleton<ICliVersionProvider>(AssemblyCliVersionProvider.Instance);
         services.AddSingleton<ILocalSettingsProvider, LocalSettingsProvider>();
         services.AddSingleton<ICliConfigurationProvider, CliConfigurationProvider>();
         services.AddOptions();
