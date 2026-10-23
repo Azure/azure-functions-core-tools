@@ -31,7 +31,7 @@
 - [ ] 3.2 Create .NET C# and F# project-template variants with `type=project`, language tags, target-framework symbols, and func host metadata.
 - [ ] 3.3 Create Node JavaScript and TypeScript project-template variants with language tags, bundle symbols, package-restore controls, and post-actions.
 - [ ] 3.4 Create Python project-template variants with language tags and bundle symbols.
-- [ ] 3.5 Create Go project-template variants with language tags, bundle symbols, module settings, and tidy post-actions.
+- [ ] 3.5 Create Go project-template variants with language tags, bundle symbols, module settings, and the separately reviewed Go module-tidy action, preserving the existing default/skip choice.
 - [ ] 3.6 Create PowerShell project-template variants with language tags and applicable project symbols.
 - [ ] 3.7 Create Java project-template variants with language tags, Maven project files, and bundle symbols.
 - [ ] 3.8 Move common bundle channel and no-bundle options from workload registrations into project-template symbols.
@@ -63,7 +63,7 @@
 
 - [x] 6.1 Prototype when filters are checked and when the template context is fixed for conditional topology, and record the decision in this design.
 - [ ] 6.2 Define immutable selection models for project-template groups, variants, and their projected configuration actions.
-- [ ] 6.3 Apply `--stack` and `--language` to every active project configuration, matching canonical names and `IProjectStack` aliases case-insensitively.
+- [ ] 6.3 After final parameters and independent-inventory completeness validation, apply `--stack` and `--language` to the configuration matched to every active root, matching canonical names and `IProjectStack` aliases case-insensitively. Missing finalization is an authoring failure, not a filtered-out project.
 - [ ] 6.4 Keep mixed-stack and mixed-language templates available when the corresponding filter is absent.
 - [ ] 6.5 Enforce project type with wrong-type diagnostics and report unknown filters, stack-language conflicts, and whole-template conflicts without substituting another template.
 - [ ] 6.6 Narrow groups and their variants by `--stack` and `--language` to templates whose unconditional projects all match every supplied filter and that declare at least one project matching them all.
@@ -94,7 +94,7 @@
 
 - [ ] 9.1 Plan deletion of all target content except `.git` for forced reinitialization.
 - [ ] 9.2 Confirm destructive cleanup interactively and treat non-interactive `--force` as explicit authorization.
-- [ ] 9.3 Complete template, filter, parsing, primary-output, configuration-action, and combined effect preflight before deleting target content.
+- [ ] 9.3 Retain the evaluated snapshot and independently inventory normalized host-file roots from resolved primary outputs and created/modified effects. Deduplicate observations, match exactly one active configuration per root, and complete template, filter, parsing, anchor, and combined effect checks before deleting target content.
 - [ ] 9.4 Invoke the selected project `ResolvedTemplate` with target path, canonical symbols, name, conflict policy, and create or dry-run mode.
 - [ ] 9.5 Combine forced cleanup, project-template, configuration-finalization, and ordinary post-action effects in deterministic execution order.
 - [ ] 9.6 Reconcile dry-run changes following planned cleanup so deletion and recreation are represented accurately.
@@ -102,6 +102,7 @@
 - [ ] 9.8 Execute mandatory configuration actions in declared order after scaffolding and run ordinary post-actions only after all configuration succeeds.
 - [ ] 9.9 Report partial initialization without deleting generated files or successful prior configurations if a configuration action fails.
 - [ ] 9.10 Dispose the command-scoped `Templater` and propagate cancellation through preflight, creation, configuration finalization, and ordinary post-actions.
+- [ ] 9.11 Test omitted/inactive actions on active roots, duplicate inventory observations versus multiple active finalizations, absent-root anchors, both-inactive controls, and mutually exclusive actions with exactly one active plan, including dry-run and forced initialization.
 
 ## 10. Rendering and Outcomes
 
@@ -117,9 +118,9 @@
 
 - [ ] 11.1 Remove `InitContext`, `IInitOptionRegistry`, `InitOptionRegistry`, and common workload init option factories after template migration.
 - [ ] 11.2 Remove .NET workload initializer file-generation and nested `dotnet new` execution code.
-- [ ] 11.3 Remove Node workload project-file generation and package-install execution code migrated to templates and post-actions.
+- [ ] 11.3 Remove Node workload project-file generation and initializer-time npm install only after default/skip, missing-tool/nonzero/cancellation, and file-preservation cases are qualified and Node/command owners approve the intentional change from best-effort nonzero results. Include migration notes rather than claiming failure parity.
 - [ ] 11.4 Remove Python workload project-file generation code migrated to templates.
-- [ ] 11.5 Remove Go workload project-file generation and tidy execution code migrated to templates and post-actions.
+- [ ] 11.5 Remove Go workload project-file generation and initializer-time tidy only after the distinct module-tidy action is agreed, implemented, and qualified for default/skip and module/checksum effects, with explicit approval/migration notes for nonzero failure reporting and cancellation outcomes. Leave startup-time Go tidy/build behavior unchanged.
 - [ ] 11.6 Remove PowerShell workload initializer scaffolding code migrated to templates.
 - [ ] 11.7 Remove Java workload project-file generation code migrated to templates.
 - [ ] 11.8 Remove initializer dependencies from `func new`, template option hydration, and language group resolution in favor of `IProjectStack` or template-owned metadata.

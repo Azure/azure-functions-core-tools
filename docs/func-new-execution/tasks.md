@@ -64,6 +64,8 @@
 - [ ] 7.5 Invoke the selected `ResolvedTemplate` for both create and dry-run modes without passing its identity back to `Templater`.
 - [ ] 7.6 Render dry-run create, modify, delete, and post-action effects with an explicit preview label in plain and JSON formats.
 - [ ] 7.7 Render successful creation, destructive conflicts, and known invocation failures from func-owned result models.
+- [ ] 7.8 Keep item ordinary dispatch deferred until real caller, typed containing-project target, authorization/security, and legacy compatibility gates are qualified. Reject unsupported new-path action declarations before creation without dropping them silently.
+- [ ] 7.9 Test pre-creation rejection of item actions for output-local and ancestor inputs, retain dry-run suppression, and preserve legacy journeys until their replacements are qualified.
 
 ## 8. Legacy Path Removal and DI
 

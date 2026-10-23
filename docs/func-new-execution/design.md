@@ -23,7 +23,7 @@ Microsoft.TemplateEngine 10.0.301 directly supports preview through `TemplateCre
 
 - Design project-template discovery or `func init` execution.
 - Decide how missing or unsupported TemplateEngine `tags.type` values are classified; `func new` consumes only candidates classified as `TemplateType.Item`.
-- Define authorization or execution policy for real template post-actions. Dry-run reports but never executes them.
+- Define an independent ordinary post-action policy. This command consumes the reviewed `template-engine-post-actions` dispatch contract; dry-run reports but never executes actions.
 - Reproduce every `dotnet new` option or its exact command-tree mutation strategy.
 - Let `--force` bypass template type, constraints, argument validation, or selection ambiguity.
 
@@ -211,6 +211,8 @@ TemplateInvocationMode
 `ResolvedTemplate.InvokeAsync` maps `DryRun` to TemplateEngine's native `dryRun` argument. Both modes perform identical selection, constraint, argument, default, output-path, and conflict evaluation. The returned func-owned result always carries projected file changes and post-actions; create mode additionally carries applied creation outputs.
 
 Dry-run never creates the requested execution directory, writes files, or executes post-actions. Destructive effects are still returned. Without `--force`, they are rendered as changes that would block actual creation; `--force` remains orthogonal and changes conflict permission, not whether preview writes.
+
+Item ordinary-action dispatch is deferred to the qualification contract in [template-engine-post-actions](../template-engine-post-actions/design.md#item-ordinary-actions-are-deferred). The initial new item path rejects action declarations before file creation rather than silently ignoring or running them. Supported legacy item journeys requiring actions stay on their existing migration path until a real caller, containing-project target, and authorization/safety contract are qualified. `--path` does not implicitly authorize ancestor-manifest mutation. Dry-run never executes actions, and required project configuration remains prohibited in item templates.
 
 The command renderer distinguishes create, modify, and delete effects and clearly labels the output as a preview. JSON and plain formatting consume the same result model.
 
