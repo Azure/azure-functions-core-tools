@@ -866,7 +866,14 @@ public sealed partial class ArtifactBindingJourneyTests
     [InlineData(true)]
     public async Task QuickstartSelection_SharedOwnerUsesInstalledProjectDeclarationsWhenAvailable(bool installed)
     {
-        await SeedAsync(installTemplates: installed);
+        if (installed)
+        {
+            await SeedQualifiedInstalledQuickstartAsync();
+        }
+        else
+        {
+            await SeedAsync(installTemplates: false);
+        }
         GuidedInteraction interaction = new(false, [], []);
         var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
@@ -898,7 +905,7 @@ public sealed partial class ArtifactBindingJourneyTests
     [Fact]
     public async Task QuickstartSelection_InstalledExplicitConflictingStackRefusesBeforeAcquisition()
     {
-        await SeedAsync();
+        await SeedQualifiedInstalledQuickstartAsync();
         GuidedInteraction interaction = new(false, [], []);
         var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
@@ -919,7 +926,7 @@ public sealed partial class ArtifactBindingJourneyTests
     [Fact]
     public async Task QuickstartSelection_InstalledUniqueStackPreservesSeparateConfirmations()
     {
-        await SeedAsync();
+        await SeedQualifiedInstalledQuickstartAsync();
         GuidedInteraction interaction = new(true, [], [true, true]);
         var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
         RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
@@ -986,7 +993,8 @@ public sealed partial class ArtifactBindingJourneyTests
     [Fact]
     public async Task QuickstartSelection_InstalledDirtyStorePropagatesWithoutAcquisitionOrRecovery()
     {
-        await SeedAsync();
+        await SeedQualifiedInstalledQuickstartAsync();
+        Directory.CreateDirectory(Path.GetDirectoryName(_templates.Journal)!);
         File.WriteAllText(_templates.Journal, "{invalid");
         GuidedInteraction interaction = new(false, [], []);
         var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
@@ -1495,6 +1503,14 @@ public sealed partial class ArtifactBindingJourneyTests
 
         await execute.Should().ThrowAsync<OperationCanceledException>();
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    private async Task SeedQualifiedInstalledQuickstartAsync()
+    {
+        await SeedAsync(installTemplates: false);
+        var initial = Guided(new(false, [], []));
+        BasicTemplateArtifact artifact = (await _catalog.LoadAsync(CancellationToken.None)).Artifacts.Single();
+        await initial.Lifecycle.EnsureAsync(artifact, Context, false, CancellationToken.None);
     }
 
     private async Task<(NativeTemplateOwnerProof Receipt, string OldArchive)> NominateOwnedUpdateAsync()
