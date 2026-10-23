@@ -861,6 +861,40 @@ public sealed partial class ArtifactBindingJourneyTests
         File.Exists(Path.Combine(Target, ".func", "config.json")).Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QuickstartSelection_SharedOwnerUsesInstalledProjectDeclarationsWhenAvailable(bool installed)
+    {
+        await SeedAsync(installTemplates: installed);
+        GuidedInteraction interaction = new(false, [], []);
+        var journey = Guided(interaction, scopes: new AdditionalStackScopeFactory(_scopes, "node-alt", "JavaScript"));
+        RootCommand root = [GuidedCommand(journey.Coordinator, interaction)];
+        var before = TemplateState();
+
+        int exit = await root.Parse(["init", Target, "--quickstart", "fixture", "--non-interactive"]).InvokeAsync();
+
+        journey.Payload.Requested.Should().BeEmpty();
+        journey.Payload.Opened.Should().BeEmpty();
+        journey.Lifecycle.Prepared.Should().BeNull();
+        interaction.SelectionTitles.Should().BeEmpty();
+        interaction.Confirmations.Should().BeEmpty();
+        TemplateState().Should().Equal(before);
+        if (installed)
+        {
+            exit.Should().Be(0, interaction.AllOutput);
+            File.ReadAllText(Path.Combine(Target, "value.txt")).Should().Be("exact");
+            using var configuration = JsonDocument.Parse(File.ReadAllText(Path.Combine(Target, ".func", "config.json")));
+            configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString().Should().Be("node");
+        }
+        else
+        {
+            exit.Should().Be(1, interaction.AllOutput);
+            interaction.AllOutput.Should().Contain("multiple qualified installed stack owners").And.Contain("--stack");
+            Directory.Exists(Target).Should().BeFalse();
+        }
+    }
+
     [Fact]
     public async Task QuickstartSelection_ExplicitConflictingStackNeverFallsBackToAnotherCandidate()
     {
