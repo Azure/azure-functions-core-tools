@@ -4,11 +4,24 @@ parameters:
   default: false
 
 steps:
+- pwsh: |
+    $ErrorActionPreference = 'Stop'
+    $globalJsonPath = Join-Path '$(Build.SourcesDirectory)' 'global.json'
+    $sdkVersion = (Get-Content -LiteralPath $globalJsonPath -Raw | ConvertFrom-Json).sdk.version
+    if ($sdkVersion -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+      throw 'global.json must declare an explicit sdk.version for CI.'
+    }
+
+    Write-Host "##vso[task.setvariable variable=BuildSdkVersion;isReadOnly=true]$sdkVersion"
+  displayName: Read exact .NET SDK version from global.json
+
+# Keep CI independent of contributor roll-forward and SDKs cached on the agent.
 - task: UseDotNet@2 # The pinned SDK we use to build
   displayName: Install .NET SDK from global.json
   inputs:
     packageType: sdk
-    useGlobalJson: true
+    version: $(BuildSdkVersion)
+    installationPath: $(Agent.TempDirectory)/dotnet
 
 - ${{ if parameters.sign }}:
   - task: UseDotNet@2 # ESRP doesn't yet support net10 SDK
@@ -16,6 +29,24 @@ steps:
     inputs:
       packageType: sdk
       version: 9.x
+      installationPath: $(Agent.TempDirectory)/dotnet
+
+- pwsh: |
+    $ErrorActionPreference = 'Stop'
+    $selectedVersion = dotnet --version
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Failed to determine the .NET SDK selected for CI.'
+    }
+    if ($selectedVersion -ne '$(BuildSdkVersion)') {
+      throw "Expected .NET SDK $(BuildSdkVersion), but dotnet selected '$selectedVersion'."
+    }
+
+    dotnet --info
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Failed to report the .NET SDK environment for CI.'
+    }
+  workingDirectory: $(Build.SourcesDirectory)
+  displayName: Verify selected .NET SDK
 
 - task: NuGetAuthenticate@1
   displayName: Authenticate to NuGet feeds
