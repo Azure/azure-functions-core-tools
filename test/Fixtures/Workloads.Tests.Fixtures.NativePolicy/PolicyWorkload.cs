@@ -44,6 +44,18 @@ internal sealed class FixturePolicy(IFixtureFiles files) : NativeTemplatePolicy
     public NativeTemplateInvocationContext? LastInvocation { get; private set; }
     public NativeTemplateCapturedOutput? LastCapture { get; private set; }
     public Dictionary<string, string?> ReturnedDefaults { get; } = new(StringComparer.Ordinal);
+    public NativeTemplateCapturedOutput? LastPreparationPreview { get; private set; }
+    public NativeTemplateCapturedOutput? LastPreparationCompletion { get; private set; }
+    public byte[]? PreparationBytes { get; private set; }
+    public List<string> ReturnedPreparationDiagnostics { get; } = [];
+    public NativeTemplateCreatedProject? LastCreatedProject { get; private set; }
+    public byte[]? ConfigurationBytes { get; private set; }
+    public int PreparationExecutions { get; private set; }
+    public int PreparationCompletions { get; private set; }
+    public NativeTemplateSource? FactorySource { get; private set; }
+    public INativeTemplateProjectPreparation? CapabilityOverride { get; set; }
+    public Func<NativeTemplateCreatedProject, NativeTemplateProjectPreparationPlan, CancellationToken,
+        Task<NativeTemplateProjectPreparationResult>>? CompleteHook { get; set; }
     public override string Stack => "fixture";
 
     public override bool Handles(NativeTemplateSource selected)
@@ -54,10 +66,113 @@ internal sealed class FixturePolicy(IFixtureFiles files) : NativeTemplatePolicy
     }
 
     public override NativeTemplatePolicyStages GetRequestedStages(NativeTemplateSource selected)
-        => Mode == "unknown-stage" ? (NativeTemplatePolicyStages)128 : Mode == "no-stages" ? NativeTemplatePolicyStages.None
+        => Mode == "unknown-stage" ? (NativeTemplatePolicyStages)128 : Mode is "no-stages" or "preparation-none" ? NativeTemplatePolicyStages.None
             : selected.IsProject || selected.Identity is "Fixture.Compile" or "Fixture.Editor"
                 ? NativeTemplatePolicyStages.Invocation | NativeTemplatePolicyStages.CapturedOutput | NativeTemplatePolicyStages.Effects
                 : NativeTemplatePolicyStages.None;
+
+    public override bool RequiresProjectPreparation(NativeTemplateSource selected)
+        => selected.IsProject && Mode.StartsWith("preparation-", StringComparison.Ordinal)
+            && !(Mode == "preparation-drift" && LastPreparationPreview is not null);
+
+    public override INativeTemplateProjectPreparation CreateProjectPreparation(NativeTemplateSource selected)
+    {
+        FactorySource = selected;
+        return Mode switch
+        {
+            "preparation-factory-null" => null!,
+            "preparation-factory-unsupported" => base.CreateProjectPreparation(selected),
+            _ => CapabilityOverride ?? new FixtureProjectPreparation(this),
+        };
+    }
+
+    private async Task<NativeTemplateProjectPreparationPlan> PreviewPreparationAsync(
+        NativeTemplateCapturedOutput captured, CancellationToken cancellationToken)
+    {
+        LastPreparationPreview = captured;
+        await captured.RevalidateAsync(cancellationToken);
+        PreparationBytes = (await captured.ReadFileAsync("Created.proj", cancellationToken)).ToArray();
+        if (Mode == "preparation-unsupported")
+        {
+            throw new NotSupportedException("Fixture workload preparation is unsupported.");
+        }
+        if (Mode == "preparation-null")
+        {
+            return null!;
+        }
+        if (!captured.Invocation.DryRun || !captured.Invocation.CanonicalValues.TryGetValue("SkipNpmInstall", out string? value)
+            || !bool.TryParse(value, out bool skip))
+        {
+            return new(false, false, ["Owner requires its canonical SkipNpmInstall value and actual preview."]);
+        }
+        ReturnedPreparationDiagnostics.Clear();
+        if (Mode == "preparation-diagnostics")
+        {
+            ReturnedPreparationDiagnostics.Add("Owner preparation diagnostics.");
+        }
+        return new(Mode != "preparation-refused", skip, ReturnedPreparationDiagnostics);
+    }
+
+    private async Task<NativeTemplateProjectPreparationResult> CompletePreparationAsync(
+        NativeTemplateCreatedProject created, NativeTemplateProjectPreparationPlan preview, CancellationToken cancellationToken)
+    {
+        PreparationCompletions++;
+        LastCreatedProject = created;
+        NativeTemplateCapturedOutput captured = created.Output;
+        LastPreparationCompletion = captured;
+        await created.RevalidateAsync(cancellationToken);
+        ConfigurationBytes = (await created.ReadConfigurationAsync(cancellationToken)).ToArray();
+        using var configuration = JsonDocument.Parse(ConfigurationBytes);
+        if (configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString() != Stack
+            || configuration.RootElement.GetProperty("stack").GetProperty("language").GetString() != "Fixture"
+            || created.ConfigurationPath != Path.Combine(captured.Invocation.OutputDirectory.Info.FullName, ".func", "config.json"))
+        {
+            return new(false, ["The owner requires the actual finalized canonical configuration."]);
+        }
+        if (!(await captured.ReadFileAsync("Created.proj", cancellationToken)).Span.SequenceEqual(PreparationBytes))
+        {
+            return new(false, ["Actual created bytes differ from the preparation preview."]);
+        }
+        ReturnedPreparationDiagnostics.Add("Mutation after returning the copied plan.");
+        if (Mode == "preparation-completion-null")
+        {
+            return null!;
+        }
+        if (Mode == "preparation-completion-refused")
+        {
+            return new(false, ["Owner refused preparation completion."]);
+        }
+        if (Mode == "preparation-completion-unsupported")
+        {
+            throw new NotSupportedException("Fixture completion is unsupported.");
+        }
+        if (Mode == "preparation-tamper")
+        {
+            await _files.WriteAllTextAsync(Path.Combine(captured.Invocation.OutputDirectory.Info.FullName, "Created.proj"),
+                "changed during completion qualification", cancellationToken);
+        }
+        if (captured.Invocation.DryRun)
+        {
+            return new(false, ["Completion must use its actual created invocation."]);
+        }
+        if (preview.Skipped)
+        {
+            return new(true, ["Owner explicitly skipped preparation."]);
+        }
+        PreparationExecutions++;
+        return CompleteHook is { } complete ? await complete(created, preview, cancellationToken)
+            : new(true, ["Original workload preparation stderr."], true);
+    }
+
+    private sealed class FixtureProjectPreparation(FixturePolicy policy) : INativeTemplateProjectPreparation
+    {
+        public Task<NativeTemplateProjectPreparationPlan> PreviewAsync(NativeTemplateCapturedOutput captured, CancellationToken cancellationToken)
+            => policy.PreviewPreparationAsync(captured, cancellationToken);
+
+        public Task<NativeTemplateProjectPreparationResult> CompleteAsync(
+            NativeTemplateCreatedProject created, NativeTemplateProjectPreparationPlan preview, CancellationToken cancellationToken)
+            => policy.CompletePreparationAsync(created, preview, cancellationToken);
+    }
 
     public override async Task<IReadOnlyList<string>> ValidateProjectAsync(NativeTemplateSource selected, CancellationToken cancellationToken)
     {

@@ -707,7 +707,8 @@ public sealed partial class BundledNodeTemplateTests
     }
 
     private async Task<ServiceProvider> CreatePolicyServicesAsync(IBasicCompanionCatalog? authority = null,
-        IProjectStack? additionalStack = null, INewExecutionContextResolver? contexts = null, IInteractionService? interaction = null)
+        IProjectStack? additionalStack = null, INewExecutionContextResolver? contexts = null, IInteractionService? interaction = null,
+        Action<IServiceCollection>? configure = null)
     {
         return await CreateServicesAsync(services =>
         {
@@ -737,14 +738,22 @@ public sealed partial class BundledNodeTemplateTests
             services.AddSingleton<IWorkloadDeploymentService>(new WorkloadDeploymentService(
                 _paths, _workloads, new WorkloadMetadataReader(), coordinator, _files,
                 bundled));
+            configure?.Invoke(services);
         }, validateScopes: true);
     }
 
     private async Task<WorkloadEntry> InstallPolicyFixtureAsync(bool fromCatalog = false,
-        bool composedParameters = false, bool promptRequired = false, bool utf8Bom = false)
+        bool composedParameters = false, bool promptRequired = false, bool utf8Bom = false, bool preparation = false)
     {
         string input = Directory.CreateDirectory(Path.Combine(_root, "policy-content")).FullName;
         WritePolicyContent(input);
+        if (preparation)
+        {
+            string path = Path.Combine(input, "content", "project", ".template.config", "template.json");
+            var configuration = JsonNode.Parse(File.ReadAllText(path))!;
+            configuration["symbols"]!["SkipNpmInstall"] = JsonNode.Parse("""{"type":"parameter","datatype":"bool","defaultValue":"false"}""");
+            File.WriteAllText(path, configuration.ToJsonString());
+        }
         if (composedParameters)
         {
             string[] kinds = ["project", "editor"];

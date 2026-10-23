@@ -40,6 +40,8 @@ internal sealed record TemplateInvocationRequest(WorkingDirectory OutputDirector
     internal TemplateFSharpCompileEffect? PolicyCompileRepair { get; init; }
 
     internal BoundNativeTemplateExecutor? OwnerExecutor { get; init; }
+
+    internal BoundNativeProjectPreparation? ProjectPreparationBinding { get; init; }
 }
 
 internal sealed record NativeTemplateInvocationEffects(
@@ -126,6 +128,9 @@ internal sealed record TemplateInvocationResult(TemplateInvocationStatus Status,
 
     [JsonIgnore]
     internal NativeTemplatePreparationSnapshot? Capture { get; init; }
+
+    [JsonIgnore]
+    internal NativeProjectPreparationCapture? ProjectPreparationCapture { get; init; }
 
     /// <summary>
     /// Distinguishes completed real output from a preview or a conflict plan without changing the serialized result.

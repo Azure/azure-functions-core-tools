@@ -83,6 +83,8 @@ public sealed class NativeTemplatePolicyCompatibilityTests
             typeof(NativeTemplateInvocationContext), typeof(NativeTemplateCapturedFile), typeof(NativeTemplateCapturedOutput),
             typeof(NativeTemplateProjectBinding), typeof(NativeTemplateInvocationQualification), typeof(NativeTemplateProjectAnchor),
             typeof(NativeTemplateCompileRepair), typeof(NativeTemplateCaptureQualification),
+            typeof(NativeTemplateProjectPreparationPlan), typeof(NativeTemplateProjectPreparationResult),
+            typeof(NativeTemplateCreatedProject), typeof(INativeTemplateProjectPreparation),
         ];
         typeof(NativeTemplatePolicy).Assembly.GetExportedTypes().Where(type => type.Namespace == typeof(NativeTemplatePolicy).Namespace)
             .Should().BeEquivalentTo(expected);
@@ -114,6 +116,12 @@ public sealed class NativeTemplatePolicyCompatibilityTests
     {
         OriginalEightPolicy policy = new();
         policy.GetRequestedStages(Substitute.For<NativeTemplateSource>()).Should().Be(NativeTemplatePolicyStages.None);
+        policy.RequiresProjectPreparation(Substitute.For<NativeTemplateSource>()).Should().BeFalse();
+        Action preparationUnsupported = () => policy.CreateProjectPreparation(Substitute.For<NativeTemplateSource>());
+        preparationUnsupported.Should().Throw<NotSupportedException>().WithMessage("*Update the owning workload*");
+        policy.RequiresProjectPreparation(Substitute.For<NativeTemplateSource>()).Should().BeFalse();
+        Action unsupported = () => policy.CreateProjectPreparation(Substitute.For<NativeTemplateSource>());
+        unsupported.Should().Throw<NotSupportedException>();
         List<string> diagnostics = [];
         Dictionary<string, string?> defaults = new() { ["Framework"] = "net10.0" };
         List<NativeTemplateSourceStamp> sources = [new("Selected", "body.txt", new('A', 64))];
@@ -126,6 +134,27 @@ public sealed class NativeTemplatePolicyCompatibilityTests
         result.Diagnostics.Should().BeEmpty();
         result.CanonicalDefaults["Framework"].Should().Be("net10.0");
         result.RequiredSources.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void ProjectPreparationContracts_CopyListsAndRejectNullInputs()
+    {
+        List<string> diagnostics = ["original"];
+        NativeTemplateProjectPreparationPlan plan = new(true, false, diagnostics);
+        NativeTemplateProjectPreparationResult result = new(false, diagnostics, true);
+        diagnostics[0] = "mutated";
+        plan.Diagnostics.Should().Equal("original");
+        result.Diagnostics.Should().Equal("original");
+        result.TargetMayHaveChanged.Should().BeTrue();
+        Action nullPlan = () => new NativeTemplateProjectPreparationPlan(true, false, null!);
+        Action nullResult = () => new NativeTemplateProjectPreparationResult(false, null!);
+        nullPlan.Should().Throw<ArgumentNullException>();
+        nullResult.Should().Throw<ArgumentNullException>();
+        OriginalEightPolicy policy = new();
+        Action nullDeclaration = () => policy.RequiresProjectPreparation(null!);
+        Action nullSource = () => policy.CreateProjectPreparation(null!);
+        nullDeclaration.Should().Throw<ArgumentNullException>().WithParameterName("selected");
+        nullSource.Should().Throw<ArgumentNullException>().WithParameterName("selected");
     }
 
     [Fact]

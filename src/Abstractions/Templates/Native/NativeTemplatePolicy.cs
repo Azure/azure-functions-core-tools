@@ -27,6 +27,18 @@ public abstract class NativeTemplatePolicy
         return NativeTemplatePolicyStages.None;
     }
 
+    public virtual bool RequiresProjectPreparation(NativeTemplateSource selected)
+    {
+        ArgumentNullException.ThrowIfNull(selected);
+        return false;
+    }
+
+    public virtual INativeTemplateProjectPreparation CreateProjectPreparation(NativeTemplateSource selected)
+    {
+        ArgumentNullException.ThrowIfNull(selected);
+        throw Unsupported("workload-owned project preparation");
+    }
+
     public virtual Task<NativeTemplateProjectAnchor> DescribeProjectLayoutAsync(NativeTemplateSource selected, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selected);

@@ -95,6 +95,11 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
 
         if (result.Preparation is { } preparation)
         {
+            if (preparation.Preview.OwnedPlan is { } owned)
+            {
+                _interaction.WriteHint($"Workload preparation: {(owned.Skipped ? "Skipped"
+                    : preparation.Completion is null ? "Planned" : preparation.Completion.Succeeded ? "Completed" : "Not completed")}.");
+            }
             foreach (NativeProjectPreparationStep operation in preparation.Preview.Operations)
             {
                 _interaction.WriteHint($"{operation.Operation}: {(operation.Skipped ? "Skipped"
@@ -256,7 +261,9 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
         {
             projected["preparation"] = new
             {
-                planned = preparation.Preview.Operations.Select(step => new { operation = step.Operation.ToString(), step.Skipped }),
+                planned = preparation.Preview.OwnedPlan is { } owned
+                    ? new[] { new { operation = "WorkloadPreparation", owned.Skipped } }
+                    : preparation.Preview.Operations.Select(step => new { operation = step.Operation.ToString(), step.Skipped }),
                 preparation.Preview.Diagnostics,
                 completion = ProjectPreparationCompletion(preparation.Completion),
             };
@@ -276,6 +283,10 @@ internal sealed class InitExecutionRenderer(IInteractionService interaction)
             ["succeeded"] = completion.Succeeded,
             ["diagnostics"] = completion.Diagnostics,
         };
+        if (completion.OwnedCompletion is { } owned)
+        {
+            projected["targetMayHaveChanged"] = owned.TargetMayHaveChanged;
+        }
         if (completion.Effects is { } effects)
         {
             projected["effects"] = NewExecutionRenderer.ProjectEffects(effects);
