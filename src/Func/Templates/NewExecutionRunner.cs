@@ -84,7 +84,7 @@ internal sealed class NewExecutionRunner(
             _ => _interaction.WriteWarning("Waiting for the installed template store to become available."));
         cancellationToken.ThrowIfCancellationRequested();
         NewExecutionResult result = await ExecuteAsync(templater, request, canPrompt, cancellationToken);
-        if (request.DryRun || !result.HasReturnedCreationResult)
+        if (request.DryRun || !result.HasCreationOutcome)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -363,7 +363,7 @@ internal sealed class NewExecutionRunner(
             ItemName = itemName,
             Diagnostics = invocation.Diagnostic is null ? [] : [invocation.Diagnostic],
         };
-        if (request.DryRun || !result.HasReturnedCreationResult)
+        if (request.DryRun || !result.HasCreationOutcome)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }
