@@ -332,12 +332,15 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
         List<string> diagnostics = [];
         using (BoundInitScope scope = await _scopes.CreateAsync(cancellationToken))
         {
-            InitExecutionResult? stackError = GetOwnedStackCandidates(scope, request.Init, out List<OwnedStackCandidate> ownedStacks, out _);
+            InitExecutionResult? stackError = GetOwnedStackCandidates(scope, request.Init, out List<OwnedStackCandidate> ownedStacks,
+                out string? canonicalLanguage);
             if (stackError is not null)
             {
                 return stackError;
             }
 
+            using Templater templates = await _templates.CreateProjectAsync(new(request.Init.WorkingDirectory) { RequireCleanStore = true },
+                scope.Availability, scope.Support, cancellationToken);
             List<QualifiedQuickstartCandidate> qualified = [];
             foreach (OwnedStackCandidate candidate in ownedStacks)
             {
@@ -345,6 +348,23 @@ internal sealed class QuickstartInitCoordinator(IBoundInitScopeFactory scopes, I
                 try
                 {
                     QualifiedQuickstart result = await _qualification.ResolveAsync(nomination, query, candidate.Owner, cancellationToken);
+                    IReadOnlyList<InstalledTemplateArtifact> installed = await templates.ProjectArtifactsAsync(scope.Verifier,
+                        query.Owner, query.Channel, cancellationToken, scope.BundledVerifier);
+                    foreach (InstalledTemplateArtifact artifact in installed)
+                    {
+                        QuickstartInstalledTemplates.ThrowSystemicFailure(artifact.Failure);
+                    }
+                    InstalledTemplateArtifact[] exact = [.. installed.Where(artifact =>
+                        QuickstartInstalledTemplates.MatchesInstalledCoordinate(artifact, nomination.PackageReference!))];
+                    if (exact.Length > 0 && (exact.Length != 1
+                        || !QuickstartInstalledTemplates.IsExactDuplicate(nomination, exact[0], query.Owner, query.Channel)
+                        || !QuickstartInstalledTemplates.SupportsTemplateConfiguration(exact[0].Entry, scope.Catalog,
+                            candidate.Stack, canonicalLanguage)))
+                    {
+                        diagnostics.Add($"{candidate.Stack.Stack}: {exact[0].Diagnostic
+                            ?? "the installed nominated project has no unique exact binding with compatible project declarations."}");
+                        continue;
+                    }
                     qualified.Add(new(candidate.Stack, result));
                 }
                 catch (BasicAcquisitionException exception) when (QuickstartQualification.IsCandidateRefusal(exception.Failure))

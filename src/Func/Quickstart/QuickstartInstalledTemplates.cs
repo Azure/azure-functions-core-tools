@@ -191,7 +191,7 @@ internal sealed class QuickstartInstalledTemplates(ITemplaterFactory templates, 
         return true;
     }
 
-    private static bool IsExactDuplicate(QuickstartCatalogEntry entry, InstalledTemplateArtifact installed,
+    internal static bool IsExactDuplicate(QuickstartCatalogEntry entry, InstalledTemplateArtifact installed,
         NativeTemplateOwnerIdentity owner, BundleChannel? channel)
     {
         if (installed.Diagnostic is not null || installed.Failure is not null || entry.MetadataStatus != QuickstartPackageMetadataStatus.Unverified
@@ -216,7 +216,7 @@ internal sealed class QuickstartInstalledTemplates(ITemplaterFactory templates, 
         return false;
     }
 
-    private static bool MatchesInstalledCoordinate(InstalledTemplateArtifact installed, QuickstartPackageReference reference)
+    internal static bool MatchesInstalledCoordinate(InstalledTemplateArtifact installed, QuickstartPackageReference reference)
     {
         TemplatePackageInfo? package = installed.Entry.Package;
         return string.Equals(installed.Entry.Identity, reference.TemplateIdentity, StringComparison.Ordinal)
@@ -239,7 +239,7 @@ internal sealed class QuickstartInstalledTemplates(ITemplaterFactory templates, 
             && actual == nominated && string.Equals(source, reference.Source, StringComparison.Ordinal)
             && string.Equals(sha256, reference.Artifact?.Digest, StringComparison.OrdinalIgnoreCase);
 
-    private static void ThrowSystemicFailure(Exception? failure)
+    internal static void ThrowSystemicFailure(Exception? failure)
     {
         if (failure is null || failure is InvalidTemplateMetadataException
             || failure is BasicAcquisitionException acquisitionFailure

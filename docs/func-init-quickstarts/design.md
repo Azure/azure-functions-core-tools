@@ -20,7 +20,11 @@ project declarations supported by the selected stack. Quickstarts are qualified
 against each actual owner without treating catalog language or package claims
 as owner evidence. One candidate is selected without a stack prompt; multiple
 candidates prompt interactively and require `--stack` in scripts. No candidate
-fails before acquisition or project writes. After quickstart acquisition, the
+fails before acquisition or project writes. When the exact nominated quickstart
+is already installed and independently bound, all of its actual project
+declarations also filter stack candidates. Missing payloads and not-yet-installed
+update versions retain owner-qualified ambiguity. An unusable installed binding
+is a refusal, not permission to download a replacement. After quickstart acquisition, the
 fresh template binding and every generated project configuration are validated
 again against the inferred stack before project effects.
 
