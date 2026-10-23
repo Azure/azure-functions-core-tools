@@ -173,4 +173,26 @@ public sealed class NewExecutionContractTests
 
         result.HasCreationOutcome.Should().Be(retained);
     }
+
+    [Theory]
+    [InlineData("applied", false, true)]
+    [InlineData("partialFailure", false, true)]
+    [InlineData("incomplete", false, true)]
+    [InlineData("planned", false, false)]
+    [InlineData("invalid", false, false)]
+    [InlineData("applied", true, false)]
+    [InlineData("partialFailure", true, false)]
+    public void CreationOutcome_RetainsReturnedEffectsOnlyForFailedInvocations(string effectKind, bool succeeded, bool retained)
+    {
+        NativeTemplateEffectPlan plan = new(WorkingDirectory.FromCwd(), []);
+        NewExecutionResult result = new("invocationFailed", succeeded)
+        {
+            Invocation = new(TemplateInvocationStatus.Failed, [])
+            {
+                Effects = new(effectKind, false, plan, [], [], []),
+            },
+        };
+
+        result.HasCreationOutcome.Should().Be(retained);
+    }
 }

@@ -835,6 +835,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         services.AddSingleton<ICliVersionProvider>(AssemblyCliVersionProvider.Instance);
         services.AddSingleton<IWorkloadStore>(_workloads);
         services.AddSingleton<IWorkloadPaths>(_paths);
+        services.AddSingleton<IBundledTemplateInstaller>(new BundledTemplateInstaller(_templates, _inspector, _files, new(Home)));
         services.AddSingleton<IWorkloadDeploymentService>(AdmissionDeployment(new FileWorkloadOperationCoordinator(_paths)));
         services.AddSingleton<IBasicCompanionCatalog>(nativeCatalog ?? new BundledBasicCompanionCatalog(new BasicCompanionManifestReader()));
         services.AddSingleton<BasicAcquisitionPlanner>();

@@ -62,7 +62,7 @@ public sealed partial class BundledNodeTemplateTests
         packageJson.RootElement.GetProperty("funcTemplateCohort").GetString().Should().Be("selected-owner",
             "only the physical workload that contributed the selected IProjectStack may supply its template asset cohort");
         var created = await SetupProgramAdvisoryTests.RunCliAsync(Path.Combine(_root, "owner-process"), Home, _paths.Home, project,
-            ["new", project, "-t", "HttpTrigger-JavaScript", "-n", "SelectedOwner", "--output=json"], timeout.Token, ReviewPublishedCli);
+            ["new", project, "-t", "HttpTrigger-JavaScript", "-n", "SelectedOwner", "--format=json"], timeout.Token, ReviewPublishedCli);
         created.ExitCode.Should().Be(0, created.StandardOutput + created.StandardError);
         File.ReadAllText(Path.Combine(project, "src", "functions", "SelectedOwner.js"))
             .Should().Contain("// cohort:selected-owner").And.NotContain("// cohort:unrelated-runtime");
@@ -141,7 +141,7 @@ public sealed partial class BundledNodeTemplateTests
 
     [Theory]
     [InlineData("init", "target")]
-    [InlineData("--verbose=true", "new", "target", "-t", "http", "--output=json")]
+    [InlineData("--verbose=true", "new", "target", "-t", "http", "--format=json")]
     [InlineData("help", "new")]
     [InlineData("new", "--", "init")]
     public async Task TemplateClassification_ActualTemplateCommandsAndHelp_RetainNativeInputPolicy(params string[] arguments)
@@ -294,7 +294,7 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task Program_ValidAmbientCwdProject_CannotOverrideDifferentExplicitNativeTarget()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await _installer.InstallFromPackageAsync(CombinedNodeFixtureArchive());
         string cwd = Path.Combine(_root, "ambient-cwd");
         Directory.CreateDirectory(Path.Combine(cwd, ".func"));
         File.WriteAllText(Path.Combine(cwd, ".func", "config.json"),
@@ -310,7 +310,7 @@ public sealed partial class BundledNodeTemplateTests
         config.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be("JavaScript");
 
         var item = await SetupProgramAdvisoryTests.RunCliAsync(Path.Combine(_root, "ambient-process"), Home, _paths.Home, cwd,
-            ["new", target, "-t", "HttpTrigger-JavaScript", "-n", "ExplicitTarget", "--output=json"], timeout.Token, ReviewPublishedCli);
+            ["new", target, "-t", "HttpTrigger-JavaScript", "-n", "ExplicitTarget", "--format=json"], timeout.Token, ReviewPublishedCli);
 
         item.ExitCode.Should().Be(0, item.StandardOutput + item.StandardError);
         item.StandardError.Should().BeEmpty();

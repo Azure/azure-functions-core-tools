@@ -208,6 +208,38 @@ public sealed partial class BundledNodeTemplateTests
     }
 
     [Theory]
+    [InlineData("unhandled", "does not handle")]
+    [InlineData("refused", "refused")]
+    public async Task LoadedPolicy_CoreLayoutFallback_CannotBypassAClaimingOwner(string mode, string diagnostic)
+    {
+        WorkloadEntry entry = await InstallPolicyFixtureAsync();
+        using ServiceProvider provider = await CreatePolicyServicesAsync();
+        using IServiceScope scope = provider.CreateScope();
+        NativeTemplatePolicy policy = scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicyRegistration>().Policy;
+        policy.GetType().GetProperty("Mode")!.SetValue(policy, mode);
+        bool fallbackCalled = false;
+        TemplateProjectSupport support = provider.GetRequiredService<TemplateProjectSupport>() with
+        {
+            QualifyLayoutAsync = (source, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+                fallbackCalled = true;
+                return Task.FromResult<NativeProjectLayoutQualification?>(
+                    new(source.Entry.Identity, source.Configuration.Fingerprint, new(0, "fixture", "Fixture")));
+            },
+        };
+        string target = Path.Combine(_root, "refused-core-fallback");
+        using Templater templater = await scope.ServiceProvider.GetRequiredService<ITemplaterFactory>()
+            .CreateProjectAsync(new(WorkingDirectory.FromExplicit(target)), Availability(entry), support, CancellationToken.None);
+
+        IReadOnlyList<TemplateCatalogEntry> catalog = await templater.ListAsync(TemplateType.Project);
+
+        catalog.Single(candidate => candidate.Identity == "Fixture.Project").ProjectConfigurationDiagnostic.Should().Contain(diagnostic);
+        fallbackCalled.Should().BeFalse();
+        Directory.Exists(target).Should().BeFalse();
+    }
+
+    [Theory]
     [InlineData("missing-declaration")]
     [InlineData("wrong-index")]
     [InlineData("foreign-stack")]

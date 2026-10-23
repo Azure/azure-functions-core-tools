@@ -18,12 +18,12 @@ namespace Azure.Functions.Cli.Tests.Templates;
 public sealed partial class BundledNodeTemplateTests
 {
     [Theory]
-    [InlineData(true, "--output=json")]
-    [InlineData(true, "--output", "JSON", "--non-interactive=false")]
-    [InlineData(true, "--output=plain", "--non-interactive")]
+    [InlineData(true, "--format=json")]
+    [InlineData(true, "--format", "JSON", "--non-interactive=false")]
+    [InlineData(true, "--format=plain", "--non-interactive")]
     [InlineData(false, "--param:Output=json")]
     [InlineData(false, "--greeting=--output=json")]
-    [InlineData(false, "--output=plain", "--non-interactive=false")]
+    [InlineData(false, "--format=plain", "--non-interactive=false")]
     public void StagedReview_EffectivePromptPolicy_UsesParsedHostOptionsOnly(bool nonInteractive, params string[] options)
     {
         NewCommand command = new(Substitute.For<INewCommandRunner>(), Substitute.For<INewCommandTemplateOptionProvider>());
@@ -68,7 +68,7 @@ public sealed partial class BundledNodeTemplateTests
         int checks = 0;
 
         int exit = await new NativeCliEntryPoint().ExecuteAsync(
-            ["new", project, "-t", "HttpTrigger-JavaScript", "--output=json", .. options],
+            ["new", project, "-t", "HttpTrigger-JavaScript", "--format=json", .. options],
             interaction, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ =>
             {
                 checks++;
@@ -129,7 +129,7 @@ public sealed partial class BundledNodeTemplateTests
         interaction.IsInteractive.Should().BeTrue();
         int checks = 0;
 
-        int exit = await new NativeCliEntryPoint().ExecuteAsync(["new", project, .. selector, "--output=JSON"],
+        int exit = await new NativeCliEntryPoint().ExecuteAsync(["new", project, .. selector, "--format=JSON"],
             interaction, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ =>
             {
                 checks++;
@@ -162,7 +162,7 @@ public sealed partial class BundledNodeTemplateTests
         int checks = 0;
 
         int exit = await new NativeCliEntryPoint().ExecuteAsync(
-            ["new", project, "-t", fail ? "missing-review-template" : "HttpTrigger-JavaScript", "--non-interactive", "--output=plain"],
+            ["new", project, "-t", fail ? "missing-review-template" : "HttpTrigger-JavaScript", "--non-interactive", "--format=plain"],
             interaction, _paths, new(Home), CancellationToken.None, services =>
             {
                 TrackEntryContexts(services);
@@ -197,7 +197,7 @@ public sealed partial class BundledNodeTemplateTests
         SpectreInteractionService interaction = new(new DefaultTheme(), stdout, stderr);
         int checks = 0;
 
-        int exit = await new NativeCliEntryPoint().ExecuteAsync(["new", project, "--output=plain"],
+        int exit = await new NativeCliEntryPoint().ExecuteAsync(["new", project, "--format=plain"],
             interaction, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ =>
             {
                 checks++;
@@ -259,7 +259,7 @@ public sealed partial class BundledNodeTemplateTests
 
     private async Task<string> CreateReviewProjectAsync()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         string project = Path.Combine(_root, "review-project");
         int exit = await new NativeCliEntryPoint().ExecuteAsync(
             ["init", project, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"],

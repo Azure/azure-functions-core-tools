@@ -39,10 +39,12 @@ public sealed class NativeProgramStackTests : IDisposable
         builder.Services.AddSingleton(workloads);
         builder.Services.AddSingleton<IWorkloadPaths>(workloads);
         builder.Services.AddSingleton(configuration);
+        using BundledNodeTemplateTests? nodeFixture = stack == "node" ? new() : null;
         using (var installer = builder.Build())
         {
-            string archive = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, artifacts),
-                $"Azure.Functions.Cli.Workloads.{package}.*.nupkg").Single();
+            string archive = nodeFixture?.CombinedNodeFixtureArchive()
+                ?? Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, artifacts),
+                    $"Azure.Functions.Cli.Workloads.{package}.*.nupkg").Single();
             await installer.Services.GetRequiredService<IWorkloadInstaller>().InstallFromPackageAsync(archive, cancellationToken: CancellationToken.None);
             if (stack == "python")
             {
@@ -115,7 +117,7 @@ public sealed class NativeProgramStackTests : IDisposable
         };
         string template = stack == "python" ? "HttpTrigger-Python" : "http";
         var created = await SetupProgramAdvisoryTests.RunCliAsync(processHome, configuration.Home, workloads.Home, project,
-            ["new", project, "-t", template, "--name", "NativeGreeting", "--non-interactive", "--output=json", .. itemOptions], timeout.Token);
+            ["new", project, "-t", template, "--name", "NativeGreeting", "--non-interactive", "--format=json", .. itemOptions], timeout.Token);
         created.ExitCode.Should().Be(0, created.StandardOutput + created.StandardError);
         created.StandardError.Should().BeEmpty();
         using var item = JsonDocument.Parse(created.StandardOutput);

@@ -139,7 +139,7 @@ public sealed class NativeSelectedItemAppendSupportTests : IDisposable
         NativeTemplateCommandAdapter adapter = new(Substitute.For<IInitExecutionRunner>(), runner, new(interaction), new(interaction), new([]),
             selectedItemEffects: support);
         NewCommand command = new(Substitute.For<INewCommandRunner>(), Substitute.For<INewCommandTemplateOptionProvider>());
-        var parsed = adapter.ParseNewInvocation(command, [Output, "-t", UserIdentity, "-n", "Named", "--non-interactive", "--output", "json"]);
+        var parsed = adapter.ParseNewInvocation(command, [Output, "-t", UserIdentity, "-n", "Named", "--non-interactive", "--format", "json"]);
 
         if (outcome == "throw")
         {

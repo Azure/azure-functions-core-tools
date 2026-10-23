@@ -5,11 +5,11 @@ using System.Text.Json;
 using System.IO.Compression;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Node;
 using Azure.Functions.Cli.Tests.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
-using Azure.Functions.Cli.Workloads.Node;
+using Azure.Functions.Cli.Workloads.Node.Native;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge.Template;
@@ -25,7 +25,7 @@ public sealed partial class BundledNodeTemplateTests
     public async Task RelativePlacement_LegacyRootSpellingsAndNestedBase_FollowOwnedPathWhileLiteralRemainsLiteral(
         string language, string extension, string main)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         using var host = await CreateNodePlacementHostAsync();
         string project = Path.Combine(_root, "relative-" + language);
         await CreatePlacementProjectAsync(host, project, language);
@@ -87,7 +87,7 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("src/functions")]
     public async Task RelativePlacement_DerivedPrefixIsAFile_RefusesWithoutChangingUserFile(string prefix)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         using var host = await CreateNodePlacementHostAsync();
         string project = Path.Combine(_root, "prefix-file");
         await CreatePlacementProjectAsync(host, project, "js");
@@ -113,7 +113,7 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task RelativePlacement_ConflictAndCancellation_PreserveOriginalUserEffects()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         using var host = await CreateNodePlacementHostAsync();
         string project = Path.Combine(_root, "placement-conflict");
         await CreatePlacementProjectAsync(host, project, "ts");
@@ -143,7 +143,7 @@ public sealed partial class BundledNodeTemplateTests
     [SymbolicLinkFact]
     public async Task RelativePlacement_DerivedPrefixLink_RefusesBeforePreviewOrCreationOutsideOriginalBoundary()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         using var host = await CreateNodePlacementHostAsync();
         foreach (string prefix in new[] { "src", "src/functions" })
         {
@@ -181,7 +181,7 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task RelativePlacement_OwnedArchiveSourceChangesAfterPreview_RefusesStalePlanWithoutWrites()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         string project = Path.Combine(_root, "source-changed");
         using (var host = await CreateNodePlacementHostAsync())
         {
@@ -196,16 +196,15 @@ public sealed partial class BundledNodeTemplateTests
         using (var templater = TemplateFixtures.CreateTemplater(session))
         {
             var selected = (await templater.ResolveGroupAsync("HttpTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
-            var source = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
+            var source = await new NodeItemSource().ReadAsync(CreateNodePolicySource(selected), CancellationToken.None);
             var arguments = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));
             request = new(command, arguments.ValuesByCanonicalName, "ChangedSource")
             {
-                SourceSnapshot = new(selected.Entry.Identity, selected.ConfigurationSha256!, source.Sources,
-                    [new(Path.GetFileName(source.ContentPath), source.ContentSource)]),
+                SourceSnapshot = CreateNodeSourceSnapshot(selected, source),
             };
             var preview = await selected.InvokeAsync(request with { DryRun = true }, CancellationToken.None);
             preview.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
-            archive = (await session.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None)).Single().MountPointUri;
+            archive = selected.PackageMountPoint!;
         }
         using (var zip = ZipFile.Open(archive, ZipArchiveMode.Update))
         {
@@ -232,7 +231,7 @@ public sealed partial class BundledNodeTemplateTests
     [SymbolicLinkFact]
     public async Task RelativePlacement_LinkAppearsAfterNativePreview_SharedGuardRefusesLiveWrite()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         string project = Path.Combine(_root, "late-link-project");
         using (var host = await CreateNodePlacementHostAsync())
         {
@@ -254,12 +253,11 @@ public sealed partial class BundledNodeTemplateTests
         };
         using var templater = TemplateFixtures.CreateTemplater(session);
         var selected = (await templater.ResolveGroupAsync("HttpTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
-        var source = await NodeItemCompatibility.ReadSourceAsync(selected, CancellationToken.None);
+        var source = await new NodeItemSource().ReadAsync(CreateNodePolicySource(selected), CancellationToken.None);
         var parsed = new TemplateArgumentParser().Parse(new(selected.Entry.Identity, selected.Parameters, new HashSet<string>(), []));
         var request = new TemplateInvocationRequest(command, parsed.ValuesByCanonicalName, "LateLinked")
         {
-            SourceSnapshot = new(selected.Entry.Identity, selected.ConfigurationSha256!, source.Sources,
-                [new(Path.GetFileName(source.ContentPath), source.ContentSource)]),
+            SourceSnapshot = CreateNodeSourceSnapshot(selected, source),
         };
         try
         {
@@ -286,14 +284,17 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("extra-directory/_._")]
     public async Task RelativePlacement_UnexpectedNativeSourceOrPlaceholder_RefusesInBothModes(string extra)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         using var host = await CreateNodePlacementHostAsync();
         string project = Path.Combine(_root, "unexpected-source");
         await CreatePlacementProjectAsync(host, project, "js");
         string archive;
-        using (var reader = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(project)), CancellationToken.None))
+        var availability = new TemplateConstraintEvaluationSnapshot([new("node-stack", NuGetVersion.Parse("1.0.0"), ["node"], true)]);
+        using (var reader = await _templates.OpenReadAsync(new(WorkingDirectory.FromExplicit(project)), CancellationToken.None, availability))
+        using (var templater = TemplateFixtures.CreateTemplater(reader))
         {
-            archive = (await reader.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None)).Single().MountPointUri;
+            var selected = (await templater.ResolveGroupAsync("HttpTrigger-JavaScript", TemplateType.Item, CancellationToken.None)).Group!.Single();
+            archive = selected.PackageMountPoint!;
         }
         using (var zip = ZipFile.Open(archive, ZipArchiveMode.Update))
         {
@@ -346,11 +347,17 @@ public sealed partial class BundledNodeTemplateTests
         {
             _loadContexts.AddRange(services.Select(service => service.ImplementationInstance).OfType<RuntimeWorkloadInfo>()
                 .Select(workload => workload.LoadContext));
-            services.AddScoped<NodeNpmInstaller>();
-            services.AddScoped<NodeTemplateWorkflowProvider>();
-            services.AddScoped<INativeItemWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
-            services.AddScoped<INativeProjectWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
+            services.AddSingleton<IBasicCompanionCatalog>(_ownedJourneyCatalog
+                ?? throw new InvalidOperationException("Install the qualified Node function association before composing its host."));
+            services.AddSingleton<BasicAcquisitionPlanner>();
         }, enableBundleBindingConstraints: true, CancellationToken.None);
+
+    private static NativeTemplateSourceSnapshot CreateNodeSourceSnapshot(ResolvedTemplate selected, NodeQualifiedItem source)
+    {
+        TemplateEffectSource[] pins = [.. source.Sources.Select(pin => new TemplateEffectSource(pin.TemplateIdentity, pin.RelativePath, pin.Sha256))];
+        return new(selected.Entry.Identity, selected.ConfigurationSha256!, pins,
+            [new(Path.GetFileName(source.ContentPath), pins.Single(pin => pin.Identity == source.ContentPath))]);
+    }
 
     private static async Task CreatePlacementProjectAsync(NativeTemplateWorkflowHost host, string project, string language)
     {

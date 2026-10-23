@@ -80,7 +80,7 @@ internal sealed class NodeFunctionCatalogFixture(WorkloadEntry stack, string arc
         Azure.Functions.Cli.Workloads.Install.WorkloadInstaller installer, PhysicalFileSystem files,
         Azure.Functions.Cli.Workloads.Install.IWorkloadDeploymentService deployment, string home, string root)
     {
-        INativeTemplateOwnership ownership = new NativeTemplateOwnership(files, new(home));
+        INativeTemplateOwnership ownership = new Azure.Functions.Cli.Templates.Acquisition.NativeTemplateOwnership(files, new(home));
         BasicTemplateLifecycle lifecycle = new(templates, this, new BasicArtifactInspector(files), ownership, files);
         FileWorkloadOperationCoordinator coordinator = new(paths);
         PackageSourceProvider sources = new(Options.Create(new WorkloadCatalogOptions { Source = BasicAcquisitionFixture.Source }));

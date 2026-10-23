@@ -129,7 +129,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         }
 
         string[] itemTokens = [Target, "-t", "controlled-item", "-n", "Item", "--greeting=original", "--param:Auth", "anonymous",
-            "--non-interactive", "--output", "json"];
+            "--non-interactive", "--format", "json"];
         int itemPreview = await InvokeAsync(harness.Adapter.ParseNewInvocation(harness.CreateNew(), itemTokens, dryRun: true));
 
         itemPreview.Should().Be(0);
@@ -164,7 +164,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         string before = File.ReadAllText(Path.Combine(Project, ".func", "config.json"));
 
         int exit = await InvokeAsync(harness.Adapter.ParseNewInvocation(harness.CreateNew(),
-            [Target, "-t", "controlled-item", "--output=json", "--non-interactive", .. tail]));
+            [Target, "-t", "controlled-item", "--format=json", "--non-interactive", .. tail]));
 
         exit.Should().Be(1);
         AssertJsonKind("invalidArguments");
@@ -230,7 +230,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
             """{"version":"2.0","extensionBundle":{"id":"Microsoft.Azure.Functions.ExtensionBundle","version":"[4.0.0,5.0.0)"}}""");
 
         int exit = await InvokeAsync(harness.Adapter.ParseNewInvocation(harness.CreateNew(),
-            [Target, "-t", "controlled-item", "--greeting", "original", "--output", "json"]));
+            [Target, "-t", "controlled-item", "--greeting", "original", "--format", "json"]));
 
         exit.Should().Be(1);
         AssertJsonKind("bundleUnavailable");
@@ -249,7 +249,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         string[] name = explicitName is null ? [] : ["--name", explicitName];
 
         int exit = await InvokeAsync(harness.Adapter.ParseNewInvocation(harness.CreateNew(),
-            [Target, "-t", "controlled-item", "--greeting", "original", "--non-interactive", "--output", "json", .. name]));
+            [Target, "-t", "controlled-item", "--greeting", "original", "--non-interactive", "--format", "json", .. name]));
 
         exit.Should().Be(0);
         File.ReadAllText(Path.Combine(Target, expected + ".txt")).Should().StartWith(expected + "|original|");
@@ -265,7 +265,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         await CreateProjectAsync(harness);
 
         int exit = await InvokeAsync(harness.Adapter.ParseNewInvocation(harness.CreateNew(),
-            [Target, "-t", "controlled-item", "--name", "Original-Invalid", "--greeting", "original", "--output", "json"]));
+            [Target, "-t", "controlled-item", "--name", "Original-Invalid", "--greeting", "original", "--format", "json"]));
 
         exit.Should().Be(1);
         AssertJsonKind("invalidLegacyInput");
@@ -281,7 +281,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         await CreateProjectAsync(harness);
 
         int exit = await InvokeAsync(harness.Adapter.ParseNewInvocation(harness.CreateNew(),
-            [Target, "-t", "controlled-item", "--greeting", "original", "--non-interactive", "--output", "json"]));
+            [Target, "-t", "controlled-item", "--greeting", "original", "--non-interactive", "--format", "json"]));
 
         exit.Should().Be(0);
         File.ReadAllText(Path.Combine(Target, "nested.txt")).Should().StartWith("nested|original|");
@@ -555,7 +555,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         int? exit = null;
         var parsed = harness.Adapter.ParseNewInvocation(harness.CreateNew(),
             [Target, "-t", noOutputs ? "Controlled.Empty" : "Azure.Functions.Node.Http.JavaScript",
-                "-n", "Committed", "--non-interactive", "--output", json ? "json" : "plain"]);
+                "-n", "Committed", "--non-interactive", "--format", json ? "json" : "plain"]);
 
         Exception? failure = await Record.ExceptionAsync(async () =>
             exit = await parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token));
@@ -663,7 +663,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         await CreateBasicProjectAsync(harness);
         int beforeOutput = _interaction.Lines.Count;
         string[] selection = outcome == "list" ? ["--list"] : ["-t", outcome == "missing" ? "missing" : "Azure.Functions.Node.Http.JavaScript"];
-        var parsed = harness.Adapter.ParseNewInvocation(harness.CreateNew(), [Target, .. selection, "--output", "json"],
+        var parsed = harness.Adapter.ParseNewInvocation(harness.CreateNew(), [Target, .. selection, "--format", "json"],
             dryRun: outcome == "preview");
 
         Func<Task> act = () => parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
@@ -688,7 +688,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         await CreateBasicProjectAsync(harness);
         int beforeOutput = _interaction.Lines.Count;
         var parsed = harness.Adapter.ParseNewInvocation(harness.CreateNew(),
-            [Target, "-t", "Azure.Functions.Node.Http.JavaScript", "--output", "json"]);
+            [Target, "-t", "Azure.Functions.Node.Http.JavaScript", "--format", "json"]);
 
         Func<Task> act = () => parsed.InvokeAsync(new() { EnableDefaultExceptionHandler = false }, cancellation.Token);
 

@@ -11,10 +11,12 @@ using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Node;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Install;
 using Azure.Functions.Cli.Workloads.Node;
+using Azure.Functions.Cli.Workloads.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -31,7 +33,7 @@ public sealed partial class BundledNodeTemplateTests
     public async Task Composition_ProductionFactoryAndRunners_ApplyNodeProvidersWithoutRequestCapabilities(
         string language, string canonicalLanguage, string extension)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         var npm = Substitute.For<NodeNpmInstaller>();
         using var services = await CreateNodeWorkflowServicesAsync(npm);
         using var scope = services.CreateScope();
@@ -53,12 +55,18 @@ public sealed partial class BundledNodeTemplateTests
 
         preview.Succeeded.Should().BeTrue(string.Join("; ", preview.Diagnostics));
         created.Succeeded.Should().BeTrue(string.Join("; ", created.Diagnostics));
-        created.Preparation!.Preview.Operations.Should().ContainSingle().Which.Skipped.Should().BeTrue();
+        created.Preparation!.Preview.Operations.Should().BeEmpty();
+        created.Preparation.Preview.OwnedPlan!.Skipped.Should().BeTrue();
+        created.Preparation.Completion!.OwnedCompletion!.Succeeded.Should().BeTrue();
         created.Preparation.Completion!.Diagnostics.Should().Contain("Skipped npm installation.");
-        await npm.DidNotReceive().InstallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        var registered = scope.ServiceProvider.GetRequiredService<NodeTemplateWorkflowProvider>();
-        scope.ServiceProvider.GetServices<INativeItemWorkflowProvider>().Should().ContainSingle().Which.Should().BeSameAs(registered);
-        scope.ServiceProvider.GetServices<INativeProjectWorkflowProvider>().Should().ContainSingle().Which.Should().BeSameAs(registered);
+        await npm.DidNotReceive().InstallRequiredAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        var registered = scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicies>();
+        scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicies>().Should().BeSameAs(registered);
+        scope.ServiceProvider.GetServices<INativeItemWorkflowProvider>().Should().NotContain(provider => provider.Stack == "node");
+        scope.ServiceProvider.GetServices<INativeProjectWorkflowProvider>().Should().NotContain(provider => provider.Stack == "node");
+        created.Preview!.ProjectPreparationCapture!.Owner.Capability.GetType().Assembly.Should()
+            .BeSameAs(scope.ServiceProvider.GetServices<WorkloadNativeTemplatePolicyRegistration>().Single(value => value.Policy.Stack == "node")
+                .Policy.GetType().Assembly);
         using (var config = JsonDocument.Parse(File.ReadAllText(Path.Combine(project, ".func", "config.json"))))
         {
             config.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be(canonicalLanguage);
@@ -94,13 +102,13 @@ public sealed partial class BundledNodeTemplateTests
     [Theory]
     [InlineData(0, "controlled npm warning", "created")]
     [InlineData(7, "controlled npm failure", "partialPreparation")]
-    public async Task Composition_ProductionPreparation_UsesHostHelperAfterConfigurationAndPreservesStderr(
+    public async Task Composition_ProductionPreparation_UsesOwnedHelperAfterConfigurationAndPreservesStderr(
         int exitCode, string stderr, string kind)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         string project = Path.Combine(_root, "composed-preparation");
         var npm = Substitute.For<NodeNpmInstaller>();
-        npm.InstallAsync(project, Arg.Any<CancellationToken>()).Returns(_ =>
+        npm.InstallRequiredAsync(project, Arg.Any<CancellationToken>()).Returns(_ =>
         {
             File.Exists(Path.Combine(project, ".func", "config.json")).Should().BeTrue();
             File.Exists(Path.Combine(project, "package.json")).Should().BeTrue();
@@ -112,27 +120,29 @@ public sealed partial class BundledNodeTemplateTests
         var request = NodeComposedInit(project, "ts", []);
 
         var preview = await composer.ExecuteProjectAsync(request with { DryRun = true }, CancellationToken.None);
-        await npm.DidNotReceive().InstallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        preview.Succeeded.Should().BeTrue(string.Join("; ", preview.Diagnostics));
+        await npm.DidNotReceive().InstallRequiredAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         var result = await composer.ExecuteProjectAsync(request, CancellationToken.None);
 
-        preview.Preparation!.Preview.Operations.Should().ContainSingle().Which.Skipped.Should().BeFalse();
+        preview.Preparation!.Preview.Operations.Should().BeEmpty();
+        preview.Preparation.Preview.OwnedPlan!.Skipped.Should().BeFalse();
         result.Kind.Should().Be(kind);
         result.Succeeded.Should().Be(exitCode == 0);
         result.Preparation!.Completion!.Diagnostics.Should().Contain(stderr);
         File.Exists(Path.Combine(project, "host.json")).Should().BeTrue();
         File.Exists(Path.Combine(project, ".func", "config.json")).Should().BeTrue();
-        await npm.Received(1).InstallAsync(project, Arg.Any<CancellationToken>());
+        await npm.Received(1).InstallRequiredAsync(project, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Composition_ProductionCancellation_RetainsOutputsWarnsAndPropagatesSameException()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         using var cancellation = new CancellationTokenSource();
         string project = Path.Combine(_root, "composed-canceled");
         var original = new OperationCanceledException(cancellation.Token);
         var npm = Substitute.For<NodeNpmInstaller>();
-        npm.InstallAsync(project, Arg.Any<CancellationToken>()).Returns(_ =>
+        npm.InstallRequiredAsync(project, Arg.Any<CancellationToken>()).Returns(_ =>
         {
             File.Exists(Path.Combine(project, ".func", "config.json")).Should().BeTrue();
             cancellation.Cancel();
@@ -155,8 +165,8 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task Composition_ProductionItemSelection_UsesActualBundleCapabilitiesAndHiddenPolicy()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
-        using var services = await CreateNodeWorkflowServicesAsync(new NodeNpmInstaller());
+        await InstallOwnedNodeJourneyAsync();
+        using var services = await CreateNodeWorkflowServicesAsync(Substitute.For<NodeNpmInstaller>());
         using var scope = services.CreateScope();
         var composer = scope.ServiceProvider.GetRequiredService<NativeTemplateWorkflowComposer>();
         string project = Path.Combine(_root, "composed-bindings");
@@ -184,7 +194,7 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task Composition_FactoryCreatedCommandAdapter_PreservesExistingFlagsAndSelectsNodeProviders()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         var npm = Substitute.For<NodeNpmInstaller>();
         using var services = await CreateNodeWorkflowServicesAsync(npm);
         using var scope = services.CreateScope();
@@ -202,18 +212,18 @@ public sealed partial class BundledNodeTemplateTests
         var legacy = Substitute.For<INewCommandRunner>();
         var command = new NewCommand(legacy, Substitute.For<INewCommandTemplateOptionProvider>());
         int created = await InvokeNodeBridgeAsync(adapter.ParseNewInvocation(command,
-            [Path.Combine(project, "src", "functions"), "--template", "HttpTrigger-JavaScript", "--non-interactive", "--output", "json"]));
+            [Path.Combine(project, "src", "functions"), "--template", "HttpTrigger-JavaScript", "--non-interactive", "--format", "json"]));
 
         initialized.Should().Be(0, _interaction.AllOutput);
         created.Should().Be(0, _interaction.AllOutput);
         File.ReadAllText(Path.Combine(project, "src", "functions", "httpTrigger.js")).Should().Contain("app.http('httpTrigger'");
         File.Exists(Path.Combine(project, "src", "functions", "functions.js")).Should().BeFalse();
         _interaction.AllOutput.Should().Contain("Skipped npm installation.");
-        await npm.DidNotReceive().InstallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await npm.DidNotReceive().InstallRequiredAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         legacy.ReceivedCalls().Should().BeEmpty();
         using var second = services.CreateScope();
-        second.ServiceProvider.GetRequiredService<NodeTemplateWorkflowProvider>()
-            .Should().NotBeSameAs(scope.ServiceProvider.GetRequiredService<NodeTemplateWorkflowProvider>());
+        second.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicies>()
+            .Should().NotBeSameAs(scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicies>());
     }
 
     private static InitExecutionRequest NodeComposedInit(string project, string language, IReadOnlyList<string> tokens) =>
@@ -230,6 +240,14 @@ public sealed partial class BundledNodeTemplateTests
         services.AddSingleton<IFileSystem>(_files);
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddSingleton(new CliConfigurationPathsOptions(Home));
+        services.AddSingleton<ICliVersionProvider>(AssemblyCliVersionProvider.Instance);
+        services.AddSingleton<IWorkloadStore>(_workloads);
+        services.AddSingleton<IWorkloadPaths>(_paths);
+        services.AddSingleton<IBundledTemplateInstaller>(new BundledTemplateInstaller(_templates, _inspector, _files, new(Home)));
+        services.AddSingleton<IWorkloadDeploymentService>(AdmissionDeployment(new FileWorkloadOperationCoordinator(_paths)));
+        services.AddSingleton<IBasicCompanionCatalog>(_ownedJourneyCatalog
+            ?? throw new InvalidOperationException("Install the qualified Node function association before composing its services."));
+        services.AddSingleton<BasicAcquisitionPlanner>();
         services.AddSingleton<ILocalSettingsProvider, LocalSettingsProvider>();
         services.AddSingleton<ICliConfigurationProvider, CliConfigurationProvider>();
         services.AddOptions();
@@ -256,10 +274,7 @@ public sealed partial class BundledNodeTemplateTests
         services.AddTemplatesOrchestrator();
         services.AddSingleton<InstalledProjectStackCatalog>();
         services.AddSingleton<ITemplateStore>(_templates);
-        services.AddScoped(_ => npm);
-        services.AddScoped<NodeTemplateWorkflowProvider>();
-        services.AddScoped<INativeItemWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
-        services.AddScoped<INativeProjectWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
+        ConfigureNodePreparationHelper(services, npm.InstallRequiredAsync);
         services.AddSingleton(capture);
         services.AddScoped<INativeTemplateAvailability, NativeTemplateAvailability>();
         services.AddSingleton(new TemplateEngineBundleContextReader(_files));

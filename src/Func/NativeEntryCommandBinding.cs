@@ -25,13 +25,14 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
     private readonly ITemplaterFactory _templates = services.GetRequiredService<ITemplaterFactory>();
     private readonly ITemplateArgumentParser _parser = services.GetRequiredService<ITemplateArgumentParser>();
     private readonly Lazy<NativeTemplateWorkflowRegistry> _workflows = new(services.GetRequiredService<NativeTemplateWorkflowRegistry>);
+    private readonly Lazy<WorkloadNativeTemplatePolicies> _policies = new(services.GetRequiredService<WorkloadNativeTemplatePolicies>);
     private readonly Lazy<NativeTemplateStackCompatibility> _stackCompatibility = new(services.GetRequiredService<NativeTemplateStackCompatibility>);
 
     internal static bool IsJsonOutput(NewCommand command, ParseResult parsed)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(parsed);
-        return string.Equals(parsed.GetResult(command.OutputOption)?.GetValueOrDefault<string?>(), "json", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(parsed.GetResult(command.FormatOption)?.GetValueOrDefault<string?>(), "json", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool IsNonInteractive(NewCommand command, ParseResult parsed) => IsJsonOutput(command, parsed)
@@ -51,11 +52,12 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
 
     private async Task<int> ExecuteNewAsync(NewCommand command, ParseResult parsed, CancellationToken cancellationToken)
     {
-        string? output = parsed.GetValue(command.OutputOption);
+        NewCommand.ValidateRenderingOptions(parsed);
+        string? output = parsed.GetValue(command.FormatOption);
         bool json = IsJsonOutput(command, parsed);
         if (output is not null && !json && !string.Equals(output, "plain", StringComparison.OrdinalIgnoreCase))
         {
-            return _items.Render(NewExecutionResult.Reject("invalidOutput", "Use --output plain or --output json."), false);
+            return _items.Render(NewExecutionResult.Reject("invalidOutput", "Use --format plain or --format json."), false);
         }
 
         (IReadOnlyList<string> Tokens, int? PathIndex, Common.WorkingDirectory Directory) raw;
@@ -68,7 +70,7 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
             return _items.Render(NewExecutionResult.Reject("invalidPath", $"Supply a valid project path. {exception.Message}"), json);
         }
 
-        HashSet<Option> host = [command.NameOption, command.TemplateOption, command.ForceOption, command.NonInteractiveOption, command.ListOption, command.OutputOption];
+        HashSet<Option> host = [command.NameOption, command.TemplateOption, command.ForceOption, command.NonInteractiveOption, command.ListOption, command.FormatOption];
         var input = NativeTemplateCommandInput.CaptureEntry(command, parsed, raw.Tokens, host, raw.PathIndex);
         var request = new NewExecutionRequest(raw.Directory, parsed.GetValue(command.TemplateOption), parsed.GetValue(command.NameOption),
             null, parsed.GetValue(command.ForceOption), IsNonInteractive(command, parsed), false, parsed.GetValue(command.ListOption),
@@ -169,7 +171,17 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
                 item.Options.ToHashSet(), raw.PathIndex);
             foreach (ResolvedTemplate selected in visible)
             {
-                INativeItemWorkflowProvider? provider = binding._workflows.Value.FindItem(context.Context!.Project!.Stack!);
+                INativeItemWorkflowProvider? provider;
+                try
+                {
+                    provider = await binding._policies.Value.FindAsync(selected, cancellationToken)
+                        ?? binding._workflows.Value.FindItem(context.Context!.Project!.Stack!);
+                }
+                catch (Exception exception) when (exception is InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
+                {
+                    binding._interaction.WriteError(exception.Message);
+                    return 1;
+                }
                 NativeItemHelpProjection overlay = provider is null ? new(selected.Parameters, [])
                     : await provider.DescribeHelpAsync(new(selected, context.Context), cancellationToken);
                 if (overlay.Parameters.Count != selected.Parameters.Count || selected.Parameters.Any(parameter =>

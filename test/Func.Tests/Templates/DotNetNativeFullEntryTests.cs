@@ -80,7 +80,7 @@ public sealed class DotNetNativeFullEntryTests : IDisposable
         TestInteractionService created = new();
         int advisoryCalls = 0;
         int itemExit = await entry.ExecuteAsync(
-            ["new", target, "-t", "http", "-n", "Greeting", "--AccessRights", "Anonymous", "--non-interactive", "--output", "json"],
+            ["new", target, "-t", "http", "-n", "Greeting", "--AccessRights", "Anonymous", "--non-interactive", "--format", "json"],
             created, workloads, configuration, timeout.Token, versionCheck: _ =>
             {
                 advisoryCalls++;

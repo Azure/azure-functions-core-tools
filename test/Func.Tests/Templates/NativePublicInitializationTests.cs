@@ -18,7 +18,7 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("ts", "TypeScript", ".ts")]
     public async Task Program_NonemptyInitThenNativeNew_PreservesUserFilesAndPublicPlacement(string alias, string language, string extension)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await _installer.InstallFromPackageAsync(CombinedNodeFixtureArchive());
         string project = Path.Combine(_root, "public-program-" + alias);
         Directory.CreateDirectory(Path.Combine(project, ".git"));
         File.WriteAllText(Path.Combine(project, ".git", "HEAD"), "ref: refs/heads/user-branch");
@@ -40,7 +40,7 @@ public sealed partial class BundledNodeTemplateTests
         configuration.RootElement.GetProperty("stack").GetProperty("language").GetString().Should().Be(language);
         var beforeList = PublicSnapshot(project);
         var listed = await SetupProgramAdvisoryTests.RunCliAsync(processHome, Home, _paths.Home, project,
-            ["new", project, "--list", "--output=json"], timeout.Token);
+            ["new", project, "--list", "--format=json"], timeout.Token);
         listed.ExitCode.Should().Be(0, listed.StandardError);
         listed.StandardError.Should().BeEmpty();
         using var catalog = JsonDocument.Parse(listed.StandardOutput);
@@ -52,7 +52,7 @@ public sealed partial class BundledNodeTemplateTests
         string nested = Path.Combine(project, "nested");
         var created = await SetupProgramAdvisoryTests.RunCliAsync(processHome, Home, _paths.Home, project,
             ["--verbose=true", "new", "--authlevel=anonymous", nested, "-t", "HttpTrigger-" + language,
-                "-n", "NativeGreeting", "--non-interactive", "--output=json"], timeout.Token);
+                "-n", "NativeGreeting", "--non-interactive", "--format=json"], timeout.Token);
         created.ExitCode.Should().Be(0, created.StandardError);
         created.StandardError.Should().BeEmpty();
         using var result = JsonDocument.Parse(created.StandardOutput);

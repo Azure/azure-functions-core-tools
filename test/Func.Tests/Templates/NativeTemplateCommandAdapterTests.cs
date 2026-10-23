@@ -29,7 +29,7 @@ public sealed class NativeTemplateCommandAdapterTests
         var legacy = Substitute.For<INewCommandRunner>();
         NewCommand command = new(legacy, Substitute.For<INewCommandTemplateOptionProvider>());
         string target = Path.Combine(Path.GetTempPath(), "native-adapter-target");
-        string[] tokens = [target, "-t", "item", "-n", "Named", "--output=json", "--force=false",
+        string[] tokens = [target, "-t", "item", "-n", "Named", "--format=json", "--force=false",
             "--non-interactive", "--greeting=first", "--greeting", "second", "--param:Auth=anonymous"];
         var parsed = CreateAdapter().ParseNewInvocation(command, tokens, dryRun: true);
         tokens[^1] = "caller mutation";
@@ -47,7 +47,7 @@ public sealed class NativeTemplateCommandAdapterTests
         captured.DryRun.Should().BeTrue();
         captured.JsonOutput.Should().BeTrue();
         captured.RawTemplateTokens.Should().Equal("--greeting=first", "--greeting", "second", "--param:Auth=anonymous");
-        captured.ReservedAliases.Should().Contain(["--template", "-t", "--name", "-n", "--output", "--verbose"]);
+        captured.ReservedAliases.Should().Contain(["--template", "-t", "--name", "-n", "--format", "--verbose"]);
         legacy.ReceivedCalls().Should().BeEmpty();
         command.PathArgument.Should().NotBeNull();
         command.Options.Select(option => option.Name).Should().NotContain(["--path", "--dry-run", "--language"]);
@@ -130,7 +130,7 @@ public sealed class NativeTemplateCommandAdapterTests
             .Returns(new NewExecutionResult("listed", true));
         NewCommand command = new(Substitute.For<INewCommandRunner>(), Substitute.For<INewCommandTemplateOptionProvider>());
 
-        int exit = await CreateAdapter().ParseNewInvocation(command, [list, "--output", "json"]).InvokeAsync();
+        int exit = await CreateAdapter().ParseNewInvocation(command, [list, "--format", "json"]).InvokeAsync();
 
         exit.Should().Be(0);
         captured!.List.Should().BeTrue();
@@ -139,7 +139,7 @@ public sealed class NativeTemplateCommandAdapterTests
     }
 
     [Theory]
-    [InlineData("--output", "yaml")]
+    [InlineData("--format", "yaml")]
     public async Task New_UnsupportedOutput_StopsBeforeNativeOrLegacyRunner(params string[] tokens)
     {
         NewCommand command = new(Substitute.For<INewCommandRunner>(), Substitute.For<INewCommandTemplateOptionProvider>());
@@ -148,14 +148,31 @@ public sealed class NativeTemplateCommandAdapterTests
 
         exit.Should().Be(1);
         _items.ReceivedCalls().Should().BeEmpty();
-        _interaction.AllOutput.Should().Contain("--output plain");
+        _interaction.AllOutput.Should().Contain("--format plain");
+    }
+
+    [Theory]
+    [InlineData("--output", "json")]
+    [InlineData("--output=json")]
+    [InlineData("--output:json")]
+    public async Task New_RetiredRenderingOption_RejectsBeforeNativeOrLegacyDispatch(params string[] tokens)
+    {
+        var legacy = Substitute.For<INewCommandRunner>();
+        NewCommand command = new(legacy, Substitute.For<INewCommandTemplateOptionProvider>());
+        var parsed = CreateAdapter().ParseNewInvocation(command, [".", "--list", .. tokens]);
+
+        Func<Task> act = () => parsed.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        await act.Should().ThrowAsync<GracefulException>().WithMessage("*--output*--format*");
+        _items.ReceivedCalls().Should().BeEmpty();
+        legacy.ReceivedCalls().Should().BeEmpty();
     }
 
     [Fact]
     public async Task New_EmptyOutput_PreservesPublicParserFailure()
     {
         NewCommand command = new(Substitute.For<INewCommandRunner>(), Substitute.For<INewCommandTemplateOptionProvider>());
-        var parsed = CreateAdapter().ParseNewInvocation(command, ["--output="]);
+        var parsed = CreateAdapter().ParseNewInvocation(command, ["--format="]);
 
         int exit = await parsed.InvokeAsync();
 

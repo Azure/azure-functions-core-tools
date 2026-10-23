@@ -60,7 +60,7 @@ public sealed partial class BundledPythonTemplateTests
             var advisoryCalls = 0;
 
             var exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-Python", "--non-interactive",
-                "--output=json", "--http-trigger-auth-level", "ANONYMOUS", .. name],
+                "--format=json", "--http-trigger-auth-level", "ANONYMOUS", .. name],
                 output, paths, new(home), CancellationToken.None, TrackPythonEntry, _ =>
                 {
                     advisoryCalls++;
@@ -85,7 +85,7 @@ public sealed partial class BundledPythonTemplateTests
         var beforeRefusal = File.ReadAllBytes(app);
         TestInteractionService invalid = new();
         var rejected = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-Python", "--non-interactive",
-            "--output=json", "--name", "bad-name", "--http-trigger-auth-level", "ANONYMOUS"],
+            "--format=json", "--name", "bad-name", "--http-trigger-auth-level", "ANONYMOUS"],
             invalid, paths, new(home), CancellationToken.None, TrackPythonEntry, _ => Task.FromResult<string?>(null));
         rejected.Should().Be(1, invalid.AllOutput);
         using (var result = JsonDocument.Parse(invalid.Lines.Single(line => line.StartsWith("JSON: ", StringComparison.Ordinal))["JSON: ".Length..]))

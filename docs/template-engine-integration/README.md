@@ -95,7 +95,11 @@ retained installed inventories independently of the global deduplicating cache.
 Each invocation keeps the existing protected/private cache boundary, allowing
 retained v1, current v2, and retained v1 flows to interleave without cache leakage.
 
-Node, Python, and .NET retain their supported public item catalogs and placement;
+Node policy and project preparation are supplied by its owning runtime workload.
+Its bundled archive contains the two basic projects; function items are produced
+in the separate `Azure.Functions.Templates.Node.Functions` package and require
+qualified acquisition rather than being implicitly trusted by package name.
+Python and .NET retain their supported public item catalogs and placement;
 C#/F# dependency and compile-order work remains source-qualified. Go, Java, and
 PowerShell supply project workflows, not a new first-party item catalog.
 Go names reserved by the toolchain (`go` and `toolchain`) use the existing `app`
@@ -105,7 +109,7 @@ including for `start --no-build`, without changing the shared worker asset.
 
 ## Prompt and completion policy
 
-For public `new`, the parsed host `--output=json` implies noninteractive execution
+For public `new`, the parsed host `--format=json` implies noninteractive execution
 before project/profile resolution, template selection, or required-value completion.
 Template values that happen to contain output-option text do not set host policy.
 JSON and explicit `--non-interactive` also prevent version checks and alias nudges
@@ -114,6 +118,8 @@ commands retain their existing advisory behavior. Bare parent commands dispatch
 both synchronous and asynchronous help actions through the common command base.
 The public `init` grammar has no host JSON output option; this does not add one or
 change the separate internal INIT harness's prompt policy.
+The retired public `--output` rendering spelling is rejected before native or
+legacy dispatch; the internal execution harnesses retain their separate grammar.
 
 After native project creation and mandatory CLI configuration commit, a thrown
 stack-preparation cancellation retains the original exception and warns that
@@ -234,7 +240,7 @@ Back in the setup terminal, choose an unused host port and run the generated app
 ```powershell
 $env:AzureWebJobsStorage = "UseDevelopmentStorage=true"
 $env:FUNCTIONS_WORKER_RUNTIME = "node"
-& $cli run (Join-Path $smoke "template/generated") --offline --port 7183 --no-azurite --output plain --log-file (Join-Path $smoke "host.log")
+& $cli run (Join-Path $smoke "template/generated") --offline --port 7183 --no-azurite --format plain --log-file (Join-Path $smoke "host.log")
 ```
 
 Once the function is listed, verify from another terminal.

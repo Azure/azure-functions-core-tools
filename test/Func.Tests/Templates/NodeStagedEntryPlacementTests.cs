@@ -19,7 +19,7 @@ public sealed partial class BundledNodeTemplateTests
     public async Task NodeEntryPlacement_ExistingFunctionsNestedBase_IsNotDeduplicatedAndStagedPathRemainsLiteral(
         string alias, string language, string extension)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         string project = Path.Combine(_root, "entry-placement-" + alias);
         var entry = new NativeCliEntryPoint();
         (await entry.ExecuteAsync(["init", project, "-s", "node", "-l", alias, "--no-bundles", "--skip-npm-install"],
@@ -28,7 +28,7 @@ public sealed partial class BundledNodeTemplateTests
         string nested = Path.Combine(project, "src", "functions");
         TestInteractionService output = new();
 
-        int exit = await entry.ExecuteAsync(["new", nested, "-t", "HttpTrigger-" + language, "--non-interactive", "--output=json"],
+        int exit = await entry.ExecuteAsync(["new", nested, "-t", "HttpTrigger-" + language, "--non-interactive", "--format=json"],
             output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
 
         exit.Should().Be(0, output.AllOutput);
@@ -44,7 +44,7 @@ public sealed partial class BundledNodeTemplateTests
         }
         TestInteractionService explicitOutput = new();
         int explicitlyNamed = await entry.ExecuteAsync(
-            ["new", project, "-t", "HttpTrigger-" + language, "--name", "ExplicitAuthored", "--authlevel", "function", "--non-interactive", "--output=json"],
+            ["new", project, "-t", "HttpTrigger-" + language, "--name", "ExplicitAuthored", "--authlevel", "function", "--non-interactive", "--format=json"],
             explicitOutput, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
         explicitlyNamed.Should().Be(0, explicitOutput.AllOutput);
         File.ReadAllText(Path.Combine(project, "src", "functions", "ExplicitAuthored" + extension))
@@ -71,7 +71,7 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("src/functions")]
     public async Task NodeEntryPlacement_UserPrefixFile_IsOneJsonRefusalWithoutLegacyFallback(string prefix)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         var entry = new NativeCliEntryPoint();
         string project = Path.Combine(_root, "entry-file-prefix");
         (await entry.ExecuteAsync(["init", project, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"],
@@ -81,7 +81,7 @@ public sealed partial class BundledNodeTemplateTests
         File.WriteAllText(blocked, "user-owned prefix");
         TestInteractionService output = new();
 
-        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--non-interactive", "--output=json"],
+        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--non-interactive", "--format=json"],
             output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
 
         exit.Should().Be(1, output.AllOutput);
@@ -95,7 +95,7 @@ public sealed partial class BundledNodeTemplateTests
     [SymbolicLinkFact]
     public async Task NodeEntryPlacement_LinkedDerivedPrefix_IsRefusedAcrossActualFullEntry()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         var entry = new NativeCliEntryPoint();
         string project = Path.Combine(_root, "entry-linked-prefix");
         (await entry.ExecuteAsync(["init", project, "-s", "node", "-l", "ts", "--no-bundles", "--skip-npm-install"],
@@ -108,7 +108,7 @@ public sealed partial class BundledNodeTemplateTests
         {
             TestInteractionService output = new();
 
-            int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-TypeScript", "--non-interactive", "--output=json"],
+            int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-TypeScript", "--non-interactive", "--format=json"],
                 output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
 
             exit.Should().Be(1, output.AllOutput);
@@ -129,14 +129,14 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("--param:InvocationOutputIntent=literal")]
     public async Task NodeEntryPlacement_BoundIntentCannotBeSuppliedAsTemplateOption(string token)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         var entry = new NativeCliEntryPoint();
         string project = Path.Combine(_root, "entry-intent-input");
         (await entry.ExecuteAsync(["init", project, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"],
             _interaction, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null))).Should().Be(0);
         TestInteractionService output = new();
 
-        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--non-interactive", "--output=json", token],
+        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--non-interactive", "--format=json", token],
             output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
 
         exit.Should().Be(1, output.AllOutput);

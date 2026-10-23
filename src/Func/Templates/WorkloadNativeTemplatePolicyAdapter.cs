@@ -57,6 +57,9 @@ internal sealed class WorkloadNativeTemplatePolicyAdapter(
     public async Task<NativeItemCompatibilityResult> ResolveAsync(ResolvedTemplate selected, TemplateCandidateParseResult arguments,
         string? requestedName, bool canPrompt, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(selected);
+        ArgumentNullException.ThrowIfNull(arguments);
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             NativePolicyItemDescription description = await DescribeAsync(selected, cancellationToken);
@@ -88,6 +91,8 @@ internal sealed class WorkloadNativeTemplatePolicyAdapter(
 
     public async Task<NativeSelectedItemBinding> ResolveAsync(ResolvedTemplate selected, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(selected);
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             return (await DescribeAsync(selected, cancellationToken)).Binding;

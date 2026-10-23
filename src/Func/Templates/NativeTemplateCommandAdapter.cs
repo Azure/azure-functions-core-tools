@@ -73,16 +73,17 @@ internal sealed class NativeTemplateCommandAdapter(
         HashSet<Option> hostOptions =
         [
             command.NameOption, command.TemplateOption, command.ForceOption, command.NonInteractiveOption,
-            command.ListOption, command.OutputOption,
+            command.ListOption, command.FormatOption,
         ];
         command.SetAction(async (parsed, cancellationToken) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string? output = parsed.GetValue(command.OutputOption);
+            NewCommand.ValidateRenderingOptions(parsed);
+            string? output = parsed.GetValue(command.FormatOption);
             bool json = string.Equals(output, "json", StringComparison.OrdinalIgnoreCase);
             if (output is not null && !json && !string.Equals(output, "plain", StringComparison.OrdinalIgnoreCase))
             {
-                return _itemRenderer.Render(NewExecutionResult.Reject("invalidOutput", "Use --output plain or --output json."), jsonOutput: false);
+                return _itemRenderer.Render(NewExecutionResult.Reject("invalidOutput", "Use --format plain or --format json."), jsonOutput: false);
             }
 
             var input = NativeTemplateCommandInput.Capture(command, parsed, original, hostOptions);

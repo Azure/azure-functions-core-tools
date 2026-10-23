@@ -91,16 +91,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(parseResult);
-
-        if (parseResult.UnmatchedTokens.Any(token =>
-            string.Equals(token, "--output", StringComparison.Ordinal)
-            || token.StartsWith("--output=", StringComparison.Ordinal)
-            || token.StartsWith("--output:", StringComparison.Ordinal)))
-        {
-            throw new GracefulException(
-                "The '--output' rendering option is no longer supported. Use '--format' instead.",
-                isUserError: true);
-        }
+        ValidateRenderingOptions(parseResult);
 
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
         string? requestedTemplate = parseResult.GetValue(TemplateOption);
@@ -135,6 +126,20 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         return parseResult.GetValue(ListOption)
             ? _runner.ListAsync(invocation, cancellationToken)
             : _runner.ExecuteAsync(invocation, cancellationToken);
+    }
+
+    internal static void ValidateRenderingOptions(ParseResult parseResult)
+    {
+        ArgumentNullException.ThrowIfNull(parseResult);
+        if (parseResult.UnmatchedTokens.Any(token =>
+            string.Equals(token, "--output", StringComparison.Ordinal)
+            || token.StartsWith("--output=", StringComparison.Ordinal)
+            || token.StartsWith("--output:", StringComparison.Ordinal)))
+        {
+            throw new GracefulException(
+                "The '--output' rendering option is no longer supported. Use '--format' instead.",
+                isUserError: true);
+        }
     }
 
     /// <summary>

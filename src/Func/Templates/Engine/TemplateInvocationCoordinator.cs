@@ -320,7 +320,19 @@ internal sealed partial class TemplateInvocationCoordinator(
         }
         catch (InvalidDataException exception)
         {
-            return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message);
+            return new(TemplateInvocationStatus.InvalidTemplate, [], exception.Message)
+            {
+                ProjectConfigurations = configurationPlans,
+                Capture = capture,
+            };
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException or UnauthorizedAccessException)
+        {
+            return new(TemplateInvocationStatus.TemplateChanged, [], exception.Message)
+            {
+                ProjectConfigurations = configurationPlans,
+                Capture = capture,
+            };
         }
         if (request.DryRun)
         {

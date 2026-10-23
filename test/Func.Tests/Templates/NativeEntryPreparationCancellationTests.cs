@@ -6,8 +6,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Templates;
-using Azure.Functions.Cli.Templates.Engine;
-using Azure.Functions.Cli.Templates.Node;
+using Azure.Functions.Cli.Templates.Native;
 using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,7 +31,7 @@ public sealed partial class BundledNodeTemplateTests
         await _installer.InstallFromPackageAsync(BuiltArchive);
         string project = Path.Combine(_root, "review-preparation");
         using CancellationTokenSource cancellation = new();
-        ReviewCancelAtConfigurationCommit files = new(project, cancellation);
+        ReviewConfigurationCommitFiles files = new(project);
         var npm = Substitute.For<NodeNpmInstaller>();
         ReviewPreparationObserver observer = new();
         using BufferedConsole stdout = new(false, false, noColor: true);
@@ -44,10 +43,25 @@ public sealed partial class BundledNodeTemplateTests
         {
             TrackEntryContexts(services);
             services.AddSingleton<IFileSystem>(files);
-            services.AddSingleton(npm);
-            services.RemoveAll<INativeProjectWorkflowProvider>();
-            services.AddScoped<INativeProjectWorkflowProvider>(provider =>
-                new ReviewObservedProjectProvider(provider.GetRequiredService<NodeTemplateWorkflowProvider>(), observer));
+            object helper = ConfigureNodePreparationHelper(services, npm.InstallRequiredAsync);
+            Type observerType = helper.GetType().Assembly.GetType(
+                "Azure.Functions.Cli.Workloads.Node.Tests.LoadedNodeTemplatePolicyObserver", throwOnError: true)!;
+            ServiceDescriptor registration = services.Single(descriptor => descriptor.ServiceType == typeof(WorkloadNativeTemplatePolicyRegistration));
+            services.Replace(ServiceDescriptor.Scoped<WorkloadNativeTemplatePolicyRegistration>(provider =>
+            {
+                var original = (WorkloadNativeTemplatePolicyRegistration)registration.ImplementationFactory!(provider);
+                var policy = (NativeTemplatePolicy)Activator.CreateInstance(observerType, original.Policy,
+                    (Action)(() => observer.Previews++), (Action)(() => observer.Completions++), (Action)(() =>
+                    {
+                        // Revalidation here follows receipt capture; canceling the file move would interrupt configuration instead.
+                        if (files.CommittedBytes.Count > 0)
+                        {
+                            observer.PostCommitValidations++;
+                            cancellation.Cancel();
+                        }
+                    }))!;
+                return new(original.Owner, policy);
+            }));
         }
 
         if (fullEntry)
@@ -82,6 +96,8 @@ public sealed partial class BundledNodeTemplateTests
         File.Exists(Path.Combine(project, "host.json")).Should().BeTrue();
         observer.Previews.Should().Be(1);
         observer.Completions.Should().Be(0);
+        observer.PostCommitValidations.Should().Be(1);
+        await npm.DidNotReceive().InstallRequiredAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await npm.DidNotReceive().InstallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         if (fullEntry)
         {
@@ -91,7 +107,7 @@ public sealed partial class BundledNodeTemplateTests
         {
             var thrown = failure.Should().BeOfType<OperationCanceledException>().Which;
             thrown.CancellationToken.Should().Be(cancellation.Token);
-            thrown.StackTrace.Should().Contain("TemplateInvocationCoordinator.ValidateSelectedConfigurationAsync");
+            thrown.StackTrace.Should().Contain("WorkloadNativeProjectPreparation.CompleteAsync");
         }
 
         stdout.Output.Should().BeEmpty();
@@ -99,7 +115,7 @@ public sealed partial class BundledNodeTemplateTests
         stderr.Output.Should().NotContain("unexpected error");
     }
 
-    private sealed class ReviewCancelAtConfigurationCommit(string project, CancellationTokenSource cancellation) : PhysicalFileSystem
+    private sealed class ReviewConfigurationCommitFiles(string project) : PhysicalFileSystem
     {
         public IReadOnlyDictionary<string, byte[]> CommittedBytes { get; private set; } = new Dictionary<string, byte[]>();
 
@@ -109,7 +125,6 @@ public sealed partial class BundledNodeTemplateTests
             if (destinationPath == Path.Combine(project, ".func", "config.json"))
             {
                 CommittedBytes = Directory.GetFiles(project, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
-                cancellation.Cancel();
             }
         }
     }
@@ -118,35 +133,6 @@ public sealed partial class BundledNodeTemplateTests
     {
         public int Previews { get; set; }
         public int Completions { get; set; }
-    }
-
-    private sealed class ReviewObservedProjectProvider(NodeTemplateWorkflowProvider inner, ReviewPreparationObserver observer)
-        : INativeProjectWorkflowProvider
-    {
-        public string Stack => inner.Stack;
-        public INativeProjectPreparation Preparation { get; } = new ReviewObservedPreparation(inner.Preparation, observer);
-        public bool Handles(TemplateCatalogEntry entry) => inner.Handles(entry);
-
-        public Task<NativeProjectLayoutQualification?> QualifyLayoutAsync(NativeProjectTemplateSource source, CancellationToken cancellationToken)
-            => ((INativeProjectWorkflowProvider)inner).QualifyLayoutAsync(source, cancellationToken);
-
-        public Task<NativeTemplateInvocationPreparation> PrepareAsync(NativeProjectWorkflowContext context, CancellationToken cancellationToken)
-            => ((INativeProjectWorkflowProvider)inner).PrepareAsync(context, cancellationToken);
-    }
-
-    private sealed class ReviewObservedPreparation(INativeProjectPreparation inner, ReviewPreparationObserver observer) : INativeProjectPreparation
-    {
-        public Task<NativeProjectPreparationPreview> PreviewAsync(NativeProjectPreparationContext context, CancellationToken cancellationToken)
-        {
-            observer.Previews++;
-            return inner.PreviewAsync(context, cancellationToken);
-        }
-
-        public Task<NativeProjectPreparationResult> CompleteAsync(NativeProjectPreparationContext context,
-            NativeProjectPreparationPreview preview, CancellationToken cancellationToken)
-        {
-            observer.Completions++;
-            return inner.CompleteAsync(context, preview, cancellationToken);
-        }
+        public int PostCommitValidations { get; set; }
     }
 }

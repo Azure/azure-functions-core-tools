@@ -2,10 +2,8 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates;
-using Azure.Functions.Cli.Templates.Node;
-using Azure.Functions.Cli.Workloads.Node;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,7 +17,7 @@ public sealed partial class BundledNodeTemplateTests
     public async Task ExplicitHostFactory_ActualInstalledNode_UsesBootCaptureAndOwnedProvidersWithNoRequestCapabilities(
         string language, string alias, string itemFile)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallOwnedNodeJourneyAsync();
         NativeTemplateWorkflowHostFactory factory = new();
         using var host = await factory.CreateAsync(_interaction, _paths, new(Home), services =>
         {
@@ -29,10 +27,8 @@ public sealed partial class BundledNodeTemplateTests
                 _loadContexts.Add(workload.LoadContext);
             }
 
-            services.AddSingleton<NodeNpmInstaller>();
-            services.AddScoped<NodeTemplateWorkflowProvider>();
-            services.AddScoped<INativeItemWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
-            services.AddScoped<INativeProjectWorkflowProvider>(provider => provider.GetRequiredService<NodeTemplateWorkflowProvider>());
+            services.AddSingleton<IBasicCompanionCatalog>(_ownedJourneyCatalog!);
+            services.AddSingleton<BasicAcquisitionPlanner>();
         }, enableBundleBindingConstraints: true, CancellationToken.None);
         var target = WorkingDirectory.FromExplicit(Path.Combine(_root, "explicit-host-" + alias));
         InitExecutionRequest project = new(target, "Azure.Functions.Node.Basic." + language, "ProjectName", "node", alias,
@@ -44,7 +40,9 @@ public sealed partial class BundledNodeTemplateTests
             var result = await invocation.Composer.ExecuteProjectAsync(project, CancellationToken.None);
             result.Succeeded.Should().BeTrue(string.Join(" ", result.Diagnostics));
             result.Preparation!.Completion!.Succeeded.Should().BeTrue();
-            result.Preparation.Preview.Operations.Should().ContainSingle().Which.Skipped.Should().BeTrue();
+            result.Preparation.Preview.Operations.Should().BeEmpty();
+            result.Preparation.Preview.OwnedPlan!.Skipped.Should().BeTrue();
+            result.Preparation.Completion.OwnedCompletion!.Succeeded.Should().BeTrue();
             File.Exists(Path.Combine(target.Info.FullName, ".func", "config.json")).Should().BeTrue();
         }
 

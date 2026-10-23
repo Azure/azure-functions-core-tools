@@ -21,6 +21,7 @@ internal sealed class NativeProjectPreparationCapture
     private readonly TemplateInvocationRequest _request;
     private readonly NativeTemplateProjectBinding? _binding;
     private readonly string _projectDirectory;
+    private readonly IReadOnlyDictionary<string, string> _installedHashes;
     private byte[]? _configuration;
 
     internal NativeProjectPreparationCapture(BoundNativeProjectPreparation owner, TemplateInvocationRequest request,
@@ -50,6 +51,23 @@ internal sealed class NativeProjectPreparationCapture
             Directories = Array.AsReadOnly<string>([.. snapshot.Directories]),
         };
         Project = new(project.PrimaryOutput, project.Stack, project.Language);
+        // Preparation must retain user bytes that init deliberately preserves, not require rendered defaults over them.
+        Dictionary<string, string> installedHashes = new(StringComparer.Ordinal);
+        foreach ((string relative, ReadOnlyMemory<byte> rendered) in Snapshot.ExpandedFiles)
+        {
+            string path = Path.Combine(Project.Root, relative);
+            if (request.PreserveExistingFiles && !request.PreviewAfterDirectoryCleanup && _basis.FileExists(path))
+            {
+                RequireKind(path, directory: false);
+                using Stream existing = _basis.OpenRead(path);
+                installedHashes[relative] = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(existing));
+            }
+            else
+            {
+                installedHashes[relative] = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(rendered.Span));
+            }
+        }
+        _installedHashes = new ReadOnlyDictionary<string, string>(installedHashes);
     }
 
     public BoundNativeProjectPreparation Owner { get; }
@@ -90,10 +108,19 @@ internal sealed class NativeProjectPreparationCapture
 
     internal bool Matches(TemplateInvocationRequest request)
         => SamePath(_request.OutputDirectory.Info.FullName, request.OutputDirectory.Info.FullName)
-        && _request.Name == request.Name && _request.Force == request.Force && _request.MsBuildBindings == request.MsBuildBindings
+        && _request.Name == request.Name && MatchesOutputPolicy(_request, request) && _request.MsBuildBindings == request.MsBuildBindings
         && _request.ExplicitParameterNames.SetEquals(request.ExplicitParameterNames)
         && _request.Parameters.Count == request.Parameters.Count
         && _request.Parameters.All(pair => request.Parameters.TryGetValue(pair.Key, out string? value) && value == pair.Value);
+
+    internal bool MatchesInstalledContent(NativeProjectPreparationCapture other)
+        => _installedHashes.Count == other._installedHashes.Count
+        && _installedHashes.All(pair => other._installedHashes.TryGetValue(pair.Key, out string? expected) && pair.Value == expected);
+
+    internal static bool MatchesOutputPolicy(TemplateInvocationRequest preview, TemplateInvocationRequest current)
+        => preview.PreserveExistingFiles == current.PreserveExistingFiles
+        && ((preview.Force == current.Force && preview.PreviewAfterDirectoryCleanup == current.PreviewAfterDirectoryCleanup)
+            || (!current.DryRun && preview.PreviewAfterDirectoryCleanup && !current.PreviewAfterDirectoryCleanup && !current.Force));
 
     internal async Task ValidateInstalledAsync(IFileSystem files, CancellationToken cancellationToken)
     {
@@ -101,12 +128,12 @@ internal sealed class NativeProjectPreparationCapture
         {
             RequireKind(Path.Combine(Project.Root, directory), directory: true);
         }
-        foreach ((string relative, ReadOnlyMemory<byte> expected) in Snapshot.ExpandedFiles)
+        foreach ((string relative, string expected) in _installedHashes)
         {
             string path = Path.Combine(Project.Root, relative);
             RequireKind(path, directory: false);
             string actual = await files.ComputeSha256Async(path, cancellationToken);
-            if (!actual.Equals(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(expected.Span)), StringComparison.OrdinalIgnoreCase))
+            if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException("Created project bytes changed before workload preparation. Generated output was retained.");
             }
@@ -202,7 +229,7 @@ internal sealed class BoundNativeProjectPreparation
     internal void ValidateRequest(NativeTemplatePolicyCandidate candidate, TemplateInvocationRequest request)
     {
         if (!ReferenceEquals(candidate, Candidate) || !NativeProjectPreparationCapture.SamePath(request.OutputDirectory.Info.FullName, TargetPath)
-            || request.Name != _initial.Name || request.Force != _initial.Force
+            || request.Name != _initial.Name || !NativeProjectPreparationCapture.MatchesOutputPolicy(_initial, request)
             || !_initial.ExplicitParameterNames.SetEquals(request.ExplicitParameterNames)
             || _initial.ExplicitParameterNames.Any(key => !_initial.Parameters.TryGetValue(key, out string? initial)
                 || !request.Parameters.TryGetValue(key, out string? current) || current != initial)
@@ -231,6 +258,10 @@ internal sealed class BoundNativeProjectPreparation
         }
         else
         {
+            if (_preview is null || !capture.MatchesInstalledContent(_preview))
+            {
+                throw new InvalidDataException("Preserved project inputs changed after workload preparation preview. Rerun initialization.");
+            }
             if (Interlocked.CompareExchange(ref _state, 2, 1) != 1)
             {
                 throw new InvalidDataException("This preparation journey already produced a creation receipt.");

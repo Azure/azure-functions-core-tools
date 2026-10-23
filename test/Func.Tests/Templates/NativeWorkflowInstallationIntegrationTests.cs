@@ -4,7 +4,6 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
-using Azure.Functions.Cli.Templates.Node;
 using Azure.Functions.Cli.Update;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -58,11 +57,13 @@ public sealed partial class BundledNodeTemplateTests
         installationRoot.Should().NotBe(Home).And.NotBe(_paths.Home);
         services.GetRequiredService<InstalledProjectStackCatalog>().Stacks.Should().ContainSingle()
             .Which.Stack.Should().Be("node");
-        var provider = services.GetRequiredService<NodeTemplateWorkflowProvider>();
-        services.GetServices<INativeItemWorkflowProvider>().OfType<NodeTemplateWorkflowProvider>().Should().ContainSingle()
-            .Which.Should().BeSameAs(provider);
-        services.GetServices<INativeProjectWorkflowProvider>().OfType<NodeTemplateWorkflowProvider>().Should().ContainSingle()
-            .Which.Should().BeSameAs(provider);
+        var provider = services.GetRequiredService<WorkloadNativeTemplatePolicies>();
+        services.GetRequiredService<WorkloadNativeTemplatePolicies>().Should().BeSameAs(provider);
+        var registration = services.GetServices<WorkloadNativeTemplatePolicyRegistration>().Single(value => value.Policy.Stack == "node");
+        registration.Policy.GetType().Assembly.Should()
+            .BeSameAs(services.GetRequiredService<InstalledProjectStackCatalog>().Stacks.Single().GetType().Assembly);
+        services.GetServices<INativeItemWorkflowProvider>().Should().NotContain(value => value.Stack == "node");
+        services.GetServices<INativeProjectWorkflowProvider>().Should().NotContain(value => value.Stack == "node");
         if (overrideFileSystem)
         {
             services.GetRequiredService<IFileSystem>().Should().BeSameAs(_files);
@@ -81,7 +82,11 @@ public sealed partial class BundledNodeTemplateTests
         File.Exists(Path.Combine(target.Info.FullName, ".func", "config.json")).Should().BeTrue();
         File.Exists(Path.Combine(target.Info.FullName, "package.json")).Should().BeTrue();
         using var next = host.CreateInvocation();
-        next.Services.GetRequiredService<NodeTemplateWorkflowProvider>().Should().NotBeSameAs(provider);
+        next.Services.GetRequiredService<WorkloadNativeTemplatePolicies>().Should().NotBeSameAs(provider);
+        var nextRegistration = next.Services.GetServices<WorkloadNativeTemplatePolicyRegistration>().Single(value => value.Policy.Stack == "node");
+        nextRegistration.Should().NotBeSameAs(registration);
+        nextRegistration.Policy.Should().NotBeSameAs(registration.Policy);
+        nextRegistration.Owner.Should().BeSameAs(registration.Owner);
         next.Services.GetRequiredService<IInstallationMetadataReader>().Should().BeSameAs(reader);
         next.Services.GetRequiredService<IFileSystem>().Should().BeSameAs(services.GetRequiredService<IFileSystem>());
         Func<Task> read = () => reader.ReadAsync(CancellationToken.None);

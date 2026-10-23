@@ -57,7 +57,7 @@ public sealed partial class BundledNodeTemplateTests
         File.WriteAllText(configurationPath, configured.ToJsonString());
         var adoptedBytes = PublicSnapshot(project);
         var created = await SetupProgramAdvisoryTests.RunCliAsync(processHome, Home, _paths.Home, project,
-            ["new", project, "-t", "http", "--output=json", "--non-interactive"], timeout.Token);
+            ["new", project, "-t", "http", "--format=json", "--non-interactive"], timeout.Token);
         created.ExitCode.Should().Be(1);
         created.StandardError.Should().BeEmpty();
         using var json = JsonDocument.Parse(created.StandardOutput);
@@ -70,8 +70,9 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task Program_RetainedBundleExplicitRepair_ReopensCapturedRuntimeAndCreatesWithoutAcquisition()
     {
+        string archive = CombinedNodeFixtureArchive();
         _inspector.FailLive = true;
-        Func<Task> install = () => _installer.InstallFromPackageAsync(BuiltArchive);
+        Func<Task> install = () => _installer.InstallFromPackageAsync(archive);
         await install.Should().ThrowAsync<BundledTemplateRegistrationException>();
         var retained = (await _workloads.GetWorkloadsAsync()).Single();
         string project = Path.Combine(_root, "retained-project");
@@ -94,7 +95,7 @@ public sealed partial class BundledNodeTemplateTests
         initialized.ExitCode.Should().Be(0, initialized.StandardError);
         initialized.StandardOutput.Should().Contain("Azure.Functions.Node.Basic.JavaScript");
         var created = await SetupProgramAdvisoryTests.RunCliAsync(processHome, Home, _paths.Home, project,
-            ["new", project, "-t", "http", "-n", "AfterRepair", "--output=json"], timeout.Token);
+            ["new", project, "-t", "http", "-n", "AfterRepair", "--format=json"], timeout.Token);
         created.ExitCode.Should().Be(0, created.StandardError);
         using var json = JsonDocument.Parse(created.StandardOutput);
         json.RootElement.GetProperty("kind").GetString().Should().Be("created");
@@ -128,7 +129,7 @@ public sealed partial class BundledNodeTemplateTests
         var originalProject = PublicSnapshot(existing);
         string userPackage = TemplateFixtures.WriteBasicPackage(_root);
         await MigrationInstallUserPackageAsync(userPackage);
-        string incoming = BuiltArchive;
+        string incoming = CombinedNodeFixtureArchive();
         await using PublicWorkloadFeed feed = new(incoming);
         string project = Path.Combine(_root, "updated-project");
         Directory.CreateDirectory(project);
@@ -165,7 +166,7 @@ public sealed partial class BundledNodeTemplateTests
         initialized.ExitCode.Should().Be(0, initialized.StandardOutput + initialized.StandardError);
         initialized.StandardOutput.Should().Contain("Azure.Functions.Node.Basic.JavaScript");
         var created = await SetupProgramAdvisoryTests.RunCliAsync(processHome, Home, _paths.Home, project,
-            ["new", project, "-t", "HttpTrigger-JavaScript", "-n", "AfterUpdate", "--output=json"], timeout.Token);
+            ["new", project, "-t", "HttpTrigger-JavaScript", "-n", "AfterUpdate", "--format=json"], timeout.Token);
         created.ExitCode.Should().Be(0, created.StandardOutput + created.StandardError);
         created.StandardError.Should().BeEmpty();
         using var document = JsonDocument.Parse(created.StandardOutput);

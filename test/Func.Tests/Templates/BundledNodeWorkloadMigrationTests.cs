@@ -1272,7 +1272,11 @@ public sealed partial class BundledNodeTemplateTests
         var reopened = new TemplateStore(new(Home), _files, new FileTemplateStoreLock(), NullLoggerFactory.Instance);
         using var session = await reopened.OpenReadAsync(new(WorkingDirectory.FromExplicit(_root)), CancellationToken.None);
         var packages = await session.PackageManager.GetManagedTemplatePackagesAsync(false, CancellationToken.None);
-        packages.Should().HaveCount(2).And.Contain(package => package.Identifier == userPackage);
+        using var outer = new NuGet.Packaging.PackageArchiveReader(archive);
+        using var declarationStream = outer.GetStream(BundledTemplateInstaller.ManifestName);
+        using var declaration = JsonDocument.Parse(declarationStream);
+        int declaredAssets = declaration.RootElement.GetProperty("assets").GetArrayLength();
+        packages.Should().HaveCount(declaredAssets + 1).And.Contain(package => package.Identifier == userPackage);
         var native = packages.Should().ContainSingle(package => package.Identifier == "Azure.Functions.Templates.Node.Basic").Subject;
         native.Version.Should().Be(version);
         File.Exists(native.MountPointUri).Should().BeTrue();

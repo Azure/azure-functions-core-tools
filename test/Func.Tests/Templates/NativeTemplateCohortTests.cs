@@ -39,7 +39,7 @@ public sealed partial class BundledNodeTemplateTests
         using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(1));
 
         var result = await SetupProgramAdvisoryTests.RunCliAsync(Path.Combine(_root, "unknown-owner-process"), Home, _paths.Home, project,
-            ["new", project, "-t", "HttpTrigger-JavaScript", "-n", "MustNotCreate", "--output=json"], timeout.Token);
+            ["new", project, "-t", "HttpTrigger-JavaScript", "-n", "MustNotCreate", "--format=json"], timeout.Token);
 
         result.ExitCode.Should().Be(1);
         result.StandardError.Should().BeEmpty();
@@ -145,7 +145,7 @@ public sealed partial class BundledNodeTemplateTests
         using var package = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "package.json")));
         package.RootElement.GetProperty("funcTemplateCohort").GetString().Should().Be("second");
         var created = await SetupProgramAdvisoryTests.RunCliAsync(Path.Combine(_root, "cohort-process"), Home, _paths.Home, target,
-            ["new", target, "-t", "HttpTrigger-JavaScript", "-n", "FreshCohort", "--output=json"], timeout.Token);
+            ["new", target, "-t", "HttpTrigger-JavaScript", "-n", "FreshCohort", "--format=json"], timeout.Token);
         created.ExitCode.Should().Be(0, created.StandardOutput + created.StandardError);
         using var result = JsonDocument.Parse(created.StandardOutput);
         result.RootElement.GetProperty("selectedTemplate").GetProperty("package").GetProperty("version").GetString().Should().Be("2.0.0");
@@ -213,64 +213,22 @@ public sealed partial class BundledNodeTemplateTests
             Dictionary<string, byte[]> changed = new(StringComparer.Ordinal) { [projectPath] = content };
             projectFile.Delete();
             using (Stream output = inner.CreateEntry(projectPath).Open()) output.Write(content);
-            const string itemPath = "content/http-js/httpTrigger.js";
-            var itemFile = inner.GetEntry(itemPath)!;
-            string item;
-            using (StreamReader reader = new(itemFile.Open())) item = reader.ReadToEnd();
-            string suffix = "\n// cohort:" + marker + "\n";
-            byte[] itemContent = Encoding.UTF8.GetBytes(item + suffix);
-            itemFile.Delete();
-            using (Stream output = inner.CreateEntry(itemPath).Open()) output.Write(itemContent);
-            changed[itemPath] = itemContent;
-            const string templatesPath = "provenance/node/v2/templates/templates.json";
-            var templatesFile = inner.GetEntry(templatesPath)!;
-            JsonArray templates;
-            using (StreamReader reader = new(templatesFile.Open())) templates = JsonNode.Parse(reader.ReadToEnd())!.AsArray();
-            JsonNode original = templates.Single(template => template!["id"]!.GetValue<string>() == "HttpTrigger-JavaScript")!;
-            JsonObject files = original["files"]!.AsObject();
-            string file = files.Single().Key;
-            files[file] = files[file]!.GetValue<string>() + suffix;
-            byte[] templatesContent = Encoding.UTF8.GetBytes(templates.ToJsonString());
-            templatesFile.Delete();
-            using (Stream output = inner.CreateEntry(templatesPath).Open()) output.Write(templatesContent);
-            changed[templatesPath] = templatesContent;
             var provenanceFile = inner.GetEntry("provenance/node/compatibility.json")!;
             JsonNode provenance;
             using (StreamReader reader = new(provenanceFile.Open())) provenance = JsonNode.Parse(reader.ReadToEnd())!;
             provenance["packageVersion"] = version;
-            int updated = UpdatePin(provenance);
+            int updated = UpdateFixtureSourcePins(provenance, changed);
             updated.Should().BeGreaterThanOrEqualTo(changed.Count);
             provenanceFile.Delete();
             using StreamWriter writer = new(inner.CreateEntry("provenance/node/compatibility.json").Open());
             writer.Write(provenance.ToJsonString());
 
-            int UpdatePin(JsonNode node)
-            {
-                int count = 0;
-                if (node is JsonObject value)
-                {
-                    if (value["path"]?.GetValue<string>() is { } source && changed.TryGetValue(source, out byte[]? contents)
-                        && value.ContainsKey("sha256"))
-                    {
-                        value["sha256"] = Convert.ToHexStringLower(SHA256.HashData(contents));
-                        count++;
-                    }
-                    foreach (var child in value.Select(value => value.Value).Where(value => value is not null))
-                    {
-                        count += UpdatePin(child!);
-                    }
-                }
-                else if (node is JsonArray array)
-                {
-                    foreach (var child in array.Where(value => value is not null)) count += UpdatePin(child!);
-                }
-                return count;
-            }
         }
         nested.Delete();
         byte[] archive = bytes.ToArray();
         using (Stream output = outer.CreateEntry(innerPath).Open()) output.Write(archive);
         asset["sha256"] = Convert.ToHexStringLower(SHA256.HashData(archive));
+        AddFunctionFixtureAsset(outer, declaration, version, marker);
         declared.Delete();
         using StreamWriter manifest = new(outer.CreateEntry(BundledTemplateInstaller.ManifestName).Open());
         manifest.Write(declaration.ToJsonString());

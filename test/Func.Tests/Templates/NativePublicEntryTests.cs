@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Commands.Setup;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,7 +37,7 @@ public sealed partial class BundledNodeTemplateTests
             string[] scalar = layout == "inline" ? ["--timer-trigger-schedule=" + value] : ["--timer-trigger-schedule", value];
             string[] tail = layout == "pathFirst" ? [project, .. scalar] : [.. scalar, project];
             string[] arguments = ["new", .. tail, "-t", "TimerTrigger-JavaScript", "--name", "SignedScalar",
-                "--non-interactive", "--output=json"];
+                "--non-interactive", "--format=json"];
             string[] original = [.. arguments];
             TestInteractionService output = new();
             int checks = 0;
@@ -87,7 +88,7 @@ public sealed partial class BundledNodeTemplateTests
         TestInteractionService output = new();
 
         int exit = await new NativeCliEntryPoint().ExecuteAsync(
-            ["new", project, .. scalar, "-t", "TimerTrigger-JavaScript", "--name", "ScalarControl", "--non-interactive", "--output=json"],
+            ["new", project, .. scalar, "-t", "TimerTrigger-JavaScript", "--name", "ScalarControl", "--non-interactive", "--format=json"],
             output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
 
         exit.Should().Be(succeeds ? 0 : 1, output.AllOutput);
@@ -110,7 +111,7 @@ public sealed partial class BundledNodeTemplateTests
     public async Task StagedEntry_FullPublicGrammar_InitAndRootOrNestedNewPreserveLegacyNodePlacement(
         string language, string alias, string extension)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         string project = Path.Combine(_root, "public-" + alias);
         var entry = new NativeCliEntryPoint();
         int initialized = await entry.ExecuteAsync(["init", project, "-s", "node", "-l", alias, "--no-bundles", "--skip-npm-install"],
@@ -123,7 +124,7 @@ public sealed partial class BundledNodeTemplateTests
             TestInteractionService output = new();
             int versionCalls = 0;
             int exit = await entry.ExecuteAsync(["--verbose=true", "new", "--authlevel=anonymous", outputBase,
-                "-t", "HttpTrigger-" + language, "--non-interactive", "--output", "json"],
+                "-t", "HttpTrigger-" + language, "--non-interactive", "--format", "json"],
                 output, _paths, new(Home), CancellationToken.None, configure: TrackEntryContexts, versionCheck: _ =>
                 {
                     versionCalls++;
@@ -147,7 +148,7 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task StagedEntry_NativeHelpUsesExplicitPathAndFullGraphWithoutCreatingFiles()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         string project = Path.Combine(_root, "help-project");
         var entry = new NativeCliEntryPoint();
         (await entry.ExecuteAsync(["init", project, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"],
@@ -177,14 +178,14 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("@not-a-response-file")]
     public async Task StagedEntry_InvalidTemplateInput_IsOneJsonFailureWithoutLegacyFallback(params string[] tail)
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         string project = Path.Combine(_root, "invalid-project");
         var entry = new NativeCliEntryPoint();
         (await entry.ExecuteAsync(["init", project, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"],
             _interaction, _paths, new(Home), CancellationToken.None, configure: TrackEntryContexts, versionCheck: _ => Task.FromResult<string?>(null))).Should().Be(0);
         TestInteractionService output = new();
 
-        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--output=json", "--non-interactive", .. tail],
+        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--format=json", "--non-interactive", .. tail],
             output, _paths, new(Home), CancellationToken.None, configure: TrackEntryContexts, versionCheck: _ => Task.FromResult<string?>(null));
 
         exit.Should().Be(1, output.AllOutput);
@@ -211,6 +212,43 @@ public sealed partial class BundledNodeTemplateTests
         File.ReadAllText(source).Should().Be("preserve");
         File.Exists(Path.Combine(target, ".func", "config.json")).Should().BeFalse();
         output.AllOutput.Should().Contain("Init cancelled").And.Contain("default: False");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PublicEntry_ExistingPackage_PreservesOrCleansBeforeOwnedPreparation(bool force)
+    {
+        await _installer.InstallFromPackageAsync(BuiltArchive);
+        string target = Directory.CreateDirectory(Path.Combine(_root, "prepared-existing")).FullName;
+        string package = Path.Combine(target, "package.json");
+        byte[] original = System.Text.Encoding.UTF8.GetBytes("""{"name":"user-owned","main":"custom.js"}""");
+        File.WriteAllBytes(package, original);
+        string extra = Path.Combine(target, "custom.js");
+        File.WriteAllText(extra, "user-owned input");
+        string git = Directory.CreateDirectory(Path.Combine(target, ".git")).FullName;
+        File.WriteAllText(Path.Combine(git, "HEAD"), "ref: refs/heads/keep-history");
+        TestInteractionService output = new();
+
+        int exit = await new NativeCliEntryPoint().ExecuteAsync(
+            ["init", target, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install",
+                .. force ? new[] { "--force" } : []],
+            output, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ => Task.FromResult<string?>(null));
+
+        exit.Should().Be(0, output.AllOutput);
+        File.ReadAllText(Path.Combine(git, "HEAD")).Should().Be("ref: refs/heads/keep-history");
+        File.Exists(Path.Combine(target, ".func", "config.json")).Should().BeTrue();
+        File.Exists(extra).Should().Be(!force);
+        if (force)
+        {
+            File.ReadAllBytes(package).Should().NotEqual(original);
+        }
+        else
+        {
+            File.ReadAllBytes(package).Should().Equal(original);
+            File.ReadAllText(extra).Should().Be("user-owned input");
+        }
+        output.AllOutput.Should().Contain("Skipped npm installation").And.NotContain("did not complete");
     }
 
     [Theory]
@@ -245,13 +283,27 @@ public sealed partial class BundledNodeTemplateTests
         if (marker == "host.json") output.AllOutput.Should().Contain("Existing project adopted");
     }
 
-    private void TrackEntryContexts(IServiceCollection services) => _loadContexts.AddRange(
-        services.Select(service => service.ImplementationInstance).OfType<RuntimeWorkloadInfo>().Select(workload => workload.LoadContext));
+    private async Task InstallEntryFunctionJourneyAsync()
+    {
+        await InstallOwnedNodeJourneyAsync();
+        _source.ClearReceivedCalls();
+    }
+
+    private void TrackEntryContexts(IServiceCollection services)
+    {
+        _loadContexts.AddRange(services.Select(service => service.ImplementationInstance)
+            .OfType<RuntimeWorkloadInfo>().Select(workload => workload.LoadContext));
+        if (_ownedJourneyCatalog is { } catalog)
+        {
+            services.AddSingleton<IBasicCompanionCatalog>(catalog);
+            services.AddSingleton<BasicAcquisitionPlanner>();
+        }
+    }
 
     [Fact]
     public async Task StagedEntry_InteractiveConsoleNonInteractiveJson_EmitsOnePhysicalDocumentWithoutPromptOrAdvisory()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         string project = Path.Combine(_root, "json-project");
         var entry = new NativeCliEntryPoint();
         (await entry.ExecuteAsync(["init", project, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"],
@@ -262,7 +314,7 @@ public sealed partial class BundledNodeTemplateTests
         SpectreInteractionService interaction = new(new DefaultTheme(), stdout, stderr);
         int checks = 0;
 
-        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--non-interactive", "--output=json"],
+        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--non-interactive", "--format=json"],
             interaction, _paths, new(Home), CancellationToken.None, TrackEntryContexts, _ =>
             {
                 checks++;
@@ -280,7 +332,7 @@ public sealed partial class BundledNodeTemplateTests
     [Fact]
     public async Task StagedEntry_ActualCommittedItemThenCancellation_RendersAuthoritativeSuccessAcrossFullEntry()
     {
-        await _installer.InstallFromPackageAsync(BuiltArchive);
+        await InstallEntryFunctionJourneyAsync();
         string project = Path.Combine(_root, "completion-project");
         var entry = new NativeCliEntryPoint();
         (await entry.ExecuteAsync(["init", project, "-s", "node", "-l", "js", "--no-bundles", "--skip-npm-install"],
@@ -289,7 +341,7 @@ public sealed partial class BundledNodeTemplateTests
         using CancellationTokenSource cancellation = new();
         TestInteractionService output = new();
 
-        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--non-interactive", "--output=json"],
+        int exit = await entry.ExecuteAsync(["new", project, "-t", "HttpTrigger-JavaScript", "--non-interactive", "--format=json"],
             output, _paths, new(Home), cancellation.Token, services =>
             {
                 TrackEntryContexts(services);

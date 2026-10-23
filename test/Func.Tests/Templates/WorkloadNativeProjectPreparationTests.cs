@@ -234,6 +234,9 @@ public sealed partial class BundledNodeTemplateTests
     [InlineData("config-bytes")]
     [InlineData("configuration-proof")]
     [InlineData("target")]
+    [InlineData("preserve")]
+    [InlineData("preserve-changed-after-preview")]
+    [InlineData("preserve-changed-after-create")]
     public async Task LoadedPreparation_CreatedProof_IsBoundOnceToExactSourceImageAndConfiguration(string change)
     {
         WorkloadEntry entry = await InstallPolicyFixtureAsync(preparation: true);
@@ -241,6 +244,13 @@ public sealed partial class BundledNodeTemplateTests
         using IServiceScope scope = provider.CreateScope();
         NativeTemplatePolicy policy = SetPreparationMode(scope, "preparation-none");
         string target = Path.Combine(_root, "bound-preparation");
+        bool preserve = change.StartsWith("preserve", StringComparison.Ordinal);
+        string preserved = Path.Combine(target, "Created.proj");
+        if (preserve)
+        {
+            Directory.CreateDirectory(target);
+            File.WriteAllText(preserved, "user-owned bytes");
+        }
         var directory = WorkingDirectory.FromExplicit(target);
         using Templater templater = await scope.ServiceProvider.GetRequiredService<ITemplaterFactory>()
             .CreateProjectAsync(new(directory), Availability(entry), provider.GetRequiredService<TemplateProjectSupport>(), CancellationToken.None);
@@ -255,18 +265,37 @@ public sealed partial class BundledNodeTemplateTests
                 .GetCandidateAsync(selected.Entry, selected.Configuration!, selected.ConfigurationSourceIdentity!, selected.PackageMountPoint,
                     selected.ReadPackageFileAsync, selected.ValidateConfigurationAsync, true, CancellationToken.None, selected.InvocationOwner))!,
             ExplicitParameterNames = new HashSet<string> { "Framework", "SkipNpmInstall" },
+            PreserveExistingFiles = preserve,
         }, CancellationToken.None);
         TemplateInvocationResult preview = await selected.InvokeAsync(request);
         preview.Status.Should().Be(TemplateInvocationStatus.Success, preview.Diagnostic);
         NativeProjectPreparationContext context = new(selected, directory, request.Parameters, preview);
         NativeProjectPreparationPreview plan = await preparation.PreviewAsync(context, CancellationToken.None);
         plan.Succeeded.Should().BeTrue(string.Join(" ", plan.Diagnostics));
+        if (change == "preserve-changed-after-preview")
+        {
+            File.WriteAllText(preserved, "changed after preview");
+        }
         TemplateInvocationResult created = await selected.InvokeAsync(request with
         {
             DryRun = false,
             ExpectedPreparation = request.ProjectPreparationBinding!.ExpectedCapture,
         });
+        if (change == "preserve-changed-after-preview")
+        {
+            created.Status.Should().Be(TemplateInvocationStatus.InvalidTemplate);
+            created.Diagnostic.Should().Contain("Preserved project inputs changed");
+            File.ReadAllText(preserved).Should().Be("changed after preview");
+            File.Exists(Path.Combine(target, ".func", "config.json")).Should().BeFalse();
+            GetFixtureState<int>(policy, "PreparationExecutions").Should().Be(0);
+            return;
+        }
         created.Status.Should().Be(TemplateInvocationStatus.Success, created.Diagnostic);
+        if (preserve)
+        {
+            File.ReadAllText(preserved).Should().Be("user-owned bytes");
+        }
+        if (change == "preserve-changed-after-create") await File.WriteAllTextAsync(preserved, "changed after create");
         if (change == "raw-source") await File.AppendAllTextAsync(selected.PackageMountPoint!, "changed");
         if (change == "file-bytes") await File.WriteAllTextAsync(Path.Combine(target, "Created.proj"), "changed");
         if (change == "config-bytes") await File.AppendAllTextAsync(Path.Combine(target, ".func", "config.json"), " ");
@@ -284,9 +313,10 @@ public sealed partial class BundledNodeTemplateTests
         NativeProjectPreparationResult result = await preparation.CompleteAsync(completionContext, plan, CancellationToken.None);
         NativeProjectPreparationResult replay = await preparation.CompleteAsync(context with { Created = created }, plan, CancellationToken.None);
 
-        result.Succeeded.Should().Be(change == "none", string.Join(" ", result.Diagnostics));
+        bool succeeds = change is "none" or "preserve";
+        result.Succeeded.Should().Be(succeeds, string.Join(" ", result.Diagnostics));
         replay.Succeeded.Should().BeFalse();
-        GetFixtureState<int>(policy, "PreparationExecutions").Should().Be(change == "none" ? 1 : 0);
+        GetFixtureState<int>(policy, "PreparationExecutions").Should().Be(succeeds ? 1 : 0);
         created.HasCommittedOutput.Should().BeTrue();
         AssemblyLoadContext.GetLoadContext(policy.GetType().Assembly).Should()
             .BeSameAs(scope.ServiceProvider.GetRequiredService<WorkloadNativeTemplatePolicyRegistration>().Owner.LoadContext);
@@ -426,6 +456,28 @@ public sealed partial class BundledNodeTemplateTests
         File.ReadAllBytes(plan.ConfigurationPath).Should().Equal(actual);
         Action missingPath = () => new TemplateProjectConfigurationWriteReceipt(null!, actual);
         missingPath.Should().Throw<ArgumentNullException>();
+    }
+
+    [Theory]
+    [InlineData(true, true, false, false, false, true)]
+    [InlineData(true, true, false, false, true, false)]
+    [InlineData(true, false, false, false, false, false)]
+    [InlineData(false, false, true, false, false, false)]
+    [InlineData(true, true, false, true, false, false)]
+    [InlineData(false, false, false, false, true, true)]
+    [InlineData(false, false, false, false, false, true)]
+    public void PreparationOutputPolicy_AllowsOnlyControlledCleanupNormalization(
+        bool previewForce, bool previewCleanup, bool actualForce, bool actualCleanup, bool dryRun, bool expected)
+    {
+        TemplateInvocationRequest preview = new(WorkingDirectory.FromCwd(), new Dictionary<string, string?>())
+        {
+            Force = previewForce,
+            PreviewAfterDirectoryCleanup = previewCleanup,
+        };
+        TemplateInvocationRequest current = preview with { Force = actualForce, PreviewAfterDirectoryCleanup = actualCleanup, DryRun = dryRun };
+
+        NativeProjectPreparationCapture.MatchesOutputPolicy(preview, current).Should().Be(expected);
+        NativeProjectPreparationCapture.MatchesOutputPolicy(preview, current with { PreserveExistingFiles = true }).Should().BeFalse();
     }
 
     private static NativeTemplatePolicy SetPreparationMode(IServiceScope scope, string mode)

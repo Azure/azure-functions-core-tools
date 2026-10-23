@@ -28,7 +28,7 @@ public sealed class NativeEntryArgumentsTests
 
         var result = new NativeEntryArguments(tokens).Read(parsed, command);
         var captured = NativeTemplateCommandInput.CaptureEntry(command, parsed, result.Tokens,
-            new HashSet<Option> { command.TemplateOption, command.NameOption, command.OutputOption,
+            new HashSet<Option> { command.TemplateOption, command.NameOption, command.FormatOption,
                 command.ForceOption, command.NonInteractiveOption, command.ListOption }, result.PathIndex);
 
         result.Directory.Info.FullName.Should().Be(Path.GetFullPath("project"));
@@ -78,7 +78,7 @@ public sealed class NativeEntryArgumentsTests
             const string alias = "--queue-trigger-name";
             string[] scalar = layout == "inline" ? [alias + "=" + value] : [alias, value];
             string[] tail = layout == "pathFirst" ? ["project", .. scalar] : [.. scalar, "project"];
-            string[] tokens = ["new", .. tail, "-t", "QueueTrigger-JavaScript", "--non-interactive", "--output=json"];
+            string[] tokens = ["new", .. tail, "-t", "QueueTrigger-JavaScript", "--non-interactive", "--format=json"];
             string[] original = [.. tokens];
             NewCommand command = new(Substitute.For<INewCommandRunner>(), Substitute.For<INewCommandTemplateOptionProvider>());
             command.PathArgument!.CustomParser = _ => WorkingDirectory.FromCwd();
@@ -93,7 +93,7 @@ public sealed class NativeEntryArgumentsTests
             accepted.IsComplete.Should().BeTrue();
             var result = new NativeEntryArguments(tokens).Read(parsed, command);
             var captured = NativeTemplateCommandInput.CaptureEntry(command, parsed, result.Tokens,
-                new HashSet<Option> { command.TemplateOption, command.NameOption, command.OutputOption,
+                new HashSet<Option> { command.TemplateOption, command.NameOption, command.FormatOption,
                     command.ForceOption, command.NonInteractiveOption, command.ListOption }, result.PathIndex);
 
             result.PathIndex.Should().Be(layout == "pathFirst" ? 0 : scalar.Length);
