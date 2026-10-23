@@ -71,7 +71,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Description = "Use only locally installed workloads and skip network installs"
     };
 
-    public Option<string?> OutputOption { get; } = new("--output")
+    public Option<string?> FormatOption { get; } = new("--format")
     {
         Description = "Output mode: compact (interactive TUI), plain (CI / non-TTY), "
             + "or json (NDJSON for AI agents). Defaults to auto-detect."
@@ -79,7 +79,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<bool> NoTuiOption { get; } = new("--no-tui")
     {
-        Description = "Alias for --output=plain. Disables the interactive TUI."
+        Description = "Alias for --format=plain. Disables the interactive TUI."
     };
 
     public Option<string?> LogFileOption { get; } = new("--log-file")
@@ -171,7 +171,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(ProfileOption);
         Options.Add(HostVersionOption);
         Options.Add(OfflineOption);
-        Options.Add(OutputOption);
+        Options.Add(FormatOption);
         Options.Add(NoTuiOption);
         Options.Add(LogFileOption);
         Options.Add(DemoOption);
@@ -204,7 +204,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         mode = OutputModeResolver.ApplyTerminalSafetyFallback(mode, _interaction, out bool downgraded);
         if (downgraded)
         {
-            _interaction.WriteWarning("Interactive input or ANSI output is unavailable; falling back to --output=plain.");
+            _interaction.WriteWarning("Interactive input or ANSI output is unavailable; falling back to --format=plain.");
         }
 
         HostStartupOptions hostStartupOptions = GetHostStartupOptions(workingDirectory.Info);
@@ -446,13 +446,13 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
     private OutputMode ResolveOutputMode(ParseResult parseResult)
     {
-        string? raw = parseResult.GetValue(OutputOption);
+        string? raw = parseResult.GetValue(FormatOption);
         OutputMode? explicitMode = null;
         if (!string.IsNullOrEmpty(raw))
         {
             if (!OutputModeResolver.TryParse(raw, out OutputMode parsed))
             {
-                throw new GracefulException($"--output must be one of: compact, plain, json. Got '{raw}'.", isUserError: true);
+                throw new GracefulException($"--format must be one of: compact, plain, json. Got '{raw}'.", isUserError: true);
             }
 
             explicitMode = parsed;

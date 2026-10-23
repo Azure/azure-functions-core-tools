@@ -63,7 +63,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         Description = "Check selected dependencies without installing or updating workloads. Metadata caches may change.",
     };
 
-    public Option<string?> OutputOption { get; } = new("--output")
+    public Option<string?> FormatOption { get; } = new("--format")
     {
         Description = "Output mode: plain or json (NDJSON). Default: plain.",
     };
@@ -91,7 +91,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(NonInteractiveOption);
         Options.Add(YesOption);
         Options.Add(CheckOption);
-        Options.Add(OutputOption);
+        Options.Add(FormatOption);
     }
 
     internal static bool ShouldSuppressAdvisories(ParseResult parseResult)
@@ -104,10 +104,10 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         }
 
         OptionResult? check = parseResult.GetResult(setup.CheckOption);
-        OptionResult? output = parseResult.GetResult(setup.OutputOption);
+        OptionResult? format = parseResult.GetResult(setup.FormatOption);
         return (check is not null && CanReadValue(check) && check.GetValueOrDefault<bool>())
-            || (output is not null && CanReadValue(output)
-                && string.Equals(output.GetValueOrDefault<string?>()?.Trim(), "json", StringComparison.OrdinalIgnoreCase));
+            || (format is not null && CanReadValue(format)
+                && string.Equals(format.GetValueOrDefault<string?>()?.Trim(), "json", StringComparison.OrdinalIgnoreCase));
 
         // Version and completion actions can clear parse errors without fixing
         // arity. Reading such a value would add errors and preempt their action.
@@ -136,7 +136,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
             parseResult.GetValue(NonInteractiveOption),
             parseResult.GetValue(YesOption),
             parseResult.GetValue(CheckOption),
-            ResolveOutputMode(parseResult.GetValue(OutputOption)));
+            ResolveOutputMode(parseResult.GetValue(FormatOption)));
 
         SetupRunResult result = await _runner.RunAsync(options, cancellationToken);
         return result.ExitCode;
@@ -170,7 +170,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         {
             "plain" => SetupOutputMode.Plain,
             "json" => SetupOutputMode.Json,
-            _ => throw new GracefulException("--output must be one of: plain, json. Got '" + raw + "'.", isUserError: true),
+            _ => throw new GracefulException("--format must be one of: plain, json. Got '" + raw + "'.", isUserError: true),
         };
     }
 
