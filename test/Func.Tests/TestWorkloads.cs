@@ -2,7 +2,12 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Workloads;
+using Azure.Functions.Cli.Workloads.Node;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Azure.Functions.Cli.Tests;
 
@@ -36,6 +41,22 @@ internal static class TestWorkloads
             ContentRoot: AppContext.BaseDirectory,
             DisplayName: packageId,
             Description: string.Empty);
+
+    /// <summary>
+    /// Registers Node control-fixture metadata without claiming an installed runtime policy owner.
+    /// </summary>
+    public static void ConfigureNodeMetadata(FunctionsCliBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        IServiceCollection services = builder.Services;
+        services.TryAddSingleton<IProjectInitializationReporter, ProjectInitializationReporter>();
+        services.AddSingleton<NodeProjectStack>();
+        services.AddSingleton<IProjectStack>(provider => provider.GetRequiredService<NodeProjectStack>());
+        services.AddSingleton<NodeNpmInstaller>();
+        services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
+        services.AddSingleton<IQuickstartProvider, NodeQuickstartProvider>();
+        builder.AddProjectFactory(new NodeProjectFactory());
+    }
 
     /// <summary>
     /// Minimal <see cref="Workloads.Workload"/> used by tests that need a

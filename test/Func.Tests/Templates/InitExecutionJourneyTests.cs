@@ -16,7 +16,6 @@ using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Tests.Templates.Engine;
-using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -64,7 +63,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
         var before = SnapshotHome();
         var builder = CliHostFactory.CreateBuilder(_interaction);
         builder.Services.AddSingleton(new CliConfigurationPathsOptions(Home));
-        new NodeWorkload().Configure(new DefaultFunctionsCliBuilder(builder.Services, TestWorkloads.CreateInfo("Controlled.Node")));
+        TestWorkloads.ConfigureNodeMetadata(new DefaultFunctionsCliBuilder(builder.Services, TestWorkloads.CreateInfo("Controlled.Node")));
         ServiceProvider provider = builder.Services.BuildServiceProvider();
         _providers.Add(provider);
         var scope = provider.CreateScope();
@@ -1345,7 +1344,7 @@ public sealed class InitExecutionJourneyTests : IDisposable
             services.AddSingleton(stack);
         }
 
-        new NodeWorkload().Configure(new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo("Controlled.Node")));
+        TestWorkloads.ConfigureNodeMetadata(new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo("Controlled.Node")));
         services.AddSingleton<InstalledProjectStackCatalog>();
         services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
         services.AddTemplatesOrchestrator();

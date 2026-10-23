@@ -99,6 +99,10 @@ Node policy and project preparation are supplied by its owning runtime workload.
 Its bundled archive contains the two basic projects; function items are produced
 in the separate `Azure.Functions.Templates.Node.Functions` package and require
 qualified acquisition rather than being implicitly trusted by package name.
+The default host does not yet supply that publisher-qualified association.
+A stack-only Node installation can initialize basic projects, but default Node
+item generation and listing remain unavailable. Positive source-qualified
+function fixtures do not establish production catalog readiness.
 Python and .NET retain their supported public item catalogs and placement;
 C#/F# dependency and compile-order work remains source-qualified. Go, Java, and
 PowerShell supply project workflows, not a new first-party item catalog.

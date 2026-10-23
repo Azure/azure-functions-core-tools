@@ -19,7 +19,6 @@ using Azure.Functions.Cli.Templates.Acquisition;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Templates.Native;
 using Azure.Functions.Cli.Tests.Templates.Engine;
-using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -535,8 +534,15 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
             WriteTemplate("empty", """
                 {"identity":"Controlled.Empty","name":"Empty","shortName":"empty","tags":{"type":"item","language":"JavaScript"}}
                 """, "{}");
-            await TemplateFixtures.InstallAsync(Path.Combine(_root, "package"), Path.Combine(Home, "templates"), CancellationToken.None);
         }
+        else
+        {
+            WriteTemplate("committed", """
+                {"identity":"Controlled.Committed","name":"Committed output","shortName":"committed-output",
+                 "tags":{"type":"item","language":"JavaScript"},"sourceName":"SourceFunction"}
+                """, "{}", ("SourceFunction.js", "app.http('SourceFunction');"));
+        }
+        await TemplateFixtures.InstallAsync(Path.Combine(_root, "package"), Path.Combine(Home, "templates"), CancellationToken.None);
 
         using CancellationTokenSource cancellation = new();
         var files = new RecordingCommitFileSystem(new PhysicalFileSystem())
@@ -554,7 +560,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         int beforeOutput = _interaction.Lines.Count;
         int? exit = null;
         var parsed = harness.Adapter.ParseNewInvocation(harness.CreateNew(),
-            [Target, "-t", noOutputs ? "Controlled.Empty" : "Azure.Functions.Node.Http.JavaScript",
+            [Target, "-t", noOutputs ? "Controlled.Empty" : "Controlled.Committed",
                 "-n", "Committed", "--non-interactive", "--format", json ? "json" : "plain"]);
 
         Exception? failure = await Record.ExceptionAsync(async () =>
@@ -1046,7 +1052,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
         services.AddSingleton<IProfileSource, BuiltInProfileSource>();
         services.AddSingleton<IProfileCatalog, ProfileCatalog>();
         services.AddSingleton<IProfileResolver, ProfileResolver>();
-        new NodeWorkload().Configure(new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo("Controlled.Node")));
+        TestWorkloads.ConfigureNodeMetadata(new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo("Controlled.Node")));
         if (additionalStack is not null)
         {
             services.AddSingleton(additionalStack);
@@ -1195,7 +1201,7 @@ public sealed class NativeTemplateCommandJourneyTests : IDisposable
              "symbols":{"Greeting":{"type":"parameter","datatype":"string","isRequired":true,"replaces":"GREETING"},
                "Auth":{"type":"parameter","datatype":"choice","defaultValue":"function","replaces":"AUTH",
                  "choices":[{"choice":"function"},{"choice":"anonymous"}]}}}
-            """, """{"symbolInfo":{"Greeting":{"longName":"greeting"},"Auth":{"longName":"output","shortName":"n"}}}""",
+            """, """{"symbolInfo":{"Greeting":{"longName":"greeting"},"Auth":{"longName":"format","shortName":"n"}}}""",
             ("ItemName.txt", "ItemName|GREETING|AUTH"));
         await TemplateFixtures.InstallAsync(Path.Combine(_root, "package"), Path.Combine(Home, "templates"), CancellationToken.None);
     }

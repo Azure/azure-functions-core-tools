@@ -25,7 +25,7 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
     private readonly ITemplaterFactory _templates = services.GetRequiredService<ITemplaterFactory>();
     private readonly ITemplateArgumentParser _parser = services.GetRequiredService<ITemplateArgumentParser>();
     private readonly Lazy<NativeTemplateWorkflowRegistry> _workflows = new(services.GetRequiredService<NativeTemplateWorkflowRegistry>);
-    private readonly Lazy<WorkloadNativeTemplatePolicies> _policies = new(services.GetRequiredService<WorkloadNativeTemplatePolicies>);
+    private readonly Lazy<WorkloadNativeTemplatePolicies?> _policies = new(services.GetService<WorkloadNativeTemplatePolicies>);
     private readonly Lazy<NativeTemplateStackCompatibility> _stackCompatibility = new(services.GetRequiredService<NativeTemplateStackCompatibility>);
 
     internal static bool IsJsonOutput(NewCommand command, ParseResult parsed)
@@ -174,8 +174,9 @@ internal sealed class NativeEntryCommandBinding(IServiceProvider services, IRead
                 INativeItemWorkflowProvider? provider;
                 try
                 {
-                    provider = await binding._policies.Value.FindAsync(selected, cancellationToken)
-                        ?? binding._workflows.Value.FindItem(context.Context!.Project!.Stack!);
+                    provider = binding._policies.Value is { } policies
+                        ? await policies.FindAsync(selected, cancellationToken) : null;
+                    provider ??= binding._workflows.Value.FindItem(context.Context!.Project!.Stack!);
                 }
                 catch (Exception exception) when (exception is InvalidTemplateMetadataException or IOException or UnauthorizedAccessException)
                 {

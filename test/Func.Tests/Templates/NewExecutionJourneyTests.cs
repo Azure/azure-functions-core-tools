@@ -17,7 +17,6 @@ using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Tests.Templates.Engine;
-using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -1329,7 +1328,7 @@ public sealed class NewExecutionJourneyTests : IDisposable
         services.AddSingleton<IProfileSource, BuiltInProfileSource>();
         services.AddSingleton<IProfileCatalog, ProfileCatalog>();
         services.AddSingleton<IProfileResolver, ProfileResolver>();
-        new NodeWorkload().Configure(new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo("Controlled.Node")));
+        TestWorkloads.ConfigureNodeMetadata(new DefaultFunctionsCliBuilder(services, TestWorkloads.CreateInfo("Controlled.Node")));
         services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
         services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();
         var installed = Substitute.For<IInstalledBundleWorkloads>();

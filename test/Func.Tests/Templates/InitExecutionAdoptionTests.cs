@@ -17,7 +17,6 @@ using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Common;
 using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Workers;
-using Azure.Functions.Cli.Workloads.Node;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -1106,7 +1105,7 @@ public sealed class InitExecutionAdoptionTests : IDisposable
             builder.AddProjectFactory(projectFactory);
         }
 
-        new NodeWorkload().Configure(builder);
+        TestWorkloads.ConfigureNodeMetadata(builder);
         foreach (var initializer in additionalInitializers ?? [])
         {
             services.AddSingleton(initializer);
