@@ -414,21 +414,10 @@ public sealed partial class ArtifactBindingJourneyTests
         QuickstartCatalogEntry first = original.Entries.Single();
         QuickstartCatalogEntry second = first with { Entry = first.Entry with { ShortDescription = "Second row" } };
         QuickstartCatalog duplicate = original with { Entries = Array.AsReadOnly<QuickstartCatalogEntry>([first, second]) };
-        IQuickstartCatalogService catalog = Substitute.For<IQuickstartCatalogService>();
-        catalog.SearchAsync(Arg.Any<QuickstartCatalogQuery>(), Arg.Any<CancellationToken>()).Returns(duplicate);
-        QuickstartBrowseResult result;
-        try
-        {
-            result = await BrowseWithBoundScopeAsync(catalog, interaction, journey.Qualification);
-            await catalog.Received(1).SearchAsync(Arg.Is<QuickstartCatalogQuery>(query =>
-                query.LegacyStack != null && query.LegacyStack.GetType().Assembly.IsCollectible), Arg.Any<CancellationToken>());
-        }
-        finally
-        {
-            // Recorded search queries retain their runtime stack and prevent its load context from unloading.
-            catalog.ClearReceivedCalls();
-        }
+        NonRetainingQuickstartCatalog catalog = new(duplicate);
+        QuickstartBrowseResult result = await BrowseWithBoundScopeAsync(catalog, interaction, journey.Qualification);
 
+        catalog.SawRuntimeStack.Should().BeTrue();
         result.Outcome.Should().Be(QuickstartBrowseOutcome.Selected);
         result.Entry.Should().Be(second);
         interaction.SelectionChoices[0].Should().Contain(choice => choice.Contains("Available to install", StringComparison.Ordinal));
@@ -441,6 +430,22 @@ public sealed partial class ArtifactBindingJourneyTests
         journey.Payload.Requested.Should().BeEmpty();
         interaction.Confirmations.Should().BeEmpty();
         Directory.Exists(Target).Should().BeFalse();
+    }
+
+    private sealed class NonRetainingQuickstartCatalog(QuickstartCatalog catalog) : IQuickstartCatalogService
+    {
+        private readonly QuickstartCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+
+        public bool SawRuntimeStack { get; private set; }
+
+        public Task<QuickstartCatalog> SearchAsync(QuickstartCatalogQuery query, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            cancellationToken.ThrowIfCancellationRequested();
+            // Retaining this query would keep the real runtime stack's load context alive through fixture teardown.
+            SawRuntimeStack = query.LegacyStack?.GetType().Assembly.IsCollectible == true;
+            return Task.FromResult(_catalog);
+        }
     }
 
     private async Task<QuickstartBrowseResult> BrowseWithBoundScopeAsync(IQuickstartCatalogService catalog,
