@@ -233,6 +233,34 @@ host. A workload using the new boundary still requires a host containing it.
 There is no reverse compatibility claim, all-stack policy migration, public
 activation or production publisher qualification.
 
+### Node validation cost in the consolidated integration
+
+Workload-owned Node policies activate an expensive existing admission path:
+source revalidation repeats deployment preflight, including runtime hashing,
+archive staging and installation/scanning in a fresh template-engine hive.
+External content also reloads its association catalog. These checks occur
+repeatedly within a single preview/create operation, not only during initial
+workload installation.
+
+Windows consolidation qualification measured about 69 minutes for 6,166 tests,
+compared with about eight minutes for 5,954 tests at the earlier baseline.
+The retained Node test class accounted for almost all of that wall-time increase;
+existing all-item bridge cases increased from roughly 6-8 seconds to 141-171
+seconds. Added coverage alone does not explain the increase. These fixture
+measurements identify a product-path cost, not a production latency benchmark.
+
+This integration preserves the authored validation and lock semantics; it is
+not a release of this limitation to `vnext`. The performance follow-up requires
+an immutable admitted proof and an explicitly read-only revalidation contract
+that retains live metadata, file-set/hash, owner/receipt/association and incumbent
+collision checks at every current mutation checkpoint. Reusing a writer-only
+validator would reverse installation lock order, and the installed-bundle
+validator is not equivalent to preparation's incumbent rules. A blanket cache,
+removed integrity checks or a restored core Node provider is not an acceptable
+shortcut. Default Node function acquisition remains separately unavailable
+without its qualified publisher association; positive item coverage uses an
+explicitly source-qualified fixture rather than inventing that authority.
+
 ### Workload-owned project preparation
 
 `NativeTemplatePolicy.RequiresProjectPreparation` declares a required phase for
