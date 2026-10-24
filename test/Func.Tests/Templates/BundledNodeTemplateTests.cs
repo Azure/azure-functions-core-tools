@@ -339,7 +339,7 @@ public sealed partial class BundledNodeTemplateTests : IDisposable
         string target = Path.Combine(_root, "parameters");
         string[] options = channel is null ? ["--no-bundles", "true"] : ["--bundles-channel", channel];
 
-        (await init.ParseInvocation([target, "--template", "basic", "--language", "js", .. options]).InvokeAsync())
+        (await init.ParseInvocation([target, "--template", "basic", "--language", "js", "--skip-npm-install", .. options]).InvokeAsync())
             .Should().Be(0, _interaction.AllOutput);
 
         using var host = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "host.json")));

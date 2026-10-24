@@ -291,7 +291,7 @@ public sealed partial class BundledNodeTemplateTests
                  new(node.PackageId, NuGetVersion.Parse(node.PackageVersion), node.Aliases, true)]));
 
         int exit = await command.ParseInvocation([target, "--template", "Azure.Functions.Node.Basic.JavaScript",
-            "--name", "Ordinary", "--non-interactive", "--output", "json"]).InvokeAsync();
+            "--name", "Ordinary", "--skip-npm-install", "--non-interactive", "--output", "json"]).InvokeAsync();
 
         exit.Should().Be(0, _interaction.AllOutput);
         File.Exists(Path.Combine(target, "host.json")).Should().BeTrue();
