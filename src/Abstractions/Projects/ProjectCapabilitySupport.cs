@@ -8,7 +8,18 @@ namespace Azure.Functions.Cli.Projects;
 /// </summary>
 public enum ProjectCapabilitySupport
 {
+    /// <summary>
+    /// The runtime has not established whether the project supports the capability.
+    /// </summary>
     Unknown,
+
+    /// <summary>
+    /// The runtime reports that the project supports the capability.
+    /// </summary>
     Supported,
+
+    /// <summary>
+    /// The runtime reports that the project does not support the capability.
+    /// </summary>
     Unsupported,
 }

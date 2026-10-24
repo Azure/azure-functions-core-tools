@@ -28,7 +28,7 @@ internal sealed class ItemTemplateCompatibilityMatcher
         List<ItemTemplateCompatibilityDiagnostic> diagnostics = [];
         if (!SameProject(context, afterCapture))
         {
-            diagnostics.Add(new("project-changed", "The resolved project root or authority changed while facts were captured. Rerun admission."));
+            diagnostics.Add(new("project-changed", "The resolved project root or runtime owner changed while project facts were captured. Start a new compatibility evaluation."));
         }
 
         if (!requirements.IsDeclared)
@@ -128,17 +128,17 @@ internal sealed class ItemTemplateCompatibilityMatcher
         List<ItemTemplateCompatibilityDiagnostic> changes = [];
         if (!SameProject(admission.Context, current.Context))
         {
-            changes.Add(new("project-changed", "The admission belongs to another project root or runtime authority. Make a new admission decision."));
+            changes.Add(new("project-changed", "The recorded compatibility decision belongs to a different project root or runtime owner. Start a new compatibility evaluation."));
         }
 
         if (admission.RequirementsFingerprint != current.RequirementsFingerprint)
         {
-            changes.Add(new("requirements-changed", "The item requirements changed after admission. Make a new admission decision."));
+            changes.Add(new("requirements-changed", "The template's capability requirements changed after compatibility was evaluated. Start a new compatibility evaluation."));
         }
 
         if (admission.ProjectFactsFingerprint != current.ProjectFactsFingerprint)
         {
-            changes.Add(new("project-facts-changed", "The project facts or inspected evidence changed after admission. Make a new admission decision."));
+            changes.Add(new("project-facts-changed", "The project facts or inspected inputs changed after compatibility was evaluated. Start a new compatibility evaluation."));
         }
 
         if (changes.Count != 0)
@@ -149,7 +149,7 @@ internal sealed class ItemTemplateCompatibilityMatcher
         if (admission.Compatibility != current.Compatibility)
         {
             return new(current.Context, requirements, current.ProjectFacts, ItemTemplateCompatibility.Unknown,
-                [new("admission-outcome-changed", "The admission outcome changed during evidence recapture. Make a new admission decision.")]);
+                [new("admission-outcome-changed", "The compatibility result changed when project facts were captured again. Start a new compatibility evaluation.")]);
         }
 
         return current;

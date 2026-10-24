@@ -1,9 +1,13 @@
 ## Current P0 purpose
 
-Defines fail-closed semantic item admission through CLI-owned runtime facts and
-publisher requirements. The [current design](../../design.md) owns API and
-declaration details. These requirements are implemented and unit-tested as a
-foundation, not integrated with public commands, package loading or preparation.
+Defines how generic Templates code checks publisher-declared project-capability
+requirements against runtime-reported facts about the existing project. The CLI
+owns the shared contracts; the runtime owns interpretation of the project.
+Missing or inconclusive evidence does not establish compatibility.
+
+The [current design](../../design.md) owns API and declaration details. These
+requirements are implemented and unit-tested as a foundation, not integrated
+with public commands, package loading or preparation.
 
 ### Requirement: Runtime-owned current project facts
 

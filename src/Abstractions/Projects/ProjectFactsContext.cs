@@ -15,6 +15,9 @@ public sealed class ProjectFactsContext(string projectRoot, string? authority, G
     /// </summary>
     public string ProjectRoot { get; } = NormalizeRoot(projectRoot);
 
+    /// <summary>
+    /// Gets the stable identifier of the runtime responsible for interpreting the project, or null when no authority is available.
+    /// </summary>
     public string? Authority { get; } = ValidateAuthority(authority);
 
     /// <summary>
@@ -122,7 +125,7 @@ public sealed class ProjectFactsContext(string projectRoot, string? authority, G
     {
         if (authority is not null && !ProjectCapability.IsValidId(authority))
         {
-            throw new ArgumentException("The project facts authority must be an opaque identifier.", nameof(authority));
+            throw new ArgumentException("The project facts authority must start with an ASCII letter or digit and contain only ASCII letters, digits, '.', '-' or '_'.", nameof(authority));
         }
 
         return authority;

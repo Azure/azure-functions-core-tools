@@ -516,7 +516,7 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_MalformedDeclaration_FailsBeforeRuntimeCapture()
+    public async Task Parse_MalformedDeclarationArgument_ThrowsBeforeRuntimeCapture()
     {
         var project = new TestProject();
         Func<Task> action = () => _matcher.EvaluateAsync(project,

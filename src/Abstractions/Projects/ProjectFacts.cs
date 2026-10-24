@@ -54,6 +54,13 @@ public sealed class ProjectFacts
     /// </summary>
     public string EvidenceFingerprint { get; }
 
+    /// <summary>
+    /// Gets whether the runtime established this snapshot by inspecting the current project inputs rather than inferring support from runtime labels alone.
+    /// A false value prevents the snapshot from establishing either compatibility or incompatibility.
+    /// </summary>
+    /// <remarks>
+    /// This is a runtime assertion, not authentication or independent verification that the runtime inspected every relevant input.
+    /// </remarks>
     public bool IsAuthoritative { get; }
 
     public IReadOnlyList<ProjectCapability> Capabilities { get; }

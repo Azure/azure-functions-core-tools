@@ -6,7 +6,8 @@ using Azure.Functions.Cli.Projects;
 namespace Azure.Functions.Cli.Templates.Compatibility;
 
 /// <summary>
-/// Records compatibility with immutable evidence. It does not authorize or perform template execution.
+/// Records a compatibility decision and its immutable evidence.
+/// It does not authorize template preparation, generation, execution, or publication.
 /// </summary>
 internal sealed class ItemTemplateAdmission(
     ProjectFactsContext context,
@@ -27,6 +28,10 @@ internal sealed class ItemTemplateAdmission(
 
     public ItemTemplateCompatibility Compatibility { get; } = compatibility;
 
+    /// <summary>
+    /// Gets whether this result passes the project-capability check.
+    /// A true value is necessary, but not sufficient, for later preparation.
+    /// </summary>
     public bool IsEligibleForPreparation => Compatibility == ItemTemplateCompatibility.Compatible;
 
     public IReadOnlyList<ItemTemplateCompatibilityDiagnostic> Diagnostics { get; } =

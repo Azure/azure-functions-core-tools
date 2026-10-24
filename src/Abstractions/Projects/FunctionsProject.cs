@@ -28,12 +28,13 @@ public abstract class FunctionsProject
     public abstract FunctionsWorkerReference WorkerReference { get; }
 
     /// <summary>
-    /// Identifies the runtime owner of semantic project facts, or returns null when facts are unavailable.
+    /// Gets the stable identifier of the runtime that interprets this project's capabilities, or null when no authority is available.
     /// </summary>
     public virtual string? ProjectFactsAuthority => null;
 
     /// <summary>
-    /// Captures current semantic facts from this project without modifying it. Returns null when unsupported.
+    /// Captures current facts about the existing project without modifying it.
+    /// Returns null when the runtime cannot provide a facts snapshot.
     /// </summary>
     /// <remarks>
     /// Implementations must inspect the actual project on each call and fingerprint all inputs used to establish facts.

@@ -57,7 +57,7 @@ The main tool users install and run. Assembly name is `func`.
 | `Commands/Workload/` | `func workload` parent command + `func workload list` |
 | `Console/`         | `IInteractionService` abstraction + Spectre.Console implementation, theme |
 | `Common/`          | Shared utilities — `Constants`, `Stacks` (stack registry), `VersionChecker` |
-| `Templates/Compatibility/` | Neutral, fail-closed item admission over runtime-owned project facts. Not wired into commands or template execution yet; see the [current Templates status](templating-system/design.md). |
+| `Templates/Compatibility/` | Checks function-template requirements against runtime-reported project capabilities without runtime-specific rules. Unknown does not pass this check. Not connected to commands, preparation, or execution; see the [current Templates status](templating-system/design.md). |
 | `Hosting/`         | `DefaultFunctionsCliBuilder` (internal `FunctionsCliBuilder` impl), `BuiltInCommands` DI registrations, and `WorkloadRegistration` (workload bootstrap seam) |
 | `Workloads/`       | `ExternalCommand` — internal `FuncCliCommand` adapter that wraps a workload-supplied `FuncCommand` and carries the owning `WorkloadInfo`. `WorkloadDetectorContribution` mirrors the same pattern for `IProjectDetector` registrations. |
 | `Workloads/Resolution/` | `IWorkloadResolver` + supporting types (`ILocalSettingsReader`, `IDirectoryMarkerMatcher`) implementing the spec §5.2 resolution algorithm |
@@ -73,7 +73,7 @@ A packable NuGet library (`Azure.Functions.Cli.Abstractions`) hosting the public
 | File / Type | Role |
 |-------------|------|
 | `Common/GracefulException` | User-friendly exception with optional verbose detail; drives non-zero exit codes |
-| `Projects/FunctionsProject`, `ProjectFactsContext`, `ProjectFacts`, `ProjectCapability`, `ProjectCapabilitySupport` | Optional read-only runtime facts contract. Separately shipped runtimes own actual-project interpretation; absent facts mean Unknown, not item compatibility. |
+| `Projects/FunctionsProject`, `ProjectFactsContext`, `ProjectFacts`, `ProjectCapability`, `ProjectCapabilitySupport` | Optional, read-only contracts for runtimes to report project capabilities. Separately shipped runtimes interpret the actual project; absent facts leave compatibility Unknown. |
 | `Workloads/IWorkload` | Workload entry point — identity properties + `Configure(FunctionsCliBuilder)` |
 | `Workloads/FunctionsCliBuilder` | DI seam (abstract base) — `Services` for plain DI plus `RegisterCommand(...)` overloads for top-level commands |
 | `Workloads/FuncCommand` | Parser-independent base for workload-contributed top-level commands (Name, Description, Options, Arguments, Subcommands, ExecuteAsync) |
