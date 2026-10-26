@@ -6,8 +6,8 @@
     version it carries:
       $(WorkerVersion) - the PowerShell worker package version. Mirrors the
                          Microsoft.Azure.Functions.PowerShellWorker.PS7.x
-                         versions pulled in at pack time. All per-version
-                         packages share the same version number.
+                         versions pulled in at pack time. Uses the highest
+                         per-version package version.
 
     Unlike the bundles workload, there is no channel axis: the upstream
     PowerShellWorker NuGets don't ship preview/experimental SKUs, so the
@@ -15,9 +15,9 @@
   -->
 
   <PropertyGroup>
-    <WorkerVersion>4.0.4778</WorkerVersion>
-    <WorkerVersionPS74>4.0.4759</WorkerVersionPS74>
-    <WorkerVersionPS76>4.0.4778</WorkerVersionPS76>
+    <WorkerVersion>4.0.5362</WorkerVersion>
+    <WorkerVersionPS74>4.0.5361</WorkerVersionPS74>
+    <WorkerVersionPS76>4.0.5362</WorkerVersionPS76>
     <VersionPrefix>$(WorkerVersion)</VersionPrefix>
     <VersionSuffix>preview.1</VersionSuffix>
   </PropertyGroup>

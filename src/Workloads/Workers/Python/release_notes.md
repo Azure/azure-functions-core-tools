@@ -1,5 +1,9 @@
 # Azure.Functions.Cli.Workloads.Workers.Python
 
+## 4.46.0-preview.3
+
+- Updated the Python worker payload to 4.46.0, matching host release 4.1054.200.
+
 ## 4.43.0-preview.3
 
 - Updated package layout to RID pointer format for per-OS/arch workload resolution. Compatible with CLI `5.0.0-preview.3`+; not compatible with earlier CLI releases.
