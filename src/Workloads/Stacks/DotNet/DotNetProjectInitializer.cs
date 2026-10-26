@@ -20,7 +20,7 @@ internal sealed class DotNetProjectInitializer(
     internal const string TemplateShortName = "func";
     internal const string DefaultFramework = "net10.0";
 
-    internal static readonly IReadOnlyList<string> SupportedFrameworks = ["net10.0"];
+    internal static readonly IReadOnlyList<string> SupportedFrameworks = ["net10.0", "net11.0"];
 
     internal static readonly TimeSpan HiveTtl = TimeSpan.FromDays(30);
     internal static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
@@ -47,7 +47,7 @@ internal sealed class DotNetProjectInitializer(
 
         FrameworkOption = registry.GetOrAdd(new Option<string>("--target-framework", "-tfm")
         {
-            Description = "The target framework for the project (e.g. net10.0).",
+            Description = "The target framework for the project (net10.0 or net11.0; default: net10.0; net11.0 requires C#).",
             DefaultValueFactory = _ => DefaultFramework
         });
 
@@ -74,6 +74,13 @@ internal sealed class DotNetProjectInitializer(
         if (!SupportedFrameworks.Contains(framework, StringComparer.OrdinalIgnoreCase))
         {
             throw new ArgumentException($"Framework '{framework}' is not supported. Supported frameworks: {string.Join(", ", SupportedFrameworks)}.", nameof(framework));
+        }
+
+        if (framework.Equals("net11.0", StringComparison.OrdinalIgnoreCase) && language == "F#")
+        {
+            throw new GracefulException(
+                ".NET 11 isolated project initialization is not yet supported for F#. Use C# or target .NET 10 instead.",
+                isUserError: true);
         }
 
         try

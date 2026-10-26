@@ -32,13 +32,16 @@ public class DotNetSourceProjectTests : IDisposable
         }
     }
 
-    [Fact]
-    public async Task PrepareForHostRunAsync_builds_and_sets_startup_directory_from_target_result()
+    [Theory]
+    [InlineData("net10.0", "csproj")]
+    [InlineData("net11.0", "csproj")]
+    [InlineData("net11.0", "fsproj")]
+    public async Task PrepareForHostRunAsync_builds_and_sets_startup_directory_from_target_result(string framework, string projectExtension)
     {
-        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        string projectFile = Path.Combine(_projectDir.FullName, $"MyApp.{projectExtension}");
         File.WriteAllText(projectFile, "<Project></Project>");
 
-        string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", "net10.0", "MyApp.dll");
+        string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", framework, "MyApp.dll");
         string json = BuildTargetResultJson(assemblyPath, "Build");
 
         SetupStreamingBuild("--getTargetResult:Build", json);
@@ -78,13 +81,16 @@ public class DotNetSourceProjectTests : IDisposable
         reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsProjectReportSeverity.Error && entry.Line == "warning XYZ: heads up");
     }
 
-    [Fact]
-    public async Task PrepareForHostRunAsync_skip_build_uses_get_target_path()
+    [Theory]
+    [InlineData("net10.0", "csproj")]
+    [InlineData("net11.0", "csproj")]
+    [InlineData("net11.0", "fsproj")]
+    public async Task PrepareForHostRunAsync_skip_build_uses_get_target_path(string framework, string projectExtension)
     {
-        string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
+        string projectFile = Path.Combine(_projectDir.FullName, $"MyApp.{projectExtension}");
         File.WriteAllText(projectFile, "<Project></Project>");
 
-        string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", "net10.0", "MyApp.dll");
+        string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", framework, "MyApp.dll");
         string json = BuildTargetResultJson(assemblyPath, "GetTargetPath");
 
         // --no-build trusts existing output, so the assembly must actually be on disk.
