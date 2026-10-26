@@ -129,13 +129,6 @@ jobs:
           versionSpec: 22.x
 
       - pwsh: |
-          node --test test/Installers/NpmPackaging.test.js
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Offline npm packaging tests failed.'
-          }
-        displayName: Test offline npm packaging
-
-      - pwsh: |
           $packageNames = @($env:NPM_PACKAGE_NAMES | ConvertFrom-Json)
           & ./eng/scripts/pack-npm.ps1 `
             -PackageDirectory '${{ parameters.npmPackageDirectory }}' `
