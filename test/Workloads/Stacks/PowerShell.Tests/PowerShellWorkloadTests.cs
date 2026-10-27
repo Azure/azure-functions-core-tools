@@ -23,6 +23,17 @@ public class PowerShellWorkloadTests
         initializer.Should().BeOfType<PowerShellProjectInitializer>();
         initializer.Stack.Should().Be("powershell");
         initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("PowerShell");
+
+        IProjectStack stack = provider.GetRequiredService<IProjectStack>();
+        stack.Should().BeOfType<PowerShellProjectStack>();
+        stack.Should().BeSameAs(provider.GetRequiredService<PowerShellProjectStack>());
+        stack.Should().NotBeAssignableTo<IProjectInitializer>();
+        stack.Stack.Should().Be(initializer.Stack);
+        stack.DisplayName.Should().Be("PowerShell").And.Be(initializer.DisplayName);
+        stack.WorkerRuntimeAliases.Should().BeEmpty().And.Equal(initializer.WorkerRuntimeAliases);
+        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
+        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
+        stack.SupportedLanguageAliases["PowerShell"].Should().Equal("pwsh", "ps");
     }
 
     [Fact]

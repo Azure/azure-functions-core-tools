@@ -10,6 +10,12 @@ namespace Azure.Functions.Cli.Common;
 internal sealed class CliEnvironmentOptions
 {
     /// <summary>
+    /// Base directory containing the running application. Defaults to
+    /// <see cref="AppContext.BaseDirectory"/>.
+    /// </summary>
+    public string BaseDirectory { get; set; } = AppContext.BaseDirectory;
+
+    /// <summary>
     /// Full path of the running executable. Defaults to
     /// <see cref="Environment.ProcessPath"/>.
     /// </summary>

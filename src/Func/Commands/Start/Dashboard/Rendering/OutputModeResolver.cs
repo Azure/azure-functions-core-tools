@@ -10,8 +10,8 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// explicit flags + auto-detection. Mode selection rules (locked in the
 /// design plan):
 /// <list type="number">
-///   <item>Explicit <c>--output</c> always wins.</item>
-///   <item><c>--no-tui</c> is an alias for <c>--output=plain</c>.</item>
+///   <item>Explicit <c>--format</c> always wins.</item>
+///   <item><c>--no-tui</c> is an alias for <c>--format=plain</c>.</item>
 ///   <item>Auto: console lacks interactive input or ANSI output → <c>plain</c>; otherwise <c>compact</c>.</item>
 ///   <item>JSON is never auto-selected — callers must opt in.</item>
 /// </list>

@@ -1,6 +1,6 @@
 # `func start` JSON output schema
 
-`func start --output=json` (alias: `--output json`) emits one self-contained
+`func start --format=json` (alias: `--format json`) emits one self-contained
 JSON object per line on stdout (newline-delimited JSON, NDJSON / JSON Lines).
 Records are not wrapped in an array; there are no commas between them.
 See [`func-start-output-modes.md`](func-start-output-modes.md) for how JSON
@@ -296,8 +296,8 @@ actionable `recommendation` when one applies.
   "timestamp": "2026-05-11T07:20:14.000Z",
   "code": "renderer_downgrade",
   "level": "warning",
-  "message": "Interactive input or ANSI output is unavailable; falling back to --output=plain.",
-  "recommendation": "Re-run with --output=plain to silence this notice, or with --output=json for programmatic use."
+  "message": "Interactive input or ANSI output is unavailable; falling back to --format=plain.",
+  "recommendation": "Re-run with --format=plain to silence this notice, or with --format=json for programmatic use."
 }
 ```
 

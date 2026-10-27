@@ -2,7 +2,9 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates;
 using NSubstitute;
 
@@ -32,6 +34,58 @@ public class NewCommandTests
         optionNames.Should().Contain("--force");
         optionNames.Should().Contain("--non-interactive");
         optionNames.Should().Contain("--list");
+        optionNames.Should().Contain("--format");
+        optionNames.Should().NotContain("--output");
+    }
+
+    [Theory]
+    [InlineData("plain", false)]
+    [InlineData("json", true)]
+    public async Task NewCommand_Format_ForwardsRenderingMode(string format, bool expectedJsonOutput)
+    {
+        var command = new NewCommand(_runner, _templateOptions);
+        _runner.ListAsync(Arg.Any<NewInvocation>(), Arg.Any<CancellationToken>()).Returns(0);
+        ParseResult result = command.Parse(["--list", "--format", format]);
+
+        int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        exitCode.Should().Be(0);
+        await _runner.Received(1).ListAsync(
+            Arg.Is<NewInvocation>(invocation => invocation.JsonOutput == expectedJsonOutput),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("--output", "json")]
+    [InlineData("--output=json")]
+    [InlineData("--output:json")]
+    public void NewCommand_RemovedOutputOption_ReportsUnrecognizedOption(params string[] args)
+    {
+        var command = new NewCommand(_runner, _templateOptions);
+        ParseResult result = command.Parse(["--list", .. args]);
+
+        result.Errors.Should().Contain(error =>
+            error.Message.Contains("Unrecognized", StringComparison.Ordinal)
+            && error.Message.Contains("--output", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("--output", "json")]
+    [InlineData("--output=json")]
+    [InlineData("--output:json")]
+    public async Task NewCommand_RemovedOutputOptionWithExplicitPath_RejectsBeforeDispatch(params string[] args)
+    {
+        var command = new NewCommand(_runner, _templateOptions);
+        ParseResult result = command.Parse([".", "--list", .. args]);
+
+        GracefulException exception = (await FluentActions
+            .Awaiting(() => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+            .Should().ThrowAsync<GracefulException>()).Which;
+
+        exception.Message.Should().Contain("--output");
+        exception.Message.Should().Contain("--format");
+        await _runner.DidNotReceiveWithAnyArgs().ListAsync(default!, default);
+        await _runner.DidNotReceiveWithAnyArgs().ExecuteAsync(default!, default);
     }
 
     [Fact]
@@ -64,4 +118,3 @@ public class NewCommandTests
         result.Errors.Should().Contain(e => e.Message.Contains("Unrecognized option '-name'", System.StringComparison.Ordinal));
     }
 }
-
