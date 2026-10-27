@@ -86,6 +86,7 @@ internal static class CliHostFactory
         // user hasn't opted out; otherwise ActivitySource / Meter calls no-op.
         if (CliTelemetry.TryGetConnectionString(out string? connectionString))
         {
+            CliTelemetry.ConfigureProcessSettings();
             telemetryEnvironment.Apply();
             builder.Services.AddOpenTelemetry()
                 .ConfigureResource(r => CliTelemetry.ConfigureResource(r))

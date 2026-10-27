@@ -25,17 +25,14 @@ namespace Azure.Functions.Cli.Telemetry;
 /// </remarks>
 internal static class CliTelemetry
 {
+    internal const string ShutdownDrainBudgetName =
+        "Azure.Monitor.OpenTelemetry.Exporter.ShutdownDrainBudgetMilliseconds";
+
     /// <summary>
     /// OTel source / service name. Lowercase, dotted form to match the
     /// convention used by the Functions host (<c>azure.functions.host</c>).
     /// </summary>
     public const string SourceName = "azure.functions.cli";
-
-    /// <summary>
-    /// Sentinel value used in dev/local builds where the real instrumentation
-    /// key has not been injected via the build-time attribute.
-    /// </summary>
-    private const string EmptyInstrumentationKey = "00000000-0000-0000-0000-000000000000";
 
     public static readonly string CliVersion = ResolveCliVersion();
 
@@ -90,20 +87,31 @@ internal static class CliTelemetry
         options.EnablePerformanceCounters = false;
     }
 
+    internal static void ConfigureProcessSettings()
+    {
+        AppContext.SetData(ShutdownDrainBudgetName, 0);
+    }
+
     private static readonly HashSet<string> _optOutFalseSentinels =
         new(StringComparer.OrdinalIgnoreCase) { "no", "n", "0", "false", "off" };
 
     /// <summary>
     /// Returns the Azure Monitor connection string when telemetry is
-    /// configured (build has a real instrumentation key) and the user has
+    /// configured (build has a connection string) and the user has
     /// not opted out.
     /// </summary>
     public static bool TryGetConnectionString([NotNullWhen(true)] out string? connectionString)
     {
+        return TryGetConnectionString(Constants.TelemetryConnectionString, out connectionString);
+    }
+
+    internal static bool TryGetConnectionString(
+        string? configuredConnectionString,
+        [NotNullWhen(true)] out string? connectionString)
+    {
         connectionString = null;
 
-        string key = Constants.TelemetryInstrumentationKey;
-        if (string.IsNullOrEmpty(key) || key == EmptyInstrumentationKey)
+        if (string.IsNullOrWhiteSpace(configuredConnectionString))
         {
             return false;
         }
@@ -114,7 +122,7 @@ internal static class CliTelemetry
             return false;
         }
 
-        connectionString = $"InstrumentationKey={key}";
+        connectionString = configuredConnectionString;
         return true;
     }
 

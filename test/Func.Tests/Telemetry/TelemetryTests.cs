@@ -11,13 +11,21 @@ namespace Azure.Functions.Cli.Tests.Telemetry;
 
 public class TelemetryTests
 {
+    private const string TestConnectionString =
+        "InstrumentationKey=11111111-1111-1111-1111-111111111111;IngestionEndpoint=https://westus-0.in.applicationinsights.azure.com/";
+
     [Fact]
-    public void TryGetConnectionString_DefaultBuild_ReturnsFalse()
+    public void TryGetConnectionString_MissingConfiguration_ReturnsFalse()
     {
-        // Default build has the all-zeros instrumentation key, so telemetry
-        // is not configured.
-        CliTelemetry.TryGetConnectionString(out var connectionString).Should().BeFalse();
+        CliTelemetry.TryGetConnectionString(string.Empty, out var connectionString).Should().BeFalse();
         connectionString.Should().BeNull();
+    }
+
+    [Fact]
+    public void TryGetConnectionString_Configured_ReturnsFullConnectionString()
+    {
+        CliTelemetry.TryGetConnectionString(TestConnectionString, out var connectionString).Should().BeTrue();
+        connectionString.Should().Be(TestConnectionString);
     }
 
     [Theory]
@@ -25,13 +33,11 @@ public class TelemetryTests
     [InlineData(Azure.Functions.Cli.Common.Constants.LegacyTelemetryOptOutEnvVar)]
     public void TryGetConnectionString_OptOutEnvVarSet_ReturnsFalse(string envVarName)
     {
-        // Even with a non-default key, an opt-out via either the new or
+        // Even with a configured connection string, an opt-out via either the new or
         // legacy env var must short-circuit telemetry.
         using var optOut = new EnvVarScope(envVarName, "1");
 
-        // We can't override the build-time key from a test, so we just
-        // assert the helper agrees the opt-out wins regardless of key state.
-        CliTelemetry.TryGetConnectionString(out _).Should().BeFalse();
+        CliTelemetry.TryGetConnectionString(TestConnectionString, out _).Should().BeFalse();
     }
 
     [Theory]
@@ -47,13 +53,11 @@ public class TelemetryTests
     public void TryGetConnectionString_OptOutFalseSentinels_DoNotOptOut(string value)
     {
         // The documented "off" sentinels must NOT be treated as opt-out.
-        // The default build still returns false because of the missing key,
-        // but the opt-out path itself should not be the reason.
         using var optOut = new EnvVarScope(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar, value);
         using var legacy = new EnvVarScope(Azure.Functions.Cli.Common.Constants.LegacyTelemetryOptOutEnvVar, value);
 
-        // Just exercising the path; result is gated by the build key.
-        _ = CliTelemetry.TryGetConnectionString(out _);
+        CliTelemetry.TryGetConnectionString(TestConnectionString, out var connectionString).Should().BeTrue();
+        connectionString.Should().Be(TestConnectionString);
     }
 
     [Theory]
@@ -68,7 +72,7 @@ public class TelemetryTests
         // an opt-out, so we fail safe toward not collecting telemetry.
         using var optOut = new EnvVarScope(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar, value);
 
-        CliTelemetry.TryGetConnectionString(out _).Should().BeFalse();
+        CliTelemetry.TryGetConnectionString(TestConnectionString, out _).Should().BeFalse();
     }
 
     private sealed class EnvVarScope : IDisposable
@@ -276,7 +280,9 @@ public class TelemetryTests
     {
         var options = new AzureMonitorExporterOptions();
 
-        CliTelemetry.ConfigureExporter(options, "InstrumentationKey=00000000-0000-0000-0000-000000000000");
+        CliTelemetry.ConfigureExporter(
+            options,
+            "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://westus-0.in.applicationinsights.azure.com/");
 
         options.TracesPerSecond.Should().BeNull();
         options.SamplingRatio.Should().Be(1.0F);

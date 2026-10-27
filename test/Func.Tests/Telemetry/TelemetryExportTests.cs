@@ -26,17 +26,30 @@ public sealed class TelemetryExportCollection
 }
 
 [Collection(TelemetryExportCollection.Name)]
-public class TelemetryExportTests
+public class TelemetryExportTests : IDisposable
 {
+    private readonly ITelemetryEnvironmentScope _environment;
+
+    public TelemetryExportTests()
+    {
+        _environment = new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
+        _environment.Apply();
+    }
+
+    public void Dispose()
+    {
+        _environment.Dispose();
+    }
+
     [Fact]
     public void AzureMonitorExport_ContainsEnrichedSignalsWithoutResourceOrSdkMetrics()
     {
-        using var environment = (ITelemetryEnvironmentScope)new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
-        environment.Apply();
         var payloads = new ConcurrentQueue<string>();
         using var client = new HttpClient(new RecordingHandler(payloads));
         var options = new AzureMonitorExporterOptions();
-        CliTelemetry.ConfigureExporter(options, "InstrumentationKey=11111111-1111-1111-1111-111111111111");
+        CliTelemetry.ConfigureExporter(
+            options,
+            "InstrumentationKey=11111111-1111-1111-1111-111111111111;IngestionEndpoint=https://westus-0.in.applicationinsights.azure.com/");
         options.Transport = new HttpClientTransport(client);
         options.DisableOfflineStorage = true;
 
@@ -147,9 +160,11 @@ public class TelemetryExportTests
         using var client = new HttpClient(new RecordingHandler(payloads));
         var options = new AzureMonitorExporterOptions();
 
-        // A distinct instrumentation key per call avoids colliding with the
+        // A distinct connection string per call avoids colliding with the
         // Azure Monitor exporter's process-wide per-key transmitter cache.
-        CliTelemetry.ConfigureExporter(options, $"InstrumentationKey={Guid.NewGuid()}");
+        CliTelemetry.ConfigureExporter(
+            options,
+            $"InstrumentationKey={Guid.NewGuid()};IngestionEndpoint=https://westus-0.in.applicationinsights.azure.com/");
         options.Transport = new HttpClientTransport(client);
         options.DisableOfflineStorage = true;
 
@@ -185,6 +200,59 @@ public class TelemetryExportTests
                 .Any(metric => metric.GetProperty("name").GetString() == TelemetryConventions.CommandCountInstrument));
     }
 
+    [Fact]
+    public async Task AzureMonitorExport_ZeroShutdownDrainBudget_DoesNotWaitForNetwork()
+    {
+        object? originalDrainBudget = AppContext.GetData(CliTelemetry.ShutdownDrainBudgetName);
+        string storageDirectory = Path.Combine(Path.GetTempPath(), $"func-telemetry-{Guid.NewGuid():N}");
+        using var releaseRequest = new ManualResetEventSlim();
+        using var client = new HttpClient(new BlockingHandler(releaseRequest));
+        var options = new AzureMonitorExporterOptions();
+        CliTelemetry.ConfigureExporter(
+            options,
+            $"InstrumentationKey={Guid.NewGuid()};IngestionEndpoint=https://westus-0.in.applicationinsights.azure.com/");
+        options.Transport = new HttpClientTransport(client);
+        options.StorageDirectory = storageDirectory;
+
+        CliTelemetry.ConfigureProcessSettings();
+        try
+        {
+            HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(null);
+            builder.Services.AddOpenTelemetry()
+                .ConfigureResource(r => CliTelemetry.ConfigureResource(r))
+                .WithTracing(t => t
+                    .AddSource(CliTelemetry.SourceName)
+                    .AddAzureMonitorTraceExporter(o => CopyOptions(options, o)))
+                .WithMetrics(m => m
+                    .AddMeter(CliTelemetry.SourceName)
+                    .AddAzureMonitorMetricExporter(o => CopyOptions(options, o)));
+
+            IHost host = builder.Build();
+            await host.StartAsync();
+
+            using (Activity? command = CliTelemetry.Trace.StartCommandActivity(DateTimeOffset.UtcNow))
+            {
+                command.Should().NotBeNull();
+                command!.SetCommandName("zero-drain-budget-test");
+                CliTelemetry.Metric.RecordCommand("zero-drain-budget-test", exitCode: 0, durationMs: 1);
+            }
+
+            var disposeTask = Task.Run(host.Dispose);
+            var completed = await Task.WhenAny(disposeTask, Task.Delay(TimeSpan.FromSeconds(1)));
+            completed.Should().Be(disposeTask);
+            Directory.EnumerateFiles(storageDirectory, "*", SearchOption.AllDirectories).Should().NotBeEmpty();
+        }
+        finally
+        {
+            releaseRequest.Set();
+            AppContext.SetData(CliTelemetry.ShutdownDrainBudgetName, originalDrainBudget);
+            if (Directory.Exists(storageDirectory))
+            {
+                Directory.Delete(storageDirectory, recursive: true);
+            }
+        }
+    }
+
     private static void CopyOptions(AzureMonitorExporterOptions source, AzureMonitorExporterOptions destination)
     {
         destination.ConnectionString = source.ConnectionString;
@@ -195,20 +263,21 @@ public class TelemetryExportTests
         destination.EnablePerformanceCounters = source.EnablePerformanceCounters;
         destination.Transport = source.Transport;
         destination.DisableOfflineStorage = source.DisableOfflineStorage;
+        destination.StorageDirectory = source.StorageDirectory;
     }
 
     private static (TracerProvider Traces, MeterProvider Metrics) BuildProviders(ConcurrentQueue<string> payloads)
     {
-        using var environment = (ITelemetryEnvironmentScope)new CliTelemetryEnvironment(new ProcessEnvironment(), Environment.SetEnvironmentVariable);
-        environment.Apply();
         var client = new HttpClient(new RecordingHandler(payloads));
         var options = new AzureMonitorExporterOptions();
 
-        // A distinct instrumentation key per call avoids colliding with the
+        // A distinct connection string per call avoids colliding with the
         // Azure Monitor exporter's process-wide per-key transmitter cache,
         // which would otherwise route this test's telemetry through a
         // different test's (already-torn-down) transport.
-        CliTelemetry.ConfigureExporter(options, $"InstrumentationKey={Guid.NewGuid()}");
+        CliTelemetry.ConfigureExporter(
+            options,
+            $"InstrumentationKey={Guid.NewGuid()};IngestionEndpoint=https://westus-0.in.applicationinsights.azure.com/");
         options.Transport = new HttpClientTransport(client);
         options.DisableOfflineStorage = true;
 
@@ -255,6 +324,18 @@ public class TelemetryExportTests
 
             using var reader = new StreamReader(stream);
             payloads.Enqueue(reader.ReadToEnd());
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(Send(request, cancellationToken));
+    }
+
+    private sealed class BlockingHandler(ManualResetEventSlim releaseRequest) : HttpMessageHandler
+    {
+        protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            releaseRequest.Wait(cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
         }
 
