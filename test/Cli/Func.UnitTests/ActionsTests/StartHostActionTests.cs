@@ -28,7 +28,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData(WorkerRuntime.Python)]
         [InlineData(WorkerRuntime.Custom)]
         [InlineData(WorkerRuntime.None)]
-        public void ConfigureLanguageWorkerDefaults_SetsWindowsGoExecutablePathOnly(WorkerRuntime runtime)
+        public void AddGoWorkerConfigurationDefaults_SetsWindowsGoExecutablePathOnly(WorkerRuntime runtime)
         {
             var originalRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             try
@@ -36,7 +36,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 GlobalCoreToolsSettings.CurrentWorkerRuntime = runtime;
                 var builder = new ConfigurationBuilder();
 
-                StartHostAction.ConfigureLanguageWorkerDefaults(builder);
+                StartHostAction.AddGoWorkerConfigurationDefaults(builder);
 
                 var expected = OperatingSystem.IsWindows() && runtime == WorkerRuntime.Go
                     ? Path.Combine("bin", "app.exe")
@@ -56,7 +56,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData(@"C:\custom worker\worker.exe", false)]
         [InlineData("bin/app", true)]
         [InlineData("bin/app", false)]
-        public void ConfigureLanguageWorkerDefaults_PreservesExplicitPath(string executablePath, bool configureFirst)
+        public void AddGoWorkerConfigurationDefaults_PreservesExplicitPath(string executablePath, bool configureFirst)
         {
             var originalRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             try
@@ -73,7 +73,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                     builder.AddInMemoryCollection(settings);
                 }
 
-                StartHostAction.ConfigureLanguageWorkerDefaults(builder);
+                StartHostAction.AddGoWorkerConfigurationDefaults(builder);
 
                 if (!configureFirst)
                 {
@@ -91,7 +91,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [Theory]
         [InlineData("languageWorkers:native:defaultExecutablePath")]
         [InlineData("languageWorkers__native__defaultExecutablePath")]
-        public void ConfigureLanguageWorkerDefaults_PreservesEnvironmentPath(string settingName)
+        public void AddGoWorkerConfigurationDefaults_PreservesEnvironmentPath(string settingName)
         {
             var originalRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
             var settingNames = new[]
@@ -112,7 +112,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
                 Environment.SetEnvironmentVariable(settingName, executablePath);
                 var builder = new ConfigurationBuilder();
 
-                StartHostAction.ConfigureLanguageWorkerDefaults(builder);
+                StartHostAction.AddGoWorkerConfigurationDefaults(builder);
                 builder.AddEnvironmentVariables();
 
                 builder.Build()["languageWorkers:native:defaultExecutablePath"].Should().Be(executablePath);

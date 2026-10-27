@@ -244,7 +244,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .UseUrls(listenAddress.ToString())
                 .ConfigureAppConfiguration(configBuilder =>
                 {
-                    ConfigureLanguageWorkerDefaults(configBuilder);
+                    AddGoWorkerConfigurationDefaults(configBuilder);
                     configBuilder.AddEnvironmentVariables();
                 })
                 .ConfigureLogging(loggingBuilder =>
@@ -295,7 +295,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
         }
 #pragma warning restore ASPDEPR008
 
-        internal static void ConfigureLanguageWorkerDefaults(IConfigurationBuilder configBuilder)
+        internal static void AddGoWorkerConfigurationDefaults(IConfigurationBuilder configBuilder)
         {
             if (OperatingSystem.IsWindows() && GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.Go)
             {
