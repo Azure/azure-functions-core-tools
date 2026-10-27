@@ -4,7 +4,6 @@
 
 #### Changes
 
-- Add Python 3.15 support through the 4.46.2 Python worker workload and built-in profile constraints, including Windows ARM64.
 - `func init` now adopts an existing project's language (writes `stack.language` to `.func/config.json`) using the runtime project resolver. (#5300)
 - `func init` heals a `.func/config.json` that has `stack.runtime` but no `stack.language` on a multi-language stack, instead of refusing with "pass --force". Other top-level keys (profiles, etc.) are preserved. (#5300)
 - Clarified the `func new` "missing language" hint to mention both scaffolding and adopting an existing project. (#5300)
