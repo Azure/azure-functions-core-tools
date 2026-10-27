@@ -1,8 +1,5 @@
 # Azure.Functions.Cli.Workloads.Workers.Python
 
-## 4.46.2-preview.3
-
-- Updated the Python worker payload to 4.46.2, adding Python 3.15 support, including Windows ARM64.
 ## 4.46.0-preview.3
 
 - Updated the Python worker payload to 4.46.0, matching host release 4.1054.200.
