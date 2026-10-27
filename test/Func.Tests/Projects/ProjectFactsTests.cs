@@ -18,25 +18,25 @@ public sealed partial class ProjectFactsTests
     private static string Root => Path.DirectorySeparatorChar == '\\' ? @"C:\projects\sample" : "/projects/sample";
 
     [Fact]
-    public async Task GetProjectFactsAsync_LegacyRuntime_ReturnsNoFactsOrAuthority()
+    public async Task GetProjectFactsAsync_LegacyStack_ReturnsNoFactsDespiteKnownStackIdentity()
     {
         var project = new LegacyProject();
-        var context = new ProjectFactsContext(Root, project.ProjectFactsAuthority, _captureId);
+        var context = new ProjectFactsContext(Root, project.StackName, _captureId);
 
         var facts = await project.GetProjectFactsAsync(context, CancellationToken.None);
 
         facts.Should().BeNull();
-        project.ProjectFactsAuthority.Should().BeNull();
+        context.Authority.Should().Be(project.StackName);
     }
 
     [Theory]
     [InlineData(ProjectCapabilitySupport.Supported)]
     [InlineData(ProjectCapabilitySupport.Unsupported)]
     [InlineData(ProjectCapabilitySupport.Unknown)]
-    public async Task GetProjectFactsAsync_RuntimeOverride_PreservesReportedKnowledge(ProjectCapabilitySupport support)
+    public async Task GetProjectFactsAsync_StackOverride_PreservesReportedKnowledge(ProjectCapabilitySupport support)
     {
         var project = new FactsProject([new("future.semantic-capability", support)]);
-        var context = new ProjectFactsContext(project.WorkingDirectory.Info.FullName, project.ProjectFactsAuthority, _captureId);
+        var context = new ProjectFactsContext(project.WorkingDirectory.Info.FullName, project.StackName, _captureId);
 
         var facts = await project.GetProjectFactsAsync(context, CancellationToken.None);
 
@@ -49,7 +49,7 @@ public sealed partial class ProjectFactsTests
     }
 
     [Fact]
-    public async Task GetProjectFactsAsync_MixedRuntimeFacts_SnapshotsCallerCollection()
+    public async Task GetProjectFactsAsync_MixedStackReports_SnapshotsCallerCollection()
     {
         List<ProjectCapability> capabilities =
         [
@@ -102,7 +102,7 @@ public sealed partial class ProjectFactsTests
         context.CaptureId.Should().Be(_captureId);
     }
 
-    [Theory]
+    [WindowsTheory]
     [InlineData(@"C:\", @"C:\")]
     [InlineData(@"C:\projects\sample", @"C:\projects\sample")]
     [InlineData(@"C:\projects\\sample\\", @"C:\projects\sample")]
@@ -141,11 +141,6 @@ public sealed partial class ProjectFactsTests
     [InlineData(@"//?/UNC/server/share/one/../../sample/", @"\\?\UNC\server\sample")]
     public void Context_WindowsPathForms_HaveExplicitLexicalIdentities(string path, string expected)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         var context = new ProjectFactsContext(path, Authority, _captureId);
 
         context.ProjectRoot.Should().Be(expected);
@@ -287,17 +282,12 @@ public sealed partial class ProjectFactsTests
         action.Should().Throw<ArgumentException>().WithParameterName("projectRoot");
     }
 
-    [Theory]
+    [WindowsTheory]
     [InlineData(@"C:relative")]
     [InlineData(@"\root-relative")]
     [InlineData(@"~\project")]
     public void Context_WindowsPartiallyQualifiedPaths_RemainRejected(string path)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         Action action = () => new ProjectFactsContext(path, Authority, _captureId);
 
         action.Should().Throw<ArgumentException>().WithParameterName("projectRoot");
@@ -306,8 +296,9 @@ public sealed partial class ProjectFactsTests
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
-    [InlineData("runtime owner")]
-    [InlineData("runtime\nowner")]
+    [InlineData(" example.stack")]
+    [InlineData("example.stack ")]
+    [InlineData("example.stack\n")]
     public void Context_InvalidAuthority_Throws(string authority)
     {
         Action action = () => new ProjectFactsContext(Root, authority, _captureId);
@@ -368,6 +359,54 @@ public sealed partial class ProjectFactsTests
     }
 
     [Fact]
+    public void Facts_SortedSnapshot_PreservesCallerOrderAndRepeatedReports()
+    {
+        ProjectCapability[] capabilities =
+        [
+            new("b", ProjectCapabilitySupport.Supported),
+            new("a", ProjectCapabilitySupport.Unsupported),
+            new("a", ProjectCapabilitySupport.Supported),
+            new("A", ProjectCapabilitySupport.Unknown),
+            new("a", ProjectCapabilitySupport.Unknown),
+            new("a", ProjectCapabilitySupport.Supported),
+        ];
+        var callerOrder = capabilities.ToList();
+
+        var facts = new ProjectFacts(new(Root, Authority, _captureId), _evidence, true, capabilities);
+
+        capabilities.Should().Equal(callerOrder);
+        facts.Capabilities.Select(capability => (capability.Id, capability.Support)).Should().Equal(
+            ("A", ProjectCapabilitySupport.Unknown),
+            ("a", ProjectCapabilitySupport.Unknown),
+            ("a", ProjectCapabilitySupport.Supported),
+            ("a", ProjectCapabilitySupport.Supported),
+            ("a", ProjectCapabilitySupport.Unsupported),
+            ("b", ProjectCapabilitySupport.Supported));
+    }
+
+    [Fact]
+    public void Facts_CapabilitySource_IsEnumeratedOnce()
+    {
+        var enumerations = 0;
+        IEnumerable<ProjectCapability> ReadCapabilities()
+        {
+            enumerations++;
+            if (enumerations != 1)
+            {
+                throw new InvalidOperationException("The capability source must be enumerated only once.");
+            }
+
+            yield return new("b", ProjectCapabilitySupport.Unsupported);
+            yield return new("a", ProjectCapabilitySupport.Supported);
+        }
+
+        var facts = new ProjectFacts(new(Root, Authority, _captureId), _evidence, true, ReadCapabilities());
+
+        enumerations.Should().Be(1);
+        facts.Capabilities.Select(capability => capability.Id).Should().Equal("a", "b");
+    }
+
+    [Fact]
     public void Facts_EquivalentReorderedInputs_HaveSameFingerprint()
     {
         var context = new ProjectFactsContext(Root, Authority, _captureId);
@@ -379,6 +418,18 @@ public sealed partial class ProjectFactsTests
         first.Fingerprint.Should().Be(second.Fingerprint);
         first.EvidenceFingerprint.Should().Be(_evidence);
         first.Capabilities.Select(capability => capability.Id).Should().Equal("a", "b");
+    }
+
+    [Fact]
+    public void Facts_CompleteSnapshot_PreservesCanonicalFingerprint()
+    {
+        var facts = new ProjectFacts(new(Root, Authority, _captureId), _evidence, true,
+            [new("b", ProjectCapabilitySupport.Unsupported), new("a", ProjectCapabilitySupport.Supported)]);
+        var expected = OperatingSystem.IsWindows()
+            ? "FF00666DE5EA173E556314A265ACB2925D54035B9DFA7DB3BDAD833E4F2561C6"
+            : "A18B16CCB8705BEF9BC762165BA1BE6963004505391BAE7D53F0BA4570FA624F";
+
+        facts.Fingerprint.Should().Be(expected);
     }
 
     [Fact]
@@ -395,6 +446,8 @@ public sealed partial class ProjectFactsTests
             new(context, new('B', 64), true, capabilities),
             new(context, _evidence, false, capabilities),
             new(context, _evidence, true, [new("a", ProjectCapabilitySupport.Unsupported)]),
+            new(context, _evidence, true, [new("b", ProjectCapabilitySupport.Supported)]),
+            new(context, _evidence, true, [capabilities[0], capabilities[0]]),
         ];
 
         changed.Should().OnlyContain(facts => facts.Fingerprint != original.Fingerprint);
@@ -462,6 +515,29 @@ public sealed partial class ProjectFactsTests
         return null;
     }
 
+    [Theory]
+    [InlineData(true, null)]
+    [InlineData(false, "Lexical Windows path cases require Windows.")]
+    public void WindowsTheory_Prerequisite_IsReportedToXunit(bool isWindows, string? expectedSkip)
+    {
+        var attribute = new WindowsTheoryAttribute(isWindows);
+
+        attribute.Skip.Should().Be(expectedSkip);
+    }
+
+    private sealed class WindowsTheoryAttribute : TheoryAttribute
+    {
+        public WindowsTheoryAttribute()
+            : this(OperatingSystem.IsWindows())
+        {
+        }
+
+        internal WindowsTheoryAttribute(bool isWindows)
+        {
+            Skip = isWindows ? null : "Lexical Windows path cases require Windows.";
+        }
+    }
+
     private sealed class WindowsShortNameFactAttribute : FactAttribute
     {
         public WindowsShortNameFactAttribute()
@@ -495,7 +571,7 @@ public sealed partial class ProjectFactsTests
     {
         public override WorkingDirectory WorkingDirectory => WorkingDirectory.FromExplicit(Root);
 
-        public override string StackName => throw new InvalidOperationException("Facts must not read stack labels.");
+        public override string StackName => Authority;
 
         public override string StackDisplayName => throw new InvalidOperationException("Facts must not read display names.");
 
@@ -506,8 +582,6 @@ public sealed partial class ProjectFactsTests
 
     private sealed class FactsProject(IEnumerable<ProjectCapability> capabilities) : LegacyProject
     {
-        public override string ProjectFactsAuthority => Authority;
-
         public override ValueTask<ProjectFacts?> GetProjectFactsAsync(ProjectFactsContext context, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

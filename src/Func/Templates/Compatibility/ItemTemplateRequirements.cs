@@ -8,7 +8,7 @@ using Azure.Functions.Cli.Projects;
 namespace Azure.Functions.Cli.Templates.Compatibility;
 
 /// <summary>
-/// Captures a publisher's nonempty conjunction of opaque project capabilities.
+/// Snapshots a publisher's capability requirements, preserving absence separately from a declared nonempty conjunction.
 /// </summary>
 internal sealed class ItemTemplateRequirements
 {

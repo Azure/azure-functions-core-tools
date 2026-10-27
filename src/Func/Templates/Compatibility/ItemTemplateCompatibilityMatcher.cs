@@ -6,11 +6,11 @@ using Azure.Functions.Cli.Projects;
 namespace Azure.Functions.Cli.Templates.Compatibility;
 
 /// <summary>
-/// Admits items only from current, authoritative runtime facts and publisher-declared requirements.
+/// Evaluates compatibility using current, authoritative stack-reported capabilities and publisher-declared requirements.
 /// </summary>
 internal sealed class ItemTemplateCompatibilityMatcher
 {
-    public async Task<ItemTemplateAdmission> EvaluateAsync(
+    public async Task<ItemTemplateCompatibilityResult> EvaluateAsync(
         FunctionsProject project,
         ItemTemplateRequirements requirements,
         Guid captureId,
@@ -28,7 +28,7 @@ internal sealed class ItemTemplateCompatibilityMatcher
         List<ItemTemplateCompatibilityDiagnostic> diagnostics = [];
         if (!SameProject(context, afterCapture))
         {
-            diagnostics.Add(new("project-changed", "The resolved project root or runtime owner changed while project facts were captured. Start a new compatibility evaluation."));
+            diagnostics.Add(new("project-changed", "The resolved project root or stack implementation changed while project facts were captured. Start a new compatibility evaluation."));
         }
 
         if (!requirements.IsDeclared)
@@ -38,12 +38,12 @@ internal sealed class ItemTemplateCompatibilityMatcher
 
         if (context.Authority is null)
         {
-            diagnostics.Add(new("project-authority-missing", "The resolved runtime does not provide an authority for project facts."));
+            diagnostics.Add(new("project-authority-missing", "The resolved project does not provide a canonical stack identifier for project facts."));
         }
 
         if (facts is null)
         {
-            diagnostics.Add(new("project-facts-missing", "The resolved runtime supplies no authoritative project facts."));
+            diagnostics.Add(new("project-facts-missing", "The resolved stack supplies no authoritative project facts."));
             return new(context, requirements, facts, ItemTemplateCompatibility.Unknown, diagnostics);
         }
 
@@ -54,7 +54,7 @@ internal sealed class ItemTemplateCompatibilityMatcher
 
         if (!string.Equals(context.Authority, facts.Context.Authority, StringComparison.Ordinal))
         {
-            diagnostics.Add(new("project-authority-mismatch", "The project facts do not belong to the resolved runtime authority."));
+            diagnostics.Add(new("project-authority-mismatch", "The project facts do not belong to the resolved stack authority."));
         }
 
         if (context.CaptureId != facts.Context.CaptureId)
@@ -64,7 +64,7 @@ internal sealed class ItemTemplateCompatibilityMatcher
 
         if (!facts.IsAuthoritative)
         {
-            diagnostics.Add(new("project-facts-not-authoritative", "The runtime could not establish authoritative project evidence."));
+            diagnostics.Add(new("project-facts-not-authoritative", "The stack implementation could not establish authoritative project evidence."));
         }
 
         if (diagnostics.Count != 0)
@@ -76,10 +76,11 @@ internal sealed class ItemTemplateCompatibilityMatcher
         foreach (IGrouping<string, ProjectCapability> capability in capabilities)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (capability.Select(fact => fact.Support).Distinct().Skip(1).Any())
+            ProjectCapabilitySupport firstSupport = capability.First().Support;
+            if (capability.Any(report => report.Support != firstSupport))
             {
                 diagnostics.Add(new("capability-conflicting",
-                    $"The runtime reports conflicting project evidence for capability '{capability.Key}'.", capability.Key));
+                    $"The stack reports conflicting project evidence for capability '{capability.Key}'.", capability.Key));
             }
         }
 
@@ -93,18 +94,22 @@ internal sealed class ItemTemplateCompatibilityMatcher
         {
             cancellationToken.ThrowIfCancellationRequested();
             ProjectCapability? capability = capabilities[id].FirstOrDefault();
-            if (capability is null)
+            switch (capability?.Support)
             {
-                diagnostics.Add(new("capability-missing", $"The runtime provides no fact for required capability '{id}'.", id));
-            }
-            else if (capability.Support == ProjectCapabilitySupport.Unsupported)
-            {
-                incompatible = true;
-                diagnostics.Add(new("capability-unsupported", $"The project does not support required capability '{id}'.", id));
-            }
-            else if (capability.Support != ProjectCapabilitySupport.Supported)
-            {
-                diagnostics.Add(new("capability-unknown", $"The runtime cannot establish required capability '{id}'.", id));
+                case null:
+                    diagnostics.Add(new("capability-missing", $"The stack provides no report for required capability '{id}'.", id));
+                    break;
+                case ProjectCapabilitySupport.Supported:
+                    break;
+                case ProjectCapabilitySupport.Unsupported:
+                    incompatible = true;
+                    diagnostics.Add(new("capability-unsupported", $"The project does not support required capability '{id}'.", id));
+                    break;
+                case ProjectCapabilitySupport.Unknown:
+                    diagnostics.Add(new("capability-unknown", $"The stack cannot establish required capability '{id}'.", id));
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unexpected capability support value: {capability?.Support}.");
             }
         }
 
@@ -117,26 +122,26 @@ internal sealed class ItemTemplateCompatibilityMatcher
     /// <summary>
     /// Recaptures evidence for the same operation, invalidating the previous decision on any binding change.
     /// </summary>
-    public async Task<ItemTemplateAdmission> RevalidateAsync(
-        ItemTemplateAdmission admission,
+    public async Task<ItemTemplateCompatibilityResult> RevalidateAsync(
+        ItemTemplateCompatibilityResult previousResult,
         FunctionsProject project,
         ItemTemplateRequirements requirements,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(admission);
-        ItemTemplateAdmission current = await EvaluateAsync(project, requirements, admission.Context.CaptureId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(previousResult);
+        ItemTemplateCompatibilityResult current = await EvaluateAsync(project, requirements, previousResult.Context.CaptureId, cancellationToken);
         List<ItemTemplateCompatibilityDiagnostic> changes = [];
-        if (!SameProject(admission.Context, current.Context))
+        if (!SameProject(previousResult.Context, current.Context))
         {
-            changes.Add(new("project-changed", "The recorded compatibility decision belongs to a different project root or runtime owner. Start a new compatibility evaluation."));
+            changes.Add(new("project-changed", "The recorded compatibility decision belongs to a different project root or stack implementation. Start a new compatibility evaluation."));
         }
 
-        if (admission.RequirementsFingerprint != current.RequirementsFingerprint)
+        if (previousResult.RequirementsFingerprint != current.RequirementsFingerprint)
         {
             changes.Add(new("requirements-changed", "The template's capability requirements changed after compatibility was evaluated. Start a new compatibility evaluation."));
         }
 
-        if (admission.ProjectFactsFingerprint != current.ProjectFactsFingerprint)
+        if (previousResult.ProjectFactsFingerprint != current.ProjectFactsFingerprint)
         {
             changes.Add(new("project-facts-changed", "The project facts or inspected inputs changed after compatibility was evaluated. Start a new compatibility evaluation."));
         }
@@ -146,7 +151,7 @@ internal sealed class ItemTemplateCompatibilityMatcher
             return new(current.Context, requirements, current.ProjectFacts, ItemTemplateCompatibility.Unknown, changes);
         }
 
-        if (admission.Compatibility != current.Compatibility)
+        if (previousResult.Compatibility != current.Compatibility)
         {
             return new(current.Context, requirements, current.ProjectFacts, ItemTemplateCompatibility.Unknown,
                 [new("admission-outcome-changed", "The compatibility result changed when project facts were captured again. Start a new compatibility evaluation.")]);
@@ -156,7 +161,7 @@ internal sealed class ItemTemplateCompatibilityMatcher
     }
 
     private static ProjectFactsContext CaptureContext(FunctionsProject project, Guid captureId)
-        => new(project.WorkingDirectory.Info.FullName, project.ProjectFactsAuthority, captureId);
+        => new(project.WorkingDirectory.Info.FullName, project.StackName, captureId);
 
     private static bool SameProject(ProjectFactsContext first, ProjectFactsContext second)
         => string.Equals(first.ProjectRoot, second.ProjectRoot, StringComparison.Ordinal)

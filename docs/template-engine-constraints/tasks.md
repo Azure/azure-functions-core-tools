@@ -1,28 +1,11 @@
-## Current P0 foundation
+## Historical engine-constraint checklist
 
-See [design](design.md) for the neutral contract and its separation from
-historical engine eligibility.
-
-- [x] Add optional runtime facts, explicit authority and operation capture context.
-- [x] Snapshot Supported / Unsupported / Unknown opaque facts and inspected-input evidence.
-- [x] Validate nonempty publisher conjunctions in the `func-project-capabilities` vocabulary.
-- [x] Distinguish absent requirements from invalid/unsupported declarations.
-- [x] Match generically and fail closed unless all required facts are authoritatively Supported.
-- [x] Bind admission to root, authority, capture, requirements and facts fingerprints.
-- [x] Invalidate changed evidence on read-only recapture without upgrading an old decision.
-- [x] Cover mutation, cancellation, deterministic diagnostics, legacy runtimes and unfamiliar IDs in focused tests.
-- [ ] Add qualified production runtime facts implementations.
-- [ ] Extract exact raw declarations in the private adapter before engine normalization.
-- [ ] Consume admission and revalidation at the later item preparation boundary.
-- [ ] Qualify real projects/content and the end-to-end command/runtime journey.
-
-The common base already contains the raw engine declaration reader,
-workload/bundle requirement matcher/evaluator and immutable workload snapshot
-helpers. Their existence is not completion of the original lifecycle,
-engine-registration or command tasks below, nor semantic item compatibility.
-No production runtime, engine registration or public command is changed here.
-
-## Historical engine-constraint checklist (preserved)
+The checklist below preserves the earlier workload/bundle constraint plan.
+Its checkboxes are not current implementation status. See the
+[project-compatibility contract](design.md) for the Foundation boundary.
+Current implementation and validation evidence belong in
+[PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
+and follow-up issues.
 
 ## 1. Constraint Types
 

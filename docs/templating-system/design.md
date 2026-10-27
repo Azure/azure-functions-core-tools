@@ -1,102 +1,53 @@
-## Current P0 scope and implementation status
+## Templates scope and contract navigation
 
-P0 is one reusable, package-backed Templates capability for both `func init`
-(project creation) and `func new` (item creation). A representative project
-and HTTP item qualify that capability; they do not define its runtime or
-content catalog. There is no independent Quickstart P0 workstream.
+P0 aims to provide one reusable, package-backed Templates capability for both
+`func init` (project creation) and `func new` (item creation). Representative
+project and HTTP-item checks qualify that capability; they are not a complete
+language-stack or content catalog. There is no independent Quickstart P0 workstream.
 
-This section records current scope and implementation truth. The older program
-map below is retained as historical design provenance, not as the P0 delivery
-plan. In particular, its shared hive, persistent installation, multi-project
-topology, native-effects preview, and Quickstart dependencies are not P0
-requirements.
-
-### Implemented foundation: neutral item admission
-
-The first bounded implementation establishes:
+The Foundation provides a read-only project-compatibility boundary:
 
 ```text
-resolved FunctionsProject
-  -> optional runtime-owned, read-only project facts
-  -> publisher-declared func-project-capabilities requirements
-  -> generic opaque-ID matching
-  -> Compatible / Incompatible / Unknown
+resolved project's stack implementation -> ProjectFacts
+template publisher -> ItemTemplateRequirements
+ProjectFacts + ItemTemplateRequirements
+  -> CLI compatibility matcher
+  -> ItemTemplateCompatibilityResult (inputs, outcome, diagnostics)
 ```
 
-Only Compatible is eligible for later item preparation. The admission result
-binds the normalized project root, runtime authority, operation capture ID,
-requirements fingerprint, and complete facts/evidence fingerprint. Changing
-any binding requires a new decision. Recapturing evidence cannot upgrade an
-Unknown admission into Compatible.
-
 The [constraint design](../template-engine-constraints/design.md) owns the
-implemented API, bounded declaration syntax, evidence responsibilities, and
-tri-state rules. Its [requirements](../template-engine-constraints/specs/template-constraints/spec.md)
-and [tasks](../template-engine-constraints/tasks.md) distinguish semantic
-admission from the older engine eligibility work.
+shared API, capability-report definitions, declaration syntax, matching rules,
+and revalidation behavior. Its
+[acceptance scenarios](../template-engine-constraints/specs/template-constraints/spec.md)
+exercise that boundary. This overview does not repeat those requirements.
 
-| Surface | Current implementation truth |
-|---|---|
-| Runtime/project contracts | Public, optional `FunctionsProject.ProjectFactsAuthority` and `GetProjectFactsAsync`; default supplies no authority or facts. Existing runtime implementations need not change. |
-| Neutral Templates | Internal immutable requirements, deterministic matcher, evidence-bound admission, and read-only revalidation in `src/Func/Templates/Compatibility`. |
-| Runtime interpretation | No production runtime opts into semantic facts in this foundation. Real evidence collection and capability meaning remain runtime-owned work. |
-| Unit validation | Focused synthetic-runtime tests exercise the contract, failures, cancellation, immutable snapshots, and unfamiliar capability IDs. They are not runtime or content qualification. |
-| Public commands and DI | Unchanged. Neither `func init` nor `func new` consumes the new matcher yet; the new type is not registered into the current command graph. |
-| Execution and publication | Not implemented by this foundation. Admission has no engine session, prepared operation, file plan, or execution authority. |
+The stack implementation is the language-aware CLI project implementation,
+not the Azure Functions Runtime/host. The public contracts allow separately
+shipped workloads to report capabilities. The matcher and its result stay
+internal to the CLI.
 
-These runtime facts types are public because independently shipped workloads
-implement the resolved-project boundary. Templates requirements and matching
-remain internal to the CLI. A CLI containing the new contract must be available
-before workloads that reference it are released; this change adds no workload
-compatibility gate.
+Compatibility evaluation does not perform template preparation or authorize
+execution. Package intake, private engine adaptation, output preparation,
+publication, and command wiring are separate responsibilities. This Foundation
+change does not alter public `func init` or `func new` behavior.
 
-### What already existed in the common v5 base
-
-The base already contains additive `IProjectStack` metadata and
-`InstalledProjectStackCatalog`, alongside the existing initializers. It also
-contains engine context/session/host models, parameter and catalog projections,
-raw constraint declaration validation, workload/bundle matching, and immutable
-workload constraint snapshots.
-
-Those are real implementation helpers, not proof of a completed Templates P0.
-For example, the current `Templater.ListAsync` projects installed catalog
-metadata; it does not connect the new semantic facts matcher to item
-preparation. Workload availability, stack/language labels, package versions,
-and engine eligibility do not establish actual-project item compatibility.
-The existing public template-provider dispatch remains unchanged.
-
-### Designed / required, but not implemented here
-
-The remaining reusable capability requires:
-
-| Capability | Responsibility |
-|---|---|
-| Exact package/reference intake | Validate selected identity, digest, type and structure; return an immutable engine-neutral content lease. An explicit override failure must not fall back. |
-| Private engine adaptation | Command-private registration, discovery/selection and raw declaration translation behind CLI-owned contracts. |
-| Actual-output preparation | Capture generated bytes, paths and kinds; validate one Functions root and one configuration intent; prepare exact CLI-owned configuration bytes before target mutation. |
-| Single-use prepared operation | Preview the captured plan; commit create-only without rerendering or reserializing configuration; report cancellation, partial completion and cleanup truthfully. |
-| Command integration | Thin `init`/`new` consumers, compatible-only item gate, DI, grammar/help/exits, and exclusion of previous generation routes from the candidate graph and artifact. |
-| Runtime/content qualification | Production runtime facts, selected project/item content, adversarial evidence cases, unfamiliar-runtime proof, and the existing start/invoke/shutdown journey. |
-
-Project configuration remains CLI-owned. The approved first scope uses one
-independently verified Functions root, a regular generated `host.json`, and one
-configuration declaration with `primaryOutputIndex`, `stack`, and `language`.
-This foundation changes neither configuration declarations nor serialization,
-runtime startup, content, or public command behavior.
+See [PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
+for Foundation implementation progress and revision-specific validation evidence.
+Track subsequent work in issues, not this design. The older program inventory
+below records historical design decisions, not delivery status.
 
 ### Historical and deferred documentation boundaries
 
 The detailed integration, init, and new designs below remain useful inventories
-of parsing, metadata, and diagnostic mechanisms. Their execution sections must
-be reconciled when private adaptation, captured preparation, and command
-integration are implemented; unchecked historical task lists are not evidence
-that their already-merged helpers are absent.
+of parsing, metadata, and diagnostic mechanisms. They do not establish the
+contracts of later Integration work. Unchecked historical task lists are not
+evidence that a helper is absent from the source.
 
 The [stack inventory](../func-init-execution/stack-inventory.md) still describes
 the additive metadata/initializer step. Its reference to multi-project
 Quickstarts as future authority does not apply to current P0. The older
 `func new` flow in [CLI architecture](../cli-architecture.md) also needs
-reconciliation with the actual command cutover; it is not the new admission
+reconciliation with the actual command integration; it is not the compatibility
 contract.
 
 The [package-install design](../template-package-install/design.md) and its
@@ -112,7 +63,7 @@ ordinary qualified project content may be reused without importing that workflow
 The proposals under `proposed/` retain earlier workload/provider design
 provenance. They must not be used to infer that legacy dispatch is the approved
 P0 path, that this foundation has replaced it, or that workload/version matching
-is semantic item admission.
+establishes project compatibility.
 
 ## Historical program context
 
@@ -163,7 +114,7 @@ OpenSpec does not provide parent-child change semantics. This umbrella change th
 
 ### Focused changes remain authoritative
 
-The umbrella owns the map, not the territory. Detailed scenarios, API boundaries, failure behavior, and implementation tasks remain in the focused change responsible for that capability.
+Each focused change owns its detailed scenarios, API boundaries and failure behavior. This overview records how those responsibilities relate.
 
 ```text
 templating-system

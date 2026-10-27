@@ -13,6 +13,9 @@ public abstract class FunctionsProject
 {
     public abstract WorkingDirectory WorkingDirectory { get; }
 
+    /// <summary>
+    /// Gets the canonical stack identifier used to bind project-capability reports to this resolved project.
+    /// </summary>
     public abstract string StackName { get; }
 
     public abstract string StackDisplayName { get; }
@@ -28,13 +31,8 @@ public abstract class FunctionsProject
     public abstract FunctionsWorkerReference WorkerReference { get; }
 
     /// <summary>
-    /// Gets the stable identifier of the runtime that interprets this project's capabilities, or null when no authority is available.
-    /// </summary>
-    public virtual string? ProjectFactsAuthority => null;
-
-    /// <summary>
-    /// Captures current facts about the existing project without modifying it.
-    /// Returns null when the runtime cannot provide a facts snapshot.
+    /// Captures the stack implementation's current capability reports without modifying the project.
+    /// Returns null when the stack cannot provide a snapshot.
     /// </summary>
     /// <remarks>
     /// Implementations must inspect the actual project on each call and fingerprint all inputs used to establish facts.
@@ -44,6 +42,7 @@ public abstract class FunctionsProject
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
+
         return ValueTask.FromResult<ProjectFacts?>(null);
     }
 

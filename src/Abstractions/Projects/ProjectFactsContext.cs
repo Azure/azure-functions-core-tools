@@ -16,12 +16,12 @@ public sealed class ProjectFactsContext(string projectRoot, string? authority, G
     public string ProjectRoot { get; } = NormalizeRoot(projectRoot);
 
     /// <summary>
-    /// Gets the stable identifier of the runtime responsible for interpreting the project, or null when no authority is available.
+    /// Gets the resolved project's canonical stack identifier, or null when unavailable.
     /// </summary>
     public string? Authority { get; } = ValidateAuthority(authority);
 
     /// <summary>
-    /// Identifies the caller's operation. A runtime must echo this value rather than reuse an earlier capture.
+    /// Identifies the caller's operation. The stack implementation must echo this value rather than reuse an earlier capture.
     /// </summary>
     public Guid CaptureId { get; } = captureId != Guid.Empty
         ? captureId
@@ -40,7 +40,7 @@ public sealed class ProjectFactsContext(string projectRoot, string? authority, G
             throw new ArgumentException("The resolved project root must not contain a null character.", nameof(projectRoot));
         }
 
-        if (Path.DirectorySeparatorChar == '\\'
+        if (OperatingSystem.IsWindows()
             && projectRoot.Length >= 4
             && projectRoot[0] == '\\'
             && projectRoot[1] is '\\' or '?'
@@ -52,7 +52,7 @@ public sealed class ProjectFactsContext(string projectRoot, string? authority, G
         }
 
         string path = NormalizeSeparators(projectRoot);
-        bool windows = Path.DirectorySeparatorChar == '\\';
+        bool windows = OperatingSystem.IsWindows();
         int rootLength = Path.GetPathRoot(path.AsSpan()).Length;
         if (windows && path.Length >= 4 && path[0] == '\\' && path[1] == '\\' && path[2] is '.' or '?' && path[3] == '\\')
         {
@@ -123,9 +123,11 @@ public sealed class ProjectFactsContext(string projectRoot, string? authority, G
 
     private static string? ValidateAuthority(string? authority)
     {
-        if (authority is not null && !ProjectCapability.IsValidId(authority))
+        if (authority is not null
+            && (string.IsNullOrWhiteSpace(authority) || !string.Equals(authority, authority.Trim(), StringComparison.Ordinal)))
         {
-            throw new ArgumentException("The project facts authority must start with an ASCII letter or digit and contain only ASCII letters, digits, '.', '-' or '_'.", nameof(authority));
+            throw new ArgumentException(
+                "The project facts authority must be a canonical stack identifier without leading or trailing whitespace.", nameof(authority));
         }
 
         return authority;

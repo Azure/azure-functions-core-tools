@@ -149,6 +149,16 @@ public sealed class ItemTemplateRequirementsTests
     }
 
     [Fact]
+    public void Fingerprints_DeclaredAndAbsentRequirements_PreserveCanonicalRepresentation()
+    {
+        var declared = new ItemTemplateRequirements(["b", "a"]);
+        var absent = ItemTemplateRequirements.Parse(null);
+
+        declared.Fingerprint.Should().Be("4C5188EAFDCA050FB097BE621B04518259C24991C336ADD00B2113A6B752CBFA");
+        absent.Fingerprint.Should().Be("39E871627D94E47CBE71F39DAD086C689A83BCCB5D6A2F0DF907BB330CB1D492");
+    }
+
+    [Fact]
     public void Constructor_IdentifiersDifferOnlyByCase_AreDistinctOpaqueRequirements()
     {
         var requirements = new ItemTemplateRequirements(["A", "a"]);

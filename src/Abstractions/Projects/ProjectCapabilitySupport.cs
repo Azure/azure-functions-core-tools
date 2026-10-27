@@ -4,22 +4,22 @@
 namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
-/// Describes a runtime owner's knowledge of one semantic project capability.
+/// Describes a stack implementation's knowledge of one project capability, not a template's aggregate compatibility.
 /// </summary>
 public enum ProjectCapabilitySupport
 {
     /// <summary>
-    /// The runtime has not established whether the project supports the capability.
+    /// The stack implementation has not established whether the project supports the capability.
     /// </summary>
     Unknown,
 
     /// <summary>
-    /// The runtime reports that the project supports the capability.
+    /// The stack implementation reports that the project supports the capability.
     /// </summary>
     Supported,
 
     /// <summary>
-    /// The runtime reports that the project does not support the capability.
+    /// The stack implementation reports that the project does not support the capability.
     /// </summary>
     Unsupported,
 }

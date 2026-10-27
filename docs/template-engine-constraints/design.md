@@ -1,56 +1,86 @@
-## Current P0: project compatibility checks for function templates
+## Project compatibility checks for function templates
 
 Before a function template is added to an existing Functions project, its
 required project capabilities must be checked. A function template is an item
 template used to add a function to an existing project.
 
-The runtime interprets the actual project and reports its capabilities.
-Generic Templates code compares those reports with the template publisher's
-requirements and returns `Compatible`, `Incompatible`, or `Unknown`.
+The template publisher declares requirements. The stack-specific
+[`FunctionsProject`](../../src/Abstractions/Projects/FunctionsProject.cs)
+implementation inspects the existing project and reports its capabilities.
+The CLI's compatibility matcher compares those reports with the requirements.
+It returns `Compatible`, `Incompatible`, or `Unknown`.
 
-Admission records the compatibility decision and its immutable inputs. It does
-not authorize preparation, generation, execution, or publication.
+Here, **stack implementation** means the CLI's language-aware project code,
+such as Python- or .NET-aware code supplied by a workload. It does not mean
+the Azure Functions Runtime/host or a language-worker process.
 
-**Implemented foundation, not command cutover.** No item is prepared or generated
-by this foundation. The [program status](../templating-system/design.md)
-distinguishes this work from engine helpers already in the base and the
-remaining P0 capabilities.
+This section owns the detailed project-compatibility contract. The
+[specification](specs/template-constraints/spec.md) provides acceptance
+scenarios; [the Templates overview](../templating-system/design.md) provides
+navigation and historical context. Implementation progress and validation
+evidence belong in [PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
+and follow-up issues, not in this contract.
 
 ### Ownership and API
 
 The public workload contracts live beside
 [`FunctionsProject`](../../src/Abstractions/Projects/FunctionsProject.cs):
 
-- `ProjectFactsAuthority` is the stable runtime owner identifier, not a stack
-  alias, language label, package identity or package version. The default is null.
+- `FunctionsProject.StackName` supplies the canonical stack identifier used to
+  bind the reports. See [authority](#authority).
 - `GetProjectFactsAsync(ProjectFactsContext, CancellationToken)` is optional,
-  read-only and cancellable. The default returns no facts. Existing runtimes
-  remain source compatible and cannot establish semantic compatibility by default.
-- `ProjectFactsContext` binds a fully qualified, lexically normalized project
-  root, the resolved runtime authority and a nonempty caller-supplied capture ID.
-  Use a fresh ID for each operation; evidence revalidation retains that operation's ID.
+  read-only and [cancellable](#cancellation-and-failures). Its default returns
+  no snapshot, so existing stack implementations remain source compatible.
+- `ProjectFactsContext` identifies the expected
+  [project root](#project-root), [authority](#authority), and
+  [capture ID](#capture-id).
 - `ProjectCapability` reports an opaque ID as Supported, Unsupported or Unknown.
-- `ProjectFacts` snapshots the capabilities, context, authority quality and
-  runtime evidence fingerprint. It computes a separate deterministic fingerprint
-  over the complete snapshot.
+- `ProjectFacts` is an immutable **capability-report snapshot** for one resolved
+  project and capture. It contains the reports, their context, an
+  `IsAuthoritative` assertion, and the stack's
+  [inspected-input fingerprint](#inspected-input-fingerprint).
 
 The types are public because separately shipped workloads implement the
 resolved-project boundary. They contain no template identity, template selection,
 package acquisition, generation policy or engine-native object.
 
-A runtime opting in must interpret the actual existing project on every call,
-echo the current capture context, and supply a SHA-256 fingerprint of **all**
-inputs used to establish the reported facts, including relevant missing inputs.
-The runtime decides which actual-project evidence establishes each capability
-and whether its evidence is authoritative. Invalid IDs, enum values, fingerprints
-or null entries are rejected as contract errors, not admitted.
+`ProjectFacts` names the project observations supplied to the matcher; it is not
+a separate framework pattern or a claim that every report is established truth.
+The stack implementation produces it. The matcher consumes it alongside
+`ItemTemplateRequirements`. The context identifies the capture, the evidence
+fingerprint identifies inspected inputs, and the reports describe capability
+support. None of those inputs alone is a template-compatibility result.
 
-A digest is evidence binding, not authentication or a substitute for runtime
-qualification. Generic Templates cannot prove that a runtime inspected all the
-right inputs or detect an unreported edit. The capture ID rejects accidental
-reuse from another operation; revalidation detects a changed evidence or facts
-fingerprint within an operation. Runtime owners must not label cached or
-heuristic data authoritative.
+For example, after inspecting project inputs, a stack implementation could
+return the following snapshot. The capability name is illustrative, not a
+registered production capability:
+
+```csharp
+return new ProjectFacts(
+    context,
+    inspectedInputFingerprint,
+    isAuthoritative: true,
+    [new ProjectCapability("example.http-items", ProjectCapabilitySupport.Supported)]);
+```
+
+The shared CLI-owned types carry strings, identifiers and support states.
+They do not expose Microsoft.TemplateEngine objects or stack-specific project
+models. The matcher therefore needs no Python- or .NET-specific interpretation.
+
+`ProjectCapabilitySupport` describes knowledge of **one capability**.
+`ItemTemplateCompatibility` describes the result of combining the template's
+requirements with snapshot validity and all relevant reports. The separate
+enums represent different decisions; their mapping is defined under
+[matching](#matching-and-compatibility-results).
+
+### Capture identity and evidence
+
+The matcher records the expected context from the resolved project before
+calling the stack implementation. It compares the returned context with that
+expectation and checks the resolved project again after capture. Passing the
+context into the stack does not make the returned identity trustworthy.
+
+#### Project root
 
 Root normalization is a deterministic string operation over a fully qualified
 native path. It does not call `Path.GetFullPath`, probe the filesystem, resolve
@@ -72,9 +102,45 @@ most one trailing separator beyond the root. Alternate-separator device
 prefixes follow the non-verbatim rules. On Unix, `/` is the root boundary and
 backslashes remain literal. No path form gains filesystem alias equivalence.
 
-Root and authority comparisons remain ordinal and conservative: aliases or
-differently cased paths do not establish identity by themselves. A missing
-runtime authority, unrelated root/owner or stale capture ID produces Unknown.
+Root comparisons are ordinal and conservative. Aliases or differently cased
+paths do not establish identity by themselves. The matcher starts with the
+resolved project's `WorkingDirectory.Info.FullName`; the public context also
+validates and normalizes independently supplied roots.
+
+#### Authority
+
+Authority is the resolved project's canonical `FunctionsProject.StackName`,
+recorded in `ProjectFactsContext.Authority`. There is no separate producer-ID
+property. The matcher compares the expected and returned identifiers ordinally
+and checks that the resolved stack did not change during capture. Stack identity
+binds the snapshot; it does not establish that a capability is supported.
+Stack identifiers follow the existing stack-metadata contract: nonempty with
+no leading or trailing whitespace. They are not capability IDs and do not use
+the capability declaration's ASCII grammar. Their spelling is preserved.
+
+#### Capture ID
+
+The capture ID is a nonempty caller-supplied GUID identifying one operation.
+Use a fresh ID for a new evaluation. The stack implementation must echo it
+rather than return a snapshot from another operation. Revalidation retains
+the operation's ID.
+
+#### Inspected-input fingerprint
+
+A stack implementation opting in must inspect the actual project on every
+call and supply a SHA-256 fingerprint of **all** inputs used to establish its
+reports, including relevant missing inputs. It decides which project evidence
+establishes each capability and whether that evidence is authoritative.
+Invalid IDs, enum values, fingerprints or null reports are contract errors.
+
+`IsAuthoritative` asserts that the reports came from current project inspection,
+not inference from stack, language or package labels alone. A false value
+cannot establish either compatibility or incompatibility.
+
+The fingerprint binds inspected evidence; it does not authenticate the producer
+or prove complete inspection. The matcher cannot detect an edit the stack
+implementation omits from its evidence. Stack implementations must not label
+cached or heuristic data authoritative.
 
 ### Publisher declaration
 
@@ -99,7 +165,7 @@ requirements snapshot) from a malformed declared object. Empty arrays,
 malformed/duplicate IDs, duplicate properties, missing fields, non-string IDs,
 and invalid JSON fail with `FormatException`. Unknown vocabularies or extra
 properties fail with `NotSupportedException`. There are no expressions,
-scripts, version ranges, predicates, runtime callbacks or alternative syntax.
+scripts, version ranges, predicates, stack callbacks or alternative syntax.
 Caller collections are copied, sorted ordinally and exposed read-only.
 
 This foundation does **not** read `template.json`, register an engine constraint,
@@ -108,13 +174,13 @@ must extract the exact declaration and reject duplicate/unsupported raw syntax
 before engine normalization can discard it. The neutral object is not an
 engine-native product contract.
 
-### Matching and immutable admission evidence
+### Matching and compatibility results
 
 [`ItemTemplateCompatibilityMatcher`](../../src/Func/Templates/Compatibility/ItemTemplateCompatibilityMatcher.cs)
-obtains facts through the resolved project's optional operation. It reads no
-stack name, display name, language, worker reference, bundle version or package
-identity. It also checks that the resolved root/authority did not change while
-the runtime captured facts.
+obtains the snapshot through the resolved project's optional operation. It does
+not infer support from stack name, display name, language, worker reference,
+bundle version or package identity. It checks that the resolved root/authority
+did not change while the stack implementation captured the reports.
 
 | Outcome | Rule |
 |---|---|
@@ -128,34 +194,60 @@ are consistent. Negative precedence applies only after snapshot-wide authority,
 identity, freshness and consistency checks pass; an invalid snapshot cannot
 establish either compatibility or incompatibility.
 
-Requirements and facts fingerprints include all snapshotted inputs in a
-deterministic order. Diagnostics have stable codes and capability ordering.
-[`ItemTemplateAdmission`](../../src/Func/Templates/Compatibility/ItemTemplateAdmission.cs)
+The requirements fingerprint includes the vocabulary, declaration-presence
+state, and ordinally sorted IDs. The facts fingerprint includes the normalized
+root, authority, capture ID, uppercase inspected-input fingerprint,
+`IsAuthoritative`, and every capability report sorted by ordinal ID and support
+state. Repeated reports remain part of the snapshot and its fingerprint.
+Both use SHA-256 over deterministic UTF-8 JSON.
+
+[`ItemTemplateCompatibilityResult`](../../src/Func/Templates/Compatibility/ItemTemplateCompatibilityResult.cs)
 retains the normalized root, authority, capture ID, immutable requirements and
-facts, fingerprints, outcome and immutable diagnostics. Only its Compatible
-outcome is eligible for later preparation; the value does not execute or
-authorize execution of a template.
+facts, fingerprints, outcome and immutable diagnostics.
+`PassesProjectCapabilityCheck` is true exactly when the outcome is Compatible.
+It passes only this check: it does not establish preparation readiness or
+authorize preparation, generation, execution, or publication.
+
+### Read-only revalidation
 
 `RevalidateAsync` recaptures facts without mutation for the same operation.
 Changed root/authority, requirements, capability reports, authority quality,
-runtime evidence or disappearance of facts invalidates the prior decision
+inspected-input evidence or disappearance of facts invalidates the prior decision
 as Unknown, even if the new inputs could independently match. An outcome
-change during recapture also fails closed. Make a fresh admission decision
+change during recapture also fails closed. Make a fresh compatibility evaluation
 instead of promoting an old result.
 
-Cancellation is checked before and after runtime capture and forwarded to the
-runtime. Unexpected runtime failures propagate; they are not converted into
-success-shaped missing-facts fallbacks. Runtime fact acquisition is the only
+### Cancellation and failures
+
+The optional operation accepts a `CancellationToken`. Implementations must pass
+it to child operations and honor cancellation without returning a successful
+snapshot. The matcher forwards the token and checks it before and after
+capture and while evaluating reports and requirements.
+
+Unexpected stack failures propagate; they are not converted into
+success-shaped missing-facts fallbacks. Project-facts acquisition is the only
 boundary call: the matcher has no engine, package/store, Quickstart, transaction,
 generation, publication or command collaborator.
 
-### Validation and remaining integration
+### Diagnostics
 
-Focused unit tests cover legacy runtimes, all fact states, invalid/conflicting
+`ItemTemplateCompatibilityDiagnostic` carries a code, message and optional
+capability ID. The current consumers are the focused Foundation tests; no public
+command exposes these matcher codes. Codes use local lower-case, hyphenated
+names. No repository-wide diagnostic-code naming convention is established
+here, and this design does not define an external machine-readable contract.
+
+The matcher orders snapshot-validity diagnostics by check, conflicting IDs
+ordinally, and required-capability diagnostics by ordinal requirement ID.
+
+### Validation boundary
+
+Focused unit tests cover legacy stack implementations, all support states, invalid/conflicting
 evidence, strict/absent declarations, immutable snapshots, deterministic
 matching, negative precedence, stale/changed evidence, cancellation and an
-unfamiliar runtime/capability. Throwing stack/language/worker getters prove
-that the matcher does not consult runtime-specific labels.
+unfamiliar stack/capability. Tests with throwing display-name/language/worker
+getters check that matching does not consult those labels. Canonical stack
+identity is read only to bind the reports, never to infer support.
 
 From an already-restored checkout, the focused validation path is:
 
@@ -165,30 +257,23 @@ dotnet test .\test\Func.Tests\Func.Tests.csproj --no-build --no-restore --config
   --filter 'FullyQualifiedName~Azure.Functions.Cli.Tests.Projects.ProjectFactsTests|FullyQualifiedName~Azure.Functions.Cli.Tests.Templates.Compatibility|FullyQualifiedName~Azure.Functions.Cli.Tests.Projects.FunctionsProjectHostRunContextTests'
 ```
 
-The original foundational local run passed 139 cases (131 new cases and eight existing
-project lifecycle-default cases), with zero build warnings or errors. It used
-cached dependencies without restore or new acquisition. This is unit/build
-evidence only, not independent implementation review or runtime qualification.
+These tests establish contract behavior with synthetic stack implementations,
+not production-stack, TemplateEngine-integration, cross-platform or end-to-end
+qualification. Exact runs and historical normalization evidence are recorded
+with their source revisions in
+[PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
+and its Git history.
 
-The PR-01 normalization correction expands that same focused selection to 187
-passing cases, including 83 project-facts cases, with zero build warnings or
-errors. Windows regressions verify explicit drive/UNC/device/verbatim identities,
-literal `~`, nonexistent components, and a real 8.3 alias before and after
-removing its long-name directory. The native short-name API is used only to
-obtain the test fixture's alias; production normalization makes no native calls.
-
-No production runtime supplies these facts yet, and no public command consumes
-the matcher. Runtime-owned evidence implementations, raw package declaration
-translation, compatible-only preparation, private engine integration and
-runtime/content qualification remain later work. This foundation needs no
-new package dependency or generated content.
+Production evidence collection, raw package declaration translation,
+preparation, private engine integration and command wiring are outside this
+read-only boundary. No new package dependency or generated content is needed.
 
 ## Historical engine constraint context
 
 The remainder preserves the earlier workload/bundle constraint design.
 Its eligibility states and valid empty engine-constraint objects are not
-semantic project/item admission. Workload/version checks must not substitute
-for the current runtime-facts contract. Its shared install/hive and Quickstart
+semantic project/item compatibility. Workload/version checks must not substitute
+for the project-capability contract above. Its shared install/hive and Quickstart
 assumptions are historical broader scope, not current P0 prerequisites.
 
 See `proposal.md` for motivation and `specs/template-constraints/spec.md` for the behavior contract.

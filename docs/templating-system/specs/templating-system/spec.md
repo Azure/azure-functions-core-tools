@@ -1,16 +1,10 @@
-## Current P0 coordination
+## Foundation contract navigation
 
-The current scope and implementation status are maintained in the existing
-[program design](../../design.md). P0 is the reusable package-backed capability
-for both project creation and item creation, not completion of the historical
-ten-change roadmap below.
-
-The implemented foundation is read-only semantic item admission from
-runtime-owned project facts through neutral Templates contracts. The
-[item admission requirements](../../../template-engine-constraints/specs/template-constraints/spec.md)
-own its fail-closed behavior. Only Compatible may proceed to later item
-preparation. There is no command cutover, engine registration, prepared
-operation, content delivery, or runtime qualification in this foundation.
+The [Templates overview](../../design.md) describes the Foundation boundary.
+The [project-compatibility contract](../../../template-engine-constraints/design.md)
+owns its detailed behavior. The
+[compatibility acceptance scenarios](../../../template-engine-constraints/specs/template-constraints/spec.md)
+reference that contract without duplicating it here.
 
 The following coordination requirements are preserved as historical planning
 provenance. Their installed-template/shared-hive and Quickstart dependencies

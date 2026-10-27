@@ -1,26 +1,31 @@
-## Current P0 purpose
+## Project-compatibility purpose
 
-Defines how generic Templates code checks publisher-declared project-capability
-requirements against runtime-reported facts about the existing project. The CLI
-owns the shared contracts; the runtime owns interpretation of the project.
-Missing or inconclusive evidence does not establish compatibility.
+The template publisher declares requirements. The CLI's language-stack
+implementation reports project capabilities, and the CLI's compatibility
+matcher compares the reports with the requirements.
 
-The [current design](../../design.md) owns API and declaration details. These
-requirements are implemented and unit-tested as a foundation, not integrated
-with public commands, package loading or preparation.
+**Stack implementation** means the language-aware `FunctionsProject`
+implementation, not the Azure Functions Runtime/host or a language worker.
+The [ownership and API definitions](../../design.md#ownership-and-api) explain
+the shared, engine-independent types and show an illustrative capability report.
 
-### Requirement: Runtime-owned current project facts
+The focused design owns the detailed contract. The requirements below reference
+that contract and give acceptance scenarios, not another copy of its rules.
 
-The resolved project SHALL expose an optional read-only, cancellable facts
-operation with neutral CLI-owned types. Its default SHALL supply no facts or
-authority. Runtime owners SHALL interpret the actual project and distinguish
-Supported, Unsupported and Unknown capabilities. Facts SHALL bind the normalized
-root, runtime authority, operation capture ID and inspected-input fingerprint;
-their collections SHALL be immutable snapshots.
+### Requirement: Stack-reported project capabilities
 
-#### Scenario: Runtime supplies no facts
-- **WHEN** a runtime does not implement authoritative facts
-- **THEN** item compatibility is Unknown and cannot permit preparation
+The resolved-project operation SHALL follow the
+[ownership contract](../../design.md#ownership-and-api) and
+[cancellation contract](../../design.md#cancellation-and-failures).
+Its snapshot binding uses the defined
+[normalized root](../../design.md#project-root),
+[authority](../../design.md#authority),
+[capture ID](../../design.md#capture-id), and
+[inspected-input fingerprint](../../design.md#inspected-input-fingerprint).
+
+#### Scenario: Stack supplies no snapshot
+- **WHEN** a stack implementation uses the default project-facts operation
+- **THEN** item compatibility is Unknown
 
 #### Scenario: Evidence is unrelated, insufficient or stale
 - **WHEN** the facts have another root, authority or capture, or are not authoritative
@@ -28,55 +33,57 @@ their collections SHALL be immutable snapshots.
 
 ### Requirement: Bounded publisher requirements
 
-An item declaration SHALL use only `func-project-capabilities` with a nonempty
-conjunction of opaque IDs. Malformed or unsupported declared syntax SHALL fail
-before preparation. Absence SHALL remain distinguishable from malformed
-declarations and SHALL NOT imply compatibility. Requirements SHALL be
-snapshotted without runtime-name, language or version interpretation.
+An item declaration SHALL follow the
+[publisher-declaration contract](../../design.md#publisher-declaration).
+
+#### Scenario: Declaration is absent
+- **WHEN** the publisher supplies no project-capability declaration
+- **THEN** the requirements snapshot retains that absence and compatibility is Unknown
 
 #### Scenario: Declaration is malformed or empty
 - **WHEN** a declared requirement has invalid/duplicate IDs, empty arguments or malformed structure
 - **THEN** declaration validation fails rather than dropping requirements
 
 #### Scenario: Capability is unfamiliar
-- **WHEN** a publisher and runtime use the same unfamiliar valid opaque ID
-- **THEN** generic matching requires no runtime-specific implementation change
+- **WHEN** a publisher and stack implementation use the same unfamiliar valid opaque ID
+- **THEN** generic matching requires no stack-specific implementation change
 
 ### Requirement: Tri-state fail-closed matching
 
-Compatible SHALL require authoritative Supported evidence for every required
-ID. An uncontradicted authoritative Unsupported required fact SHALL establish
-Incompatible even when another required fact is missing or Unknown.
-Contradictory reports for any ID SHALL invalidate the facts snapshot as Unknown,
-even when the contradictory ID is not required.
-All other insufficient-evidence cases SHALL be Unknown. Only Compatible SHALL
-be eligible for later preparation.
+The matcher SHALL evaluate the snapshot and requirements under the
+[matching contract](../../design.md#matching-and-compatibility-results).
 
-#### Scenario: Runtime or package labels appear to match
+#### Scenario: Stack or package labels appear to match
 - **WHEN** only stack, language, workload or package-version labels suggest compatibility
 - **THEN** compatibility remains Unknown without the required actual-project facts
 
-### Requirement: Admission evidence remains bound
+#### Scenario: Valid negative accompanies inconclusive evidence
+- **WHEN** a valid snapshot reports a required capability as Unsupported and another required capability is missing
+- **THEN** the compatibility result is Incompatible
 
-Admission SHALL retain immutable requirements/facts and their deterministic
-fingerprints, normalized root, authority, capture ID, outcome and diagnostics.
-Read-only revalidation SHALL invalidate changed project identity, requirements
-or evidence as Unknown and SHALL NOT promote a previous Unknown into Compatible.
-An admission value SHALL NOT itself authorize template execution.
+#### Scenario: An unrelated report contradicts the snapshot
+- **WHEN** reports disagree about an ID not required by the template
+- **THEN** the compatibility result is Unknown
 
-#### Scenario: Evidence changes after admission
-- **WHEN** the runtime evidence, facts or requirements fingerprint changes
-- **THEN** the old admission is invalid and a new decision is required
+### Requirement: Compatibility results remain bound
+
+Results SHALL follow the
+[result contract](../../design.md#matching-and-compatibility-results) and
+[read-only revalidation contract](../../design.md#read-only-revalidation).
+
+#### Scenario: Evidence changes after evaluation
+- **WHEN** the inspected-input, facts or requirements fingerprint changes
+- **THEN** revalidation returns Unknown and a fresh evaluation is required
 
 #### Scenario: Caller mutates original collections
 - **WHEN** the caller changes collections used to construct requirements or facts
-- **THEN** the recorded admission and its evidence remain unchanged
+- **THEN** the recorded result and its evidence remain unchanged
 
 ## Historical engine-constraint purpose
 
 The requirements below retain the earlier environmental workload/bundle
 constraint design. Their empty-constraints and eligibility rules do not waive
-the current semantic admission requirements. Shared lifecycle/preflight work
+the project-compatibility contract above. Shared lifecycle/preflight work
 is broader historical scope, not implemented by this foundation.
 
 Defines the func-specific template constraints, how templates declare them, how the CLI evaluates them, and the structured results commands receive.

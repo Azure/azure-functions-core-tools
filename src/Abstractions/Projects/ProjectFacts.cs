@@ -7,19 +7,17 @@ using System.Text.Json;
 namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
-/// Binds immutable runtime-owned capabilities to the project, capture, and inspected evidence.
+/// Captures a stack implementation's immutable capability reports and their project, capture, and evidence identity.
+/// A compatibility matcher combines this snapshot with template requirements to evaluate compatibility.
 /// </summary>
 public sealed class ProjectFacts
 {
-    public ProjectFacts(
-        ProjectFactsContext context,
-        string evidenceFingerprint,
-        bool isAuthoritative,
-        IEnumerable<ProjectCapability> capabilities)
+    public ProjectFacts(ProjectFactsContext context, string evidenceFingerprint, bool isAuthoritative, IEnumerable<ProjectCapability> capabilities)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(capabilities);
         ArgumentNullException.ThrowIfNull(evidenceFingerprint);
+
         if (evidenceFingerprint.Length != 64 || !evidenceFingerprint.All(char.IsAsciiHexDigit))
         {
             throw new ArgumentException("Project evidence must have a SHA-256 fingerprint.", nameof(evidenceFingerprint));
@@ -34,8 +32,12 @@ public sealed class ProjectFacts
         Context = context;
         EvidenceFingerprint = evidenceFingerprint.ToUpperInvariant();
         IsAuthoritative = isAuthoritative;
-        Capabilities = Array.AsReadOnly<ProjectCapability>(
-            [.. captured.OrderBy(capability => capability.Id, StringComparer.Ordinal).ThenBy(capability => capability.Support)]);
+        Array.Sort(captured, static (first, second) =>
+        {
+            int comparison = StringComparer.Ordinal.Compare(first.Id, second.Id);
+            return comparison != 0 ? comparison : first.Support.CompareTo(second.Support);
+        });
+        Capabilities = Array.AsReadOnly(captured);
         Fingerprint = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
         {
             Context.ProjectRoot,
@@ -50,16 +52,16 @@ public sealed class ProjectFacts
     public ProjectFactsContext Context { get; }
 
     /// <summary>
-    /// Gets the runtime's SHA-256 fingerprint of all actual-project inputs used to establish the facts, including relevant absences.
+    /// Gets the stack implementation's SHA-256 fingerprint of all inspected project inputs, including relevant absences.
     /// </summary>
     public string EvidenceFingerprint { get; }
 
     /// <summary>
-    /// Gets whether the runtime established this snapshot by inspecting the current project inputs rather than inferring support from runtime labels alone.
+    /// Gets whether the stack implementation established this snapshot by inspecting current project inputs rather than inferring support from labels.
     /// A false value prevents the snapshot from establishing either compatibility or incompatibility.
     /// </summary>
     /// <remarks>
-    /// This is a runtime assertion, not authentication or independent verification that the runtime inspected every relevant input.
+    /// This is a stack implementation's assertion, not authentication or independent verification of its input coverage.
     /// </remarks>
     public bool IsAuthoritative { get; }
 
