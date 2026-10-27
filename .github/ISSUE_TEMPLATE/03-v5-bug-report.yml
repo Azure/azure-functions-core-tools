@@ -1,7 +1,7 @@
 name: V5 Bug Report
 description: Report a bug or issue with the Azure Functions CLI v5.
-title: "[v5] "
-labels: ["v5"]
+title: "[v5-preview5] "
+labels: ["v5", "v5-preview5"]
 body:
 - id: version
   type: textarea
