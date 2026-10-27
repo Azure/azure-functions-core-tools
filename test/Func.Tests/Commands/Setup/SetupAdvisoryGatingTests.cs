@@ -14,27 +14,27 @@ public sealed class SetupAdvisoryGatingTests
     public static TheoryData<string[], bool> ParsedCommands => new()
     {
         { ["setup"], false },
-        { ["setup", "--output", "plain"], false },
-        { ["setup", "--output", " PlAiN "], false },
-        { ["setup", "--output", " "], false },
+        { ["setup", "--format", "plain"], false },
+        { ["setup", "--format", " PlAiN "], false },
+        { ["setup", "--format", " "], false },
         { ["setup", "--check=false"], false },
-        { ["setup", "--check=false", "--output=plain", "--non-interactive", "-y"], false },
+        { ["setup", "--check=false", "--format=plain", "--non-interactive", "-y"], false },
         { ["setup", "--check"], true },
         { ["setup", "--check=true"], true },
-        { ["setup", "--output=plain", "--check"], true },
-        { ["setup", "--output", "json"], true },
-        { ["setup", "--output=JSON"], true },
-        { ["setup", "--output", " \tJsOn\t "], true },
-        { ["setup", "--check=false", "--output=json"], true },
-        { ["setup", "--check", "--output=json"], true },
-        { ["--verbose", "setup", "--output=json", "--features=host", "--install-policy=if-needed", "-y"], true },
-        { ["setup", "--yes", "--features", "host", "--output", "json", "--verbose"], true },
-        { ["setup", ".", "--check", "--output=plain"], true },
-        { ["setup", "--output=json", ".", "--prerelease=false"], true },
+        { ["setup", "--format=plain", "--check"], true },
+        { ["setup", "--format", "json"], true },
+        { ["setup", "--format=JSON"], true },
+        { ["setup", "--format", " \tJsOn\t "], true },
+        { ["setup", "--check=false", "--format=json"], true },
+        { ["setup", "--check", "--format=json"], true },
+        { ["--verbose", "setup", "--format=json", "--features=host", "--install-policy=if-needed", "-y"], true },
+        { ["setup", "--yes", "--features", "host", "--format", "json", "--verbose"], true },
+        { ["setup", ".", "--check", "--format=plain"], true },
+        { ["setup", "--format=json", ".", "--prerelease=false"], true },
         { ["setup", "--source", "json", "--profile", "json", "--features", "host"], false },
-        { ["setup", "--output=jsonl"], false },
-        { ["setup", "--output=jsonl", "--check"], true },
-        { ["setup", "--output=json", "--install-policy=invalid"], true },
+        { ["setup", "--format=jsonl"], false },
+        { ["setup", "--format=jsonl", "--check"], true },
+        { ["setup", "--format=json", "--install-policy=invalid"], true },
         { ["setup", "--help", "--check"], true },
         { ["--help"], false },
         { ["--version"], false },
@@ -64,14 +64,14 @@ public sealed class SetupAdvisoryGatingTests
         var setup = root.Subcommands.OfType<SetupCommand>().Single();
         setup.Aliases.Add("prepare");
         setup.CheckOption.Aliases.Add("-c");
-        setup.OutputOption.Aliases.Add("-o");
+        setup.FormatOption.Aliases.Add("-f");
 
         (string[] Args, bool Expected)[] invocations =
         [
             (["prepare", "-c"], true),
-            (["prepare", "-o=JSON", "-y"], true),
-            (["--verbose", "prepare", "-y", "-o", " json "], true),
-            (["prepare", "-c=false", "-o=plain", "-y"], false),
+            (["prepare", "-f=JSON", "-y"], true),
+            (["--verbose", "prepare", "-y", "-f", " json "], true),
+            (["prepare", "-c=false", "-f=plain", "-y"], false),
         ];
         foreach (var (args, expected) in invocations)
         {
@@ -85,7 +85,7 @@ public sealed class SetupAdvisoryGatingTests
     }
 
     [Theory]
-    [InlineData("--output", "jsonl", false)]
+    [InlineData("--format", "jsonl", false)]
     [InlineData("--install-policy", "invalid", true)]
     public async Task ShouldSuppressAdvisories_InvalidOptionValue_LeavesValidationToInvocation(string option, string value, bool expected)
     {
@@ -93,9 +93,9 @@ public sealed class SetupAdvisoryGatingTests
         using var services = (ServiceProvider)TestParser.BuildServiceProviderWith(
             new TestInteractionService(), registrations => registrations.AddSingleton(runner));
         var root = Parser.CreateCommand(services);
-        string[] args = option == "--output"
+        string[] args = option == "--format"
             ? ["setup", option, value]
-            : ["setup", "--output=json", option, value];
+            : ["setup", "--format=json", option, value];
         var parsed = root.Parse(args, new ParserConfiguration { EnablePosixBundling = false });
         parsed.Errors.Should().BeEmpty();
         using CancellationTokenSource cancellation = new();
@@ -111,7 +111,7 @@ public sealed class SetupAdvisoryGatingTests
 
     [Theory]
     [InlineData("--check=invalid")]
-    [InlineData("--check=invalid", "--output=json")]
+    [InlineData("--check=invalid", "--format=json")]
     public void ShouldSuppressAdvisories_NonBooleanCheckValue_PreservesParserPathBinding(params string[] args)
     {
         var root = TestParser.CreateRoot(new TestInteractionService());
@@ -128,9 +128,9 @@ public sealed class SetupAdvisoryGatingTests
     }
 
     [Theory]
-    [InlineData(false, "--output")]
-    [InlineData(true, "--check", "--output")]
-    [InlineData(true, "--output=json", "--bad-option")]
+    [InlineData(false, "--format")]
+    [InlineData(true, "--check", "--format")]
+    [InlineData(true, "--format=json", "--bad-option")]
     public async Task ShouldSuppressAdvisories_MalformedOption_PreservesParserErrors(bool expected, params string[] args)
     {
         var root = TestParser.CreateRoot(new TestInteractionService());
@@ -166,29 +166,29 @@ public sealed class SetupAdvisoryGatingTests
     }
 
     [Theory]
-    [InlineData(false, 0, "--version", "setup", "--output")]
-    [InlineData(false, 0, "--version", "setup", "--check=false", "--output")]
-    [InlineData(true, 0, "--version", "setup", "--check=true", "--output")]
-    [InlineData(false, 0, "--version", "prepare", "-o")]
-    [InlineData(false, 0, "--help", "setup", "--output")]
-    [InlineData(false, 1, "setup", "--output")]
-    [InlineData(true, 0, "--version", "setup", "--output=json")]
+    [InlineData(false, 0, "--version", "setup", "--format")]
+    [InlineData(false, 0, "--version", "setup", "--check=false", "--format")]
+    [InlineData(true, 0, "--version", "setup", "--check=true", "--format")]
+    [InlineData(false, 0, "--version", "prepare", "-f")]
+    [InlineData(false, 0, "--help", "setup", "--format")]
+    [InlineData(false, 1, "setup", "--format")]
+    [InlineData(true, 0, "--version", "setup", "--format=json")]
     [InlineData(false, 0, "--version", "setup", "--install-policy")]
     [InlineData(false, 0, "--version")]
-    [InlineData(false, 0, "--version", "setup", "--output=json", "--output=plain")]
+    [InlineData(false, 0, "--version", "setup", "--format=json", "--format=plain")]
     [InlineData(false, 0, "--version", "setup", "--check=true", "--check=false")]
-    [InlineData(true, 0, "--version", "setup", "--check=true", "--check=false", "--output=json")]
-    [InlineData(false, 0, "--version", "setup", "--check=true", "--check=false", "--output")]
-    [InlineData(false, 0, "[suggest]", "setup", "--output")]
-    [InlineData(true, 0, "[suggest]", "setup", "--output=json")]
-    [InlineData(false, 0, "[suggest]", "setup", "--check=false", "--output")]
-    [InlineData(false, 0, "--version", "prepare", "-o=json", "-o=plain")]
+    [InlineData(true, 0, "--version", "setup", "--check=true", "--check=false", "--format=json")]
+    [InlineData(false, 0, "--version", "setup", "--check=true", "--check=false", "--format")]
+    [InlineData(false, 0, "[suggest]", "setup", "--format")]
+    [InlineData(true, 0, "[suggest]", "setup", "--format=json")]
+    [InlineData(false, 0, "[suggest]", "setup", "--check=false", "--format")]
+    [InlineData(false, 0, "--version", "prepare", "-f=json", "-f=plain")]
     public async Task ShouldSuppressAdvisories_SelectedParserAction_PreservesDispatch(bool expected, int expectedExit, params string[] args)
     {
         var root = TestParser.CreateRoot(new TestInteractionService());
         var setup = root.Subcommands.OfType<SetupCommand>().Single();
         setup.Aliases.Add("prepare");
-        setup.OutputOption.Aliases.Add("-o");
+        setup.FormatOption.Aliases.Add("-f");
         var parsed = root.Parse(args, new ParserConfiguration { EnablePosixBundling = false });
         var action = parsed.Action;
         var errors = parsed.Errors.ToArray();
@@ -211,7 +211,7 @@ public sealed class SetupAdvisoryGatingTests
         parsed.Action.Should().BeSameAs(action);
         parsed.Errors.Should().Equal(errors);
         if (expectedExit == 0) stderr.ToString().Should().BeEmpty();
-        else stderr.ToString().Should().Contain("Required argument missing for option: '--output'");
+        else stderr.ToString().Should().Contain("Required argument missing for option: '--format'");
     }
 
     [Fact]

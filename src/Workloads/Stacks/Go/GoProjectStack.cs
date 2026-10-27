@@ -1,0 +1,22 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Azure.Functions.Cli.Projects;
+
+namespace Azure.Functions.Cli.Workloads.Go;
+
+internal sealed class GoProjectStack : IProjectStack
+{
+    public string Stack => "go";
+
+    public string DisplayName => "Go";
+
+    public IReadOnlyList<string> WorkerRuntimeAliases { get; } = ["native"];
+
+    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
+
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>
+    {
+        { "Go", ["golang"] }
+    };
+}

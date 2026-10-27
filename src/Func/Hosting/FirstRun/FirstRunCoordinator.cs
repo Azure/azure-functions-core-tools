@@ -42,12 +42,13 @@ internal sealed class FirstRunCoordinator(
     // is the canonical first-run trigger. Explicit `--help`/`-h` invocations
     // are handled by the token check below. "version" stays because it only
     // arises from `func --verbose` with no subcommand, which is a CLI-
-    // inspection gesture, not a real first command. "workload" covers every
+    // inspection gesture, not a real first command. "update" must inspect its
+    // installation metadata before any setup activity. "workload" covers every
     // `func workload ...` subcommand: a user reaching for those is already
     // managing their setup directly. `init` and `new` stay off the skip list
     // intentionally; the spec wants the prompt there too.
     private static readonly HashSet<string> _skippedRootCommands =
-        new(StringComparer.OrdinalIgnoreCase) { "setup", "version", "workload" };
+        new(StringComparer.OrdinalIgnoreCase) { "setup", "update", "version", "workload" };
 
     private static readonly HashSet<string> _skippedTokens =
         new(StringComparer.OrdinalIgnoreCase) { "--help", "-h", "-?", "/?", "--version", "-v" };

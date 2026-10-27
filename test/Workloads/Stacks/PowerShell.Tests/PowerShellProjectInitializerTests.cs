@@ -12,30 +12,43 @@ namespace Azure.Functions.Cli.Workloads.PowerShell.Tests;
 public class PowerShellProjectInitializerTests
 {
     [Fact]
+    public void Constructor_NullStack_Throws()
+    {
+        FluentActions.Invoking(() => new PowerShellProjectInitializer(null!))
+            .Should().ThrowExactly<ArgumentNullException>().WithParameterName("stack");
+    }
+
+    [Fact]
     public void Stack_IsPowerShell()
     {
-        new PowerShellProjectInitializer().Stack.Should().Be("powershell");
+        new PowerShellProjectInitializer(new PowerShellProjectStack()).Stack.Should().Be("powershell");
     }
 
     [Fact]
     public void SupportedLanguages_ContainsPowerShell()
     {
-        new PowerShellProjectInitializer().SupportedLanguages.Should().ContainSingle().Subject.Should().Be("PowerShell");
+        new PowerShellProjectInitializer(new PowerShellProjectStack()).SupportedLanguages.Should().ContainSingle().Subject.Should().Be("PowerShell");
     }
 
     [Fact]
     public void GetInitOptions_ReturnsFourOptions()
     {
         RootCommand root = [];
-        IReadOnlyList<Option> options = new PowerShellProjectInitializer().GetInitOptions(new InitOptionRegistry(root));
+        IReadOnlyList<Option> options = new PowerShellProjectInitializer(new PowerShellProjectStack()).GetInitOptions(new InitOptionRegistry(root));
 
         options.Count.Should().Be(4);
+        options.Should().OnlyContain(option =>
+            option.Description != null &&
+            !string.IsNullOrWhiteSpace(option.Description) &&
+            !option.Description.Contains('\r') &&
+            !option.Description.Contains('\n'));
     }
 
     [Fact]
     public void GetInitOptions_NullRegistry_Throws()
     {
-        FluentActions.Invoking(() => new PowerShellProjectInitializer().GetInitOptions(null!)).Should().ThrowExactly<ArgumentNullException>();
+        FluentActions.Invoking(() => new PowerShellProjectInitializer(new PowerShellProjectStack()).GetInitOptions(null!))
+            .Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
@@ -46,7 +59,7 @@ public class PowerShellProjectInitializerTests
 
         try
         {
-            PowerShellProjectInitializer initializer = new();
+            PowerShellProjectInitializer initializer = new(new PowerShellProjectStack());
             // Stub the Az module lookup to avoid network calls
             initializer.GetLatestAzModuleMajorVersion = _ => Task.FromResult<string?>("12");
 
@@ -85,7 +98,7 @@ public class PowerShellProjectInitializerTests
 
         try
         {
-            PowerShellProjectInitializer initializer = new();
+            PowerShellProjectInitializer initializer = new(new PowerShellProjectStack());
             initializer.GetLatestAzModuleMajorVersion = _ => Task.FromResult<string?>("12");
 
             RootCommand root = [];
@@ -123,7 +136,7 @@ public class PowerShellProjectInitializerTests
 
         try
         {
-            PowerShellProjectInitializer initializer = new();
+            PowerShellProjectInitializer initializer = new(new PowerShellProjectStack());
             initializer.GetLatestAzModuleMajorVersion = _ => Task.FromResult<string?>(null);
 
             RootCommand root = [];
@@ -150,7 +163,7 @@ public class PowerShellProjectInitializerTests
     [Fact]
     public async Task InitializeAsync_NullContext_Throws()
     {
-        PowerShellProjectInitializer initializer = new();
+        PowerShellProjectInitializer initializer = new(new PowerShellProjectStack());
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
 
@@ -165,7 +178,7 @@ public class PowerShellProjectInitializerTests
 
         try
         {
-            PowerShellProjectInitializer initializer = new();
+            PowerShellProjectInitializer initializer = new(new PowerShellProjectStack());
             initializer.GetLatestAzModuleMajorVersion = _ => Task.FromResult<string?>(null);
 
             RootCommand root = [];
@@ -197,7 +210,7 @@ public class PowerShellProjectInitializerTests
 
         try
         {
-            PowerShellProjectInitializer initializer = new();
+            PowerShellProjectInitializer initializer = new(new PowerShellProjectStack());
             initializer.GetLatestAzModuleMajorVersion = _ => Task.FromResult<string?>(null);
 
             RootCommand root = [];
@@ -220,7 +233,7 @@ public class PowerShellProjectInitializerTests
     [Fact]
     public async Task InitializeAsync_NullParseResult_Throws()
     {
-        PowerShellProjectInitializer initializer = new();
+        PowerShellProjectInitializer initializer = new(new PowerShellProjectStack());
         RootCommand root = [];
         initializer.GetInitOptions(new InitOptionRegistry(root));
 
@@ -233,4 +246,3 @@ public class PowerShellProjectInitializerTests
         await FluentActions.Awaiting(() => initializer.InitializeAsync(context, null!)).Should().ThrowAsync<ArgumentNullException>();
     }
 }
-

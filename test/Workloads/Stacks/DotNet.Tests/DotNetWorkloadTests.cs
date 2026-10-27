@@ -43,6 +43,18 @@ public class DotNetWorkloadTests
         initializer.Should().BeOfType<DotNetProjectInitializer>();
         initializer.Stack.Should().Be("dotnet");
         initializer.SupportedLanguages.Should().Equal(["C#", "F#"]);
+
+        IProjectStack stack = provider.GetRequiredService<IProjectStack>();
+        stack.Should().BeOfType<DotNetProjectStack>();
+        stack.Should().BeSameAs(provider.GetRequiredService<DotNetProjectStack>());
+        stack.Should().NotBeAssignableTo<IProjectInitializer>();
+        stack.Stack.Should().Be(initializer.Stack);
+        stack.DisplayName.Should().Be(".NET").And.Be(initializer.DisplayName);
+        stack.WorkerRuntimeAliases.Should().Equal("dotnet-isolated").And.Equal(initializer.WorkerRuntimeAliases);
+        stack.SupportedLanguages.Should().Equal(initializer.SupportedLanguages);
+        stack.SupportedLanguageAliases.Should().BeSameAs(initializer.SupportedLanguageAliases);
+        stack.SupportedLanguageAliases["C#"].Should().Equal("csharp");
+        stack.SupportedLanguageAliases["F#"].Should().Equal("fsharp");
     }
 
     [Fact]

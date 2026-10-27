@@ -1,9 +1,5 @@
 # Azure.Functions.Cli.Workloads.DotNet
 
-## 1.0.0-preview.2
+## 1.0.0-preview.3
 
-- `func init` adopt mode now reports the project language to the CLI so it gets written to `.func/config.json`.
-- `func start`/`func run` now support `--dotnet-isolated-debug`, `--enable-json-output`, and `--json-output-file` for .NET projects, flowing the worker debug wait and JSON output startup hook environment variables.
-
-## 1.0.0-preview.1
-
+- Support `func init --target-framework net11.0` for C# projects while retaining `net10.0` as the default. Reject .NET 11 F# initialization with the same guidance as v4.

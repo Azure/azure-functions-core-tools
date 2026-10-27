@@ -218,9 +218,11 @@ When the authored file is absent, `.github/azure-functions-template.yaml` suppli
 
 The generated template uses the descriptor's identity, short name, name, and description, sets `tags.type` to `project`, and treats the complete filtered snapshot as content. It defines no parameter symbols, replacements, or ordinary post-actions. It emits a singular language tag only when all declared projects have the same language; mixed-language topology is represented exclusively by the configuration actions.
 
-The packager also adds the workload constraint defined by `template-engine-constraints`, derived from the declared project stacks. The descriptor has no workload field, so requirements always follow the declared projects.
+The packager also adds one workload constraint per declared project stack, in the form `template-engine-constraints` defines. The descriptor has no workload field, so requirements always follow the declared projects.
 
 Both modes pass the same TemplateEngine load, dry-run, action, output-path, and package safety validation during release packaging. Onboarding PR validation does not acquire source releases or validate repository-owned template definitions.
+
+Template authors own the full end-to-end tests for their generated applications, normally in the source repositories. The central packager owns format, scope, provenance, action, path, and artifact safety checks, not execution of repository-controlled tests or generated application code. Release qualification can reference author-owned evidence tied to the exact source revision, package version, and tested CLI version. A source test pass is not proof that the packaged artifact preserves that source or that the CLI can consume it; packaging checks and CLI compatibility sanity checks remain separate. The evidence-report format and storage location are review decisions.
 
 **Alternative considered:** inject generated actions into an authored file. This changes source-owned behavior without a source PR and cannot safely reproduce authored conditions or rename behavior. It is rejected.
 

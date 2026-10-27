@@ -2,7 +2,7 @@
 
 See `proposal.md` for motivation and `specs/func-new-execution/spec.md` for the command contract.
 
-`NewCommand` currently inherits the shared optional `[path]` argument, exposes template selection only through `--template`, and uses `--output` for plain/JSON rendering. It disables unmatched-token errors, dynamically attaches template options to the singleton command, manually walks unmatched tokens, and can ignore unknown template arguments. `NewCommandArgPreparer` performs a synchronous pre-parse lookup from process current directory and intentionally swallows hydration failures. `NewCommandRunner` then combines project and bundle resolution, legacy template workload lookup, group selection, prompting, and provider dispatch.
+`NewCommand` currently inherits the shared optional `[path]` argument, exposes template selection only through `--template`, and uses `--format` for plain/JSON rendering. It disables unmatched-token errors, dynamically attaches template options to the singleton command, manually walks unmatched tokens, and can ignore unknown template arguments. `NewCommandArgPreparer` performs a synchronous pre-parse lookup from process current directory and intentionally swallows hydration failures. `NewCommandRunner` then combines project and bundle resolution, legacy template workload lookup, group selection, prompting, and provider dispatch.
 
 The `template-engine-integration` change establishes the replacement boundary: one command-scoped `Templater`, constraint-aware immutable template groups, projected `func.host.json` parameter metadata, and self-invoking `ResolvedTemplate` instances. This change defines how `func new` consumes that boundary for item templates. It does not define `func init`.
 
@@ -71,7 +71,7 @@ The static command owns:
 - `--path`;
 - `--name` / `-n`;
 - `--language`;
-- `--output`;
+- `--format`;
 - `--force`;
 - `--non-interactive`;
 - `--dry-run`;
@@ -111,6 +111,8 @@ The effective language is canonicalized and validated before constructing `Templ
 `TemplateEngineContext.CommandDirectory` receives the requested template execution directory, while `TemplateEngineContext.Project.RootDirectory` receives the separately discovered project root. Consequently, `host:WorkingDirectory` can identify a nested creation location while `host:func:project-root` continues to identify the containing Functions project.
 
 Failure to discover a Functions project anywhere in the execution path's hierarchy is a command error with guidance to run `func init`. The command does not create an environment with guessed or ambient project defaults.
+
+For projects that use extension bundles, failure to resolve a declared bundle is a command error with bundle repair guidance before `Templater` is created or templates are listed. Projects without extension bundles, including .NET projects, remain supported with absent bundle context. A template that declares `func-bundle` is then restricted, while a template without that requirement can still be selected.
 
 **Alternative considered:** create `Templater` before language and bundle resolution and apply those values only as later filters. Constraints and bind symbols would observe incomplete context while selection observes different values. It is rejected.
 
@@ -192,7 +194,7 @@ Existing selection rendering can be reused where it accepts func-owned candidate
 
 Project discovery starts from that resolved path and walks upward. If the path does not yet exist, discovery starts from its nearest existing ancestor without changing the requested TemplateEngine directory. This keeps item placement intuitive while allowing stack, language, bundle, constraints, and bind symbols to come from the containing project.
 
-The current `NewCommand.OutputOption` remains the plain/JSON rendering selector. No `--format` migration is required by this change.
+The current `NewCommand.FormatOption` remains the plain/JSON rendering selector.
 
 **Alternative considered:** make `--path` identify the project root and add a separate template output option. Item templates commonly run in nested project directories, and two path-like options create unnecessary ambiguity. It is rejected.
 
@@ -244,7 +246,7 @@ Known user failures become `GracefulException` only at the command boundary when
 
 1. Extend `template-engine-integration` with `TemplateType` projection and type-scoped listing and resolution.
 2. Refine candidate parsing so invalid explicit input and unresolved required input are distinct.
-3. Introduce the static `func new` grammar, template execution `--path`, existing rendering `--output`, and `--dry-run`.
+3. Introduce the static `func new` grammar, template execution `--path`, existing rendering `--format`, and `--dry-run`.
 4. Add strict candidate parsing and deterministic alias assignment using projected parameter definitions.
 5. Route listing, filtering, prompting, dry-run, and creation through command-scoped `Templater` and `ResolvedTemplate`.
 6. Replace legacy workload/provider dispatch, dynamic option hydration, and `NewCommandArgPreparer`.

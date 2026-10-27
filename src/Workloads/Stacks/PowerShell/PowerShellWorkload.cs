@@ -22,6 +22,8 @@ public sealed class PowerShellWorkload : Workload
     public override void Configure(FunctionsCliBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.AddSingleton<PowerShellProjectStack>();
+        builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<PowerShellProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, PowerShellProjectInitializer>();
         builder.AddProjectFactory(new PowerShellProjectFactory());
     }

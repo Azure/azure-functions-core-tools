@@ -31,8 +31,6 @@ extends:
     stages:
     - stage: Validate
       jobs:
-      # CLI release is not yet fully automated, so manual steps will perform the actual
-      # validation.
       - template: /eng/ci/templates/jobs/validate-release-ref.yml@self
         parameters:
           failOnInvalidRef: false
@@ -44,6 +42,7 @@ extends:
       - template: /eng/ci/templates/jobs/build.yml@self
         parameters:
           sign: false
+          # npm packaging is disabled; do not publish or consume drop_npm.
           artifacts: ['publish']
           projects: |
             src/Func/Func.csproj
@@ -56,11 +55,31 @@ extends:
       - template: /eng/ci/templates/jobs/stage-cli-artifacts.yml@self
         parameters:
           sign: true
+          includeNpmPackage: false
 
-    - stage: PublishCdn
-      displayName: Publish CLI to CDN
+    - stage: ApproveRelease
+      displayName: Approve CLI release
       dependsOn: Release
       jobs:
-      - template: /ci/release-cdn-artifacts.yml@eng
+      - job: Approve
+        displayName: Review CLI release artifacts
+        pool: server
+        timeoutInMinutes: 1500
+        templateContext:
+          type: validationJob
+        steps:
+        - task: ManualValidation@1
+          timeoutInMinutes: 1440
+          inputs:
+            notifyUsers: '[internal]\Azure Functions Core'
+            approvers: '[internal]\Azure Functions Core'
+            allowApproversToApproveTheirOwnRuns: false
+            onTimeout: reject
+
+    - stage: Publish
+      dependsOn: ApproveRelease
+      jobs:
+      - template: /ci/publish-cli.yml@eng
         parameters:
           version: $(Build.BuildNumber)
+          npmPackageNames: []

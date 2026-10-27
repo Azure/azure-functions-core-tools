@@ -31,7 +31,7 @@ Program.cs
   ├── Parser.CreateCommand(host.Services)
   │   ├── Build root command
   │   ├── Resolve every FuncCliCommand from DI:
-  │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, pack, publish, version, help, profile, workload
+  │   │     ├── Built-in commands (IBuiltInCommand): init, new, start, update, pack, publish, version, help, profile, workload
   │   │     └── ExternalCommand wrappers (each carries the WorkloadInfo for the
   │   │         workload that called RegisterCommand)
   │   ├── Skip workload commands that collide with built-ins or with each
@@ -62,6 +62,7 @@ func
 ├── init [path]           Initialize a new Functions project
 ├── new [path]            Create a new function from a template
 ├── start [path]          Start the Functions host (placeholder)
+├── update                Update in-place installations; show owner guidance for externally managed installations
 ├── profile
 │   ├── list [path]       List available profiles
 │   ├── show <name> [path]  Show profile details

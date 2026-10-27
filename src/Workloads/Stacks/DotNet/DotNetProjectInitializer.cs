@@ -13,33 +13,31 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// Uses the <c>Microsoft.Azure.Functions.Worker.ProjectTemplates</c> NuGet
 /// template package to scaffold projects via <c>dotnet new func</c>.
 /// </summary>
-internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemplateHivePathProvider hivePathProvider) : IProjectInitializer
+internal sealed class DotNetProjectInitializer(
+    IDotnetCliRunner dotnetCli, ITemplateHivePathProvider hivePathProvider, DotNetProjectStack stack) : IProjectInitializer
 {
     internal const string TemplatesPackageName = "Microsoft.Azure.Functions.Worker.ProjectTemplates";
     internal const string TemplateShortName = "func";
     internal const string DefaultFramework = "net10.0";
 
-    internal static readonly IReadOnlyList<string> SupportedFrameworks = ["net10.0"];
+    internal static readonly IReadOnlyList<string> SupportedFrameworks = ["net10.0", "net11.0"];
 
     internal static readonly TimeSpan HiveTtl = TimeSpan.FromDays(30);
     internal static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
 
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
     private readonly ITemplateHivePathProvider _hivePathProvider = hivePathProvider ?? throw new ArgumentNullException(nameof(hivePathProvider));
+    private readonly DotNetProjectStack _stack = stack ?? throw new ArgumentNullException(nameof(stack));
 
-    public string Stack => "dotnet";
+    public string Stack => _stack.Stack;
 
-    public string DisplayName => ".NET";
+    public string DisplayName => _stack.DisplayName;
 
-    public IReadOnlyList<string> WorkerRuntimeAliases { get; } = ["dotnet-isolated"];
+    public IReadOnlyList<string> WorkerRuntimeAliases => _stack.WorkerRuntimeAliases;
 
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>()
-    {
-        { "C#", ["csharp"] },
-        { "F#", ["fsharp"] }
-    };
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases => _stack.SupportedLanguageAliases;
 
-    public IReadOnlyList<string> SupportedLanguages => [.. SupportedLanguageAliases.Keys];
+    public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<string> FrameworkOption { get; private set; } = default!;
 
@@ -49,7 +47,7 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
 
         FrameworkOption = registry.GetOrAdd(new Option<string>("--target-framework", "-tfm")
         {
-            Description = "The target framework for the project (e.g. net10.0).",
+            Description = "The target framework for the project (net10.0 or net11.0; default: net10.0; net11.0 requires C#).",
             DefaultValueFactory = _ => DefaultFramework
         });
 
@@ -76,6 +74,13 @@ internal sealed class DotNetProjectInitializer(IDotnetCliRunner dotnetCli, ITemp
         if (!SupportedFrameworks.Contains(framework, StringComparer.OrdinalIgnoreCase))
         {
             throw new ArgumentException($"Framework '{framework}' is not supported. Supported frameworks: {string.Join(", ", SupportedFrameworks)}.", nameof(framework));
+        }
+
+        if (framework.Equals("net11.0", StringComparison.OrdinalIgnoreCase) && language == "F#")
+        {
+            throw new GracefulException(
+                ".NET 11 isolated project initialization is not yet supported for F#. Use C# or target .NET 10 instead.",
+                isUserError: true);
         }
 
         try

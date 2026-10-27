@@ -19,14 +19,18 @@ internal sealed record Release(SemVersion Version, Uri DownloadUrl)
     /// <c>"tar.gz"</c> on Linux and macOS.
     /// </summary>
     internal static string ArchiveExtension { get; } =
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "zip" : "tar.gz";
+        GetArchiveExtension(RuntimeInformation.RuntimeIdentifier);
 
     /// <summary>
-    /// Expected SHA-256 hex digest of the downloaded archive, or <c>null</c>
-    /// when the release feed does not yet publish checksums.
+    /// Expected SHA-256 hex digest from the archive's published checksum sidecar.
     /// </summary>
-    // TODO: Populate from the release feed once checksum metadata is available (#5445).
-    public string? Sha256Checksum { get; init; }
+    public required string Sha256Checksum { get; init; }
 
     public bool IsPrerelease => Version.IsPrerelease;
+
+    internal static string GetArchiveExtension(string runtimeIdentifier)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(runtimeIdentifier);
+        return runtimeIdentifier.StartsWith("win-", StringComparison.Ordinal) ? "zip" : "tar.gz";
+    }
 }

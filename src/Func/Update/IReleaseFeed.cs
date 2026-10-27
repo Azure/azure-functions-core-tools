@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Update;
 internal interface IReleaseFeed
 {
     /// <summary>
-    /// Returns the latest release based on the requested quality level.
+    /// Returns the latest release and its verified-format checksum metadata based on the requested quality level.
     /// </summary>
     /// <param name="includePrerelease">
     /// <c>false</c> to return the latest stable release;
@@ -22,16 +22,16 @@ internal interface IReleaseFeed
     /// </param>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the manifest cannot be fetched or contains no version for
-    /// the requested quality level.
+    /// the requested quality level, or when its checksum sidecar cannot be fetched or is invalid.
     /// </exception>
     public Task<Release> GetLatestAsync(bool includePrerelease, CancellationToken cancellationToken);
 
     /// <summary>
     /// Returns a <see cref="Release"/> for the given <paramref name="version"/>
-    /// after verifying the artifact exists on the CDN.
+    /// after verifying the artifact exists on the CDN and reading its checksum sidecar.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the version is not available on the CDN or the request fails.
+    /// Thrown when the version is not available on the CDN, a request fails, or its checksum sidecar is invalid.
     /// </exception>
     public Task<Release> GetVersionAsync(SemVersion version, CancellationToken cancellationToken);
 }

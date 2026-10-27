@@ -771,7 +771,7 @@ Built-in (declared on `NewCommand`, visible in top-level `func new --help`):
 | `--force` | — | `bool` | Overwrite existing files. |
 | `--non-interactive` | — | `bool` | Refuse to prompt; exit 1 if any input is missing. |
 | `--list` | `-l` | `bool` | List available templates for this project instead of scaffolding (§5.5). |
-| `--output` | — | `enum {plain, json}` | Output mode (mirrors `func setup`). |
+| `--format` | — | `enum {plain, json}` | Output mode (mirrors `func setup`). |
 
 Path positional argument (inherited via `AddPathArgument()`): the project
 directory. Defaults to cwd. **Note:** `func new` does not "create" a project —
@@ -831,7 +831,7 @@ Options:
   -t, --template <template>    ...
   --force                      ...
   --non-interactive            ...
-  --output <plain|json>        ...
+  --format <plain|json>        ...
   -?, -h, --help               Show help and usage information.
 
 Available templates (stack: python):
@@ -982,7 +982,7 @@ sees is always the catalog `func new` would actually scaffold from.
 
 ```
 func new --list [path]
-  --output {plain|json}    output mode (default: plain)
+  --format {plain|json}    output mode (default: plain)
 ```
 
 No `--stack <id>` override (§5.5.5: `func new --list` requires an
@@ -1032,7 +1032,7 @@ Layout rules:
   `dotnet-templates.json` entry (templates-workload-spec.md §5.3.1), which
   was hydrated at workload build time from the upstream `template.json` —
   same data, no run-time `dotnet new list` shell-out.
-  Truncated to terminal width with `…`; full text via `--output json`.
+  Truncated to terminal width with `…`; full text via `--format json`.
 - **Node catalog is pre-filtered per channel at workload pack time**
   (templates-workload-spec.md §6.1). Templates whose required bindings
   aren't satisfied by the channel's authoritative bundle are dropped at
@@ -1057,7 +1057,7 @@ Layout rules:
 
 #### 5.5.4 JSON output
 
-`--output json` emits a single envelope (not NDJSON), since `list` is a
+`--format json` emits a single envelope (not NDJSON), since `list` is a
 finite, ordered query:
 
 ```jsonc
@@ -1159,7 +1159,7 @@ NewCommandRunner.ExecuteAsync
  │         Fail: MinBundleVersionTooOld(installedBundle, requiredRange, templatesWorkloadVersion)
  │         (DotNet: skipped — no minBundleVersion declared. DotNet substitutes a hive-provisioning check.)
  ├── 12. ApplyAsync                (dispatch by template.EngineId → engineProviders[EngineId].ApplyAsync)
- └── 13. Render result             (NewCommandRenderer; honours --output)
+ └── 13. Render result             (NewCommandRenderer; honours --format)
 ```
 
 Steps 1–5 reuse existing CLI services. Step **4** is the
@@ -1431,7 +1431,7 @@ Promote to §4 once answered.
   needs to support both generations in the same release window, they can
   ship two separate templates content workloads (different package ids,
   different channels).
-- ✅ **Q11. `func new --list --output json` envelope shape. — RESOLVED 2026-05-28.**
+- ✅ **Q11. `func new --list --format json` envelope shape. — RESOLVED 2026-05-28.**
   Single envelope `{ stack, language, templates: [ … ] }` per §5.5.4 —
   every invocation. There is no multi-stack case because §5.5.5 now
   requires an init'd project (no stackless run, no `--stack` override):

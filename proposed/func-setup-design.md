@@ -41,7 +41,7 @@ func setup [<path>] [--features <list>]...
            [--source <nuget-feed>]
            [--prerelease]
            [--non-interactive] [--yes] [--check]
-           [--output <plain|json>]
+           [--format <plain|json>]
 ```
 
 | Option | Description |
@@ -55,7 +55,7 @@ func setup [<path>] [--features <list>]...
 | `--non-interactive` | Suppress the stack picker. Use explicit features or supported project/runtime defaults. |
 | `--yes`, `-y` | Suppress the stack picker and use project/runtime defaults when features are omitted. Does not select every stack. |
 | `--check` | Check selected dependencies without installing or updating workloads. Metadata caches may change. Does not write the first-run marker. |
-| `--output <plain|json>` | Output mode. `plain` is human-readable text. `json` emits newline-delimited JSON events and suppresses the stack picker. |
+| `--format <plain|json>` | Output mode. `plain` is human-readable text. `json` emits newline-delimited JSON events and suppresses the stack picker. |
 
 ## 4. Setup Features
 
@@ -208,7 +208,7 @@ Direct `setup` invocations skip the global first-run prompt. Parsed check and JS
 
 ## 12. JSON Output
 
-`--output json` emits newline-delimited JSON (NDJSON). Each renderer event has `type` and `timestamp` fields and uses the interaction service's raw stdout writer, bypassing console wrapping so it occupies one physical line. There is no separate final JSON document.
+`--format json` emits newline-delimited JSON (NDJSON). Each renderer event has `type` and `timestamp` fields and uses the interaction service's raw stdout writer, bypassing console wrapping so it occupies one physical line. There is no separate final JSON document.
 
 This contract covers setup renderer events, not every CLI failure. Parser, command-option/path validation, bootstrap, and unexpected exceptions can still use normal CLI error output. Cancellation exits with code `130` without a guaranteed final setup event.
 

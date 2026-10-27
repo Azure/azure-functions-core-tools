@@ -30,6 +30,7 @@
     dotnet-templates\:
         hive\        DOTNET_CLI_HOME for the dotnet new install.
         out\         Generated dotnet-templates.json + source.json.
+        .hydrate.inputs  Evaluated package id and version for cache invalidation.
         .hydrated    Sentinel file the incremental check writes after a
                      successful hydrate; included as the target's Outputs.
 
@@ -44,11 +45,21 @@
     <_DotnetTemplatesNupkg Condition="'$(SourceItemTemplatesPackageId)' != '' and '$(SourceItemTemplatesVersion)' != '' and '$(NuGetPackageRoot)' != ''">$([MSBuild]::NormalizePath('$(NuGetPackageRoot)', '$(SourceItemTemplatesPackageId.ToLowerInvariant())', '$(SourceItemTemplatesVersion)', '$(SourceItemTemplatesPackageId.ToLowerInvariant()).$(SourceItemTemplatesVersion).nupkg'))</_DotnetTemplatesNupkg>
   </PropertyGroup>
 
+  <Target Name="_DotnetTemplatesProperties"
+          Condition="'$(SkipHydrateDotnetTemplates)' != 'true'">
+    <MakeDir Directories="$(IntermediateOutputPath)dotnet-templates" />
+    <WriteLinesToFile File="$(IntermediateOutputPath)dotnet-templates/.hydrate.inputs"
+                      Lines="$(SourceItemTemplatesPackageId)|$(SourceItemTemplatesVersion)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
   <Target Name="HydrateDotnetTemplates"
+          DependsOnTargets="_DotnetTemplatesProperties"
           Condition="'$(SkipHydrateDotnetTemplates)' != 'true'"
           BeforeTargets="GenerateNuspec;_GetPackageFiles"
-          Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)../../scripts/hydrate-dotnet-templates.ps1;$(_DotnetTemplatesNupkg)"
-          Outputs="$(IntermediateOutputPath)dotnet-templates/.hydrated">
+          Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)../../scripts/hydrate-dotnet-templates.ps1;$(_DotnetTemplatesNupkg);$(IntermediateOutputPath)dotnet-templates/.hydrate.inputs"
+          Outputs="$(IntermediateOutputPath)dotnet-templates/.hydrated;$(IntermediateOutputPath)dotnet-templates/out/dotnet-templates.json;$(IntermediateOutputPath)dotnet-templates/out/source.json">
 
     <Error Condition="'$(SourceItemTemplatesPackageId)' == ''"
            Text="SourceItemTemplatesPackageId must be set (the upstream NuGet template package id, e.g. Microsoft.Azure.Functions.Worker.ItemTemplates)." />
