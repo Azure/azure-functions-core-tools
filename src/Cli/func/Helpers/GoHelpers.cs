@@ -20,6 +20,8 @@ namespace Azure.Functions.Cli.Helpers
         internal const string GoBinDir = "bin";
         internal const string GoModFileName = "go.mod";
 
+        internal static string LocalBinaryPath => Path.Combine(GoBinDir, OperatingSystem.IsWindows() ? $"{GoBinaryName}.exe" : GoBinaryName);
+
         public static async Task<WorkerLanguageVersionInfo> GetEnvironmentGoVersion()
         {
             return await GetVersion("go");
@@ -92,14 +94,13 @@ namespace Azure.Functions.Cli.Helpers
         /// Compiles the user's Go project into a binary named <see cref="GoBinaryName"/>
         /// under <c><see cref="GoBinDir"/>/</c> in <paramref name="workingDirectory"/>.
         /// The host resolves this binary via <c>defaultExecutablePath</c> in
-        /// <c>workers/native/worker.config.json</c> (the host appends <c>.exe</c> on
-        /// Windows automatically).
+        /// <c>workers/native/worker.config.json</c>. Core Tools sets the Windows
+        /// default executable path to match the <c>.exe</c> build output.
         /// </summary>
         public static async Task BuildProject(string workingDirectory = null)
         {
             workingDirectory ??= Environment.CurrentDirectory;
-            var outputName = OperatingSystem.IsWindows() ? $"{GoBinaryName}.exe" : GoBinaryName;
-            var outputPath = Path.Combine(GoBinDir, outputName);
+            var outputPath = LocalBinaryPath;
 
             ColoredConsole.WriteLine($"Building Go worker binary '{outputPath}'...");
 
@@ -147,14 +148,13 @@ namespace Azure.Functions.Cli.Helpers
         public static void AssertBinaryExists(string workingDirectory = null)
         {
             workingDirectory ??= Environment.CurrentDirectory;
-            var binaryName = OperatingSystem.IsWindows() ? $"{GoBinaryName}.exe" : GoBinaryName;
-            var binaryPath = Path.Combine(workingDirectory, GoBinDir, binaryName);
+            var binaryPath = Path.Combine(workingDirectory, LocalBinaryPath);
 
             if (!FileSystemHelpers.FileExists(binaryPath))
             {
                 throw new CliException(
-                    $"Could not find a built Go binary '{Path.Combine(GoBinDir, binaryName)}' in '{workingDirectory}'. " +
-                    $"Run 'func start' without '--no-build' to compile, or run 'go build -o {Path.Combine(GoBinDir, binaryName)} .' manually.");
+                    $"Could not find a built Go binary '{LocalBinaryPath}' in '{workingDirectory}'. " +
+                    $"Run 'func start' without '--no-build' to compile, or run 'go build -o {LocalBinaryPath} .' manually.");
             }
         }
 

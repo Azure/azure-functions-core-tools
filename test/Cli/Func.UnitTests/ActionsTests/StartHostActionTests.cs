@@ -23,6 +23,110 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
     [Collection("NativeWorkerRuntimeTests")]
     public class StartHostActionTests
     {
+        [Theory]
+        [InlineData(WorkerRuntime.Go)]
+        [InlineData(WorkerRuntime.Python)]
+        [InlineData(WorkerRuntime.Custom)]
+        [InlineData(WorkerRuntime.None)]
+        public void ConfigureLanguageWorkerDefaults_SetsWindowsGoExecutablePathOnly(WorkerRuntime runtime)
+        {
+            var originalRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            try
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = runtime;
+                var builder = new ConfigurationBuilder();
+
+                StartHostAction.ConfigureLanguageWorkerDefaults(builder);
+
+                var expected = OperatingSystem.IsWindows() && runtime == WorkerRuntime.Go
+                    ? Path.Combine("bin", "app.exe")
+                    : null;
+                builder.Build()["languageWorkers:native:defaultExecutablePath"].Should().Be(expected);
+            }
+            finally
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = originalRuntime;
+            }
+        }
+
+        [Theory]
+        [InlineData("bin/custom-worker.exe", true)]
+        [InlineData("bin/custom-worker.exe", false)]
+        [InlineData(@"C:\custom worker\worker.exe", true)]
+        [InlineData(@"C:\custom worker\worker.exe", false)]
+        [InlineData("bin/app", true)]
+        [InlineData("bin/app", false)]
+        public void ConfigureLanguageWorkerDefaults_PreservesExplicitPath(string executablePath, bool configureFirst)
+        {
+            var originalRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            try
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
+                var builder = new ConfigurationBuilder();
+                var settings = new Dictionary<string, string>
+                {
+                    ["languageWorkers:native:defaultExecutablePath"] = executablePath
+                };
+
+                if (configureFirst)
+                {
+                    builder.AddInMemoryCollection(settings);
+                }
+
+                StartHostAction.ConfigureLanguageWorkerDefaults(builder);
+
+                if (!configureFirst)
+                {
+                    builder.AddInMemoryCollection(settings);
+                }
+
+                builder.Build()["languageWorkers:native:defaultExecutablePath"].Should().Be(executablePath);
+            }
+            finally
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = originalRuntime;
+            }
+        }
+
+        [Theory]
+        [InlineData("languageWorkers:native:defaultExecutablePath")]
+        [InlineData("languageWorkers__native__defaultExecutablePath")]
+        public void ConfigureLanguageWorkerDefaults_PreservesEnvironmentPath(string settingName)
+        {
+            var originalRuntime = GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone;
+            var settingNames = new[]
+            {
+                "languageWorkers:native:defaultExecutablePath",
+                "languageWorkers__native__defaultExecutablePath"
+            };
+            var originalValues = settingNames.ToDictionary(name => name, Environment.GetEnvironmentVariable);
+            const string executablePath = "bin/custom-worker.exe";
+            try
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = WorkerRuntime.Go;
+                foreach (var name in settingNames)
+                {
+                    Environment.SetEnvironmentVariable(name, null);
+                }
+
+                Environment.SetEnvironmentVariable(settingName, executablePath);
+                var builder = new ConfigurationBuilder();
+
+                StartHostAction.ConfigureLanguageWorkerDefaults(builder);
+                builder.AddEnvironmentVariables();
+
+                builder.Build()["languageWorkers:native:defaultExecutablePath"].Should().Be(executablePath);
+            }
+            finally
+            {
+                GlobalCoreToolsSettings.CurrentWorkerRuntime = originalRuntime;
+                foreach (var setting in originalValues)
+                {
+                    Environment.SetEnvironmentVariable(setting.Key, setting.Value);
+                }
+            }
+        }
+
         [SkippableFact]
         public async Task CheckNonOptionalSettings_ThrowsOnMissingAzureWebJobsStorageAndManagedIdentity()
         {
