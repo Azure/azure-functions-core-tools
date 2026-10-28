@@ -1,0 +1,62 @@
+name: V5 Validation Scenario
+description: Define a reusable validation procedure for Azure Functions CLI v5, not a bug report or test result.
+title: "[v5 validation] "
+labels: ["v5", "validation-scenario"]
+body:
+- type: markdown
+  attributes:
+    value: |
+      Describe what should be validated, not a claim that it has passed.
+      Keep titles and procedures independent of a particular preview build.
+      Record actual runs in comments with the tested build (`func --verbose`), OS,
+      architecture, shell, runtime/workload versions, variants exercised, outcome,
+      and redacted evidence. Link failures to separate V5 Bug Reports.
+      Use only disposable projects and non-production resources; never include secrets.
+- id: scenario
+  type: textarea
+  attributes:
+    label: Scenario and motivation
+    description: What user journey or risk does this scenario cover?
+  validations:
+    required: true
+- id: area
+  type: textarea
+  attributes:
+    label: Command area and stacks
+    description: Identify commands and stacks in scope, including cross-cutting applicability.
+    placeholder: "init; Node (JavaScript and TypeScript), Python, .NET, Go"
+  validations:
+    required: true
+- id: prerequisites
+  type: textarea
+  attributes:
+    label: Environment and prerequisites
+    description: Describe required platforms, tools, workload/template state, fixtures, and safety boundaries. Link maintained setup instructions rather than pinning a preview build.
+  validations:
+    required: true
+- id: steps
+  type: textarea
+  attributes:
+    label: Steps and inputs
+    description: Provide ordered, reproducible steps and exact commands. Define placeholders, shell differences, and any destructive or billable operations.
+  validations:
+    required: true
+- id: criteria
+  type: textarea
+  attributes:
+    label: Observable pass criteria
+    description: State observable output, exit status, files, or behavior required for success. Separate unresolved expectations from acceptance criteria.
+  validations:
+    required: true
+- id: variations
+  type: textarea
+  attributes:
+    label: Coverage variations
+    description: Enumerate meaningful positive, negative, interactive, non-interactive, path, and platform variants. Mark inapplicable cases explicitly in execution records.
+  validations:
+    required: true
+- id: related
+  type: textarea
+  attributes:
+    label: Related coverage and source
+    description: Link source catalog sections, related scenarios, known bugs, and specification decisions. Explain retired syntax or coverage blocked on a design/build mismatch.
