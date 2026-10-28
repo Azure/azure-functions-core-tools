@@ -4,8 +4,12 @@
 namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
-/// Creates a Functions project when a workload recognizes the working directory.
+/// Creates a Functions project when a language stack recognizes the working directory.
 /// </summary>
+/// <remarks>
+/// Capture the project inputs used for capability reporting once and return a new project instance for each observation.
+/// Inspection must honor cancellation and must not refresh an existing project's reports.
+/// </remarks>
 public interface IFunctionsProjectFactory
 {
     public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken);

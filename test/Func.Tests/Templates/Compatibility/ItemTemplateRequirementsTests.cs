@@ -14,16 +14,15 @@ public sealed class ItemTemplateRequirementsTests
 
         requirements.IsDeclared.Should().BeTrue();
         requirements.CapabilityIds.Should().Equal("future.http-model");
-        requirements.Fingerprint.Should().HaveLength(64);
     }
 
     [Fact]
     public void Parse_MultipleRequirements_PreservesEveryOpaqueIdentifier()
     {
         var requirements = ItemTemplateRequirements.Parse(
-            """{"type":"func-project-capabilities","args":["unfamiliarRuntime_9.http-model","another.publisher-capability"]}""");
+            """{"type":"func-project-capabilities","args":["unfamiliarStack_9.http-model","another.publisher-capability"]}""");
 
-        requirements.CapabilityIds.Should().Equal("another.publisher-capability", "unfamiliarRuntime_9.http-model");
+        requirements.CapabilityIds.Should().Equal("another.publisher-capability", "unfamiliarStack_9.http-model");
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public sealed class ItemTemplateRequirementsTests
 
         requirements.IsDeclared.Should().BeFalse();
         requirements.CapabilityIds.Should().BeEmpty();
-        requirements.Fingerprint.Should().NotBe(new ItemTemplateRequirements(["a"]).Fingerprint);
+        new ItemTemplateRequirements(["a"]).IsDeclared.Should().BeTrue();
     }
 
     [Theory]
@@ -115,17 +114,15 @@ public sealed class ItemTemplateRequirementsTests
     }
 
     [Fact]
-    public void Constructor_CallerMutation_DoesNotChangeRequirementsOrFingerprint()
+    public void Constructor_CallerMutation_DoesNotChangeRequirements()
     {
         List<string> ids = ["b", "a"];
         var requirements = new ItemTemplateRequirements(ids);
-        var fingerprint = requirements.Fingerprint;
 
         ids.Clear();
         ids.Add("different");
 
         requirements.CapabilityIds.Should().Equal("a", "b");
-        requirements.Fingerprint.Should().Be(fingerprint);
     }
 
     [Fact]
@@ -139,23 +136,13 @@ public sealed class ItemTemplateRequirementsTests
     }
 
     [Fact]
-    public void Constructor_EquivalentOrderings_HaveSameFingerprint()
+    public void Constructor_EquivalentOrderings_HaveSameRequirements()
     {
         var first = new ItemTemplateRequirements(["a", "b"]);
         var second = new ItemTemplateRequirements(["b", "a"]);
-        var changed = new ItemTemplateRequirements(["a", "c"]);
 
-        first.Fingerprint.Should().Be(second.Fingerprint).And.NotBe(changed.Fingerprint);
-    }
-
-    [Fact]
-    public void Fingerprints_DeclaredAndAbsentRequirements_PreserveCanonicalRepresentation()
-    {
-        var declared = new ItemTemplateRequirements(["b", "a"]);
-        var absent = ItemTemplateRequirements.Parse(null);
-
-        declared.Fingerprint.Should().Be("4C5188EAFDCA050FB097BE621B04518259C24991C336ADD00B2113A6B752CBFA");
-        absent.Fingerprint.Should().Be("39E871627D94E47CBE71F39DAD086C689A83BCCB5D6A2F0DF907BB330CB1D492");
+        first.CapabilityIds.Should().Equal(second.CapabilityIds);
+        first.IsDeclared.Should().Be(second.IsDeclared);
     }
 
     [Fact]

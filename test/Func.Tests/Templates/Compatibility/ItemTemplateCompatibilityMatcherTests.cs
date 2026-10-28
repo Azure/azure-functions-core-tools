@@ -10,58 +10,83 @@ namespace Azure.Functions.Cli.Tests.Templates.Compatibility;
 
 public sealed class ItemTemplateCompatibilityMatcherTests
 {
-    private static readonly Guid _captureId = new("42db8847-ec89-44ac-b380-c41a28ebef62");
-    private static readonly Guid _otherCaptureId = new("e5335115-88c5-44fd-a7a2-67dff33a354d");
     private readonly ItemTemplateCompatibilityMatcher _matcher = new();
 
-    private static string Root => Path.DirectorySeparatorChar == '\\' ? @"C:\projects\sample" : "/projects/sample";
-
     [Fact]
-    public async Task EvaluateAsync_AllRequiredCapabilitiesSupported_IsCompatible()
+    public void Evaluate_AllRequiredCapabilitiesSupported_IsCompatible()
     {
-        var project = new TestProject();
-        project.Capabilities.AddRange(
+        var project = new TestProject(
             [new("future.model", ProjectCapabilitySupport.Supported), new("future.http", ProjectCapabilitySupport.Supported)]);
         var requirements = new ItemTemplateRequirements(["future.model", "future.http"]);
 
-        var result = await _matcher.EvaluateAsync(project, requirements, _captureId, CancellationToken.None);
+        var result = _matcher.Evaluate(project, requirements, CancellationToken.None);
 
         result.Compatibility.Should().Be(ItemTemplateCompatibility.Compatible);
         result.PassesProjectCapabilityCheck.Should().BeTrue();
         result.Diagnostics.Should().BeEmpty();
-        result.Context.ProjectRoot.Should().Be(Root);
-        result.Context.Authority.Should().Be(project.StackIdentity);
-        result.Context.CaptureId.Should().Be(_captureId);
-        result.RequirementsFingerprint.Should().Be(requirements.Fingerprint);
-        result.ProjectFactsFingerprint.Should().Be(result.ProjectFacts!.Fingerprint);
+        result.Project.Should().BeSameAs(project);
+        result.Requirements.Should().BeSameAs(requirements);
     }
 
     [Theory]
-    [InlineData(ProjectCapabilitySupport.Unsupported, true, "capability-unsupported")]
-    [InlineData(ProjectCapabilitySupport.Unknown, false, "capability-unknown")]
-    public async Task EvaluateAsync_RequiredCapabilityNotSupported_FailsClosed(
-        ProjectCapabilitySupport support,
-        bool isIncompatible,
-        string diagnostic)
+    [InlineData(null, null, "Unknown")]
+    [InlineData(null, ProjectCapabilitySupport.Unknown, "Unknown")]
+    [InlineData(null, ProjectCapabilitySupport.Supported, "Unknown")]
+    [InlineData(null, ProjectCapabilitySupport.Unsupported, "Incompatible")]
+    [InlineData(ProjectCapabilitySupport.Unknown, null, "Unknown")]
+    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Unknown, "Unknown")]
+    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Supported, "Unknown")]
+    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Unsupported, "Incompatible")]
+    [InlineData(ProjectCapabilitySupport.Supported, null, "Unknown")]
+    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unknown, "Unknown")]
+    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Supported, "Compatible")]
+    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unsupported, "Incompatible")]
+    [InlineData(ProjectCapabilitySupport.Unsupported, null, "Incompatible")]
+    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Unknown, "Incompatible")]
+    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Supported, "Incompatible")]
+    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Unsupported, "Incompatible")]
+    public void Evaluate_RequiredCapabilityCombinations_ApplyConjunctionAndNegativePrecedence(
+        ProjectCapabilitySupport? first, ProjectCapabilitySupport? second, string expected)
     {
-        var project = new TestProject();
-        project.Capabilities.Add(new("future.http", support));
+        List<ProjectCapability> capabilities = [];
+        if (first.HasValue)
+        {
+            capabilities.Add(new("a", first.Value));
+        }
 
-        var result = await _matcher.EvaluateAsync(project, new(["future.http"]), _captureId, CancellationToken.None);
+        if (second.HasValue)
+        {
+            capabilities.Add(new("b", second.Value));
+        }
 
-        result.Compatibility.Should().Be(isIncompatible ? ItemTemplateCompatibility.Incompatible : ItemTemplateCompatibility.Unknown);
-        result.PassesProjectCapabilityCheck.Should().BeFalse();
-        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be(diagnostic);
+        var project = new TestProject(capabilities);
+        var expectedCompatibility = Enum.Parse<ItemTemplateCompatibility>(expected);
+
+        var result = _matcher.Evaluate(project, new(["b", "a"]), CancellationToken.None);
+
+        result.Compatibility.Should().Be(expectedCompatibility);
+        result.PassesProjectCapabilityCheck.Should().Be(expectedCompatibility == ItemTemplateCompatibility.Compatible);
     }
 
     [Fact]
-    public async Task EvaluateAsync_UnsupportedAndMissingOrUnknownCapabilities_IsIncompatible()
+    public void Evaluate_MissingAndUnknownCapabilities_HaveDistinctDiagnostics()
     {
-        var project = new TestProject();
-        project.Capabilities.AddRange(
+        var project = new TestProject([new("b-unknown", ProjectCapabilitySupport.Unknown)]);
+
+        var result = _matcher.Evaluate(project, new(["b-unknown", "a-missing"]), CancellationToken.None);
+
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.CapabilityId)).Should().Equal(
+            ("capability-missing", "a-missing"), ("capability-unknown", "b-unknown"));
+    }
+
+    [Fact]
+    public void Evaluate_UnsupportedWithMissingAndUnknown_IsIncompatibleWithAllDiagnostics()
+    {
+        var project = new TestProject(
             [new("b-unsupported", ProjectCapabilitySupport.Unsupported), new("c-unknown", ProjectCapabilitySupport.Unknown)]);
 
-        var result = await _matcher.EvaluateAsync(project, new(["c-unknown", "a-missing", "b-unsupported"]), _captureId, CancellationToken.None);
+        var result = _matcher.Evaluate(project, new(["c-unknown", "a-missing", "b-unsupported"]), CancellationToken.None);
 
         result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
         result.PassesProjectCapabilityCheck.Should().BeFalse();
@@ -70,583 +95,321 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_MissingRequiredCapability_IsUnknown()
+    public void Evaluate_ExistingStackWithoutReports_IsUnknown()
     {
         var project = new TestProject();
-        project.Capabilities.Add(new("unrelated", ProjectCapabilitySupport.Supported));
 
-        var result = await _matcher.EvaluateAsync(project, new(["required"]), _captureId, CancellationToken.None);
+        var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
 
         result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        result.PassesProjectCapabilityCheck.Should().BeFalse();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("capability-missing");
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_StackReturnsNoFacts_IsUnknown()
-    {
-        var project = new TestProject { Capture = (_, _) => ValueTask.FromResult<ProjectFacts?>(null) };
-
-        var result = await _matcher.EvaluateAsync(project, new(["required"]), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.ProjectFactsFingerprint.Should().BeNull();
-        result.Diagnostics.Select(diagnostic => diagnostic.Code).Should().Equal("project-facts-missing");
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_StackDoesNotOverrideFacts_IsUnknown()
-    {
-        var project = new LegacyProject();
-
-        var result = await _matcher.EvaluateAsync(project, new(["required"]), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.Diagnostics.Select(diagnostic => diagnostic.Code).Should().Equal("project-facts-missing");
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_AbsentRequirements_IsUnknownEvenWithAuthoritativeFacts()
-    {
-        var project = new TestProject();
-        project.Capabilities.Add(new("future.http", ProjectCapabilitySupport.Supported));
-
-        var result = await _matcher.EvaluateAsync(project, ItemTemplateRequirements.Parse(null), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.PassesProjectCapabilityCheck.Should().BeFalse();
-        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("requirements-absent");
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_ConflictingRequiredEvidence_IsUnknown()
-    {
-        var project = new TestProject();
-        project.Capabilities.AddRange(
-            [new("future.http", ProjectCapabilitySupport.Supported), new("future.http", ProjectCapabilitySupport.Unsupported)]);
-
-        var result = await _matcher.EvaluateAsync(project, new(["future.http"]), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("capability-conflicting");
-    }
-
-    [Theory]
-    [InlineData(ProjectCapabilitySupport.Supported)]
-    [InlineData(ProjectCapabilitySupport.Unsupported)]
-    public async Task EvaluateAsync_ConflictingSnapshotCannotEstablishSupportOrNonSupport(ProjectCapabilitySupport requiredSupport)
-    {
-        var project = new TestProject();
-        project.Capabilities.AddRange(
-        [
-            new("required", requiredSupport),
-            new("other", ProjectCapabilitySupport.Supported),
-            new("other", ProjectCapabilitySupport.Unsupported),
-        ]);
-
-        var result = await _matcher.EvaluateAsync(project, new(["required"]), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.PassesProjectCapabilityCheck.Should().BeFalse();
-        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("capability-conflicting");
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_MultipleUnknownFactsWithoutUnsupported_IsUnknown()
-    {
-        var project = new TestProject();
-        project.Capabilities.AddRange(
-            [new("a", ProjectCapabilitySupport.Unknown), new("b", ProjectCapabilitySupport.Unknown)]);
-
-        var result = await _matcher.EvaluateAsync(project, new(["b", "a"]), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.Diagnostics.Select(diagnostic => diagnostic.CapabilityId).Should().Equal("a", "b");
-        result.Diagnostics.Should().OnlyContain(diagnostic => diagnostic.Code == "capability-unknown");
     }
 
     [Theory]
     [InlineData(ProjectCapabilitySupport.Supported)]
     [InlineData(ProjectCapabilitySupport.Unsupported)]
     [InlineData(ProjectCapabilitySupport.Unknown)]
-    public async Task EvaluateAsync_RepeatedConsistentReports_PreserveSupportOutcome(ProjectCapabilitySupport support)
+    public void Evaluate_AbsentRequirements_IsUnknownRegardlessOfReportedState(ProjectCapabilitySupport support)
     {
-        var project = new TestProject();
-        project.Capabilities.AddRange(
-            [new("future.http", support), new("future.http", support)]);
+        var project = new TestProject([new("future.http", support)]);
 
-        var result = await _matcher.EvaluateAsync(project, new(["future.http"]), _captureId, CancellationToken.None);
+        var result = _matcher.Evaluate(project, ItemTemplateRequirements.Parse(null), CancellationToken.None);
 
-        ItemTemplateCompatibility expected = support switch
-        {
-            ProjectCapabilitySupport.Supported => ItemTemplateCompatibility.Compatible,
-            ProjectCapabilitySupport.Unsupported => ItemTemplateCompatibility.Incompatible,
-            ProjectCapabilitySupport.Unknown => ItemTemplateCompatibility.Unknown,
-            _ => throw new ArgumentOutOfRangeException(nameof(support)),
-        };
-        result.Compatibility.Should().Be(expected);
-        result.Diagnostics.Should().NotContain(diagnostic => diagnostic.Code == "capability-conflicting");
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        result.PassesProjectCapabilityCheck.Should().BeFalse();
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("requirements-absent");
     }
 
     [Theory]
-    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unknown)]
-    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Supported)]
-    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Unknown)]
-    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Unsupported)]
-    public async Task EvaluateAsync_DifferingReportsIncludingUnknown_InvalidateTheSnapshot(
-        ProjectCapabilitySupport first,
-        ProjectCapabilitySupport second)
+    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unsupported, true)]
+    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Supported, true)]
+    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unknown, false)]
+    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Supported, false)]
+    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Unknown, false)]
+    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Unsupported, false)]
+    public void Evaluate_ConflictingReports_InvalidateProjectCapabilitiesEvenOutsideRequirements(
+        ProjectCapabilitySupport first, ProjectCapabilitySupport second, bool required)
     {
-        var project = new TestProject();
-        project.Capabilities.AddRange(
-            [new("required", ProjectCapabilitySupport.Unsupported), new("unrequired", first), new("unrequired", second)]);
+        var conflictingId = required ? "required" : "unrequired";
+        var project = new TestProject(
+        [
+            new("required", ProjectCapabilitySupport.Unsupported),
+            new(conflictingId, first),
+            new(conflictingId, second),
+        ]);
 
-        var result = await _matcher.EvaluateAsync(project, new(["required"]), _captureId, CancellationToken.None);
+        var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
 
         result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        result.PassesProjectCapabilityCheck.Should().BeFalse();
         result.Diagnostics.Should().ContainSingle()
             .Which.Should().Be(new ItemTemplateCompatibilityDiagnostic(
-                "capability-conflicting", "The stack reports conflicting project evidence for capability 'unrequired'.", "unrequired"));
+                "capability-conflicting",
+                $"The language stack reports conflicting states for project capability '{conflictingId}'.",
+                conflictingId));
+    }
+
+    [Theory]
+    [InlineData(ProjectCapabilitySupport.Supported, "Compatible")]
+    [InlineData(ProjectCapabilitySupport.Unsupported, "Incompatible")]
+    [InlineData(ProjectCapabilitySupport.Unknown, "Unknown")]
+    public void Evaluate_RepeatedConsistentReports_PreserveSupportOutcome(
+        ProjectCapabilitySupport support, string expected)
+    {
+        var project = new TestProject([new("required", support), new("required", support)]);
+
+        var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
+
+        result.Compatibility.Should().Be(Enum.Parse<ItemTemplateCompatibility>(expected));
+        result.Diagnostics.Should().NotContain(diagnostic => diagnostic.Code == "capability-conflicting");
     }
 
     [Theory]
     [InlineData(ProjectCapabilitySupport.Supported)]
     [InlineData(ProjectCapabilitySupport.Unsupported)]
-    public async Task EvaluateAsync_InsufficientAuthority_IsUnknownRatherThanTrustingPositiveOrNegativeFacts(ProjectCapabilitySupport support)
+    public void Evaluate_UnrequiredContradiction_PreventsPositiveAndNegativeResults(ProjectCapabilitySupport requiredSupport)
     {
-        var project = new TestProject { IsAuthoritative = false };
-        project.Capabilities.Add(new("future.http", support));
+        var project = new TestProject(
+        [
+            new("required", requiredSupport),
+            new("unrequired", ProjectCapabilitySupport.Supported),
+            new("unrequired", ProjectCapabilitySupport.Unsupported),
+        ]);
 
-        var result = await _matcher.EvaluateAsync(project, new(["future.http"]), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("project-facts-not-authoritative");
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_MissingStackAuthority_IsUnknownEvenWhenSnapshotClaimsAuthority()
-    {
-        var project = new TestProject { StackIdentity = null };
-        project.Capabilities.Add(new("future.http", ProjectCapabilitySupport.Supported));
-
-        var result = await _matcher.EvaluateAsync(project, new(["future.http"]), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.Diagnostics.Select(diagnostic => diagnostic.Code).Should().Contain("project-authority-missing");
-    }
-
-    [Theory]
-    [InlineData("root", "project-root-mismatch")]
-    [InlineData("authority", "project-authority-mismatch")]
-    [InlineData("capture", "project-facts-stale")]
-    public async Task EvaluateAsync_UnrelatedOrStaleEvidence_IsUnknown(string changedPart, string diagnostic)
-    {
-        var project = new TestProject
-        {
-            Capture = (context, _) => ValueTask.FromResult<ProjectFacts?>(new(
-                new(
-                    changedPart == "root" ? Path.Combine(context.ProjectRoot, "other") : context.ProjectRoot,
-                    changedPart == "authority" ? "another.owner" : context.Authority,
-                    changedPart == "capture" ? _otherCaptureId : context.CaptureId),
-                new('A', 64),
-                true,
-                [new("future.http", ProjectCapabilitySupport.Supported)])),
-        };
-
-        var result = await _matcher.EvaluateAsync(project, new(["future.http"]), _captureId, CancellationToken.None);
+        var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
 
         result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
         result.PassesProjectCapabilityCheck.Should().BeFalse();
-        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be(diagnostic);
+        result.Diagnostics.Should().ContainSingle().Which.CapabilityId.Should().Be("unrequired");
     }
 
     [Fact]
-    public async Task EvaluateAsync_NewOperationCannotReusePriorCapture()
+    public void Evaluate_SeveralConflictingIds_ReportsOnlyConflictsInOrdinalOrder()
     {
-        var project = new TestProject();
-        project.Capabilities.Add(new("future.http", ProjectCapabilitySupport.Supported));
-        var first = await _matcher.EvaluateAsync(project, new(["future.http"]), _captureId, CancellationToken.None);
-        project.Capture = (_, _) => ValueTask.FromResult(first.ProjectFacts);
+        ProjectCapability[] capabilities =
+        [
+            new("z", ProjectCapabilitySupport.Unsupported),
+            new("a", ProjectCapabilitySupport.Supported),
+            new("required", ProjectCapabilitySupport.Supported),
+            new("z", ProjectCapabilitySupport.Supported),
+            new("a", ProjectCapabilitySupport.Unknown),
+        ];
+        var firstProject = new TestProject(capabilities);
+        var secondProject = new TestProject(capabilities.Reverse());
 
-        var second = await _matcher.EvaluateAsync(project, new(["future.http"]), _otherCaptureId, CancellationToken.None);
+        var first = _matcher.Evaluate(firstProject, new(["required", "missing"]), CancellationToken.None);
+        var second = _matcher.Evaluate(secondProject, new(["missing", "required"]), CancellationToken.None);
 
-        first.PassesProjectCapabilityCheck.Should().BeTrue();
-        second.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        second.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("project-facts-stale");
-        project.CaptureCount.Should().Be(2);
+        first.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        first.Diagnostics.Should().OnlyContain(diagnostic => diagnostic.Code == "capability-conflicting");
+        first.Diagnostics.Select(diagnostic => diagnostic.CapabilityId).Should().Equal("a", "z");
+        second.Diagnostics.Should().Equal(first.Diagnostics);
     }
 
-    [Theory]
-    [InlineData("root")]
-    [InlineData("authority")]
-    public async Task EvaluateAsync_ProjectChangesDuringCapture_IsUnknown(string changedPart)
+    [Fact]
+    public void Evaluate_UnrequiredNegativeAndUnknownReports_DoNotRestrictSupportedRequirement()
     {
-        var project = new TestProject();
-        project.Capture = (context, _) =>
-        {
-            project.ProjectRoot = changedPart == "root" ? Path.Combine(Root, "other") : Root;
-            project.StackIdentity = changedPart == "authority" ? "another.owner" : context.Authority;
-            return ValueTask.FromResult<ProjectFacts?>(new(context, new('A', 64), true, [new("a", ProjectCapabilitySupport.Supported)]));
-        };
+        var project = new TestProject(
+        [
+            new("required", ProjectCapabilitySupport.Supported),
+            new("unrequired-negative", ProjectCapabilitySupport.Unsupported),
+            new("unrequired-unknown", ProjectCapabilitySupport.Unknown),
+        ]);
 
-        var result = await _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
+        var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
+
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Compatible);
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Evaluate_CapabilityIdsAreCaseSensitive()
+    {
+        var project = new TestProject([new("Future.Http", ProjectCapabilitySupport.Supported)]);
+
+        var result = _matcher.Evaluate(project, new(["future.http"]), CancellationToken.None);
 
         result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.Diagnostics.Select(diagnostic => diagnostic.Code).Should().Contain("project-changed");
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("capability-missing");
     }
 
     [Fact]
-    public async Task EvaluateAsync_CallerMutationAfterReturn_DoesNotAlterResult()
+    public void Evaluate_UnfamiliarCapability_DoesNotReadStackLanguageWorkerOrProjectLabels()
     {
-        var project = new TestProject();
-        project.Capabilities.Add(new("future.http", ProjectCapabilitySupport.Supported));
-        List<string> ids = ["future.http"];
-        var result = await _matcher.EvaluateAsync(project, new(ids), _captureId, CancellationToken.None);
-        var factsFingerprint = result.ProjectFactsFingerprint;
-        var requirementsFingerprint = result.RequirementsFingerprint;
+        var project = new TestProject([new("publisher_2042.unknown-model.http", ProjectCapabilitySupport.Supported)]);
 
-        project.Capabilities.Clear();
-        ids.Clear();
-        project.StackIdentity = "changed.owner";
-        project.ProjectRoot = Path.Combine(Root, "changed");
-
-        result.PassesProjectCapabilityCheck.Should().BeTrue();
-        result.Context.ProjectRoot.Should().Be(Root);
-        result.Context.Authority.Should().Be("example.runtime");
-        result.ProjectFacts!.Capabilities.Should().ContainSingle();
-        result.Requirements.CapabilityIds.Should().Equal("future.http");
-        result.ProjectFactsFingerprint.Should().Be(factsFingerprint);
-        result.RequirementsFingerprint.Should().Be(requirementsFingerprint);
-        Action changeDiagnostics = () => ((IList<ItemTemplateCompatibilityDiagnostic>)result.Diagnostics).Clear();
-        changeDiagnostics.Should().Throw<NotSupportedException>();
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_CapabilityIdsAreCaseSensitive()
-    {
-        var project = new TestProject();
-        project.Capabilities.Add(new("Future.Http", ProjectCapabilitySupport.Supported));
-
-        var result = await _matcher.EvaluateAsync(project, new(["future.http"]), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_UnfamiliarStackAndCapability_NeedsNoStackSpecificPolicy()
-    {
-        var project = new TestProject { StackIdentity = "unfamiliar.runtime-2042" };
-        project.Capabilities.Add(new("publisher_2042.unknown-model.http", ProjectCapabilitySupport.Supported));
-
-        var result = await _matcher.EvaluateAsync(project, new(["publisher_2042.unknown-model.http"]), _captureId, CancellationToken.None);
+        var result = _matcher.Evaluate(project, new(["publisher_2042.unknown-model.http"]), CancellationToken.None);
 
         result.Compatibility.Should().Be(ItemTemplateCompatibility.Compatible);
     }
 
-    [Theory]
-    [InlineData(".NET")]
-    [InlineData("example stack")]
-    [InlineData("future.\u03bb")]
-    public async Task EvaluateAsync_CanonicalStackIdentity_DoesNotUseCapabilityIdentifierGrammar(string stack)
-    {
-        var project = new TestProject { StackIdentity = stack };
-        project.Capabilities.Add(new("required", ProjectCapabilitySupport.Supported));
-
-        var result = await _matcher.EvaluateAsync(project, new(["required"]), _captureId, CancellationToken.None);
-
-        result.Context.Authority.Should().Be(stack);
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Compatible);
-        result.PassesProjectCapabilityCheck.Should().BeTrue();
-    }
-
-    [Theory]
-    [InlineData("node")]
-    [InlineData("python")]
-    [InlineData("dotnet")]
-    [InlineData("5.0.0")]
-    public async Task EvaluateAsync_StackOrPackageLikeLabelWithoutFacts_DoesNotEstablishCompatibility(string label)
-    {
-        var project = new TestProject { StackIdentity = label };
-
-        var result = await _matcher.EvaluateAsync(project, new(["required.semantic-capability"]), _captureId, CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-    }
-
     [Fact]
-    public async Task EvaluateAsync_EquivalentReorderedInputs_HaveDeterministicEvidenceAndDiagnostics()
+    public void Evaluate_ReorderedReportsAndRequirements_ProduceDeterministicDiagnostics()
     {
-        var firstProject = new TestProject();
-        firstProject.Capabilities.AddRange([new("c", ProjectCapabilitySupport.Unknown), new("b", ProjectCapabilitySupport.Unsupported)]);
-        var secondProject = new TestProject();
-        secondProject.Capabilities.AddRange([new("b", ProjectCapabilitySupport.Unsupported), new("c", ProjectCapabilitySupport.Unknown)]);
+        var firstProject = new TestProject([new("c", ProjectCapabilitySupport.Unknown), new("b", ProjectCapabilitySupport.Unsupported)]);
+        var secondProject = new TestProject([new("b", ProjectCapabilitySupport.Unsupported), new("c", ProjectCapabilitySupport.Unknown)]);
 
-        var first = await _matcher.EvaluateAsync(firstProject, new(["c", "a", "b"]), _captureId, CancellationToken.None);
-        var second = await _matcher.EvaluateAsync(secondProject, new(["b", "a", "c"]), _captureId, CancellationToken.None);
+        var first = _matcher.Evaluate(firstProject, new(["c", "a", "b"]), CancellationToken.None);
+        var second = _matcher.Evaluate(secondProject, new(["b", "a", "c"]), CancellationToken.None);
 
-        first.RequirementsFingerprint.Should().Be(second.RequirementsFingerprint);
-        first.ProjectFactsFingerprint.Should().Be(second.ProjectFactsFingerprint);
+        first.Compatibility.Should().Be(second.Compatibility).And.Be(ItemTemplateCompatibility.Incompatible);
         first.Diagnostics.Should().Equal(second.Diagnostics);
     }
 
     [Fact]
-    public async Task EvaluateAsync_PreCanceled_DoesNotCallStack()
+    public void Evaluate_CallerChangesSourceCollectionsBeforeAndAfterMatching_InputsRemainCaptured()
     {
-        var project = new TestProject();
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
+        List<ProjectCapability> capabilities = [new("required", ProjectCapabilitySupport.Supported)];
+        List<string> ids = ["required"];
+        var project = new TestProject(capabilities);
+        var requirements = new ItemTemplateRequirements(ids);
+        capabilities.Clear();
+        ids.Clear();
 
-        Func<Task> action = () => _matcher.EvaluateAsync(project, new(["a"]), _captureId, cancellation.Token);
+        var result = _matcher.Evaluate(project, requirements, CancellationToken.None);
+        capabilities.Add(new("required", ProjectCapabilitySupport.Unsupported));
+        ids.Add("different");
+        var repeated = _matcher.Evaluate(project, requirements, CancellationToken.None);
 
-        await action.Should().ThrowAsync<OperationCanceledException>();
-        project.CaptureCount.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_StackCancelsAfterCapture_DoesNotReturnResult()
-    {
-        using var cancellation = new CancellationTokenSource();
-        var project = new TestProject
-        {
-            Capture = (context, _) =>
-            {
-                cancellation.Cancel();
-                return ValueTask.FromResult<ProjectFacts?>(new(context, new('A', 64), true, [new("a", ProjectCapabilitySupport.Supported)]));
-            },
-        };
-
-        Func<Task> action = () => _matcher.EvaluateAsync(project, new(["a"]), _captureId, cancellation.Token);
-
-        await action.Should().ThrowAsync<OperationCanceledException>();
-        project.LastToken.Should().Be(cancellation.Token);
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_StackFailure_IsNotSilentlyConvertedToMissingFacts()
-    {
-        var project = new TestProject { Capture = (_, _) => throw new IOException("Stack evidence is unreadable.") };
-
-        Func<Task> action = () => _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
-
-        await action.Should().ThrowAsync<IOException>().WithMessage("Stack evidence is unreadable.");
-    }
-
-    [Fact]
-    public async Task RevalidateAsync_UnchangedEvidence_StillPassesProjectCapabilityCheck()
-    {
-        var project = new TestProject();
-        project.Capabilities.Add(new("a", ProjectCapabilitySupport.Supported));
-        var result = await _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
-
-        var current = await _matcher.RevalidateAsync(result, project, new(["a"]), CancellationToken.None);
-
-        current.PassesProjectCapabilityCheck.Should().BeTrue();
-        current.ProjectFactsFingerprint.Should().Be(result.ProjectFactsFingerprint);
-        project.CaptureCount.Should().Be(2);
-    }
-
-    [Theory]
-    [InlineData("evidence")]
-    [InlineData("capabilities")]
-    [InlineData("authority-quality")]
-    [InlineData("facts-disappeared")]
-    public async Task RevalidateAsync_ChangedProjectEvidence_InvalidatesPriorResult(string changedPart)
-    {
-        var project = new TestProject();
-        project.Capabilities.Add(new("a", ProjectCapabilitySupport.Supported));
-        var result = await _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
-        switch (changedPart)
-        {
-            case "evidence":
-                project.EvidenceFingerprint = new('B', 64);
-                break;
-            case "capabilities":
-                project.Capabilities[0] = new("a", ProjectCapabilitySupport.Unsupported);
-                break;
-            case "authority-quality":
-                project.IsAuthoritative = false;
-                break;
-            case "facts-disappeared":
-                project.Capture = (_, _) => ValueTask.FromResult<ProjectFacts?>(null);
-                break;
-        }
-
-        var current = await _matcher.RevalidateAsync(result, project, new(["a"]), CancellationToken.None);
-
-        current.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        current.PassesProjectCapabilityCheck.Should().BeFalse();
-        current.Diagnostics.Select(diagnostic => diagnostic.Code).Should().Contain("project-facts-changed");
         result.PassesProjectCapabilityCheck.Should().BeTrue();
+        repeated.PassesProjectCapabilityCheck.Should().BeTrue();
+        result.Project.Should().BeSameAs(project);
+        result.Project.Capabilities.Should().ContainSingle().Which.Support.Should().Be(ProjectCapabilitySupport.Supported);
+        result.Requirements.CapabilityIds.Should().Equal("required");
+    }
+
+    [Fact]
+    public void Evaluate_RepeatedMatching_DoesNotInspectProjectAgain()
+    {
+        var inspections = 0;
+        var support = ProjectCapabilitySupport.Supported;
+        IEnumerable<ProjectCapability> InspectProject()
+        {
+            inspections++;
+            yield return new("required", support);
+        }
+
+        var project = new TestProject(InspectProject());
+        var requirements = new ItemTemplateRequirements(["required"]);
+        inspections.Should().Be(1);
+
+        var first = _matcher.Evaluate(project, requirements, CancellationToken.None);
+        support = ProjectCapabilitySupport.Unsupported;
+        var repeated = _matcher.Evaluate(project, requirements, CancellationToken.None);
+
+        inspections.Should().Be(1);
+        first.Compatibility.Should().Be(ItemTemplateCompatibility.Compatible);
+        repeated.Compatibility.Should().Be(first.Compatibility);
     }
 
     [Theory]
-    [InlineData("root")]
-    [InlineData("authority")]
-    public async Task RevalidateAsync_ChangedProjectIdentity_InvalidatesPriorResult(string changedPart)
+    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Supported, "Unknown", "Compatible")]
+    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unsupported, "Compatible", "Incompatible")]
+    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Supported, "Incompatible", "Compatible")]
+    public void Evaluate_NewProjectObservation_ProducesNewResultWithoutChangingOriginal(
+        ProjectCapabilitySupport before, ProjectCapabilitySupport after, string originalOutcome, string newOutcome)
     {
-        var project = new TestProject();
-        project.Capabilities.Add(new("a", ProjectCapabilitySupport.Supported));
-        var result = await _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
-        project.ProjectRoot = changedPart == "root" ? Path.Combine(Root, "other") : Root;
-        project.StackIdentity = changedPart == "authority" ? "other.owner" : project.StackIdentity;
+        ProjectCapability[] inputs = [new("required", before)];
+        var originalProject = new TestProject(inputs);
+        var requirements = new ItemTemplateRequirements(["required"]);
+        var original = _matcher.Evaluate(originalProject, requirements, CancellationToken.None);
 
-        var current = await _matcher.RevalidateAsync(result, project, new(["a"]), CancellationToken.None);
+        inputs[0] = new("required", after);
+        var newProject = new TestProject(inputs);
+        var current = _matcher.Evaluate(newProject, requirements, CancellationToken.None);
 
-        current.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        current.Diagnostics.Select(diagnostic => diagnostic.Code).Should().Contain("project-changed");
+        original.Compatibility.Should().Be(Enum.Parse<ItemTemplateCompatibility>(originalOutcome));
+        original.Project.Should().BeSameAs(originalProject);
+        original.Project.Capabilities.Should().ContainSingle().Which.Support.Should().Be(before);
+        current.Project.Should().BeSameAs(newProject).And.NotBeSameAs(original.Project);
+        current.Compatibility.Should().Be(Enum.Parse<ItemTemplateCompatibility>(newOutcome));
     }
 
     [Fact]
-    public async Task RevalidateAsync_ChangedRequirements_InvalidatesPriorResultEvenWhenNewRequirementsAreSupported()
+    public void Evaluate_NewRequirements_ProducesNewResultWithoutChangingOriginal()
     {
-        var project = new TestProject();
-        project.Capabilities.AddRange([new("a", ProjectCapabilitySupport.Supported), new("b", ProjectCapabilitySupport.Supported)]);
-        var result = await _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
+        var project = new TestProject([new("a", ProjectCapabilitySupport.Supported), new("b", ProjectCapabilitySupport.Unsupported)]);
+        var original = _matcher.Evaluate(project, new(["a"]), CancellationToken.None);
 
-        var current = await _matcher.RevalidateAsync(result, project, new(["b"]), CancellationToken.None);
+        var current = _matcher.Evaluate(project, new(["b"]), CancellationToken.None);
 
-        current.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        current.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("requirements-changed");
+        original.Compatibility.Should().Be(ItemTemplateCompatibility.Compatible);
+        original.Requirements.CapabilityIds.Should().Equal("a");
+        current.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
+        current.Requirements.CapabilityIds.Should().Equal("b");
     }
 
     [Fact]
-    public async Task RevalidateAsync_UnknownDecision_CannotBePromotedWithoutNewEvaluation()
+    public void Evaluate_PreCanceled_ThrowsWithoutReturningCompatibility()
     {
         var project = new TestProject();
-        project.Capabilities.Add(new("a", ProjectCapabilitySupport.Unknown));
-        var result = await _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
-        project.Capabilities[0] = new("a", ProjectCapabilitySupport.Supported);
-
-        var revalidated = await _matcher.RevalidateAsync(result, project, new(["a"]), CancellationToken.None);
-        var newDecision = await _matcher.EvaluateAsync(project, new(["a"]), _otherCaptureId, CancellationToken.None);
-
-        revalidated.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        newDecision.Compatibility.Should().Be(ItemTemplateCompatibility.Compatible);
-    }
-
-    [Fact]
-    public async Task RevalidateAsync_ProjectChangesDuringRecaptureWithSameSnapshot_RemainsUnknown()
-    {
-        var project = new TestProject();
-        project.Capabilities.Add(new("a", ProjectCapabilitySupport.Supported));
-        var result = await _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
-        project.Capture = (_, _) =>
-        {
-            project.StackIdentity = "changed.owner";
-            return ValueTask.FromResult(result.ProjectFacts);
-        };
-
-        var current = await _matcher.RevalidateAsync(result, project, new(["a"]), CancellationToken.None);
-
-        current.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        current.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("admission-outcome-changed");
-    }
-
-    [Fact]
-    public async Task RevalidateAsync_UnknownWithOtherwiseUnchangedEvidence_CannotBePromoted()
-    {
-        var project = new TestProject();
-        project.Capabilities.Add(new("a", ProjectCapabilitySupport.Supported));
-        project.Capture = (context, _) =>
-        {
-            project.StackIdentity = "changed.owner";
-            return ValueTask.FromResult<ProjectFacts?>(new(context, new('A', 64), true, project.Capabilities));
-        };
-        var result = await _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
-        project.StackIdentity = "example.runtime";
-        project.Capture = (_, _) => ValueTask.FromResult(result.ProjectFacts);
-
-        var current = await _matcher.RevalidateAsync(result, project, new(["a"]), CancellationToken.None);
-
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        current.ProjectFactsFingerprint.Should().Be(result.ProjectFactsFingerprint);
-        current.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        current.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("admission-outcome-changed");
-    }
-
-    [Fact]
-    public async Task Parse_MalformedDeclarationArgument_ThrowsBeforeStackCapture()
-    {
-        var project = new TestProject();
-        Func<Task> action = () => _matcher.EvaluateAsync(project,
-            ItemTemplateRequirements.Parse("""{"type":"func-project-capabilities","args":[]}"""), _captureId, CancellationToken.None);
-
-        await action.Should().ThrowAsync<FormatException>();
-        project.CaptureCount.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task RevalidateAsync_PreCanceled_DoesNotCallStackAgain()
-    {
-        var project = new TestProject();
-        var result = await _matcher.EvaluateAsync(project, new(["a"]), _captureId, CancellationToken.None);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        Func<Task> action = () => _matcher.RevalidateAsync(result, project, new(["a"]), cancellation.Token);
+        Action action = () => _matcher.Evaluate(project, new(["required"]), cancellation.Token);
 
-        await action.Should().ThrowAsync<OperationCanceledException>();
-        project.CaptureCount.Should().Be(1);
+        action.Should().Throw<OperationCanceledException>().Which.CancellationToken.Should().Be(cancellation.Token);
     }
 
     [Fact]
-    public async Task EvaluateAsync_InvalidArguments_Throw()
+    public void Evaluate_NullArguments_Throw()
+    {
+        Action nullProject = () => _matcher.Evaluate(null!, new(["required"]), CancellationToken.None);
+        Action nullRequirements = () => _matcher.Evaluate(new TestProject(), null!, CancellationToken.None);
+
+        nullProject.Should().Throw<ArgumentNullException>().WithParameterName("project");
+        nullRequirements.Should().Throw<ArgumentNullException>().WithParameterName("requirements");
+    }
+
+    [Fact]
+    public void Result_CallerMutatesDiagnostics_CapturedDiagnosticsDoNotChange()
+    {
+        List<ItemTemplateCompatibilityDiagnostic> diagnostics = [new("capability-missing", "No report.", "required")];
+        var result = new ItemTemplateCompatibilityResult(new TestProject(), new(["required"]), ItemTemplateCompatibility.Unknown, diagnostics);
+
+        diagnostics.Clear();
+        Action changeCaptured = () => ((IList<ItemTemplateCompatibilityDiagnostic>)result.Diagnostics).Clear();
+
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("capability-missing");
+        changeCaptured.Should().Throw<NotSupportedException>();
+    }
+
+    [Fact]
+    public void Result_NullInputs_Throw()
     {
         var project = new TestProject();
-        Func<Task> nullProject = () => _matcher.EvaluateAsync(null!, new(["a"]), _captureId, CancellationToken.None);
-        Func<Task> nullRequirements = () => _matcher.EvaluateAsync(project, null!, _captureId, CancellationToken.None);
-        Func<Task> emptyCapture = () => _matcher.EvaluateAsync(project, new(["a"]), Guid.Empty, CancellationToken.None);
-        Func<Task> nullResult = () => _matcher.RevalidateAsync(null!, project, new(["a"]), CancellationToken.None);
+        var requirements = new ItemTemplateRequirements(["required"]);
+        Action nullProject = () => new ItemTemplateCompatibilityResult(null!, requirements, ItemTemplateCompatibility.Unknown, []);
+        Action nullRequirements = () => new ItemTemplateCompatibilityResult(project, null!, ItemTemplateCompatibility.Unknown, []);
+        Action nullDiagnostics = () => new ItemTemplateCompatibilityResult(project, requirements, ItemTemplateCompatibility.Unknown, null!);
 
-        await nullProject.Should().ThrowAsync<ArgumentNullException>().WithParameterName("project");
-        await nullRequirements.Should().ThrowAsync<ArgumentNullException>().WithParameterName("requirements");
-        await emptyCapture.Should().ThrowAsync<ArgumentException>().WithParameterName("captureId");
-        await nullResult.Should().ThrowAsync<ArgumentNullException>().WithParameterName("previousResult");
+        nullProject.Should().Throw<ArgumentNullException>().WithParameterName("project");
+        nullRequirements.Should().Throw<ArgumentNullException>().WithParameterName("requirements");
+        nullDiagnostics.Should().Throw<ArgumentNullException>().WithParameterName("diagnostics");
     }
 
-    private class LegacyProject : FunctionsProject
+    private sealed class TestProject : FunctionsProject
     {
-        public override WorkingDirectory WorkingDirectory => WorkingDirectory.FromExplicit(Root);
-
-        public override string StackName => "example.runtime";
-
-        public override string StackDisplayName => throw new InvalidOperationException("Compatibility matching must not read display names.");
-
-        public override string? Language => throw new InvalidOperationException("Compatibility matching must not read language labels.");
-
-        public override bool SupportsExtensionBundles => throw new InvalidOperationException("Compatibility matching must not read bundle policy.");
-
-        public override FunctionsWorkerReference WorkerReference => throw new InvalidOperationException("Compatibility matching must not read worker references.");
-    }
-
-    private sealed class TestProject : LegacyProject
-    {
-        public string ProjectRoot { get; set; } = Root;
-
-        public string? StackIdentity { get; set; } = "example.runtime";
-
-        public string EvidenceFingerprint { get; set; } = new('A', 64);
-
-        public bool IsAuthoritative { get; set; } = true;
-
-        public List<ProjectCapability> Capabilities { get; } = [];
-
-        public Func<ProjectFactsContext, CancellationToken, ValueTask<ProjectFacts?>>? Capture { get; set; }
-
-        public int CaptureCount { get; private set; }
-
-        public CancellationToken LastToken { get; private set; }
-
-        public override WorkingDirectory WorkingDirectory => WorkingDirectory.FromExplicit(ProjectRoot);
-
-        public override string StackName => StackIdentity!;
-
-        public override ValueTask<ProjectFacts?> GetProjectFactsAsync(ProjectFactsContext context, CancellationToken cancellationToken)
+        public TestProject()
         {
-            CaptureCount++;
-            LastToken = cancellationToken;
-            return Capture is not null
-                ? Capture(context, cancellationToken)
-                : ValueTask.FromResult<ProjectFacts?>(new(context, EvidenceFingerprint, IsAuthoritative, Capabilities));
         }
+
+        public TestProject(IEnumerable<ProjectCapability> capabilities)
+            : base(capabilities)
+        {
+        }
+
+        public override WorkingDirectory WorkingDirectory => throw new InvalidOperationException("Matching must not inspect the project directory.");
+
+        public override string StackName => throw new InvalidOperationException("Matching must not interpret stack identifiers.");
+
+        public override string StackDisplayName => throw new InvalidOperationException("Matching must not read display names.");
+
+        public override string? Language => throw new InvalidOperationException("Matching must not read language labels.");
+
+        public override bool SupportsExtensionBundles => throw new InvalidOperationException("Matching must not read bundle policy.");
+
+        public override FunctionsWorkerReference WorkerReference => throw new InvalidOperationException("Matching must not read worker references.");
     }
 }

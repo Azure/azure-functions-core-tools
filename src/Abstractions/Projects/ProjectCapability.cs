@@ -4,7 +4,7 @@
 namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
-/// Reports the stack implementation's knowledge of one project capability using an opaque, case-sensitive identifier.
+/// Reports the language stack's knowledge of one captured project capability using an opaque, case-sensitive identifier.
 /// </summary>
 public sealed class ProjectCapability(string id, ProjectCapabilitySupport support)
 {

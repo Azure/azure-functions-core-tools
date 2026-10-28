@@ -6,25 +6,18 @@ using Azure.Functions.Cli.Projects;
 namespace Azure.Functions.Cli.Templates.Compatibility;
 
 /// <summary>
-/// Records a compatibility decision and its immutable evidence.
+/// Records a project compatibility result and the captured inputs it evaluated.
 /// It does not authorize template preparation, generation, execution, or publication.
 /// </summary>
 internal sealed class ItemTemplateCompatibilityResult(
-    ProjectFactsContext context,
+    FunctionsProject project,
     ItemTemplateRequirements requirements,
-    ProjectFacts? projectFacts,
     ItemTemplateCompatibility compatibility,
     IEnumerable<ItemTemplateCompatibilityDiagnostic> diagnostics)
 {
-    public ProjectFactsContext Context { get; } = context ?? throw new ArgumentNullException(nameof(context));
+    public FunctionsProject Project { get; } = project ?? throw new ArgumentNullException(nameof(project));
 
     public ItemTemplateRequirements Requirements { get; } = requirements ?? throw new ArgumentNullException(nameof(requirements));
-
-    public ProjectFacts? ProjectFacts { get; } = projectFacts;
-
-    public string RequirementsFingerprint => Requirements.Fingerprint;
-
-    public string? ProjectFactsFingerprint => ProjectFacts?.Fingerprint;
 
     public ItemTemplateCompatibility Compatibility { get; } = compatibility;
 

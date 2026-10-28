@@ -4,15 +4,11 @@ Before a function template is added to an existing Functions project, its
 required project capabilities must be checked. A function template is an item
 template used to add a function to an existing project.
 
-The template publisher declares requirements. The stack-specific
-[`FunctionsProject`](../../src/Abstractions/Projects/FunctionsProject.cs)
-implementation inspects the existing project and reports its capabilities.
-The CLI's compatibility matcher compares those reports with the requirements.
-It returns `Compatible`, `Incompatible`, or `Unknown`.
-
-Here, **stack implementation** means the CLI's language-aware project code,
-such as Python- or .NET-aware code supplied by a workload. It does not mean
-the Azure Functions Runtime/host or a language-worker process.
+The template publisher declares requirements. Language-stack-specific project
+inspection captures the relevant project inputs and reports capabilities on the
+resolved [`FunctionsProject`](../../src/Abstractions/Projects/FunctionsProject.cs).
+The project compatibility matcher compares those captured reports with the
+requirements. It returns `Compatible`, `Incompatible`, or `Unknown`.
 
 This section owns the detailed project-compatibility contract. The
 [specification](specs/template-constraints/spec.md) provides acceptance
@@ -21,126 +17,112 @@ navigation and historical context. Implementation progress and validation
 evidence belong in [PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
 and follow-up issues, not in this contract.
 
+### Vocabulary
+
+| Term | Responsibility |
+|---|---|
+| Language stack / stack-specific project inspection | Interprets language-specific project inputs, such as Node programming models or .NET project structure, and reports capabilities. |
+| Captured Functions project | The resolved `FunctionsProject` instance holding the project capabilities for an operation. Its captured inputs do not refresh. |
+| Project compatibility matcher | Compares item-template requirements with the captured project's capabilities. It does not materialize templates. |
+| Templating Engine | The higher-level component responsible for the overall template operation and eventual materialization; it may use the project compatibility matcher. |
+| Shared Templates infrastructure | Cross-stack CLI components that carry and compare capability IDs without interpreting their stack-specific meanings. |
+| Azure Functions Runtime | The Functions host/runtime, not a language stack, language worker, or project inspector. |
+
 ### Ownership and API
 
-The public workload contracts live beside
-[`FunctionsProject`](../../src/Abstractions/Projects/FunctionsProject.cs):
+The language stack captures the project inputs needed for capability reporting
+once, while resolving a new project through `IFunctionsProjectFactory`. It owns
+their interpretation. Node versions and programming models, .NET project
+structure, and Python or PowerShell project details do not belong in shared
+Templates infrastructure.
 
-- `FunctionsProject.StackName` supplies the canonical stack identifier used to
-  bind the reports. See [authority](#authority).
-- `GetProjectFactsAsync(ProjectFactsContext, CancellationToken)` is optional,
-  read-only and [cancellable](#cancellation-and-failures). Its default returns
-  no snapshot, so existing stack implementations remain source compatible.
-- `ProjectFactsContext` identifies the expected
-  [project root](#project-root), [authority](#authority), and
-  [capture ID](#capture-id).
-- `ProjectCapability` reports an opaque ID as Supported, Unsupported or Unknown.
-- `ProjectFacts` is an immutable **capability-report snapshot** for one resolved
-  project and capture. It contains the reports, their context, an
-  `IsAuthoritative` assertion, and the stack's
-  [inspected-input fingerprint](#inspected-input-fingerprint).
+`FunctionsProject` already owns resolved-project identity and stack metadata.
+It also owns the immutable `Capabilities` collection:
 
-The types are public because separately shipped workloads implement the
-resolved-project boundary. They contain no template identity, template selection,
-package acquisition, generation policy or engine-native object.
+- The protected capability constructor copies and sorts the supplied reports
+  by ordinal ID, then support state, without changing the caller's collection.
+- `Capabilities` has no setter or virtual getter. Each report is immutable, and
+  the collection is read-only. Reading it never inspects files.
+- The parameterless constructor supplies no reports. Existing stacks remain
+  source compatible and do not imply support merely by being recognized.
+- Invalid capability IDs, undefined support states, null collections, and null
+  reports are contract errors. Duplicate reports remain available for the
+  matcher's consistency check.
 
-`ProjectFacts` names the project observations supplied to the matcher; it is not
-a separate framework pattern or a claim that every report is established truth.
-The stack implementation produces it. The matcher consumes it alongside
-`ItemTemplateRequirements`. The context identifies the capture, the evidence
-fingerprint identifies inspected inputs, and the reports describe capability
-support. None of those inputs alone is a template-compatibility result.
+The project instance owns its reports directly; there is no independently
+returned root, stack authority, or capture ID to bind back to it. The existing
+`WorkingDirectory` and `StackName` identify the resolved project. Matching does
+not normalize or compare paths, resolve filesystem aliases, or infer support
+from those identifiers.
 
-For example, after inspecting project inputs, a stack implementation could
-return the following snapshot. The capability name is illustrative, not a
-registered production capability:
+`FunctionsProject`, `ProjectCapability`, and `ProjectCapabilitySupport` are
+public workload contracts because separately shipped stacks implement this
+boundary. They contain no template identity, selection, acquisition, generation
+policy, or Microsoft.TemplateEngine type. Stack-specific captured metadata
+remains with the concrete project implementation.
+
+For example, a stack that established support from captured inputs could pass
+this report to the protected project constructor. The ID is illustrative, not
+a registered production capability:
 
 ```csharp
-return new ProjectFacts(
-    context,
-    inspectedInputFingerprint,
-    isAuthoritative: true,
-    [new ProjectCapability("example.http-items", ProjectCapabilitySupport.Supported)]);
+new ProjectCapability("example.http-items", ProjectCapabilitySupport.Supported);
 ```
 
-The shared CLI-owned types carry strings, identifiers and support states.
-They do not expose Microsoft.TemplateEngine objects or stack-specific project
-models. The matcher therefore needs no Python- or .NET-specific interpretation.
-
 `ProjectCapabilitySupport` describes knowledge of **one capability**.
-`ItemTemplateCompatibility` describes the result of combining the template's
-requirements with snapshot validity and all relevant reports. The separate
-enums represent different decisions; their mapping is defined under
+`ItemTemplateCompatibility` describes the result for **an item template and a
+project**, combining requirements and report consistency. The enums answer
+different questions and remain distinct; their mapping is defined under
 [matching](#matching-and-compatibility-results).
 
-### Capture identity and evidence
+### Immutable project lifetime
 
-The matcher records the expected context from the resolved project before
-calling the stack implementation. It compares the returned context with that
-expectation and checks the resolved project again after capture. Passing the
-context into the stack does not make the returned identity trustworthy.
+A template operation uses one captured `FunctionsProject`. The language stack
+must not refresh the project inputs used for compatibility or replace its
+capability reports during that operation. Template requirements are captured
+separately as immutable publisher data.
 
-#### Project root
+A genuinely new observation produces a new project instance and a fresh
+compatibility result. The original project and result remain unchanged, even
+when the new instance has the same root and stack. A result applies only to
+the project instance and requirements it records; it is not a cache entry for
+all projects with matching labels.
 
-Root normalization is a deterministic string operation over a fully qualified
-native path. It does not call `Path.GetFullPath`, probe the filesystem, resolve
-links, expand short/long names, interpret `~` as a home directory, or consult
-process current directory. Components need not exist. An 8.3-style component
-remains literal even when its corresponding long-name directory exists.
+If a later operation needs to establish that particular inputs remain unchanged,
+it must obtain a new project representation and compare the relevant captured
+evidence with the original. It must not refresh the original in place. This
+matcher does not implement such a later-operation policy or claim that files
+cannot change after capture.
 
-For ordinary Windows drive and UNC paths, alternate separators become `\`,
-repeated separators below the native root collapse, `.` is removed and `..`
-cannot move above the drive or share root. Trailing separators are removed
-except for a root separator. Existing non-verbatim Windows terminal-space/dot
-handling is retained lexically. DOS-device paths remain distinct namespaces,
-with their device component as the traversal boundary; they are not converted
-to ordinary drive or UNC identities.
+The former `ProjectFacts`, `ProjectFactsContext`, and `GetProjectFactsAsync`
+capture envelope is removed. Repeated capture, operation IDs, report and
+requirements fingerprints, and `RevalidateAsync` existed to detect changing
+inputs. Immutable inputs and explicit new observations replace that machinery.
+There is no second representation of the same captured project.
 
-Previously accepted verbatim `\\?\` and `\??\` paths retain their component
-spelling, dot segments and separators, except for the existing removal of at
-most one trailing separator beyond the root. Alternate-separator device
-prefixes follow the non-verbatim rules. On Unix, `/` is the root boundary and
-backslashes remain literal. No path form gains filesystem alias equivalence.
+Existing host-run lifecycle hooks still perform their own work; they do not
+refresh the captured capability reports. Filesystem publication is a separate
+boundary: an immutable project does not freeze destination files or waive
+create-only and collision checks at publication time. This Foundation does not
+implement or remove a publication mechanism.
 
-Root comparisons are ordinal and conservative. Aliases or differently cased
-paths do not establish identity by themselves. The matcher starts with the
-resolved project's `WorkingDirectory.Info.FullName`; the public context also
-validates and normalizes independently supplied roots.
+### Capability states
 
-#### Authority
+Capability IDs are opaque and case-sensitive across the shared boundary.
+Only the language stack decides which captured evidence establishes support.
 
-Authority is the resolved project's canonical `FunctionsProject.StackName`,
-recorded in `ProjectFactsContext.Authority`. There is no separate producer-ID
-property. The matcher compares the expected and returned identifiers ordinally
-and checks that the resolved stack did not change during capture. Stack identity
-binds the snapshot; it does not establish that a capability is supported.
-Stack identifiers follow the existing stack-metadata contract: nonempty with
-no leading or trailing whitespace. They are not capability IDs and do not use
-the capability declaration's ASCII grammar. Their spelling is preserved.
+| Report | Meaning |
+|---|---|
+| Missing / not reported | The stack supplies no statement about this ID. It may not recognize the capability or may not have inspected the relevant inputs. Absence is not a negative report. |
+| Supported | Inspection established that the captured project supports the capability. |
+| Unsupported | Inspection established that the captured project does not support the capability. This is a known negative, not missing information. |
+| Unknown | The stack inspected the project but could not establish support or non-support for this capability. This explicit inconclusive report differs from no report. |
 
-#### Capture ID
-
-The capture ID is a nonempty caller-supplied GUID identifying one operation.
-Use a fresh ID for a new evaluation. The stack implementation must echo it
-rather than return a snapshot from another operation. Revalidation retains
-the operation's ID.
-
-#### Inspected-input fingerprint
-
-A stack implementation opting in must inspect the actual project on every
-call and supply a SHA-256 fingerprint of **all** inputs used to establish its
-reports, including relevant missing inputs. It decides which project evidence
-establishes each capability and whether that evidence is authoritative.
-Invalid IDs, enum values, fingerprints or null reports are contract errors.
-
-`IsAuthoritative` asserts that the reports came from current project inspection,
-not inference from stack, language or package labels alone. A false value
-cannot establish either compatibility or incompatibility.
-
-The fingerprint binds inspected evidence; it does not authenticate the producer
-or prove complete inspection. The matcher cannot detect an edit the stack
-implementation omits from its evidence. Stack implementations must not label
-cached or heuristic data authoritative.
+Supported and Unsupported are stack assertions about inspected inputs, not
+authentication or independent proof of inspection coverage. Stack, language,
+worker, workload, or package-version labels alone cannot establish either.
+Report Unknown when inspection is inconclusive; omit an ID when no capability
+report is supplied. Neither establishes support or non-support.
 
 ### Publisher declaration
 
@@ -158,7 +140,7 @@ This is a **nonempty conjunction**, not an alternatives list. Every capability
 must be supported. Type/property names and capability IDs are case-sensitive.
 An ID starts with an ASCII letter or digit and contains only ASCII letters,
 digits, `.`, `-` or `_`; IDs are not trimmed or interpreted. Unfamiliar valid
-IDs need no generic code changes.
+IDs need no changes to the project compatibility matcher.
 
 The parser distinguishes absence (null input, retained as an undeclared
 requirements snapshot) from a malformed declared object. Empty arrays,
@@ -177,57 +159,42 @@ engine-native product contract.
 ### Matching and compatibility results
 
 [`ItemTemplateCompatibilityMatcher`](../../src/Func/Templates/Compatibility/ItemTemplateCompatibilityMatcher.cs)
-obtains the snapshot through the resolved project's optional operation. It does
-not infer support from stack name, display name, language, worker reference,
-bundle version or package identity. It checks that the resolved root/authority
-did not change while the stack implementation captured the reports.
+reads `FunctionsProject.Capabilities` and `ItemTemplateRequirements`. Its
+synchronous `Evaluate` operation performs no project inspection or I/O and
+does not consult stack name, display name, language, worker reference, bundle
+version, or package identity.
 
 | Outcome | Rule |
 |---|---|
-| Compatible | A declaration is present and every required capability is authoritatively Supported for this root, owner and capture. |
-| Incompatible | At least one required capability is authoritatively Unsupported. This takes precedence over missing/Unknown evidence for other capabilities. |
-| Unknown | The declaration is absent; facts or authority are missing/insufficient; root, owner or capture differs; the facts snapshot is contradictory; or a required capability is missing or Unknown without an authoritative negative establishing Incompatible. |
+| Compatible | A declaration is present, the project's reports are consistent, and every required capability is Supported. |
+| Incompatible | A declaration is present, the project's reports are consistent, and at least one required capability is Unsupported. This takes precedence over missing or Unknown reports for other required capabilities. |
+| Unknown | The declaration is absent, any reports contradict each other, or a required capability is missing or Unknown without a valid required Unsupported report. |
 
-Contradictory reports for any ID invalidate the facts snapshot as Unknown,
+Contradictory reports for any ID make the result Unknown,
 including contradictions outside the required IDs. Identical repeated reports
-are consistent. Negative precedence applies only after snapshot-wide authority,
-identity, freshness and consistency checks pass; an invalid snapshot cannot
-establish either compatibility or incompatibility.
-
-The requirements fingerprint includes the vocabulary, declaration-presence
-state, and ordinally sorted IDs. The facts fingerprint includes the normalized
-root, authority, capture ID, uppercase inspected-input fingerprint,
-`IsAuthoritative`, and every capability report sorted by ordinal ID and support
-state. Repeated reports remain part of the snapshot and its fingerprint.
-Both use SHA-256 over deterministic UTF-8 JSON.
+are consistent and retained. Negative precedence applies only after declaration
+presence and report consistency checks pass. An unrequired Unsupported report
+does not make the template Incompatible.
 
 [`ItemTemplateCompatibilityResult`](../../src/Func/Templates/Compatibility/ItemTemplateCompatibilityResult.cs)
-retains the normalized root, authority, capture ID, immutable requirements and
-facts, fingerprints, outcome and immutable diagnostics.
+retains the exact project instance and immutable requirements evaluated,
+the outcome, and immutable diagnostics. It does not duplicate project state.
 `PassesProjectCapabilityCheck` is true exactly when the outcome is Compatible.
 It passes only this check: it does not establish preparation readiness or
 authorize preparation, generation, execution, or publication.
 
-### Read-only revalidation
-
-`RevalidateAsync` recaptures facts without mutation for the same operation.
-Changed root/authority, requirements, capability reports, authority quality,
-inspected-input evidence or disappearance of facts invalidates the prior decision
-as Unknown, even if the new inputs could independently match. An outcome
-change during recapture also fails closed. Make a fresh compatibility evaluation
-instead of promoting an old result.
-
 ### Cancellation and failures
 
-The optional operation accepts a `CancellationToken`. Implementations must pass
-it to child operations and honor cancellation without returning a successful
-snapshot. The matcher forwards the token and checks it before and after
-capture and while evaluating reports and requirements.
+Project inspection uses the project factory's existing `CancellationToken`.
+The language stack must pass it to child operations and honor cancellation
+before returning a captured project. The matcher checks its token before
+matching and while evaluating reports and requirements; it has no asynchronous
+capture operation.
 
-Unexpected stack failures propagate; they are not converted into
-success-shaped missing-facts fallbacks. Project-facts acquisition is the only
-boundary call: the matcher has no engine, package/store, Quickstart, transaction,
-generation, publication or command collaborator.
+Inspection failures propagate rather than becoming an empty successful
+observation. The matcher consumes captured values only. It has no engine,
+package/store, Quickstart, transaction, generation, publication, or command
+collaborator.
 
 ### Diagnostics
 
@@ -237,24 +204,28 @@ command exposes these matcher codes. Codes use local lower-case, hyphenated
 names. No repository-wide diagnostic-code naming convention is established
 here, and this design does not define an external machine-readable contract.
 
-The matcher orders snapshot-validity diagnostics by check, conflicting IDs
-ordinally, and required-capability diagnostics by ordinal requirement ID.
+An absent declaration produces a requirements diagnostic. Otherwise the matcher
+reports conflicting IDs ordinally before considering required capabilities.
+For consistent reports, required-capability diagnostics follow ordinal
+requirement ID order, preserving distinct missing, unsupported, and unknown
+codes.
 
 ### Validation boundary
 
-Focused unit tests cover legacy stack implementations, all support states, invalid/conflicting
-evidence, strict/absent declarations, immutable snapshots, deterministic
-matching, negative precedence, stale/changed evidence, cancellation and an
-unfamiliar stack/capability. Tests with throwing display-name/language/worker
-getters check that matching does not consult those labels. Canonical stack
-identity is read only to bind the reports, never to infer support.
+Focused unit tests cover existing stacks without reports, all pairs of required
+capability states including absence, strict/absent declarations, immutable
+capture, duplicate/conflicting reports, deterministic diagnostics, valid-negative
+precedence, cancellation, and unfamiliar capability IDs. New-observation tests
+verify that original projects and results do not change. Throwing project,
+stack, display-name, language, bundle-policy, and worker getters check that
+matching does not inspect the project or infer support from labels.
 
 From an already-restored checkout, the focused validation path is:
 
 ```powershell
 dotnet build .\test\Func.Tests\Func.Tests.csproj --no-restore --configuration Release -p:CI=true
 dotnet test .\test\Func.Tests\Func.Tests.csproj --no-build --no-restore --configuration Release `
-  --filter 'FullyQualifiedName~Azure.Functions.Cli.Tests.Projects.ProjectFactsTests|FullyQualifiedName~Azure.Functions.Cli.Tests.Templates.Compatibility|FullyQualifiedName~Azure.Functions.Cli.Tests.Projects.FunctionsProjectHostRunContextTests'
+  --filter 'FullyQualifiedName~Azure.Functions.Cli.Tests.Projects.FunctionsProjectTests|FullyQualifiedName~Azure.Functions.Cli.Tests.Templates.Compatibility|FullyQualifiedName~Azure.Functions.Cli.Tests.Projects.FunctionsProjectHostRunContextTests'
 ```
 
 These tests establish contract behavior with synthetic stack implementations,
@@ -264,7 +235,7 @@ with their source revisions in
 [PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
 and its Git history.
 
-Production evidence collection, raw package declaration translation,
+Production-stack capability inspection, raw package declaration translation,
 preparation, private engine integration and command wiring are outside this
 read-only boundary. No new package dependency or generated content is needed.
 
@@ -488,6 +459,6 @@ The `func-workload` factory needs the loaded workload snapshot and the installed
 1. Register the func constraint factories with the engine session and map results to eligibility states.
 2. Evaluate constraints during listing and resolution as `template-engine-integration` specifies.
 3. Declare workload constraints in func project templates and Azure-Samples packages.
-4. When `func new` moves to the new runtime, replace the templates workload's single minimum bundle version check with `func-bundle` constraints on the templates that need them.
+4. When `func new` moves to the new template-engine integration, replace the templates workload's single minimum bundle version check with `func-bundle` constraints on the templates that need them.
 
 Rollback removes the func factories. Templates that declare func types then evaluate as not evaluated and stay blocked rather than running without their checks.

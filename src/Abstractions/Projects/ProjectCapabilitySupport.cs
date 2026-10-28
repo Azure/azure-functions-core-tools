@@ -4,22 +4,24 @@
 namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
-/// Describes a stack implementation's knowledge of one project capability, not a template's aggregate compatibility.
+/// Describes a language stack's knowledge of one project capability, not a template's aggregate compatibility.
 /// </summary>
 public enum ProjectCapabilitySupport
 {
     /// <summary>
-    /// The stack implementation has not established whether the project supports the capability.
+    /// The language stack inspected the project but could not establish whether it supports the capability.
+    /// This differs from an omitted capability, for which the stack supplies no report.
     /// </summary>
     Unknown,
 
     /// <summary>
-    /// The stack implementation reports that the project supports the capability.
+    /// The language stack established from captured project inputs that the project supports the capability.
     /// </summary>
     Supported,
 
     /// <summary>
-    /// The stack implementation reports that the project does not support the capability.
+    /// The language stack established from captured project inputs that the project does not support the capability.
+    /// Missing or inconclusive information must not be reported as Unsupported.
     /// </summary>
     Unsupported,
 }

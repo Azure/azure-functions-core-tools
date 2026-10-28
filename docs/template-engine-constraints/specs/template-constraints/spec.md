@@ -1,35 +1,37 @@
 ## Project-compatibility purpose
 
-The template publisher declares requirements. The CLI's language-stack
-implementation reports project capabilities, and the CLI's compatibility
-matcher compares the reports with the requirements.
-
-**Stack implementation** means the language-aware `FunctionsProject`
-implementation, not the Azure Functions Runtime/host or a language worker.
-The [ownership and API definitions](../../design.md#ownership-and-api) explain
-the shared, engine-independent types and show an illustrative capability report.
+The template publisher declares requirements. Language-stack-specific inspection
+reports capabilities on the captured `FunctionsProject`, and the project
+compatibility matcher compares them with the requirements. The
+[vocabulary](../../design.md#vocabulary) and
+[ownership contract](../../design.md#ownership-and-api) define these roles.
 
 The focused design owns the detailed contract. The requirements below reference
 that contract and give acceptance scenarios, not another copy of its rules.
 
-### Requirement: Stack-reported project capabilities
+### Requirement: Captured immutable project
 
-The resolved-project operation SHALL follow the
-[ownership contract](../../design.md#ownership-and-api) and
+The resolved project SHALL follow the
+[immutable-project lifetime](../../design.md#immutable-project-lifetime),
+[ownership contract](../../design.md#ownership-and-api), and
 [cancellation contract](../../design.md#cancellation-and-failures).
-Its snapshot binding uses the defined
-[normalized root](../../design.md#project-root),
-[authority](../../design.md#authority),
-[capture ID](../../design.md#capture-id), and
-[inspected-input fingerprint](../../design.md#inspected-input-fingerprint).
 
-#### Scenario: Stack supplies no snapshot
-- **WHEN** a stack implementation uses the default project-facts operation
+#### Scenario: Stack supplies no capability reports
+- **WHEN** an existing stack uses the parameterless project constructor
 - **THEN** item compatibility is Unknown
 
-#### Scenario: Evidence is unrelated, insufficient or stale
-- **WHEN** the facts have another root, authority or capture, or are not authoritative
-- **THEN** compatibility is Unknown even if the snapshot reports Supported or Unsupported
+#### Scenario: Caller changes the source reports
+- **WHEN** the caller changes a collection used to construct the project
+- **THEN** the project's reports and subsequent compatibility results use the captured values
+
+#### Scenario: Matching is repeated during an operation
+- **WHEN** the matcher evaluates the same project more than once
+- **THEN** it reads the same reports without inspecting the project again
+
+#### Scenario: Project is observed again
+- **WHEN** the language stack captures changed inputs in a new project instance
+- **THEN** a fresh evaluation can produce a different result
+- **AND** the original project and compatibility result remain unchanged
 
 ### Requirement: Bounded publisher requirements
 
@@ -45,39 +47,67 @@ An item declaration SHALL follow the
 - **THEN** declaration validation fails rather than dropping requirements
 
 #### Scenario: Capability is unfamiliar
-- **WHEN** a publisher and stack implementation use the same unfamiliar valid opaque ID
-- **THEN** generic matching requires no stack-specific implementation change
+- **WHEN** a publisher and language stack use the same unfamiliar valid opaque ID
+- **THEN** the project compatibility matcher requires no stack-specific implementation change
 
 ### Requirement: Tri-state fail-closed matching
 
-The matcher SHALL evaluate the snapshot and requirements under the
+The matcher SHALL evaluate the captured project and requirements under the
 [matching contract](../../design.md#matching-and-compatibility-results).
+Individual reports SHALL follow the
+[capability-state contract](../../design.md#capability-states).
 
 #### Scenario: Stack or package labels appear to match
 - **WHEN** only stack, language, workload or package-version labels suggest compatibility
-- **THEN** compatibility remains Unknown without the required actual-project facts
+- **THEN** compatibility remains Unknown without reports establishing the required capabilities
+
+#### Scenario: Every required capability is supported
+- **WHEN** the project's reports are consistent and every ID in a declared conjunction is Supported
+- **THEN** the compatibility result is Compatible
+
+#### Scenario: Required capability is not reported
+- **WHEN** the project's reports are consistent, a required capability has no report, and no required capability is Unsupported
+- **THEN** compatibility is Unknown with a missing-capability diagnostic
+- **AND** absence is not interpreted as Unsupported or an explicit Unknown report
+
+#### Scenario: Inspection is inconclusive
+- **WHEN** the project's reports are consistent, a required capability is Unknown, and no required capability is Unsupported
+- **THEN** compatibility is Unknown with an unknown-capability diagnostic
 
 #### Scenario: Valid negative accompanies inconclusive evidence
-- **WHEN** a valid snapshot reports a required capability as Unsupported and another required capability is missing
+- **WHEN** consistent reports include a required Unsupported capability and another required capability is missing or Unknown
 - **THEN** the compatibility result is Incompatible
 
-#### Scenario: An unrelated report contradicts the snapshot
+#### Scenario: An unrelated report contradicts another report
 - **WHEN** reports disagree about an ID not required by the template
 - **THEN** the compatibility result is Unknown
 
-### Requirement: Compatibility results remain bound
+#### Scenario: Repeated reports agree
+- **WHEN** multiple reports for an ID have the same support state
+- **THEN** those reports do not conflict
+
+#### Scenario: An unrequired capability is unsupported
+- **WHEN** the project's reports are consistent and all required capabilities are Supported but an unrequired capability is Unsupported
+- **THEN** the compatibility result is Compatible
+
+### Requirement: Compatibility results retain their inputs
 
 Results SHALL follow the
-[result contract](../../design.md#matching-and-compatibility-results) and
-[read-only revalidation contract](../../design.md#read-only-revalidation).
+[result contract](../../design.md#matching-and-compatibility-results).
 
-#### Scenario: Evidence changes after evaluation
-- **WHEN** the inspected-input, facts or requirements fingerprint changes
-- **THEN** revalidation returns Unknown and a fresh evaluation is required
+#### Scenario: Requirements change
+- **WHEN** a caller constructs different requirements and evaluates them
+- **THEN** the new result records those requirements
+- **AND** the original result still records the original project and requirements
 
 #### Scenario: Caller mutates original collections
-- **WHEN** the caller changes collections used to construct requirements or facts
-- **THEN** the recorded result and its evidence remain unchanged
+- **WHEN** the caller changes collections used to construct requirements, reports, or result diagnostics
+- **THEN** the recorded result and its captured inputs remain unchanged
+
+#### Scenario: Capability check passes
+- **WHEN** a compatibility result is Compatible
+- **THEN** it passes only the project-capability check
+- **AND** it does not authorize preparation, generation, execution, or publication
 
 ## Historical engine-constraint purpose
 

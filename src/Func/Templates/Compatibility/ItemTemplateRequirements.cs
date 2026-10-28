@@ -1,14 +1,13 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Security.Cryptography;
 using System.Text.Json;
 using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Templates.Compatibility;
 
 /// <summary>
-/// Snapshots a publisher's capability requirements, preserving absence separately from a declared nonempty conjunction.
+/// Captures a publisher's capability requirements, preserving absence separately from a declared nonempty conjunction.
 /// </summary>
 internal sealed class ItemTemplateRequirements
 {
@@ -45,19 +44,11 @@ internal sealed class ItemTemplateRequirements
         Array.Sort(captured, StringComparer.Ordinal);
         IsDeclared = isDeclared;
         CapabilityIds = Array.AsReadOnly(captured);
-        Fingerprint = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            Vocabulary,
-            IsDeclared,
-            CapabilityIds,
-        })));
     }
 
     public bool IsDeclared { get; }
 
     public IReadOnlyList<string> CapabilityIds { get; }
-
-    public string Fingerprint { get; }
 
     /// <summary>
     /// Reads a neutral declaration object containing only type and args. Null denotes an absent declaration.

@@ -8,23 +8,25 @@ language-stack or content catalog. There is no independent Quickstart P0 workstr
 The Foundation provides a read-only project-compatibility boundary:
 
 ```text
-resolved project's stack implementation -> ProjectFacts
+language-stack-specific project inspection
+  -> FunctionsProject (immutable capability reports)
 template publisher -> ItemTemplateRequirements
-ProjectFacts + ItemTemplateRequirements
-  -> CLI compatibility matcher
+FunctionsProject + ItemTemplateRequirements
+  -> project compatibility matcher
   -> ItemTemplateCompatibilityResult (inputs, outcome, diagnostics)
 ```
 
 The [constraint design](../template-engine-constraints/design.md) owns the
 shared API, capability-report definitions, declaration syntax, matching rules,
-and revalidation behavior. Its
+and immutable-project lifetime. Its
 [acceptance scenarios](../template-engine-constraints/specs/template-constraints/spec.md)
 exercise that boundary. This overview does not repeat those requirements.
 
-The stack implementation is the language-aware CLI project implementation,
-not the Azure Functions Runtime/host. The public contracts allow separately
-shipped workloads to report capabilities. The matcher and its result stay
-internal to the CLI.
+The public resolved-project contracts allow separately shipped language stacks
+to supply captured capabilities without exposing their project models.
+The matcher and its result stay internal to the CLI. The focused contract's
+[vocabulary](../template-engine-constraints/design.md#vocabulary) distinguishes
+these roles from the Templating Engine and the Azure Functions Runtime.
 
 Compatibility evaluation does not perform template preparation or authorize
 execution. Package intake, private engine adaptation, output preparation,
@@ -146,7 +148,7 @@ templating-system
 
 ### Planned changes have narrow responsibility boundaries
 
-`template-engine-constraints` owns func-specific compatibility checks and their authoring, evaluation, and diagnostic contracts. It extends, but does not redefine, the generic constraint evaluation and eligibility model in `template-engine-integration`.
+`template-engine-constraints` owns func-specific compatibility checks and their authoring, evaluation, and diagnostic contracts. It extends, but does not redefine, the shared constraint evaluation and eligibility model in `template-engine-integration`.
 
 `template-engine-post-actions` owns the supported func action vocabulary, execution context, ordering, cancellation, dry-run representation, safety policy, and diagnostics. Command changes decide when post-actions run; the focused post-action change decides how each supported action behaves.
 

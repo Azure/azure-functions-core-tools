@@ -73,7 +73,7 @@ A packable NuGet library (`Azure.Functions.Cli.Abstractions`) hosting the public
 | File / Type | Role |
 |-------------|------|
 | `Common/GracefulException` | User-friendly exception with optional verbose detail; drives non-zero exit codes |
-| `Projects/FunctionsProject`, `ProjectFactsContext`, `ProjectFacts`, `ProjectCapability`, `ProjectCapabilitySupport` | Optional, read-only contracts for stack implementations to report project capabilities. See the [report and capture definitions](template-engine-constraints/design.md#ownership-and-api). |
+| `Projects/FunctionsProject`, `ProjectCapability`, `ProjectCapabilitySupport` | The resolved project owns immutable capability reports supplied by its language stack. See the [ownership and capture contract](template-engine-constraints/design.md#ownership-and-api). |
 | `Workloads/IWorkload` | Workload entry point — identity properties + `Configure(FunctionsCliBuilder)` |
 | `Workloads/FunctionsCliBuilder` | DI seam (abstract base) — `Services` for plain DI plus `RegisterCommand(...)` overloads for top-level commands |
 | `Workloads/FuncCommand` | Parser-independent base for workload-contributed top-level commands (Name, Description, Options, Arguments, Subcommands, ExecuteAsync) |

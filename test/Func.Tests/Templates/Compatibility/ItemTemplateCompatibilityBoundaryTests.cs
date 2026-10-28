@@ -12,12 +12,13 @@ public sealed class ItemTemplateCompatibilityBoundaryTests
     [Fact]
     public void StackCapabilityContracts_ArePublicWorkloadContractsWithoutTemplateEngineTypes()
     {
-        Type[] contracts = [typeof(ProjectFactsContext), typeof(ProjectFacts), typeof(ProjectCapability), typeof(ProjectCapabilitySupport)];
+        Type[] contracts = [typeof(FunctionsProject), typeof(ProjectCapability), typeof(ProjectCapabilitySupport)];
 
         contracts.Should().OnlyContain(type => type.IsPublic && type.Assembly == typeof(FunctionsProject).Assembly);
         contracts.SelectMany(GetSurfaceTypes).Should().NotContain(type => IsForbiddenDependency(type));
-        typeof(FunctionsProject).GetMethod(nameof(FunctionsProject.GetProjectFactsAsync))!.IsAbstract.Should().BeFalse();
-        typeof(FunctionsProject).GetMethod(nameof(FunctionsProject.GetProjectFactsAsync))!.IsVirtual.Should().BeTrue();
+        var capabilities = typeof(FunctionsProject).GetProperty(nameof(FunctionsProject.Capabilities))!;
+        capabilities.GetMethod!.IsVirtual.Should().BeFalse();
+        capabilities.GetSetMethod(nonPublic: true).Should().BeNull();
     }
 
     [Fact]

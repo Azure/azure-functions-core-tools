@@ -4,7 +4,7 @@
 namespace Azure.Functions.Cli.Templates.Compatibility;
 
 /// <summary>
-/// Describes compatibility across all requirements and snapshot-validity checks, not support for one capability.
+/// Describes item-template compatibility across all requirements and report-consistency checks, not support for one capability.
 /// </summary>
 internal enum ItemTemplateCompatibility
 {
