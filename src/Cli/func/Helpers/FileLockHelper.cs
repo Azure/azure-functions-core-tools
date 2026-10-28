@@ -8,12 +8,14 @@ namespace Azure.Functions.Cli.Helpers
         private const string DefaultLockFileName = "func.lock";
         private static readonly string _templatesLockFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azurefunctions");
 
-        public static async Task<T> WithFileLockAsync<T>(string lockFileName, Func<Task<T>> action)
+        public static async Task<T> WithFileLockAsync<T>(string lockFileName, Func<Task<T>> action, int maxAttempts = 20)
         {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxAttempts);
             lockFileName ??= DefaultLockFileName;
             var lockFile = Path.Combine(_templatesLockFilePath, lockFileName);
+            IOException lastException = null;
 
-            for (int attempt = 0; attempt < 20; attempt++)
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
             {
                 FileStream stream = null;
                 try
@@ -22,31 +24,40 @@ namespace Azure.Functions.Cli.Helpers
                         lockFile,
                         FileMode.OpenOrCreate,
                         FileAccess.ReadWrite,
-                        FileShare.Delete);
+                        FileShare.None);
+                }
+                catch (IOException ex)
+                {
+                    lastException = ex;
+                }
 
-                    return await action();
-                }
-                catch (IOException)
+                if (stream is not null)
                 {
-                    stream?.Dispose();
+                    using (stream)
+                    {
+                        return await action();
+                    }
+                }
+
+                if (attempt < maxAttempts - 1)
+                {
                     await Task.Delay(1000);
-                }
-                finally
-                {
-                    stream?.Dispose();
                 }
             }
 
-            throw new IOException($"Could not acquire file lock on {lockFile} after multiple attempts.");
+            throw new IOException($"Could not acquire file lock on {lockFile} after {maxAttempts} attempts.", lastException);
         }
 
-        public static Task WithFileLockAsync(string lockFileName, Func<Task> action)
+        public static Task WithFileLockAsync(string lockFileName, Func<Task> action, int maxAttempts = 20)
         {
-            return WithFileLockAsync(lockFileName, async () =>
-            {
-                await action();
-                return true;
-            });
+            return WithFileLockAsync(
+                lockFileName,
+                async () =>
+                {
+                    await action();
+                    return true;
+                },
+                maxAttempts);
         }
     }
 }

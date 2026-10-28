@@ -4,6 +4,7 @@
 using AwesomeAssertions;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.E2ETests.Traits;
+using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.TestFramework.Assertions;
 using Azure.Functions.Cli.TestFramework.Commands;
 using Xunit;
@@ -22,6 +23,35 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated",
             "AzureWebJobsScriptRoot=/home/site/wwwroot"
         ];
+
+        [Fact]
+        public async Task Init_ConcurrentProcesses_WithFreshSharedHive_Succeed()
+        {
+            string hiveRoot = Path.Combine(WorkingDirectory, "hives");
+            var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tasks = Enumerable.Range(0, 2).Select(index => Task.Run(async () =>
+            {
+                string directory = Path.Combine(WorkingDirectory, $"app{index}");
+                Directory.CreateDirectory(directory);
+                var command = new FuncInitCommand(FuncPath, $"{nameof(Init_ConcurrentProcesses_WithFreshSharedHive_Succeed)}_{index}", Log);
+                command
+                    .WithWorkingDirectory(directory)
+                    .WithEnvironmentVariable(DotnetHelpers.CustomHiveFlag, "1")
+                    .WithEnvironmentVariable(DotnetHelpers.CustomHiveRoot, hiveRoot)
+                    .WithEnvironmentVariable(DotnetHelpers.CustomHiveKey, "concurrent-init");
+
+                await start.Task;
+                var result = command.Execute(["--worker-runtime", "dotnet-isolated", "--target-framework", "net8.0", "--docker"]);
+
+                result.Should().ExitWith(0);
+                result.Should().WriteDockerfile();
+                Assert.Single(Directory.GetFiles(directory, "*.csproj"));
+            })).ToArray();
+
+            start.SetResult();
+            await Task.WhenAll(tasks);
+            Assert.True(File.Exists(Path.Combine(hiveRoot, "concurrent-init", DotnetHelpers.CustomHiveReadyFileName)));
+        }
 
         [Fact]
         public void Init_WithWorkerRuntime_GeneratesExpectedFunctionProjectFiles()
