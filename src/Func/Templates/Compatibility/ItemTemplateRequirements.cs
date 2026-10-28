@@ -7,7 +7,8 @@ using Azure.Functions.Cli.Projects;
 namespace Azure.Functions.Cli.Templates.Compatibility;
 
 /// <summary>
-/// Captures a publisher's capability requirements, preserving absence separately from a declared nonempty conjunction.
+/// Captures neutral capability requirements, preserving absent or invalid declarations separately from a valid nonempty conjunction.
+/// The current consumer checks item templates against an existing resolved project.
 /// </summary>
 internal sealed class ItemTemplateRequirements
 {
@@ -46,15 +47,26 @@ internal sealed class ItemTemplateRequirements
         CapabilityIds = Array.AsReadOnly(captured);
     }
 
+    private ItemTemplateRequirements(string validationError)
+    {
+        IsDeclared = true;
+        CapabilityIds = Array.AsReadOnly<string>([]);
+        ValidationError = validationError;
+    }
+
     public bool IsDeclared { get; }
 
     public IReadOnlyList<string> CapabilityIds { get; }
 
     /// <summary>
-    /// Reads a neutral declaration object containing only type and args. Null denotes an absent declaration.
+    /// Gets the parsing failure, or null when the declaration is valid or absent.
     /// </summary>
-    /// <exception cref="FormatException">The declared requirements are malformed or empty.</exception>
-    /// <exception cref="NotSupportedException">The declaration uses an unsupported vocabulary or syntax.</exception>
+    public string? ValidationError { get; }
+
+    /// <summary>
+    /// Reads a neutral declaration object containing only type and args.
+    /// Null denotes absence; malformed or unsupported declarations retain a validation error.
+    /// </summary>
     public static ItemTemplateRequirements Parse(string? declaration)
     {
         if (declaration is null)
@@ -116,7 +128,15 @@ internal sealed class ItemTemplateRequirements
         }
         catch (JsonException exception)
         {
-            throw new FormatException("The item requirement declaration is not valid JSON.", exception);
+            return new($"The item requirement declaration is not valid JSON: {exception.Message}");
+        }
+        catch (FormatException exception)
+        {
+            return new(exception.Message);
+        }
+        catch (NotSupportedException exception)
+        {
+            return new(exception.Message);
         }
     }
 

@@ -14,6 +14,7 @@ public sealed class ItemTemplateRequirementsTests
 
         requirements.IsDeclared.Should().BeTrue();
         requirements.CapabilityIds.Should().Equal("future.http-model");
+        requirements.ValidationError.Should().BeNull();
     }
 
     [Fact]
@@ -23,6 +24,7 @@ public sealed class ItemTemplateRequirementsTests
             """{"type":"func-project-capabilities","args":["unfamiliarStack_9.http-model","another.publisher-capability"]}""");
 
         requirements.CapabilityIds.Should().Equal("another.publisher-capability", "unfamiliarStack_9.http-model");
+        requirements.ValidationError.Should().BeNull();
     }
 
     [Fact]
@@ -32,6 +34,7 @@ public sealed class ItemTemplateRequirementsTests
 
         requirements.IsDeclared.Should().BeFalse();
         requirements.CapabilityIds.Should().BeEmpty();
+        requirements.ValidationError.Should().BeNull();
         new ItemTemplateRequirements(["a"]).IsDeclared.Should().BeTrue();
     }
 
@@ -57,11 +60,13 @@ public sealed class ItemTemplateRequirementsTests
     [InlineData("""{"type":"func-project-capabilities","args":["\uD800"]}""")]
     [InlineData("""{"type":"\uD800","args":["a"]}""")]
     [InlineData("""{"\uD800":"invalid","type":"func-project-capabilities","args":["a"]}""")]
-    public void Parse_MalformedDeclaredRequirements_Throws(string declaration)
+    public void Parse_MalformedDeclaredRequirements_RetainsValidationFailure(string declaration)
     {
-        Action action = () => ItemTemplateRequirements.Parse(declaration);
+        var requirements = ItemTemplateRequirements.Parse(declaration);
 
-        action.Should().Throw<FormatException>();
+        requirements.IsDeclared.Should().BeTrue();
+        requirements.CapabilityIds.Should().BeEmpty();
+        requirements.ValidationError.Should().NotBeNullOrWhiteSpace();
     }
 
     [Theory]
@@ -70,11 +75,13 @@ public sealed class ItemTemplateRequirementsTests
     [InlineData("""{"type":"func-project-capabilities","args":["a"],"anyOf":["b"]}""")]
     [InlineData("""{"type":"func-project-capabilities","args":["a"],"version":"[1,2)"}""")]
     [InlineData("""{"type":"func-project-capabilities","args":["a"],"script":"return true"}""")]
-    public void Parse_UnsupportedVocabularyOrSyntax_FailsClearly(string declaration)
+    public void Parse_UnsupportedVocabularyOrSyntax_RetainsValidationFailure(string declaration)
     {
-        Action action = () => ItemTemplateRequirements.Parse(declaration);
+        var requirements = ItemTemplateRequirements.Parse(declaration);
 
-        action.Should().Throw<NotSupportedException>().WithMessage("*supported*");
+        requirements.IsDeclared.Should().BeTrue();
+        requirements.CapabilityIds.Should().BeEmpty();
+        requirements.ValidationError.Should().Contain("supported");
     }
 
     [Theory]

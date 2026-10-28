@@ -21,7 +21,6 @@ public sealed class FunctionsProjectTests
     [Theory]
     [InlineData(ProjectCapabilitySupport.Supported)]
     [InlineData(ProjectCapabilitySupport.Unsupported)]
-    [InlineData(ProjectCapabilitySupport.Unknown)]
     public void Constructor_StackReports_PreservesCapabilityState(ProjectCapabilitySupport support)
     {
         var project = new TestProject([new("future.semantic-capability", support)]);
@@ -37,7 +36,6 @@ public sealed class FunctionsProjectTests
         [
             new("supported", ProjectCapabilitySupport.Supported),
             new("unsupported", ProjectCapabilitySupport.Unsupported),
-            new("unknown", ProjectCapabilitySupport.Unknown),
         ];
         var project = new TestProject(capabilities);
         var captured = project.Capabilities;
@@ -48,7 +46,6 @@ public sealed class FunctionsProjectTests
         project.Capabilities.Should().BeSameAs(captured);
         project.Capabilities.Select(capability => (capability.Id, capability.Support)).Should().Equal(
             ("supported", ProjectCapabilitySupport.Supported),
-            ("unknown", ProjectCapabilitySupport.Unknown),
             ("unsupported", ProjectCapabilitySupport.Unsupported));
     }
 
@@ -70,8 +67,7 @@ public sealed class FunctionsProjectTests
             new("b", ProjectCapabilitySupport.Supported),
             new("a", ProjectCapabilitySupport.Unsupported),
             new("a", ProjectCapabilitySupport.Supported),
-            new("A", ProjectCapabilitySupport.Unknown),
-            new("a", ProjectCapabilitySupport.Unknown),
+            new("A", ProjectCapabilitySupport.Unsupported),
             new("a", ProjectCapabilitySupport.Supported),
         ];
         var callerOrder = capabilities.ToList();
@@ -80,11 +76,10 @@ public sealed class FunctionsProjectTests
 
         capabilities.Should().Equal(callerOrder);
         project.Capabilities.Select(capability => (capability.Id, capability.Support)).Should().Equal(
-            ("A", ProjectCapabilitySupport.Unknown),
-            ("a", ProjectCapabilitySupport.Unknown),
-            ("a", ProjectCapabilitySupport.Supported),
-            ("a", ProjectCapabilitySupport.Supported),
+            ("A", ProjectCapabilitySupport.Unsupported),
             ("a", ProjectCapabilitySupport.Unsupported),
+            ("a", ProjectCapabilitySupport.Supported),
+            ("a", ProjectCapabilitySupport.Supported),
             ("b", ProjectCapabilitySupport.Supported));
     }
 
@@ -173,6 +168,14 @@ public sealed class FunctionsProjectTests
         Action action = () => new ProjectCapability(id!, ProjectCapabilitySupport.Supported);
 
         action.Should().Throw<ArgumentException>().WithParameterName("id");
+    }
+
+    [Fact]
+    public void Capability_DefaultSupport_IsUnsupported()
+    {
+        var capability = new ProjectCapability("capability", default);
+
+        capability.Support.Should().Be(ProjectCapabilitySupport.Unsupported);
     }
 
     [Fact]

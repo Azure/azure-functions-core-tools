@@ -29,23 +29,16 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     }
 
     [Theory]
-    [InlineData(null, null, "Unknown")]
-    [InlineData(null, ProjectCapabilitySupport.Unknown, "Unknown")]
-    [InlineData(null, ProjectCapabilitySupport.Supported, "Unknown")]
+    [InlineData(null, null, "Incompatible")]
+    [InlineData(null, ProjectCapabilitySupport.Supported, "Incompatible")]
     [InlineData(null, ProjectCapabilitySupport.Unsupported, "Incompatible")]
-    [InlineData(ProjectCapabilitySupport.Unknown, null, "Unknown")]
-    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Unknown, "Unknown")]
-    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Supported, "Unknown")]
-    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Unsupported, "Incompatible")]
-    [InlineData(ProjectCapabilitySupport.Supported, null, "Unknown")]
-    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unknown, "Unknown")]
+    [InlineData(ProjectCapabilitySupport.Supported, null, "Incompatible")]
     [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Supported, "Compatible")]
     [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unsupported, "Incompatible")]
     [InlineData(ProjectCapabilitySupport.Unsupported, null, "Incompatible")]
-    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Unknown, "Incompatible")]
     [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Supported, "Incompatible")]
     [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Unsupported, "Incompatible")]
-    public void Evaluate_RequiredCapabilityCombinations_ApplyConjunctionAndNegativePrecedence(
+    public void Evaluate_RequiredCapabilityCombinations_RequireEveryCapabilitySupported(
         ProjectCapabilitySupport? first, ProjectCapabilitySupport? second, string expected)
     {
         List<ProjectCapability> capabilities = [];
@@ -68,40 +61,47 @@ public sealed class ItemTemplateCompatibilityMatcherTests
         result.PassesProjectCapabilityCheck.Should().Be(expectedCompatibility == ItemTemplateCompatibility.Compatible);
     }
 
-    [Fact]
-    public void Evaluate_MissingAndUnknownCapabilities_HaveDistinctDiagnostics()
+    [Theory]
+    [InlineData(null, "capability-missing")]
+    [InlineData(ProjectCapabilitySupport.Unsupported, "capability-unsupported")]
+    public void Evaluate_RequiredCapabilityNotSupported_IsIncompatibleWithReason(ProjectCapabilitySupport? support, string diagnosticCode)
     {
-        var project = new TestProject([new("b-unknown", ProjectCapabilitySupport.Unknown)]);
+        var project = new TestProject(support.HasValue ? [new("required", support.Value)] : []);
 
-        var result = _matcher.Evaluate(project, new(["b-unknown", "a-missing"]), CancellationToken.None);
+        var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
 
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
-        result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.CapabilityId)).Should().Equal(
-            ("capability-missing", "a-missing"), ("capability-unknown", "b-unknown"));
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
+        result.PassesProjectCapabilityCheck.Should().BeFalse();
+        result.Diagnostics.Should().ContainSingle()
+            .Which.Should().Be(new ItemTemplateCompatibilityDiagnostic(
+                diagnosticCode,
+                support.HasValue
+                    ? "The project does not support required capability 'required'."
+                    : "The stack provides no report for required capability 'required'.",
+                "required"));
     }
 
     [Fact]
-    public void Evaluate_UnsupportedWithMissingAndUnknown_IsIncompatibleWithAllDiagnostics()
+    public void Evaluate_UnsupportedAndMissing_IsIncompatibleWithAllDiagnostics()
     {
-        var project = new TestProject(
-            [new("b-unsupported", ProjectCapabilitySupport.Unsupported), new("c-unknown", ProjectCapabilitySupport.Unknown)]);
+        var project = new TestProject([new("b-unsupported", ProjectCapabilitySupport.Unsupported)]);
 
-        var result = _matcher.Evaluate(project, new(["c-unknown", "a-missing", "b-unsupported"]), CancellationToken.None);
+        var result = _matcher.Evaluate(project, new(["a-missing", "b-unsupported"]), CancellationToken.None);
 
         result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
         result.PassesProjectCapabilityCheck.Should().BeFalse();
         result.Diagnostics.Select(diagnostic => diagnostic.Code).Should().Equal(
-            "capability-missing", "capability-unsupported", "capability-unknown");
+            "capability-missing", "capability-unsupported");
     }
 
     [Fact]
-    public void Evaluate_ExistingStackWithoutReports_IsUnknown()
+    public void Evaluate_ExistingStackWithoutReports_IsIncompatible()
     {
         var project = new TestProject();
 
         var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
 
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
         result.PassesProjectCapabilityCheck.Should().BeFalse();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("capability-missing");
     }
@@ -109,25 +109,43 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     [Theory]
     [InlineData(ProjectCapabilitySupport.Supported)]
     [InlineData(ProjectCapabilitySupport.Unsupported)]
-    [InlineData(ProjectCapabilitySupport.Unknown)]
-    public void Evaluate_AbsentRequirements_IsUnknownRegardlessOfReportedState(ProjectCapabilitySupport support)
+    public void Evaluate_AbsentRequirements_IsIncompatibleRegardlessOfReportedState(ProjectCapabilitySupport support)
     {
         var project = new TestProject([new("future.http", support)]);
 
         var result = _matcher.Evaluate(project, ItemTemplateRequirements.Parse(null), CancellationToken.None);
 
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
         result.PassesProjectCapabilityCheck.Should().BeFalse();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("requirements-absent");
     }
 
     [Theory]
+    [InlineData("")]
+    [InlineData("{")]
+    [InlineData("{}")]
+    [InlineData("""{"type":"func-project-capabilities","args":[]}""")]
+    [InlineData("""{"type":"func-project-capabilities","args":["required","required"]}""")]
+    [InlineData("""{"type":"func-workload","args":["required"]}""")]
+    public void Evaluate_InvalidRequirements_IsIncompatibleWithValidationDiagnostic(string declaration)
+    {
+        var project = new TestProject([new("required", ProjectCapabilitySupport.Supported)]);
+        var requirements = ItemTemplateRequirements.Parse(declaration);
+
+        var result = _matcher.Evaluate(project, requirements, CancellationToken.None);
+
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
+        result.PassesProjectCapabilityCheck.Should().BeFalse();
+        result.Requirements.Should().BeSameAs(requirements);
+        result.Diagnostics.Should().ContainSingle()
+            .Which.Should().Be(new ItemTemplateCompatibilityDiagnostic("requirements-invalid", requirements.ValidationError!));
+    }
+
+    [Theory]
     [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unsupported, true)]
     [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Supported, true)]
-    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unknown, false)]
-    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Supported, false)]
-    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Unknown, false)]
-    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Unsupported, false)]
+    [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unsupported, false)]
+    [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Supported, false)]
     public void Evaluate_ConflictingReports_InvalidateProjectCapabilitiesEvenOutsideRequirements(
         ProjectCapabilitySupport first, ProjectCapabilitySupport second, bool required)
     {
@@ -141,7 +159,7 @@ public sealed class ItemTemplateCompatibilityMatcherTests
 
         var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
 
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
         result.PassesProjectCapabilityCheck.Should().BeFalse();
         result.Diagnostics.Should().ContainSingle()
             .Which.Should().Be(new ItemTemplateCompatibilityDiagnostic(
@@ -153,7 +171,6 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     [Theory]
     [InlineData(ProjectCapabilitySupport.Supported, "Compatible")]
     [InlineData(ProjectCapabilitySupport.Unsupported, "Incompatible")]
-    [InlineData(ProjectCapabilitySupport.Unknown, "Unknown")]
     public void Evaluate_RepeatedConsistentReports_PreserveSupportOutcome(
         ProjectCapabilitySupport support, string expected)
     {
@@ -168,7 +185,7 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     [Theory]
     [InlineData(ProjectCapabilitySupport.Supported)]
     [InlineData(ProjectCapabilitySupport.Unsupported)]
-    public void Evaluate_UnrequiredContradiction_PreventsPositiveAndNegativeResults(ProjectCapabilitySupport requiredSupport)
+    public void Evaluate_UnrequiredContradiction_IsIncompatibleRegardlessOfRequiredSupport(ProjectCapabilitySupport requiredSupport)
     {
         var project = new TestProject(
         [
@@ -179,7 +196,7 @@ public sealed class ItemTemplateCompatibilityMatcherTests
 
         var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
 
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
         result.PassesProjectCapabilityCheck.Should().BeFalse();
         result.Diagnostics.Should().ContainSingle().Which.CapabilityId.Should().Be("unrequired");
     }
@@ -193,7 +210,7 @@ public sealed class ItemTemplateCompatibilityMatcherTests
             new("a", ProjectCapabilitySupport.Supported),
             new("required", ProjectCapabilitySupport.Supported),
             new("z", ProjectCapabilitySupport.Supported),
-            new("a", ProjectCapabilitySupport.Unknown),
+            new("a", ProjectCapabilitySupport.Unsupported),
         ];
         var firstProject = new TestProject(capabilities);
         var secondProject = new TestProject(capabilities.Reverse());
@@ -201,20 +218,20 @@ public sealed class ItemTemplateCompatibilityMatcherTests
         var first = _matcher.Evaluate(firstProject, new(["required", "missing"]), CancellationToken.None);
         var second = _matcher.Evaluate(secondProject, new(["missing", "required"]), CancellationToken.None);
 
-        first.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        first.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
+        first.PassesProjectCapabilityCheck.Should().BeFalse();
         first.Diagnostics.Should().OnlyContain(diagnostic => diagnostic.Code == "capability-conflicting");
         first.Diagnostics.Select(diagnostic => diagnostic.CapabilityId).Should().Equal("a", "z");
         second.Diagnostics.Should().Equal(first.Diagnostics);
     }
 
     [Fact]
-    public void Evaluate_UnrequiredNegativeAndUnknownReports_DoNotRestrictSupportedRequirement()
+    public void Evaluate_UnrequiredUnsupportedReport_DoesNotRestrictSupportedRequirement()
     {
         var project = new TestProject(
         [
             new("required", ProjectCapabilitySupport.Supported),
             new("unrequired-negative", ProjectCapabilitySupport.Unsupported),
-            new("unrequired-unknown", ProjectCapabilitySupport.Unknown),
         ]);
 
         var result = _matcher.Evaluate(project, new(["required"]), CancellationToken.None);
@@ -230,7 +247,8 @@ public sealed class ItemTemplateCompatibilityMatcherTests
 
         var result = _matcher.Evaluate(project, new(["future.http"]), CancellationToken.None);
 
-        result.Compatibility.Should().Be(ItemTemplateCompatibility.Unknown);
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
+        result.PassesProjectCapabilityCheck.Should().BeFalse();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("capability-missing");
     }
 
@@ -247,8 +265,8 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     [Fact]
     public void Evaluate_ReorderedReportsAndRequirements_ProduceDeterministicDiagnostics()
     {
-        var firstProject = new TestProject([new("c", ProjectCapabilitySupport.Unknown), new("b", ProjectCapabilitySupport.Unsupported)]);
-        var secondProject = new TestProject([new("b", ProjectCapabilitySupport.Unsupported), new("c", ProjectCapabilitySupport.Unknown)]);
+        var firstProject = new TestProject([new("c", ProjectCapabilitySupport.Unsupported), new("b", ProjectCapabilitySupport.Unsupported)]);
+        var secondProject = new TestProject([new("b", ProjectCapabilitySupport.Unsupported), new("c", ProjectCapabilitySupport.Unsupported)]);
 
         var first = _matcher.Evaluate(firstProject, new(["c", "a", "b"]), CancellationToken.None);
         var second = _matcher.Evaluate(secondProject, new(["b", "a", "c"]), CancellationToken.None);
@@ -304,7 +322,6 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     }
 
     [Theory]
-    [InlineData(ProjectCapabilitySupport.Unknown, ProjectCapabilitySupport.Supported, "Unknown", "Compatible")]
     [InlineData(ProjectCapabilitySupport.Supported, ProjectCapabilitySupport.Unsupported, "Compatible", "Incompatible")]
     [InlineData(ProjectCapabilitySupport.Unsupported, ProjectCapabilitySupport.Supported, "Incompatible", "Compatible")]
     public void Evaluate_NewProjectObservation_ProducesNewResultWithoutChangingOriginal(
@@ -366,7 +383,7 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     public void Result_CallerMutatesDiagnostics_CapturedDiagnosticsDoNotChange()
     {
         List<ItemTemplateCompatibilityDiagnostic> diagnostics = [new("capability-missing", "No report.", "required")];
-        var result = new ItemTemplateCompatibilityResult(new TestProject(), new(["required"]), ItemTemplateCompatibility.Unknown, diagnostics);
+        var result = new ItemTemplateCompatibilityResult(new TestProject(), new(["required"]), ItemTemplateCompatibility.Incompatible, diagnostics);
 
         diagnostics.Clear();
         Action changeCaptured = () => ((IList<ItemTemplateCompatibilityDiagnostic>)result.Diagnostics).Clear();
@@ -376,13 +393,22 @@ public sealed class ItemTemplateCompatibilityMatcherTests
     }
 
     [Fact]
+    public void Result_DefaultCompatibility_IsIncompatibleAndFailsCheck()
+    {
+        var result = new ItemTemplateCompatibilityResult(new TestProject(), new(["required"]), default, []);
+
+        result.Compatibility.Should().Be(ItemTemplateCompatibility.Incompatible);
+        result.PassesProjectCapabilityCheck.Should().BeFalse();
+    }
+
+    [Fact]
     public void Result_NullInputs_Throw()
     {
         var project = new TestProject();
         var requirements = new ItemTemplateRequirements(["required"]);
-        Action nullProject = () => new ItemTemplateCompatibilityResult(null!, requirements, ItemTemplateCompatibility.Unknown, []);
-        Action nullRequirements = () => new ItemTemplateCompatibilityResult(project, null!, ItemTemplateCompatibility.Unknown, []);
-        Action nullDiagnostics = () => new ItemTemplateCompatibilityResult(project, requirements, ItemTemplateCompatibility.Unknown, null!);
+        Action nullProject = () => new ItemTemplateCompatibilityResult(null!, requirements, ItemTemplateCompatibility.Incompatible, []);
+        Action nullRequirements = () => new ItemTemplateCompatibilityResult(project, null!, ItemTemplateCompatibility.Incompatible, []);
+        Action nullDiagnostics = () => new ItemTemplateCompatibilityResult(project, requirements, ItemTemplateCompatibility.Incompatible, null!);
 
         nullProject.Should().Throw<ArgumentNullException>().WithParameterName("project");
         nullRequirements.Should().Throw<ArgumentNullException>().WithParameterName("requirements");

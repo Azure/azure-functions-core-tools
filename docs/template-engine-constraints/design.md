@@ -8,7 +8,7 @@ The template publisher declares requirements. Language-stack-specific project
 inspection captures the relevant project inputs and reports capabilities on the
 resolved [`FunctionsProject`](../../src/Abstractions/Projects/FunctionsProject.cs).
 The project compatibility matcher compares those captured reports with the
-requirements. It returns `Compatible`, `Incompatible`, or `Unknown`.
+requirements. It returns `Compatible` or `Incompatible`.
 
 This section owns the detailed project-compatibility contract. The
 [specification](specs/template-constraints/spec.md) provides acceptance
@@ -62,18 +62,59 @@ policy, or Microsoft.TemplateEngine type. Stack-specific captured metadata
 remains with the concrete project implementation.
 
 For example, a stack that established support from captured inputs could pass
-this report to the protected project constructor. The ID is illustrative, not
-a registered production capability:
+this report to the protected project constructor. This example does not define
+a production capability:
 
 ```csharp
 new ProjectCapability("example.http-items", ProjectCapabilitySupport.Supported);
 ```
 
-`ProjectCapabilitySupport` describes knowledge of **one capability**.
+`ProjectCapabilitySupport` reports support for **one capability**.
 `ItemTemplateCompatibility` describes the result for **an item template and a
 project**, combining requirements and report consistency. The enums answer
 different questions and remain distinct; their mapping is defined under
 [matching](#matching-and-compatibility-results).
+
+### Capability definitions and IDs
+
+Every production capability ID must have one authoritative semantic definition
+and an owning language stack or component. The definition states what support
+means for a project. Template authors must use that definition when declaring a
+requirement. The owning language-stack implementation must use the same
+definition when inspecting the project and reporting support. An existing ID's
+meaning must not silently change. An incompatible semantic change requires a
+distinct ID.
+
+Azure Functions owns the `azure.functions` namespace. The Azure Functions CLI
+maintains this naming contract for its production capabilities:
+
+```text
+azure.functions.<owner>.<capability>
+```
+
+Use lower-case, dot-separated segments, with hyphens within a segment.
+`<owner>` is a stable language-stack or component namespace. The remaining
+segments describe the capability and any form that matters to compatibility.
+They must not derive from a NuGet package ID or CLI release version. A model
+version may appear when it is part of the capability's meaning.
+
+The established `azure.functions.node.model-v4.javascript-commonjs` capability
+is owned by the Node language stack. It means support for Node.js programming
+model v4 JavaScript/CommonJS function items in the captured project. `model-v4`
+names the programming-model contract, not a package or CLI version. Production
+project inspection for this capability remains outside this Foundation.
+
+This is an authoring convention, not an additional parser rule or a runtime
+registry. Shared Templates infrastructure compares IDs opaquely and
+case-sensitively. It does not interpret their segments or infer support from
+package names, stack names, template names, Azure Functions Runtime names, or
+programming-model labels. Only the owning stack interprets project inputs under
+the capability definition.
+
+Package identity and capability identity are separate. A Templates package may
+contain templates requiring different capabilities, and those requirements may
+change over its lifetime. Renaming or versioning the package does not inherently
+change any capability ID or its meaning.
 
 ### Immutable project lifetime
 
@@ -108,21 +149,24 @@ implement or remove a publication mechanism.
 
 ### Capability states
 
-Capability IDs are opaque and case-sensitive across the shared boundary.
-Only the language stack decides which captured evidence establishes support.
+The language stack interprets captured project inputs under the
+[capability definition](#capability-definitions-and-ids).
 
 | Report | Meaning |
 |---|---|
-| Missing / not reported | The stack supplies no statement about this ID. It may not recognize the capability or may not have inspected the relevant inputs. Absence is not a negative report. |
 | Supported | Inspection established that the captured project supports the capability. |
-| Unsupported | Inspection established that the captured project does not support the capability. This is a known negative, not missing information. |
-| Unknown | The stack inspected the project but could not establish support or non-support for this capability. This explicit inconclusive report differs from no report. |
+| Unsupported | The stack does not establish support for this capability. |
+| Missing / not reported | The stack supplies no report for this ID. Matching treats it as not supported. |
 
-Supported and Unsupported are stack assertions about inspected inputs, not
-authentication or independent proof of inspection coverage. Stack, language,
-worker, workload, or package-version labels alone cannot establish either.
-Report Unknown when inspection is inconclusive; omit an ID when no capability
-report is supplied. Neither establishes support or non-support.
+Only a Supported report satisfies a capability requirement. If completed
+inspection does not establish support, the stack may report Unsupported or omit
+the ID. Both produce Incompatible when the template requires that capability.
+Diagnostics retain whether a report was absent or explicitly Unsupported.
+
+These are stack reports, not independent proof of inspection coverage. Stack,
+language, worker, workload, or package-version labels alone cannot establish
+support. The default capability state is Unsupported; the default aggregate
+compatibility is Incompatible.
 
 ### Publisher declaration
 
@@ -143,12 +187,23 @@ digits, `.`, `-` or `_`; IDs are not trimmed or interpreted. Unfamiliar valid
 IDs need no changes to the project compatibility matcher.
 
 The parser distinguishes absence (null input, retained as an undeclared
-requirements snapshot) from a malformed declared object. Empty arrays,
-malformed/duplicate IDs, duplicate properties, missing fields, non-string IDs,
-and invalid JSON fail with `FormatException`. Unknown vocabularies or extra
-properties fail with `NotSupportedException`. There are no expressions,
-scripts, version ranges, predicates, stack callbacks or alternative syntax.
-Caller collections are copied, sorted ordinally and exposed read-only.
+requirements snapshot) from an invalid declared object. It records a validation
+error for empty arrays, malformed/duplicate IDs, duplicate properties, missing
+fields, non-string IDs, invalid JSON, unsupported vocabularies, and extra
+properties. The matcher returns Incompatible with that reason; it never treats
+an invalid declaration as an empty successful conjunction. Direct programmatic
+construction still rejects invalid IDs and empty collections with `FormatException`.
+
+There are no expressions, scripts, version ranges, predicates, stack callbacks
+or alternative syntax. Valid caller collections are copied, sorted ordinally
+and exposed read-only.
+
+The requirement metadata is a set of opaque IDs interpreted as a conjunction.
+This Foundation evaluates it only for item templates applied to an already
+resolved `FunctionsProject`. Future project-template eligibility checks may
+reuse the metadata, but must define their own inputs before project creation.
+Reuse does not imply running the existing-project item matcher before a project
+exists. Project-template eligibility is not implemented here.
 
 This foundation does **not** read `template.json`, register an engine constraint,
 or change the existing raw engine declaration reader. A later private adapter
@@ -166,15 +221,13 @@ version, or package identity.
 
 | Outcome | Rule |
 |---|---|
-| Compatible | A declaration is present, the project's reports are consistent, and every required capability is Supported. |
-| Incompatible | A declaration is present, the project's reports are consistent, and at least one required capability is Unsupported. This takes precedence over missing or Unknown reports for other required capabilities. |
-| Unknown | The declaration is absent, any reports contradict each other, or a required capability is missing or Unknown without a valid required Unsupported report. |
+| Compatible | A valid declaration is present, the project's reports are consistent, and every required capability is Supported. |
+| Incompatible | The declaration is absent or invalid, any reports contradict each other, or a required capability is missing or Unsupported. |
 
-Contradictory reports for any ID make the result Unknown,
-including contradictions outside the required IDs. Identical repeated reports
-are consistent and retained. Negative precedence applies only after declaration
-presence and report consistency checks pass. An unrequired Unsupported report
-does not make the template Incompatible.
+Contradictory reports for any ID make the result Incompatible, including
+contradictions outside the required IDs. Identical repeated reports are
+consistent and retained. An unrequired Unsupported report does not make the
+template Incompatible.
 
 [`ItemTemplateCompatibilityResult`](../../src/Func/Templates/Compatibility/ItemTemplateCompatibilityResult.cs)
 retains the exact project instance and immutable requirements evaluated,
@@ -204,18 +257,19 @@ command exposes these matcher codes. Codes use local lower-case, hyphenated
 names. No repository-wide diagnostic-code naming convention is established
 here, and this design does not define an external machine-readable contract.
 
-An absent declaration produces a requirements diagnostic. Otherwise the matcher
-reports conflicting IDs ordinally before considering required capabilities.
-For consistent reports, required-capability diagnostics follow ordinal
-requirement ID order, preserving distinct missing, unsupported, and unknown
-codes.
+Absent and invalid declarations produce `requirements-absent` and
+`requirements-invalid` diagnostics, respectively. For a valid declaration, the
+matcher reports conflicting IDs ordinally before considering required
+capabilities. For consistent reports, required-capability diagnostics follow
+ordinal requirement ID order, preserving distinct missing and unsupported
+codes. Each diagnostic explains an Incompatible result, not a separate outcome.
 
 ### Validation boundary
 
 Focused unit tests cover existing stacks without reports, all pairs of required
-capability states including absence, strict/absent declarations, immutable
-capture, duplicate/conflicting reports, deterministic diagnostics, valid-negative
-precedence, cancellation, and unfamiliar capability IDs. New-observation tests
+capability states including absence, invalid/absent declarations, immutable
+capture, duplicate/conflicting reports, deterministic diagnostics, fail-closed
+defaults, cancellation, and unfamiliar capability IDs. New-observation tests
 verify that original projects and results do not change. Throwing project,
 stack, display-name, language, bundle-policy, and worker getters check that
 matching does not inspect the project or infer support from labels.

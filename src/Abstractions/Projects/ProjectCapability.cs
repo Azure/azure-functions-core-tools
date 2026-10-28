@@ -6,10 +6,21 @@ namespace Azure.Functions.Cli.Projects;
 /// <summary>
 /// Reports the language stack's knowledge of one captured project capability using an opaque, case-sensitive identifier.
 /// </summary>
+/// <remarks>
+/// The template publisher and reporting language stack must use the same authoritative definition for the capability ID.
+/// </remarks>
+/// <param name="id">The capability ID shared with template requirements.</param>
+/// <param name="support">The language stack's assessment of project support.</param>
 public sealed class ProjectCapability(string id, ProjectCapabilitySupport support)
 {
+    /// <summary>
+    /// Gets the opaque ID of the capability being reported.
+    /// </summary>
     public string Id { get; } = ValidateId(id);
 
+    /// <summary>
+    /// Gets whether the language stack reports support for the capability.
+    /// </summary>
     public ProjectCapabilitySupport Support { get; } = Enum.IsDefined(support)
         ? support
         : throw new ArgumentOutOfRangeException(nameof(support));

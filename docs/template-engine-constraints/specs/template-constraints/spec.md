@@ -17,8 +17,8 @@ The resolved project SHALL follow the
 [cancellation contract](../../design.md#cancellation-and-failures).
 
 #### Scenario: Stack supplies no capability reports
-- **WHEN** an existing stack uses the parameterless project constructor
-- **THEN** item compatibility is Unknown
+- **WHEN** an item declares valid capability requirements and the stack uses the parameterless project constructor
+- **THEN** item compatibility is Incompatible with a missing-capability diagnostic
 
 #### Scenario: Caller changes the source reports
 - **WHEN** the caller changes a collection used to construct the project
@@ -37,20 +37,24 @@ The resolved project SHALL follow the
 
 An item declaration SHALL follow the
 [publisher-declaration contract](../../design.md#publisher-declaration).
+Production capability IDs SHALL follow the
+[capability-definition contract](../../design.md#capability-definitions-and-ids).
 
 #### Scenario: Declaration is absent
 - **WHEN** the publisher supplies no project-capability declaration
-- **THEN** the requirements snapshot retains that absence and compatibility is Unknown
+- **THEN** the requirements snapshot retains that absence
+- **AND** compatibility is Incompatible with a requirements-absent diagnostic
 
-#### Scenario: Declaration is malformed or empty
-- **WHEN** a declared requirement has invalid/duplicate IDs, empty arguments or malformed structure
-- **THEN** declaration validation fails rather than dropping requirements
+#### Scenario: Declaration is invalid
+- **WHEN** a declared requirement has invalid/duplicate IDs, empty arguments, malformed structure, or unsupported vocabulary or syntax
+- **THEN** the requirements snapshot retains a validation failure rather than dropping requirements
+- **AND** compatibility is Incompatible with a requirements-invalid diagnostic
 
 #### Scenario: Capability is unfamiliar
 - **WHEN** a publisher and language stack use the same unfamiliar valid opaque ID
 - **THEN** the project compatibility matcher requires no stack-specific implementation change
 
-### Requirement: Tri-state fail-closed matching
+### Requirement: Two-state fail-closed matching
 
 The matcher SHALL evaluate the captured project and requirements under the
 [matching contract](../../design.md#matching-and-compatibility-results).
@@ -59,28 +63,28 @@ Individual reports SHALL follow the
 
 #### Scenario: Stack or package labels appear to match
 - **WHEN** only stack, language, workload or package-version labels suggest compatibility
-- **THEN** compatibility remains Unknown without reports establishing the required capabilities
+- **THEN** compatibility is Incompatible without reports establishing the required capabilities
 
 #### Scenario: Every required capability is supported
-- **WHEN** the project's reports are consistent and every ID in a declared conjunction is Supported
+- **WHEN** the project's reports are consistent and every ID in a valid declared conjunction is Supported
 - **THEN** the compatibility result is Compatible
 
 #### Scenario: Required capability is not reported
-- **WHEN** the project's reports are consistent, a required capability has no report, and no required capability is Unsupported
-- **THEN** compatibility is Unknown with a missing-capability diagnostic
-- **AND** absence is not interpreted as Unsupported or an explicit Unknown report
+- **WHEN** the project's reports are consistent and a required capability has no report
+- **THEN** compatibility is Incompatible with a missing-capability diagnostic
 
-#### Scenario: Inspection is inconclusive
-- **WHEN** the project's reports are consistent, a required capability is Unknown, and no required capability is Unsupported
-- **THEN** compatibility is Unknown with an unknown-capability diagnostic
+#### Scenario: Inspection does not establish support
+- **WHEN** completed inspection does not establish support for a required capability
+- **THEN** the stack reports Unsupported or omits that capability
+- **AND** compatibility is Incompatible
 
-#### Scenario: Valid negative accompanies inconclusive evidence
-- **WHEN** consistent reports include a required Unsupported capability and another required capability is missing or Unknown
-- **THEN** the compatibility result is Incompatible
+#### Scenario: Required capability is unsupported
+- **WHEN** the project's reports are consistent and a required capability is Unsupported
+- **THEN** compatibility is Incompatible with an unsupported-capability diagnostic
 
 #### Scenario: An unrelated report contradicts another report
 - **WHEN** reports disagree about an ID not required by the template
-- **THEN** the compatibility result is Unknown
+- **THEN** compatibility is Incompatible with a conflict diagnostic
 
 #### Scenario: Repeated reports agree
 - **WHEN** multiple reports for an ID have the same support state
@@ -108,6 +112,10 @@ Results SHALL follow the
 - **WHEN** a compatibility result is Compatible
 - **THEN** it passes only the project-capability check
 - **AND** it does not authorize preparation, generation, execution, or publication
+
+#### Scenario: Capability check fails
+- **WHEN** a compatibility result is Incompatible
+- **THEN** it does not pass the project-capability gate
 
 ## Historical engine-constraint purpose
 

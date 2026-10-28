@@ -19,8 +19,14 @@ internal sealed class ItemTemplateCompatibilityMatcher
         List<ItemTemplateCompatibilityDiagnostic> diagnostics = [];
         if (!requirements.IsDeclared)
         {
-            diagnostics.Add(new("requirements-absent", "The item declares no project capability requirements. Compatibility cannot be established."));
-            return new(project, requirements, ItemTemplateCompatibility.Unknown, diagnostics);
+            diagnostics.Add(new("requirements-absent", "The item declares no project capability requirements. Compatibility requires a valid declaration."));
+            return new(project, requirements, ItemTemplateCompatibility.Incompatible, diagnostics);
+        }
+
+        if (requirements.ValidationError is string validationError)
+        {
+            diagnostics.Add(new("requirements-invalid", validationError));
+            return new(project, requirements, ItemTemplateCompatibility.Incompatible, diagnostics);
         }
 
         ILookup<string, ProjectCapability> capabilities = project.Capabilities.ToLookup(capability => capability.Id, StringComparer.Ordinal);
@@ -37,10 +43,9 @@ internal sealed class ItemTemplateCompatibilityMatcher
 
         if (diagnostics.Count != 0)
         {
-            return new(project, requirements, ItemTemplateCompatibility.Unknown, diagnostics);
+            return new(project, requirements, ItemTemplateCompatibility.Incompatible, diagnostics);
         }
 
-        bool incompatible = false;
         foreach (string id in requirements.CapabilityIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -53,20 +58,14 @@ internal sealed class ItemTemplateCompatibilityMatcher
                 case ProjectCapabilitySupport.Supported:
                     break;
                 case ProjectCapabilitySupport.Unsupported:
-                    incompatible = true;
                     diagnostics.Add(new("capability-unsupported", $"The project does not support required capability '{id}'.", id));
-                    break;
-                case ProjectCapabilitySupport.Unknown:
-                    diagnostics.Add(new("capability-unknown", $"The stack cannot establish required capability '{id}'.", id));
                     break;
                 default:
                     throw new InvalidOperationException($"Unexpected capability support value: {capability?.Support}.");
             }
         }
 
-        ItemTemplateCompatibility compatibility = incompatible
-            ? ItemTemplateCompatibility.Incompatible
-            : diagnostics.Count == 0 ? ItemTemplateCompatibility.Compatible : ItemTemplateCompatibility.Unknown;
+        ItemTemplateCompatibility compatibility = diagnostics.Count == 0 ? ItemTemplateCompatibility.Compatible : ItemTemplateCompatibility.Incompatible;
         return new(project, requirements, compatibility, diagnostics);
     }
 }
