@@ -69,6 +69,8 @@ public sealed class SetupCommandTests : IDisposable
         string description = cmd.FeaturesOption.Description ?? string.Empty;
 
         description.Should().Contain("dotnet");
+        description.Should().Contain("java");
+        description.Should().Contain("powershell");
         description.Should().NotContain("dotnet-isolated");
     }
 

@@ -127,7 +127,7 @@ public sealed class SetupAutomationContractTests
 
         harness.Interaction.PromptCount.Should().Be(1);
         harness.Interaction.MultiSelectionChoices.Should().ContainSingle().Which.Select(choice => choice.Value)
-            .Should().Equal("dotnet", "go", "node", "python");
+            .Should().Equal("dotnet", "go", "java", "node", "powershell", "python");
         plan.Should().NotBeNull();
         plan!.Features.Should().Equal("node");
         plan.WorkerRuntimes.Should().Equal("node");
@@ -292,7 +292,7 @@ public sealed class SetupAutomationContractTests
     {
         SelectionInteraction interaction = new(interactive);
         var store = Substitute.For<IWorkloadStore>();
-        string[] stacks = ["dotnet", "go", "node", "python"];
+        string[] stacks = ["dotnet", "go", "java", "node", "powershell", "python"];
         IReadOnlyList<WorkloadEntry> installed = allStacksInstalled
             ? [.. stacks.Select(stack => new WorkloadEntry
             {

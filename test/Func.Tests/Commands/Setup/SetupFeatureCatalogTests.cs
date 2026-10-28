@@ -15,9 +15,26 @@ public sealed class SetupFeatureCatalogTests
     [InlineData("Azure.Functions.Cli.Workloads.Workers.Node", "node")]
     [InlineData("Azure.Functions.Cli.Workloads.Templates.Python", "python")]
     [InlineData("Azure.Functions.Cli.Workloads.Python", "python")]
+    [InlineData("Azure.Functions.Cli.Workloads.Java", "java")]
+    [InlineData("azure.functions.cli.workloads.powershell", "powershell")]
+    [InlineData("Azure.Functions.Cli.Workloads.Workers.Java", "java")]
+    [InlineData("Azure.Functions.Cli.Workloads.Workers.PowerShell", "powershell")]
     public void TryGetFeatureForPackageId_ReturnsExpectedFeature(string packageId, string expectedFeature)
     {
         bool matched = SetupFeatureCatalog.TryGetFeatureForPackageId(packageId, out string feature);
+
+        matched.Should().BeTrue();
+        feature.Should().Be(expectedFeature);
+    }
+
+    [Theory]
+    [InlineData("java", "java")]
+    [InlineData(" Java ", "java")]
+    [InlineData("powershell", "powershell")]
+    [InlineData(" PowerShell ", "powershell")]
+    public void TryGetFeatureForRuntime_JavaOrPowerShell_ReturnsExpectedFeature(string runtime, string expectedFeature)
+    {
+        bool matched = SetupFeatureCatalog.TryGetFeatureForRuntime(runtime, out string feature);
 
         matched.Should().BeTrue();
         feature.Should().Be(expectedFeature);

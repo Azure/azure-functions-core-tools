@@ -692,14 +692,14 @@ public sealed class SetupRunnerTests : IDisposable
     [Fact]
     public async Task RunAsync_FeatureWithoutStackMapping_DoesNotInstallStack()
     {
-        string workerPackageId = WorkerPackage("java");
+        string workerPackageId = WorkerPackage("custom");
         FakeCatalog catalog = Catalog()
             .WithLatest(_hostPackageId, "4.1.0")
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0")
             .WithLatest(workerPackageId, "1.0.0");
         SetupRunner runner = CreateRunner(catalog);
 
-        SetupRunResult result = await runner.RunAsync(Options(features: ["java"]), CancellationToken.None);
+        SetupRunResult result = await runner.RunAsync(Options(features: ["custom"]), CancellationToken.None);
 
         result.ExitCode.Should().Be(0);
         await _installer.DidNotReceive().InstallFromCatalogAsync(
@@ -714,6 +714,103 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("java", "Java", false)]
+    [InlineData("java", "Java", true)]
+    [InlineData("powershell", "PowerShell", false)]
+    [InlineData("powershell", "PowerShell", true)]
+    public async Task RunAsync_JavaOrPowerShell_InstallsWorkerStackAndBundle(string runtime, string packageSuffix, bool explicitFeature)
+    {
+        string stackPackageId = $"Azure.Functions.Cli.Workloads.{packageSuffix}";
+        string workerPackageId = WorkerPackage(runtime);
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(workerPackageId, "1.0.0")
+            .WithLatest(stackPackageId, "1.0.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
+        SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
+        {
+            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = runtime,
+        });
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: explicitFeature ? [runtime] : [], installPolicy: SetupInstallPolicy.IfNeeded),
+            CancellationToken.None);
+
+        result.ExitCode.Should().Be(0);
+        _installer.ReceivedCalls()
+            .Where(call => call.GetMethodInfo().Name == nameof(IWorkloadInstaller.InstallFromCatalogAsync))
+            .Select(call => (string)call.GetArguments()[0]!)
+            .Should().Equal(
+                _hostPackageId.ToLowerInvariant(),
+                workerPackageId.ToLowerInvariant(),
+                stackPackageId.ToLowerInvariant(),
+                IInstalledBundleWorkloads.BundleWorkloadPackageId.ToLowerInvariant());
+        _interaction.Lines.Should().Contain(line => line.Contains($"Installed {runtime} stack", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("java", false, "missing")]
+    [InlineData("java", true, "missing")]
+    [InlineData("java", false, "installed")]
+    [InlineData("java", true, "installed")]
+    [InlineData("java", false, "unpublished")]
+    [InlineData("java", true, "unpublished")]
+    [InlineData("powershell", false, "missing")]
+    [InlineData("powershell", true, "missing")]
+    [InlineData("powershell", false, "installed")]
+    [InlineData("powershell", true, "installed")]
+    [InlineData("powershell", false, "unpublished")]
+    [InlineData("powershell", true, "unpublished")]
+    public async Task RunAsync_JavaOrPowerShellCheck_RequiresStack(string runtime, bool explicitFeature, string stackState)
+    {
+        string stackPackageId = $"Azure.Functions.Cli.Workloads.{runtime}";
+        List<WorkloadEntry> installed = [
+            Entry(_hostPackageId, "4.1.0"),
+            Entry(WorkerPackage(runtime), "1.0.0"),
+            Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0"),
+        ];
+        if (stackState == "installed")
+        {
+            installed.Add(Entry(stackPackageId, "1.0.0"));
+        }
+
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(installed);
+        FakeCatalog catalog = Catalog();
+        if (stackState != "unpublished")
+        {
+            catalog.WithLatest(stackPackageId, "1.0.0");
+        }
+
+        SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
+        {
+            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = runtime,
+        });
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(
+                features: explicitFeature ? [runtime] : [],
+                installPolicy: SetupInstallPolicy.IfNeeded,
+                check: true,
+                outputMode: SetupOutputMode.Json),
+            CancellationToken.None);
+
+        bool satisfied = stackState == "installed";
+        result.ExitCode.Should().Be(satisfied ? 0 : 1);
+        JsonElement[] events = [.. _interaction.Lines.Select(line =>
+        {
+            using var document = JsonDocument.Parse(line);
+            return document.RootElement.Clone();
+        })];
+        JsonElement stackResult = events.Should().ContainSingle(item =>
+            item.GetProperty("type").GetString() == "dependency.result"
+            && item.GetProperty("dependency_type").GetString() == "stack").Which;
+        stackResult.GetProperty("package_id").GetString().Should().BeEquivalentTo(stackPackageId);
+        stackResult.GetProperty("status").GetString().Should().Be(satisfied ? "satisfied" : "failed");
+        events[^1].GetProperty("type").GetString().Should().Be(satisfied ? "setup.completed" : "setup.failed");
+        _installer.ReceivedCalls().Should().BeEmpty();
     }
 
     [Fact]

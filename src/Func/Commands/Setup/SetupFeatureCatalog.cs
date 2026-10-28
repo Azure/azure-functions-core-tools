@@ -19,15 +19,12 @@ internal static class SetupFeatureCatalog
     private const string TemplatesPackagePrefix = "Azure.Functions.Cli.Workloads.Templates.";
     private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
 
-    private static readonly HashSet<string> _supportedStacks =
-        new(StringComparer.OrdinalIgnoreCase) { "dotnet", "node", "python", "go" };
-
     public static bool TryGetFeatureForRuntime(string? workerRuntime, out string feature)
     {
         if (!string.IsNullOrWhiteSpace(workerRuntime))
         {
             string normalized = workerRuntime.Trim().ToLowerInvariant();
-            if (_supportedStacks.Contains(normalized))
+            if (SetupDependency.SupportsStack(normalized))
             {
                 feature = normalized;
                 return true;
@@ -92,7 +89,7 @@ internal static class SetupFeatureCatalog
         }
 
         string normalized = suffix.ToLowerInvariant();
-        if (_supportedStacks.Contains(normalized))
+        if (SetupDependency.SupportsStack(normalized))
         {
             feature = normalized;
             return true;

@@ -143,8 +143,11 @@ public sealed class SetupDefaultHintTests
         fixture.Dependencies.Should().Equal(SetupDependencyKind.Host, SetupDependencyKind.ExtensionBundle);
     }
 
-    [Fact]
-    public async Task RunAsync_LocalSettingsRuntimeProjection_DoesNotSuggestFallback()
+    [Theory]
+    [InlineData("dotnet-isolated")]
+    [InlineData("java")]
+    [InlineData("powershell")]
+    public async Task RunAsync_LocalSettingsRuntimeProjection_DoesNotSuggestFallback(string runtime)
     {
         DirectoryInfo directory = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"setup-hint-{Guid.NewGuid():N}"));
         try
@@ -152,7 +155,7 @@ public sealed class SetupDefaultHintTests
             var localSettings = Substitute.For<ILocalSettingsProvider>();
             localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(new LocalSettingsSnapshot
             {
-                Values = new Dictionary<string, string> { [CliConfigurationNames.WorkerRuntimeSettingName] = "dotnet-isolated" },
+                Values = new Dictionary<string, string> { [CliConfigurationNames.WorkerRuntimeSettingName] = runtime },
             });
             CliConfigurationProvider configuration = new(localSettings, new CliConfigurationPathsOptions(directory.FullName));
             Fixture fixture = new(configuration: configuration);
@@ -162,7 +165,9 @@ public sealed class SetupDefaultHintTests
 
             result.ExitCode.Should().Be(0);
             fixture.Hints.Should().BeEmpty();
-            fixture.Dependencies.Should().Equal(SetupDependencyKind.Host, SetupDependencyKind.Stack, SetupDependencyKind.Templates);
+            fixture.Dependencies.Should().Equal(runtime == "dotnet-isolated"
+                ? [SetupDependencyKind.Host, SetupDependencyKind.Stack, SetupDependencyKind.Templates]
+                : [SetupDependencyKind.Host, SetupDependencyKind.Worker, SetupDependencyKind.Stack, SetupDependencyKind.ExtensionBundle]);
             localSettings.Received(1).Get(Arg.Is<DirectoryInfo>(path => path.FullName == directory.FullName));
         }
         finally
