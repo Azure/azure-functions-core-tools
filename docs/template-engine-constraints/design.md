@@ -1,4 +1,305 @@
-## Context
+## Project compatibility checks for function templates
+
+Before a function template is added to an existing Functions project, its
+required project capabilities must be checked. A function template is an item
+template used to add a function to an existing project.
+
+The template publisher declares requirements. Language-stack-specific project
+inspection captures the relevant project inputs and reports capabilities on the
+resolved [`FunctionsProject`](../../src/Abstractions/Projects/FunctionsProject.cs).
+The project compatibility matcher compares those captured reports with the
+requirements. It returns `Compatible` or `Incompatible`.
+
+This section owns the detailed project-compatibility contract. The
+[specification](specs/template-constraints/spec.md) provides acceptance
+scenarios; [the Templates overview](../templating-system/design.md) provides
+navigation and historical context. Implementation progress and validation
+evidence belong in [PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
+and follow-up issues, not in this contract.
+
+### Vocabulary
+
+| Term | Responsibility |
+|---|---|
+| Language stack / stack-specific project inspection | Interprets language-specific project inputs, such as Node programming models or .NET project structure, and reports capabilities. |
+| Captured Functions project | The resolved `FunctionsProject` instance holding the project capabilities for an operation. Its captured inputs do not refresh. |
+| Project compatibility matcher | Compares item-template requirements with the captured project's capabilities. It does not materialize templates. |
+| Templating Engine | The higher-level component responsible for the overall template operation and eventual materialization; it may use the project compatibility matcher. |
+| Shared Templates infrastructure | Cross-stack CLI components that carry and compare capability IDs without interpreting their stack-specific meanings. |
+| Azure Functions Runtime | The Functions host/runtime, not a language stack, language worker, or project inspector. |
+
+### Ownership and API
+
+The language stack captures the project inputs needed for capability reporting
+once, while resolving a new project through `IFunctionsProjectFactory`. It owns
+their interpretation. Node versions and programming models, .NET project
+structure, and Python or PowerShell project details do not belong in shared
+Templates infrastructure.
+
+`FunctionsProject` already owns resolved-project identity and stack metadata.
+It also owns the immutable `Capabilities` collection:
+
+- The protected capability constructor copies and sorts the supplied reports
+  by ordinal ID, then support state, without changing the caller's collection.
+- `Capabilities` has no setter or virtual getter. Each report is immutable, and
+  the collection is read-only. Reading it never inspects files.
+- The parameterless constructor supplies no reports. Existing stacks remain
+  source compatible and do not imply support merely by being recognized.
+- Invalid capability IDs, undefined support states, null collections, and null
+  reports are contract errors. Duplicate reports remain available for the
+  matcher's consistency check.
+
+The project instance owns its reports directly; there is no independently
+returned root, stack authority, or capture ID to bind back to it. The existing
+`WorkingDirectory` and `StackName` identify the resolved project. Matching does
+not normalize or compare paths, resolve filesystem aliases, or infer support
+from those identifiers.
+
+`FunctionsProject`, `ProjectCapability`, and `ProjectCapabilitySupport` are
+public workload contracts because separately shipped stacks implement this
+boundary. They contain no template identity, selection, acquisition, generation
+policy, or Microsoft.TemplateEngine type. Stack-specific captured metadata
+remains with the concrete project implementation.
+
+For example, a stack that established support from captured inputs could pass
+this report to the protected project constructor. This example does not define
+a production capability:
+
+```csharp
+new ProjectCapability("example.http-items", ProjectCapabilitySupport.Supported);
+```
+
+`ProjectCapabilitySupport` reports support for **one capability**.
+`ItemTemplateCompatibility` describes the result for **an item template and a
+project**, combining requirements and report consistency. The enums answer
+different questions and remain distinct; their mapping is defined under
+[matching](#matching-and-compatibility-results).
+
+### Capability definitions and IDs
+
+Every production capability ID must have one authoritative semantic definition
+and an owning language stack or component. The definition states what support
+means for a project. Template authors must use that definition when declaring a
+requirement. The owning language-stack implementation must use the same
+definition when inspecting the project and reporting support. An existing ID's
+meaning must not silently change. An incompatible semantic change requires a
+distinct ID.
+
+Azure Functions owns the `azure.functions` namespace. The Azure Functions CLI
+maintains this naming contract for its production capabilities:
+
+```text
+azure.functions.<owner>.<capability>
+```
+
+Use lower-case, dot-separated segments, with hyphens within a segment.
+`<owner>` is a stable language-stack or component namespace. The remaining
+segments describe the capability and any form that matters to compatibility.
+They must not derive from a NuGet package ID or CLI release version. A model
+version may appear when it is part of the capability's meaning.
+
+The established `azure.functions.node.model-v4.javascript-commonjs` capability
+is owned by the Node language stack. It means support for Node.js programming
+model v4 JavaScript/CommonJS function items in the captured project. `model-v4`
+names the programming-model contract, not a package or CLI version. Production
+project inspection for this capability remains outside this Foundation.
+
+This is an authoring convention, not an additional parser rule or a runtime
+registry. Shared Templates infrastructure compares IDs opaquely and
+case-sensitively. It does not interpret their segments or infer support from
+package names, stack names, template names, Azure Functions Runtime names, or
+programming-model labels. Only the owning stack interprets project inputs under
+the capability definition.
+
+Package identity and capability identity are separate. A Templates package may
+contain templates requiring different capabilities, and those requirements may
+change over its lifetime. Renaming or versioning the package does not inherently
+change any capability ID or its meaning.
+
+### Immutable project lifetime
+
+A template operation uses one captured `FunctionsProject`. The language stack
+must not refresh the project inputs used for compatibility or replace its
+capability reports during that operation. Template requirements are captured
+separately as immutable publisher data.
+
+A genuinely new observation produces a new project instance and a fresh
+compatibility result. The original project and result remain unchanged, even
+when the new instance has the same root and stack. A result applies only to
+the project instance and requirements it records; it is not a cache entry for
+all projects with matching labels.
+
+If a later operation needs to establish that particular inputs remain unchanged,
+it must obtain a new project representation and compare the relevant captured
+evidence with the original. It must not refresh the original in place. This
+matcher does not implement such a later-operation policy or claim that files
+cannot change after capture.
+
+The former `ProjectFacts`, `ProjectFactsContext`, and `GetProjectFactsAsync`
+capture envelope is removed. Repeated capture, operation IDs, report and
+requirements fingerprints, and `RevalidateAsync` existed to detect changing
+inputs. Immutable inputs and explicit new observations replace that machinery.
+There is no second representation of the same captured project.
+
+Existing host-run lifecycle hooks still perform their own work; they do not
+refresh the captured capability reports. Filesystem publication is a separate
+boundary: an immutable project does not freeze destination files or waive
+create-only and collision checks at publication time. This Foundation does not
+implement or remove a publication mechanism.
+
+### Capability states
+
+The language stack interprets captured project inputs under the
+[capability definition](#capability-definitions-and-ids).
+
+| Report | Meaning |
+|---|---|
+| Supported | Inspection established that the captured project supports the capability. |
+| Unsupported | The stack does not establish support for this capability. |
+| Missing / not reported | The stack supplies no report for this ID. Matching treats it as not supported. |
+
+Only a Supported report satisfies a capability requirement. If completed
+inspection does not establish support, the stack may report Unsupported or omit
+the ID. Both produce Incompatible when the template requires that capability.
+Diagnostics retain whether a report was absent or explicitly Unsupported.
+
+These are stack reports, not independent proof of inspection coverage. Stack,
+language, worker, workload, or package-version labels alone cannot establish
+support. The default capability state is Unsupported; the default aggregate
+compatibility is Incompatible.
+
+### Publisher declaration
+
+[`ItemTemplateRequirements`](../../src/Func/Templates/Compatibility/ItemTemplateRequirements.cs)
+accepts this standalone neutral declaration:
+
+```json
+{
+  "type": "func-project-capabilities",
+  "args": ["example.model-v1", "example.http-items"]
+}
+```
+
+This is a **nonempty conjunction**, not an alternatives list. Every capability
+must be supported. Type/property names and capability IDs are case-sensitive.
+An ID starts with an ASCII letter or digit and contains only ASCII letters,
+digits, `.`, `-` or `_`; IDs are not trimmed or interpreted. Unfamiliar valid
+IDs need no changes to the project compatibility matcher.
+
+The parser distinguishes absence (null input, retained as an undeclared
+requirements snapshot) from an invalid declared object. It records a validation
+error for empty arrays, malformed/duplicate IDs, duplicate properties, missing
+fields, non-string IDs, invalid JSON, unsupported vocabularies, and extra
+properties. The matcher returns Incompatible with that reason; it never treats
+an invalid declaration as an empty successful conjunction. Direct programmatic
+construction still rejects invalid IDs and empty collections with `FormatException`.
+
+There are no expressions, scripts, version ranges, predicates, stack callbacks
+or alternative syntax. Valid caller collections are copied, sorted ordinally
+and exposed read-only.
+
+The requirement metadata is a set of opaque IDs interpreted as a conjunction.
+This Foundation evaluates it only for item templates applied to an already
+resolved `FunctionsProject`. Future project-template eligibility checks may
+reuse the metadata, but must define their own inputs before project creation.
+Reuse does not imply running the existing-project item matcher before a project
+exists. Project-template eligibility is not implemented here.
+
+This foundation does **not** read `template.json`, register an engine constraint,
+or change the existing raw engine declaration reader. A later private adapter
+must extract the exact declaration and reject duplicate/unsupported raw syntax
+before engine normalization can discard it. The neutral object is not an
+engine-native product contract.
+
+### Matching and compatibility results
+
+[`ItemTemplateCompatibilityMatcher`](../../src/Func/Templates/Compatibility/ItemTemplateCompatibilityMatcher.cs)
+reads `FunctionsProject.Capabilities` and `ItemTemplateRequirements`. Its
+synchronous `Evaluate` operation performs no project inspection or I/O and
+does not consult stack name, display name, language, worker reference, bundle
+version, or package identity.
+
+| Outcome | Rule |
+|---|---|
+| Compatible | A valid declaration is present, the project's reports are consistent, and every required capability is Supported. |
+| Incompatible | The declaration is absent or invalid, any reports contradict each other, or a required capability is missing or Unsupported. |
+
+Contradictory reports for any ID make the result Incompatible, including
+contradictions outside the required IDs. Identical repeated reports are
+consistent and retained. An unrequired Unsupported report does not make the
+template Incompatible.
+
+[`ItemTemplateCompatibilityResult`](../../src/Func/Templates/Compatibility/ItemTemplateCompatibilityResult.cs)
+retains the exact project instance and immutable requirements evaluated,
+the outcome, and immutable diagnostics. It does not duplicate project state.
+`PassesProjectCapabilityCheck` is true exactly when the outcome is Compatible.
+It passes only this check: it does not establish preparation readiness or
+authorize preparation, generation, execution, or publication.
+
+### Cancellation and failures
+
+Project inspection uses the project factory's existing `CancellationToken`.
+The language stack must pass it to child operations and honor cancellation
+before returning a captured project. The matcher checks its token before
+matching and while evaluating reports and requirements; it has no asynchronous
+capture operation.
+
+Inspection failures propagate rather than becoming an empty successful
+observation. The matcher consumes captured values only. It has no engine,
+package/store, Quickstart, transaction, generation, publication, or command
+collaborator.
+
+### Diagnostics
+
+`ItemTemplateCompatibilityDiagnostic` carries a code, message and optional
+capability ID. The current consumers are the focused Foundation tests; no public
+command exposes these matcher codes. Codes use local lower-case, hyphenated
+names. No repository-wide diagnostic-code naming convention is established
+here, and this design does not define an external machine-readable contract.
+
+Absent and invalid declarations produce `requirements-absent` and
+`requirements-invalid` diagnostics, respectively. For a valid declaration, the
+matcher reports conflicting IDs ordinally before considering required
+capabilities. For consistent reports, required-capability diagnostics follow
+ordinal requirement ID order, preserving distinct missing and unsupported
+codes. Each diagnostic explains an Incompatible result, not a separate outcome.
+
+### Validation boundary
+
+Focused unit tests cover existing stacks without reports, all pairs of required
+capability states including absence, invalid/absent declarations, immutable
+capture, duplicate/conflicting reports, deterministic diagnostics, fail-closed
+defaults, cancellation, and unfamiliar capability IDs. New-observation tests
+verify that original projects and results do not change. Throwing project,
+stack, display-name, language, bundle-policy, and worker getters check that
+matching does not inspect the project or infer support from labels.
+
+From an already-restored checkout, the focused validation path is:
+
+```powershell
+dotnet build .\test\Func.Tests\Func.Tests.csproj --no-restore --configuration Release -p:CI=true
+dotnet test .\test\Func.Tests\Func.Tests.csproj --no-build --no-restore --configuration Release `
+  --filter 'FullyQualifiedName~Azure.Functions.Cli.Tests.Projects.FunctionsProjectTests|FullyQualifiedName~Azure.Functions.Cli.Tests.Templates.Compatibility|FullyQualifiedName~Azure.Functions.Cli.Tests.Projects.FunctionsProjectHostRunContextTests'
+```
+
+These tests establish contract behavior with synthetic stack implementations,
+not production-stack, TemplateEngine-integration, cross-platform or end-to-end
+qualification. Exact runs and historical normalization evidence are recorded
+with their source revisions in
+[PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
+and its Git history.
+
+Production-stack capability inspection, raw package declaration translation,
+preparation, private engine integration and command wiring are outside this
+read-only boundary. No new package dependency or generated content is needed.
+
+## Historical engine constraint context
+
+The remainder preserves the earlier workload/bundle constraint design.
+Its eligibility states and valid empty engine-constraint objects are not
+semantic project/item compatibility. Workload/version checks must not substitute
+for the project-capability contract above. Its shared install/hive and Quickstart
+assumptions are historical broader scope, not current P0 prerequisites.
 
 See `proposal.md` for motivation and `specs/template-constraints/spec.md` for the behavior contract.
 
@@ -212,6 +513,6 @@ The `func-workload` factory needs the loaded workload snapshot and the installed
 1. Register the func constraint factories with the engine session and map results to eligibility states.
 2. Evaluate constraints during listing and resolution as `template-engine-integration` specifies.
 3. Declare workload constraints in func project templates and Azure-Samples packages.
-4. When `func new` moves to the new runtime, replace the templates workload's single minimum bundle version check with `func-bundle` constraints on the templates that need them.
+4. When `func new` moves to the new template-engine integration, replace the templates workload's single minimum bundle version check with `func-bundle` constraints on the templates that need them.
 
 Rollback removes the func factories. Templates that declare func types then evaluate as not evaluated and stay blocked rather than running without their checks.

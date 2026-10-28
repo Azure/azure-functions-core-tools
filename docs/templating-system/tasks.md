@@ -1,3 +1,13 @@
+## Historical planning checklist
+
+The checklist below preserves the earlier broad program. Checked specification
+artifacts are not completed product capabilities, and unchecked tasks are not
+evidence that a helper is absent. Its lifecycle and Quickstart scope is not a
+Foundation dependency. See the [Templates overview](design.md) for contract
+navigation. Current implementation and validation evidence belong in
+[PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
+and follow-up issues.
+
 ## 1. Existing Focused Specifications
 
 - [x] 1.1 Track the completed `template-engine-integration` planning artifacts and its core integration responsibility.

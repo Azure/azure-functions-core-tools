@@ -57,6 +57,7 @@ The main tool users install and run. Assembly name is `func`.
 | `Commands/Workload/` | `func workload` parent command + `func workload list` |
 | `Console/`         | `IInteractionService` abstraction + Spectre.Console implementation, theme |
 | `Common/`          | Shared utilities — `Constants`, `Stacks` (stack registry), `VersionChecker` |
+| `Templates/Compatibility/` | Compares function-template requirements with stack-reported project capabilities. See the [project-compatibility contract](template-engine-constraints/design.md) for matching and result semantics. |
 | `Hosting/`         | `DefaultFunctionsCliBuilder` (internal `FunctionsCliBuilder` impl), `BuiltInCommands` DI registrations, and `WorkloadRegistration` (workload bootstrap seam) |
 | `Workloads/`       | `ExternalCommand` — internal `FuncCliCommand` adapter that wraps a workload-supplied `FuncCommand` and carries the owning `WorkloadInfo`. `WorkloadDetectorContribution` mirrors the same pattern for `IProjectDetector` registrations. |
 | `Workloads/Resolution/` | `IWorkloadResolver` + supporting types (`ILocalSettingsReader`, `IDirectoryMarkerMatcher`) implementing the spec §5.2 resolution algorithm |
@@ -72,6 +73,7 @@ A packable NuGet library (`Azure.Functions.Cli.Abstractions`) hosting the public
 | File / Type | Role |
 |-------------|------|
 | `Common/GracefulException` | User-friendly exception with optional verbose detail; drives non-zero exit codes |
+| `Projects/FunctionsProject`, `ProjectCapability`, `ProjectCapabilitySupport` | The resolved project owns immutable capability reports supplied by its language stack. See the [ownership and capture contract](template-engine-constraints/design.md#ownership-and-api). |
 | `Workloads/IWorkload` | Workload entry point — identity properties + `Configure(FunctionsCliBuilder)` |
 | `Workloads/FunctionsCliBuilder` | DI seam (abstract base) — `Services` for plain DI plus `RegisterCommand(...)` overloads for top-level commands |
 | `Workloads/FuncCommand` | Parser-independent base for workload-contributed top-level commands (Name, Description, Options, Arguments, Subcommands, ExecuteAsync) |

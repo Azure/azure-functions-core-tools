@@ -1,4 +1,18 @@
-## Purpose
+## Foundation contract navigation
+
+The [Templates overview](../../design.md) describes the Foundation boundary.
+The [project-compatibility contract](../../../template-engine-constraints/design.md)
+owns its detailed behavior. The
+[compatibility acceptance scenarios](../../../template-engine-constraints/specs/template-constraints/spec.md)
+reference that contract without duplicating it here.
+
+The following coordination requirements are preserved as historical planning
+provenance. Their installed-template/shared-hive and Quickstart dependencies
+do not override current P0 boundaries. In particular, an independent Quickstart
+workstream, persistent package membership and multi-project generation are not
+prerequisites for this foundation or P0.
+
+## Historical purpose
 
 Coordinates the focused specifications that together define the func templating system, including their ownership boundaries, dependencies, readiness, and overall completion criteria.
 

@@ -1,3 +1,12 @@
+## Historical engine-constraint checklist
+
+The checklist below preserves the earlier workload/bundle constraint plan.
+Its checkboxes are not current implementation status. See the
+[project-compatibility contract](design.md) for the Foundation boundary.
+Current implementation and validation evidence belong in
+[PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
+and follow-up issues.
+
 ## 1. Constraint Types
 
 - [ ] 1.1 Add the `func-workload` constraint factory over the usable workload snapshot and installed workload list, excluding workloads rejected by applicable compatibility or activation checks, retaining their CLI-owned diagnostics, validating names, matching aliases and package IDs case-insensitively, and checking NuGet version ranges with the workload catalog's prerelease rule.
@@ -16,5 +25,5 @@
 
 - [ ] 3.1 Document the func constraint types, arguments, version rules, case-sensitive type names, unique object entries, and the shared-package rule in the template authoring guidance.
 - [ ] 3.2 Add one context-independent raw declaration validator shared by packaging, isolated template install/update preflight, and installed-template listing and resolution. Reject repeated top-level `constraints` members and duplicate properties in every object in the constraints subtree before normalization, along with malformed sections, entries, types, and func arguments. Evaluate the validated content snapshot rather than stale engine cache data. Enforce the shared-package rule from available NuGet host-sharing metadata in packaging, preflight, and installed-template validation, without classifying metadata-free folders as shared.
-- [ ] 3.3 Replace the templates workload's minimum bundle version check with `func-bundle` constraints when `func new` moves to the new runtime.
+- [ ] 3.3 Replace the templates workload's minimum bundle version check with `func-bundle` constraints when `func new` moves to the new template-engine integration.
 - [ ] 3.4 Add tests for third-party and folder packages, rejected replacement leaving the live hive unchanged, repeated root `constraints`, labels, `type`, `args`, nested `id`/`version`, distinct alternative objects, malformed declarations hidden by normalization or cache, omitted and empty constraints, valid unknown types, prebuilt and installed shared packages with and without func types, and unchanged versus changed or unreadable configuration before invocation. Verify changed configuration blocks the original selection without re-resolution or substitution.

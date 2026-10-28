@@ -1,4 +1,128 @@
-## Purpose
+## Project-compatibility purpose
+
+The template publisher declares requirements. Language-stack-specific inspection
+reports capabilities on the captured `FunctionsProject`, and the project
+compatibility matcher compares them with the requirements. The
+[vocabulary](../../design.md#vocabulary) and
+[ownership contract](../../design.md#ownership-and-api) define these roles.
+
+The focused design owns the detailed contract. The requirements below reference
+that contract and give acceptance scenarios, not another copy of its rules.
+
+### Requirement: Captured immutable project
+
+The resolved project SHALL follow the
+[immutable-project lifetime](../../design.md#immutable-project-lifetime),
+[ownership contract](../../design.md#ownership-and-api), and
+[cancellation contract](../../design.md#cancellation-and-failures).
+
+#### Scenario: Stack supplies no capability reports
+- **WHEN** an item declares valid capability requirements and the stack uses the parameterless project constructor
+- **THEN** item compatibility is Incompatible with a missing-capability diagnostic
+
+#### Scenario: Caller changes the source reports
+- **WHEN** the caller changes a collection used to construct the project
+- **THEN** the project's reports and subsequent compatibility results use the captured values
+
+#### Scenario: Matching is repeated during an operation
+- **WHEN** the matcher evaluates the same project more than once
+- **THEN** it reads the same reports without inspecting the project again
+
+#### Scenario: Project is observed again
+- **WHEN** the language stack captures changed inputs in a new project instance
+- **THEN** a fresh evaluation can produce a different result
+- **AND** the original project and compatibility result remain unchanged
+
+### Requirement: Bounded publisher requirements
+
+An item declaration SHALL follow the
+[publisher-declaration contract](../../design.md#publisher-declaration).
+Production capability IDs SHALL follow the
+[capability-definition contract](../../design.md#capability-definitions-and-ids).
+
+#### Scenario: Declaration is absent
+- **WHEN** the publisher supplies no project-capability declaration
+- **THEN** the requirements snapshot retains that absence
+- **AND** compatibility is Incompatible with a requirements-absent diagnostic
+
+#### Scenario: Declaration is invalid
+- **WHEN** a declared requirement has invalid/duplicate IDs, empty arguments, malformed structure, or unsupported vocabulary or syntax
+- **THEN** the requirements snapshot retains a validation failure rather than dropping requirements
+- **AND** compatibility is Incompatible with a requirements-invalid diagnostic
+
+#### Scenario: Capability is unfamiliar
+- **WHEN** a publisher and language stack use the same unfamiliar valid opaque ID
+- **THEN** the project compatibility matcher requires no stack-specific implementation change
+
+### Requirement: Two-state fail-closed matching
+
+The matcher SHALL evaluate the captured project and requirements under the
+[matching contract](../../design.md#matching-and-compatibility-results).
+Individual reports SHALL follow the
+[capability-state contract](../../design.md#capability-states).
+
+#### Scenario: Stack or package labels appear to match
+- **WHEN** only stack, language, workload or package-version labels suggest compatibility
+- **THEN** compatibility is Incompatible without reports establishing the required capabilities
+
+#### Scenario: Every required capability is supported
+- **WHEN** the project's reports are consistent and every ID in a valid declared conjunction is Supported
+- **THEN** the compatibility result is Compatible
+
+#### Scenario: Required capability is not reported
+- **WHEN** the project's reports are consistent and a required capability has no report
+- **THEN** compatibility is Incompatible with a missing-capability diagnostic
+
+#### Scenario: Inspection does not establish support
+- **WHEN** completed inspection does not establish support for a required capability
+- **THEN** the stack reports Unsupported or omits that capability
+- **AND** compatibility is Incompatible
+
+#### Scenario: Required capability is unsupported
+- **WHEN** the project's reports are consistent and a required capability is Unsupported
+- **THEN** compatibility is Incompatible with an unsupported-capability diagnostic
+
+#### Scenario: An unrelated report contradicts another report
+- **WHEN** reports disagree about an ID not required by the template
+- **THEN** compatibility is Incompatible with a conflict diagnostic
+
+#### Scenario: Repeated reports agree
+- **WHEN** multiple reports for an ID have the same support state
+- **THEN** those reports do not conflict
+
+#### Scenario: An unrequired capability is unsupported
+- **WHEN** the project's reports are consistent and all required capabilities are Supported but an unrequired capability is Unsupported
+- **THEN** the compatibility result is Compatible
+
+### Requirement: Compatibility results retain their inputs
+
+Results SHALL follow the
+[result contract](../../design.md#matching-and-compatibility-results).
+
+#### Scenario: Requirements change
+- **WHEN** a caller constructs different requirements and evaluates them
+- **THEN** the new result records those requirements
+- **AND** the original result still records the original project and requirements
+
+#### Scenario: Caller mutates original collections
+- **WHEN** the caller changes collections used to construct requirements, reports, or result diagnostics
+- **THEN** the recorded result and its captured inputs remain unchanged
+
+#### Scenario: Capability check passes
+- **WHEN** a compatibility result is Compatible
+- **THEN** it passes only the project-capability check
+- **AND** it does not authorize preparation, generation, execution, or publication
+
+#### Scenario: Capability check fails
+- **WHEN** a compatibility result is Incompatible
+- **THEN** it does not pass the project-capability gate
+
+## Historical engine-constraint purpose
+
+The requirements below retain the earlier environmental workload/bundle
+constraint design. Their empty-constraints and eligibility rules do not waive
+the project-compatibility contract above. Shared lifecycle/preflight work
+is broader historical scope, not implemented by this foundation.
 
 Defines the func-specific template constraints, how templates declare them, how the CLI evaluates them, and the structured results commands receive.
 

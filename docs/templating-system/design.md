@@ -1,6 +1,75 @@
-## Context
+## Templates scope and contract navigation
 
-See `proposal.md` for motivation and `specs/templating-system/spec.md` for the coordination contract.
+P0 aims to provide one reusable, package-backed Templates capability for both
+`func init` (project creation) and `func new` (item creation). Representative
+project and HTTP-item checks qualify that capability; they are not a complete
+language-stack or content catalog. There is no independent Quickstart P0 workstream.
+
+The Foundation provides a read-only project-compatibility boundary:
+
+```text
+language-stack-specific project inspection
+  -> FunctionsProject (immutable capability reports)
+template publisher -> ItemTemplateRequirements
+FunctionsProject + ItemTemplateRequirements
+  -> project compatibility matcher
+  -> ItemTemplateCompatibilityResult (inputs, outcome, diagnostics)
+```
+
+The [constraint design](../template-engine-constraints/design.md) owns the
+shared API, capability-report definitions, declaration syntax, matching rules,
+and immutable-project lifetime. Its
+[acceptance scenarios](../template-engine-constraints/specs/template-constraints/spec.md)
+exercise that boundary. This overview does not repeat those requirements.
+
+The public resolved-project contracts allow separately shipped language stacks
+to supply captured capabilities without exposing their project models.
+The matcher and its result stay internal to the CLI. The focused contract's
+[vocabulary](../template-engine-constraints/design.md#vocabulary) distinguishes
+these roles from the Templating Engine and the Azure Functions Runtime.
+
+Compatibility evaluation does not perform template preparation or authorize
+execution. Package intake, private engine adaptation, output preparation,
+publication, and command wiring are separate responsibilities. This Foundation
+change does not alter public `func init` or `func new` behavior.
+
+See [PR #5767](https://github.com/Azure/azure-functions-core-tools/pull/5767)
+for Foundation implementation progress and revision-specific validation evidence.
+Track subsequent work in issues, not this design. The older program inventory
+below records historical design decisions, not delivery status.
+
+### Historical and deferred documentation boundaries
+
+The detailed integration, init, and new designs below remain useful inventories
+of parsing, metadata, and diagnostic mechanisms. They do not establish the
+contracts of later Integration work. Unchecked historical task lists are not
+evidence that a helper is absent from the source.
+
+The [stack inventory](../func-init-execution/stack-inventory.md) still describes
+the additive metadata/initializer step. Its reference to multi-project
+Quickstarts as future authority does not apply to current P0. The older
+`func new` flow in [CLI architecture](../cli-architecture.md) also needs
+reconciliation with the actual command integration; it is not the compatibility
+contract.
+
+The [package-install design](../template-package-install/design.md) and its
+requirements describe a persistent lifecycle, not the current exact-content
+intake contract. The [init Quickstarts design](../func-init-quickstarts/design.md)
+does not define P0. Persistent installed membership, shared stores/hives,
+install/update/remove UX, acquisition/repair transactions, Quickstart migration,
+repository fetching, browse/search/gallery, multi-root topology, broad content
+catalogs and general executable actions are deferred. Producer documentation
+under `azure-samples-template-pipeline` remains a separate publication proposal;
+ordinary qualified project content may be reused without importing that workflow.
+
+The proposals under `proposed/` retain earlier workload/provider design
+provenance. They must not be used to infer that legacy dispatch is the approved
+P0 path, that this foundation has replaced it, or that workload/version matching
+establishes project compatibility.
+
+## Historical program context
+
+See `proposal.md` for the original motivation and `specs/templating-system/spec.md` for the historical coordination contract.
 
 Seven focused templating changes currently have complete planning artifacts:
 
@@ -47,7 +116,7 @@ OpenSpec does not provide parent-child change semantics. This umbrella change th
 
 ### Focused changes remain authoritative
 
-The umbrella owns the map, not the territory. Detailed scenarios, API boundaries, failure behavior, and implementation tasks remain in the focused change responsible for that capability.
+Each focused change owns its detailed scenarios, API boundaries and failure behavior. This overview records how those responsibilities relate.
 
 ```text
 templating-system
@@ -79,7 +148,7 @@ templating-system
 
 ### Planned changes have narrow responsibility boundaries
 
-`template-engine-constraints` owns func-specific compatibility checks and their authoring, evaluation, and diagnostic contracts. It extends, but does not redefine, the generic constraint evaluation and eligibility model in `template-engine-integration`.
+`template-engine-constraints` owns func-specific compatibility checks and their authoring, evaluation, and diagnostic contracts. It extends, but does not redefine, the shared constraint evaluation and eligibility model in `template-engine-integration`.
 
 `template-engine-post-actions` owns the supported func action vocabulary, execution context, ordering, cancellation, dry-run representation, safety policy, and diagnostics. Command changes decide when post-actions run; the focused post-action change decides how each supported action behaves.
 
