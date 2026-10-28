@@ -389,6 +389,15 @@ If a newer version is found, a notice is printed after the command completes.
 
 Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundles`) show up once in `--help` and every contributing workload reads the canonical instance.
 
+### `func setup` for Go projects
+
+When inferring setup features from project configuration, `func setup` maps the Go
+worker runtime `native` to the `go` feature, even before the Go stack is installed.
+It reconciles the Go stack and worker using the profile's `go` runtime constraints,
+just like explicit `--features go`. `--check` reports missing Go dependencies without
+installing them. This setup-only mapping does not change `FUNCTIONS_WORKER_RUNTIME`:
+the Functions host still receives `native`.
+
 ### `func new`
 
 ```

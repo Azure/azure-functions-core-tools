@@ -122,7 +122,9 @@ internal sealed class SetupFeatureResolver(
 
         if (!string.IsNullOrWhiteSpace(configuredStack))
         {
-            return [configuredStack.Trim()];
+            // Resolve Go's host runtime before its stack workload is installed.
+            string stack = configuredStack.Trim();
+            return [string.Equals(stack, "native", StringComparison.OrdinalIgnoreCase) ? "go" : stack];
         }
 
         if (!options.NonInteractive && !options.AssumeYes && options.OutputMode != SetupOutputMode.Json && _interaction.IsInteractive)
