@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 
 namespace Azure.Functions.Cli;
 
@@ -25,11 +26,13 @@ namespace Azure.Functions.Cli;
 /// </remarks>
 internal static class NewCommandArgPreparer
 {
-    public static void PrepareIfFuncNew(string[] args, IServiceProvider services, Command rootCommand)
+    public static void PrepareIfFuncNew(
+        string[] args, IServiceProvider services, Command rootCommand, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(rootCommand);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!LooksLikeFuncNew(args))
         {
@@ -54,7 +57,21 @@ internal static class NewCommandArgPreparer
         // attach/detach lifecycle for the help path).
         try
         {
-            newCommand.AttachHydratedOptionsForPreParse(templateId);
+            ParseResult preliminary = rootCommand.Parse(args);
+            string? path = preliminary.GetResult(newCommand.PathArgument!)?.Tokens.FirstOrDefault()?.Value;
+            // Before hydration, an unknown option can occupy the optional path slot.
+            WorkingDirectory directory = path is null || path.StartsWith('-')
+                ? WorkingDirectory.FromCwd() : WorkingDirectory.FromExplicit(path);
+            bool help = args.Any(argument => argument is "--help" or "-h" or "-?");
+            newCommand.AttachHydratedOptionsForPreParse(templateId, directory, !help && preliminary.GetValue(newCommand.ForceOption), cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (GracefulException)
+        {
+            throw;
         }
         catch
         {

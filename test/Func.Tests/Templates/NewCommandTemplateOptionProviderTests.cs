@@ -75,7 +75,8 @@ public class NewCommandTemplateOptionProviderTests
 
     private NewCommandTemplateOptionProvider CreateProvider()
     {
-        return new NewCommandTemplateOptionProvider(_contextResolver, _templateCatalog, _optionHydrator);
+        return new NewCommandTemplateOptionProvider(_contextResolver, _templateCatalog, _optionHydrator,
+            Substitute.For<Azure.Functions.Cli.Templates.Integration.IPublicPackageTemplates>());
     }
 
     private static NewInvocation CreateInvocation()

@@ -12,6 +12,7 @@ public class NodeProjectFactoryTests : IDisposable
 {
     private readonly DirectoryInfo _projectDir;
     private readonly IFunctionsWorkerResolver _workerResolver = Substitute.For<IFunctionsWorkerResolver>();
+    private readonly NodeProjectFactory _factory = new(new(new NodeProjectFileReader()));
 
     public NodeProjectFactoryTests()
     {
@@ -37,7 +38,7 @@ public class NodeProjectFactoryTests : IDisposable
     [Fact]
     public async Task Empty_directory_does_not_match()
     {
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>()
             .Which.Reason.Should().Be("no Node project fingerprint found");
@@ -52,7 +53,7 @@ public class NodeProjectFactoryTests : IDisposable
     {
         WriteFile(fileName, "{}");
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.Created>();
     }
@@ -63,7 +64,7 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("requirements.txt", string.Empty);
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -74,7 +75,7 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("go.mod", "module example");
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -91,7 +92,7 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile(fileName, contents);
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         created.Project.StackName.Should().Be("node");
@@ -113,7 +114,7 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile(fileName, "{}");
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.Created>().Which.Project.Language.Should().Be(expectedLanguage);
     }
@@ -125,7 +126,7 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("package.json", "{}");
         WriteFile("tsconfig.json", "{}");
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.Created>().Which.Project.Language.Should().Be("TypeScript");
     }
@@ -136,7 +137,7 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("package.json", """{ "dependencies": { "@azure/functions": "^4.0.0" } }""");
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.Created>()
             .Which.Reason.Should().Be("package.json declares @azure/functions");
@@ -148,7 +149,7 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("package.json", """{ "devDependencies": { "@azure/functions": "^4.0.0" } }""");
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.Created>()
             .Which.Reason.Should().Be("package.json declares @azure/functions");
@@ -160,7 +161,7 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("package.json", """{ "dependencies": { "lodash": "^4.0.0" } }""");
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found package.json");
     }
@@ -171,7 +172,7 @@ public class NodeProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("package.json", "{ this is not valid json");
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be("found package.json");
     }
@@ -181,7 +182,7 @@ public class NodeProjectFactoryTests : IDisposable
     {
         WriteFile("host.json", "{}");
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -196,7 +197,7 @@ public class NodeProjectFactoryTests : IDisposable
         _workerResolver.ResolveWorkerAsync(Arg.Any<FunctionsWorkerId>(), Arg.Any<CancellationToken>())
             .Returns(FunctionsWorkerResolutionResults.NotResolved(failure));
 
-        ProjectCreationResult result = await new NodeProjectFactory().TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), default);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         FunctionsWorkerResolutionResult workerResult = await created.Project.WorkerReference.ResolveWorkerAsync(
@@ -209,11 +210,92 @@ public class NodeProjectFactoryTests : IDisposable
     [Fact]
     public async Task NullContext_throws()
     {
-        await FluentActions.Awaiting(() => new NodeProjectFactory().TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
+        await FluentActions.Awaiting(() => _factory.TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Constructor_NullCapabilityReader_Throws()
+    {
+        FluentActions.Invoking(() => new NodeProjectFactory(null!)).Should().ThrowExactly<ArgumentNullException>();
+    }
+
+    [Theory]
+    [InlineData("package.json")]
+    [InlineData("host.json")]
+    [InlineData(".func/config.json")]
+    [InlineData("local.settings.json")]
+    public async Task CapabilityInspection_IsDefaultOffAndMalformedInputsFailOnlyWhenRequested(string path)
+    {
+        WriteFile("package.json", "{}");
+        WriteFile("host.json", """{"version":"2.0"}""");
+        WriteFile(path, "{ broken");
+
+        ProjectCreationResult result = await _factory.TryCreateProjectAsync(CreateContext(), CancellationToken.None);
+        FunctionsProject project = result.Should().BeOfType<ProjectCreationResult.Created>().Which.Project;
+
+        project.Capabilities.Should().BeEmpty();
+        await FluentActions.Awaiting(() => _factory.TryCreateProjectAsync(
+            CreateContext() with { InspectCapabilities = true }, CancellationToken.None))
+            .Should().ThrowAsync<FormatException>().WithMessage($"*{path}*");
+    }
+
+    [Fact]
+    public async Task CapabilityInspection_ReadFailureFailsTemplatesButDoesNotAffectOrdinaryClassification()
+    {
+        WriteFile("package.json", "{}");
+        NodeProjectFileReader files = Substitute.For<NodeProjectFileReader>();
+        var cause = new IOException("Cannot inspect the project.");
+        files.ReadAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromException<(NodeProjectFileKind, byte[])>(cause));
+        var factory = new NodeProjectFactory(new(files));
+
+        ProjectCreationResult ordinary = await factory.TryCreateProjectAsync(CreateContext(), CancellationToken.None);
+
+        ordinary.Should().BeOfType<ProjectCreationResult.Created>().Which.Project.Capabilities.Should().BeEmpty();
+        files.ReceivedCalls().Should().BeEmpty();
+        Func<Task<ProjectCreationResult>> strict = () => factory.TryCreateProjectAsync(CreateContext() with { InspectCapabilities = true }, CancellationToken.None);
+        IOException error = (await strict.Should().ThrowAsync<IOException>()).Which;
+        error.Message.Should().Contain("package.json");
+        error.InnerException.Should().BeSameAs(cause);
+        files.ReceivedCalls().Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task CapabilityInspection_CapturesAllReportsOnceWhenConstructingEachProject()
+    {
+        WriteFile("package.json", "{}");
+        NodeProjectFileReader files = Substitute.For<NodeProjectFileReader>();
+        Dictionary<string, byte[]> content = new(StringComparer.Ordinal)
+        {
+            ["package.json"] = [.. """{"main":"src/functions/*.js","dependencies":{"@azure/functions":"^4.0.0"}}"""u8],
+            ["host.json"] = [.. """{"version":"2.0"}"""u8],
+        };
+        files.ReadAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => Task.FromResult<(NodeProjectFileKind, byte[])>(content.TryGetValue(call.ArgAt<string>(1), out byte[]? bytes)
+                ? (NodeProjectFileKind.RegularFile, bytes) : (NodeProjectFileKind.Absent, [])));
+        var factory = new NodeProjectFactory(new(files));
+        using var cancellation = new CancellationTokenSource();
+        ProjectCreationContext context = CreateContext() with { InspectCapabilities = true };
+
+        FunctionsProject first = (await factory.TryCreateProjectAsync(context, cancellation.Token))
+            .Should().BeOfType<ProjectCreationResult.Created>().Which.Project;
+        content.Remove("host.json");
+        FunctionsProject second = (await factory.TryCreateProjectAsync(context, cancellation.Token))
+            .Should().BeOfType<ProjectCreationResult.Created>().Which.Project;
+
+        first.Capabilities.Should().ContainSingle().Which.Support.Should().Be(ProjectCapabilitySupport.Supported);
+        second.Capabilities.Should().BeEmpty();
+        second.Should().NotBeSameAs(first);
+        files.ReceivedCalls().Should().HaveCount(14).And.OnlyContain(call =>
+            (CancellationToken)call.GetArguments()[2]! == cancellation.Token);
     }
 
     private void WriteFile(string name, string contents)
-        => File.WriteAllText(Path.Combine(_projectDir.FullName, name), contents);
+    {
+        string path = Path.Combine(_projectDir.FullName, name);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, contents);
+    }
 
     private ProjectCreationContext CreateContext(DirectoryInfo? directory = null)
         => new(WorkingDirectory.FromExplicit((directory ?? _projectDir).FullName));

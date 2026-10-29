@@ -12,7 +12,7 @@ namespace Azure.Functions.Cli.Workloads.Node;
 
 /// <summary>
 /// Entry-point for the Node workload. Registers Node-specific
-/// services (project initializer today; project factory / commands later).
+/// project services, including opt-in capability inspection.
 /// </summary>
 public sealed class NodeWorkload : Workload
 {
@@ -27,6 +27,8 @@ public sealed class NodeWorkload : Workload
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<NodeProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, NodeQuickstartProvider>();
-        builder.AddProjectFactory(new NodeProjectFactory());
+        builder.Services.AddSingleton<NodeProjectFileReader>();
+        builder.Services.AddSingleton<NodeProjectCapabilityReader>();
+        builder.AddProjectFactory<NodeProjectFactory>();
     }
 }

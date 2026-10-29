@@ -68,7 +68,8 @@ public class PromptCapabilityConsumerTests
         var installed = Substitute.For<IInstalledBundleWorkloads>();
         installed.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
         var command = new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), localSettings,
-            Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(), new InstalledBundleScanner(installed), [initializer]);
+            Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(), new InstalledBundleScanner(installed),
+            [initializer], Substitute.For<Azure.Functions.Cli.Templates.Integration.IPublicPackageTemplates>());
         string directory = Path.Combine(Path.GetTempPath(), $"func-5511-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
 

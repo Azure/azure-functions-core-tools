@@ -1,7 +1,10 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Templates;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates;
 
@@ -54,6 +57,22 @@ public class NewCommandRendererTests
             [MakeTemplate(id: "http", displayName: "HttpTrigger", description: "")]);
 
         interaction.Lines.Should().Contain(l => l.Contains("func new --template <TEMPLATE_ID> --name <function-name>", System.StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RenderCatalogueJson_UsesUnwrappedOutputAndPreservesLongAuthoredText()
+    {
+        var interaction = Substitute.For<IInteractionService>();
+        var renderer = new NewCommandRenderer(interaction);
+        string description = new('x', 240);
+
+        renderer.RenderCatalogueJson("node", "javascript", [MakeTemplate("http", "HTTP trigger", description)]);
+
+        interaction.Received(1).WriteRawLine(Arg.Any<string>());
+        interaction.DidNotReceive().WriteLine(Arg.Any<string>());
+        string json = (string)interaction.ReceivedCalls().Single().GetArguments()[0]!;
+        using var document = JsonDocument.Parse(json);
+        document.RootElement.GetProperty("templates")[0].GetProperty("description").GetString().Should().Be(description);
     }
 
     private static FunctionTemplateInfo MakeTemplate(string id, string displayName, string? description) =>

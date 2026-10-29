@@ -9,4 +9,10 @@ namespace Azure.Functions.Cli.Projects;
 /// Inputs passed to workload project factories.
 /// </summary>
 /// <param name="WorkingDirectory">The directory the command is operating on.</param>
-public sealed record ProjectCreationContext(WorkingDirectory WorkingDirectory);
+public sealed record ProjectCreationContext(WorkingDirectory WorkingDirectory)
+{
+    /// <summary>
+    /// Gets whether this observation requires strict capability inspection; ordinary project creation leaves it disabled.
+    /// </summary>
+    public bool InspectCapabilities { get; init; }
+}

@@ -303,6 +303,8 @@ public class RemoteProfileSourceTests
         }
 
         public Stream? OpenReadIfExists(string path) => throw new NotImplementedException();
+        public FileAttributes? GetAttributesIfExists(string path) => throw new NotImplementedException();
+        public Stream CreateNewFile(string path) => throw new NotImplementedException();
 
         public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
         {
@@ -320,10 +322,13 @@ public class RemoteProfileSourceTests
         public bool FileExists(string path) => Files.ContainsKey(path);
         public Task SaveStreamToFileAsync(string filePath, Stream content, CancellationToken cancellationToken) => throw new NotImplementedException();
         public void MoveFile(string sourcePath, string destinationPath, bool overwrite = false) => throw new NotImplementedException();
+        public void PublishFileNoReplace(string sourcePath, string destinationPath) => throw new NotImplementedException();
         public void CopyFile(string sourcePath, string destinationPath) => throw new NotImplementedException();
         public void DeleteFile(string path) => Files.Remove(path);
         public bool DirectoryExists(string path) => throw new NotImplementedException();
         public void CreateDirectory(string path) => throw new NotImplementedException();
+        public void CreateNewDirectory(string path) => throw new NotImplementedException();
+        public string CreateStagingDirectory(string parentDirectory) => throw new NotImplementedException();
         public TempDirectory CreateTempDirectory() => throw new NotImplementedException();
         public TempDirectory CreateTempDirectory(string parentDirectory) => throw new NotImplementedException();
         public void CopyDirectory(string sourcePath, string destinationPath) => throw new NotImplementedException();

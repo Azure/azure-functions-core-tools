@@ -32,6 +32,22 @@
     <EmbeddedResource Include="Profiles/BuiltInProfiles.json" LogicalName="Azure.Functions.Cli.Profiles.BuiltInProfiles.json" />
   </ItemGroup>
 
+  <PropertyGroup Condition="'$(EnableTemplatesQualification)' == 'true'">
+    <DefineConstants>$(DefineConstants);TEMPLATES_QUALIFICATION</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(EnableTemplatesQualification)' == 'true'">
+    <EmbeddedResource Include="$(TemplatesQualificationPackage)"
+                      LogicalName="Azure.Functions.Cli.Templates.Qualification.Node.Basic.nupkg" />
+    <AssemblyMetadata Include="TemplatesQualification" Value="Node JavaScript/HTTP; not approved for production shipping" />
+  </ItemGroup>
+
+  <Target Name="ValidateTemplatesQualificationInput" BeforeTargets="PrepareForBuild"
+          Condition="'$(EnableTemplatesQualification)' == 'true'">
+    <Error Condition="'$(TemplatesQualificationPackage)' == '' Or !Exists('$(TemplatesQualificationPackage)')"
+           Text="A qualification build requires TemplatesQualificationPackage to identify the original verified archive. This is not a production binding." />
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="NuGet.Packaging" />
     <PackageReference Include="NuGet.Protocol" />

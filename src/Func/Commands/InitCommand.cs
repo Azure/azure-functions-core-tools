@@ -10,6 +10,7 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Integration;
 using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Commands;
@@ -60,6 +61,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IHostJsonBundleSectionReader _bundleSectionReader;
     private readonly InstalledBundleScanner _bundleScanner;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
+    private readonly IPublicPackageTemplates _packages;
 
     public InitCommand(
         IInteractionService interaction,
@@ -68,7 +70,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IFunctionsProjectResolver projectResolver,
         IHostJsonBundleSectionReader bundleSectionReader,
         InstalledBundleScanner bundleScanner,
-        IEnumerable<IProjectInitializer> initializers)
+        IEnumerable<IProjectInitializer> initializers,
+        IPublicPackageTemplates packages)
         : base("init", "Initialize a new Azure Functions project.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -78,6 +81,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         ArgumentNullException.ThrowIfNull(bundleSectionReader);
         ArgumentNullException.ThrowIfNull(bundleScanner);
         ArgumentNullException.ThrowIfNull(initializers);
+        ArgumentNullException.ThrowIfNull(packages);
 
         _interaction = interaction;
         _hintRenderer = hintRenderer;
@@ -86,6 +90,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _bundleSectionReader = bundleSectionReader;
         _bundleScanner = bundleScanner;
         _initializers = initializers.ToList();
+        _packages = packages;
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
         LanguageOption.Description = BuildLanguageOptionDescription(_initializers);
@@ -131,7 +136,10 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
-        workingDirectory.CreateIfNotExists();
+        if (!_packages.IsEnabled)
+        {
+            workingDirectory.CreateIfNotExists();
+        }
         bool force = parseResult.GetValue(ForceOption);
         string? language = parseResult.GetValue(LanguageOption);
         if (!string.IsNullOrWhiteSpace(language))
@@ -283,6 +291,29 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             language = resolved;
         }
 
+        if (!adoptExisting && !healExisting && _packages.HandlesProject(initializer.Stack, language))
+        {
+            if (force || parseResult.GetValue(NameOption) is not null)
+            {
+                throw new GracefulException(
+                    "The qualification project default is create-only and declares no project-name substitution. Omit --force and --name; no existing files were modified.",
+                    isUserError: true);
+            }
+
+            foreach (Option option in Options)
+            {
+                if (option.Name == "--bundles-channel" && parseResult.GetResult(option) is { Implicit: false })
+                {
+                    throw new GracefulException(
+                        $"The qualification project default does not support '{option.Name}'. It uses the authored host.json without an extension bundle.",
+                        isUserError: true);
+                }
+            }
+
+            return await _packages.InitializeAsync(workingDirectory, cancellationToken);
+        }
+
+        workingDirectory.CreateIfNotExists();
         if (force)
         {
             if (!await ConfirmClearDirectoryAsync(workingDirectory.Info, cancellationToken))

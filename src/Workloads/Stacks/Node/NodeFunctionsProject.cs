@@ -14,21 +14,15 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// <c>node_modules</c> (when missing) and runs the project's <c>build</c>
 /// script (when defined) so the host can launch compiled output.
 /// </summary>
-internal sealed class NodeFunctionsProject : FunctionsProject
+internal sealed class NodeFunctionsProject(WorkingDirectory workingDirectory, string language, IEnumerable<ProjectCapability> capabilities)
+    : FunctionsProject(capabilities)
 {
     private const string PackageJsonFileName = "package.json";
     private const string NodeModulesFolderName = "node_modules";
 
-    private readonly WorkingDirectory _workingDirectory;
-    private readonly FunctionsWorkerReference _workerReference;
-    private readonly string _language;
-
-    public NodeFunctionsProject(WorkingDirectory workingDirectory, string language)
-    {
-        _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
-        _language = language ?? throw new ArgumentNullException(nameof(language));
-        _workerReference = FunctionsWorkerReference.FromWorkload("node");
-    }
+    private readonly WorkingDirectory _workingDirectory = workingDirectory ?? throw new ArgumentNullException(nameof(workingDirectory));
+    private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload("node");
+    private readonly string _language = language ?? throw new ArgumentNullException(nameof(language));
 
     // Internal seam so tests can stub npm invocations without spawning real
     // processes. Args is forwarded as a single argv list to keep tests

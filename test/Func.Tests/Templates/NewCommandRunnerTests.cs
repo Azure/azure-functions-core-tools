@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Profiles;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Integration;
 using Azure.Functions.Cli.Workers;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -90,7 +91,7 @@ public class NewCommandRunnerTests
             templateSelector,
             templateApplicator,
             new NewCommandRenderer(interaction),
-            resultRenderer);
+            resultRenderer, Substitute.For<IPublicPackageTemplates>());
 
         int exitCode = await runner.ExecuteAsync(invocation, cancellation.Token);
 
@@ -248,7 +249,7 @@ public class NewCommandRunnerTests
             new NewCommandTemplateSelector(interaction, new TemplatePicker(interaction)),
             new NewCommandTemplateApplicator(engineProviders, optionHydrator),
             renderer,
-            new NewCommandResultRenderer(interaction, renderer));
+            new NewCommandResultRenderer(interaction, renderer), Substitute.For<IPublicPackageTemplates>());
     }
 
     private static NewCommandRunner BuildRunnerForChannelFallback(
@@ -294,7 +295,7 @@ public class NewCommandRunnerTests
             new NewCommandTemplateSelector(interaction, new TemplatePicker(interaction)),
             new NewCommandTemplateApplicator(engineProviders, optionHydrator),
             renderer,
-            new NewCommandResultRenderer(interaction, renderer));
+            new NewCommandResultRenderer(interaction, renderer), Substitute.For<IPublicPackageTemplates>());
     }
 
     private sealed class FakeDotNetProject(WorkingDirectory workingDirectory) : FunctionsProject

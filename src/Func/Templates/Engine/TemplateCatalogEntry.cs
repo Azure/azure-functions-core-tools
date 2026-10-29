@@ -33,7 +33,15 @@ internal sealed record TemplateCatalogEntry(
     TemplatePackageInfo? Package,
     bool IsHidden,
     IReadOnlyList<TemplateParameterDefinition> Parameters,
-    string? MetadataDiagnostic);
+    string? MetadataDiagnostic)
+{
+    /// <summary>
+    /// Gets the authored internal role, independently of visibility and project capabilities.
+    /// </summary>
+    public string? DeclaredInternalRole { get; init; }
+
+    public string? DefaultName { get; init; }
+}
 
 /// <summary>
 /// Installed template package that provides a template.

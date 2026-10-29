@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Integration;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
@@ -44,7 +45,8 @@ public class InitCommandTests
     }
 
     private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
+        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles),
+            initializers, Substitute.For<IPublicPackageTemplates>());
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -655,7 +657,8 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [dotnet]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+                new InstalledBundleScanner(_installedBundles), [dotnet], Substitute.For<IPublicPackageTemplates>());
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
@@ -819,7 +822,8 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var python = new FakeProjectInitializer("python");
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [python]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+                new InstalledBundleScanner(_installedBundles), [python], Substitute.For<IPublicPackageTemplates>());
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync();
