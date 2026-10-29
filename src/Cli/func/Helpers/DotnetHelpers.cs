@@ -360,7 +360,7 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task EnsureTemplatesInCustomHiveAsync(Func<Task> action, WorkerRuntime workerRuntime)
         {
-            string hive = GetHivePath(workerRuntime);
+            string hive = Path.GetFullPath(GetHivePath(workerRuntime));
             FileSystemHelpers.EnsureDirectory(hive);
             string readyFile = Path.Combine(hive, CustomHiveReadyFileName);
 
