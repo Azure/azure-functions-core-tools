@@ -33,6 +33,31 @@ The resolved project SHALL follow the
 - **THEN** a fresh evaluation can produce a different result
 - **AND** the original project and compatibility result remain unchanged
 
+### Requirement: Templates-only project inspection
+
+Stack integration SHALL follow the
+[B1 inspection scope](../../design.md#templates-only-inspection-b1).
+These scenarios qualify later stack integration, not completed Foundation behavior.
+
+#### Scenario: An unrelated command classifies a project
+- **WHEN** project classification does not require Templates capability evaluation
+- **THEN** existing classification behavior remains unchanged
+- **AND** strict Templates inspection is not introduced into that path
+
+#### Scenario: Required inspection input is malformed
+- **WHEN** a Templates operation requires capability evaluation and a required project input is malformed
+- **THEN** the operation fails before preparation or publication
+- **AND** the failure is not converted into missing or Unsupported capability reports
+
+#### Scenario: Inspection cannot read required inputs
+- **WHEN** capability inspection encounters an I/O failure
+- **THEN** the Templates operation fails rather than treating inspection as successful
+
+#### Scenario: Valid inputs do not establish support
+- **WHEN** inspection completes successfully but does not establish a required capability
+- **THEN** the stack may report Unsupported or omit the report
+- **AND** the project compatibility matcher returns Incompatible
+
 ### Requirement: Bounded publisher requirements
 
 An item declaration SHALL follow the

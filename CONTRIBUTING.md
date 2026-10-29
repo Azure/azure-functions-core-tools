@@ -20,6 +20,16 @@ When your pull-request is created, we classify it. If the change is trivial, i.e
 
 Before submitting a feature or substantial code contribution please discuss it with the team and ensure it follows the product roadmap. Note that all code submissions will be rigorously reviewed and tested by the Azure Functions Core Tools team, and only those that meet the bar for both quality and design/roadmap appropriateness will be merged into the source.
 
+## Contributing template support for a language stack
+
+Start with the [stack enablement contract](docs/template-engine-integration/README.md#stack-enablement-contract)
+and the [Foundation-based stack readiness assessment](docs/func-init-execution/stack-inventory.md#pr-3-stack-readiness).
+The inventory includes [Sarah Vu's first bounded work item](docs/func-init-execution/stack-inventory.md#first-work-item-for-sarah).
+Keep a contribution to one project/HTTP-item pair for one stack, with its inspection,
+content validation, and qualification evidence. Use the normal contributor workflow
+and target `feature/v5-templates`. Stack-owned work can start from merged Foundation;
+shared CLI integration is reconciled against the stable PR 2 Node/HTTP reference.
+
 ## AI-Assisted Development
 
 This repo includes agent instructions (`AGENTS.md`) and developer

@@ -75,6 +75,26 @@ project**, combining requirements and report consistency. The enums answer
 different questions and remain distinct; their mapping is defined under
 [matching](#matching-and-compatibility-results).
 
+### Templates-only inspection (B1)
+
+Each language stack validates project capabilities for Templates operations
+without changing unrelated Azure Functions CLI commands. Strict inspection runs
+only when a Templates operation requires capability evaluation. Ordinary project
+classification and its existing fingerprints remain unchanged.
+
+A recognized project is not necessarily compatible with an HTTP item. The stack
+must validate the inputs required by its capability definition before reporting
+support. Successfully inspected inputs that do not establish support may produce
+Unsupported or no report. Malformed required inputs and inspection I/O failures
+must instead fail the Templates operation; they must not become empty reports or
+an ordinary Incompatible result.
+
+This scope does not redesign `FunctionsProject`, add capability states, or make
+host-run preparation perform Templates inspection. Capture reports once on the
+existing project contract and preserve cancellation and immutable-project rules.
+The Templates-specific call path is integration work, not behavior supplied by
+this Foundation.
+
 ### Capability definitions and IDs
 
 Every production capability ID must have one authoritative semantic definition
