@@ -52,6 +52,10 @@ public class NodeWorkloadTests
 
         new NodeWorkload().Configure(builder);
 
-        builder.Received(1).AddProjectFactory(Arg.Any<NodeProjectFactory>());
+        builder.Received(1).AddProjectFactory<NodeProjectFactory>();
+        using ServiceProvider provider = services.BuildServiceProvider();
+        provider.GetRequiredService<NodeProjectCapabilityReader>().Should().BeSameAs(provider.GetRequiredService<NodeProjectCapabilityReader>());
+        provider.GetRequiredService<NodeProjectFileReader>().Should().BeSameAs(provider.GetRequiredService<NodeProjectFileReader>());
+        ActivatorUtilities.CreateInstance<NodeProjectFactory>(provider).Should().NotBeNull();
     }
 }

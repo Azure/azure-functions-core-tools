@@ -168,6 +168,6 @@ internal sealed class NewCommandRenderer(IInteractionService interaction)
         };
 
         string json = System.Text.Json.JsonSerializer.Serialize(envelope, jsonOptions);
-        _interaction.WriteLine(json);
+        _interaction.WriteRawLine(json);
     }
 }

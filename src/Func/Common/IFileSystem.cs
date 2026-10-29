@@ -28,6 +28,16 @@ internal interface IFileSystem
     public Stream? OpenReadIfExists(string path);
 
     /// <summary>
+    /// Reads attributes without following a final symbolic link; returns null only when the path is absent.
+    /// </summary>
+    public FileAttributes? GetAttributesIfExists(string path);
+
+    /// <summary>
+    /// Opens a new binary file for asynchronous writing, refusing an occupied path without creating parent directories.
+    /// </summary>
+    public Stream CreateNewFile(string path);
+
+    /// <summary>
     /// Writes <paramref name="contents"/> to <paramref name="path"/> atomically
     /// (via temp-file-and-rename), creating parent directories if needed.
     /// </summary>
@@ -45,6 +55,12 @@ internal interface IFileSystem
     /// is <c>true</c>, an existing file at the destination is replaced.
     /// </summary>
     public void MoveFile(string sourcePath, string destinationPath, bool overwrite = false);
+
+    /// <summary>
+    /// Atomically publishes a staged file only if the destination is absent.
+    /// The staging directory must be directly beneath the destination's parent; the source may remain for caller-owned cleanup.
+    /// </summary>
+    public void PublishFileNoReplace(string sourcePath, string destinationPath);
 
     /// <summary>
     /// Copies a single file from <paramref name="sourcePath"/> to
@@ -73,6 +89,17 @@ internal interface IFileSystem
     /// Creates a directory (and any missing parents) at <paramref name="path"/>.
     /// </summary>
     public void CreateDirectory(string path);
+
+    /// <summary>
+    /// Creates exactly one new directory, refusing an occupied path without creating missing parents.
+    /// </summary>
+    public void CreateNewDirectory(string path);
+
+    /// <summary>
+    /// Exclusively creates an empty staging directory under an existing parent.
+    /// The caller owns its path and must report cleanup failures.
+    /// </summary>
+    public string CreateStagingDirectory(string parentDirectory);
 
     /// <summary>
     /// Creates a new, uniquely-named temporary directory under the system temp

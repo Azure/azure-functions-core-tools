@@ -89,7 +89,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         // Attach them to NewCommand BEFORE the parser sees argv so SCL
         // treats them as known options instead of erroring out via
         // PathArgument's unrecognized-token guard.
-        NewCommandArgPreparer.PrepareIfFuncNew(normalizedArgs, host.Services, rootCommand);
+        NewCommandArgPreparer.PrepareIfFuncNew(normalizedArgs, host.Services, rootCommand, cts.Token);
 
         // Disable POSIX bundling so single-dash typos like `-name` surface as unrecognized options.
         var parserConfiguration = new ParserConfiguration { EnablePosixBundling = false };

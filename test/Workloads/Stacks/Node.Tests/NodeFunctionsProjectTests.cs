@@ -174,15 +174,15 @@ public class NodeFunctionsProjectTests : IDisposable
     [Fact]
     public void Language_ReflectsValuePassedToConstructor()
     {
-        var ts = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), "TypeScript");
-        var js = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), "JavaScript");
+        var ts = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), "TypeScript", []);
+        var js = new NodeFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName), "JavaScript", []);
 
         ts.Language.Should().Be("TypeScript");
         js.Language.Should().Be("JavaScript");
     }
 
     private NodeFunctionsProject CreateProject(Func<string, IReadOnlyList<string>, Action<string>, Action<string>, CancellationToken, Task<int>> runner)
-        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), "JavaScript")
+        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), "JavaScript", [])
         {
             RunNpm = runner,
         };

@@ -11,14 +11,15 @@ namespace Azure.Functions.Cli.Workloads.Node;
 /// <summary>
 /// Creates Node Functions projects from Node-specific fingerprints.
 /// </summary>
-internal sealed class NodeProjectFactory : IFunctionsProjectFactory
+internal sealed class NodeProjectFactory(NodeProjectCapabilityReader capabilities) : IFunctionsProjectFactory
 {
     private const string FunctionsPackage = "@azure/functions";
 
     private static readonly FunctionsWorkerId _workerId = new("node");
     private static readonly string[] _sourceFilePatterns = ["*.js", "*.mjs", "*.cjs", "*.ts"];
+    private readonly NodeProjectCapabilityReader _capabilities = capabilities ?? throw new ArgumentNullException(nameof(capabilities));
 
-    public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
+    public async Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
@@ -26,17 +27,20 @@ internal sealed class NodeProjectFactory : IFunctionsProjectFactory
         DirectoryInfo workingDirectory = context.WorkingDirectory.Info;
         if (!workingDirectory.Exists)
         {
-            return Task.FromResult(NotCreated("directory does not exist"));
+            return NotCreated("directory does not exist");
         }
 
         (string? reason, string language) = Fingerprint(workingDirectory);
         if (reason is null)
         {
-            return Task.FromResult(NotCreated("no Node project fingerprint found"));
+            return NotCreated("no Node project fingerprint found");
         }
 
-        FunctionsProject project = new NodeFunctionsProject(context.WorkingDirectory, language);
-        return Task.FromResult(Created(project, reason));
+        IReadOnlyList<ProjectCapability> reports = context.InspectCapabilities
+            ? await _capabilities.ReadAsync(workingDirectory.FullName, cancellationToken)
+            : [];
+        FunctionsProject project = new NodeFunctionsProject(context.WorkingDirectory, language, reports);
+        return Created(project, reason);
     }
 
     // Language defaults to JavaScript so a Node directory with only package.json

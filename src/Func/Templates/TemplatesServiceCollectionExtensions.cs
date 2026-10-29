@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Templates.Integration;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -37,6 +38,7 @@ internal static class TemplatesServiceCollectionExtensions
         services.AddSingleton<INewCommandResultRenderer, NewCommandResultRenderer>();
         services.AddSingleton<INewCommandRunner, NewCommandRunner>();
         services.AddSingleton<ITemplaterFactory, TemplaterFactory>();
+        services.AddPublicPackageTemplates();
 
         return services;
     }

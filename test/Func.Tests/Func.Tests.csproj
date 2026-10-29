@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" />
   </ItemGroup>
 
   <Target Name="RecordCliProductOutput" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="ResolveProjectReferences">
@@ -20,6 +21,10 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Update/Fixtures/version.json" LogicalName="Azure.Functions.Cli.Tests.Update.Fixtures.version.json" />
+    <EmbeddedResource Include="$(SrcRoot)Workloads/Templates/Node/content/v2/templates/templates.json"
+                      LogicalName="Azure.Functions.Cli.Tests.PreParser.LegacyNode.templates.json" />
+    <EmbeddedResource Include="$(SrcRoot)Workloads/Templates/Node/content/v2/bindings/userPrompts.json"
+                      LogicalName="Azure.Functions.Cli.Tests.PreParser.LegacyNode.userPrompts.json" />
   </ItemGroup>
 
   <!-- Test fixtures: built and copied to output as content; loaded via reflection. -->

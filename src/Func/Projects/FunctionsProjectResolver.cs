@@ -18,7 +18,7 @@ internal sealed class FunctionsProjectResolver(IEnumerable<WorkloadProjectFactor
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var creationContext = new ProjectCreationContext(context.WorkingDirectory);
+        var creationContext = new ProjectCreationContext(context.WorkingDirectory) { InspectCapabilities = context.InspectCapabilities };
         foreach (WorkloadProjectFactoryRegistration registration in _factories)
         {
             cancellationToken.ThrowIfCancellationRequested();

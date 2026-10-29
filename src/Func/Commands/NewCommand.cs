@@ -1,10 +1,12 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Immutable;
 using System.CommandLine;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Templates;
+using Azure.Functions.Cli.Templates.Selection;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -110,7 +112,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         if (!string.IsNullOrWhiteSpace(requestedTemplate))
         {
             userOptionValues = ReadParsedPromptOverrides(parseResult)
-                ?? ParsePromptOverrides(parseResult.UnmatchedTokens, requestedTemplate);
+                ?? ParsePromptOverrides(parseResult.UnmatchedTokens, requestedTemplate, workingDirectory, parseResult.GetValue(ForceOption), cancellationToken);
         }
 
         var invocation = new NewInvocation(
@@ -121,6 +123,16 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
             NonInteractive: parseResult.GetValue(NonInteractiveOption),
             JsonOutput: jsonOutput,
             UserOptionValues: userOptionValues);
+        (ImmutableArray<string> Arguments, ImmutableArray<string> Reserved, ImmutableArray<string> Repeated) transported =
+            TemplateArgumentTransport.Capture(parseResult, PathArgument!,
+            Options.Where(option => _builtInOptionNames.Contains(option.Name)));
+        invocation = invocation with
+        {
+            TemplateArguments = transported.Arguments,
+            ReservedAliases = transported.Reserved,
+            RepeatedHostOptions = transported.Repeated,
+            OutputFormat = parseResult.GetValue(OutputOption),
+        };
 
         return parseResult.GetValue(ListOption)
             ? _runner.ListAsync(invocation, cancellationToken)
@@ -183,20 +195,31 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     /// </summary>
     private IReadOnlyDictionary<string, string?>? ParsePromptOverrides(
         IReadOnlyList<string> unmatched,
-        string templateId)
+        string templateId,
+        WorkingDirectory workingDirectory,
+        bool force,
+        CancellationToken cancellationToken)
     {
         IReadOnlyList<Option>? hydrated;
         try
         {
             var invocation = new NewInvocation(
-                new WorkingDirectory(new DirectoryInfo(Environment.CurrentDirectory), false),
+                workingDirectory,
                 RequestedTemplate: templateId,
                 RequestedFunctionName: null,
-                Force: false,
+                Force: force,
                 NonInteractive: true);
 
-            hydrated = _templateOptions.HydrateOptionsForTemplateAsync(invocation, templateId, CancellationToken.None)
+            hydrated = _templateOptions.HydrateOptionsForTemplateAsync(invocation, templateId, cancellationToken)
                 .GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (GracefulException)
+        {
+            throw;
         }
         catch
         {
@@ -267,30 +290,40 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     /// recognise them. Idempotent — duplicate calls (including the
     /// help-time path) drop previously-attached options first.
     /// </summary>
-    public void AttachHydratedOptionsForPreParse(string templateId)
+    public void AttachHydratedOptionsForPreParse(
+        string templateId, WorkingDirectory? workingDirectory = null, bool force = false, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(templateId);
 
         DropDynamicOptions();
 
         var invocation = new NewInvocation(
-            new WorkingDirectory(new DirectoryInfo(Environment.CurrentDirectory), false),
+            workingDirectory ?? WorkingDirectory.FromCwd(),
             RequestedTemplate: templateId,
             RequestedFunctionName: null,
-            Force: false,
+            Force: force,
             NonInteractive: true);
 
         IReadOnlyList<HydratedTemplateOption>? hydrated;
         try
         {
-            hydrated = _templateOptions.HydrateOptionsForTemplateWithIdsAsync(invocation, templateId, CancellationToken.None)
+            hydrated = _templateOptions.HydrateOptionsForTemplateWithIdsAsync(invocation, templateId, cancellationToken)
                 .GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (GracefulException)
+        {
+            throw;
         }
         catch
         {
             return;
         }
 
+        ApplyPackageHelp();
         if (hydrated is null || hydrated.Count == 0)
         {
             return;
@@ -321,6 +354,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
         }
         _optionNameToPromptId.Clear();
         _attachedTemplateId = null;
+        NameOption.Description = "Function name. Defaults to the template's default function name.";
     }
 
     /// <summary>
@@ -342,6 +376,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
     public int AttachHydratedOptionsForHelp(ParseResult parseResult)
     {
         ArgumentNullException.ThrowIfNull(parseResult);
+        NameOption.Description = "Function name. Defaults to the template's default function name.";
 
         // Drop any options we previously attached so reruns start clean.
         // Comparing the snapshot of built-in names is safer than holding
@@ -384,6 +419,10 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
             hydrated = _templateOptions.HydrateOptionsForTemplateAsync(invocation, templateId, CancellationToken.None)
                 .GetAwaiter().GetResult();
         }
+        catch (GracefulException)
+        {
+            throw;
+        }
         catch
         {
             // Resolution / I/O failures are non-fatal at help time. Falling
@@ -392,6 +431,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
             return 0;
         }
 
+        ApplyPackageHelp();
         if (hydrated is null || hydrated.Count == 0)
         {
             return 0;
@@ -411,6 +451,14 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand, ITemplateAwa
 
         _attachedTemplateId = templateId;
         return Options.Count - _builtInOptionNames.Count;
+    }
+
+    private void ApplyPackageHelp()
+    {
+        if (_templateOptions.SelectedPackageTemplate is { } selected)
+        {
+            NameOption.Description = $"Function name for {selected.DisplayName}. Native default: '{selected.DefaultFunctionName}'. Preview5 qualification; --force is unsupported.";
+        }
     }
 
     /// <inheritdoc />

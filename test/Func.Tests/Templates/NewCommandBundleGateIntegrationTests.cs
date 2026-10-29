@@ -174,7 +174,7 @@ public sealed class NewCommandBundleGateIntegrationTests : IDisposable
             new NewCommandTemplateSelector(_interaction, new TemplatePicker(_interaction)),
             new NewCommandTemplateApplicator(registry, new TemplateOptionHydrator([])),
             renderer,
-            new NewCommandResultRenderer(_interaction, renderer));
+            new NewCommandResultRenderer(_interaction, renderer), Substitute.For<Azure.Functions.Cli.Templates.Integration.IPublicPackageTemplates>());
     }
 
     private static NewInvocation Invocation(WorkingDirectory directory)

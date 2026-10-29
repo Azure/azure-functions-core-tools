@@ -1,7 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Immutable;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Templates.Integration;
+using Azure.Functions.Cli.Templates.Selection;
 
 namespace Azure.Functions.Cli.Templates;
 
@@ -23,7 +27,8 @@ internal sealed class NewCommandRunner(
     INewCommandTemplateSelector templateSelector,
     INewCommandTemplateApplicator templateApplicator,
     NewCommandRenderer renderer,
-    INewCommandResultRenderer resultRenderer) : INewCommandRunner
+    INewCommandResultRenderer resultRenderer,
+    IPublicPackageTemplates packages) : INewCommandRunner
 {
     private readonly INewCommandContextResolver _contextResolver = contextResolver ?? throw new ArgumentNullException(nameof(contextResolver));
     private readonly INewCommandBundleValidator _bundleValidator = bundleValidator ?? throw new ArgumentNullException(nameof(bundleValidator));
@@ -32,10 +37,40 @@ internal sealed class NewCommandRunner(
     private readonly INewCommandTemplateApplicator _templateApplicator = templateApplicator ?? throw new ArgumentNullException(nameof(templateApplicator));
     private readonly NewCommandRenderer _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
     private readonly INewCommandResultRenderer _resultRenderer = resultRenderer ?? throw new ArgumentNullException(nameof(resultRenderer));
+    private readonly IPublicPackageTemplates _packages = packages ?? throw new ArgumentNullException(nameof(packages));
 
     public async Task<int> ExecuteAsync(NewInvocation invocation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(invocation);
+
+        if (_packages.IsEnabled && await _packages.IsNodeJavaScriptAsync(invocation.WorkingDirectory, cancellationToken))
+        {
+            if (_packages.IsPackageReference(invocation.RequestedTemplate))
+            {
+                return await _packages.CreateAsync(invocation, cancellationToken);
+            }
+
+            if (string.IsNullOrWhiteSpace(invocation.RequestedTemplate))
+            {
+                IReadOnlyList<FunctionTemplateInfo>? supported = await ReadSupportedCatalogAsync(invocation, cancellationToken);
+                if (supported is null)
+                {
+                    return 1;
+                }
+
+                FunctionTemplateInfo? selected = await _templateSelector.SelectAsync(invocation, supported, cancellationToken);
+                if (selected is null)
+                {
+                    return 1;
+                }
+
+                invocation = invocation with { RequestedTemplate = selected.Id };
+                if (selected.EngineId == PublicPackageTemplates.EngineId)
+                {
+                    return await _packages.CreateAsync(invocation, cancellationToken);
+                }
+            }
+        }
 
         NewCommandResolutionResult outcome = await _contextResolver.ResolveAsync(invocation, cancellationToken);
         if (outcome.Failure is { } executeFailure)
@@ -96,6 +131,27 @@ internal sealed class NewCommandRunner(
     {
         ArgumentNullException.ThrowIfNull(invocation);
 
+        if (_packages.IsEnabled && await _packages.IsNodeJavaScriptAsync(invocation.WorkingDirectory, cancellationToken))
+        {
+            PublicPackageTemplates.ValidateOutput(invocation.OutputFormat);
+            IReadOnlyList<FunctionTemplateInfo>? supported = await ReadSupportedCatalogAsync(invocation, cancellationToken);
+            if (supported is null)
+            {
+                return 1;
+            }
+
+            if (invocation.JsonOutput)
+            {
+                _renderer.RenderCatalogueJson("node", "javascript", supported);
+            }
+            else
+            {
+                _renderer.RenderCatalogue("node", "javascript", supported);
+            }
+
+            return 0;
+        }
+
         NewCommandResolutionResult outcome = await _contextResolver.ResolveAsync(invocation, cancellationToken);
         if (outcome.Failure is { } listFailure)
         {
@@ -129,6 +185,33 @@ internal sealed class NewCommandRunner(
         return 0;
     }
 
+    private async Task<IReadOnlyList<FunctionTemplateInfo>?> ReadSupportedCatalogAsync(NewInvocation invocation, CancellationToken cancellationToken)
+    {
+        TemplateDescriptor descriptor = await _packages.ReadItemAsync(invocation.WorkingDirectory, cancellationToken);
+        TemplateCatalogEntry item = descriptor.Metadata;
+        FunctionTemplateInfo projected = _packages.ProjectItem(item);
+        NewCommandResolutionResult legacy = await _contextResolver.ResolveAsync(invocation, cancellationToken);
+        List<FunctionTemplateInfo> catalog = [];
+        if (legacy.Context is { } context)
+        {
+            IReadOnlyList<FunctionTemplateInfo> installed = await _templateCatalog.ListAsync(context, cancellationToken);
+            catalog.AddRange(installed.Where(template => !string.Equals(template.Id, projected.Id, StringComparison.OrdinalIgnoreCase)));
+        }
+        else if (legacy.Failure is not { Kind: NewCommandResolutionFailureKind.NoTemplatesWorkloadInstalled
+            or NewCommandResolutionFailureKind.NoTemplatesWorkloadForChannel or NewCommandResolutionFailureKind.HostJsonBundleMissing })
+        {
+            _resultRenderer.RenderResolutionFailure(legacy.Failure!);
+            return null;
+        }
+
+        if (!item.IsHidden && await _packages.IsCompatibleAsync(invocation.WorkingDirectory, descriptor, cancellationToken))
+        {
+            catalog.Add(projected);
+        }
+
+        return catalog;
+    }
+
 }
 
 /// <summary>
@@ -143,4 +226,13 @@ internal sealed record NewInvocation(
     bool Force,
     bool NonInteractive,
     bool JsonOutput = false,
-    IReadOnlyDictionary<string, string?>? UserOptionValues = null);
+    IReadOnlyDictionary<string, string?>? UserOptionValues = null)
+{
+    public ImmutableArray<string> TemplateArguments { get; init; } = [];
+
+    public ImmutableArray<string> ReservedAliases { get; init; } = [];
+
+    public ImmutableArray<string> RepeatedHostOptions { get; init; } = [];
+
+    public string? OutputFormat { get; init; }
+}

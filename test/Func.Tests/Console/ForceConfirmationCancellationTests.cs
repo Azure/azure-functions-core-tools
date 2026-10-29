@@ -83,7 +83,7 @@ public class ForceConfirmationCancellationTests
             bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
             command = new InitCommand(interaction, Substitute.For<IWorkloadHintRenderer>(), localSettings,
                 Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-                new InstalledBundleScanner(bundles), [initializer]);
+                new InstalledBundleScanner(bundles), [initializer], Substitute.For<Azure.Functions.Cli.Templates.Integration.IPublicPackageTemplates>());
         }
         commandConstructed = true;
 

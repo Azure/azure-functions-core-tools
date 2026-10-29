@@ -80,6 +80,23 @@ Workloads can add their own subcommands by calling `builder.RegisterCommand(...)
 
 ## Command Architecture
 
+### Isolated package template candidate
+
+An explicit internal `PackageTemplateCandidateGraph` composes package-backed
+`init` and `new` through the private native adapter. It is not registered by
+public startup, built-in command discovery, or the public parser. The public
+command tree above is unchanged. This path does not use legacy generation as a
+fallback or activate Quickstart. See the
+[internal package-backed implementation](template-engine-integration/README.md#internal-package-backed-implementation)
+for its composition and validation boundaries.
+
+An opt-in qualification build also connects the existing public `init` and
+`new` commands to the shared package-backed application for Node JavaScript
+project/HTTP generation. Other templates and TypeScript select the existing
+implementation upfront; package failures never trigger fallback. Normal
+builds keep the package binding disabled. No public package-selection options
+are added. See the [public qualification cohort](template-engine-integration/README.md#public-qualification-cohort).
+
 All commands extend `FuncCliCommand` → `System.CommandLine.Command`.
 
 ### FuncCliCommand
