@@ -43,12 +43,11 @@ internal sealed record SetupDependency(
 
     // TODO: this should not be hardcoded in the CLI; discover the stack package
     // from the catalog (e.g. via an `alias:stack-<name>` tag) so new stacks don't
-    // require a CLI release. Stacks not in this set (java, powershell, custom)
-    // skip silently today.
-    private static readonly HashSet<string> _stacks = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet" };
+    // require a CLI release.
+    private static readonly HashSet<string> _stacks = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet", "java", "powershell" };
 
     // Stacks that publish a templates content workload (Azure.Functions.Cli.Workloads.Templates.*).
-    // Go has no templates package today, so it is intentionally absent.
+    // Go, Java, and PowerShell have no templates packages today.
     private static readonly HashSet<string> _templates = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "dotnet" };
 
     public static IReadOnlyList<string> Stacks => [.. _stacks];
@@ -139,6 +138,8 @@ internal sealed record SetupDependency(
             "node" => "Node",
             "python" => "Python",
             "go" => "Go",
+            "java" => "Java",
+            "powershell" => "PowerShell",
             _ => stack,
         };
 

@@ -152,6 +152,21 @@ export PATH="$PATH:$(pwd)/out/bin/Func/debug"
 func <command>
 ```
 
+### Set Up Language Workloads
+
+`func setup` installs the host and the selected language's stack and worker workloads,
+plus templates and extension bundles where applicable. Supported stacks are `dotnet`,
+`node`, `python`, `go`, `java`, and `powershell`. For example:
+
+```bash
+func setup --features java --yes
+func setup --features powershell --yes
+```
+
+In an existing project, setup uses its configured runtime when `--features` is omitted.
+`func setup --check` checks the same dependencies without installing them and returns
+a nonzero exit code when a required stack workload is missing.
+
 ### Run Locally with Workloads
 
 One-time bootstrap (per workload you want to test, into ./.debug-workloads/):
@@ -190,7 +205,7 @@ pwsh ./eng/scripts/debug-workloads.ps1 -Feature node    # everything `func setup
 pwsh ./eng/scripts/debug-workloads.ps1 -Clean           # wipe + reinstall
 ```
 
-`-Feature` accepts `host`, `runtime`, `dotnet`, `node`, `python`, `go` (or any combination, deduped).
+`-Feature` accepts `host`, `runtime`, `dotnet`, `node`, `python`, `go`, `java`, `powershell` (or any combination, deduped).
 
 Inner loop with the script (sub-second, copy-only):
 

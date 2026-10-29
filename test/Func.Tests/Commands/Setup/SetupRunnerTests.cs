@@ -152,6 +152,177 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_ConfiguredNativeRuntime_UsesGoProfileWorkerConstraint(bool check)
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>())
+            .Returns([Entry(WorkerPackage("go"), "2.0.0", kind: WorkloadKind.Content)]);
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest("Azure.Functions.Cli.Workloads.Go", "1.0.0")
+            .WithLatest(WorkerPackage("go"), "1.5.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
+        SetupRunner runner = CreateRunner(
+            catalog,
+            projectConfig: new Dictionary<string, string?>
+            {
+                [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = "native",
+            },
+            profileCatalog: new ProfileCatalog([
+                new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
+                    new("go-profile", new ProfileDefinition
+                    {
+                        Host = new ProfileVersionConstraint { Version = "[4.0.0, 5.0.0)" },
+                        SupportedRuntimes = ["go"],
+                        Workers = new() { ["go"] = new ProfileWorkerConstraint { Version = "[1.0.0, 2.0.0)" } },
+                    }),
+                ]),
+            ], NullLogger<ProfileCatalog>.Instance));
+
+        SetupRunResult result = await runner.RunAsync(Options(profiles: ["go-profile"], check: check), CancellationToken.None);
+
+        result.ExitCode.Should().Be(check ? 1 : 0);
+        catalog.RangeResolutions.Where(resolution => resolution.PackageId == WorkerPackage("go")).Should().ContainSingle()
+            .Which.Should().Be((WorkerPackage("go"), VersionRange.Parse("[1.0.0, 2.0.0)")));
+        string expectedMessage = check ? "go worker 1.5.0 is not installed." : "Installed go worker 1.5.0.";
+        _interaction.Lines.Should().Contain(line => line.Contains(expectedMessage, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("native", false)]
+    [InlineData(" NaTiVe ", false)]
+    [InlineData("go", false)]
+    [InlineData("native", true)]
+    public async Task RunAsync_GoProject_InstallsGoStackAndWorker(string configuredRuntime, bool explicitGoFeature)
+    {
+        const string goStack = "Azure.Functions.Cli.Workloads.Go";
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(goStack, "1.0.0")
+            .WithLatest(WorkerPackage("go"), "1.0.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
+        var projectConfig = new Dictionary<string, string?>
+        {
+            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = configuredRuntime,
+        };
+        SetupRunner runner = CreateRunner(catalog, projectConfig);
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: explicitGoFeature ? ["go"] : [], outputMode: SetupOutputMode.Json),
+            CancellationToken.None);
+
+        result.ExitCode.Should().Be(0);
+        _installer.ReceivedCalls()
+            .Where(call => call.GetMethodInfo().Name == nameof(IWorkloadInstaller.InstallFromCatalogAsync))
+            .Select(call => (string)call.GetArguments()[0]!)
+            .Should().BeEquivalentTo(
+                _hostPackageId.ToLowerInvariant(),
+                goStack.ToLowerInvariant(),
+                WorkerPackage("go").ToLowerInvariant(),
+                IInstalledBundleWorkloads.BundleWorkloadPackageId.ToLowerInvariant());
+        using var started = JsonDocument.Parse(_interaction.Lines[0]);
+        started.RootElement.GetProperty("features").EnumerateArray().Select(feature => feature.GetString()).Should().Equal("go");
+        started.RootElement.GetProperty("worker_runtimes").EnumerateArray().Select(runtime => runtime.GetString()).Should().Equal("go");
+    }
+
+    [Theory]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, true)]
+    public async Task RunAsync_ConfiguredNativeRuntime_CheckRequiresGoStackAndWorker(
+        bool stackInstalled,
+        bool workerInstalled,
+        bool json)
+    {
+        const string goStack = "Azure.Functions.Cli.Workloads.Go";
+        List<WorkloadEntry> installed =
+        [
+            Entry(_hostPackageId, "4.1.0", kind: WorkloadKind.Content),
+            Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0", kind: WorkloadKind.Content),
+        ];
+        if (stackInstalled)
+        {
+            installed.Add(Entry(goStack, "1.0.0"));
+        }
+
+        if (workerInstalled)
+        {
+            installed.Add(Entry(WorkerPackage("go"), "1.0.0", kind: WorkloadKind.Content));
+        }
+
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(installed);
+        SetupRunner runner = CreateRunner(
+            Catalog()
+                .WithLatest(_hostPackageId, "4.1.0")
+                .WithLatest(goStack, "1.0.0")
+                .WithLatest(WorkerPackage("go"), "1.0.0")
+                .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0"),
+            projectConfig: new Dictionary<string, string?>
+            {
+                [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = "native",
+            });
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(check: true, outputMode: json ? SetupOutputMode.Json : SetupOutputMode.Plain),
+            CancellationToken.None);
+
+        result.ExitCode.Should().Be(stackInstalled && workerInstalled ? 0 : 1);
+        if (!stackInstalled)
+        {
+            _interaction.Lines.Should().Contain(line => line.Contains("go stack 1.0.0 is not installed.", StringComparison.Ordinal));
+        }
+
+        if (!workerInstalled)
+        {
+            _interaction.Lines.Should().Contain(line => line.Contains("go worker 1.0.0 is not installed.", StringComparison.Ordinal));
+        }
+
+        await _installer.DidNotReceive().InstallFromCatalogAsync(
+            Arg.Any<string>(),
+            Arg.Any<NuGetVersion?>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_ConfiguredNativeRuntime_UnsupportedProfileReportsGo(bool check)
+    {
+        SetupRunner runner = CreateRunner(
+            Catalog()
+                .WithLatest(_hostPackageId, "4.1.0")
+                .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0"),
+            projectConfig: new Dictionary<string, string?>
+            {
+                [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = "native",
+            },
+            profileCatalog: new ProfileCatalog([
+                new FakeProfileSource(new ProfileSourceInfo(ProfileSourceKind.BuiltIn, "built-in"), [
+                    new("no-go", new ProfileDefinition
+                    {
+                        Host = new ProfileVersionConstraint { Version = "[4.0.0, 5.0.0)" },
+                        SupportedRuntimes = ["python"],
+                    }),
+                ]),
+            ], NullLogger<ProfileCatalog>.Instance));
+
+        SetupRunResult result = await runner.RunAsync(Options(profiles: ["no-go"], check: check), CancellationToken.None);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.Lines.Should().Contain(line => line.Contains("does not support runtime 'go'", StringComparison.Ordinal));
+        _interaction.Lines.Should().NotContain(line => line.Contains("native", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public async Task RunAsync_DotnetFeature_InstallsDotnetStackAndSkipsWorkerAndBundle()
     {
@@ -692,14 +863,14 @@ public sealed class SetupRunnerTests : IDisposable
     [Fact]
     public async Task RunAsync_FeatureWithoutStackMapping_DoesNotInstallStack()
     {
-        string workerPackageId = WorkerPackage("java");
+        string workerPackageId = WorkerPackage("custom");
         FakeCatalog catalog = Catalog()
             .WithLatest(_hostPackageId, "4.1.0")
             .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0")
             .WithLatest(workerPackageId, "1.0.0");
         SetupRunner runner = CreateRunner(catalog);
 
-        SetupRunResult result = await runner.RunAsync(Options(features: ["java"]), CancellationToken.None);
+        SetupRunResult result = await runner.RunAsync(Options(features: ["custom"]), CancellationToken.None);
 
         result.ExitCode.Should().Be(0);
         await _installer.DidNotReceive().InstallFromCatalogAsync(
@@ -714,6 +885,103 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("java", "Java", false)]
+    [InlineData("java", "Java", true)]
+    [InlineData("powershell", "PowerShell", false)]
+    [InlineData("powershell", "PowerShell", true)]
+    public async Task RunAsync_JavaOrPowerShell_InstallsWorkerStackAndBundle(string runtime, string packageSuffix, bool explicitFeature)
+    {
+        string stackPackageId = $"Azure.Functions.Cli.Workloads.{packageSuffix}";
+        string workerPackageId = WorkerPackage(runtime);
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest(workerPackageId, "1.0.0")
+            .WithLatest(stackPackageId, "1.0.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
+        SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
+        {
+            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = runtime,
+        });
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(features: explicitFeature ? [runtime] : [], installPolicy: SetupInstallPolicy.IfNeeded),
+            CancellationToken.None);
+
+        result.ExitCode.Should().Be(0);
+        _installer.ReceivedCalls()
+            .Where(call => call.GetMethodInfo().Name == nameof(IWorkloadInstaller.InstallFromCatalogAsync))
+            .Select(call => (string)call.GetArguments()[0]!)
+            .Should().Equal(
+                _hostPackageId.ToLowerInvariant(),
+                workerPackageId.ToLowerInvariant(),
+                stackPackageId.ToLowerInvariant(),
+                IInstalledBundleWorkloads.BundleWorkloadPackageId.ToLowerInvariant());
+        _interaction.Lines.Should().Contain(line => line.Contains($"Installed {runtime} stack", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("java", false, "missing")]
+    [InlineData("java", true, "missing")]
+    [InlineData("java", false, "installed")]
+    [InlineData("java", true, "installed")]
+    [InlineData("java", false, "unpublished")]
+    [InlineData("java", true, "unpublished")]
+    [InlineData("powershell", false, "missing")]
+    [InlineData("powershell", true, "missing")]
+    [InlineData("powershell", false, "installed")]
+    [InlineData("powershell", true, "installed")]
+    [InlineData("powershell", false, "unpublished")]
+    [InlineData("powershell", true, "unpublished")]
+    public async Task RunAsync_JavaOrPowerShellCheck_RequiresStack(string runtime, bool explicitFeature, string stackState)
+    {
+        string stackPackageId = $"Azure.Functions.Cli.Workloads.{runtime}";
+        List<WorkloadEntry> installed = [
+            Entry(_hostPackageId, "4.1.0"),
+            Entry(WorkerPackage(runtime), "1.0.0"),
+            Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0"),
+        ];
+        if (stackState == "installed")
+        {
+            installed.Add(Entry(stackPackageId, "1.0.0"));
+        }
+
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns(installed);
+        FakeCatalog catalog = Catalog();
+        if (stackState != "unpublished")
+        {
+            catalog.WithLatest(stackPackageId, "1.0.0");
+        }
+
+        SetupRunner runner = CreateRunner(catalog, projectConfig: new Dictionary<string, string?>
+        {
+            [$"{CliConfigurationNames.StackSectionName}:{CliConfigurationNames.StackRuntimeKey}"] = runtime,
+        });
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(
+                features: explicitFeature ? [runtime] : [],
+                installPolicy: SetupInstallPolicy.IfNeeded,
+                check: true,
+                outputMode: SetupOutputMode.Json),
+            CancellationToken.None);
+
+        bool satisfied = stackState == "installed";
+        result.ExitCode.Should().Be(satisfied ? 0 : 1);
+        JsonElement[] events = [.. _interaction.Lines.Select(line =>
+        {
+            using var document = JsonDocument.Parse(line);
+            return document.RootElement.Clone();
+        })];
+        JsonElement stackResult = events.Should().ContainSingle(item =>
+            item.GetProperty("type").GetString() == "dependency.result"
+            && item.GetProperty("dependency_type").GetString() == "stack").Which;
+        stackResult.GetProperty("package_id").GetString().Should().BeEquivalentTo(stackPackageId);
+        stackResult.GetProperty("status").GetString().Should().Be(satisfied ? "satisfied" : "failed");
+        events[^1].GetProperty("type").GetString().Should().Be(satisfied ? "setup.completed" : "setup.failed");
+        _installer.ReceivedCalls().Should().BeEmpty();
     }
 
     [Fact]
@@ -938,6 +1206,8 @@ public sealed class SetupRunnerTests : IDisposable
 
         public List<string?> ResolveSources { get; } = [];
 
+        public List<(string PackageId, VersionRange Range)> RangeResolutions { get; } = [];
+
         public FakeCatalog WithAlias(string alias, string packageId, string version)
         {
             var parsed = NuGetVersion.Parse(version);
@@ -1008,6 +1278,7 @@ public sealed class SetupRunnerTests : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             ResolveLatestCallCount++;
             ResolveSources.Add(source);
+            RangeResolutions.Add((packageId, versionRange));
             NuGetVersion? version = _latest.TryGetValue(packageId, out NuGetVersion? candidate) && versionRange.Satisfies(candidate)
                 ? candidate
                 : null;
