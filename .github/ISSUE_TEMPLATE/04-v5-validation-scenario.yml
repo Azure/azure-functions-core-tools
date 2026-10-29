@@ -10,9 +10,8 @@ body:
       Keep titles and procedures independent of a particular preview build.
       See the live bug-bash wiki for current setup and prerequisites:
       https://github.com/Azure/azure-functions-core-tools/wiki/Azure-Functions-CLI-(v5)-Bug-Bash
-      Record actual runs in comments with the tested build (`func --verbose`), OS,
-      architecture, shell, runtime/workload versions, variants exercised, outcome,
-      and redacted evidence. Link failures to separate V5 Bug Reports.
+      Record each validation run in a separate issue that references this scenario.
+      Do not record runs in this scenario issue's comments.
       Use only disposable projects and non-production resources; never include secrets.
 - id: scenario
   type: textarea
