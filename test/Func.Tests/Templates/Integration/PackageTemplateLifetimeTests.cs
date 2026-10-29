@@ -130,6 +130,77 @@ public sealed class PackageTemplateLifetimeTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PrepareAsync_IndependentlyCanceledCleanup_PreservesPrimaryFailureAndBothCancellationTokens(bool preparationCanceled)
+    {
+        var fixture = new PackageTemplateFixture();
+        var candidate = fixture.Candidate();
+        using var preparationCancellation = new CancellationTokenSource();
+        using var cleanupCancellation = new CancellationTokenSource();
+        preparationCancellation.Cancel();
+        cleanupCancellation.Cancel();
+        Exception primary = preparationCanceled
+            ? new OperationCanceledException("Preparation independently canceled.", preparationCancellation.Token)
+            : new IOException("Rendering failed before cleanup.");
+        candidate.DuringRender = _ => Task.FromException(primary);
+        fixture.SetCandidates(candidate);
+        fixture.Session.CleanupFailure = new OperationCanceledException("Cleanup independently canceled.", cleanupCancellation.Token);
+
+        var action = () => fixture.Application.PrepareAsync(fixture.Request(), CancellationToken.None);
+
+        var failure = (await action.Should().ThrowExactlyAsync<AggregateException>()).Which;
+        failure.InnerExceptions.Should().HaveCount(2);
+        if (preparationCanceled)
+        {
+            var canceled = failure.InnerExceptions[0].Should().BeOfType<TaskCanceledException>().Which;
+            canceled.CancellationToken.Should().Be(preparationCancellation.Token);
+            canceled.Task.Should().NotBeNull();
+            canceled.Task!.IsCanceled.Should().BeTrue();
+            canceled.Task.Exception.Should().BeNull();
+        }
+        else
+        {
+            failure.InnerExceptions[0].Should().BeSameAs(primary);
+        }
+
+        var cleanup = failure.InnerExceptions[1].Should().BeOfType<TaskCanceledException>().Which;
+        cleanup.CancellationToken.Should().Be(cleanupCancellation.Token).And.NotBe(preparationCancellation.Token);
+        cleanup.Task.Should().NotBeNull();
+        cleanup.Task!.IsCanceled.Should().BeTrue();
+        cleanup.Task.Exception.Should().BeNull();
+        fixture.Session.DisposeCalls.Should().Be(1);
+        fixture.Lease!.CleanupOutcome.Should().Be(TemplatePackageCleanupOutcome.Released);
+        var read = () => fixture.Lease.OpenRead();
+        read.Should().Throw<ObjectDisposedException>();
+        fixture.Storage.Files.Should().BeEmpty();
+        fixture.Storage.FileSystem.DidNotReceive().PublishFileNoReplace(Arg.Any<string>(), Arg.Any<string>());
+        fixture.Storage.FileSystem.DidNotReceive().CreateNewDirectory(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task DisposeAsync_CleanupCancellationAlone_RemainsObservableAndReleasesPackage()
+    {
+        var fixture = new PackageTemplateFixture();
+        fixture.SetCandidates(fixture.Candidate());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        fixture.Session.CleanupFailure = new OperationCanceledException("Native cleanup canceled.", cancellation.Token);
+        var operation = await fixture.Application.PrepareAsync(fixture.Request(), CancellationToken.None);
+
+        var action = () => operation.DisposeAsync().AsTask();
+
+        (await action.Should().ThrowAsync<OperationCanceledException>()).Which.CancellationToken.Should().Be(cancellation.Token);
+        operation.Completion.Status.Should().Be(PreparedCommitStatus.NotStarted);
+        operation.Completion.CleanupStatus.Should().Be(PreparedCleanupStatus.Failed);
+        operation.Completion.CleanupErrors.Should().ContainSingle()
+            .Which.Should().BeOfType<TaskCanceledException>().Which.CancellationToken.Should().Be(cancellation.Token);
+        fixture.Session.DisposeCalls.Should().Be(1);
+        fixture.Lease!.CleanupOutcome.Should().Be(TemplatePackageCleanupOutcome.Released);
+        fixture.Storage.Files.Should().BeEmpty();
+    }
+
+    [Theory]
     [InlineData("before-intake")]
     [InlineData("adapter")]
     [InlineData("project-resolution")]

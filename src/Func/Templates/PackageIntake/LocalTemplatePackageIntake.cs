@@ -46,7 +46,7 @@ internal sealed class LocalTemplatePackageIntake(IFileSystem fileSystem, Templat
     /// <exception cref="InvalidTemplatePackageException">The archive fails validation or exceeds a limit.</exception>
     /// <exception cref="IOException">Opening, reading, or closing the selected source fails.</exception>
     /// <exception cref="UnauthorizedAccessException">The selected source cannot be read.</exception>
-    /// <exception cref="AggregateException">Capture and source cleanup both fail.</exception>
+    /// <exception cref="AggregateException">Capture and source cleanup independently fail or are canceled.</exception>
     public async Task<TemplatePackageContentLease> IntakeAsync(
         TemplatePackageIdentity request, Func<Stream> openSource, CancellationToken cancellationToken)
     {
@@ -127,6 +127,10 @@ internal sealed class LocalTemplatePackageIntake(IFileSystem fileSystem, Templat
                 throw new AggregateException("Reading the selected template archive and closing its source both failed.", captureFailure, exception);
             }
             catch (UnauthorizedAccessException exception) when (captureFailure is not null)
+            {
+                throw new AggregateException("Reading the selected template archive and closing its source both failed.", captureFailure, exception);
+            }
+            catch (OperationCanceledException exception) when (captureFailure is not null)
             {
                 throw new AggregateException("Reading the selected template archive and closing its source both failed.", captureFailure, exception);
             }

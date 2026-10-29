@@ -772,6 +772,89 @@ public sealed class LocalTemplatePackageIntakeTests
         failure.InnerExceptions.OfType<IOException>().Should().ContainSingle().Which.Message.Should().Be("source close failed");
     }
 
+    [Theory]
+    [InlineData("read")]
+    [InlineData("access")]
+    [InlineData("limit")]
+    [InlineData("cancellation")]
+    public async Task IntakeAsync_IndependentlyCanceledSourceDisposal_PreservesPrimaryFailureAndReleasesReservation(string phase)
+    {
+        var bytes = Archive();
+        var fileSystem = Substitute.For<IFileSystem>();
+        using var captureCancellation = new CancellationTokenSource();
+        using var disposalCancellation = new CancellationTokenSource();
+        disposalCancellation.Cancel();
+        Exception primary = phase == "access"
+            ? new UnauthorizedAccessException("Source read access denied.")
+            : new IOException("Source read failed.");
+        var cleanup = new OperationCanceledException("Source disposal independently canceled.", disposalCancellation.Token);
+        Action? afterRead = phase switch
+        {
+            "read" or "access" => () => throw primary,
+            "cancellation" => captureCancellation.Cancel,
+            _ => null,
+        };
+        var source = new ObservedReadStream(phase == "limit" ? [.. bytes, 0] : bytes, afterRead, afterDispose: () => throw cleanup);
+        var attempt = 0;
+        fileSystem.OpenReadIfExists(ArchivePath).Returns(_ =>
+            attempt++ == 0 ? source : new MemoryStream(bytes, writable: false));
+        var intake = new LocalTemplatePackageIntake(fileSystem,
+            phase == "limit" ? Limits(archiveBytes: bytes.Length, activeLeases: 1) : Limits(activeLeases: 1));
+
+        var action = () => intake.IntakeAsync(Request(), captureCancellation.Token);
+
+        var failure = (await action.Should().ThrowExactlyAsync<AggregateException>()).Which;
+        failure.InnerExceptions.Should().HaveCount(2);
+        if (phase == "limit")
+        {
+            var rejection = failure.InnerExceptions[0].Should().BeOfType<InvalidTemplatePackageException>().Which;
+            rejection.Failure.Should().Be(TemplatePackageFailure.ResourceLimitExceeded);
+            rejection.Message.Should().Contain("archive read bytes");
+        }
+        else if (phase == "cancellation")
+        {
+            failure.InnerExceptions[0].Should().BeAssignableTo<OperationCanceledException>()
+                .Which.CancellationToken.Should().Be(captureCancellation.Token).And.NotBe(disposalCancellation.Token);
+        }
+        else
+        {
+            failure.InnerExceptions[0].Should().BeSameAs(primary);
+        }
+
+        failure.InnerExceptions[1].Should().BeSameAs(cleanup);
+        cleanup.CancellationToken.Should().Be(disposalCancellation.Token);
+        source.Disposed.Should().BeTrue();
+        source.CanRead.Should().BeFalse();
+        using var retry = await intake.IntakeAsync(Request(), CancellationToken.None);
+        retry.CleanupOutcome.Should().Be(TemplatePackageCleanupOutcome.Active);
+        fileSystem.Received(2).OpenReadIfExists(ArchivePath);
+    }
+
+    [Fact]
+    public async Task IntakeAsync_SourceDisposalCancellationAlone_RemainsObservableAndReleasesReservation()
+    {
+        var bytes = Archive();
+        var fileSystem = Substitute.For<IFileSystem>();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var cleanup = new OperationCanceledException("Source disposal canceled.", cancellation.Token);
+        var source = new ObservedReadStream(bytes, afterDispose: () => throw cleanup);
+        var attempt = 0;
+        fileSystem.OpenReadIfExists(ArchivePath).Returns(_ =>
+            attempt++ == 0 ? source : new MemoryStream(bytes, writable: false));
+        var intake = new LocalTemplatePackageIntake(fileSystem, Limits(activeLeases: 1));
+
+        var action = () => intake.IntakeAsync(Request(), CancellationToken.None);
+
+        var failure = (await action.Should().ThrowExactlyAsync<OperationCanceledException>()).Which;
+        failure.Should().BeSameAs(cleanup);
+        failure.CancellationToken.Should().Be(cancellation.Token);
+        source.Disposed.Should().BeTrue();
+        source.CanRead.Should().BeFalse();
+        using var retry = await intake.IntakeAsync(Request(), CancellationToken.None);
+        retry.CleanupOutcome.Should().Be(TemplatePackageCleanupOutcome.Active);
+    }
+
     [Fact]
     public async Task IntakeAsync_SourceReadFailure_PropagatesAndClosesSource()
     {

@@ -54,7 +54,7 @@ internal sealed class PackageTemplateApplication(
     /// <exception cref="InvalidTemplateMetadataException">The package metadata or required project default is invalid.</exception>
     /// <exception cref="IOException">Native rendering or capture fails.</exception>
     /// <exception cref="OperationCanceledException">Preparation is canceled.</exception>
-    /// <exception cref="AggregateException">Preparation and cleanup both fail.</exception>
+    /// <exception cref="AggregateException">Preparation and cleanup independently fail or are canceled.</exception>
     public async Task<PackageTemplateOperation> PrepareAsync(
         TemplatePackageContentLease package, TemplatePreparationRequest request, CancellationToken cancellationToken)
     {
@@ -90,12 +90,12 @@ internal sealed class PackageTemplateApplication(
                     }
                     finally
                     {
-                        if (cleanup.IsFaulted)
+                        if (!cleanup.IsCompletedSuccessfully)
                         {
                             List<Exception> failures = preparation.IsCanceled
                                 ? [new TaskCanceledException(preparation)]
                                 : [.. preparation.Exception!.InnerExceptions];
-                            failures.AddRange(cleanup.Exception!.InnerExceptions);
+                            failures.AddRange(cleanup.IsCanceled ? [new TaskCanceledException(cleanup)] : cleanup.Exception!.InnerExceptions);
                             throw new AggregateException("Template preparation and resource cleanup both failed.", failures);
                         }
                     }
