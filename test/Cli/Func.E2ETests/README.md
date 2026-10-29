@@ -39,6 +39,19 @@ There are two main types of tests for the `func start` command:
 - Refer to TestTraits.cs for trait names and explanations on when they should be used
 - This ensures they run sequentially rather than in parallel
 
+### .NET Template Hives
+
+E2E setup enables `FUNC_E2E_USE_CUSTOM_HIVE=1` and uses a shared hive per worker
+runtime under `FUNC_E2E_HIVE_ROOT`. `FUNC_E2E_HIVE_KEY` can select an independent
+hive. Initialization uses a cross-process file lock and writes `.templates-installed`
+only after all bundled template packages install successfully; a nonempty `packages`
+directory alone does not establish readiness. Failed installs surface their exit code
+and can be retried safely.
+
+Custom-hive project and function creation pass `--no-update-check` to `dotnet new`
+to avoid unnecessary network checks for newer template packages. Package restore
+and normal CLI behavior outside custom-hive mode are unchanged.
+
 ### Node.js Tests
 
 ⚠️ **Node.js tests require explicit environment variable configuration**
