@@ -56,10 +56,11 @@ jobs:
       versionSpec: '18.x'
 
   - task: UsePythonVersion@0
-    displayName: 'Use Python 3.12 for tests'
+    displayName: 'Use cached Python 3.11 for tests'
     inputs:
-      versionSpec: '3.12'
+      versionSpec: '3.11'
       addToPath: true
+      disableDownloadFromRegistry: true
 
   - template: ../../steps/install-dotnet.yml
 
