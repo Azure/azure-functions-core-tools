@@ -120,7 +120,7 @@ namespace Build
             foreach (var runtime in Settings.TargetRuntimes)
             {
                 // In-proc version does not need language workers for net6.0 or if it's the minified runtime.
-                // We need workers for the inproc8 build for logic apps.
+                // Logic Apps needs the remaining non-Python workers in full inproc8 builds.
                 if (_targetFramework == DefaultTargetFramework && !runtime.StartsWith(Settings.MinifiedVersionPrefix))
                 {
                     continue;
