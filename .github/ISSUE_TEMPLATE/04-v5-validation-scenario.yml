@@ -23,11 +23,32 @@ body:
 - id: area
   type: textarea
   attributes:
-    label: Command area and stacks
-    description: Identify commands and stacks in scope, including cross-cutting applicability.
-    placeholder: "init; Node (JavaScript and TypeScript), Python, .NET, Go"
+    label: Command area
+    description: Identify commands and cross-cutting areas in scope.
+    placeholder: "init; local development; deployment"
   validations:
     required: true
+- id: stack
+  type: dropdown
+  attributes:
+    label: Stack
+    description: Select every applicable stack. Choose N/A alone for scenarios that are not stack-specific.
+    multiple: true
+    options:
+      - .NET
+      - Node
+      - Python
+      - Go
+      - N/A
+  validations:
+    required: true
+- id: cli-version
+  type: textarea
+  attributes:
+    label: CLI version reference (`func --version`)
+    description: If available, paste the literal output as authoring/reference context. This is not a fixed prerequisite or an execution result.
+  validations:
+    required: false
 - id: prerequisites
   type: textarea
   attributes:
@@ -53,7 +74,7 @@ body:
   type: textarea
   attributes:
     label: Coverage variations
-    description: Enumerate meaningful positive, negative, interactive, non-interactive, path, and platform variants. Mark inapplicable cases explicitly in execution records.
+    description: Enumerate meaningful positive, negative, interactive, non-interactive, path, and platform variants. Mark inapplicable cases explicitly in the separate run issue.
   validations:
     required: true
 - id: related
