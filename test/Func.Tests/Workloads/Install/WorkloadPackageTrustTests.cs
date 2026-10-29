@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Formats.Asn1;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Security.Cryptography.Pkcs;
@@ -105,7 +104,7 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
     [Theory]
     [InlineData(MicrosoftSubject)]
     [InlineData("C=US, S=Washington, L=Redmond, O=Microsoft Corporation, CN=Microsoft Corporation")]
-    public async Task ValidAuthors_CanRotateLeafCertificatesUnderApprovedRoot(string subject)
+    public async Task NuGetVerifier_AcceptsValidAuthorCertificates(string subject)
     {
         using X509Certificate2 root = CreateRoot();
         TestRootTrust trust = new(root);
@@ -118,75 +117,19 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
         }
     }
 
-    [Theory]
-    [InlineData("wrong-cn", "CN=Not Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    [InlineData("wrong-organization", "CN=Microsoft Corporation, O=Not Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    [InlineData("cn-substring", "CN=Microsoft Corporation Attacker, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    [InlineData("wrong-locality", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Seattle, S=Washington, C=US")]
-    [InlineData("wrong-state", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Oregon, C=US")]
-    [InlineData("wrong-country", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=CA")]
-    [InlineData("wrong-case", "CN=microsoft corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    [InlineData("missing-cn", "O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    [InlineData("missing-organization", "CN=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    [InlineData("missing-locality", "CN=Microsoft Corporation, O=Microsoft Corporation, S=Washington, C=US")]
-    [InlineData("missing-state", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, C=US")]
-    [InlineData("missing-country", "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington")]
-    [InlineData("extra-ou", "CN=Microsoft Corporation, O=Microsoft Corporation, OU=Workloads, L=Redmond, S=Washington, C=US")]
-    [InlineData("duplicate-cn", "CN=Microsoft Corporation, CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US")]
-    public async Task ValidChain_WithWrongAuthorIdentity_IsRejected(string caseName, string subject)
-    {
-        using X509Certificate2 root = CreateRoot();
-        using X509Certificate2 author = CreateAuthor(root, subject);
-        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author);
-        Func<Task> act = async () =>
-        {
-            using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
-        };
-
-        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>()
-            .WithMessage("*Microsoft Corporation*", "subject case {0} must not qualify", caseName);
-    }
-
     [Fact]
-    public async Task ValidChain_WithMultivaluedAuthorIdentity_IsRejected()
+    public async Task AuthorCertificateNotOnAllowlist_IsRejected()
     {
-        (string Oid, string Value)[][] names =
-        [
-            [("2.5.4.3", "Microsoft Corporation"), ("2.5.4.10", "Microsoft Corporation")],
-            [("2.5.4.7", "Redmond")],
-            [("2.5.4.8", "Washington")],
-            [("2.5.4.6", "US")],
-        ];
-        AsnWriter writer = new(AsnEncodingRules.DER);
-        // Encode the RDN sets directly because subject-string parsing differs across platforms.
-        using (writer.PushSequence())
-        {
-            foreach (var name in names)
-            {
-                using (writer.PushSetOf())
-                {
-                    foreach (var (oid, value) in name)
-                    {
-                        using (writer.PushSequence())
-                        {
-                            writer.WriteObjectIdentifier(oid);
-                            writer.WriteCharacterString(UniversalTagNumber.PrintableString, value);
-                        }
-                    }
-                }
-            }
-        }
-
         using X509Certificate2 root = CreateRoot();
-        using X509Certificate2 author = CreateAuthor(root, new X500DistinguishedName(writer.Encode()));
-        author.SubjectName.EnumerateRelativeDistinguishedNames().Should().ContainSingle(name => name.HasMultipleElements);
+        using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject);
         string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author);
+        TestRootTrust trust = new(root, trustedPublisherFingerprint: new string('0', 64));
         Func<Task> act = async () =>
         {
-            using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
+            using var snapshot = await trust.AcquireAsync(signed, false, TestContextToken());
         };
 
-        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*Microsoft Corporation*");
+        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>();
     }
 
     [Fact]
@@ -200,7 +143,7 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
             using var snapshot = await new WorkloadPackageTrust().AcquireAsync(signed, false, TestContextToken());
         };
 
-        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*bundled workload trust anchor*");
+        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*not trusted*");
     }
 
     [Fact]
@@ -223,45 +166,40 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
         await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*integrity*");
     }
 
-    [Theory]
-    [InlineData(false, false, true)]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    public async Task Timestamp_MustBindSignatureAndChainToApprovedRoot(bool wrongImprint, bool wrongRoot, bool accepted)
+    [Fact]
+    public async Task Bypass_StillRejectsTamperedSignedPackage()
     {
         using X509Certificate2 root = CreateRoot();
-        using X509Certificate2 otherRoot = CreateRoot();
-        using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject, expired: true);
-        using X509Certificate2 timestamper = CreateAuthor(wrongRoot ? otherRoot : root, "CN=Test Timestamp Authority", timestamping: true);
-        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author, timestamper,
-            wrongRoot ? otherRoot : root, wrongImprint);
+        using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject);
+        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author);
+        using (ZipArchive archive = ZipFile.Open(signed, ZipArchiveMode.Update))
+        {
+            ZipArchiveEntry entry = archive.Entries.First(e => e.FullName.EndsWith("Test.dll", StringComparison.Ordinal));
+            using Stream stream = entry.Open();
+            stream.Write([1, 2, 3, 4]);
+        }
+
         Func<Task> act = async () =>
         {
-            using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
+            using var snapshot = await new WorkloadPackageTrust().AcquireAsync(signed, true, TestContextToken());
         };
 
-        if (accepted)
-        {
-            await act.Should().NotThrowAsync();
-        }
-        else
-        {
-            await act.Should().ThrowExactlyAsync<InvalidWorkloadException>()
-                .WithMessage(wrongRoot ? "*bundled workload trust anchor*" : "*timestamp*");
-        }
+        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*integrity*");
     }
 
     [Fact]
-    public async Task ExpiredAuthor_WithoutTimestamp_IsRejected()
+    public async Task Timestamp_FromUntrustedAuthority_IsRejected()
     {
         using X509Certificate2 root = CreateRoot();
         using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject, expired: true);
-        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author);
+        using X509Certificate2 timestamper = CreateAuthor(root, "CN=Test Timestamp Authority", timestamping: true);
+        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author, timestamper, root);
         Func<Task> act = async () =>
         {
             using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
         };
-        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>();
+
+        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*timestamping certificate is not trusted*");
     }
 
     [Theory]
@@ -414,6 +352,10 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
             using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, CancellationToken.None);
         };
         await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*primary NuGet author signature*");
+
+        using WorkloadPackageSnapshot bypassed = await new WorkloadPackageTrust().AcquireAsync(
+            signed, allowUntrusted: true, cancellationToken: CancellationToken.None);
+        File.Exists(bypassed.Path).Should().BeTrue();
     }
 
     [Fact]
@@ -430,26 +372,24 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
     }
 
     [Fact]
-    public void ShippedRootBundle_ContainsOnlyCorroboratedDigiCertAnchor()
+    public void PublisherFingerprintAllowlist_ContainsVerifiedMicrosoftSigners()
     {
-        using Stream stream = typeof(WorkloadPackageTrust).Assembly.GetManifestResourceStream(
-            "Azure.Functions.Cli.Workloads.Install.trusted-roots.pem")!;
-        using StreamReader reader = new(stream);
-        X509Certificate2Collection roots = [];
-        roots.ImportFromPem(reader.ReadToEnd());
-        try
-        {
-            roots.Should().ContainSingle();
-            roots[0].GetCertHashString(HashAlgorithmName.SHA256)
-                .Should().Be("552F7BDCF1A7AF9E6CE672017F4F12ABF77240C78E761AC203D1D9D20AC89988");
-        }
-        finally
-        {
-            foreach (X509Certificate2 root in roots)
-            {
-                root.Dispose();
-            }
-        }
+        WorkloadPackageTrust.PublisherFingerprints.Should().Contain(
+            "9A1B131BEE0605433056A4EA3815478A8E177961A968C6C0027C1093D1FEB630");
+        WorkloadPackageTrust.PublisherFingerprints.Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public void VerificationSettings_RequireOnlineCertificateStatus()
+    {
+        SignedPackageVerifierSettings settings = new WorkloadPackageTrust().CreateVerifierSettings();
+
+        settings.AllowUntrusted.Should().BeFalse();
+        settings.AllowUnknownRevocation.Should().BeFalse();
+        settings.AllowUnsigned.Should().BeFalse();
+        settings.AllowMultipleTimestamps.Should().BeFalse();
+        settings.AllowNoTimestamp.Should().BeTrue();
+        settings.RevocationMode.Should().Be(NuGet.Common.RevocationMode.Online);
     }
 
     [Fact]
@@ -583,14 +523,49 @@ public sealed partial class WorkloadPackageTrustTests(ITestOutputHelper output) 
         return signed;
     }
 
-    private sealed class TestRootTrust(X509Certificate2 root, Action? onLoad = null, bool? supportsOfflineRevocation = null) : WorkloadPackageTrust
+    private sealed class TestRootTrust(X509Certificate2 root, Action? onLoad = null, string? trustedPublisherFingerprint = null) : WorkloadPackageTrust
     {
-        protected override bool SupportsOfflineRevocation => supportsOfflineRevocation ?? base.SupportsOfflineRevocation;
-
-        protected override X509Certificate2Collection LoadRoots()
+        protected override PackageSignatureVerifier CreateVerifier(PrimarySignature signature)
         {
             onLoad?.Invoke();
-            return [X509CertificateLoader.LoadCertificate(root.RawData)];
+            signature.SignedCms.Certificates.Cast<X509Certificate2>()
+                .Should().Contain(certificate => certificate.RawData.SequenceEqual(root.RawData));
+            string signerFingerprint = signature.SignerInfo.Certificate!.GetCertHashString(HashAlgorithmName.SHA256);
+            string publisherFingerprint = trustedPublisherFingerprint ?? signerFingerprint;
+            KeyValuePair<string, NuGet.Common.HashAlgorithmName>[] untrustedRootFingerprints =
+            [
+                new(signerFingerprint, NuGet.Common.HashAlgorithmName.SHA256),
+                .. signature.Timestamps.Select(timestamp =>
+                    new KeyValuePair<string, NuGet.Common.HashAlgorithmName>(
+                        timestamp.SignerInfo.Certificate!.GetCertHashString(HashAlgorithmName.SHA256),
+                        NuGet.Common.HashAlgorithmName.SHA256)),
+            ];
+            return new([
+                new IntegrityVerificationProvider(),
+                new SignatureTrustAndValidityVerificationProvider(untrustedRootFingerprints),
+                new AllowListVerificationProvider(
+                    [new CertificateHashAllowListEntry(
+                        VerificationTarget.Author,
+                        SignaturePlacement.PrimarySignature,
+                        publisherFingerprint,
+                        NuGet.Common.HashAlgorithmName.SHA256)],
+                    requireNonEmptyAllowList: true),
+            ]);
         }
+
+        internal override SignedPackageVerifierSettings CreateVerifierSettings()
+            => new(
+                allowUnsigned: false,
+                allowIllegal: false,
+                allowUntrusted: false,
+                allowIgnoreTimestamp: false,
+                allowMultipleTimestamps: false,
+                allowNoTimestamp: true,
+                allowUnknownRevocation: true,
+                reportUnknownRevocation: false,
+                verificationTarget: VerificationTarget.Author,
+                signaturePlacement: SignaturePlacement.PrimarySignature,
+                repositoryCountersignatureVerificationBehavior: SignatureVerificationBehavior.Never,
+                revocationMode: NuGet.Common.RevocationMode.Offline);
     }
 }

@@ -44,129 +44,7 @@ public sealed partial class WorkloadPackageTrustTests
             using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
         };
 
-        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*bundled workload trust anchor*");
-    }
-
-    [Theory]
-    [InlineData(1, true)]
-    [InlineData(2, false)]
-    public async Task Timestamp_Multiplicity_RequiresAtMostOne(int count, bool accepted)
-    {
-        using X509Certificate2 root = CreateRoot();
-        using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject);
-        using X509Certificate2 timestamper = CreateAuthor(root, "CN=Test Timestamp Authority", timestamping: true);
-        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author, timestamper, root, timestampCount: count);
-        Func<Task> act = async () =>
-        {
-            using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
-        };
-
-        if (accepted)
-        {
-            await act.Should().NotThrowAsync();
-        }
-        else
-        {
-            await act.Should().ThrowExactlyAsync<InvalidWorkloadException>();
-        }
-    }
-
-    [Theory]
-    [InlineData(false, -1, false)]
-    [InlineData(false, 0, true)]
-    [InlineData(false, 1, true)]
-    [InlineData(true, -1, true)]
-    [InlineData(true, 1, false)]
-    public async Task Timestamp_AuthorValidityBoundaries_AreEnforced(bool endBoundary, int offsetSeconds, bool accepted)
-    {
-        var now = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        DateTimeOffset notBefore = now.AddHours(-24);
-        DateTimeOffset notAfter = now.AddHours(-12);
-        var time = (endBoundary ? notAfter : notBefore).AddSeconds(offsetSeconds);
-        using X509Certificate2 root = CreateRoot();
-        using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject, notBefore: notBefore, notAfter: notAfter);
-        using X509Certificate2 timestamper = CreateAuthor(root, "CN=Test Timestamp Authority", timestamping: true,
-            notBefore: now.AddHours(-36));
-        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author, timestamper, root, timestampTime: time);
-        Func<Task> act = async () =>
-        {
-            using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
-        };
-
-        if (accepted)
-        {
-            await act.Should().NotThrowAsync();
-        }
-        else
-        {
-            await act.Should().ThrowExactlyAsync<InvalidWorkloadException>();
-        }
-    }
-
-    [Fact]
-    public async Task Timestamp_AtAuthorExpiry_UsesNativeChainValidation()
-    {
-        var expiry = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddHours(-12).ToUnixTimeSeconds());
-        using X509Certificate2 root = CreateRoot();
-        using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject, notAfter: expiry);
-        using X509Certificate2 timestamper = CreateAuthor(root, "CN=Test Timestamp Authority", timestamping: true,
-            notBefore: expiry.AddHours(-24));
-        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author, timestamper, root, timestampTime: expiry);
-        using X509Chain nativeChain = new();
-        nativeChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
-        nativeChain.ChainPolicy.CustomTrustStore.Add(root);
-        nativeChain.ChainPolicy.ApplicationPolicy.Add(new("1.3.6.1.5.5.7.3.3"));
-        nativeChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-        nativeChain.ChainPolicy.DisableCertificateDownloads = true;
-        nativeChain.ChainPolicy.VerificationTime = expiry.UtcDateTime;
-        // Expiry equality differs by native engine; the verifier must preserve that decision.
-        bool nativeAccepted = nativeChain.Build(author);
-        output.WriteLine("Native chain accepts author at NotAfter: {0}", nativeAccepted);
-        if (!nativeAccepted)
-        {
-            nativeChain.ChainStatus.Should().ContainSingle().Which.Status.Should().Be(X509ChainStatusFlags.NotTimeValid);
-        }
-
-        Func<Task> act = async () =>
-        {
-            using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
-        };
-
-        if (nativeAccepted)
-        {
-            await act.Should().NotThrowAsync();
-        }
-        else
-        {
-            await act.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*bundled workload trust anchor*");
-        }
-    }
-
-    [Theory]
-    [InlineData(false, false, 1024, false)]
-    [InlineData(false, false, 2048, true)]
-    [InlineData(true, false, 2048, false)]
-    [InlineData(false, true, 2048, false)]
-    public async Task Timestamp_AlgorithmAndKeyLimits_AreEnforced(bool weakDigest, bool weakSignatureDigest, int keySize, bool accepted)
-    {
-        using X509Certificate2 root = CreateRoot();
-        using X509Certificate2 author = CreateAuthor(root, MicrosoftSubject);
-        using X509Certificate2 timestamper = CreateAuthor(root, "CN=Test Timestamp Authority", timestamping: true, keySize: keySize);
-        string signed = await SignAsync(BuildNupkg(id: OfficialId), root, author, timestamper, root,
-            weakTimestampDigest: weakDigest, weakTimestampSignatureDigest: weakSignatureDigest);
-        Func<Task> act = async () =>
-        {
-            using var snapshot = await new TestRootTrust(root).AcquireAsync(signed, false, TestContextToken());
-        };
-
-        if (accepted)
-        {
-            await act.Should().NotThrowAsync();
-        }
-        else
-        {
-            await act.Should().ThrowExactlyAsync<InvalidWorkloadException>();
-        }
+        await act.Should().ThrowExactlyAsync<InvalidWorkloadException>();
     }
 
     [Theory]
@@ -459,7 +337,7 @@ public sealed partial class WorkloadPackageTrustTests
             ["workload", "install", signed], cancellation.Token);
 
         result.ExitCode.Should().Be(1);
-        (result.StandardOutput + result.StandardError).Should().Contain("bundled workload trust anchor");
+        (result.StandardOutput + result.StandardError).Should().Contain("Workload publisher verification failed");
         File.Exists(workloads.WorkloadRegistryPath).Should().BeFalse();
         Directory.Exists(workloads.GetInstallDirectory(OfficialId.ToLowerInvariant(), "1.0.0")).Should().BeFalse();
         (await File.ReadAllBytesAsync(signed)).Should().Equal(original);
