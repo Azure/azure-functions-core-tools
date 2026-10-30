@@ -1,0 +1,84 @@
+name: V5 Validation Scenario
+description: Define a reusable validation procedure for Azure Functions CLI v5, not a bug report or test result.
+title: "[v5 validation] "
+labels: ["v5", "validation-scenario"]
+body:
+- type: markdown
+  attributes:
+    value: |
+      Describe what should be validated, not a claim that it has passed.
+      Keep titles and procedures independent of a particular preview build.
+      See the live bug-bash wiki for current setup and prerequisites:
+      https://github.com/Azure/azure-functions-core-tools/wiki/Azure-Functions-CLI-(v5)-Bug-Bash
+      Record each validation run in a separate issue that references this scenario.
+      Do not record runs in this scenario issue's comments.
+      Use only disposable projects and non-production resources; never include secrets.
+- id: scenario
+  type: textarea
+  attributes:
+    label: Scenario and motivation
+    description: What user journey or risk does this scenario cover?
+  validations:
+    required: true
+- id: area
+  type: textarea
+  attributes:
+    label: Command area
+    description: Identify commands and cross-cutting areas in scope.
+    placeholder: "init; local development; deployment"
+  validations:
+    required: true
+- id: stack
+  type: dropdown
+  attributes:
+    label: Stack
+    description: Select every applicable stack. Choose N/A alone for scenarios that are not stack-specific.
+    multiple: true
+    options:
+      - .NET
+      - Node
+      - Python
+      - Go
+      - N/A
+  validations:
+    required: true
+- id: cli-version
+  type: textarea
+  attributes:
+    label: CLI version reference (`func --version`)
+    description: If available, paste the literal output as authoring/reference context. This is not a fixed prerequisite or an execution result.
+  validations:
+    required: false
+- id: prerequisites
+  type: textarea
+  attributes:
+    label: Environment and prerequisites
+    description: Link to the live bug-bash wiki for current setup and prerequisites. Describe only scenario-specific platform, tool, workload/template, fixture, and safety preconditions here.
+  validations:
+    required: true
+- id: steps
+  type: textarea
+  attributes:
+    label: Steps and inputs
+    description: Provide ordered, reproducible steps and exact commands. Define placeholders, shell differences, and any destructive or billable operations.
+  validations:
+    required: true
+- id: criteria
+  type: textarea
+  attributes:
+    label: Observable pass criteria
+    description: State observable output, exit status, files, or behavior required for success. Separate unresolved expectations from acceptance criteria.
+  validations:
+    required: true
+- id: variations
+  type: textarea
+  attributes:
+    label: Coverage variations
+    description: Enumerate meaningful positive, negative, interactive, non-interactive, path, and platform variants. Mark inapplicable cases explicitly in the separate run issue.
+  validations:
+    required: true
+- id: related
+  type: textarea
+  attributes:
+    label: Related coverage and source
+    description: Link source catalog sections, related scenarios, known bugs, and specification decisions. Explain retired syntax or coverage blocked on a design/build mismatch.
