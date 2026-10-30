@@ -87,21 +87,6 @@ checksum, extracts it, and replaces the installed files with backup/rollback.
 The installed executable's `--version` verifies the result. Copy failures,
 verification failures, and cancellation during installation trigger rollback.
 
-Run the published-artifact regression on the current host with:
-
-```powershell
-pwsh -NoProfile -File .\eng\scripts\test-single-file-update.ps1
-```
-
-The script publishes two different single-file builds labeled
-`5.0.0-preview.4` and `5.0.0-preview.5` using build properties, with a compressed
-target bundle to change the layout rather than just the version string. It does
-not change release versions. It uses isolated installations and a bounded local HTTP feed
-under `artifacts/single-file-update`, preserving logs and hashes there. It checks
-cold-start updates, subsequent invocations, version-verification and archive-checksum
-failure, copy-failure rollback, retry/downgrade without stale locks, and opt-in
-verbose exception details. CI runs it for builds that publish CLI artifacts.
-
 ## Command Architecture
 
 All commands extend `FuncCliCommand` → `System.CommandLine.Command`.
