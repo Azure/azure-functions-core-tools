@@ -63,15 +63,15 @@ internal static class Constants
     public const string ProfilesCdnBaseUrlEnvironmentVariable = "FUNC_CLI_PROFILES_CDN_BASE_URL";
 
     /// <summary>
-    /// The telemetry instrumentation key, injected at build time via Telemetry.props.
+    /// The telemetry connection string, injected at build time via Telemetry.props.
     /// </summary>
-    public static readonly string TelemetryInstrumentationKey =
-        typeof(Constants).Assembly.GetCustomAttribute<TelemetryInstrumentationKeyAttribute>()?.Value
-        ?? "00000000-0000-0000-0000-000000000000";
+    public static readonly string TelemetryConnectionString =
+        typeof(Constants).Assembly.GetCustomAttribute<TelemetryConnectionStringAttribute>()?.Value
+        ?? string.Empty;
 }
 
 [AttributeUsage(AttributeTargets.Assembly)]
-internal sealed class TelemetryInstrumentationKeyAttribute(string value) : Attribute
+internal sealed class TelemetryConnectionStringAttribute(string value) : Attribute
 {
     public string Value => value;
 }

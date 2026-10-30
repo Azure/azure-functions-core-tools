@@ -4,11 +4,15 @@
 using System.Diagnostics;
 using System.Globalization;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Telemetry;
 
 namespace Azure.Functions.Cli.Commands.Start.Host;
 
-internal sealed class HostProcessStartInfoFactory
+internal sealed class HostProcessStartInfoFactory(ITelemetryEnvironmentScope telemetryEnvironment)
 {
+    private readonly ITelemetryEnvironmentScope _telemetryEnvironment =
+        telemetryEnvironment ?? throw new ArgumentNullException(nameof(telemetryEnvironment));
+
     public const int DefaultPort = 7071;
     public const string ExecutableBaseName = "Azure.Functions.Cli.Workloads.Host";
     public const string ScriptRootEnvironmentVariable = "AzureWebJobsScriptRoot";
@@ -55,6 +59,8 @@ internal sealed class HostProcessStartInfoFactory
 
         startInfo.ArgumentList.Add("--urls");
         startInfo.ArgumentList.Add(listenUriText);
+
+        _telemetryEnvironment.RestoreInheritedVariables(startInfo.Environment);
 
         foreach (KeyValuePair<string, string> pair in context.HostRunContext.EnvironmentVariables)
         {

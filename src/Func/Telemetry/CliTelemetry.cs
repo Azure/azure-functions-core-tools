@@ -7,13 +7,14 @@ using System.Diagnostics.Metrics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Azure.Functions.Cli.Common;
+using Azure.Monitor.OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 
 namespace Azure.Functions.Cli.Telemetry;
 
 /// <summary>
 /// Holds the singleton <see cref="ActivitySource"/> and <see cref="Meter"/>
-/// used to emit CLI telemetry, and exposes the resource attributes that all
+/// used to emit CLI telemetry, and exposes the common attributes that all
 /// spans and metrics share.
 /// </summary>
 /// <remarks>
@@ -24,17 +25,14 @@ namespace Azure.Functions.Cli.Telemetry;
 /// </remarks>
 internal static class CliTelemetry
 {
+    internal const string ShutdownDrainBudgetName =
+        "Azure.Monitor.OpenTelemetry.Exporter.ShutdownDrainBudgetMilliseconds";
+
     /// <summary>
     /// OTel source / service name. Lowercase, dotted form to match the
     /// convention used by the Functions host (<c>azure.functions.host</c>).
     /// </summary>
     public const string SourceName = "azure.functions.cli";
-
-    /// <summary>
-    /// Sentinel value used in dev/local builds where the real instrumentation
-    /// key has not been injected via the build-time attribute.
-    /// </summary>
-    private const string EmptyInstrumentationKey = "00000000-0000-0000-0000-000000000000";
 
     public static readonly string CliVersion = ResolveCliVersion();
 
@@ -43,14 +41,14 @@ internal static class CliTelemetry
     public static readonly Meter Metric = new(SourceName, CliVersion);
 
     /// <summary>
-    /// Returns the OS / runtime attributes that should be applied to the OTel
-    /// resource (in addition to <c>service.name</c> / <c>service.version</c>,
-    /// which are added via <c>AddService</c>).
+    /// Returns the allow-listed dimensions shared by CLI spans and metric measurements.
     /// </summary>
-    public static IEnumerable<KeyValuePair<string, object>> GetResourceAttributes()
+    public static IReadOnlyList<KeyValuePair<string, object>> GetCommonAttributes()
     {
         return
         [
+            new(TelemetryConventions.ServiceName, SourceName),
+            new(TelemetryConventions.ServiceVersion, CliVersion),
             new(TelemetryConventions.OsType, RuntimeInformation.OSDescription),
             new(TelemetryConventions.OsArchitecture, RuntimeInformation.OSArchitecture.ToString()),
             new(TelemetryConventions.ProcessRuntimeDescription, RuntimeInformation.FrameworkDescription),
@@ -58,28 +56,40 @@ internal static class CliTelemetry
     }
 
     /// <summary>
-    /// Builds a standalone <see cref="ResourceBuilder"/> with the same
-    /// service/OS/runtime attributes used by the live exporters. Intended
-    /// for tests and tooling that need the resource without going through
-    /// the host.
+    /// Builds the CLI service identity without ambient resource detectors.
     /// </summary>
     public static ResourceBuilder CreateResourceBuilder()
     {
-        return ResourceBuilder.CreateDefault()
-            .AddService(serviceName: SourceName, serviceVersion: CliVersion)
-            .AddAttributes(GetResourceAttributes());
+        return ConfigureResource(ResourceBuilder.CreateEmpty());
     }
 
     /// <summary>
-    /// Applies the standard CLI service / OS / runtime attributes to an
-    /// existing <see cref="ResourceBuilder"/>. Used by the OTel hosting
-    /// integration via <c>ConfigureResource</c>.
+    /// Keeps service identity in the resource; other dimensions are attached directly to each signal.
     /// </summary>
     public static ResourceBuilder ConfigureResource(ResourceBuilder builder)
     {
-        return builder
-            .AddService(serviceName: SourceName, serviceVersion: CliVersion)
-            .AddAttributes(GetResourceAttributes());
+        ArgumentNullException.ThrowIfNull(builder);
+
+        return builder.Clear()
+            .AddService(serviceName: SourceName, serviceVersion: CliVersion);
+    }
+
+    internal static void ConfigureExporter(AzureMonitorExporterOptions options, string connectionString)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentException.ThrowIfNullOrEmpty(connectionString);
+
+        options.ConnectionString = connectionString;
+        options.TracesPerSecond = null;
+        options.SamplingRatio = 1.0F;
+        options.EnableLiveMetrics = false;
+        options.EnableStandardMetrics = false;
+        options.EnablePerformanceCounters = false;
+    }
+
+    internal static void ConfigureProcessSettings()
+    {
+        AppContext.SetData(ShutdownDrainBudgetName, 0);
     }
 
     private static readonly HashSet<string> _optOutFalseSentinels =
@@ -87,15 +97,21 @@ internal static class CliTelemetry
 
     /// <summary>
     /// Returns the Azure Monitor connection string when telemetry is
-    /// configured (build has a real instrumentation key) and the user has
+    /// configured (build has a connection string) and the user has
     /// not opted out.
     /// </summary>
     public static bool TryGetConnectionString([NotNullWhen(true)] out string? connectionString)
     {
+        return TryGetConnectionString(Constants.TelemetryConnectionString, out connectionString);
+    }
+
+    internal static bool TryGetConnectionString(
+        string? configuredConnectionString,
+        [NotNullWhen(true)] out string? connectionString)
+    {
         connectionString = null;
 
-        string key = Constants.TelemetryInstrumentationKey;
-        if (string.IsNullOrEmpty(key) || key == EmptyInstrumentationKey)
+        if (string.IsNullOrWhiteSpace(configuredConnectionString))
         {
             return false;
         }
@@ -106,7 +122,7 @@ internal static class CliTelemetry
             return false;
         }
 
-        connectionString = $"InstrumentationKey={key}";
+        connectionString = configuredConnectionString;
         return true;
     }
 

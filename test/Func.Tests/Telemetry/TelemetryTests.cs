@@ -2,19 +2,30 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using Azure.Functions.Cli.Telemetry;
+using Azure.Monitor.OpenTelemetry.Exporter;
+using OpenTelemetry.Resources;
 
 namespace Azure.Functions.Cli.Tests.Telemetry;
 
 public class TelemetryTests
 {
+    private const string TestConnectionString =
+        "InstrumentationKey=11111111-1111-1111-1111-111111111111;IngestionEndpoint=https://westus-0.in.applicationinsights.azure.com/";
+
     [Fact]
-    public void TryGetConnectionString_DefaultBuild_ReturnsFalse()
+    public void TryGetConnectionString_MissingConfiguration_ReturnsFalse()
     {
-        // Default build has the all-zeros instrumentation key, so telemetry
-        // is not configured.
-        CliTelemetry.TryGetConnectionString(out var connectionString).Should().BeFalse();
+        CliTelemetry.TryGetConnectionString(string.Empty, out var connectionString).Should().BeFalse();
         connectionString.Should().BeNull();
+    }
+
+    [Fact]
+    public void TryGetConnectionString_Configured_ReturnsFullConnectionString()
+    {
+        CliTelemetry.TryGetConnectionString(TestConnectionString, out var connectionString).Should().BeTrue();
+        connectionString.Should().Be(TestConnectionString);
     }
 
     [Theory]
@@ -22,13 +33,11 @@ public class TelemetryTests
     [InlineData(Azure.Functions.Cli.Common.Constants.LegacyTelemetryOptOutEnvVar)]
     public void TryGetConnectionString_OptOutEnvVarSet_ReturnsFalse(string envVarName)
     {
-        // Even with a non-default key, an opt-out via either the new or
+        // Even with a configured connection string, an opt-out via either the new or
         // legacy env var must short-circuit telemetry.
         using var optOut = new EnvVarScope(envVarName, "1");
 
-        // We can't override the build-time key from a test, so we just
-        // assert the helper agrees the opt-out wins regardless of key state.
-        CliTelemetry.TryGetConnectionString(out _).Should().BeFalse();
+        CliTelemetry.TryGetConnectionString(TestConnectionString, out _).Should().BeFalse();
     }
 
     [Theory]
@@ -44,13 +53,11 @@ public class TelemetryTests
     public void TryGetConnectionString_OptOutFalseSentinels_DoNotOptOut(string value)
     {
         // The documented "off" sentinels must NOT be treated as opt-out.
-        // The default build still returns false because of the missing key,
-        // but the opt-out path itself should not be the reason.
         using var optOut = new EnvVarScope(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar, value);
         using var legacy = new EnvVarScope(Azure.Functions.Cli.Common.Constants.LegacyTelemetryOptOutEnvVar, value);
 
-        // Just exercising the path; result is gated by the build key.
-        _ = CliTelemetry.TryGetConnectionString(out _);
+        CliTelemetry.TryGetConnectionString(TestConnectionString, out var connectionString).Should().BeTrue();
+        connectionString.Should().Be(TestConnectionString);
     }
 
     [Theory]
@@ -65,7 +72,7 @@ public class TelemetryTests
         // an opt-out, so we fail safe toward not collecting telemetry.
         using var optOut = new EnvVarScope(Azure.Functions.Cli.Common.Constants.TelemetryOptOutEnvVar, value);
 
-        CliTelemetry.TryGetConnectionString(out _).Should().BeFalse();
+        CliTelemetry.TryGetConnectionString(TestConnectionString, out _).Should().BeFalse();
     }
 
     private sealed class EnvVarScope : IDisposable
@@ -156,16 +163,133 @@ public class TelemetryTests
     }
 
     [Fact]
-    public void CreateResourceBuilder_IncludesServiceAndOsAttributes()
+    public void CreateResourceBuilder_IncludesServiceIdentityWithoutOtherDimensions()
     {
         var resource = CliTelemetry.CreateResourceBuilder().Build();
         var attrs = resource.Attributes.ToDictionary(kv => kv.Key, kv => kv.Value);
 
         attrs["service.name"].Should().Be(CliTelemetry.SourceName);
         attrs["service.version"].Should().Be(CliTelemetry.CliVersion);
-        attrs.ContainsKey("os.type").Should().BeTrue();
-        attrs.ContainsKey("os.architecture").Should().BeTrue();
-        attrs.ContainsKey("process.runtime.description").Should().BeTrue();
+        attrs.ContainsKey("os.type").Should().BeFalse();
+        attrs.ContainsKey("os.architecture").Should().BeFalse();
+        attrs.ContainsKey("process.runtime.description").Should().BeFalse();
+        attrs.ContainsKey("telemetry.sdk.name").Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConfigureResource_RemovesAmbientAttributes()
+    {
+        var builder = ResourceBuilder.CreateEmpty()
+            .AddAttributes([new KeyValuePair<string, object>("unrelated.attribute", "do-not-export")]);
+
+        var resource = CliTelemetry.ConfigureResource(builder).Build();
+
+        resource.Attributes.Should().NotContain(attribute => attribute.Key == "unrelated.attribute");
+    }
+
+    [Fact]
+    public void EnrichmentProcessor_AddsCommonAttributesWithoutOverwritingExistingTags()
+    {
+        using var processor = new CliActivityEnrichmentProcessor(CliTelemetry.GetCommonAttributes());
+        using var activity = new Activity("test");
+        activity.SetTag(TelemetryConventions.OsType, "explicit-os");
+
+        processor.OnStart(activity);
+
+        activity.GetTagItem(TelemetryConventions.OsType).Should().Be("explicit-os");
+        foreach (var attribute in CliTelemetry.GetCommonAttributes().Where(attribute => attribute.Key != TelemetryConventions.OsType))
+        {
+            activity.GetTagItem(attribute.Key).Should().Be(attribute.Value);
+        }
+    }
+
+    [Fact]
+    public void EnrichmentProcessor_RejectsNullArguments()
+    {
+        FluentActions.Invoking(() => new CliActivityEnrichmentProcessor(null!)).Should().Throw<ArgumentNullException>();
+        using var processor = new CliActivityEnrichmentProcessor([]);
+        FluentActions.Invoking(() => processor.OnStart(null!)).Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void RecordMetrics_IncludesCommonDimensionsBeforeAggregation()
+    {
+        var measurements = new List<(string Name, double Value, Dictionary<string, object?> Tags)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == CliTelemetry.SourceName)
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+            measurements.Add((instrument.Name, value, tags.ToArray().ToDictionary(tag => tag.Key, tag => tag.Value))));
+        listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
+            measurements.Add((instrument.Name, value, tags.ToArray().ToDictionary(tag => tag.Key, tag => tag.Value))));
+        listener.Start();
+
+        CliTelemetry.Metric.RecordCommand("dimension-test", exitCode: 1, durationMs: 125);
+        CliTelemetry.Metric.RecordWorkloadBoot(workloadCount: 3, durationMs: 25);
+
+        measurements.Should().HaveCount(3);
+        foreach (var measurement in measurements)
+        {
+            foreach (var attribute in CliTelemetry.GetCommonAttributes())
+            {
+                measurement.Tags[attribute.Key].Should().Be(attribute.Value);
+            }
+        }
+
+        var count = measurements.Single(measurement => measurement.Name == TelemetryConventions.CommandCountInstrument);
+        count.Value.Should().Be(1);
+        count.Tags[TelemetryConventions.CliCommandName].Should().Be("dimension-test");
+        count.Tags[TelemetryConventions.ProcessExitCode].Should().Be(1);
+        measurements.Single(measurement => measurement.Name == TelemetryConventions.CommandDurationInstrument).Value.Should().Be(125);
+        measurements.Single(measurement => measurement.Name == TelemetryConventions.WorkloadBootDurationInstrument).Value.Should().Be(25);
+    }
+
+    [Fact]
+    public void RecordWorkloadBootActivity_PreservesMeasuredIntervalAndParent()
+    {
+        using var listener = SubscribeListener();
+        Activity? bootActivity = null;
+        listener.ActivityStopped = activity =>
+        {
+            if (activity.OperationName == TelemetryConventions.WorkloadBootActivityName)
+            {
+                bootActivity = activity;
+            }
+        };
+        var startTime = DateTimeOffset.UtcNow.AddSeconds(-2);
+        var telemetry = new WorkloadBootTelemetry(3, startTime.AddMilliseconds(10), TimeSpan.FromMilliseconds(250));
+        using var command = CliTelemetry.Trace.StartCommandActivity(startTime);
+
+        CliTelemetry.Trace.RecordWorkloadBootActivity(telemetry);
+
+        bootActivity.Should().NotBeNull();
+        bootActivity!.StartTimeUtc.Should().Be(telemetry.StartTime.UtcDateTime);
+        bootActivity.Duration.Should().Be(telemetry.Duration);
+        bootActivity.ParentSpanId.Should().Be(command!.SpanId);
+        bootActivity.GetTagItem(TelemetryConventions.CliWorkloadCount).Should().Be(3);
+        command.StartTimeUtc.Should().Be(startTime.UtcDateTime);
+    }
+
+    [Fact]
+    public void ConfigureExporter_UsesFullSamplingWithoutGeneratedMetrics()
+    {
+        var options = new AzureMonitorExporterOptions();
+
+        CliTelemetry.ConfigureExporter(
+            options,
+            "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://westus-0.in.applicationinsights.azure.com/");
+
+        options.TracesPerSecond.Should().BeNull();
+        options.SamplingRatio.Should().Be(1.0F);
+        options.EnableLiveMetrics.Should().BeFalse();
+        options.EnableStandardMetrics.Should().BeFalse();
+        options.EnablePerformanceCounters.Should().BeFalse();
+        options.DisableOfflineStorage.Should().BeFalse();
     }
 
     private static ActivityListener SubscribeListener()

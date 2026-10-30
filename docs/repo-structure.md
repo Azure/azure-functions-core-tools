@@ -88,7 +88,7 @@ A packable NuGet library (`Azure.Functions.Cli.Abstractions`) hosting the public
 | `Directory.Build.targets` | Imports `eng/build/Engineering.targets` |
 | `Directory.Packages.props` | Enables Central Package Management, imports `eng/build/Packages.props` |
 | `eng/build/Packages.props` | Pins all NuGet package versions centrally |
-| `eng/build/Telemetry.props` | Injects telemetry instrumentation key as assembly attribute |
+| `eng/build/Telemetry.props` | Injects the telemetry connection string as an assembly attribute |
 | `src/Directory.Build.props` | Sets `IsPackable=true`, package output to `out/pkg/` |
 
 Each project also has its own `Directory.Version.props` for independent versioning.
