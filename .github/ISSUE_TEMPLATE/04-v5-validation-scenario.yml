@@ -39,6 +39,8 @@ body:
       - Node
       - Python
       - Go
+      - PowerShell
+      - Java
       - N/A
   validations:
     required: true
