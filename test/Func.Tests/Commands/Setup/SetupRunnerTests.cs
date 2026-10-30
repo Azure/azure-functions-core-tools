@@ -290,7 +290,8 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            allowUntrusted: Arg.Any<bool>(),
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Theory]
