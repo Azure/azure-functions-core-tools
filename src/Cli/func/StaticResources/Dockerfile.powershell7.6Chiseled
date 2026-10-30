@@ -1,0 +1,37 @@
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-resolute AS runtime
+
+ARG POWERSHELL_VERSION=7.6.9
+ARG TARGETARCH
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl && \
+    case "${TARGETARCH}" in \
+        amd64) POWERSHELL_ARCH="x64"; POWERSHELL_SHA256="1da6d6d6035d651f20e70ddee7c4c15ac6ab8b9fb40ee92240d91263f28a884b" ;; \
+        arm64) POWERSHELL_ARCH="arm64"; POWERSHELL_SHA256="02eb9991af447c7e7fe881acde195961afd397c40b8eb1c2b3856b84ec2d85f2" ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    POWERSHELL_ARCHIVE="powershell-${POWERSHELL_VERSION}-linux-${POWERSHELL_ARCH}.tar.gz" && \
+    curl -fsSLO "https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/${POWERSHELL_ARCHIVE}" && \
+    echo "${POWERSHELL_SHA256}  ${POWERSHELL_ARCHIVE}" | sha256sum -c - && \
+    mkdir -p /opt/microsoft/powershell/7 && \
+    tar -xzf "${POWERSHELL_ARCHIVE}" -C /opt/microsoft/powershell/7 && \
+    chmod +x /opt/microsoft/powershell/7/pwsh && \
+    rm -f "${POWERSHELL_ARCHIVE}" && \
+    rm -rf /var/lib/apt/lists/*
+
+# This image uses a chiseled (minimal) Azure Functions base image.
+# It doesn't include the PowerShell 7.6 runtime, so the next step copies it in from the Resolute runtime stage.
+FROM mcr.microsoft.com/azure-functions/powershell:4-powershell7.6-chiseled
+COPY --from=runtime /opt/microsoft/powershell/7 /opt/microsoft/powershell/7
+
+# The base image doesn't include a shell. For debugging purposes, you can add other dependencies as needed.
+# For example, uncomment the lines below to add a lightweight shell using BusyBox.
+# BusyBox doesn't include an SSH server, so it doesn't enable SSH access to your app on App Service.
+# COPY --from=busybox:uclibc /bin/busybox /bin/busybox
+# RUN ["/bin/busybox", "--install", "-s", "/bin"]
+
+ENV PATH="/opt/microsoft/powershell/7:${PATH}" \
+    FUNCTIONS_WORKER_RUNTIME=powershell \
+    AzureWebJobsScriptRoot=/home/site/wwwroot \
+    AzureFunctionsJobHost__Logging__Console__IsEnabled=true
+
+COPY . /home/site/wwwroot

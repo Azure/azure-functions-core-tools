@@ -1,0 +1,44 @@
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-resolute AS runtime
+
+ARG NODE_VERSION=24.22.1
+ARG TARGETARCH
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl xz-utils && \
+    case "${TARGETARCH}" in \
+        amd64) NODE_ARCH="x64"; NODE_SHA256="6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6" ;; \
+        arm64) NODE_ARCH="arm64"; NODE_SHA256="dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e" ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    NODE_ARCHIVE="node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" && \
+    curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_ARCHIVE}" && \
+    echo "${NODE_SHA256}  ${NODE_ARCHIVE}" | sha256sum -c - && \
+    mkdir -p /opt/node && \
+    tar -xJf "${NODE_ARCHIVE}" -C /opt/node --strip-components=1 && \
+    rm -f "${NODE_ARCHIVE}" && \
+    rm -rf /var/lib/apt/lists/*
+
+FROM runtime AS build
+WORKDIR /src
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+# This image uses a chiseled (minimal) Azure Functions base image.
+# It doesn't include the Node.js 24 runtime, so the next step copies it in from the matching runtime image.
+FROM mcr.microsoft.com/azure-functions/node:4-node24-chiseled AS final
+COPY --from=runtime /opt/node /usr/local
+
+# The base image doesn't include a shell. For debugging purposes, you can add other dependencies as needed.
+# For example, uncomment the lines below to add a lightweight shell using BusyBox.
+# BusyBox doesn't include an SSH server, so it doesn't enable SSH access to your app on App Service.
+# COPY --from=busybox:uclibc /bin/busybox /bin/busybox
+# RUN ["/bin/busybox", "--install", "-s", "/bin"]
+
+ENV PATH="/usr/local/bin:${PATH}" \
+    FUNCTIONS_WORKER_RUNTIME=node \
+    AzureWebJobsScriptRoot=/home/site/wwwroot \
+    AzureFunctionsJobHost__Logging__Console__IsEnabled=true
+
+COPY --from=build /src /home/site/wwwroot

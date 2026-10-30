@@ -34,6 +34,9 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.dotnet10Isolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet10Isolated</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.dotnet10IsolatedChiseled">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnet10IsolatedChiseled</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.dotnet11IsolatedChiseled">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet11IsolatedChiseled</LogicalName>
     </EmbeddedResource>
@@ -61,6 +64,15 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.java11">
       <LogicalName>$(AssemblyName).Dockerfile.java11</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.java25Chiseled">
+      <LogicalName>$(AssemblyName).Dockerfile.java25Chiseled</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.node24Chiseled">
+      <LogicalName>$(AssemblyName).Dockerfile.node24Chiseled</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.node26Chiseled">
+      <LogicalName>$(AssemblyName).Dockerfile.node26Chiseled</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.powershell7">
       <LogicalName>$(AssemblyName).Dockerfile.powershell7</LogicalName>
     </EmbeddedResource>
@@ -69,6 +81,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.powershell7.4">
       <LogicalName>$(AssemblyName).Dockerfile.powershell7.4</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.powershell7.6Chiseled">
+      <LogicalName>$(AssemblyName).Dockerfile.powershell7.6Chiseled</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.9">
       <LogicalName>$(AssemblyName).Dockerfile.python3.9</LogicalName>
@@ -93,6 +108,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.14-buildenv">
       <LogicalName>$(AssemblyName).Dockerfile.python3.14-buildenv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.14Chiseled">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.14Chiseled</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.15">
       <LogicalName>$(AssemblyName).Dockerfile.python3.15</LogicalName>
