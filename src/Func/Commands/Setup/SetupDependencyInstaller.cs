@@ -122,7 +122,7 @@ internal sealed class SetupDependencyInstaller(
                     exact: true,
                     force: false,
                     progress: null,
-                    cancellationToken)
+                    cancellationToken: cancellationToken)
                 : await _interaction.RunWithProgressAsync(
                     $"Installing {dependency.DisplayName} {targetVersion}",
                     async (ctx, ct) => await _workloadInstaller.InstallFromCatalogAsync(
@@ -133,7 +133,7 @@ internal sealed class SetupDependencyInstaller(
                         exact: true,
                         force: false,
                         new WorkloadInstallProgressAdapter(ctx),
-                        ct),
+                        cancellationToken: ct),
                     cancellationToken);
 
             string installedVersion = installResult.Entry.PackageVersion;

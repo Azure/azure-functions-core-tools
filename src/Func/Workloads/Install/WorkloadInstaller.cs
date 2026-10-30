@@ -9,7 +9,7 @@ using NuGet.Versioning;
 namespace Azure.Functions.Cli.Workloads.Install;
 
 internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IWorkloadPackageInspector packageInspector,
-    WorkloadRidPackageSelector ridPackageSelector, IWorkloadDeploymentService deploymentService) : IWorkloadInstaller
+    WorkloadRidPackageSelector ridPackageSelector, IWorkloadDeploymentService deploymentService, IWorkloadPackageTrust packageTrust) : IWorkloadInstaller
 {
     private readonly IWorkloadPackageSource _packageSource =
         packageSource ?? throw new ArgumentNullException(nameof(packageSource));
@@ -19,9 +19,11 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         ridPackageSelector ?? throw new ArgumentNullException(nameof(ridPackageSelector));
     private readonly IWorkloadDeploymentService _deploymentService =
         deploymentService ?? throw new ArgumentNullException(nameof(deploymentService));
+    private readonly IWorkloadPackageTrust _packageTrust =
+        packageTrust ?? throw new ArgumentNullException(nameof(packageTrust));
 
     public async Task<WorkloadInstallResult> InstallFromPackageAsync(string nupkgPath, bool force = false,
-        IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default)
+        IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nupkgPath);
 
@@ -31,7 +33,8 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         }
 
         string fullPath = Path.GetFullPath(nupkgPath);
-        InspectedWorkloadPackage package = await _packageInspector.InspectAsync(fullPath, cancellationToken);
+        using WorkloadPackageSnapshot snapshot = await _packageTrust.AcquireAsync(fullPath, allowUntrusted, cancellationToken);
+        InspectedWorkloadPackage package = await _packageInspector.InspectAsync(snapshot.Path, cancellationToken);
 
         if (package.Role != WorkloadPackageRole.Pointer)
         {
@@ -42,14 +45,16 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         WorkloadPointerSelection selection = _ridPackageSelector.SelectImplementation(package);
         LogicalPackage logicalPackage = CreateLogicalPackage(package, fullPath);
         string implementationPath = _packageSource.FindLocalImplementation(fullPath, selection.PackageId, package.Identity.Version, selection.RuntimeIdentifier);
-        InspectedWorkloadPackage implementation = await _packageInspector.InspectAsync(implementationPath, cancellationToken);
+        using WorkloadPackageSnapshot implementationSnapshot = await _packageTrust.AcquireAsync(implementationPath, allowUntrusted, cancellationToken);
+        InspectedWorkloadPackage implementation = await _packageInspector.InspectAsync(implementationSnapshot.Path, cancellationToken);
         _ridPackageSelector.ValidateImplementation(package, selection, implementation);
 
         return await _deploymentService.InstallAsync(implementation, implementationPath, WorkloadOwnershipKind.Logical, logicalPackage, force, progress, cancellationToken);
     }
 
     public async Task<WorkloadInstallResult> InstallFromCatalogAsync(string packageId, NuGetVersion? version, string? source,
-        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default)
+        bool? includePrerelease, bool exact, bool force, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         progress?.Report(new WorkloadInstallProgress(
@@ -66,7 +71,8 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         }
 
         using TemporaryWorkloadPackageFile packageDownload = await _packageSource.DownloadAsync(resolved, progress, cancellationToken);
-        InspectedWorkloadPackage package = await _packageInspector.InspectAsync(packageDownload.Path, cancellationToken);
+        using WorkloadPackageSnapshot snapshot = await _packageTrust.AcquireAsync(packageDownload.Path, allowUntrusted, cancellationToken);
+        InspectedWorkloadPackage package = await _packageInspector.InspectAsync(snapshot.Path, cancellationToken);
         ValidateResolvedIdentity(resolved, package.Identity);
 
         if (package.Role != WorkloadPackageRole.Pointer)
@@ -89,7 +95,8 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         ResolvedPackage implementationResolved = await _packageSource.ResolveImplementationAsync(package, selection, resolved.Source.Source, cancellationToken);
         using TemporaryWorkloadPackageFile implementationDownload = await _packageSource.DownloadAsync(implementationResolved, progress, cancellationToken);
-        InspectedWorkloadPackage implementation = await _packageInspector.InspectAsync(implementationDownload.Path, cancellationToken);
+        using WorkloadPackageSnapshot implementationSnapshot = await _packageTrust.AcquireAsync(implementationDownload.Path, allowUntrusted, cancellationToken);
+        InspectedWorkloadPackage implementation = await _packageInspector.InspectAsync(implementationSnapshot.Path, cancellationToken);
 
         ValidateResolvedIdentity(implementationResolved, implementation.Identity);
 
@@ -99,20 +106,21 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     }
 
     public async Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
-        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default)
-        => await UpdateAsync(packageId, targetInstalledVersion, source, includePrerelease, allowMajor, WorkloadOwnershipKind.Explicit, progress, cancellationToken);
+        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false,
+        CancellationToken cancellationToken = default)
+        => await UpdateAsync(packageId, targetInstalledVersion, source, includePrerelease, allowMajor, WorkloadOwnershipKind.Explicit, progress, allowUntrusted, cancellationToken);
 
     public async Task<WorkloadUpdateResult> UpdateAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
         bool? includePrerelease, bool allowMajor, WorkloadOwnershipKind ownership,
-        IProgress<WorkloadInstallProgress>? progress = null, CancellationToken cancellationToken = default)
+        IProgress<WorkloadInstallProgress>? progress = null, bool allowUntrusted = false, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
 
         return ownership == WorkloadOwnershipKind.Logical
             ? await UpdateLogicalAsync(
-                packageId, targetInstalledVersion, source, includePrerelease, allowMajor, progress, cancellationToken)
+                packageId, targetInstalledVersion, source, includePrerelease, allowMajor, progress, allowUntrusted, cancellationToken)
             : await UpdateExplicitAsync(
-                packageId, targetInstalledVersion, source, includePrerelease, allowMajor, progress, cancellationToken);
+                packageId, targetInstalledVersion, source, includePrerelease, allowMajor, progress, allowUntrusted, cancellationToken);
     }
 
     public async Task<bool> UninstallAsync(string packageId, string version, CancellationToken cancellationToken = default)
@@ -128,7 +136,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     }
 
     private async Task<WorkloadUpdateResult> UpdateExplicitAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
-        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
+        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, bool allowUntrusted, CancellationToken cancellationToken)
     {
         WorkloadEntry currentEntry = await _deploymentService.GetUpdateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Explicit, cancellationToken);
         var currentVersion = NuGetVersion.Parse(currentEntry.PackageVersion);
@@ -145,7 +153,8 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         }
 
         using TemporaryWorkloadPackageFile download = await _packageSource.DownloadAsync(resolved, progress, cancellationToken);
-        InspectedWorkloadPackage package = await _packageInspector.InspectAsync(download.Path, cancellationToken);
+        using WorkloadPackageSnapshot snapshot = await _packageTrust.AcquireAsync(download.Path, allowUntrusted, cancellationToken);
+        InspectedWorkloadPackage package = await _packageInspector.InspectAsync(snapshot.Path, cancellationToken);
         ValidateResolvedIdentity(resolved, package.Identity);
         WorkloadEntry newEntry = await _deploymentService.UpdateAsync(currentEntry, package, resolved.Source.Source, WorkloadOwnershipKind.Explicit, logicalPackage: null, progress, cancellationToken);
 
@@ -153,7 +162,7 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
     }
 
     private async Task<WorkloadUpdateResult> UpdateLogicalAsync(string packageId, NuGetVersion? targetInstalledVersion, string? source,
-        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, CancellationToken cancellationToken)
+        bool? includePrerelease, bool allowMajor, IProgress<WorkloadInstallProgress>? progress, bool allowUntrusted, CancellationToken cancellationToken)
     {
         WorkloadEntry currentEntry = await _deploymentService.GetUpdateTargetAsync(packageId, targetInstalledVersion, WorkloadOwnershipKind.Logical, cancellationToken);
         LogicalPackage currentLogical = currentEntry.LogicalPackage!;
@@ -181,7 +190,8 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
         }
 
         using TemporaryWorkloadPackageFile pointerDownload = await _packageSource.DownloadAsync(pointerResolved, progress, cancellationToken);
-        InspectedWorkloadPackage pointer = await _packageInspector.InspectAsync(pointerDownload.Path, cancellationToken);
+        using WorkloadPackageSnapshot pointerSnapshot = await _packageTrust.AcquireAsync(pointerDownload.Path, allowUntrusted, cancellationToken);
+        InspectedWorkloadPackage pointer = await _packageInspector.InspectAsync(pointerSnapshot.Path, cancellationToken);
 
         ValidateResolvedIdentity(pointerResolved, pointer.Identity);
 
@@ -211,7 +221,8 @@ internal sealed class WorkloadInstaller(IWorkloadPackageSource packageSource, IW
 
         ResolvedPackage implementationResolved = await _packageSource.ResolveImplementationAsync(pointer, selection, pointerResolved.Source.Source, cancellationToken);
         using TemporaryWorkloadPackageFile implementationDownload = await _packageSource.DownloadAsync(implementationResolved, progress, cancellationToken);
-        InspectedWorkloadPackage implementation = await _packageInspector.InspectAsync(implementationDownload.Path, cancellationToken);
+        using WorkloadPackageSnapshot implementationSnapshot = await _packageTrust.AcquireAsync(implementationDownload.Path, allowUntrusted, cancellationToken);
+        InspectedWorkloadPackage implementation = await _packageInspector.InspectAsync(implementationSnapshot.Path, cancellationToken);
         ValidateResolvedIdentity(implementationResolved, implementation.Identity);
         _ridPackageSelector.ValidateImplementation(pointer, selection, implementation);
         WorkloadEntry newEntry = await _deploymentService.UpdateAsync(currentEntry, implementation, implementationResolved.Source.Source, WorkloadOwnershipKind.Logical, newLogical, progress, cancellationToken);

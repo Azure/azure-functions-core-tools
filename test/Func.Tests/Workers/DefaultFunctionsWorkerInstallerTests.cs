@@ -59,7 +59,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>())
+                cancellationToken: Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(CreateWorkerEntry("3.13.0"), AlreadyInstalled: false));
         DefaultFunctionsWorkerInstaller installer = CreateInstaller();
 
@@ -92,7 +92,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>())
+                cancellationToken: Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(CreateWorkerEntry("3.14.0"), AlreadyInstalled: true));
         DefaultFunctionsWorkerInstaller installer = CreateInstaller();
 
@@ -138,7 +138,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>())
+                cancellationToken: Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(entry, AlreadyInstalled: false));
         DefaultFunctionsWorkerInstaller installer = CreateInstaller();
 
@@ -189,7 +189,7 @@ public class DefaultFunctionsWorkerInstallerTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>())
+                cancellationToken: Arg.Any<CancellationToken>())
             .Returns(new WorkloadInstallResult(entry, AlreadyInstalled: false));
         DefaultFunctionsWorkerInstaller installer = CreateInstaller();
 

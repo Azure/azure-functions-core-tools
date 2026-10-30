@@ -48,7 +48,7 @@ public sealed class SetupRunnerTests : IDisposable
                 Arg.Any<bool>(),
                 Arg.Any<bool>(),
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-                Arg.Any<CancellationToken>())
+                cancellationToken: Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 string packageId = (string)callInfo[0]!;
@@ -84,7 +84,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.10.0"),
@@ -93,7 +93,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -121,7 +121,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, _dotNetStackPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.0.0"),
@@ -130,7 +130,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
 
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.Contains(".Workers.", StringComparison.OrdinalIgnoreCase)),
@@ -140,7 +140,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.Contains("ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
@@ -149,7 +149,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -290,7 +290,8 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            allowUntrusted: Arg.Any<bool>(),
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -345,7 +346,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.Contains(".Workers.", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
@@ -354,7 +355,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.Contains("ExtensionBundles", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<NuGetVersion?>(),
@@ -363,7 +364,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -496,7 +497,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -519,7 +520,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Is(true),
             Arg.Is(false),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -542,7 +543,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -567,7 +568,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -606,7 +607,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -688,7 +689,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -716,7 +717,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -738,7 +739,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Any<string>(),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.20.0-preview.1"),
@@ -747,7 +748,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -776,7 +777,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, nodeTemplates, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.1.0-preview.1"),
@@ -785,7 +786,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -809,7 +810,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
         _interaction.Lines.Should().Contain(line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
     }
 
@@ -834,7 +835,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -884,7 +885,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -1030,7 +1031,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -1053,7 +1054,7 @@ public sealed class SetupRunnerTests : IDisposable
             Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            Arg.Any<CancellationToken>());
+            cancellationToken: Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -87,7 +87,8 @@ public abstract class WorkloadInstallerTestBase : IDisposable
     private protected static ResolvedPackage NewResolved(string id, string version)
         => new(id, NuGetVersion.Parse(version), new PackageSource("https://example/v3/index.json", "test"));
 
-    private protected WorkloadInstaller NewInstaller(bool includePrerelease = false, IWorkloadMetadataReader? metadataReader = null)
+    private protected WorkloadInstaller NewInstaller(bool includePrerelease = false, IWorkloadMetadataReader? metadataReader = null,
+        IWorkloadPackageTrust? packageTrust = null)
     {
         IWorkloadMetadataReader reader = metadataReader ?? _metadataReader;
         WorkloadRidPackageSelector selector = new(_runtimeIdentifierProvider);
@@ -95,7 +96,14 @@ public abstract class WorkloadInstallerTestBase : IDisposable
         WorkloadPackageSource packageSource =
             new(_catalog, inspector, Options.Create(new WorkloadCatalogOptions { IncludePrerelease = includePrerelease }));
         WorkloadDeploymentService deploymentService = new(_paths, _store, reader);
-        return new WorkloadInstaller(packageSource, inspector, selector, deploymentService);
+        IWorkloadPackageTrust trust = packageTrust ?? Substitute.For<IWorkloadPackageTrust>();
+        if (packageTrust is null)
+        {
+            trust.AcquireAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                .Returns(call => new WorkloadPackageTrust().AcquireAsync(call.Arg<string>(), true, call.Arg<CancellationToken>()));
+        }
+
+        return new WorkloadInstaller(packageSource, inspector, selector, deploymentService, trust);
     }
 
     private protected string BuildNupkg(string? tags = null, bool includeFuncCliWorkloadType = true, string version = "1.0.0",
