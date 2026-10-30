@@ -9,7 +9,7 @@
 
 - [ ] 2.1 Add func-owned models for projected and resolved Functions project configurations without exposing TemplateEngine post-action implementation types to commands.
 - [ ] 2.2 Project trusted configuration-action metadata, including whether each action is conditional, into installed project-template catalog entries.
-- [ ] 2.3 Resolve active configuration actions against final template parameters and final primary-output paths.
+- [ ] 2.3 Resolve the independent host-root inventory from retained outputs/effects, then match active configuration actions after final parameters. Require exactly one active finalization per root without deriving completeness from declarations alone.
 - [ ] 2.4 Leave stack and language unavailable in the init template context for every template.
 - [ ] 2.5 Add unit tests for single-project, multi-project, mixed, conditional, renamed, and unavailable topology projections.
 
@@ -32,11 +32,11 @@
 ## 5. Configuration Preflight and Dry-Run
 
 - [ ] 5.1 Validate the selected template has at least one mandatory trusted configuration action with canonical stack and language, and that an installed stack supports each action's language.
-- [ ] 5.2 Validate primary-output references, target containment, direct project-root anchors, unique project roots, and configuration output collisions.
+- [ ] 5.2 Validate primary-output references against independent inventory, target containment, direct project-root anchors, exactly one active configuration per normalized root, valid inventory deduplication, and configuration output collisions.
 - [ ] 5.3 Reject template file effects that create or modify `.func/config.json`.
 - [ ] 5.4 Add planned `.func/config.json` writes to combined creation effects and dry-run rendering.
 - [ ] 5.5 Ensure every selection, constraint, topology, and effect check completes before destructive `--force` cleanup.
-- [ ] 5.6 Add preflight and dry-run tests for malformed actions, missing or renamed outputs, duplicate roots, path traversal, collisions, conditional projects, and forced initialization.
+- [ ] 5.6 Add preflight and dry-run tests for malformed/omitted/inactive actions on active roots, active actions targeting absent roots, missing or renamed outputs, valid duplicate inventory observations versus multiple active plans, path traversal, collisions, both-inactive and mutually exclusive controls, conditional projects, and forced initialization.
 
 ## 6. Project Configuration Finalization
 
