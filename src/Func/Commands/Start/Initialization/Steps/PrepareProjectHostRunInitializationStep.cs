@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
@@ -85,7 +86,10 @@ internal sealed class PrepareProjectHostRunInitializationStep(
         var environmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         LocalSettingsSnapshot localSettings = _localSettingsProvider.Get(project.WorkingDirectory.Info);
-        MergeLocalSettingsValues(localSettings.Values, environmentVariables);
+        if (!localSettings.IsEncrypted)
+        {
+            MergeLocalSettingsValues(localSettings.Values, environmentVariables);
+        }
 
         foreach ((string name, string value) in context.State.HostEnvironmentVariables)
         {
@@ -117,6 +121,23 @@ internal sealed class PrepareProjectHostRunInitializationStep(
             {
                 environmentVariables[name] = value;
             }
+        }
+
+        // Only names survive encrypted input; reject values that would still be needed
+        // after safe resolution and guaranteed preparation or launcher replacements.
+        if (localSettings.IsEncrypted
+            && localSettings.EncryptedValueNames.Any(name =>
+                !string.IsNullOrEmpty(name)
+                && !environmentVariables.ContainsKey(name)
+                && _processEnvironment.Get(name) is null
+                && !project.GuaranteesHostRunEnvironmentVariableOverride(name)
+                && (context.Options.DemoMode || !HostProcessStartInfoFactory.GuaranteesEnvironmentVariableOverride(name))))
+        {
+            throw new GracefulException(
+                "Encrypted local.settings.json values are not supported by this Azure Functions CLI path. "
+                + "Use a supported decryption or migration workflow to provide plaintext local settings, "
+                + "or override the settings through the process environment.",
+                isUserError: true);
         }
 
         return environmentVariables;

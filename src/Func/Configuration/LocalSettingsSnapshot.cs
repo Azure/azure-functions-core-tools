@@ -7,13 +7,18 @@ internal sealed class LocalSettingsSnapshot
 {
     public static LocalSettingsSnapshot Empty { get; } = new();
 
+    public bool IsEncrypted { get; init; }
+
+    public IReadOnlyCollection<string> EncryptedValueNames { get; init; } = [];
+
     public IReadOnlyDictionary<string, string> Values { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     public LocalSettingsHostSnapshot? Host { get; init; }
 
     public string? WorkerRuntime =>
-        Values.TryGetValue(CliConfigurationNames.WorkerRuntimeSettingName, out string? value)
+        !IsEncrypted
+            && Values.TryGetValue(CliConfigurationNames.WorkerRuntimeSettingName, out string? value)
             && !string.IsNullOrWhiteSpace(value)
                 ? value
                 : null;

@@ -17,6 +17,12 @@ internal sealed class HostProcessStartInfoFactory
     public const string AspNetCoreSuppressStatusMessagesEnvironmentVariable = "ASPNETCORE_SUPPRESSSTATUSMESSAGES";
     public const string HostingLifetimeLogLevelEnvironmentVariable = "Logging__LogLevel__Microsoft.Hosting.Lifetime";
 
+    internal static bool GuaranteesEnvironmentVariableOverride(string name) =>
+        string.Equals(name, ScriptRootEnvironmentVariable, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(name, AzureFunctionsEnvironmentVariable, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(name, WebsiteHostnameEnvironmentVariable, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(name, HostingLifetimeLogLevelEnvironmentVariable, StringComparison.OrdinalIgnoreCase);
+
     public HostProcessLaunchInfo Create(HostProcessStartContext context)
     {
         ArgumentNullException.ThrowIfNull(context);

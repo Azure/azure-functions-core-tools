@@ -42,9 +42,14 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
                 return LocalSettingsSnapshot.Empty;
             }
 
+            bool isEncrypted = ReadNullableBoolean(document.RootElement, "IsEncrypted") == true;
+            IReadOnlyDictionary<string, string> values = ReadValues(document.RootElement);
+
             return new LocalSettingsSnapshot
             {
-                Values = ReadValues(document.RootElement),
+                IsEncrypted = isEncrypted,
+                EncryptedValueNames = isEncrypted ? [.. values.Keys] : [],
+                Values = isEncrypted ? LocalSettingsSnapshot.Empty.Values : values,
                 Host = ReadHost(document.RootElement),
             };
         }

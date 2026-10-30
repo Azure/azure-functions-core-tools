@@ -59,6 +59,10 @@ internal sealed class PythonFunctionsProject : FunctionsProject
 
     public override FunctionsWorkerReference WorkerReference => _workerReference;
 
+    public override bool GuaranteesHostRunEnvironmentVariableOverride(string name) =>
+        string.Equals(name, IsolateWorkerDepsEnvVar, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(name, WorkerExecutablePathEnvVar, StringComparison.OrdinalIgnoreCase);
+
     public override async Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);

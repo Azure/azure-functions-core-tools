@@ -55,6 +55,8 @@ public class PythonFunctionsProjectTests : IDisposable
             ReadEnvironmentVariable = _ => null,
         };
         FunctionsProjectHostRunContext context = CreateContext();
+        context.EnvironmentVariables[PythonFunctionsProject.IsolateWorkerDepsEnvVar] = "stale-isolation";
+        context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar] = "stale-python";
 
         await project.PrepareForHostRunAsync(context, default);
 
@@ -63,6 +65,12 @@ public class PythonFunctionsProjectTests : IDisposable
         pipUsed!.Should().Contain(PythonFunctionsProject.DefaultVenvFolderName);
         requirementsUsed.Should().Be(Path.Combine(_projectDir.FullName, "requirements.txt"));
         context.EnvironmentVariables[PythonFunctionsProject.IsolateWorkerDepsEnvVar].Should().Be("1");
+        context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar].Should().Be(
+            PythonFunctionsProject.GetVenvExecutablePath(venvCreatedAt!, "python"));
+        project.GuaranteesHostRunEnvironmentVariableOverride(PythonFunctionsProject.IsolateWorkerDepsEnvVar.ToLowerInvariant()).Should().BeTrue();
+        project.GuaranteesHostRunEnvironmentVariableOverride(PythonFunctionsProject.WorkerExecutablePathEnvVar).Should().BeTrue();
+        project.GuaranteesHostRunEnvironmentVariableOverride(PythonFunctionsProject.WorkerRuntimeVersionEnvVar).Should().BeFalse();
+        project.GuaranteesHostRunEnvironmentVariableOverride(PythonFunctionsProject.VirtualEnvEnvVar).Should().BeFalse();
     }
 
     [Fact]
