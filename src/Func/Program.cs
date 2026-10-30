@@ -32,6 +32,7 @@ catch (System.IO.IOException)
 
 DefaultTheme theme = new();
 SpectreInteractionService interaction = new(theme);
+UnexpectedErrorReporter unexpectedErrors = new(interaction);
 
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.
@@ -138,7 +139,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
     catch (Exception ex)
     {
         activity?.Fail(ex);
-        interaction.WriteError($"An unexpected error occurred: {ex.Message}");
+        unexpectedErrors.Report(ex, rootCommand is not null && commandParseResult?.GetValue(rootCommand.VerboseOption) is true);
         exitCode = 1;
     }
     finally

@@ -122,6 +122,10 @@ jobs:
             install.sh
           TargetFolder: $(publish_dir)
 
+      - pwsh: |
+          & ./eng/scripts/test-single-file-update.ps1
+        displayName: Test published single-file self-update
+
     - ${{ if containsValue(parameters.artifacts, 'npm') }}:
       - task: NodeTool@0
         displayName: Install Node.js
