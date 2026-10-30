@@ -30,7 +30,7 @@ public sealed class UnexpectedErrorReporterTests
 
         reporter.Report(exception, verbose: true);
 
-        interaction.Received().WriteHint(Arg.Is<string>(message =>
+        interaction.Received().WriteError(Arg.Is<string>(message =>
             message.Contains("FileNotFoundException", StringComparison.Ordinal)
             && message.Contains("System.Diagnostics.Process", StringComparison.Ordinal)
             && message.Contains("inner", StringComparison.Ordinal)));
