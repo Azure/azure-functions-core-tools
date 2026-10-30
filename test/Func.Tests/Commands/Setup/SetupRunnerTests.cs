@@ -693,34 +693,6 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunAsync_FeatureForRuntime_InstallsTemplatesWorkload()
-    {
-        string workerPackageId = WorkerPackage("node");
-        const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
-        const string nodeTemplates = "Azure.Functions.Cli.Workloads.Templates.Node";
-        FakeCatalog catalog = Catalog()
-            .WithLatest(_hostPackageId, "4.1.0")
-            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0")
-            .WithLatest(workerPackageId, "1.0.0")
-            .WithLatest(nodeStack, "1.0.0")
-            .WithLatest(nodeTemplates, "1.0.0");
-        SetupRunner runner = CreateRunner(catalog);
-
-        SetupRunResult result = await runner.RunAsync(Options(features: ["node"]), CancellationToken.None);
-
-        result.ExitCode.Should().Be(0);
-        await _installer.Received(1).InstallFromCatalogAsync(
-            Arg.Is<string>(id => string.Equals(id, nodeTemplates, StringComparison.OrdinalIgnoreCase)),
-            Arg.Any<NuGetVersion?>(),
-            Arg.Any<string?>(),
-            Arg.Any<bool>(),
-            Arg.Any<bool>(),
-            Arg.Any<bool>(),
-            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            cancellationToken: Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task RunAsync_StableProject_IgnoresPrereleaseBundle_EvenWithIncludePrerelease()
     {
         FakeCatalog catalog = Catalog()
@@ -752,18 +724,16 @@ public sealed class SetupRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunAsync_HostJsonPreviewBundle_InstallsPreviewBundleAndTemplates()
+    public async Task RunAsync_HostJsonPreviewBundle_InstallsPreviewBundle()
     {
         const string nodeStack = "Azure.Functions.Cli.Workloads.Node";
-        const string nodeTemplates = "Azure.Functions.Cli.Workloads.Templates.Node";
         _bundleReader.ReadAsync(Arg.Any<DirectoryInfo>(), Arg.Any<CancellationToken>())
             .Returns(new HostJsonBundleSection(BundleHelpers.PreviewBundleId, "[4.0.0, 5.0.0)"));
         FakeCatalog catalog = Catalog()
             .WithLatest(_hostPackageId, "4.1.0")
             .WithVersions(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0", "4.11.0-preview.1")
             .WithLatest(WorkerPackage("node"), "1.0.0")
-            .WithLatest(nodeStack, "1.0.0")
-            .WithVersions(nodeTemplates, "1.0.0", "1.1.0-preview.1");
+            .WithLatest(nodeStack, "1.0.0");
         SetupRunner runner = CreateRunner(catalog);
 
         SetupRunResult result = await runner.RunAsync(Options(features: ["node"]), CancellationToken.None);
@@ -772,15 +742,6 @@ public sealed class SetupRunnerTests : IDisposable
         await _installer.Received(1).InstallFromCatalogAsync(
             Arg.Is<string>(id => string.Equals(id, IInstalledBundleWorkloads.BundleWorkloadPackageId, StringComparison.OrdinalIgnoreCase)),
             Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "4.11.0-preview.1"),
-            Arg.Any<string?>(),
-            Arg.Any<bool>(),
-            Arg.Any<bool>(),
-            Arg.Any<bool>(),
-            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
-            cancellationToken: Arg.Any<CancellationToken>());
-        await _installer.Received(1).InstallFromCatalogAsync(
-            Arg.Is<string>(id => string.Equals(id, nodeTemplates, StringComparison.OrdinalIgnoreCase)),
-            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.1.0-preview.1"),
             Arg.Any<string?>(),
             Arg.Any<bool>(),
             Arg.Any<bool>(),

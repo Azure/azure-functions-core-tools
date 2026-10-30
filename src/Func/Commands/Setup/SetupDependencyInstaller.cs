@@ -222,7 +222,7 @@ internal sealed class SetupDependencyInstaller(
         }
     }
 
-    // Resolves a bundle or templates dependency on its declared channel. When the
+    // Resolves a bundle dependency on its declared channel. When the
     // requested channel has nothing published we fall back to the stable channel
     // (with a warning) so setup still provisions a working workload rather than failing.
     private async Task<CatalogResolution> ResolveChannelFromCatalogAsync(

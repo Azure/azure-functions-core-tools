@@ -166,7 +166,7 @@ public sealed class SetupDefaultHintTests
             result.ExitCode.Should().Be(0);
             fixture.Hints.Should().BeEmpty();
             fixture.Dependencies.Should().Equal(runtime == "dotnet-isolated"
-                ? [SetupDependencyKind.Host, SetupDependencyKind.Stack, SetupDependencyKind.Templates]
+                ? [SetupDependencyKind.Host, SetupDependencyKind.Stack]
                 : [SetupDependencyKind.Host, SetupDependencyKind.Worker, SetupDependencyKind.Stack, SetupDependencyKind.ExtensionBundle]);
             localSettings.Received(1).Get(Arg.Is<DirectoryInfo>(path => path.FullName == directory.FullName));
         }

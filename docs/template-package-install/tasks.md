@@ -3,7 +3,7 @@
 - [ ] 1.1 Complete the command-scoped `ITemplaterFactory`, immutable context, private engine session, and func-owned model boundaries required from `template-engine-integration`.
 - [ ] 1.2 Remove product access to `Templater.Settings`, `Templater.Creator`, and `Templater.PackageManager`, retaining only internal adapters and focused test seams.
 - [ ] 1.3 Add func-owned install, update, and uninstall request/result records plus domain exceptions for unsupported requests, ownership, source conflicts, invalid source usage, and failed replacement.
-- [ ] 1.4 Register the templater factory and package lifecycle infrastructure through `TemplatesServiceCollectionExtensions` with singleton factories and command-scoped facade instances.
+- [ ] 1.4 Extend the templater factory registration in `CliHostFactory` with package lifecycle infrastructure, retaining singleton factories and command-scoped facade instances.
 
 ## 2. Package Ownership and Source Resolution
 
@@ -60,7 +60,7 @@
 - [ ] 7.2 Register the nested commands as concrete singletons in `BuiltInCommands` and attach them to `NewCommand` without exposing them as top-level commands.
 - [ ] 7.3 Add applicable `--source` and `--force` options directly to the nested lifecycle commands.
 - [ ] 7.4 Add validators for invalid source combinations, unsupported force combinations, and missing package values.
-- [ ] 7.5 Ensure lifecycle subcommands bypass template-specific stage-B argument parsing and do not extend `NewCommandArgPreparer`.
+- [ ] 7.5 Route lifecycle subcommands before candidate-specific template argument parsing.
 - [ ] 7.6 Add `TemplatePackageCommandRunner` that resolves operation kind and source, creates one lifecycle `Templater`, and calls the matching func-owned method.
 - [ ] 7.7 Add `TemplatePackageCommandRenderer` using `IInteractionService` for installed, replaced, already-installed, updated, no-update, uninstalled, and next-action output.
 - [ ] 7.8 Catch only documented lifecycle domain exceptions at the command boundary and wrap them in `GracefulException` with inner exceptions preserved.

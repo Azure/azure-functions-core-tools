@@ -12,7 +12,6 @@ using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Projects;
-using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
 
@@ -20,36 +19,6 @@ namespace Azure.Functions.Cli.Tests.Console;
 
 public class PromptCapabilityConsumerTests
 {
-    [Theory]
-    [MemberData(nameof(SpectreInteractionServiceTests.Capabilities), MemberType = typeof(SpectreInteractionServiceTests))]
-    public async Task NewTemplateSelector_UsesWholeCommandCapabilities(bool input, bool stdoutAnsi, bool stderrAnsi, bool noColor)
-    {
-        using var stdout = new BufferedConsole(input, stdoutAnsi, noColor);
-        using var stderr = new BufferedConsole(input, stderrAnsi, noColor);
-        stderr.Enqueue(ConsoleKey.DownArrow);
-        stderr.Enqueue(ConsoleKey.Enter);
-        var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
-        var selector = new NewCommandTemplateSelector(service, new TemplatePicker(service));
-        FunctionTemplateInfo first = CreateTemplate("first");
-        FunctionTemplateInfo second = CreateTemplate("second");
-        var invocation = new NewInvocation(WorkingDirectory.FromExplicit(Path.GetTempPath()), null, null, false, false);
-
-        var result = await selector.SelectAsync(invocation, [first, second], CancellationToken.None);
-
-        if (input && stdoutAnsi && stderrAnsi)
-        {
-            result.Should().BeSameAs(second);
-            stderr.Reads.Should().Be(2);
-        }
-        else
-        {
-            result.Should().BeNull();
-            stderr.Output.Should().Contain("Missing required option: --template");
-            stderr.Reads.Should().Be(0);
-        }
-        stdout.Reads.Should().Be(0);
-    }
-
     [Theory]
     [MemberData(nameof(SpectreInteractionServiceTests.Capabilities), MemberType = typeof(SpectreInteractionServiceTests))]
     public async Task Init_MissingLanguage_UsesWholeCommandCapabilities(bool input, bool stdoutAnsi, bool stderrAnsi, bool noColor)
@@ -147,6 +116,4 @@ public class PromptCapabilityConsumerTests
         OutputModeResolver.Resolve(null, true, service).Should().Be(OutputMode.Plain);
     }
 
-    private static FunctionTemplateInfo CreateTemplate(string id)
-        => new(id, "node", EngineIds.V2, id, null, null, ["javascript"], new TemplateMetadata([], false, null));
 }

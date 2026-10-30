@@ -77,7 +77,7 @@ func <command> [path] [options]
 | Command | Description |
 |---------|-------------|
 | `func init [path]` | Initialize a new Azure Functions project |
-| `func new [path]` | Create a new function from a template |
+| `func new [path]` | Function scaffolding is temporarily unavailable |
 | `func run [path]` | Start the Functions host locally (alias: `func start`) |
 | `func workload install <id>` | Install a language workload |
 | `func workload list` | List installed workloads |
@@ -85,6 +85,12 @@ func <command> [path] [options]
 | `func help [command]` | Display help for a command |
 
 ## Architecture
+
+The function-template engine is implemented under `src/Func/Templates/Engine`
+on `Microsoft.TemplateEngine`. `func new` command integration is in progress;
+until available, scaffolding and `--list` return a nonzero exit code without
+modifying the target directory. `func init`, quickstarts, setup, and runtime
+execution remain available.
 
 The v5 CLI is a ground-up rebuild using:
 

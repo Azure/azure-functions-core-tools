@@ -124,8 +124,7 @@ internal static class Parser
 
     private static void ReplaceHelpAction(FuncRootCommand rootCommand, HelpCommand helpCommand)
     {
-        var templateAwareHelp = new TemplateAwareHelpAction(helpCommand);
-        var spectreHelp = new SpectreHelpAction(helpCommand, templateAwareHelp);
+        var spectreHelp = new SpectreHelpAction(helpCommand);
 
         SetHelpAction(rootCommand, spectreHelp);
 
@@ -159,4 +158,3 @@ internal static class Parser
         });
     }
 }
-

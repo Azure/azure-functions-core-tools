@@ -767,7 +767,6 @@ public class WorkloadInstallNextStepsHintTests
     [InlineData("Azure.Functions.Cli.Workloads.Workers.node", "node")]
     [InlineData("Azure.Functions.Cli.Workloads.Go", "go")]
     [InlineData("Azure.Functions.Cli.Workloads.Python", "python")]
-    [InlineData("Azure.Functions.Cli.Workloads.Templates.Node", "node")]
     public async Task Install_KnownFeaturePackage_PrintsSetupHint(string packageId, string expectedFeature)
     {
         StubInstall(packageId);

@@ -75,7 +75,7 @@ internal sealed class SetupCommand : FuncCliCommand, IBuiltInCommand
         : base(
             "setup",
             "Prepare local Azure Functions CLI dependencies. "
-            + "Reconciles host, worker, stack, templates, and extension bundle workloads for the chosen stack(s). "
+            + "Reconciles host, worker, stack, and extension bundle workloads for the chosen stack(s). "
             + "For installing individual workload packages, see 'func workload'.")
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));

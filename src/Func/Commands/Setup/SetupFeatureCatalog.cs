@@ -16,7 +16,6 @@ internal static class SetupFeatureCatalog
     public const string HostFeature = "host";
 
     private const string WorkerPackagePrefix = "Azure.Functions.Cli.Workloads.Workers.";
-    private const string TemplatesPackagePrefix = "Azure.Functions.Cli.Workloads.Templates.";
     private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
 
     public static bool TryGetFeatureForRuntime(string? workerRuntime, out string feature)
@@ -64,8 +63,7 @@ internal static class SetupFeatureCatalog
         }
 
         if (TryGetStackFeatureFromPrefix(id, WorkerPackagePrefix, out feature)
-            || TryGetStackFeatureFromPrefix(id, TemplatesPackagePrefix, out feature)
-            // Stack prefix is also a prefix of worker/templates ids, so it must run last.
+            // Stack prefix is also a prefix of worker ids, so it must run last.
             || TryGetStackFeatureFromPrefix(id, StackPackagePrefix, out feature))
         {
             return true;
