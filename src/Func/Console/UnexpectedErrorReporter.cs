@@ -14,7 +14,7 @@ internal sealed class UnexpectedErrorReporter(IInteractionService interaction)
         _interaction.WriteError($"An unexpected error occurred: {message}");
         if (verbose)
         {
-            _interaction.WriteHint(exception.ToString());
+            _interaction.WriteError(exception.ToString());
         }
     }
 }
