@@ -5,8 +5,7 @@
         DotNet,
         PowerShell,
         Java,
-        Node,
-        Python
+        Node
     }
 
     public static class FunctionAppRuntimeExtensions

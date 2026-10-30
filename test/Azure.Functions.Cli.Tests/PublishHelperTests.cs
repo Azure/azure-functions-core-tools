@@ -11,7 +11,7 @@ namespace Azure.Functions.Cli.PublishHelperTests
         [Theory]
         [InlineData("DOCKER|mcr.microsoft.com/azure-functions/node", false)]
         [InlineData("DOCKER|customimage", true)]
-        [InlineData("PYTHON|3.6", false)]
+        [InlineData("NODE|18", false)]
         [InlineData("DOTNET", false)]
         [InlineData("", false)]
         public void IsLinuxFxVersionUsingCustomImageTest(string linuxFxVersion, bool expected)
@@ -23,8 +23,8 @@ namespace Azure.Functions.Cli.PublishHelperTests
         [InlineData("DOCKER|mcr.microsoft.com/azure-functions/dotnet", WorkerRuntime.dotnet, true)]
         [InlineData("DOCKER|mcr.microsoft.com/azure-functions/node", WorkerRuntime.dotnet, false)]
         [InlineData("DOCKER|customimage", WorkerRuntime.dotnet, false)]
-        [InlineData("PYTHON|3.7", WorkerRuntime.python, true)]
-        [InlineData("PYTHON|3.7", WorkerRuntime.node, false)]
+        [InlineData("NODE|18", WorkerRuntime.node, true)]
+        [InlineData("NODE|18", WorkerRuntime.dotnet, false)]
         [InlineData("", WorkerRuntime.dotnet, true)]
         public void IsLinuxFxVersionRuntimeMatchedTest(string linuxFxVersion, WorkerRuntime runtime, bool expected)
         {

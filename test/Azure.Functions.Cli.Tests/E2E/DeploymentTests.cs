@@ -20,7 +20,7 @@ namespace Azure.Functions.Cli.Tests.E2E
         private readonly static string id = DateTime.Now.ToString("HHmmss");
         private readonly static string linuxStorageAccountName = $"lcte2estorage{id}";
         private readonly static string linuxConsumptionServerFarm = $"lcte2ecserverfarm{id}";
-        private readonly static string linuxConsumptionPythonFunctionApp = $"lcte2ecpython{id}";
+        private readonly static string linuxConsumptionNodeFunctionApp = $"lcte2ecnode{id}";
         private bool ResroucesCreated = false;
 
         public DeploymentTests(ITestOutputHelper output, StorageAccountManager saManager, ServerFarmManager sfManager, FunctionAppManager faManager) : base(output)
@@ -45,7 +45,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 if ((!_storageAccountManager.Contains(linuxStorageAccountName) ||
                 !_serverFarmManager.Contains(linuxConsumptionServerFarm) ||
-                !_functionAppManager.Contains(linuxConsumptionPythonFunctionApp)) &&
+                !_functionAppManager.Contains(linuxConsumptionNodeFunctionApp)) &&
                 !EnvironmentHelper.GetEnvironmentVariableAsBool(E2ETestConstants.CodeQLBuild))
                 {
                     InitializeLinuxResources().Wait();
@@ -77,14 +77,14 @@ namespace Azure.Functions.Cli.Tests.E2E
             string storageAccountKey = listkeys.keys.FirstOrDefault().value;
 
             // Create function app
-            await _functionAppManager.Create(linuxConsumptionPythonFunctionApp, linuxStorageAccountName, storageAccountKey, linuxConsumptionServerFarm,
-                os: FunctionAppOs.Linux, runtime: FunctionAppRuntime.Python);
-            await _functionAppManager.WaitUntilSiteAvailable(linuxConsumptionPythonFunctionApp);
-            await _functionAppManager.WaitUntilScmSiteAvailable(linuxConsumptionPythonFunctionApp);
+            await _functionAppManager.Create(linuxConsumptionNodeFunctionApp, linuxStorageAccountName, storageAccountKey, linuxConsumptionServerFarm,
+                os: FunctionAppOs.Linux, runtime: FunctionAppRuntime.Node);
+            await _functionAppManager.WaitUntilSiteAvailable(linuxConsumptionNodeFunctionApp);
+            await _functionAppManager.WaitUntilScmSiteAvailable(linuxConsumptionNodeFunctionApp);
         }
 
         [SkippableFact]
-        public async void RemoteBuildPythonFunctionApp()
+        public async Task RemoteBuildNodeFunctionApp()
         {
             Skip.IfNot(ResroucesCreated, "Resources are not created");
             TestConditions.SkipIfPublicBuild();
@@ -94,9 +94,9 @@ namespace Azure.Functions.Cli.Tests.E2E
                 {
                     Commands = new[]
                     {
-                        "init . --worker-runtime python",
-                        "new -l python -t HttpTrigger -n httptrigger",
-                        $"azure functionapp publish {linuxConsumptionPythonFunctionApp} --build remote"
+                        "init . --worker-runtime node --skip-npm-install",
+                        "new -l javascript -t HttpTrigger -n httptrigger",
+                        $"azure functionapp publish {linuxConsumptionNodeFunctionApp} --build remote"
                     },
                     OutputContains = new string[]
                     {

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
 using Xunit.Abstractions;
@@ -17,7 +16,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [Theory]
         [InlineData("node")]
         [InlineData("java")]
-        [InlineData("python")]
         public Task init_with_worker_runtime(string workerRuntime)
         {
             var files = new List<FileResult>
@@ -105,9 +103,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [InlineData("node", "v4")]
         [InlineData("node", "")]
         [InlineData("java", "v1")]
-        [InlineData("python", "v1")]
-        [InlineData("python", "v2")]
-        [InlineData("python", "")]
         public Task init_with_worker_runtime_and_model(string workerRuntime, string programmingModel)
         {
             var files = new List<FileResult>
@@ -123,14 +118,7 @@ namespace Azure.Functions.Cli.Tests.E2E
                 }
             };
 
-            if (workerRuntime == "python" && (programmingModel == "v2" || programmingModel == string.Empty))
-            {
-                files.Add(new FileResult
-                {
-                    Name = "function_app.py",
-                });
-            }
-            else if (workerRuntime == "node" && (programmingModel == "v4" || programmingModel == string.Empty))
+            if (workerRuntime == "node" && (programmingModel == "v4" || programmingModel == string.Empty))
             {
                 files.Add(new FileResult
                 {
@@ -164,7 +152,6 @@ namespace Azure.Functions.Cli.Tests.E2E
         [InlineData("node", "v1")]
         [InlineData("node", "v2")]
         [InlineData("java", "v2")]
-        [InlineData("python", "v3")]
         public Task init_with_worker_runtime_and_unsupported_model(string workerRuntime, string programmingModel)
         {
             return CliTester.Run(new RunConfiguration
@@ -332,27 +319,6 @@ namespace Azure.Functions.Cli.Tests.E2E
                     }
                 },
                 CommandTimeout = TimeSpan.FromSeconds(300),
-                OutputContains = new[] { "Dockerfile" }
-            }, _output);
-        }
-
-        [SkippableFact]
-        public async Task init_with_python_Dockerfile()
-        {
-            WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
-            Skip.If(worker == null);
-
-            await CliTester.Run(new RunConfiguration
-            {
-                Commands = new[] { $"init . --worker-runtime python --docker" },
-                CheckFiles = new[]
-                {
-                    new FileResult
-                    {
-                        Name = "Dockerfile",
-                        ContentContains = new[] { $"FROM mcr.microsoft.com/azure-functions/python:4-python{worker.Major}.{worker.Minor}" }
-                    }
-                },
                 OutputContains = new[] { "Dockerfile" }
             }, _output);
         }
@@ -776,7 +742,7 @@ namespace Azure.Functions.Cli.Tests.E2E
             {
                 Commands = new[]
                 {
-                    $"init . --worker-runtime python --managed-dependencies "
+                    "init . --worker-runtime node --managed-dependencies"
                 },
                 HasStandardError = true,
                 ErrorContains = new[]
@@ -786,113 +752,31 @@ namespace Azure.Functions.Cli.Tests.E2E
             }, _output);
         }
 
-        [Fact]
-        public Task init_python_app_twice()
-        {
-            return CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init \"anapp\" --worker-runtime python -m v1",
-                    "init \"anapp\" --worker-runtime python -m v1"
-                },
-                OutputContains = new[]
-                {
-                    "Writing .gitignore",
-                    "Writing host.json",
-                    "Writing local.settings.json",
-                    "Writing getting_started.md",
-                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                    "requirements.txt already exists. Skipped!",
-                    ".gitignore already exists. Skipped!",
-                    "host.json already exists. Skipped!",
-                    "getting_started.md already exists. Skipped!",
-                    "local.settings.json already exists. Skipped!",
-                    $".vscode{Path.DirectorySeparatorChar}extensions.json already exists. Skipped!"
-                }
-            }, _output);
-        }
-
-        [Fact]
-        public Task init_python_app_twice_new_programming_model()
-        {
-            return CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init \"anapp\" --worker-runtime python",
-                    "init \"anapp\" --worker-runtime python"
-                },
-                OutputContains = new[]
-                {
-                    "Writing .gitignore",
-                    "Writing host.json",
-                    "Writing local.settings.json",
-                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
-                    "requirements.txt already exists. Skipped!",
-                    ".gitignore already exists. Skipped!",
-                    "host.json already exists. Skipped!",
-                    "local.settings.json already exists. Skipped!",
-                    $".vscode{Path.DirectorySeparatorChar}extensions.json already exists. Skipped!"
-                }
-            }, _output);
-        }
-
         [Theory]
-        [InlineData("-m V1")]
-        [InlineData("-m V2")]
-        [InlineData("")]
-        public Task init_python_app_generates_requirements_txt(string modelParameter)
+        [InlineData("v3")]
+        [InlineData("v4")]
+        public Task init_node_app_twice(string programmingModel)
         {
             return CliTester.Run(new RunConfiguration
             {
                 Commands = new[]
                 {
-                    $"init . --worker-runtime python {modelParameter}"
+                    $"init \"anapp\" --worker-runtime node -m {programmingModel} --skip-npm-install",
+                    $"init \"anapp\" --worker-runtime node -m {programmingModel} --skip-npm-install"
                 },
                 OutputContains = new[]
                 {
-                    "Writing requirements.txt"
-                },
-                CheckFiles = new FileResult[]
-                {
-                    new FileResult
-                    {
-                        Name = "requirements.txt",
-                        ContentContains = new []
-                        {
-                            "# Do not include azure-functions-worker",
-                            "azure-functions"
-                        }
-                    }
-                },
-            }, _output);
-        }
-
-        [Fact]
-        public Task init_python_app_generates_getting_started_md()
-        {
-            return CliTester.Run(new RunConfiguration
-            {
-                Commands = new[]
-                {
-                    "init . --worker-runtime python -m V1"
-                },
-                OutputContains = new[]
-                {
-                    "Writing getting_started.md"
-                },
-                CheckFiles = new FileResult[]
-                {
-                    new FileResult
-                    {
-                        Name = "getting_started.md",
-                        ContentContains = new []
-                        {
-                            "## Getting Started with Azure Function"
-                        }
-                    }
-                },
+                    "Writing .gitignore",
+                    "Writing host.json",
+                    "Writing local.settings.json",
+                    "Writing package.json",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json",
+                    "package.json already exists. Skipped!",
+                    ".gitignore already exists. Skipped!",
+                    "host.json already exists. Skipped!",
+                    "local.settings.json already exists. Skipped!",
+                    $".vscode{Path.DirectorySeparatorChar}extensions.json already exists. Skipped!"
+                }
             }, _output);
         }
 
