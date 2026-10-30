@@ -76,7 +76,7 @@ Raw workload package installation belongs to `func workload install`. An unknown
 
 The `dotnet` setup name and its `dotnet-isolated` alias do not enable in-process .NET. `.net` and `dotnet-inprocess` are rejected.
 
-Stack package IDs use fixed `Azure.Functions.Cli.Workloads.<Name>` mappings. Legacy template-content workloads have been removed and are no longer installed by setup. Metadata-driven stack discovery, custom template package acquisition, and metapackage-based setup recipes are future work, not implemented by this setup flow.
+Stack package IDs use fixed `Azure.Functions.Cli.Workloads.<Name>` mappings. Template packages are managed through the template engine and are separate from setup. Metadata-driven stack discovery, direct template-package acquisition, and metapackage-based setup recipes are future work, not implemented by this setup flow.
 
 ## 5. Feature Defaults
 

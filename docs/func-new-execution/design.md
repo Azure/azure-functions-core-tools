@@ -2,9 +2,9 @@
 
 See `proposal.md` for motivation and `specs/func-new-execution/spec.md` for the command contract.
 
-`NewCommand` retains the shared optional `[path]` argument, template selection through `--template`, and `--format`. Scaffolding and listing currently fail with a migration diagnostic before writing project files. The legacy providers, content workloads, dynamic option hydration, pre-parse hook, and orchestration have been removed. They must not be reintroduced when implementing this design.
+The integration under `src/Func/Templates/Engine` creates command-scoped Template Engine sessions and lists installed templates through func-owned catalog entries, including projected template metadata and parameter definitions. This design specifies the remaining `func new` resolution, argument handling, and invocation flow. Until that command integration is complete, scaffolding and listing return a nonzero exit code before modifying project files.
 
-The `template-engine-integration` change establishes the replacement boundary: one command-scoped `Templater`, constraint-aware immutable template groups, projected `func.host.json` parameter metadata, and self-invoking `ResolvedTemplate` instances. This change defines how `func new` consumes that boundary for item templates. It does not define `func init`.
+The command consumes the catalog through one command-scoped `Templater`. The design keeps command context, candidate filtering, projected `func.host.json` parameter metadata, and invocation within that session. It does not define `func init`.
 
 Microsoft.TemplateEngine 10.0.301 directly supports preview through `TemplateCreator.InstantiateAsync(..., dryRun: true, ...)`. Preview returns creation effects, including file changes and post-actions, without creating the target directory or applying template content.
 
@@ -93,7 +93,7 @@ NewExecutionRequest
 `- RawTemplateTokens
 ```
 
-This replaces both dynamic option attachment and manual key/value walking. `NewCommandArgPreparer` is removed; the preliminary parse no longer resolves projects through a service locator, blocks on asynchronous work, reads `Environment.CurrentDirectory` in business logic, or swallows failures.
+The command parser preserves template arguments until the selected candidates' projected parameter definitions are available. It then parses those arguments against each candidate without mutating the singleton command's option graph.
 
 **Alternative considered:** attach every candidate option to the singleton `NewCommand` before the root parse. Candidate variants can expose different aliases and types, stale options can survive across invocations, and failures occur before project-aware diagnostics are available. It is rejected.
 
@@ -181,7 +181,7 @@ Optional parameters are left to template defaults. Invalid explicit values fail 
 
 `--non-interactive` and `IInteractionService.IsInteractive == false` use the same refusal path. Diagnostics enumerate candidate identities or all missing required aliases so automation can correct the invocation in one pass.
 
-Existing selection rendering can be reused where it accepts func-owned candidate models, but prompting must not depend on legacy template workload or provider types.
+Selection and prompting operate on func-owned catalog and resolution models from the template engine integration.
 
 ### `--path` is the template execution directory
 
@@ -249,7 +249,7 @@ Known user failures become `GracefulException` only at the command boundary when
 3. Introduce the static `func new` grammar, template execution `--path`, existing rendering `--format`, and `--dry-run`.
 4. Add strict candidate parsing and deterministic alias assignment using projected parameter definitions.
 5. Route listing, filtering, prompting, dry-run, and creation through command-scoped `Templater` and `ResolvedTemplate`.
-6. Replace legacy workload/provider dispatch, dynamic option hydration, and `NewCommandArgPreparer`.
+6. Connect the command parser and orchestration to the command-scoped `Templater`.
 7. Update command help, tests, and user documentation for the positional template and output-option changes.
 
-During migration, the legacy execution path can remain behind the existing runner while the new func-owned models are introduced. The final command switch must remove permissive fallback parsing so behavior cannot vary by whether pre-parse hydration happened to succeed. Rollback restores the previous command wiring and option meanings; the shared TemplateEngine settings hive and installed package registry are unchanged.
+The command switch enables scaffolding only when listing, resolution, argument validation, prompting, and invocation all use the same command-scoped engine context. The existing TemplateEngine settings hive and installed package registry remain the source of template state.

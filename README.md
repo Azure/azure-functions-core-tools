@@ -77,7 +77,7 @@ func <command> [path] [options]
 | Command | Description |
 |---------|-------------|
 | `func init [path]` | Initialize a new Azure Functions project |
-| `func new [path]` | Temporarily unavailable during the template engine migration |
+| `func new [path]` | Function scaffolding is temporarily unavailable |
 | `func run [path]` | Start the Functions host locally (alias: `func start`) |
 | `func workload install <id>` | Install a language workload |
 | `func workload list` | List installed workloads |
@@ -86,17 +86,11 @@ func <command> [path] [options]
 
 ## Architecture
 
-The legacy function-template engines and their template-content workloads have
-been removed. `func new`, including `--list` and `--force`, reports a migration
-diagnostic and exits with code 1 without modifying the target directory.
-`func init` retains its independent workload initializers, including project
-adoption and configuration repair; quickstarts and runtime execution also remain
-available. Setup no longer installs the removed template-content workloads.
-
-The single intended function-template engine is the integration under
-`src/Func/Templates/Engine`, backed by `Microsoft.TemplateEngine`. Command
-resolution, parameter parsing, and invocation integration are separate work;
-do not register another provider or restore the removed dispatch layer.
+The function-template engine is implemented under `src/Func/Templates/Engine`
+on `Microsoft.TemplateEngine`. `func new` command integration is in progress;
+until available, scaffolding and `--list` return a nonzero exit code without
+modifying the target directory. `func init`, quickstarts, setup, and runtime
+execution remain available.
 
 The v5 CLI is a ground-up rebuild using:
 

@@ -1,6 +1,6 @@
 ## Why
 
-`func new` needs a deterministic item-template execution path that resolves the current Functions project, selects only compatible item templates, strictly interprets template-specific arguments, and prompts only when user input is genuinely required. The former dynamic option hydration and legacy provider dispatch have been removed. The command currently reports that scaffolding and listing are unavailable; this proposal describes the subsequent integration, not the current command behavior.
+`func new` needs a deterministic item-template execution path built on the command-scoped Template Engine integration under `src/Func/Templates/Engine`. It resolves the current Functions project, selects only compatible item templates, parses template-specific arguments against projected parameter definitions, and prompts only when user input is genuinely required. Until command integration is complete, scaffolding and listing return a nonzero exit code without modifying project files.
 
 ## What Changes
 

@@ -1,12 +1,12 @@
 ## Context
 
-See `proposal.md` for motivation and `specs/template-package-install/spec.md` for lifecycle behavior. The companion `../template-engine-integration/` change defines the shared TemplateEngine boundary, command-scoped `Templater` lifetime, func settings hive, and rule that raw TemplateEngine types remain internal.
+See `proposal.md` for motivation and `specs/template-package-install/spec.md` for lifecycle behavior. Package lifecycle operations use the shared TemplateEngine boundary, command-scoped `Templater` lifetime, func settings hive, and func-owned models.
 
-The current code has the following relevant surfaces:
+The implementation has the following relevant surfaces:
 
-- `Templates/Engine/Templater.cs` wraps template listing using a command-scoped engine session. Raw engine objects remain internal.
-- `Commands/NewCommand.cs` retains the singleton command surface but currently fails execution and listing with a migration diagnostic. It has no lifecycle subcommands or lifecycle options.
-- The legacy project-aware execution pipeline and provider registry have been removed. Future command orchestration must not absorb package-management behavior.
+- `Templates/Engine/Templater.cs` lists installed item or project templates using a command-scoped engine session and projects their func host metadata and parameter definitions. Raw engine objects remain internal.
+- `Commands/NewCommand.cs` currently returns a clear failure for scaffolding and listing. It has no lifecycle subcommands or lifecycle options.
+- Package lifecycle operations are a separate command path over the shared template engine facade; they do not require project, stack, language, or bundle resolution.
 - `Hosting/CliHostFactory.cs` registers `ITemplaterFactory` as a singleton.
 - `Hosting/BuiltInCommands.cs` registers `NewCommand` directly as a top-level command; nested commands need concrete registrations so they are not also added at the root.
 - `Workloads/Catalog/IPackageSourceProvider.cs` already implements the required `--source`, `FUNC_CLI_WORKLOADS_SOURCE`, and nuget.org precedence.
@@ -77,9 +77,9 @@ NewUninstallCommand  -> func new uninstall <package>
 
 The nested commands own their applicable `--source` and `--force` options. Command validators reject `--source` where package acquisition is not performed, unsupported force combinations, and missing or whitespace package expressions.
 
-Lifecycle subcommands delegate to `TemplatePackageCommandRunner`. They are recognized during stage A and bypass the template-specific reparsing described by `template-engine-integration`. The legacy pre-parse hook has already been removed and must not be restored for lifecycle behavior.
+Lifecycle subcommands delegate to `TemplatePackageCommandRunner`. They are recognized during stage A and bypass candidate-specific parsing used for template invocation.
 
-**Alternative considered:** add legacy option aliases on the parent command. The aliases overload template execution parsing, complicate diagnostics, and preserve a form that func does not need for compatibility. They are rejected in favor of subcommands only.
+**Alternative considered:** add package lifecycle options on the parent command. The aliases overload template execution parsing and complicate diagnostics. Lifecycle operations use subcommands instead.
 
 ### The command layer owns orchestration and rendering
 

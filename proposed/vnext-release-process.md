@@ -99,9 +99,7 @@ at pack time:
 | `experimental` | `bundles/v4.35.0-experimental.1`  | `4.35.0-experimental.1`   |
 
 The `BundleVersion` (payload version) defaults to the channel's pinned value
-in `eng/build/Workloads/Workloads.ExtensionBundles.Version.props`. Legacy
-template-content workloads and their release pipelines have been removed;
-bundle versioning no longer coordinates with those packages.
+in `eng/build/Workloads/Workloads.ExtensionBundles.Version.props`.
 
 ### Release steps (bundles)
 

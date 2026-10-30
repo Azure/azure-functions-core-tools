@@ -60,7 +60,7 @@
 - [ ] 7.2 Register the nested commands as concrete singletons in `BuiltInCommands` and attach them to `NewCommand` without exposing them as top-level commands.
 - [ ] 7.3 Add applicable `--source` and `--force` options directly to the nested lifecycle commands.
 - [ ] 7.4 Add validators for invalid source combinations, unsupported force combinations, and missing package values.
-- [ ] 7.5 Ensure lifecycle subcommands bypass template-specific stage-B argument parsing and do not extend `NewCommandArgPreparer`.
+- [ ] 7.5 Route lifecycle subcommands before candidate-specific template argument parsing.
 - [ ] 7.6 Add `TemplatePackageCommandRunner` that resolves operation kind and source, creates one lifecycle `Templater`, and calls the matching func-owned method.
 - [ ] 7.7 Add `TemplatePackageCommandRenderer` using `IInteractionService` for installed, replaced, already-installed, updated, no-update, uninstalled, and next-action output.
 - [ ] 7.8 Catch only documented lifecycle domain exceptions at the command boundary and wrap them in `GracefulException` with inner exceptions preserved.

@@ -3,12 +3,6 @@
 Everything we need to GA the v5 CLI, organized by milestone. Each bullet
 is one issue / one PR scope (unless explicitly informational).
 
-> Template-workload items below are historical planning references. The legacy
-> implementations and content workloads have since been removed. Future template
-> work uses `src/Func/Templates/Engine` and the designs under
-> `docs/template-engine-integration` and `docs/template-package-install`,
-> not the former workload/provider registration model.
-
 ---
 
 ## Milestone 1 (Now: August)

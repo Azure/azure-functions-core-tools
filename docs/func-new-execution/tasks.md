@@ -65,17 +65,13 @@
 - [ ] 7.6 Render dry-run create, modify, delete, and post-action effects with an explicit preview label in plain and JSON formats.
 - [ ] 7.7 Render successful creation, destructive conflicts, and known invocation failures from func-owned result models.
 
-## 8. Legacy Path Removal and DI
+## 8. Command Integration and DI
 
-The removal-only increment is complete. Scaffolding and listing remain unavailable until the integration tasks below are implemented.
-
-- [x] 8.1 Remove `NewCommandArgPreparer` and its pre-parse call from `Program`.
-- [x] 8.2 Remove dynamic option attachment, unmatched-token key/value walking, and silent hydration catches from `NewCommand`.
-- [ ] 8.3 Implement parameter handling using projected `ResolvedTemplate.Parameters` and strict candidate parsing, without restoring legacy hydration.
-- [ ] 8.4 Implement command orchestration using `ITemplaterFactory`, without legacy template workloads or provider-registry dispatch.
-- [ ] 8.5 Remove or adapt `LanguageTiebreaker` so explicit language is authoritative and prompting occurs only after all deterministic filters.
-- [ ] 8.6 Register the new request orchestration, argument parser, alias assignment, prompting, and rendering dependencies with the narrowest appropriate lifetimes.
-- [x] 8.7 Remove legacy template-selection types, consumers, and dedicated tests.
+- [ ] 8.1 Keep the unavailable command response until the complete Template Engine execution path is connected.
+- [ ] 8.2 Parse template arguments against projected `ResolvedTemplate.Parameters` with strict candidate-specific parsing.
+- [ ] 8.3 Implement command orchestration using `ITemplaterFactory` and the command-scoped engine context.
+- [ ] 8.4 Remove or adapt `LanguageTiebreaker` so explicit language is authoritative and prompting occurs only after all deterministic filters.
+- [ ] 8.5 Register the new request orchestration, argument parser, alias assignment, prompting, and rendering dependencies with the narrowest appropriate lifetimes.
 
 ## 9. Command and Parser Tests
 
