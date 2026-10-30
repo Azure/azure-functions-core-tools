@@ -39,6 +39,11 @@ Workload Spec §5.3.1). If `Microsoft.Azure.Functions.Worker.ItemTemplates`
 is staged in a private feed, configure the feed in `NuGet.Config` so
 restore picks it up.
 
+Incremental packing tracks the evaluated package id and version, including
+command-line overrides. Changing either rehydrates both the catalog and
+`source.json` without requiring a clean; unchanged inputs reuse the existing
+payload. Missing generated metadata also triggers hydration.
+
 The dev-only flag `/p:SkipHydrateDotnetTemplates=true` produces a
 pack with no catalog payload for offline iteration; it is **not** for
 release builds.

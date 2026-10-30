@@ -193,8 +193,10 @@ public class PythonFunctionsProjectTests : IDisposable
         reporter.Logs.Should().Contain(e => e.Severity == FunctionsProjectReportSeverity.Error && e.Line == "invalid spec");
     }
 
-    [Fact]
-    public async Task PrepareForHostRun_sets_worker_executable_path_and_runtime_version()
+    [Theory]
+    [InlineData("3.12")]
+    [InlineData("3.15")]
+    public async Task PrepareForHostRun_sets_worker_executable_path_and_runtime_version(string pythonVersion)
     {
         File.WriteAllText(Path.Combine(_projectDir.FullName, "requirements.txt"), "azure-functions");
         var project = new PythonFunctionsProject(WorkingDirectory.FromExplicit(_projectDir.FullName))
@@ -205,7 +207,7 @@ public class PythonFunctionsProjectTests : IDisposable
                 return Task.FromResult(0);
             },
             RunPipInstall = (_, _, _, _, _, _) => Task.FromResult(0),
-            ReadPythonVersion = (_, _) => Task.FromResult<string?>("3.12"),
+            ReadPythonVersion = (_, _) => Task.FromResult<string?>(pythonVersion),
             ReadEnvironmentVariable = _ => null,
         };
         FunctionsProjectHostRunContext context = CreateContext();
@@ -217,7 +219,7 @@ public class PythonFunctionsProjectTests : IDisposable
             "python");
 
         context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar].Should().Be(expectedExe);
-        context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar].Should().Be("3.12");
+        context.EnvironmentVariables[PythonFunctionsProject.WorkerRuntimeVersionEnvVar].Should().Be(pythonVersion);
     }
 
     [Fact]

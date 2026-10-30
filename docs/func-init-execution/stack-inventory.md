@@ -11,7 +11,7 @@ not an alias for `--stack powershell`.
 
 | Stack ID / display name | Canonical languages (aliases) | Additional worker runtime aliases | Workload-contributed init options |
 | --- | --- | --- | --- |
-| `dotnet` / .NET | `C#` (`csharp`), `F#` (`fsharp`) | `dotnet-isolated` | `--target-framework` / `-tfm` (default and supported value: `net10.0`) |
+| `dotnet` / .NET | `C#` (`csharp`), `F#` (`fsharp`) | `dotnet-isolated` | `--target-framework` / `-tfm` (default: `net10.0`; supported: `net10.0`, `net11.0`; .NET 11 initialization requires C#) |
 | `node` / Node.js | `JavaScript` (`js`), `TypeScript` (`ts`) | None | Bundle options; `--skip-npm-install` (default: false) |
 | `python` / Python | `Python` (`py`) | None | Bundle options |
 | `go` / Go | `Go` (`golang`) | `native` | Bundle options; `--skip-go-mod-tidy` (default: false) |

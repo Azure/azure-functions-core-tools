@@ -1,22 +1,22 @@
 {
   "$schema": "https://aka.ms/func-profiles/v1/schema.json",
-  "generatedAt": "2026-05-23T00:00:00Z",
+  "generatedAt": "2026-10-27T00:00:00Z",
   "profiles": {
     "flex": {
       "sku": "flex-consumption",
       "status": "stable",
       "host": {
-        "version": "[1.8.1, 4.1048.200)"
+        "version": "[1.8.1, 4.1054.200]"
       },
       "extensionBundle": {
         "version": "[3.0.0, 5.0.0)"
       },
       "workers": {
         "node": {
-          "version": "[3.13.0]"
+          "version": "[3.16.0]"
         },
         "python": {
-          "version": "[4.43.0]"
+          "version": "[4.46.0]"
         },
         "go": {
           "version": "[1.0.0]"
@@ -36,17 +36,17 @@
       "sku": "linux-premium",
       "status": "stable",
       "host": {
-        "version": "[1.8.1, 4.1048.200)"
+        "version": "[1.8.1, 4.1054.200]"
       },
       "extensionBundle": {
         "version": "[3.0.0, 5.0.0)"
       },
       "workers": {
         "node": {
-          "version": "[3.13.0]"
+          "version": "[3.16.0]"
         },
         "python": {
-          "version": "[4.43.0]"
+          "version": "[4.46.0]"
         }
       },
       "supportedRuntimes": [
@@ -62,14 +62,14 @@
       "sku": "windows-consumption",
       "status": "stable",
       "host": {
-        "version": "[1.8.1, 4.1048.200)"
+        "version": "[1.8.1, 4.1054.200]"
       },
       "extensionBundle": {
         "version": "[3.0.0, 5.0.0)"
       },
       "workers": {
         "node": {
-          "version": "[3.13.0]"
+          "version": "[3.16.0]"
         }
       },
       "supportedRuntimes": [
@@ -84,14 +84,14 @@
       "sku": "windows-dedicated",
       "status": "stable",
       "host": {
-        "version": "[1.8.1, 4.1048.200)"
+        "version": "[1.8.1, 4.1054.200]"
       },
       "extensionBundle": {
         "version": "[3.0.0, 5.0.0)"
       },
       "workers": {
         "node": {
-          "version": "[3.13.0]"
+          "version": "[3.16.0]"
         }
       },
       "supportedRuntimes": [
@@ -106,17 +106,17 @@
       "sku": "linux-consumption",
       "status": "deprecated",
       "host": {
-        "version": "[1.8.1, 4.1048.200)"
+        "version": "[1.8.1, 4.1054.200]"
       },
       "extensionBundle": {
         "version": "[3.0.0, 5.0.0)"
       },
       "workers": {
         "node": {
-          "version": "[3.13.0]"
+          "version": "[3.16.0]"
         },
         "python": {
-          "version": "[4.43.0]"
+          "version": "[4.46.0]"
         }
       },
       "supportedRuntimes": [

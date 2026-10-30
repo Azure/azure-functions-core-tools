@@ -28,7 +28,7 @@
 .PARAMETER Feature
     One or more feature names matching `func setup --features`. Expands to
     the set of workloads that feature installs end-to-end. Supported:
-    `host`, `runtime`, `dotnet`, `node`, `python`, `go`. Combine with -Project
+    `host`, `runtime`, `dotnet`, `node`, `python`, `go`, `java`, `powershell`. Combine with -Project
     to add extra workloads.
 
 .PARAMETER WorkloadsHome
@@ -68,7 +68,7 @@
 [CmdletBinding()]
 param(
     [string[]] $Project,
-    [ValidateSet('host', 'runtime', 'dotnet', 'node', 'python', 'go')]
+    [ValidateSet('host', 'runtime', 'dotnet', 'node', 'python', 'go', 'java', 'powershell')]
     [string[]] $Feature,
     [string] $WorkloadsHome,
     [ValidateSet('Debug', 'Release')]
@@ -162,7 +162,7 @@ if (-not $SkipFuncBuild) {
 $allProjects = Get-AllWorkloadProjects
 
 # Mirrors `func setup --features`: feature -> set of workload short names that
-# the feature installs end-to-end. Keep aligned with SetupRunner.BuildPlan.
+# the feature installs end-to-end. Keep aligned with SetupDependencyPlanBuilder.
 $featureMap = @{
     'host'    = @('Workloads.Host')
     'runtime' = @('Workloads.Host', 'Workloads.ExtensionBundles')
@@ -170,6 +170,8 @@ $featureMap = @{
     'node'    = @('Workloads.Host', 'Workloads.Node', 'Workloads.Workers.Node', 'Workloads.Templates.Node', 'Workloads.ExtensionBundles')
     'python'  = @('Workloads.Host', 'Workloads.Python', 'Workloads.Workers.Python', 'Workloads.Templates.Python', 'Workloads.ExtensionBundles')
     'go'      = @('Workloads.Host', 'Workloads.Go', 'Workloads.Workers.Go', 'Workloads.ExtensionBundles')
+    'java'    = @('Workloads.Host', 'Workloads.Java', 'Workloads.Workers.Java', 'Workloads.ExtensionBundles')
+    'powershell' = @('Workloads.Host', 'Workloads.PowerShell', 'Workloads.Workers.PowerShell', 'Workloads.ExtensionBundles')
 }
 
 if ($Feature -or $Project) {

@@ -12,7 +12,7 @@
 - [ ] 2.1 Introduce the immutable `NewExecutionRequest` model for host options and preserved raw template tokens.
 - [ ] 2.2 Replace the inherited `NewCommand` positional `[path]` argument with optional positional `<template>` and add a `--path` option bound to `WorkingDirectory`.
 - [ ] 2.3 Add parser validation that rejects simultaneous positional and `--template` / `-t` selectors.
-- [ ] 2.4 Add `--language`, template execution `--path`, and `--dry-run` to the stable command surface while retaining name, force, non-interactive, list, and plain/JSON `--output` options.
+- [ ] 2.4 Add `--language`, template execution `--path`, and `--dry-run` to the stable command surface while retaining name, force, non-interactive, list, and plain/JSON `--format` options.
 - [ ] 2.5 Preserve registered install, update, and uninstall subcommand routing while allowing those names through the explicit template selector.
 - [ ] 2.6 Capture the original unmatched template token sequence during Stage A without accepting it as a successful final parse.
 - [ ] 2.7 Reduce `NewCommand.ExecuteAsync` to request construction and one runner delegation.
@@ -99,7 +99,7 @@
 
 ## 11. Documentation and Validation
 
-- [ ] 11.1 Update `func new --help` descriptions and examples for positional templates, template execution `--path`, rendering `--output`, `--non-interactive`, and `--dry-run`.
+- [ ] 11.1 Update `func new --help` descriptions and examples for positional templates, template execution `--path`, rendering `--format`, `--non-interactive`, and `--dry-run`.
 - [ ] 11.2 Document the `--template` escape hatch for reserved lifecycle names and exact identities.
 - [ ] 11.3 Document that project discovery walks upward from `--path` and that generated files remain rooted at the requested execution directory.
 - [ ] 11.4 Update user-facing template documentation for strict template options, output-path semantics, preview behavior, and breaking grammar changes.

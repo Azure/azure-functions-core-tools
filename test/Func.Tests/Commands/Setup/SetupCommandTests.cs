@@ -44,7 +44,22 @@ public sealed class SetupCommandTests : IDisposable
         optionNames.Should().Contain("--non-interactive");
         optionNames.Should().Contain("--yes");
         optionNames.Should().Contain("--check");
-        optionNames.Should().Contain("--output");
+        optionNames.Should().Contain("--format");
+        optionNames.Should().NotContain("--output");
+    }
+
+    [Theory]
+    [InlineData("--output", "json")]
+    [InlineData("--output=json")]
+    public void SetupCommand_RemovedOutputOption_ReportsUnrecognizedOption(params string[] args)
+    {
+        var root = TestParser.CreateRoot(_interaction);
+
+        ParseResult result = root.Parse(["setup", .. args]);
+
+        result.Errors.Should().Contain(error =>
+            error.Message.Contains("Unrecognized", StringComparison.Ordinal)
+            && error.Message.Contains("--output", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -54,6 +69,8 @@ public sealed class SetupCommandTests : IDisposable
         string description = cmd.FeaturesOption.Description ?? string.Empty;
 
         description.Should().Contain("dotnet");
+        description.Should().Contain("java");
+        description.Should().Contain("powershell");
         description.Should().NotContain("dotnet-isolated");
     }
 
@@ -79,7 +96,7 @@ public sealed class SetupCommandTests : IDisposable
         FuncRootCommand root = Parser.CreateCommand(services);
         ParseResult result = root.Parse(
             $"setup \"{_tempDir}\" --features node,python --profile flex --profile premium --profiles staging,prod "
-            + "--source https://example.test/v3/index.json --install-policy if-needed --prerelease --non-interactive --yes --check --output json");
+            + "--source https://example.test/v3/index.json --install-policy if-needed --prerelease --non-interactive --yes --check --format json");
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 

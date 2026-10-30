@@ -9,6 +9,7 @@ public sealed class PythonWorkerWorkloadPackageTests
 {
     [Theory]
     [InlineData("win-x64", "Azure.Functions.Cli.Workloads.Workers.Python.win-x64")]
+    [InlineData("win-arm64", "Azure.Functions.Cli.Workloads.Workers.Python.win-arm64")]
     [InlineData("LINUX-X64", "Azure.Functions.Cli.Workloads.Workers.Python.linux-x64")]
     [InlineData(" osx-arm64 ", "Azure.Functions.Cli.Workloads.Workers.Python.osx-arm64")]
     public void FromRuntimeIdentifier_AppendsLowercasedRid(string runtimeIdentifier, string expected)
