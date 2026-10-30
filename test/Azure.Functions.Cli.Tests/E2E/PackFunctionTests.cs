@@ -1,8 +1,9 @@
-﻿using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Tests.E2E.Helpers;
 using System;
 using System.IO;
+using System.IO.Compression;
+using System.Linq;
 using System.Threading.Tasks;
+using Azure.Functions.Cli.Tests.E2E.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -12,115 +13,40 @@ namespace Azure.Functions.Cli.Tests.E2E
     {
         public PackFunctionTests(ITestOutputHelper output) : base(output) { }
 
-        // [Fact]
-        public Task pack_python_from_cache()
+        [Fact]
+        public Task pack_node_app_and_replace_existing_archive()
         {
-            var syncDirMessage = "Directory .python_packages already in sync with requirements.txt. Skipping restoring dependencies...";
-            return CliTester.Run(new[] {
-                // Create a Python function
+            return CliTester.Run(new[]
+            {
                 new RunConfiguration
                 {
                     Commands = new[]
                     {
-                        "init . --worker-runtime python",
-                        "new --template \"Httptrigger\" --name httptrigger",
+                        "init . --worker-runtime node -m v3 --skip-npm-install",
+                        "new -l javascript -t HttpTrigger -n httptrigger",
+                        "pack -o packed"
                     },
-                    CheckFiles = new FileResult[]
+                    CheckFiles = new[] { new FileResult { Name = "packed.zip" } },
+                    OutputContains = new[] { "Creating a new package" },
+                    CommandTimeout = TimeSpan.FromMinutes(2)
+                },
+                new RunConfiguration
+                {
+                    Commands = new[] { "pack -o packed" },
+                    OutputContains = new[] { "Deleting the old package", "Creating a new package" },
+                    Test = (workingDir, _, _) =>
                     {
-                        new FileResult
-                        {
-                            Name = "local.settings.json",
-                            ContentContains = new []
-                            {
-                                "FUNCTIONS_WORKER_RUNTIME",
-                                "python"
-                            }
-                        }
-                    },
-                    OutputContains = new[]
-                    {
-                        "Writing .gitignore",
-                        "Writing host.json",
-                        "Writing local.settings.json"
+                        using var archive = ZipFile.OpenRead(Path.Combine(workingDir, "packed.zip"));
+                        var entries = archive.Entries.Select(entry => entry.FullName).ToArray();
+                        Assert.Contains("host.json", entries);
+                        Assert.Contains("httptrigger/function.json", entries);
+                        Assert.Contains("httptrigger/index.js", entries);
+                        Assert.DoesNotContain("local.settings.json", entries);
+                        Assert.DoesNotContain("packed.zip", entries);
+                        return Task.CompletedTask;
                     }
-                },
-                // Make sure pack works
-                new RunConfiguration
-                {
-                    Commands = new[]
-                    {
-                        "pack",
-                    },
-                    OutputContains = new[]
-                    {
-                        "Creating a new package"
-                    },
-                    CheckFiles = new FileResult[]
-                    {
-                        new FileResult
-                        {
-                            Name = Path.Combine(".python_packages", "requirements.txt.md5")
-                        }
-                    },
-                    OutputDoesntContain = new[]
-                    {
-                        syncDirMessage
-                    },
-                    CommandTimeout = TimeSpan.FromMinutes(2)
-                },
-                // Without changing requirements.txt, make sure pack does not restore again
-                new RunConfiguration
-                {
-                    Commands = new[]
-                    {
-                        "pack",
-                    },
-                    OutputContains = new[]
-                    {
-                        "Creating a new package",
-                        syncDirMessage
-                    },
-                    CheckFiles = new FileResult[]
-                    {
-                        new FileResult
-                        {
-                            Name = Path.Combine(".python_packages", "requirements.txt.md5")
-                        }
-                    },
-                    CommandTimeout = TimeSpan.FromMinutes(2)
-                },
-                // Update requirements.txt and make sure pack restores the dependencies
-                new RunConfiguration
-                {
-                    PreTest = (workingDir) =>
-                    {
-                        var reqTxt = Path.Combine(workingDir, "requirements.txt");
-                        _output.WriteLine($"Writing to file {reqTxt}");
-                        FileSystemHelpers.WriteAllTextToFile(reqTxt, "requests");
-                    },
-                    Commands = new[]
-                    {
-                        "pack",
-                    },
-                    OutputContains = new[]
-                    {
-                        "Creating a new package"
-                    },
-                    CheckFiles = new FileResult[]
-                    {
-                        new FileResult
-                        {
-                            Name = Path.Combine(".python_packages", "requirements.txt.md5")
-                        }
-                    },
-                    OutputDoesntContain = new[]
-                    {
-                        syncDirMessage
-                    },
-                    CommandTimeout = TimeSpan.FromMinutes(2)
                 }
             }, _output);
         }
-
     }
 }

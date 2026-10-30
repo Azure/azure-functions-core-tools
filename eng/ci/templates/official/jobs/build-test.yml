@@ -55,13 +55,6 @@ jobs:
     inputs:
       versionSpec: '18.x'
 
-  - task: UsePythonVersion@0
-    displayName: 'Use cached Python 3.11 for tests'
-    inputs:
-      versionSpec: '3.11'
-      addToPath: true
-      disableDownloadFromRegistry: true
-
   - template: ../../steps/install-dotnet.yml
 
   - task: NuGetToolInstaller@1
