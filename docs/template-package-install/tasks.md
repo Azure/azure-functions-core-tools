@@ -3,7 +3,7 @@
 - [ ] 1.1 Complete the command-scoped `ITemplaterFactory`, immutable context, private engine session, and func-owned model boundaries required from `template-engine-integration`.
 - [ ] 1.2 Remove product access to `Templater.Settings`, `Templater.Creator`, and `Templater.PackageManager`, retaining only internal adapters and focused test seams.
 - [ ] 1.3 Add func-owned install, update, and uninstall request/result records plus domain exceptions for unsupported requests, ownership, source conflicts, invalid source usage, and failed replacement.
-- [ ] 1.4 Register the templater factory and package lifecycle infrastructure through `TemplatesServiceCollectionExtensions` with singleton factories and command-scoped facade instances.
+- [ ] 1.4 Extend the templater factory registration in `CliHostFactory` with package lifecycle infrastructure, retaining singleton factories and command-scoped facade instances.
 
 ## 2. Package Ownership and Source Resolution
 

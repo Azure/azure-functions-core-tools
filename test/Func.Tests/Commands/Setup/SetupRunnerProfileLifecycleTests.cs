@@ -20,7 +20,6 @@ namespace Azure.Functions.Cli.Tests.Commands.Setup;
 public sealed class SetupRunnerProfileLifecycleTests
 {
     private const string StackId = "Azure.Functions.Cli.Workloads.DotNet";
-    private const string TemplatesId = "Azure.Functions.Cli.Workloads.Templates.DotNet";
 
     [Fact]
     public async Task RunAsync_SecondProfilePlanningFailure_InstallsValidDependenciesBeforeStopping()
@@ -34,12 +33,12 @@ public sealed class SetupRunnerProfileLifecycleTests
         fixture.CompletedProfiles.Should().Equal("p1:0", "p2:1");
         fixture.BundleReader.ReceivedCalls().Should().HaveCount(2);
         fixture.InstallAttempts.Should().Equal(
-            $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0", $"{TemplatesId}@1.0.0",
+            $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0",
             $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0", $"{HostWorkloadPackage.PackageId}@4.2.0");
         fixture.ResultsFor("p2").Should().Equal("host:installed", "extension-bundle:satisfied", "runtime:failed");
         fixture.Interaction.FailureMessages.Should().ContainSingle().Which.Should().Contain("Profile 'p2' does not support runtime 'dotnet'");
         (await fixture.InstalledAsync()).Should().Equal(
-            $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0", $"{TemplatesId}@1.0.0",
+            $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0",
             $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0", $"{HostWorkloadPackage.PackageId}@4.2.0");
         fixture.Interaction.Events.Should().ContainSingle(item => item.GetProperty("type").GetString() == "setup.failed")
             .Which.GetProperty("failure_count").GetInt32().Should().Be(1);
@@ -61,7 +60,7 @@ public sealed class SetupRunnerProfileLifecycleTests
         fixture.CompletedProfiles.Should().Equal("p1:0", "p2:2", "p3:1");
         fixture.BundleReader.ReceivedCalls().Should().HaveCount(3);
         fixture.ResultsFor("p2").Should().Equal("host:failed", "extension-bundle:satisfied", "runtime:failed");
-        fixture.ResultsFor("p3").Should().Equal("host:failed", "stack:satisfied", "templates:satisfied", "extension-bundle:satisfied");
+        fixture.ResultsFor("p3").Should().Equal("host:failed", "stack:satisfied", "extension-bundle:satisfied");
         fixture.Interaction.Events.Should().ContainSingle(item => item.GetProperty("type").GetString() == "setup.failed")
             .Which.GetProperty("failure_count").GetInt32().Should().Be(3);
         fixture.Interaction.EventTypes.Should().NotContain("setup.completed");
@@ -83,12 +82,12 @@ public sealed class SetupRunnerProfileLifecycleTests
         fixture.CompletedProfiles.Should().Equal("p1:0", "p2:1");
         fixture.BundleReader.ReceivedCalls().Should().HaveCount(2);
         fixture.InstallAttempts.Should().Equal(
-            $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0", $"{TemplatesId}@1.0.0",
+            $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0",
             $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0", $"{HostWorkloadPackage.PackageId}@4.2.0");
         fixture.ResultsFor("p2").Should().Equal("host:failed");
         fixture.Interaction.FailureMessages.Should().Equal("Host installation failed for 4.2.0.");
         (await fixture.InstalledAsync()).Should().Equal(
-            $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0", $"{TemplatesId}@1.0.0",
+            $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0",
             $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0");
         fixture.Interaction.EventTypes.Should().ContainSingle(type => type == "setup.failed").And.NotContain("setup.completed");
         fixture.FirstRun.ReceivedCalls().Should().BeEmpty();
@@ -130,7 +129,7 @@ public sealed class SetupRunnerProfileLifecycleTests
         {
             string[] expected = firstProfileFails
                 ? [$"{HostWorkloadPackage.PackageId}@4.1.0", $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0"]
-                : [$"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0", $"{TemplatesId}@1.0.0",
+                : [$"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0",
                     $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0"];
             fixture.InstallAttempts.Should().Equal(expected);
             (await fixture.InstalledAsync()).Should().Equal(expected);
@@ -153,14 +152,14 @@ public sealed class SetupRunnerProfileLifecycleTests
         fixture.CompletedProfiles.Should().Equal("p1:0", "p2:0", "p3:0");
         fixture.BundleReader.ReceivedCalls().Should().HaveCount(3);
         fixture.ResultsFor("p2").Should().Equal(check ? "host:satisfied" : "host:installed",
-            "stack:satisfied", "templates:satisfied", "extension-bundle:satisfied");
+            "stack:satisfied", "extension-bundle:satisfied");
         fixture.ResultsFor("p3").Should().Equal(check ? "host:satisfied" : "host:installed",
-            "stack:satisfied", "templates:satisfied", "extension-bundle:satisfied");
+            "stack:satisfied", "extension-bundle:satisfied");
         fixture.Interaction.EventTypes.Should().ContainSingle(type => type == "setup.completed").And.NotContain("setup.failed");
         string[] expected =
         [
             $"{HostWorkloadPackage.PackageId}@4.1.0", $"{HostWorkloadPackage.PackageId}@4.2.0", $"{HostWorkloadPackage.PackageId}@4.3.0",
-            $"{StackId}@1.0.0", $"{TemplatesId}@1.0.0", $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0",
+            $"{StackId}@1.0.0", $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0",
         ];
         (await fixture.InstalledAsync()).Should().BeEquivalentTo(expected);
         if (check)
@@ -173,7 +172,7 @@ public sealed class SetupRunnerProfileLifecycleTests
         else
         {
             fixture.InstallAttempts.Should().Equal(
-                $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0", $"{TemplatesId}@1.0.0",
+                $"{HostWorkloadPackage.PackageId}@4.1.0", $"{StackId}@1.0.0",
                 $"{IInstalledBundleWorkloads.BundleWorkloadPackageId}@4.0.0",
                 $"{HostWorkloadPackage.PackageId}@4.2.0", $"{HostWorkloadPackage.PackageId}@4.3.0");
             await fixture.FirstRun.Received(1).MarkCompleteAsync(CancellationToken.None);
@@ -280,7 +279,7 @@ public sealed class SetupRunnerProfileLifecycleTests
                 Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(call =>
                 {
                     string id = call.ArgAt<string>(0);
-                    return Task.FromResult<ResolvedPackage?>(id is StackId or TemplatesId ? Resolved(id, NuGetVersion.Parse("1.0.0")) : null);
+                    return Task.FromResult<ResolvedPackage?>(id == StackId ? Resolved(id, NuGetVersion.Parse("1.0.0")) : null);
                 });
             Catalog.ResolveLatestVersionOnChannelAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<VersionRange?>(),
                 Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(call =>
@@ -327,7 +326,6 @@ public sealed class SetupRunnerProfileLifecycleTests
             foreach (string version in hostVersions)
                 await Store.SaveWorkloadAsync(Entry(HostWorkloadPackage.PackageId, version), CancellationToken.None);
             await Store.SaveWorkloadAsync(Entry(StackId, "1.0.0"), CancellationToken.None);
-            await Store.SaveWorkloadAsync(Entry(TemplatesId, "1.0.0"), CancellationToken.None);
             await Store.SaveWorkloadAsync(Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.0.0"), CancellationToken.None);
         }
 

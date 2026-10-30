@@ -4,29 +4,22 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Common;
-using Azure.Functions.Cli.Templates;
-using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
 public class NewCommandTests
 {
     private readonly TestInteractionService _interaction;
-    private readonly INewCommandRunner _runner;
-    private readonly INewCommandTemplateOptionProvider _templateOptions;
 
     public NewCommandTests()
     {
         _interaction = new TestInteractionService();
-        _runner = Substitute.For<INewCommandRunner>();
-        _templateOptions = Substitute.For<INewCommandTemplateOptionProvider>();
     }
 
     [Fact]
     public void NewCommand_HasExpectedOptions()
     {
-        var cmd = new NewCommand(_runner, _templateOptions);
+        var cmd = new NewCommand(_interaction);
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         optionNames.Should().Contain("--name");
@@ -39,20 +32,17 @@ public class NewCommandTests
     }
 
     [Theory]
-    [InlineData("plain", false)]
-    [InlineData("json", true)]
-    public async Task NewCommand_Format_ForwardsRenderingMode(string format, bool expectedJsonOutput)
+    [InlineData("plain")]
+    [InlineData("json")]
+    public async Task NewCommand_List_FailsWithMigrationDiagnostic(string format)
     {
-        var command = new NewCommand(_runner, _templateOptions);
-        _runner.ListAsync(Arg.Any<NewInvocation>(), Arg.Any<CancellationToken>()).Returns(0);
+        var command = new NewCommand(_interaction);
         ParseResult result = command.Parse(["--list", "--format", format]);
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-        exitCode.Should().Be(0);
-        await _runner.Received(1).ListAsync(
-            Arg.Is<NewInvocation>(invocation => invocation.JsonOutput == expectedJsonOutput),
-            Arg.Any<CancellationToken>());
+        exitCode.Should().Be(1);
+        _interaction.AllOutput.Should().Contain("temporarily unavailable");
     }
 
     [Theory]
@@ -61,7 +51,7 @@ public class NewCommandTests
     [InlineData("--output:json")]
     public void NewCommand_RemovedOutputOption_ReportsUnrecognizedOption(params string[] args)
     {
-        var command = new NewCommand(_runner, _templateOptions);
+        var command = new NewCommand(_interaction);
         ParseResult result = command.Parse(["--list", .. args]);
 
         result.Errors.Should().Contain(error =>
@@ -73,19 +63,14 @@ public class NewCommandTests
     [InlineData("--output", "json")]
     [InlineData("--output=json")]
     [InlineData("--output:json")]
-    public async Task NewCommand_RemovedOutputOptionWithExplicitPath_RejectsBeforeDispatch(params string[] args)
+    public void NewCommand_RemovedOutputOptionWithExplicitPath_ReportsUnrecognizedOption(params string[] args)
     {
-        var command = new NewCommand(_runner, _templateOptions);
+        var command = new NewCommand(_interaction);
         ParseResult result = command.Parse([".", "--list", .. args]);
 
-        GracefulException exception = (await FluentActions
-            .Awaiting(() => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
-            .Should().ThrowAsync<GracefulException>()).Which;
-
-        exception.Message.Should().Contain("--output");
-        exception.Message.Should().Contain("--format");
-        await _runner.DidNotReceiveWithAnyArgs().ListAsync(default!, default);
-        await _runner.DidNotReceiveWithAnyArgs().ExecuteAsync(default!, default);
+        result.Errors.Should().Contain(error =>
+            error.Message.Contains("Unrecognized", StringComparison.Ordinal)
+            && error.Message.Contains("--output", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -100,7 +85,7 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_HasPathArgument()
     {
-        var cmd = new NewCommand(_runner, _templateOptions);
+        var cmd = new NewCommand(_interaction);
         cmd.Arguments.Should().ContainSingle();
         cmd.Arguments[0].Name.Should().Be("path");
     }
@@ -116,5 +101,63 @@ public class NewCommandTests
             new ParserConfiguration { EnablePosixBundling = false });
 
         result.Errors.Should().Contain(e => e.Message.Contains("Unrecognized option '-name'", System.StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task NewCommand_Unavailable_LeavesTargetUnchanged(bool exists, bool force)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-new-unavailable-{Guid.NewGuid():N}");
+        string configDirectory = Path.Combine(directory, ".func");
+        string configPath = Path.Combine(configDirectory, "config.json");
+        const string config = """{"stack":{"runtime":"node"},"custom":"keep"}""";
+        if (exists)
+        {
+            Directory.CreateDirectory(configDirectory);
+            await File.WriteAllTextAsync(configPath, config);
+            await File.WriteAllTextAsync(Path.Combine(directory, "host.json"), "{}");
+            Directory.CreateDirectory(Path.Combine(directory, "empty"));
+        }
+
+        try
+        {
+            var command = new NewCommand(_interaction);
+            string[] args = [directory, "--template", "HttpTrigger", "--name", "Example", "--non-interactive"];
+            if (force)
+            {
+                args = [.. args, "--force"];
+            }
+
+            int exitCode = await command.Parse(args).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+            exitCode.Should().Be(1);
+            _interaction.AllOutput.Should().Contain("temporarily unavailable");
+            Directory.Exists(directory).Should().Be(exists);
+            if (exists)
+            {
+                Directory.GetFileSystemEntries(directory, "*", SearchOption.AllDirectories)
+                    .Should().BeEquivalentTo([configDirectory, configPath, Path.Combine(directory, "host.json"), Path.Combine(directory, "empty")]);
+                (await File.ReadAllTextAsync(configPath)).Should().Be(config);
+                (await File.ReadAllTextAsync(Path.Combine(directory, "host.json"))).Should().Be("{}");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void NewCommand_NullInteraction_Throws()
+    {
+        Action act = () => _ = new NewCommand(null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("interaction");
     }
 }

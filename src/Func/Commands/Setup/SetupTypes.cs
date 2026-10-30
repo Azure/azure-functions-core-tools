@@ -39,25 +39,18 @@ internal sealed record SetupDependency(
 {
     private const string WorkerPackagePrefix = "Azure.Functions.Cli.Workloads.Workers.";
     private const string StackPackagePrefix = "Azure.Functions.Cli.Workloads.";
-    private const string TemplatesPackagePrefix = "Azure.Functions.Cli.Workloads.Templates.";
 
     // TODO: this should not be hardcoded in the CLI; discover the stack package
     // from the catalog (e.g. via an `alias:stack-<name>` tag) so new stacks don't
     // require a CLI release.
     private static readonly HashSet<string> _stacks = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "go", "dotnet", "java", "powershell" };
 
-    // Stacks that publish a templates content workload (Azure.Functions.Cli.Workloads.Templates.*).
-    // Go, Java, and PowerShell have no templates packages today.
-    private static readonly HashSet<string> _templates = new(StringComparer.OrdinalIgnoreCase) { "node", "python", "dotnet" };
-
     public static IReadOnlyList<string> Stacks => [.. _stacks];
 
-    // Workload search alias for the channel-fallback hint. Only the channeled
-    // dependency kinds (bundle, templates) need one.
+    // Workload search alias for the bundle channel-fallback hint.
     public string? SearchAlias => Kind switch
     {
         SetupDependencyKind.ExtensionBundle => "bundles",
-        SetupDependencyKind.Templates => $"{Name}-templates",
         _ => null,
     };
 
@@ -116,21 +109,6 @@ internal sealed record SetupDependency(
     public static bool SupportsStack(string stack)
         => !string.IsNullOrWhiteSpace(stack) && _stacks.Contains(stack.Trim());
 
-    public static SetupDependency Templates(string stack, BundleChannel? channel)
-        => new(
-            SetupDependencyKind.Templates,
-            stack,
-            $"{stack} templates",
-            TemplatesPackagePrefix + StackPackageSuffix(stack),
-            VersionRange: null,
-            RangeText: null,
-            ResolvedPackageId: null,
-            Optional: true,
-            Channel: channel);
-
-    public static bool SupportsTemplates(string stack)
-        => !string.IsNullOrWhiteSpace(stack) && _templates.Contains(stack.Trim());
-
     private static string StackPackageSuffix(string stack)
         => stack.Trim().ToLowerInvariant() switch
         {
@@ -155,7 +133,6 @@ internal enum SetupDependencyKind
     Runtime,
     Worker,
     Stack,
-    Templates,
     ExtensionBundle,
 }
 

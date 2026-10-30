@@ -2,7 +2,7 @@
 
 See `proposal.md` for motivation and `specs/func-new-execution/spec.md` for the command contract.
 
-`NewCommand` currently inherits the shared optional `[path]` argument, exposes template selection only through `--template`, and uses `--format` for plain/JSON rendering. It disables unmatched-token errors, dynamically attaches template options to the singleton command, manually walks unmatched tokens, and can ignore unknown template arguments. `NewCommandArgPreparer` performs a synchronous pre-parse lookup from process current directory and intentionally swallows hydration failures. `NewCommandRunner` then combines project and bundle resolution, legacy template workload lookup, group selection, prompting, and provider dispatch.
+`NewCommand` retains the shared optional `[path]` argument, template selection through `--template`, and `--format`. Scaffolding and listing currently fail with a migration diagnostic before writing project files. The legacy providers, content workloads, dynamic option hydration, pre-parse hook, and orchestration have been removed. They must not be reintroduced when implementing this design.
 
 The `template-engine-integration` change establishes the replacement boundary: one command-scoped `Templater`, constraint-aware immutable template groups, projected `func.host.json` parameter metadata, and self-invoking `ResolvedTemplate` instances. This change defines how `func new` consumes that boundary for item templates. It does not define `func init`.
 

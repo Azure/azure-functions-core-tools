@@ -13,7 +13,6 @@ public sealed class SetupFeatureCatalogTests
     [InlineData("Azure.Functions.Cli.Workloads.Workers.Python.win-x64", "python")]
     [InlineData("azure.functions.cli.workloads.workers.python.osx-arm64", "python")]
     [InlineData("Azure.Functions.Cli.Workloads.Workers.Node", "node")]
-    [InlineData("Azure.Functions.Cli.Workloads.Templates.Python", "python")]
     [InlineData("Azure.Functions.Cli.Workloads.Python", "python")]
     [InlineData("Azure.Functions.Cli.Workloads.Java", "java")]
     [InlineData("azure.functions.cli.workloads.powershell", "powershell")]

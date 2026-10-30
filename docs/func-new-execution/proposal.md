@@ -1,6 +1,6 @@
 ## Why
 
-`func new` needs a deterministic item-template execution path that resolves the current Functions project, selects only compatible item templates, strictly interprets template-specific arguments, and prompts only when user input is genuinely required. The current command mixes project targeting, dynamic option hydration, permissive unmatched-token handling, and legacy provider dispatch in ways that can ignore invalid input or select a template against stale context.
+`func new` needs a deterministic item-template execution path that resolves the current Functions project, selects only compatible item templates, strictly interprets template-specific arguments, and prompts only when user input is genuinely required. The former dynamic option hydration and legacy provider dispatch have been removed. The command currently reports that scaffolding and listing are unavailable; this proposal describes the subsequent integration, not the current command behavior.
 
 ## What Changes
 

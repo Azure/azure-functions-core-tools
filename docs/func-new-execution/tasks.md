@@ -67,13 +67,15 @@
 
 ## 8. Legacy Path Removal and DI
 
-- [ ] 8.1 Remove `NewCommandArgPreparer` and its pre-parse call from `Program`.
-- [ ] 8.2 Remove dynamic option attachment, unmatched-token key/value walking, and silent hydration catches from `NewCommand`.
-- [ ] 8.3 Replace `TemplateOptionHydrator` usage with projected `ResolvedTemplate.Parameters` and strict candidate parsing.
-- [ ] 8.4 Replace legacy template workload and provider-registry execution dispatch in `NewCommandRunner` with `ITemplaterFactory`.
+The removal-only increment is complete. Scaffolding and listing remain unavailable until the integration tasks below are implemented.
+
+- [x] 8.1 Remove `NewCommandArgPreparer` and its pre-parse call from `Program`.
+- [x] 8.2 Remove dynamic option attachment, unmatched-token key/value walking, and silent hydration catches from `NewCommand`.
+- [ ] 8.3 Implement parameter handling using projected `ResolvedTemplate.Parameters` and strict candidate parsing, without restoring legacy hydration.
+- [ ] 8.4 Implement command orchestration using `ITemplaterFactory`, without legacy template workloads or provider-registry dispatch.
 - [ ] 8.5 Remove or adapt `LanguageTiebreaker` so explicit language is authoritative and prompting occurs only after all deterministic filters.
 - [ ] 8.6 Register the new request orchestration, argument parser, alias assignment, prompting, and rendering dependencies with the narrowest appropriate lifetimes.
-- [ ] 8.7 Remove legacy template-selection types and tests only after all remaining callers have migrated.
+- [x] 8.7 Remove legacy template-selection types, consumers, and dedicated tests.
 
 ## 9. Command and Parser Tests
 

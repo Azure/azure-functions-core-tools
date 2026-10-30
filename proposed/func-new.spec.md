@@ -1,5 +1,11 @@
 # `func new` spec
 
+> **Historical, superseded design.** The providers, abstractions, and content
+> workloads described here have been removed. This document is retained only
+> as design history, not implementation or registration guidance. The current
+> command fails without writing files; future integration uses only
+> `src/Func/Templates/Engine` and the design in `docs/func-new-execution`.
+
 > Sister spec to `templates-workload-spec.md` (templates **workload** — payload,
 > layout, packaging) and the working-context reference in
 > `working_context_templates_workload_design.md` (which has the §3B legacy

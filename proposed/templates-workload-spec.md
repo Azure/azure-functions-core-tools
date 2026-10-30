@@ -1,5 +1,11 @@
 # Templates Workload Spec
 
+> **Historical, superseded design.** The legacy content packages, payload
+> formats, build pipelines, and provider registrations described here have
+> been removed. Do not use this document to create or register implementations.
+> The intended engine is `src/Func/Templates/Engine`; future package lifecycle
+> work is described in `docs/template-package-install`.
+
 ## 1. Goals
 
 - Deliver function-scaffold templates as `kind: content` workloads,

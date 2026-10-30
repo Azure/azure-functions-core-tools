@@ -83,14 +83,6 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         rootCommand = Parser.CreateCommand(host.Services);
         string[] normalizedArgs = LegacyStartArgumentNormalizer.Normalize(args);
 
-        // Pre-parse hydration for `func new -t <id>`: the user can pass
-        // per-template options (e.g. --auth-level) that NewCommand learns
-        // about only after the hydrator runs against the chosen template.
-        // Attach them to NewCommand BEFORE the parser sees argv so SCL
-        // treats them as known options instead of erroring out via
-        // PathArgument's unrecognized-token guard.
-        NewCommandArgPreparer.PrepareIfFuncNew(normalizedArgs, host.Services, rootCommand);
-
         // Disable POSIX bundling so single-dash typos like `-name` surface as unrecognized options.
         var parserConfiguration = new ParserConfiguration { EnablePosixBundling = false };
         commandParseResult = rootCommand.Parse(normalizedArgs, parserConfiguration);
