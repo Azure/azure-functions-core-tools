@@ -1,3 +1,5 @@
+> **DEFERRED historical proposal, not current quickstart behavior.** Installed multi-project/template-first init, browse/install guidance and trusted configuration actions require separate scope/owner approval. Existing quickstart and adoption/healing paths remain supported. [Templates Architecture](../templates/README.md) identifies the current proposed first slice without promoting these future requirements.
+
 ## Why
 
 Azure-Samples quickstarts will be distributed as ordinary `FuncTemplate` packages, but `func init` needs a coherent installed-template experience that works for both single-project and multi-project solutions. Users must be able to discover installed quickstarts, understand why a template is restricted, configure every generated Functions project, and find additional packages without turning initialization into an implicit package installer.

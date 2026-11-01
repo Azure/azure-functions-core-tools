@@ -1,5 +1,7 @@
 # Template Engine and Packages
 
+> **MIXED gateway, not an approved integration or package contract.** [Templates Architecture](../docs/templates/README.md) links to the current proposed Phase 6 authority. Factory/session/catalog and constraint helpers exist, but helpers are not registered constraint-aware command selection/invocation. Production workload-to-hive registration is missing; future lifecycle flows below are deferred. Keep existing initializer/setup behavior separate, including the .NET initializer's distinct hive; no template readiness or release approval is implied.
+
 ## Purpose
 
 Azure Functions templates are discovered and invoked through the

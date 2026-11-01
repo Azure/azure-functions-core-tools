@@ -1,3 +1,5 @@
+> **DEFERRED historical producer specification, not first-slice implementation authority.** Control-plane onboarding, synthesis/configuration actions, release scanning and package publication below require separate approval. These producer requirements do not jointly govern the proposed minimal engine/command contract. See [Templates Architecture](../../../templates/README.md) and the [Phase 6 authority map](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority); preserve unique source/package/provenance requirements for future work.
+
 ## Purpose
 
 Defines how Azure-Samples quickstart releases are onboarded, converted into safe `FuncTemplate` NuGet packages, staged, approved, and published to NuGet.org.

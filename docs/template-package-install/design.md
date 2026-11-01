@@ -1,3 +1,5 @@
+> **DEFERRED lifecycle design with existing-infrastructure references.** New install/update/uninstall commands, feed acquisition and replacement transactions below are not implemented or required for the first engine/command proof. Preserve package/source/replacement evidence, but do not confuse test-only installation or the current hive with approved production workload registration. See [Templates Architecture](../templates/README.md) and the [Phase 6 registration seam](../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#workload-registration).
+
 ## Context
 
 See `proposal.md` for motivation and `specs/template-package-install/spec.md` for lifecycle behavior. Package lifecycle operations use the shared TemplateEngine boundary, command-scoped `Templater` lifetime, func settings hive, and func-owned models.

@@ -1,3 +1,5 @@
+> **DEFERRED historical package-lifecycle proposal.** The new public install/update/uninstall, feed and cross-source replacement flows below require separate authorization; they are not first-slice prerequisites. Workload-delivered local registration remains an unresolved production seam, not item-command acquisition. See [Templates Architecture](../templates/README.md); package provenance and safety requirements are retained as future evidence.
+
 ## Why
 
 Template packages and func workloads require different lifecycle semantics and ownership. Template packages should be managed through `func new`, while workloads remain managed through `func workload`, with clear guidance when a package is sent to the wrong command.

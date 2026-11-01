@@ -1,3 +1,5 @@
+> **DEFERRED historical task list.** Completed reconciliation boxes record earlier planning edits, not accepted API contracts or shipped quickstart integration. Template-first selection, multi-project actions, browse/lifecycle UX and broad package migration are not first-slice prerequisites. See [Templates Architecture](../templates/README.md) for proposed authority and separate approval gates; existing quickstart behavior and all checkboxes are preserved.
+
 ## 1. Reconcile Focused Contracts
 
 - [x] 1.1 Update the pending `func-init-execution` proposal, design, and specification to use template-first selection, whole-template filters, and action-owned multi-project configuration.

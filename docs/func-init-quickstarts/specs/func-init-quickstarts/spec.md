@@ -1,3 +1,5 @@
+> **Deferred historical quickstart proposal - not first-slice `func init` behavior.** Template-first/multi-project selection, new lifecycle and browse UX, trusted action schema and public dry-run below require separate scope/owner approval. Preserve current `func quickstart` and `func init` adoption/healing behavior. See the [Phase 6 authority map](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority) and [end-to-end proof](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#end-to-end-proof). The retained clauses remain historical evidence.
+
 ## Purpose
 
 Defines how `func init` discovers and runs installed quickstart project templates, explains workload restrictions, and configures one or more generated Functions projects.

@@ -1,3 +1,5 @@
+> **HISTORICAL task list with already-implemented helper work, not current implementation instructions.** Do not recreate existing factory/session/context/catalog types from unchecked boxes or freeze the list-shaped group and invocation/post-action APIs below. See [Templates Architecture](../templates/README.md) for the proposed first-slice contract and separate authorization gates. Original checkboxes remain checkpoint evidence.
+
 ## 1. Context and Engine Lifetime
 
 - [ ] 1.1 Add immutable template engine context models for command directory, resolved project stack and language, and resolved extension bundle identity and version.

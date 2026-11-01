@@ -1,3 +1,5 @@
+> **Historical proposed contract - not current `func init` behavior or approved first-slice requirements.** Current Stack initializers, occupied non-project write-if-missing behavior, adoption and healing remain operative. The requirements below for template-first selection, public `--template`/`--non-interactive`/`--dry-run`, mandatory trusted actions and removing all initializer routes are deferred or require owner approval. An empty-or-force-only project route is superseded by the [Phase 6 non-force init contract](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#non-force-init). See the [authority map](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority); preserve the text below for provenance.
+
 ## Purpose
 
 Defines how `func init` selects an installed project template and applies stack and language filters before creating or adopting an Azure Functions project.

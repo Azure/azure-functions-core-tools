@@ -1,3 +1,5 @@
+> **MIXED: implemented listing infrastructure and historical command design.** The positional template, `--path`, upward search, public dry-run and lifecycle grammar below are not the current command contract; projected requiredness/defaults do not evaluate conditional engine parameters. See [Templates Architecture](../templates/README.md) and the [Phase 6 authority map](../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority). `func new` retains `[path]`/`--format` and its unavailable migration handler; first-run setup may complete before that handler.
+
 ## Context
 
 See `proposal.md` for motivation and `specs/func-new-execution/spec.md` for the command contract.

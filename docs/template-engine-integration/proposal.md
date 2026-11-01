@@ -1,3 +1,5 @@
+> **MIXED historical integration proposal.** Command-scoped factory/session, host context and catalog projection are implemented infrastructure; constraint-aware groups, selection and invocation below are proposed, not wired command behavior. Immutable list-shaped group APIs are not mandatory current signatures. [Templates Architecture](../templates/README.md) links to Phase 6's proposed authority and owner decisions.
+
 ## Why
 
 The CLI needs one reliable boundary around Microsoft.TemplateEngine so every template operation uses the same func host, settings hive, command context, constraint policy, and result model. Without that boundary, commands can leak engine types, reuse stale project context, or invoke templates without enforcing compatibility constraints.

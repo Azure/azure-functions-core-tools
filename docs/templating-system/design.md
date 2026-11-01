@@ -1,3 +1,5 @@
+> **HISTORICAL / SUPERSEDED program authority map.** The claim that all child changes independently govern implementation and the ten-change completion gate below do not govern the first slice. This remains a useful producer/package/extensibility inventory, not current implementation authority. See [Templates Architecture](../templates/README.md) and the [Phase 6 disposition map](../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority); planning completeness is not approval or runtime evidence.
+
 ## Context
 
 See `proposal.md` for motivation and `specs/templating-system/spec.md` for the coordination contract.

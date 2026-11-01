@@ -1,5 +1,7 @@
 # CLI v5 Templates — Fabio's Object-Model Draft
 
+> **Preserved historical starting proposal (October 30, 2026).** Proposed type names/signatures below are not mandatory current APIs. See [Templates Architecture](README.md) for the current proposed Phase 6 contract and outstanding approval gates; the original draft body is retained for provenance.
+
 - **Status:** Proposed starting architecture; API shapes not approved.
 - **Design source:** Fabio Cavalcante's October 30 object-model proposal.
 - **Captured:** October 30, 2026; this copy was supplied by Francisco as an attachment, not retrieved from a Git commit.

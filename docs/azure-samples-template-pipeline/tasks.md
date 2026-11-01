@@ -1,3 +1,5 @@
+> **DEFERRED producer checklist, not current command implementation instructions.** Repository creation, provisioning, source acquisition and publication tasks below require separate authorization and do not block the bounded local proof. Checked or unchecked tasks are not runtime evidence. See [Templates Architecture](../templates/README.md); original producer requirements and checkboxes are preserved.
+
 ## 1. Repository and Tooling Foundation
 
 - [ ] 1.1 Create the `func-templates` repository in `azfunc/internal` with `src/Quickstarts`, `src/Schema`, central tooling and test projects, and `eng/ci`.

@@ -1,3 +1,5 @@
+> **MIXED: implemented declaration/matcher/evaluator helpers and proposed safety obligations.** Helpers are not registered constraint-aware `func init`/`func new` behavior. Raw validation, fail-closed eligibility and selected-content recheck are retained proposed first-slice obligations; packaging/install preflight and producer rules below are deferred, and bundle-gated listing is superseded. See [Templates Architecture](../templates/README.md) and the [selected-content contract](../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#selected-content-and-constraints). Historical baseline statements are not current runtime proof.
+
 ## Context
 
 See `proposal.md` for motivation and `specs/template-constraints/spec.md` for the behavior contract.

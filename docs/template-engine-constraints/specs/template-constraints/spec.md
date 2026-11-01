@@ -1,3 +1,5 @@
+> **Phase 6 status: retained safety design, not an implemented command contract.** Raw declaration validation and fail-closed eligibility remain required for the proposed first slice, including rechecking selected content before invocation. Current reader/matcher/evaluator helpers are not registered or wired into `func init`/`func new`; package install/update preflight and Azure-Samples producer clauses below are deferred with those workflows. See the [selected-content contract](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#selected-content-and-constraints) and [authority map](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority). The original spec is preserved for provenance, not runtime proof.
+
 ## Purpose
 
 Defines the func-specific template constraints, how templates declare them, how the CLI evaluates them, and the structured results commands receive.

@@ -1,6 +1,6 @@
 # CLI v5 Templates — Architecture Reset
 
-> **Historical architecture-reset charter — not current implementation authority.** This document preserves the investigation and simplification objectives established before the October 30, 2026 Templates discussion. Its architecture, process-lifetime inventory, bundled-content assumptions, and implementation sequence remain historical proposals. The current redesign starts from [Fabio's object-model draft](CLI-v5-Templates-Object-Model-Fabio-Draft-2026-10-30.md) and the reviewed PR #5820 cleanup baseline. See the [Engine Redesign Execution Plan](CLI-v5-Templates-Engine-Redesign-Execution-Plan-2026-10-30.md) for current decisions and review gates.
+> **Historical architecture-reset charter — not current implementation authority.** This document preserves the investigation and simplification objectives established before the October 30, 2026 Templates discussion. Its architecture, process-lifetime inventory, bundled-content assumptions, and implementation sequence remain historical proposals. See [Templates Architecture](README.md) for the current proposed Phase 6 contract and review gates. [Fabio's object-model draft](CLI-v5-Templates-Object-Model-Fabio-Draft-2026-10-30.md) and the [Engine Redesign Execution Plan](CLI-v5-Templates-Engine-Redesign-Execution-Plan-2026-10-30.md) are historical starting/planning checkpoints.
 
 **Status:** Working design and investigation charter; not an approved implementation specification
 

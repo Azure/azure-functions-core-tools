@@ -1,5 +1,7 @@
 # Installed stack metadata inventory
 
+> **MIXED: current implemented Stack/initializer inventory and historical future-navigation claims.** Additive `IProjectStack` metadata/catalog coexist with working initializers; this is not authorization to switch commands. The quickstart-authority and release-order statements below belong to that metadata checkpoint, not an approved first-slice migration plan. See [Templates Architecture](../templates/README.md) for Phase 6's proposed contract and owner decisions; retain the Stack options and supported scaffolding evidence.
+
 This is the additive metadata step for [#5648](https://github.com/Azure/azure-functions-core-tools/issues/5648).
 It describes current `vnext` initializers, not the future template parameters.
 

@@ -1,3 +1,5 @@
+> **Historical proposed integration contract - only its implemented parts describe the current baseline.** The current factory/session/host context and catalog projection do not implement group resolution, constraint-aware invocation or creation. Projected parameter `IsRequired`/defaults are not authoritative for conditional engine semantics; a full-ID choice may not widen into sibling variants; content validity must be rechecked before rendering. See the [Phase 6 authority map](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority), [parameter-evaluation contract](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#parameter-evaluation), and [exact-ID contract](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#exact-id-selection). Unapproved future API shapes and post-actions below remain historical proposals.
+
 ## Purpose
 
 Defines the context-aware contract for discovering, evaluating, selecting, and invoking installed templates through the Azure Functions CLI template engine integration.

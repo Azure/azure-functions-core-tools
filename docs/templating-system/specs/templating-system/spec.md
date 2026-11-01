@@ -1,3 +1,5 @@
+> **Historical umbrella roadmap - not the current first-slice authority.** The child specifications below record an earlier ten-change program; their `SHALL` clauses do not collectively override present CLI behavior or approve public template commands. See the [Phase 6 authority/disposition map](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority) for the proposed minimal contract and unresolved owner decisions. Preserve this inventory as program history; do not require its entire completion before the bounded engine/command proof.
+
 ## Purpose
 
 Coordinates the focused specifications that together define the func templating system, including their ownership boundaries, dependencies, readiness, and overall completion criteria.

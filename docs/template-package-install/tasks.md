@@ -1,3 +1,5 @@
+> **DEFERRED historical lifecycle checklist, not first-slice instructions.** Factory/session infrastructure already exists; new lifecycle commands, package acquisition, locking and replacement transactions below await separate approval. Production local registration is a distinct unresolved installer step. [Templates Architecture](../templates/README.md) links to the proposed contract; all package-safety tasks and checkboxes are preserved.
+
 ## 1. TemplateEngine Boundary Foundation
 
 - [ ] 1.1 Complete the command-scoped `ITemplaterFactory`, immutable context, private engine session, and func-owned model boundaries required from `template-engine-integration`.

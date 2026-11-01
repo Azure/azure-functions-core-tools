@@ -1,3 +1,5 @@
+> **HISTORICAL migration checklist, not the current implementation task list.** Additive `IProjectStack` metadata/catalog already exist; unchecked boxes are not source inventory. Do not remove working initializers or require all-Stack packages, template-first topology, new public options or an action framework from these tasks. See [Templates Architecture](../templates/README.md) for proposed first-slice authority and separate approval gates; original checkboxes are unchanged.
+
 ## 1. Template Integration Prerequisites
 
 - [ ] 1.1 Use the project catalog entries, eligibility, and declared projects defined by `template-engine-integration` and `func-init-quickstarts` instead of a separate init catalog.

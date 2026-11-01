@@ -1,3 +1,5 @@
+> **HISTORICAL checklist mixing existing helpers, missing command wiring and deferred producer/install work.** Unchecked validator/evaluator tasks do not establish absence of those helpers; they are not yet a registered command path. Packaging and lifecycle tasks are not first-slice prerequisites. See [Templates Architecture](../templates/README.md) for Phase 6's proposed safety contract and owner decisions; all checkboxes are preserved.
+
 ## 1. Constraint Types
 
 - [ ] 1.1 Add the `func-workload` constraint factory over the usable workload snapshot and installed workload list, excluding workloads rejected by applicable compatibility or activation checks, retaining their CLI-owned diagnostics, validating names, matching aliases and package IDs case-insensitively, and checking NuGet version ranges with the workload catalog's prerelease rule.

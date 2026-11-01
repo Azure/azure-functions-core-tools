@@ -1,3 +1,5 @@
+> **MIXED: existing initialization evidence and historical migration design.** Preserve working Stack initializers, occupied non-project write-if-missing, adoption/healing and supported behavior. The empty-or-force-only route is superseded; broad initializer removal, template-first/multi-project UX, new public options and mandatory action framework below are deferred or require owner approval. [Templates Architecture](../templates/README.md) links to the current proposed contract, including [non-force init](../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#non-force-init); older quickstart designs are not independent authority.
+
 ## Context
 
 See `proposal.md` for motivation and `specs/func-init-execution/spec.md` for the behavioral contract.

@@ -1,3 +1,5 @@
+> **MIXED historical constraint proposal, not an implemented command contract.** Reader/matcher/evaluator helpers exist; command registration, fail-closed selection and invocation rechecks remain missing. Install/update preflight and Azure-Samples producer requirements are deferred with those workflows. [Templates Architecture](../templates/README.md) links to the retained proposed safety obligations and unresolved integrity/registration decisions.
+
 ## Why
 
 Templates need a way to say what they require before a command runs them. `func init` must not scaffold a project whose stack workloads aren't installed, and `func new` must not add a function that the project's extension bundle can't support. Microsoft.TemplateEngine already evaluates template constraints, but its built-in workload and SDK checks describe the .NET SDK. The other templating changes defer the func-specific checks, their results, and the guidance users see to this change.

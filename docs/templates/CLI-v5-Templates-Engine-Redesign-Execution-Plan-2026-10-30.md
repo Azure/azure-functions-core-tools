@@ -1,5 +1,7 @@
 # CLI v5 Templates — Engine Redesign Execution Plan
 
+> **Dated planning checkpoint (October 30, 2026), not the current implementation task list.** Phase/status statements below reflect that checkpoint date. The current proposed [Templates Architecture](README.md) links to Phase 6 and its authority map; this checkpoint does not authorize implementation.
+
 - **Date:** 2026-10-30
 - **Status:** Phases 1–3 complete; Phase 3 accepted with follow-ups; Phase 4 next (not started). Architecture and implementation not approved.
 - **Owner:** Francisco Gomez Gamino

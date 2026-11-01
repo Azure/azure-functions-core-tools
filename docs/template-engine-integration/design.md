@@ -1,3 +1,5 @@
+> **MIXED: existing factory/session/catalog infrastructure and historical future contracts.** The opening baseline and API shapes below are checkpoint evidence, not a current source inventory. Mandatory list-shaped groups, projection-driven conditional evaluation, force/post-action request policy and full-ID widening do not govern the proposed first slice. See [Templates Architecture](../templates/README.md) and the [Phase 6 authority map](../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority); command-facing resolution/invocation remain unimplemented.
+
 ## Context
 
 See `proposal.md` for motivation and `specs/template-execution/spec.md` for the behavioral contract.

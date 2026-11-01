@@ -1,3 +1,5 @@
+> **DEFERRED historical producer proposal.** The control-plane repository, onboarding, synthesis and feed publication below are future supply work, not authorization or prerequisites for the first implementation slice. Their unique package/provenance requirements remain evidence for a separately approved producer design. See [Templates Architecture](../templates/README.md) for the current proposed contract and content-owner decisions.
+
 ## Why
 
 Azure-Samples quickstart repositories are independently released source repositories, but the Azure Functions CLI template system consumes versioned `FuncTemplate` NuGet packages. A centrally managed supply pipeline is needed to onboard eligible repositories, detect new releases, convert immutable release snapshots into safe template packages, and publish those packages without requiring each sample repository to own packaging infrastructure.

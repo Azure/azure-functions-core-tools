@@ -1,3 +1,5 @@
+> **HISTORICAL program-readiness checklist, not implementation authorization.** Completed planning boxes do not approve child contracts or prove product behavior; ten-change validation is not the proposed first-slice gate. See [Templates Architecture](../templates/README.md) for current proposed authority and deferred scope. Preserve these coordination tasks and their original checkboxes as history.
+
 ## 1. Existing Focused Specifications
 
 - [x] 1.1 Track the completed `template-engine-integration` planning artifacts and its core integration responsibility.

@@ -1,5 +1,7 @@
 # `func new`
 
+> **MIXED gateway: implemented helpers and historical future command requirements.** Start with [Templates Architecture](../docs/templates/README.md) and its Phase 6 authority map, not the older focused designs linked below. Factory/session/catalog helpers exist; command-facing resolution, engine-evaluated parameters, invocation and production registration are missing. Preview/lifecycle and superseded grammar are not current requirements. The migration handler fails before target writes, but first-run setup can complete before it is reached.
+
 ## Purpose
 
 `func new` creates a function from an installed item template in an existing

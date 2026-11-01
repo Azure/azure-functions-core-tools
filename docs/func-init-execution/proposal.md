@@ -1,3 +1,5 @@
+> **HISTORICAL migration proposal, not current `func init` behavior.** Additive Stack metadata exists alongside working initializers; removing those initializers and requiring template-first selection, new public options or configuration actions is not approved. Preserve adoption/healing and supported initialization until a separately authorized replacement is qualified. See [Templates Architecture](../templates/README.md) for the Phase 6 proposed first-slice dispositions.
+
 ## Why
 
 `func init` needs a unified project-template execution path that can select an installed project template before any Functions project context exists. The current workload initializers combine stack discovery, command options, file generation, and post-generation behavior, preventing project templates from using the shared func TemplateEngine integration.

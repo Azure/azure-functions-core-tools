@@ -1,3 +1,5 @@
+> **HISTORICAL / SUPERSEDED umbrella authority proposal.** Keep the child-change inventory as program history, not a competing normative owner or first-slice completion gate. [Templates Architecture](../templates/README.md) links to the current proposed Phase 6 contract, deferred work and unresolved owner decisions; no child proposal independently authorizes implementation.
+
 ## Why
 
 The func templating redesign spans integration, package lifecycle, command execution, extensibility, and project-tool integration across several focused changes. An umbrella specification is needed to keep their ownership boundaries, dependencies, and completion status coherent without duplicating the detailed requirements in each child change.

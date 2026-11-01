@@ -1,3 +1,5 @@
+> **HISTORICAL / SUPERSEDED command proposal, not implementation authority.** The breaking positional-template/`--path` and upward-search changes below are superseded; public dry-run, lifecycle UX and unresolved selection/alias policies are deferred or require owner approval. See [Templates Architecture](../templates/README.md) for the current proposed contract. Existing `[path]`/`--format` and the unavailable command handler are not replaced by this proposal.
+
 ## Why
 
 `func new` needs a deterministic item-template execution path built on the command-scoped Template Engine integration under `src/Func/Templates/Engine`. It resolves the current Functions project, selects only compatible item templates, parses template-specific arguments against projected parameter definitions, and prompts only when user input is genuinely required. Until command integration is complete, scaffolding and listing return a nonzero exit code without modifying project files.

@@ -1,3 +1,5 @@
+> **DEFERRED producer design, not the proposed first-slice command contract.** The separate control plane, release pipeline, synthesis/actions and publication flows below require their own owner approval; they are not prerequisites for a bounded local engine/command proof. Preserve source/package/provenance evidence. See [Templates Architecture](../templates/README.md) for current proposed authority and approved-content/registration decisions still required before public availability.
+
 ## Context
 
 See `proposal.md` for motivation and `specs/azure-samples-template-pipeline/spec.md` for the behavior contract.

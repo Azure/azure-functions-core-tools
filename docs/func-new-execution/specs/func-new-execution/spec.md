@@ -1,3 +1,5 @@
+> **Historical proposed contract - not current CLI behavior or approved first-slice requirements.** Current `func new` has positional `[path]`, `--template`, `--name`, `--force`, `--non-interactive`, `--list` and `--format`, but scaffolding/listing are temporarily unavailable. The requirements below for a positional template, `--path`, upward project search, bundle-gated listing, fallback aliases, automatic precedence, public dry-run and package lifecycle are superseded, deferred or subject to owner approval; do not implement them from this spec alone. See the [Phase 6 authority map](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority) and [token-capture contract](../../../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#token-capture). Retain the original proposals below as historical evidence.
+
 ## Purpose
 
 Defines how `func new` resolves an existing Functions project, selects and configures an eligible item template, and either previews or performs its invocation.

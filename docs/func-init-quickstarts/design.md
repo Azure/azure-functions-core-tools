@@ -1,3 +1,5 @@
+> **DEFERRED historical quickstart integration design.** Template-first/multi-project init, browse/lifecycle UX and mandatory configuration-action topology below are not first-slice prerequisites. Preserve existing `func quickstart` and `func init` adoption/healing; this proposal does not establish their replacement or runtime coverage. See [Templates Architecture](../templates/README.md) and the [Phase 6 authority map](../templates/CLI-v5-Templates-Phase-6-Semifinal-Architecture.md#normative-authority).
+
 ## Context
 
 See `proposal.md` for motivation and `specs/func-init-quickstarts/spec.md` for the behavior contract.

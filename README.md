@@ -87,10 +87,12 @@ func <command> [path] [options]
 ## Architecture
 
 The function-template engine is implemented under `src/Func/Templates/Engine`
-on `Microsoft.TemplateEngine`. `func new` command integration is in progress;
-until available, scaffolding and `--list` return a nonzero exit code without
-modifying the target directory. `func init`, quickstarts, setup, and runtime
-execution remain available.
+on `Microsoft.TemplateEngine`. `func new` command integration is in progress. When its handler runs,
+scaffolding and `--list` report temporary unavailability and return
+exit code 1 without modifying the target directory. First-run setup
+may instead complete successfully and ask the user to rerun the
+command before that handler is reached. `func init`, quickstarts,
+setup, and runtime execution remain available.
 
 The v5 CLI is a ground-up rebuild using:
 
@@ -125,8 +127,9 @@ eng/
   scripts/                 # Build and validation scripts
   res/                     # Resources (icons, MSI assets)
 docs/
-  vnext.md                 # v5 design document
-  modernization.md         # Modernization design document
+  cli-architecture.md      # CLI architecture
+  repo-structure.md        # Repository navigation
+  templates/README.md      # Templates Architecture entry point (proposed)
 Azure.Functions.Cli.slnx   # Solution file
 ```
 
@@ -169,7 +172,7 @@ func setup --features java --yes
 func setup --features powershell --yes
 ```
 
-In an existing project, setup uses its configured runtime when `--features` is omitted.
+In an existing project, setup uses its configured language stack when `--features` is omitted.
 `func setup --check` checks the same dependencies without installing them and returns
 a nonzero exit code when a required stack workload is missing.
 
@@ -239,6 +242,7 @@ Common runtime identifiers: `osx-arm64`, `osx-x64`, `linux-x64`, `win-x64`
 
 ## Documentation
 
+- [Templates Architecture](docs/templates/README.md) — proposed design for `func init` and `func new`, document status and review gates; not implementation approval.
 - [Code and test Azure Functions locally](https://docs.microsoft.com/azure/azure-functions/functions-run-local)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Design proposals](proposed/)

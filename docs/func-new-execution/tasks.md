@@ -1,3 +1,5 @@
+> **HISTORICAL task list, not the current implementation backlog.** Do not execute the positional-template/`--path`, upward-search, lifecycle or public dry-run tasks below from this checklist. Some factory/catalog/type helpers already exist; unchecked boxes do not establish missing source behavior. [Templates Architecture](../templates/README.md) links to the proposed first-slice authority and approval gates; original checkboxes are preserved.
+
 ## 1. Template Integration Prerequisites
 
 - [ ] 1.1 Add the func-owned `TemplateType` projection for TemplateEngine `tags.type` values and expose it on catalog and resolved-template models.
