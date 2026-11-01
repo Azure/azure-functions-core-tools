@@ -9,7 +9,8 @@
 
 | Category | Areas to explore |
 | --- | --- |
-| Recommended | Installation and version checks, setup, profiles, workloads, CLI update, local execution, and Quickstart |
+| Recommended | Installation and version checks, setup, profiles, workloads, CLI update, and local execution |
+| Optional regression | Quickstart browsing and scaffolding with an available template and known local prerequisites |
 | Stack-specific | Node.js, Python, and .NET isolated, with the prerequisites below |
 | Exploratory | Go (Flex only); assigned Java, PowerShell, and platform-specific tests |
 | Assigned prerequisites | Installer recovery, publisher trust, specific workload versions, and incompatible-bundle checks |
