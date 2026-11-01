@@ -10,7 +10,7 @@
 | Category | Areas to explore |
 | --- | --- |
 | Recommended | Installation and version checks, setup, profiles, workloads, CLI update, and local execution |
-| Optional regression | Quickstart browsing and scaffolding with an available template and known local prerequisites |
+| Optional regression | Quickstart browsing and scaffolding with an available template and the required local tools and dependencies |
 | Stack-specific | Node.js, Python, and .NET isolated, with the prerequisites below |
 | Exploratory | Go (Flex only); assigned Java, PowerShell, and platform-specific tests |
 | Assigned prerequisites | Installer recovery, publisher trust, specific workload versions, and incompatible-bundle checks |
@@ -19,7 +19,7 @@ Use the prerequisites and limits in the detailed sections below.
 
 ## 1. Get ready
 
-Choose **one** language stack to start with. Use a disposable directory and keep your existing v4 installation unchanged.
+Choose a language stack to test. Use a disposable directory and keep your existing v4 installation unchanged.
 
 | Stack | Local prerequisite |
 | --- | --- |
@@ -96,9 +96,9 @@ Preview 5 installers target Windows x64/ARM64, Linux glibc x64/ARM64, and macOS 
 
 ## 2. Run one local end-to-end test
 
-Pick one of the following. Use a fresh project name for each test. Choose an **HTTP trigger** when prompted and anonymous authentication if offered. You can inspect templates with `func5 new "PROJECT_DIRECTORY" --list`.
+Start with one of these examples. Use a fresh project name for each test. Choose an **HTTP trigger** when prompted and anonymous authentication if offered. You can inspect templates with `func5 new "PROJECT_DIRECTORY" --list`.
 
-> If function generation fails, report it. You can still test initialization and host startup, but an empty app has no HTTP endpoint. For an HTTP invocation test, use a listed Quickstart or an assigned app containing an HTTP function. Listing templates does not prove function generation works.
+> If function generation fails, report it. You can still test initialization and host startup, but an empty app has no HTTP endpoint. For an HTTP invocation test, try an available Quickstart or a prepared app with an HTTP function. Listing templates does not prove function generation works.
 
 ### Node.js — JavaScript
 
