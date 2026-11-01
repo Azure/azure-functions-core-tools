@@ -45,10 +45,10 @@ internal sealed class FirstRunCoordinator(
     // inspection gesture, not a real first command. "update" must inspect its
     // installation metadata before any setup activity. "workload" covers every
     // `func workload ...` subcommand: a user reaching for those is already
-    // managing their setup directly. `init` and `new` stay off the skip list
-    // intentionally; the spec wants the prompt there too.
+    // managing their setup directly. `init` still prompts, but the unavailable
+    // `new` command must report its failure without running setup.
     private static readonly HashSet<string> _skippedRootCommands =
-        new(StringComparer.OrdinalIgnoreCase) { "setup", "update", "version", "workload" };
+        new(StringComparer.OrdinalIgnoreCase) { "new", "setup", "update", "version", "workload" };
 
     private static readonly HashSet<string> _skippedTokens =
         new(StringComparer.OrdinalIgnoreCase) { "--help", "-h", "-?", "/?", "--version", "-v" };
@@ -173,7 +173,7 @@ internal sealed class FirstRunCoordinator(
 
         // After a successful setup we always short-circuit the user's original
         // command. The workload loader snapshots templates/bundles/host metadata
-        // at host build time, so anything the user typed (init, new, run,
+        // at host build time, so anything the user typed (init, run,
         // start, quickstart, ...) is operating against the pre-install view
         // and would either fail outright ("no project here") or silently use
         // stale metadata. Asking them to re-run is the only safe answer until
