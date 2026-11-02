@@ -17,6 +17,8 @@ RUN apt-get update && \
     rm -f "${NODE_ARCHIVE}" && \
     rm -rf /var/lib/apt/lists/*
 
+ENV PATH="/opt/node/bin:${PATH}"
+
 FROM runtime AS build
 WORKDIR /src
 
