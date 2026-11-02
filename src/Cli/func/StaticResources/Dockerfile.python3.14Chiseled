@@ -1,0 +1,35 @@
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-resolute AS build
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3.14 python3-pip && \
+    mkdir -p /opt/python-links && \
+    ln -s /usr/bin/python3.14 /opt/python-links/python && \
+    ln -s /usr/bin/python3.14 /opt/python-links/python3 && \
+    ln -s /usr/bin/python3.14 /opt/python-links/python3.14 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+COPY requirements.txt .
+RUN python3.14 -m pip install --target /app/.python_packages/lib/site-packages -r requirements.txt
+
+COPY . /app
+
+# This image uses a chiseled (minimal) Azure Functions base image.
+# It doesn't include the Python 3.14 runtime, so the next steps copy it in from the Canonical Resolute image.
+FROM mcr.microsoft.com/azure-functions/python:4-python3.14-chiseled AS final
+COPY --from=ubuntu/python:3.14-26.04_stable /usr/ /usr/
+COPY --from=ubuntu/python:3.14-26.04_stable /etc/python3.14 /etc/python3.14
+COPY --from=build /opt/python-links/ /usr/local/bin/
+
+# The base image doesn't include a shell. For debugging purposes, you can add other dependencies as needed.
+# For example, uncomment the lines below to add a lightweight shell using BusyBox.
+# BusyBox doesn't include an SSH server, so it doesn't enable SSH access to your app on App Service.
+# COPY --from=busybox:uclibc /bin/busybox /bin/busybox
+# RUN ["/bin/busybox", "--install", "-s", "/bin"]
+
+ENV PATH="/usr/local/bin:${PATH}" \
+    FUNCTIONS_WORKER_RUNTIME=python \
+    AzureWebJobsScriptRoot=/home/site/wwwroot \
+    AzureFunctionsJobHost__Logging__Console__IsEnabled=true
+
+COPY --from=build /app /home/site/wwwroot
