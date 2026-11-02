@@ -65,6 +65,18 @@ This design targets **profile-level host version alignment**, not full cloud par
 
 ### 5.1 Built-in Profile Registry
 
+The bundled catalog covers Azure Functions hosting plans from the
+[Azure Functions operating system support matrix](https://learn.microsoft.com/azure/azure-functions/functions-scale#operating-system-support):
+
+| Hosting option | Built-in profiles |
+| --- | --- |
+| Flex Consumption (Linux) | `flex` |
+| Premium | `linux-premium`, `windows-premium` |
+| Dedicated | `linux-dedicated`, `windows-dedicated` |
+| Consumption (legacy) | `linux-consumption` (deprecated), `windows-consumption` |
+
+Python is included only in Linux profiles.
+
 The registry uses a `$schema` URI for self-description and versioning, following the pattern established by Azure Resource Manager templates:
 
 ```json
@@ -84,7 +96,7 @@ The registry uses a `$schema` URI for self-description and versioning, following
       "features": {
         "proxies": false
       },
-      "supportedRuntimes": ["node", "python", "java", "powershell", "dotnet-isolated", "custom"],
+      "supportedRuntimes": ["node", "python", "java", "powershell", "dotnet-isolated"],
       "notes": "Newest host — Flex gets bits first"
     }
   }

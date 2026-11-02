@@ -17,6 +17,11 @@ The per-version packages may not always share the same version number, so each
 is pinned independently. Bump both whenever the upstream worker packages are
 bumped. `VersionOverride` ensures each reference stays pinned.
 
+Profiles constrain the combined workload package through
+`workers.powershell.version`, not the individual upstream packages. For example,
+`[4.0.5362]` selects the workload containing both PS 7.4 worker `4.0.5361` and
+PS 7.6 worker `4.0.5362`.
+
 Unlike the bundles workload, there is no channel axis: the upstream
 PowerShellWorker NuGets don't ship preview/experimental SKUs.
 
