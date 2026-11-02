@@ -5,33 +5,57 @@
     reviewable Markdown evidence file.
 
 .DESCRIPTION
-    Invokes an executable directly without evaluating a shell string. Captures
-    stdout and stderr in memory, applies conservative redaction, and writes only
-    the sanitized result. Records allowlisted bug-bash variable presence but
-    never their values.
+    Uses one literal isolated CLI executable for version, verbose identity, and
+    the reproduction command. Before executing the reproduction, verifies the
+    exact CLI version, install-root containment, and five allowlisted bug-bash
+    settings against caller-supplied expected values. Captures stdout/stderr in
+    memory, applies conservative redaction, and writes only sanitized evidence.
 
-    This helper is not for interactive prompts, cancellation testing, TUI
+    This helper is not for prompts, cancellation testing, dashboard/TUI
     behavior, or long-running commands such as func run.
 
-.PARAMETER FilePath
-    Executable name or path, normally func.
+.PARAMETER CliPath
+    Literal path to the isolated func executable. Command names and aliases such
+    as func or func5 are rejected.
+
+.PARAMETER ExpectedCliVersion
+    Exact version from the live bug-bash wiki.
+
+.PARAMETER ExpectedInstallPath
+    Approved isolated install directory that must contain CliPath.
+
+.PARAMETER ExpectedConfigurationJson
+    JSON object containing expected values for exactly these keys:
+    FUNC_CLI_WORKLOADS_SOURCE, FUNC_CLI_QUICKSTART_MANIFEST_URL,
+    FUNC_CLI_WORKLOADS_PRERELEASE, FUNC_CLI_HOME, and
+    FUNC_CLI_WORKLOADS_HOME. Values are compared in memory and never emitted.
 
 .PARAMETER ArgumentList
-    Exact argument tokens passed to the executable when invoking this script
-    directly from PowerShell.
+    Exact CLI argument tokens when invoking this script directly from
+    PowerShell.
 
 .PARAMETER ArgumentsJson
-    JSON array of exact argument tokens. Use this with pwsh -File from
+    JSON array of exact CLI argument tokens. Use this with pwsh -File from
     PowerShell, bash, or zsh.
 
 .PARAMETER Stack
     Relevant runtime versions to collect: node, python, dotnet, go, powershell.
 
+.PARAMETER HostVersion
+    Relevant actual Host version, when known.
+
+.PARAMETER WorkloadVersionsJson
+    Optional JSON object mapping relevant workload/package names to actual
+    installed versions.
+
+.PARAMETER TargetProfile
+    Relevant Azure Functions target-profile name. This is not a shell profile.
+
+.PARAMETER TemplateId
+    Relevant template ID.
+
 .PARAMETER OutputDirectory
     New directory that will contain evidence.md.
-
-.PARAMETER FuncPath
-    Executable name or path used for func --version and func --verbose.
 
 .PARAMETER ShellName
     Optional participant shell name when automatic detection is insufficient.
@@ -40,18 +64,38 @@
 param(
     [Parameter(Mandatory)]
     [ValidateNotNullOrEmpty()]
-    [string] $FilePath,
+    [string] $CliPath,
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string] $ExpectedCliVersion,
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string] $ExpectedInstallPath,
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string] $ExpectedConfigurationJson,
     [string[]] $ArgumentList = @(),
     [string] $ArgumentsJson,
     [ValidateSet('node', 'python', 'dotnet', 'go', 'powershell')]
     [string[]] $Stack = @(),
+    [string] $HostVersion,
+    [string] $WorkloadVersionsJson,
+    [string] $TargetProfile,
+    [string] $TemplateId,
     [string] $OutputDirectory,
-    [string] $FuncPath = 'func',
     [string] $ShellName
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+$configurationVariables = [ordered]@{
+    FUNC_CLI_WORKLOADS_SOURCE = 'value'
+    FUNC_CLI_QUICKSTART_MANIFEST_URL = 'value'
+    FUNC_CLI_WORKLOADS_PRERELEASE = 'value'
+    FUNC_CLI_HOME = 'path'
+    FUNC_CLI_WORKLOADS_HOME = 'path'
+}
 
 function Assert-SafeCommand {
     param(
@@ -70,37 +114,166 @@ function Assert-SafeCommand {
     foreach ($token in $tokens) {
         foreach ($pattern in $blockedPatterns) {
             if ($token -match $pattern) {
-                throw "Refusing to capture a command that may contain sensitive material. Use synthetic input or a manually redacted report."
+                throw 'Refusing to capture a command that may contain sensitive material. Use synthetic input or a manually redacted report.'
             }
         }
     }
 
     $executableName = [System.IO.Path]::GetFileNameWithoutExtension($Executable).ToLowerInvariant()
-    $shellExecutables = @('bash', 'cmd', 'powershell', 'pwsh', 'sh', 'zsh')
-    $evaluationFlags = @('-c', '-command', '-encodedcommand', '-e', '-ec', '/c')
-    if ($executableName -in $shellExecutables) {
-        foreach ($argument in $Arguments) {
-            if ($argument.ToLowerInvariant() -in $evaluationFlags) {
-                throw "Refusing to capture an opaque shell command. Invoke the target executable directly with explicit argument tokens."
-            }
-        }
+    if ($executableName -in @('bash', 'cmd', 'powershell', 'pwsh', 'sh', 'zsh')) {
+        throw 'Refusing to capture an opaque shell executable. Pass the literal isolated func executable.'
     }
 }
 
-function Resolve-Application {
-    param([string] $Command)
+function Resolve-LiteralExecutable {
+    param([string] $Path)
 
-    if (Test-Path -LiteralPath $Command -PathType Leaf) {
-        return (Resolve-Path -LiteralPath $Command).Path
+    if ($Path -match '[\r\n]') {
+        throw 'CliPath must not contain line breaks.'
     }
 
-    $resolved = Get-Command $Command -CommandType Application -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-    if ($null -eq $resolved) {
-        return $null
+    $hasDirectorySeparator = $Path.Contains([System.IO.Path]::DirectorySeparatorChar)
+    if ([System.IO.Path]::AltDirectorySeparatorChar -ne [System.IO.Path]::DirectorySeparatorChar) {
+        $hasDirectorySeparator = $hasDirectorySeparator -or $Path.Contains([System.IO.Path]::AltDirectorySeparatorChar)
     }
 
-    return $resolved.Source
+    if (-not [System.IO.Path]::IsPathRooted($Path) -and -not $hasDirectorySeparator) {
+        throw "CliPath must be a literal file path, not a command name or alias: $Path"
+    }
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "CLI executable does not exist: $Path"
+    }
+
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.LinkType -eq 'SymbolicLink') {
+        $target = $item.ResolveLinkTarget($true)
+        if ($null -eq $target) {
+            throw "CLI executable symbolic link cannot be resolved: $Path"
+        }
+
+        return $target.FullName
+    }
+
+    return $item.FullName
+}
+
+function Get-NormalizedPath {
+    param([string] $Path)
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $root = [System.IO.Path]::GetPathRoot($fullPath)
+    if ($fullPath.Length -gt $root.Length) {
+        return $fullPath.TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar)
+    }
+
+    return $fullPath
+}
+
+function Test-PathEquals {
+    param(
+        [string] $Left,
+        [string] $Right
+    )
+
+    try {
+        $leftPath = Get-NormalizedPath $Left
+        $rightPath = Get-NormalizedPath $Right
+    }
+    catch {
+        return $false
+    }
+
+    $comparison = if ($IsWindows) {
+        [System.StringComparison]::OrdinalIgnoreCase
+    }
+    else {
+        [System.StringComparison]::Ordinal
+    }
+
+    return [string]::Equals($leftPath, $rightPath, $comparison)
+}
+
+function Test-PathWithin {
+    param(
+        [string] $Candidate,
+        [string] $Root
+    )
+
+    try {
+        $candidatePath = Get-NormalizedPath $Candidate
+        $rootPath = Get-NormalizedPath $Root
+    }
+    catch {
+        return $false
+    }
+
+    $comparison = if ($IsWindows) {
+        [System.StringComparison]::OrdinalIgnoreCase
+    }
+    else {
+        [System.StringComparison]::Ordinal
+    }
+
+    if ([string]::Equals($candidatePath, $rootPath, $comparison)) {
+        return $false
+    }
+
+    $rootWithSeparator = $rootPath + [System.IO.Path]::DirectorySeparatorChar
+    return $candidatePath.StartsWith($rootWithSeparator, $comparison)
+}
+
+function ConvertFrom-StringMapJson {
+    param(
+        [AllowNull()]
+        [string] $Json,
+        [string] $Name,
+        [string[]] $RequiredKeys = @(),
+        [string[]] $AllowedKeys = @()
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Json)) {
+        if ($RequiredKeys.Count -gt 0) {
+            throw "$Name is required."
+        }
+
+        return [ordered]@{}
+    }
+
+    try {
+        $map = ConvertFrom-Json -InputObject $Json -AsHashtable
+    }
+    catch {
+        throw "$Name must be a JSON object with string values: $($_.Exception.Message)"
+    }
+
+    if ($map -isnot [System.Collections.IDictionary]) {
+        throw "$Name must be a JSON object with string values."
+    }
+
+    foreach ($key in $map.Keys) {
+        if ($key -isnot [string] -or $map[$key] -isnot [string] -or [string]::IsNullOrWhiteSpace($map[$key])) {
+            throw "$Name must contain only non-empty string keys and values."
+        }
+        if ($AllowedKeys.Count -gt 0 -and $key -notin $AllowedKeys) {
+            throw "$Name contains an unsupported key: $key"
+        }
+    }
+
+    foreach ($key in $RequiredKeys) {
+        if (-not $map.Contains($key)) {
+            throw "$Name is missing required key: $key"
+        }
+    }
+
+    $orderedMap = [ordered]@{}
+    foreach ($key in $map.Keys) {
+        $orderedMap[$key] = $map[$key]
+    }
+
+    return $orderedMap
 }
 
 function Invoke-CapturedProcess {
@@ -108,15 +281,6 @@ function Invoke-CapturedProcess {
         [string] $Executable,
         [string[]] $Arguments
     )
-
-    if ([string]::IsNullOrWhiteSpace($Executable)) {
-        return [pscustomobject]@{
-            Started = $false
-            ExitCode = $null
-            StdOut = ''
-            StdErr = 'Executable was not found.'
-        }
-    }
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $Executable
@@ -167,7 +331,8 @@ function Protect-Text {
     param(
         [AllowNull()]
         [string] $Text,
-        [ref] $RedactionCount
+        [ref] $RedactionCount,
+        [string[]] $OmittedValues = @()
     )
 
     if ([string]::IsNullOrEmpty($Text)) {
@@ -210,8 +375,21 @@ function Protect-Text {
         }
     }
 
+    foreach ($omittedValue in $OmittedValues | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique) {
+        $pattern = [regex]::Escape($omittedValue)
+        if ($omittedValue -match '^[A-Za-z0-9._-]+$') {
+            $pattern = "(?<![A-Za-z0-9._-])$pattern(?![A-Za-z0-9._-])"
+        }
+
+        $matches = [regex]::Matches($result, $pattern)
+        if ($matches.Count -gt 0) {
+            $RedactionCount.Value += $matches.Count
+            $result = [regex]::Replace($result, $pattern, '[OMITTED_CONFIGURATION_VALUE]')
+        }
+    }
+
     if (-not [string]::IsNullOrWhiteSpace($HOME)) {
-        $homePattern = [regex]::Escape($HOME)
+        $homePattern = [regex]::Escape((Get-NormalizedPath $HOME))
         $homeMatches = [regex]::Matches(
             $result,
             $homePattern,
@@ -237,6 +415,18 @@ function Format-CommandToken {
     }
 
     return "'$($Token.Replace("'", "''"))'"
+}
+
+function Resolve-Application {
+    param([string] $Command)
+
+    $resolved = Get-Command $Command -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($null -eq $resolved) {
+        return $null
+    }
+
+    return $resolved.Source
 }
 
 function Get-VersionResult {
@@ -268,7 +458,8 @@ function Get-VersionResult {
 function ConvertTo-MarkdownCell {
     param([string] $Value)
 
-    return $Value.Replace('|', '\|').Replace("`r`n", '<br>').Replace("`n", '<br>')
+    $encoded = [System.Net.WebUtility]::HtmlEncode($Value)
+    return $encoded.Replace('|', '\|').Replace("`r`n", '<br>').Replace("`n", '<br>')
 }
 
 function Get-CodeFence {
@@ -292,6 +483,10 @@ if ($PSBoundParameters.ContainsKey('ArgumentList') -and -not [string]::IsNullOrW
 
 $effectiveArguments = $ArgumentList
 if (-not [string]::IsNullOrWhiteSpace($ArgumentsJson)) {
+    if ($ArgumentsJson -notmatch '^\s*\[') {
+        throw 'ArgumentsJson must be a JSON array of strings.'
+    }
+
     try {
         $parsedArguments = @(ConvertFrom-Json -InputObject $ArgumentsJson)
     }
@@ -308,7 +503,17 @@ if (-not [string]::IsNullOrWhiteSpace($ArgumentsJson)) {
     $effectiveArguments = [string[]] $parsedArguments
 }
 
-Assert-SafeCommand -Executable $FilePath -Arguments $effectiveArguments
+$resolvedCli = Resolve-LiteralExecutable $CliPath
+Assert-SafeCommand -Executable $resolvedCli -Arguments $effectiveArguments
+
+$expectedConfiguration = ConvertFrom-StringMapJson `
+    -Json $ExpectedConfigurationJson `
+    -Name 'ExpectedConfigurationJson' `
+    -RequiredKeys @($configurationVariables.Keys) `
+    -AllowedKeys @($configurationVariables.Keys)
+$workloadVersions = ConvertFrom-StringMapJson `
+    -Json $WorkloadVersionsJson `
+    -Name 'WorkloadVersionsJson'
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path (Get-Location) "func-v5-evidence-$([DateTimeOffset]::Now.ToString('yyyyMMdd-HHmmss'))"
@@ -318,12 +523,98 @@ if (Test-Path -LiteralPath $OutputDirectory) {
     throw "Output directory already exists: $OutputDirectory"
 }
 
-$resolvedCommand = Resolve-Application $FilePath
-$commandResult = Invoke-CapturedProcess -Executable $resolvedCommand -Arguments $effectiveArguments
+$pathStatus = if (Test-PathWithin $resolvedCli $ExpectedInstallPath) { 'set' } else { 'mismatch' }
+$configurationStatus = [ordered]@{}
+$omittedConfigurationValues = [System.Collections.Generic.List[string]]::new()
+foreach ($entry in $configurationVariables.GetEnumerator()) {
+    $actualValue = [Environment]::GetEnvironmentVariable($entry.Key)
+    $omittedConfigurationValues.Add($expectedConfiguration[$entry.Key])
+    if (-not [string]::IsNullOrWhiteSpace($actualValue)) {
+        $omittedConfigurationValues.Add($actualValue)
+    }
 
-$resolvedFunc = Resolve-Application $FuncPath
-$funcVersion = Invoke-CapturedProcess -Executable $resolvedFunc -Arguments @('--version')
-$funcVerbose = Invoke-CapturedProcess -Executable $resolvedFunc -Arguments @('--verbose')
+    if ([string]::IsNullOrWhiteSpace($actualValue)) {
+        $configurationStatus[$entry.Key] = 'missing'
+        continue
+    }
+
+    $expectedValue = $expectedConfiguration[$entry.Key]
+    $matches = if ($entry.Value -eq 'path') {
+        Test-PathEquals $actualValue $expectedValue
+    }
+    else {
+        [string]::Equals($actualValue, $expectedValue, [System.StringComparison]::Ordinal)
+    }
+
+    $configurationStatus[$entry.Key] = if ($matches) { 'set' } else { 'mismatch' }
+}
+
+$canInspectCli = $pathStatus -eq 'set' -and -not (
+    $configurationStatus.Values |
+        Where-Object { $_ -ne 'set' } |
+        Select-Object -First 1)
+$versionResult = if ($canInspectCli) {
+    Invoke-CapturedProcess -Executable $resolvedCli -Arguments @('--version')
+}
+else {
+    [pscustomobject]@{
+        Started = $false
+        ExitCode = $null
+        StdOut = ''
+        StdErr = 'CLI identity was not queried because install-path or configuration verification failed.'
+    }
+}
+$actualVersion = $versionResult.StdOut.Trim()
+$versionStatus = if (-not $versionResult.Started -or [string]::IsNullOrWhiteSpace($actualVersion)) {
+    'missing'
+}
+elseif ($versionResult.ExitCode -eq 0 -and $actualVersion -ceq $ExpectedCliVersion) {
+    'set'
+}
+else {
+    'mismatch'
+}
+
+$gateStatus = [ordered]@{
+    'Executable under expected install path' = $pathStatus
+    'Exact CLI version' = $versionStatus
+}
+
+$gateFailures = [System.Collections.Generic.List[string]]::new()
+foreach ($entry in $gateStatus.GetEnumerator()) {
+    if ($entry.Value -ne 'set') {
+        $gateFailures.Add("$($entry.Key): $($entry.Value)")
+    }
+}
+foreach ($entry in $configurationStatus.GetEnumerator()) {
+    if ($entry.Value -ne 'set') {
+        $gateFailures.Add("$($entry.Key): $($entry.Value)")
+    }
+}
+
+$verboseResult = if ($gateFailures.Count -eq 0) {
+    Invoke-CapturedProcess -Executable $resolvedCli -Arguments @('--verbose')
+}
+else {
+    [pscustomobject]@{
+        Started = $false
+        ExitCode = $null
+        StdOut = ''
+        StdErr = 'CLI verbose identity was not queried because the verification gate failed.'
+    }
+}
+
+$commandResult = if ($gateFailures.Count -eq 0) {
+    Invoke-CapturedProcess -Executable $resolvedCli -Arguments $effectiveArguments
+}
+else {
+    [pscustomobject]@{
+        Started = $false
+        ExitCode = $null
+        StdOut = ''
+        StdErr = 'Command was not run because the isolation or configuration verification gate failed.'
+    }
+}
 
 $runtimeVersions = [ordered]@{}
 foreach ($stackName in $Stack | Select-Object -Unique) {
@@ -356,54 +647,71 @@ else {
     "PowerShell $($PSVersionTable.PSVersion)"
 }
 
-$variableNames = @(
-    'FUNC_CLI_WORKLOADS_SOURCE',
-    'FUNC_CLI_QUICKSTART_MANIFEST_URL',
-    'FUNC_CLI_WORKLOADS_PRERELEASE'
-)
-$variableStatus = [ordered]@{}
-foreach ($name in $variableNames) {
-    $value = [Environment]::GetEnvironmentVariable($name)
-    $variableStatus[$name] = if ([string]::IsNullOrWhiteSpace($value)) { 'missing' } else { 'set' }
-}
-
-$commandDisplay = (@($FilePath) + $effectiveArguments | ForEach-Object { Format-CommandToken $_ }) -join ' '
+$commandDisplay = (@($resolvedCli) + $effectiveArguments | ForEach-Object { Format-CommandToken $_ }) -join ' '
 $redactionCount = 0
-$safeCommand = Protect-Text -Text $commandDisplay -RedactionCount ([ref] $redactionCount)
-$safeStdOut = Protect-Text -Text $commandResult.StdOut -RedactionCount ([ref] $redactionCount)
-$safeStdErr = Protect-Text -Text $commandResult.StdErr -RedactionCount ([ref] $redactionCount)
-$safeFuncVersion = Protect-Text -Text $funcVersion.StdOut -RedactionCount ([ref] $redactionCount)
-$safeFuncVersionError = Protect-Text -Text $funcVersion.StdErr -RedactionCount ([ref] $redactionCount)
-$safeFuncVerbose = Protect-Text -Text $funcVerbose.StdOut -RedactionCount ([ref] $redactionCount)
-$safeFuncVerboseError = Protect-Text -Text $funcVerbose.StdErr -RedactionCount ([ref] $redactionCount)
-$safeShell = Protect-Text -Text $detectedShell -RedactionCount ([ref] $redactionCount)
+$omittedValues = $omittedConfigurationValues.ToArray()
+$safeExecutable = Protect-Text -Text $resolvedCli -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeCommand = Protect-Text -Text $commandDisplay -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeStdOut = Protect-Text -Text $commandResult.StdOut -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeStdErr = Protect-Text -Text $commandResult.StdErr -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeVersionStdOut = Protect-Text -Text $versionResult.StdOut -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeVersionStdErr = Protect-Text -Text $versionResult.StdErr -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeVerboseStdOut = Protect-Text -Text $verboseResult.StdOut -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeVerboseStdErr = Protect-Text -Text $verboseResult.StdErr -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeShell = Protect-Text -Text $detectedShell -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeHostVersion = Protect-Text -Text $HostVersion -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeTargetProfile = Protect-Text -Text $TargetProfile -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+$safeTemplateId = Protect-Text -Text $TemplateId -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
 
 foreach ($key in @($runtimeVersions.Keys)) {
-    $runtimeVersions[$key] = Protect-Text -Text $runtimeVersions[$key] -RedactionCount ([ref] $redactionCount)
+    $runtimeVersions[$key] = Protect-Text -Text $runtimeVersions[$key] -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+}
+$safeWorkloadVersions = [System.Collections.Generic.List[object]]::new()
+foreach ($entry in $workloadVersions.GetEnumerator()) {
+    $safeWorkloadVersions.Add([pscustomobject]@{
+        Name = Protect-Text -Text $entry.Key -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+        Version = Protect-Text -Text $entry.Value -RedactionCount ([ref] $redactionCount) -OmittedValues $omittedValues
+    })
 }
 
 $fence = Get-CodeFence -Values @(
     $safeCommand,
     $safeStdOut,
     $safeStdErr,
-    $safeFuncVersion,
-    $safeFuncVersionError,
-    $safeFuncVerbose,
-    $safeFuncVerboseError)
+    $safeVersionStdOut,
+    $safeVersionStdErr,
+    $safeVerboseStdOut,
+    $safeVerboseStdErr)
 
 $exitCode = if ($commandResult.Started) { $commandResult.ExitCode.ToString() } else { 'not started' }
 $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add('# Azure Functions CLI v5 bug-bash evidence')
 $lines.Add('')
 $lines.Add("> Generated locally on $([DateTimeOffset]::Now.ToString('o')). Review every line before sharing.")
-$lines.Add('> Output is exact except for explicit `[REDACTED...]` substitutions and the home-directory replacement `~`.')
+$lines.Add('> Expected and actual configuration values are intentionally omitted; only the reviewed executable path is retained.')
+$lines.Add('> Output is exact except for explicit `[REDACTED...]` or `[OMITTED...]` substitutions and the home-directory replacement `~`.')
+$lines.Add('')
+$lines.Add('## Verification gate')
+$lines.Add('')
+$lines.Add('| Check | Status |')
+$lines.Add('| --- | --- |')
+foreach ($entry in $gateStatus.GetEnumerator()) {
+    $lines.Add("| $($entry.Key) | $($entry.Value) |")
+}
+if ($gateFailures.Count -gt 0) {
+    $lines.Add('')
+    $lines.Add('The reproduction command was not run because one or more checks were not `set`.')
+}
 $lines.Add('')
 $lines.Add('## Reproduction command')
+$lines.Add('')
+$lines.Add("- Executable: ``$safeExecutable``")
 $lines.Add('')
 $lines.Add($fence + 'text')
 $lines.Add($safeCommand)
 $lines.Add($fence)
 $lines.Add('')
+$lines.Add("- Started: ``$(if ($commandResult.Started) { 'yes' } else { 'no' })``")
 $lines.Add("- Exit code: ``$exitCode``")
 $lines.Add("- Sanitizer replacements: ``$redactionCount``")
 $lines.Add('')
@@ -419,40 +727,40 @@ $lines.Add($fence + 'text')
 $lines.Add($(if ([string]::IsNullOrEmpty($safeStdErr)) { '<empty>' } else { $safeStdErr }))
 $lines.Add($fence)
 $lines.Add('')
-$lines.Add('## Azure Functions CLI')
+$lines.Add('## Azure Functions CLI identity')
 $lines.Add('')
-$lines.Add("### ``func --version`` (exit code: $(if ($funcVersion.Started) { $funcVersion.ExitCode } else { 'not started' }))")
+$lines.Add("### ``--version`` (exit code: $(if ($versionResult.Started) { $versionResult.ExitCode } else { 'not started' }))")
 $lines.Add('')
 $lines.Add('#### stdout')
 $lines.Add('')
 $lines.Add($fence + 'text')
-$lines.Add($(if ([string]::IsNullOrEmpty($safeFuncVersion)) { '<empty>' } else { $safeFuncVersion }))
+$lines.Add($(if ([string]::IsNullOrEmpty($safeVersionStdOut)) { '<empty>' } else { $safeVersionStdOut }))
 $lines.Add($fence)
 $lines.Add('')
 $lines.Add('#### stderr')
 $lines.Add('')
 $lines.Add($fence + 'text')
-$lines.Add($(if ([string]::IsNullOrEmpty($safeFuncVersionError)) { '<empty>' } else { $safeFuncVersionError }))
+$lines.Add($(if ([string]::IsNullOrEmpty($safeVersionStdErr)) { '<empty>' } else { $safeVersionStdErr }))
 $lines.Add($fence)
 $lines.Add('')
-$lines.Add("### ``func --verbose`` (exit code: $(if ($funcVerbose.Started) { $funcVerbose.ExitCode } else { 'not started' }))")
+$lines.Add("### ``--verbose`` (exit code: $(if ($verboseResult.Started) { $verboseResult.ExitCode } else { 'not started' }))")
 $lines.Add('')
 $lines.Add('#### stdout')
 $lines.Add('')
 $lines.Add($fence + 'text')
-$lines.Add($(if ([string]::IsNullOrEmpty($safeFuncVerbose)) { '<empty>' } else { $safeFuncVerbose }))
+$lines.Add($(if ([string]::IsNullOrEmpty($safeVerboseStdOut)) { '<empty>' } else { $safeVerboseStdOut }))
 $lines.Add($fence)
 $lines.Add('')
 $lines.Add('#### stderr')
 $lines.Add('')
 $lines.Add($fence + 'text')
-$lines.Add($(if ([string]::IsNullOrEmpty($safeFuncVerboseError)) { '<empty>' } else { $safeFuncVerboseError }))
+$lines.Add($(if ([string]::IsNullOrEmpty($safeVerboseStdErr)) { '<empty>' } else { $safeVerboseStdErr }))
 $lines.Add($fence)
 $lines.Add('')
 $lines.Add('## Environment')
 $lines.Add('')
-$lines.Add("| Field | Value |")
-$lines.Add("| --- | --- |")
+$lines.Add('| Field | Value |')
+$lines.Add('| --- | --- |')
 $lines.Add("| OS | $(ConvertTo-MarkdownCell ([System.Runtime.InteropServices.RuntimeInformation]::OSDescription.Trim())) |")
 $lines.Add("| OS architecture | $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) |")
 $lines.Add("| Process architecture | $([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture) |")
@@ -461,23 +769,36 @@ $lines.Add("| Capture host | PowerShell $($PSVersionTable.PSVersion) |")
 foreach ($entry in $runtimeVersions.GetEnumerator()) {
     $lines.Add("| $($entry.Key) | $(ConvertTo-MarkdownCell $entry.Value) |")
 }
+if (-not [string]::IsNullOrWhiteSpace($safeHostVersion)) {
+    $lines.Add("| Host version | $(ConvertTo-MarkdownCell $safeHostVersion) |")
+}
+foreach ($entry in $safeWorkloadVersions) {
+    $lines.Add("| Workload $(ConvertTo-MarkdownCell $entry.Name) | $(ConvertTo-MarkdownCell $entry.Version) |")
+}
+if (-not [string]::IsNullOrWhiteSpace($safeTargetProfile)) {
+    $lines.Add("| Target profile | $(ConvertTo-MarkdownCell $safeTargetProfile) |")
+}
+if (-not [string]::IsNullOrWhiteSpace($safeTemplateId)) {
+    $lines.Add("| Template ID | $(ConvertTo-MarkdownCell $safeTemplateId) |")
+}
 $lines.Add('')
 $lines.Add('## Bug-bash configuration')
 $lines.Add('')
-$lines.Add('Values are intentionally omitted. Compare them with the live bug-bash wiki before submission.')
+$lines.Add('`set` means the current value exactly matched the caller-supplied expected value. Values are omitted.')
 $lines.Add('')
 $lines.Add('| Variable | Status |')
 $lines.Add('| --- | --- |')
-foreach ($entry in $variableStatus.GetEnumerator()) {
+foreach ($entry in $configurationStatus.GetEnumerator()) {
     $lines.Add("| ``$($entry.Key)`` | $($entry.Value) |")
 }
 $lines.Add('')
 $lines.Add('## Review checklist')
 $lines.Add('')
+$lines.Add('- [ ] The literal executable is the intended isolated preview.')
 $lines.Add('- [ ] The command uses only synthetic or public test data.')
 $lines.Add('- [ ] No secret, token, key, connection string, customer data, or private endpoint is present.')
 $lines.Add('- [ ] stdout and stderr are limited to the relevant reproduction.')
-$lines.Add('- [ ] Environment and runtime details are accurate.')
+$lines.Add('- [ ] Host, workload, runtime, target-profile, and template details are accurate.')
 $lines.Add('- [ ] Any attachment was selected and reviewed separately.')
 
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
@@ -488,6 +809,9 @@ Write-Host "Evidence written to: $reportPath"
 Write-Host "Sanitizer replacements: $redactionCount"
 Write-Host 'Review the file before copying it into a report or uploading anything.'
 
+if ($gateFailures.Count -gt 0) {
+    exit 3
+}
 if (-not $commandResult.Started) {
     exit 2
 }

@@ -4,21 +4,25 @@ The live bug-bash wiki is authoritative:
 
 <https://github.com/Azure/azure-functions-core-tools/wiki/Azure-Functions-CLI-(v5)-Bug-Bash>
 
-Refresh it before setup, scenario selection, troubleshooting, and cleanup.
-Commands and preview details can change during the event.
+Refresh it before setup, scenario selection, troubleshooting, reporting, and
+cleanup. Do not use a PR snapshot or a remembered preview number.
 
-## 1. Detect the participant environment
+## 1. Read-only detection
 
-Read-only PowerShell checks:
+Run this phase before proposing any setup. It must not create directories,
+download files, set variables, change `PATH`, invoke installers, or acquire
+workloads.
+
+PowerShell:
 
 ```powershell
 $PSVersionTable.PSVersion
 [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
 [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-Get-Command func, gh, dotnet, node, python, python3, go -ErrorAction SilentlyContinue
+Get-Command func, gh, dotnet, node, python, python3, go -CommandType Application -ErrorAction SilentlyContinue
 ```
 
-Read-only bash/zsh checks:
+Bash on Linux/macOS:
 
 ```bash
 uname -s
@@ -27,115 +31,175 @@ printf '%s\n' "${SHELL##*/}"
 for tool in func gh dotnet node python3 python go; do command -v "$tool" 2>/dev/null || true; done
 ```
 
-Do not run `env`, `set`, `Get-ChildItem Env:`, or a history command. Check only
-the bug-bash variable names listed by the live wiki, and retain only whether
-each is `set`, `missing`, or `mismatch`.
+On Linux, determine compatibility without changing the machine:
 
-Before installation, record:
-
-- the resolved `func` path and `func --verbose` output if one already exists;
-- whether `~/.azure-functions` already exists;
-- the active shell and the applicable profile path;
-- whether the three required bug-bash variables are already set;
-- the user-approved sandbox path.
-
-Do not copy a profile file into evidence. If profile tracking is useful, record
-only its path, existence, and last-write time. Search later only for the exact
-line or marker documented by the current installer.
-
-## 2. Check only relevant prerequisites
-
-Use the live wiki's current versions and requirements. Check a runtime only if
-the user selected its stack. Report a missing prerequisite and the affected
-scenario; do not install it without a new consent step.
-
-PowerShell 7 is sufficient to run the repository's evidence helper on Windows
-or macOS. A macOS participant using only bash/zsh may run the scenarios without
-the helper; collect the same evidence fields manually.
-
-## 3. Install with an explicit consent gate
-
-Present:
-
-1. the exact installer command copied from the live wiki;
-2. its remote source URL and the fact that it executes downloaded code;
-3. the documented install directory;
-4. any `PATH`, profile, or bug-bash variable changes it may make;
-5. the pre-existing installation state that cleanup must preserve.
-
-Run the command only after an explicit confirmation. Do not translate the
-official PowerShell installer into shell or the official shell installer into
-PowerShell. Preserve its exit code and output.
-
-If the installer fails, stop and diagnose that failure before manually changing
-the environment. Any manual environment or profile change requires another
-explicit confirmation and must use the exact values from the live wiki.
-
-## 4. Verify the installed preview
-
-Run:
-
-```text
-func --version
-func --verbose
-func help
+```bash
+test ! -e /etc/alpine-release
+getconf GNU_LIBC_VERSION 2>/dev/null || ldd --version 2>&1 | head -n 1
 ```
 
-Then verify the three required bug-bash variables against the live wiki. Compare
-values in memory and report only status. Never write the values to the report.
+The documented target set is Windows x64/ARM64, Linux glibc x64/ARM64, and
+macOS Intel/Apple silicon. Alpine/musl is unsupported. If architecture, libc,
+or a published build is outside the live guide, skip rather than substitute.
 
-If multiple `func` commands exist:
+Check only prerequisites for the stack the participant selected. The live guide
+currently separates baseline Node.js, Python, .NET isolated, and exploratory Go
+requirements. Java, PowerShell, special platform cases, .NET 11, publisher
+trust, recovery, and pinned package versions require assigned fixtures or
+instructions.
 
-- show each resolved executable path;
-- identify which one produced the reported version;
-- update the current process `PATH` only after consent;
-- persist a profile change only after separate consent.
+Inventory normal `func` paths and versions, but treat v4 on `PATH` as expected
+coexistence. Do not repair `PATH`. Check only these environment names:
 
-Do not begin scenarios until the resolved executable is the intended v5 preview
-and required configuration is present.
+- `FUNC_CLI_WORKLOADS_SOURCE`
+- `FUNC_CLI_QUICKSTART_MANIFEST_URL`
+- `FUNC_CLI_WORKLOADS_PRERELEASE`
+- `FUNC_CLI_HOME`
+- `FUNC_CLI_WORKLOADS_HOME`
 
-## 5. Select and execute scenarios
+Compare against the current wiki and approved disposable paths in memory.
+Retain only `set`, `missing`, or `mismatch`, never the values.
 
-Offer only the groups relevant to the participant:
+## 2. Plan and consent
 
-- top-level help, version, invalid input, cancellation, color, and non-TTY;
-- setup, profiles, and workload lifecycle;
-- init, new, run/start, and output modes;
-- quickstart discovery and scaffolding;
-- end-to-end Node, Python, .NET, Go, or other stacks currently listed;
-- exploratory usability, documentation, or accessibility feedback.
+Select:
 
-Fetch the exact current commands and expected behavior from the wiki after the
-user chooses. Create a fresh directory for each stack so state does not leak
-between scenarios.
+- a new, unused disposable bug-bash root;
+- the install directory under that root;
+- isolated CLI and workload home directories under that root;
+- a separate evidence directory outside any project destination that a
+  `--force` or recovery scenario may clean.
 
-Before each scenario:
+Present the exact installer block from the live wiki. It should pin the current
+preview and use the documented skip-PATH switch. Explain that the installer
+does not configure the three feed/template settings. All five settings are
+session-only and must be set in every terminal used for CLI commands.
 
-1. state the exact command and expected behavior;
-2. identify mutations such as workload installation or generated files;
-3. get consent if the scenario changes machine-wide state;
-4. run it from the approved sandbox;
-5. capture the exit code and separate stdout/stderr when practical;
-6. note the smallest sequence that reproduces unexpected behavior.
+Get explicit consent before creating the root, downloading the installer,
+executing it, or setting session variables. Never edit a shell profile or
+persist environment settings.
 
-Run cancellation, prompts, TUI, and `func run` in a visible interactive
-terminal. Do not use the finite-command evidence helper for a process expected
-to keep running.
+## 3. Install and verify coexistence
 
-## 6. Clean up
+Run the exact platform block from the live wiki in one user-visible terminal.
+The root must be unused. If it already exists, choose a different root rather
+than cleaning it automatically.
 
-Re-read the wiki cleanup section. Compare its current instructions with the
-pre-install inventory and propose exact targets before deleting anything.
+The wiki may define `func5` as a convenience alias/function in that terminal.
+For agent shell calls, evidence capture, and second-terminal commands, use the
+literal executable path instead. Aliases and functions are not inherited by
+child processes, and agent tool calls start fresh shells.
 
-Cleanup can include:
+For every fresh agent shell call:
 
-- workloads installed during the session;
-- the v5 preview installation if it did not predate the session;
-- only the installer-added profile lines;
-- only the user-approved sandbox;
-- local evidence after the user confirms it is no longer needed.
+1. set all five approved values in that same process;
+2. assign the literal isolated executable path;
+3. run the requested command through that path;
+4. do not modify normal `PATH`.
 
-Never recursively delete a home directory, repository root, profile directory,
-or unresolved variable. Resolve and display each target first, then obtain
-confirmation. If a pre-existing installation or setting cannot be separated
-confidently from the bug-bash changes, leave it in place and explain why.
+Verify:
+
+- the literal executable exists under the approved install path;
+- `--version` equals the exact live-wiki version;
+- `--verbose` identifies the intended build, runtime, OS, and architecture;
+- help renders through the same executable;
+- all five session settings match their expected values.
+
+Stop on a missing build or any version mismatch. Do not continue with another
+preview. Normal `func` may still resolve to v4 and should remain untouched.
+
+## 4. Run one local E2E first
+
+Choose one supported stack from the live guide and use a fresh project name.
+Track these as distinct outcomes:
+
+1. setup completed for the selected stack;
+2. project initialization completed;
+3. templates could be listed;
+4. an actual function was generated;
+5. the host started;
+6. a real HTTP endpoint existed and responded;
+7. Ctrl+C stopped the host and owned child processes cleanly.
+
+Template listing does not prove generation. An empty app can start without
+providing an HTTP endpoint. Do not claim an invocation test unless a generated
+or prepared HTTP function actually responded.
+
+Use the current `--format` spelling from the wiki. JSON output is newline-
+delimited events, not one final JSON document. Keep host/dashboard,
+cancellation, prompt, and non-TTY tests visible and interactive.
+
+Go remains exploratory and Flex-only. Initialization already generates its HTTP
+`hello` function, so do not add a `func new` step. Use only assigned compatible
+worker/package prerequisites.
+
+In a second terminal, repeat the five session settings and invoke the same
+literal executable. Keep logs and evidence outside project destinations that
+may be force-cleaned.
+
+## 5. Optional exploration
+
+Fetch current commands from the wiki after the participant chooses an area.
+
+### Setup and profiles
+
+- Test only disposable projects and approved target profiles.
+- Record the target-profile name, never shell profile contents.
+- Unsupported stack/profile combinations should fail before worker acquisition.
+- In setup JSON check mode, expect NDJSON events.
+
+### Workloads
+
+- Inventory isolated workload state before and after mutation.
+- Pinned versions, Host packages, local packages, trust, and destructive
+  install/uninstall cases require the exact assigned fixture.
+- Do not fall back to nuget.org or replace an unavailable special version.
+
+### CLI update
+
+- Use a separate disposable CLI install so the main Preview test root remains
+  stable.
+- Restore the exact current preview before continuing other scenarios.
+- A successful same-version update is a no-op, not proof of replacement.
+- Recovery, missing metadata, decline, cancellation, and trust cases require
+  assigned fixtures. Never edit a working installation's metadata to authorize
+  an update.
+
+### Init, new, run, and Quickstart
+
+- Use template IDs returned by current list commands.
+- Distinguish listing, generation, startup, and invocation.
+- Follow generated local-development instructions, but skip cloud deployment.
+- Test `--force`, adoption, healing, or populated destinations only with
+  sentinel files in disposable directories.
+- Quickstart recovery may move only the isolated quickstart cache to a uniquely
+  named backup after consent. Never reset shared/default CLI state.
+
+### Assigned focus areas
+
+Installer upgrade/recovery, publisher trust, special workload/Host versions,
+Java, PowerShell, Windows ARM64 target-profile cases, .NET 11, incompatible
+bundles, and failure fixtures remain assigned. If a fixture is unavailable,
+record that and continue unrelated tests.
+
+Never deploy to Azure or change authentication to unblock a scenario.
+
+## 6. Cleanup
+
+Re-read the live cleanup section. Stop only processes started for the test.
+Save issue links and useful evidence before proposing deletion.
+
+Closing the terminal discards session-only variables and the `func5`
+alias/function. Inspect and resolve every deletion target before consent.
+Cleanup may remove only:
+
+- the approved disposable bug-bash root;
+- the separate disposable update root;
+- owned project sandboxes;
+- isolated cache backups created during recovery;
+- evidence after explicit confirmation that it is no longer needed.
+
+Preserve the normal v4 installation, normal `.azure-functions`, shared caches,
+shell profiles, unrelated projects, and any path that cannot be confidently
+attributed to this session. Never delete a broad/root directory or an unresolved
+variable.

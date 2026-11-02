@@ -1,10 +1,39 @@
-## Summary
+<!--
+Use the exact title prefix and default labels discovered from the issue form
+linked by the live bug-bash wiki. Do not assume a generic v5 prefix.
+-->
 
-<!-- One or two sentences describing the specific bug, feedback, or documentation gap. -->
+## Version
 
-## Reproduction steps
+- **Executable:** <!-- literal isolated CLI path; replace home directory with ~ -->
+- **`--version`:** <!-- exact output -->
+- **`--verbose`:**
 
-1. <!-- Minimal first step. -->
+  ```text
+  <!-- output from the same executable -->
+  ```
+
+- **Host version:** <!-- relevant actual version or N/A -->
+- **Workload versions:** <!-- relevant actual package/alias versions or N/A -->
+
+## OS / shell
+
+- **OS / architecture:** <!-- include libc on Linux -->
+- **Shell:** <!-- shell name and version -->
+
+## Stack
+
+- **Stack / runtime:** <!-- selected stack and runtime version -->
+- **Target profile:** <!-- profile name only, or N/A -->
+- **Template ID:** <!-- exact template ID, or N/A -->
+
+## Description
+
+<!-- One or two sentences describing the specific failure, confusing behavior, feedback, or documentation gap. -->
+
+## Steps to reproduce
+
+1. <!-- Minimal first step using the isolated executable. -->
 2. <!-- Exact next step. -->
 3. <!-- Point where the behavior occurs. -->
 
@@ -14,14 +43,14 @@
 
 ## Actual behavior
 
-<!-- What happened instead? Include the exact exit code. -->
+<!-- What happened instead? Include the exact exit code and distinguish listing, generation, startup, and invocation. -->
 
 ## Command and output
 
 **Command**
 
 ```text
-<!-- Exact command tokens, with any sensitive value replaced by [REDACTED]. -->
+<!-- Exact command tokens, with sensitive values replaced by [REDACTED]. -->
 ```
 
 **Exit code:** `<!-- integer or "not started" -->`
@@ -44,19 +73,23 @@
 
 </details>
 
-## Environment
+## Bug-bash configuration
 
-- **`func --version`:** <!-- output -->
-- **`func --verbose`:**
+<!-- Values are intentionally omitted. Use only set/missing/mismatch. -->
 
-  ```text
-  <!-- output -->
-  ```
+| Setting | Status |
+| --- | --- |
+| `FUNC_CLI_WORKLOADS_SOURCE` | <!-- status --> |
+| `FUNC_CLI_QUICKSTART_MANIFEST_URL` | <!-- status --> |
+| `FUNC_CLI_WORKLOADS_PRERELEASE` | <!-- status --> |
+| `FUNC_CLI_HOME` | <!-- status --> |
+| `FUNC_CLI_WORKLOADS_HOME` | <!-- status --> |
 
-- **OS / architecture:** <!-- example: Windows 11 / x64 -->
-- **Shell:** <!-- example: PowerShell 7.5 -->
-- **Stack runtime:** <!-- only the relevant runtime and version -->
-- **Bug-bash configuration:** <!-- required variables set/missing/mismatch; values omitted -->
+## Stack trace / logs
+
+```text
+<!-- Minimal relevant logs, or N/A. -->
+```
 
 ## Attachments
 
@@ -64,4 +97,4 @@
 - [ ] No attachments
 - [ ] Confirmed screenshots or recordings: <!-- filenames and alt text -->
 
-<!-- If the reporter cannot apply labels: Requested labels: v5, <bug|enhancement|documentation> -->
+<!-- Record unavailable assigned prerequisites or builds without substituting another version. -->

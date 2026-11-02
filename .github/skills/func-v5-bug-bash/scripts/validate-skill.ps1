@@ -23,6 +23,7 @@ $requiredFiles = @(
     'references/reporting.md',
     'references/workflow.md',
     'scripts/capture-evidence.ps1',
+    'scripts/test-capture-evidence.ps1',
     'scripts/validate-skill.ps1'
 )
 
@@ -72,6 +73,15 @@ if (Test-Path -LiteralPath $skillPath -PathType Leaf) {
 
 }
 
+$documentationFiles = Get-ChildItem -LiteralPath $skillRoot -Filter '*.md' -File -Recurse
+foreach ($documentationFile in $documentationFiles) {
+    $documentationContent = Get-Content -LiteralPath $documentationFile.FullName -Raw
+    if ($documentationContent -match '\b5\.0\.0-preview\.\d+\b') {
+        $relativeDocumentationPath = [System.IO.Path]::GetRelativePath($skillRoot, $documentationFile.FullName)
+        Add-ValidationError "$relativeDocumentationPath hardcodes a preview version; read it from the live wiki."
+    }
+}
+
 $markdownFiles = Get-ChildItem -LiteralPath $skillRoot -Filter '*.md' -File -Recurse
 foreach ($markdownFile in $markdownFiles) {
     $markdownContent = Get-Content -LiteralPath $markdownFile.FullName -Raw
@@ -86,6 +96,34 @@ foreach ($markdownFile in $markdownFiles) {
             $relativeMarkdownPath = [System.IO.Path]::GetRelativePath($skillRoot, $markdownFile.FullName)
             Add-ValidationError "Broken local link in ${relativeMarkdownPath}: $target"
         }
+    }
+}
+
+$capturePath = Join-Path $skillRoot 'scripts/capture-evidence.ps1'
+if (Test-Path -LiteralPath $capturePath -PathType Leaf) {
+    $captureContent = Get-Content -LiteralPath $capturePath -Raw
+    $requiredCaptureContract = @(
+        '[string] $CliPath',
+        '[string] $ExpectedCliVersion',
+        '[string] $ExpectedInstallPath',
+        '[string] $ExpectedConfigurationJson',
+        'FUNC_CLI_WORKLOADS_SOURCE',
+        'FUNC_CLI_QUICKSTART_MANIFEST_URL',
+        'FUNC_CLI_WORKLOADS_PRERELEASE',
+        'FUNC_CLI_HOME',
+        'FUNC_CLI_WORKLOADS_HOME'
+    )
+    foreach ($requiredText in $requiredCaptureContract) {
+        if (-not $captureContent.Contains($requiredText)) {
+            Add-ValidationError "capture-evidence.ps1 is missing required contract text: $requiredText"
+        }
+    }
+
+    if ($captureContent -match '(?m)^\s*\[string\]\s+\$(?:FilePath|FuncPath)\b') {
+        Add-ValidationError 'capture-evidence.ps1 must not restore the FilePath/FuncPath split contract.'
+    }
+    if ($captureContent -match '(?m)Get-Command\s+\$CliPath\b') {
+        Add-ValidationError 'capture-evidence.ps1 must not resolve CliPath through PATH.'
     }
 }
 
@@ -130,4 +168,4 @@ if ($errors.Count -gt 0) {
     exit 1
 }
 
-Write-Host "Validated ${skillName}: frontmatter, local links, required paths, PowerShell syntax, root index, and Claude symlink."
+Write-Host "Validated ${skillName}: frontmatter, live-wiki version discipline, links, evidence contract, scripts, root index, and Claude symlink."
