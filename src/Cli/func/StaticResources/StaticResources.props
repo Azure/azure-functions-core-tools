@@ -37,6 +37,24 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.dotnet11IsolatedChiseled">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet11IsolatedChiseled</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated.8">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated.8</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated.9">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated.9</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated.10">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated.10</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated.11">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated.11</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.dotnetIsolated">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.dotnetIsolated</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)dockerignore.flexByoc">
+      <LogicalName>$(AssemblyName).dockerignore.flexByoc</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>

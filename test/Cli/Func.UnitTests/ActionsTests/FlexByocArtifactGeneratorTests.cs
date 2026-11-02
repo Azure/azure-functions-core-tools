@@ -12,10 +12,23 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
     public class FlexByocArtifactGeneratorTests
     {
         [Theory]
-        [InlineData(WorkerRuntime.DotnetIsolated, "net8.0", null, "dotnetIsolated.8")]
-        [InlineData(WorkerRuntime.DotnetIsolated, "9", null, "dotnetIsolated.9")]
-        [InlineData(WorkerRuntime.DotnetIsolated, "10.0", null, "dotnetIsolated.10")]
-        [InlineData(WorkerRuntime.DotnetIsolated, "net11.0", null, "dotnetIsolated.11")]
+        [InlineData("net8.0")]
+        [InlineData("9")]
+        [InlineData("10.0")]
+        [InlineData("net11.0")]
+        public async Task GetTemplateArtifactsAsync_LoadsDotnetIsolatedArtifacts(string runtimeVersion)
+        {
+            FlexByocTemplateArtifacts artifacts = await FlexByocArtifactGenerator.GetTemplateArtifactsAsync(
+                WorkerRuntime.DotnetIsolated,
+                runtimeVersion,
+                null);
+
+            artifacts.Dockerfile.Should().NotBeNullOrWhiteSpace();
+            artifacts.Entrypoint.Should().NotBeNullOrWhiteSpace();
+            artifacts.DockerIgnore.Should().NotBeNullOrWhiteSpace();
+        }
+
+        [Theory]
         [InlineData(WorkerRuntime.Python, "3.11", null, "python.3.11")]
         [InlineData(WorkerRuntime.Python, "3.15", null, "python.3.15")]
         [InlineData(WorkerRuntime.Node, "18", Constants.Languages.JavaScript, "node.javascript.18")]
