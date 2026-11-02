@@ -45,28 +45,41 @@ internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, str
 
     private async Task<DirectoryInfo> BuildAndGetOutputDirectoryAsync(string projectDir, string targetName, bool requireAssemblyExists, IFunctionsProjectHostRunReporter reporter, CancellationToken cancellationToken)
     {
-        // Stream the build output live (stdout as informational, stderr as error) while MSBuild writes the
-        // structured target result to a temp file via --getResultOutputFile. In this mode the human-readable
-        // build console output (including compiler errors) goes to stdout, leaving stdout free of the JSON we
-        // need for path resolution.
+        // Keep structured target results separate from console output so builds can stream diagnostics
+        // while output-path lookups remain silent on success.
         string resultFile = Path.Combine(Path.GetTempPath(), $"func-dotnet-build-{Guid.NewGuid():N}.json");
+        List<string> arguments = ["build", ProjectFilePath, $"--getTargetResult:{targetName}", $"--getResultOutputFile:{resultFile}"];
 
         try
         {
             try
             {
-                await _dotnetCli.RunStreamingAsync(
-                    ["build", ProjectFilePath, $"--getTargetResult:{targetName}", $"--getResultOutputFile:{resultFile}"],
-                    projectDir,
-                    line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
-                    line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
-                    cancellationToken);
+                if (requireAssemblyExists)
+                {
+                    await _dotnetCli.RunAsync(arguments, projectDir, cancellationToken);
+                }
+                else
+                {
+                    await _dotnetCli.RunStreamingAsync(
+                        arguments,
+                        projectDir,
+                        line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Info),
+                        line => reporter.WriteLog(line, FunctionsProjectReportSeverity.Error),
+                        cancellationToken);
+                }
+            }
+            catch (DotnetCliException ex) when (requireAssemblyExists)
+            {
+                throw new GracefulException(
+                    $"Could not resolve .NET build output (exit {ex.ExitCode}).{Environment.NewLine}{ex.StandardError}{ex.StandardOutput}".TrimEnd(),
+                    ex,
+                    isUserError: true);
             }
             catch (DotnetCliException ex)
             {
                 // The build output has already been streamed live through the callbacks above, so point the
                 // user there instead of repeating it in the message.
-                throw new GracefulException($"'dotnet build' failed (exit {ex.ExitCode}).", isUserError: true);
+                throw new GracefulException($"'dotnet build' failed (exit {ex.ExitCode}).", ex, isUserError: true);
             }
 
             string json = File.Exists(resultFile)
