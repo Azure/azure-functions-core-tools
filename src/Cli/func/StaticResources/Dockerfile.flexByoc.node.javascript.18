@@ -1,0 +1,35 @@
+# === BYOC: WORKER SOURCE - open question ===
+# The source and packaging contract for the Node.js worker is not yet defined.
+# FROM <node-worker-source> AS worker-source
+
+# === BYOC: BUILD STAGE ===
+FROM node:18-bookworm-slim AS build
+WORKDIR /src
+
+# === BYOC: BUILD PACKAGES - customer customization ===
+# Add build-only tools here.
+
+# === BYOC: BUILD PROJECT ===
+COPY package*.json ./
+RUN npm install --omit=dev
+
+# === BYOC: RUNTIME STAGE ===
+FROM node:18-bookworm-slim AS runtime
+WORKDIR /home/site/wwwroot
+
+# === BYOC: RUNTIME PACKAGES - customer customization ===
+# Add native runtime dependencies here.
+
+# === BYOC: COPY APPLICATION ===
+COPY . ./
+COPY --from=build /src/node_modules/ ./node_modules/
+# COPY --from=worker-source <node-worker-path> /azure-functions-worker
+
+# === BYOC: PERMISSIONS - customer customization ===
+RUN chown -R node:node /home/site/wwwroot
+
+# === BYOC: STARTUP SCRIPT ===
+COPY entrypoint.sh /usr/local/bin/byoc-entrypoint
+RUN chmod 755 /usr/local/bin/byoc-entrypoint
+USER node
+ENTRYPOINT ["/usr/local/bin/byoc-entrypoint"]

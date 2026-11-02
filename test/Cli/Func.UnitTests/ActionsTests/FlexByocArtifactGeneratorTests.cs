@@ -47,8 +47,29 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Theory]
-        [InlineData(WorkerRuntime.Node, "18", Constants.Languages.JavaScript, "node.javascript.18")]
-        [InlineData(WorkerRuntime.Node, "26", Constants.Languages.TypeScript, "node.typescript.26")]
+        [InlineData("18", Constants.Languages.JavaScript)]
+        [InlineData("20", Constants.Languages.JavaScript)]
+        [InlineData("22", Constants.Languages.JavaScript)]
+        [InlineData("24", Constants.Languages.JavaScript)]
+        [InlineData("26", Constants.Languages.JavaScript)]
+        [InlineData("18", Constants.Languages.TypeScript)]
+        [InlineData("20", Constants.Languages.TypeScript)]
+        [InlineData("22", Constants.Languages.TypeScript)]
+        [InlineData("24", Constants.Languages.TypeScript)]
+        [InlineData("26", Constants.Languages.TypeScript)]
+        public async Task GetTemplateArtifactsAsync_LoadsNodeArtifacts(string runtimeVersion, string language)
+        {
+            FlexByocTemplateArtifacts artifacts = await FlexByocArtifactGenerator.GetTemplateArtifactsAsync(
+                WorkerRuntime.Node,
+                runtimeVersion,
+                language);
+
+            artifacts.Dockerfile.Should().NotBeNullOrWhiteSpace();
+            artifacts.Entrypoint.Should().NotBeNullOrWhiteSpace();
+            artifacts.DockerIgnore.Should().NotBeNullOrWhiteSpace();
+        }
+
+        [Theory]
         [InlineData(WorkerRuntime.Java, "21", null, "java.21")]
         [InlineData(WorkerRuntime.Java, "25", null, "java.25")]
         [InlineData(WorkerRuntime.Powershell, "7.2", null, "powershell.7.2")]

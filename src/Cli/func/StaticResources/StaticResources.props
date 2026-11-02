@@ -70,6 +70,39 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.python">
       <LogicalName>$(AssemblyName).entrypoint.flexByoc.python</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.18">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.18</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.20">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.20</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.22">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.22</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.24">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.24</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.26">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.26</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.18">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.18</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.20">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.20</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.22">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.22</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.24">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.24</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.26">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.26</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.node">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.node</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)dockerignore.flexByoc">
       <LogicalName>$(AssemblyName).dockerignore.flexByoc</LogicalName>
     </EmbeddedResource>
