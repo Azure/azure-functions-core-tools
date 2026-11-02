@@ -8,7 +8,6 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Quickstart;
-using Azure.Functions.Cli.Templates;
 using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
@@ -72,13 +71,6 @@ internal static class TestParser
         services.AddOptions<HostStartupOptions>();
         services.AddBuiltInCommands();
         services.AddProfiles();
-        services.AddTemplatesOrchestrator();
-
-        // NewCommandRunner depends on IFunctionsProjectResolver and on
-        // IWorkloadPaths (via InstalledTemplatesWorkloads). Neither is
-        // registered by the test parser by default; substitute both with
-        // no-op fakes so the orchestrator activates cleanly. Tests that
-        // exercise the resolver replace the substitute.
         services.AddSingleton(Substitute.For<Cli.Projects.IFunctionsProjectResolver>());
         services.AddSingleton(Substitute.For<Cli.Workloads.Storage.IWorkloadPaths>());
         services.AddSingleton(Substitute.For<Cli.Bundles.IHostJsonBundleSectionReader>());

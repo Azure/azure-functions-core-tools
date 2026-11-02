@@ -70,14 +70,6 @@ internal sealed class SetupDependencyPlanBuilder(
             {
                 dependencies.Add(SetupDependency.Stack(runtimeFeature.Name));
             }
-
-            if (SetupDependency.SupportsTemplates(runtimeFeature.Name))
-            {
-                // Script stacks ship per-channel templates that track the bundle
-                // channel; dotnet templates don't use bundles, so they stay channel-less.
-                BundleChannel? templatesChannel = SetupRuntimes.IsDotNetRuntime(runtimeFeature.Name) ? null : bundleChannel;
-                dependencies.Add(SetupDependency.Templates(runtimeFeature.Name, templatesChannel));
-            }
         }
 
         if (featurePlan.IncludeExtensionBundle)

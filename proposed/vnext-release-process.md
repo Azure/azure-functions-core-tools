@@ -3,7 +3,7 @@
 ## Overview
 
 The `vnext` branch ships the v5 CLI as a set of independently versioned
-components: the host, bundles, templates, workers, and language stacks. Each
+components: the host, bundles, workers, and language stacks. Each
 component is released by pushing a git tag from `vnext` and then queuing
 its release pipeline against that tag. The pipeline packs the matching
 workload(s) and publishes them to the appropriate feed.
@@ -26,9 +26,6 @@ the signal; the props file is the source of truth.
 | CLI (`func`)      | _(none)_            | `v5.0.0`                             |
 | Host              | `host/`             | `host/v4.1048.200-preview.1`         |
 | Bundles           | `bundles/`          | `bundles/v4.35.0`                    |
-| Node templates    | `node-templates/`   | `node-templates/v1.0.1`              |
-| Python templates  | `python-templates/` | `python-templates/v1.0.1`            |
-| .NET templates    | `dotnet-templates/` | `dotnet-templates/v1.0.1`            |
 | Node worker       | `node-worker/`      | `node-worker/v3.13.0-preview.1`      |
 | Python worker     | `python-worker/`    | `python-worker/v4.43.0-preview.1`    |
 | Go worker         | `go-worker/`        | `go-worker/v1.0.0-preview.1`         |
@@ -101,9 +98,8 @@ at pack time:
 | `preview`      | `bundles/v4.35.0-preview.1`       | `4.35.0-preview.1`        |
 | `experimental` | `bundles/v4.35.0-experimental.1`  | `4.35.0-experimental.1`   |
 
-The `BundleVersion` (payload version) is shared across channels and
-defaults to `$(LatestExtensionBundleVersion)` so the bundle payload always
-matches the snapshot the templates workloads were built against.
+The `BundleVersion` (payload version) defaults to the channel's pinned value
+in `eng/build/Workloads/Workloads.ExtensionBundles.Version.props`.
 
 ### Release steps (bundles)
 

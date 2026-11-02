@@ -1,9 +1,7 @@
 <Project>
 
   <!--
-    Shared channel/version mapping for any workload that snapshots from
-    or ships an extension bundle (the Templates workloads and the
-    ExtensionBundles workload).
+    Channel/version mapping for the ExtensionBundles workload.
 
       $(BundleChannel)   stable (default) | preview | experimental.
                          Selects $(_BundleCdnId) and the channel-pinned
@@ -11,10 +9,7 @@
       $(_BundleCdnId)    The CDN package id for the channel.
       $(BundleVersion)   The bundle version this build targets for the
                          channel. Bumping a value here re-points the
-                         bundles workload (which ships that bundle) and
-                         the bundle-backed templates workloads (which
-                         snapshot StaticContent from it) in lockstep, so
-                         they can't drift across a bundle release.
+                         payload shipped by the bundles workload.
   -->
 
   <PropertyGroup>

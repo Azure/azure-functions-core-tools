@@ -11,7 +11,7 @@ It is intentionally a small, thin command. Its interface is small ("ready this m
 - Host workload installation.
 - Setup feature expansion, where user-facing feature IDs such as `runtime`, `node`, or `dotnet-isolated` map to one or more lower-level workload installs.
 - Profile-constrained installation for runtime constraint sets.
-- Built-in stack and templates workload installation.
+- Built-in stack workload installation.
 - Extension bundle workload installation when the selected feature/worker runtime uses extension bundles.
 
 ### What it is *not*
@@ -51,7 +51,7 @@ func setup [<path>] [--features <list>]...
 | `--profiles <list>` | Comma-separated convenience alias for passing multiple profiles. |
 | `--install-policy <policy>` | Dependency reconciliation policy. Default: `latest-compatible`. |
 | `--source <nuget-feed>` | Override the NuGet package source used for workload catalog resolution and installation. Same semantics as workload commands. |
-| `--prerelease` | Override the workload prerelease policy. Otherwise use a valid `FUNC_CLI_WORKLOADS_PRERELEASE` setting, then the running CLI's stable/prerelease status. Bundle/templates channels have separate rules below. |
+| `--prerelease` | Override the workload prerelease policy. Otherwise use a valid `FUNC_CLI_WORKLOADS_PRERELEASE` setting, then the running CLI's stable/prerelease status. Bundle channels have separate rules below. |
 | `--non-interactive` | Suppress the stack picker. Use explicit features or supported project/runtime defaults. |
 | `--yes`, `-y` | Suppress the stack picker and use project/runtime defaults when features are omitted. Does not select every stack. |
 | `--check` | Check selected dependencies without installing or updating workloads. Metadata caches may change. Does not write the first-run marker. |
@@ -67,16 +67,16 @@ The current built-in stack list is fixed to Node, Python, Go, and .NET. Feature 
 | --- | --- |
 | `host` | Install or verify only the Azure Functions host workload. No workers. No extension bundle. |
 | `runtime` | Host and the selected extension bundle, stable by default. No worker or stack workload. |
-| `node`, `python` | Host, optional worker, built-in stack, optional templates, and the selected extension bundle. |
-| `go` | Host, optional worker, built-in Go stack, and the selected extension bundle. No templates workload. |
-| `dotnet`, also accepted as `dotnet-isolated` | Host, built-in .NET stack, and optional .NET templates. No separate worker or extension bundle for this feature. Profile checks use `dotnet-isolated`. |
-| Other runtime names, including `java`, `powershell`, and `custom` | Host, optional worker, and the selected extension bundle. No stack or templates workload. |
+| `node`, `python` | Host, optional worker, built-in stack, and the selected extension bundle. |
+| `go` | Host, optional worker, built-in Go stack, and the selected extension bundle. |
+| `dotnet`, also accepted as `dotnet-isolated` | Host and built-in .NET stack. No separate worker or extension bundle for this feature. Profile checks use `dotnet-isolated`. |
+| Other runtime names, including `java`, `powershell`, and `custom` | Host, optional worker, and the selected extension bundle. |
 
 Raw workload package installation belongs to `func workload install`. An unknown non-empty setup name is currently treated as a runtime, with an optional worker at `Azure.Functions.Cli.Workloads.Workers.<runtime>` and a bundle. It is not rejected merely for being unknown, and setup can succeed without that worker.
 
 The `dotnet` setup name and its `dotnet-isolated` alias do not enable in-process .NET. `.net` and `dotnet-inprocess` are rejected.
 
-Stack and templates package IDs use fixed `Azure.Functions.Cli.Workloads.<Node|Python|Go|DotNet>` and `Azure.Functions.Cli.Workloads.Templates.<Node|Python|DotNet>` mappings. Metadata-driven stack discovery, custom template package acquisition, and metapackage-based setup recipes are future work, not implemented by this setup flow.
+Stack package IDs use fixed `Azure.Functions.Cli.Workloads.<Name>` mappings. Template packages are managed through the template engine and are separate from setup. Metadata-driven stack discovery, direct template-package acquisition, and metapackage-based setup recipes are future work, not implemented by this setup flow.
 
 ## 5. Feature Defaults
 
@@ -148,7 +148,7 @@ Policy resolution:
 
 When a project `host.json` declares an extension bundle, setup intersects the `host.json` bundle version range with the selected profile range. When no project bundle declaration is available, setup uses the stable default bundle ID with the profile range, if any.
 
-An explicit preview or experimental bundle ID also selects that channel for Node/Python templates. .NET templates remain channel-less and use the general prerelease policy. Bundle and channeled templates resolution falls back to stable with a warning when the requested non-stable channel has no matching version in the applicable range. A general prerelease opt-in does not change the selected channel.
+Bundle resolution falls back to stable with a warning when the requested non-stable channel has no matching version in the applicable range. A general prerelease opt-in does not change the selected channel.
 
 The planner reads `host.json` for each profile, even for host-only or .NET selections.
 
@@ -162,7 +162,7 @@ For each dependency, setup resolves the maximum available version that satisfies
 
 - If a lower compatible version is installed and the catalog resolves a newer compatible version, setup installs the newer version.
 - If a handled catalog error or no matching version prevents resolution, an installed compatible version can satisfy the dependency as `satisfied-fallback`. The handled errors include configuration/source errors as well as transport failures. This is not a fallback for arbitrary exceptions or later installation failures.
-- Without an installed compatible version, required dependencies fail. Optional workers/templates are skipped when catalog resolution returns no matching version, but not when it throws a handled error.
+- Without an installed compatible version, required dependencies fail. Optional workers are skipped when catalog resolution returns no matching version, but not when it throws a handled error.
 
 ### `if-needed`
 
@@ -174,7 +174,7 @@ For each dependency, setup first checks installed state.
 
 ### `--prerelease`
 
-An explicit `--prerelease` value wins. Otherwise, a valid `FUNC_CLI_WORKLOADS_PRERELEASE` setting wins, then the CLI build determines the default. Stable builds exclude prereleases and prerelease builds include them. Bundle and Node/Python templates channels use the separate rules in section 8.
+An explicit `--prerelease` value wins. Otherwise, a valid `FUNC_CLI_WORKLOADS_PRERELEASE` setting wins, then the CLI build determines the default. Stable builds exclude prereleases and prerelease builds include them. Bundle channels use the separate rules in section 8.
 
 ### `--source`
 
@@ -190,7 +190,7 @@ An explicit `--prerelease` value wins. Otherwise, a valid `FUNC_CLI_WORKLOADS_PR
 - With `if-needed`, check passes when any installed version satisfies the active constraints.
 - For handled catalog errors or no matching version, check uses the same installed-version fallback as install mode.
 
-`--check` exits with code `1` for failed dependency results or planning/configuration failures. A missing resolved target version is reported as `failed`, not `would-install`. Optional missing workers/templates can be `skipped`, so exit code `0` does not prove that every prerequisite exists or that installed payloads are intact.
+`--check` exits with code `1` for failed dependency results or planning/configuration failures. A missing resolved target version is reported as `failed`, not `would-install`. Optional missing workers can be `skipped`, so exit code `0` does not prove that every prerequisite exists or that installed payloads are intact.
 
 Check mode continues through dependency results and returned planning failures for all selected profiles. A thrown configuration error ends the run rather than continuing to later profiles.
 
@@ -261,7 +261,7 @@ Successful normal setup marks first-run completion on a best-effort basis, inclu
 
 ## 14. Failure Semantics
 
-- Within each profile, setup processes planned dependencies first, then returned planning failures. Dependency order is host, each selected runtime's worker/stack/templates, then the bundle when included. A known planning failure does not prevent otherwise planned dependencies from installing.
+- Within each profile, setup processes planned dependencies first, then returned planning failures. Dependency order is host, each selected runtime's worker/stack, then the bundle when included. A known planning failure does not prevent otherwise planned dependencies from installing.
 - Install mode stops at the first failed dependency result, or the first returned planning failure reached afterward. That failed profile ends the run before later profiles. Earlier installs remain, including those in the same profile.
 - Setup accepts partial completion. A re-run can reconcile remaining dependencies after the cause is addressed. There is no rollback or transaction across dependencies or profiles.
 - Check mode continues through returned failures for all profiles. Thrown configuration errors abort the run, and unexpected exceptions reach the normal CLI error handler.
@@ -269,7 +269,7 @@ Successful normal setup marks first-run completion on a best-effort basis, inclu
 
 ### Current limitations
 
-- Workers and templates are optional. No matching catalog version can mean that all published versions are incompatible with the range or policy, not just that a package is absent. Those optional dependencies can still be skipped.
+- Workers are optional. No matching catalog version can mean that all published versions are incompatible with the range or policy, not just that a package is absent. Those optional dependencies can still be skipped.
 - Installed-state checks compare registry identities and versions. They do not validate payload files or prove that a workload can run.
 
 ## 15. Boundaries with `init`, `start`, and `workload`

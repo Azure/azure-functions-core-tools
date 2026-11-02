@@ -7,8 +7,6 @@
   <Folder Name="/src/">
     <Project Path="src/Abstractions/Abstractions.csproj" />
     <Project Path="src/Func/Func.csproj" />
-    <Project Path="src/Templates.V2/Templates.V2.csproj" />
-    <Project Path="src/Templates.DotNet/Templates.DotNet.csproj" />
   </Folder>
   <Folder Name="/src/Workloads/">
     <Project Path="src/Workloads/Host/Workloads.Host.csproj" />
@@ -22,11 +20,6 @@
     <Project Path="src/Workloads/Stacks/Node/Workloads.Node.csproj" />
     <Project Path="src/Workloads/Stacks/PowerShell/Workloads.PowerShell.csproj" />
     <Project Path="src/Workloads/Stacks/Python/Workloads.Python.csproj" />
-  </Folder>
-  <Folder Name="/src/Workloads/Templates/">
-    <Project Path="src/Workloads/Templates/DotNet/Workloads.Templates.DotNet.csproj" />
-    <Project Path="src/Workloads/Templates/Node/Workloads.Templates.Node.csproj" />
-    <Project Path="src/Workloads/Templates/Python/Workloads.Templates.Python.csproj" />
   </Folder>
   <Folder Name="/src/Workloads/Workers/">
     <Project Path="src/Workloads/Workers/Go/Workloads.Workers.Go.csproj" />
