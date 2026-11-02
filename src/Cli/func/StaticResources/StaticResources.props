@@ -103,6 +103,27 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.node">
       <LogicalName>$(AssemblyName).entrypoint.flexByoc.node</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.powershell.7.2">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.powershell.7.2</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.powershell.7.4">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.powershell.7.4</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.powershell.7.6">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.powershell.7.6</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.powershell">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.powershell</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.java.21">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.java.21</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.java.25">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.java.25</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.java">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.java</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)dockerignore.flexByoc">
       <LogicalName>$(AssemblyName).dockerignore.flexByoc</LogicalName>
     </EmbeddedResource>

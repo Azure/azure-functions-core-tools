@@ -70,25 +70,34 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Theory]
-        [InlineData(WorkerRuntime.Java, "21", null, "java.21")]
-        [InlineData(WorkerRuntime.Java, "25", null, "java.25")]
-        [InlineData(WorkerRuntime.Powershell, "7.2", null, "powershell.7.2")]
-        [InlineData(WorkerRuntime.Powershell, "7.6", null, "powershell.7.6")]
-        public async Task GetTemplateArtifactsAsync_MissingDockerfileIdentifiesResolvedArtifact(
-            WorkerRuntime workerRuntime,
-            string runtimeVersion,
-            string language,
-            string expectedTemplateName)
+        [InlineData("7.2")]
+        [InlineData("7.4")]
+        [InlineData("7.6")]
+        public async Task GetTemplateArtifactsAsync_LoadsPowerShellArtifacts(string runtimeVersion)
         {
-            Func<Task> act = () => FlexByocArtifactGenerator.GetTemplateArtifactsAsync(
-                workerRuntime,
+            FlexByocTemplateArtifacts artifacts = await FlexByocArtifactGenerator.GetTemplateArtifactsAsync(
+                WorkerRuntime.Powershell,
                 runtimeVersion,
-                language);
+                null);
 
-            var exception = await act.Should().ThrowAsync<CliException>();
-            exception.Which.Message.Should().Be(
-                $"Flex BYOC template artifact 'Dockerfile.flexByoc.{expectedTemplateName}' was not present.");
-            exception.Which.InnerException.Should().NotBeNull();
+            artifacts.Dockerfile.Should().NotBeNullOrWhiteSpace();
+            artifacts.Entrypoint.Should().NotBeNullOrWhiteSpace();
+            artifacts.DockerIgnore.Should().NotBeNullOrWhiteSpace();
+        }
+
+        [Theory]
+        [InlineData("21")]
+        [InlineData("25")]
+        public async Task GetTemplateArtifactsAsync_LoadsJavaArtifacts(string runtimeVersion)
+        {
+            FlexByocTemplateArtifacts artifacts = await FlexByocArtifactGenerator.GetTemplateArtifactsAsync(
+                WorkerRuntime.Java,
+                runtimeVersion,
+                null);
+
+            artifacts.Dockerfile.Should().NotBeNullOrWhiteSpace();
+            artifacts.Entrypoint.Should().NotBeNullOrWhiteSpace();
+            artifacts.DockerIgnore.Should().NotBeNullOrWhiteSpace();
         }
 
         [Theory]
