@@ -46,6 +46,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool InitDockerOnly { get; set; }
 
+        public bool FlexByoc { get; set; }
+
+        private bool InitDockerOptionSpecified { get; set; }
+
         public string WorkerRuntime { get; set; }
 
         public string FolderName { get; set; } = string.Empty;
@@ -97,7 +101,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             Parser
                 .Setup<bool>("docker")
                 .WithDescription("Create a Dockerfile based on the selected worker runtime.")
-                .Callback(f => InitDocker = f);
+                .Callback(f =>
+                {
+                    InitDocker = f;
+                    InitDockerOptionSpecified = f;
+                });
 
             Parser
                 .Setup<bool>("docker-only")
@@ -107,6 +115,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     InitDocker = f;
                     InitDockerOnly = f;
                 });
+
+            Parser
+                .Setup<bool>("flex-byoc")
+                .WithDescription("Generate Flex Consumption bring-your-own-container worker artifacts. Requires either --docker or --docker-only.")
+                .Callback(f => FlexByoc = f);
 
             Parser
                 .Setup<bool>("no-bundle")
@@ -184,6 +197,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 throw new Exception("Only Git is supported right now for vsc");
             }
 
+            ValidateDockerOptions();
+
             if (!string.IsNullOrEmpty(FolderName))
             {
                 var folderPath = Path.Combine(Environment.CurrentDirectory, FolderName);
@@ -198,6 +213,24 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 await InitFunctionAppProject();
+            }
+        }
+
+        private void ValidateDockerOptions()
+        {
+            if (!FlexByoc)
+            {
+                return;
+            }
+
+            if (!InitDockerOptionSpecified && !InitDockerOnly)
+            {
+                throw new CliArgumentsException("The --flex-byoc option requires either --docker or --docker-only.");
+            }
+
+            if (InitDockerOptionSpecified && InitDockerOnly)
+            {
+                throw new CliArgumentsException("The --docker and --docker-only options cannot be used together with --flex-byoc.");
             }
         }
 

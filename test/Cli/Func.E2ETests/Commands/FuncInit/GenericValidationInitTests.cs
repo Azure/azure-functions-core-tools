@@ -47,6 +47,28 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         }
 
         [Fact]
+        public void Init_WithFlexByocWithoutDockerMode_ExpectedToFailWithError()
+        {
+            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithFlexByocWithoutDockerMode_ExpectedToFailWithError), Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(["--flex-byoc"]);
+
+            funcInitResult.Should().ExitWith(1);
+            funcInitResult.Should().HaveStdErrContaining("The --flex-byoc option requires either --docker or --docker-only.");
+        }
+
+        [Fact]
+        public void Init_WithFlexByocAndConflictingDockerModes_ExpectedToFailWithError()
+        {
+            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithFlexByocAndConflictingDockerModes_ExpectedToFailWithError), Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(["--docker", "--docker-only", "--flex-byoc"]);
+
+            funcInitResult.Should().ExitWith(1);
+            funcInitResult.Should().HaveStdErrContaining("The --docker and --docker-only options cannot be used together with --flex-byoc.");
+        }
+
+        [Fact]
         public void Init_WithManagedDependenciesOnUnsupportedWorkerRuntime_FailsWithError()
         {
             var workingDir = WorkingDirectory;
