@@ -59,9 +59,19 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 _ => throw new InvalidOperationException(),
             };
 
+            string entrypointName = workerRuntime switch
+            {
+                WorkerRuntime.DotnetIsolated => "dotnetIsolated",
+                WorkerRuntime.Node => "node",
+                WorkerRuntime.Python => "python",
+                WorkerRuntime.Java => "java",
+                WorkerRuntime.Powershell => "powershell",
+                _ => throw new InvalidOperationException(),
+            };
+
             return new FlexByocArtifactNames(
                 $"Dockerfile.flexByoc.{templateName}",
-                $"entrypoint.flexByoc.{templateName}",
+                $"entrypoint.flexByoc.{entrypointName}",
                 "dockerignore.flexByoc");
         }
 
