@@ -69,6 +69,41 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
         }
 
         [Fact]
+        public void Init_WithFlexByocWithoutWorkerRuntime_ExpectedToFailWithError()
+        {
+            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithFlexByocWithoutWorkerRuntime_ExpectedToFailWithError), Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(["--docker-only", "--flex-byoc"]);
+
+            funcInitResult.Should().ExitWith(1);
+            funcInitResult.Should().HaveStdErrContaining("The --flex-byoc option requires --worker-runtime.");
+        }
+
+        [Fact]
+        public void Init_WithRuntimeVersionWithoutFlexByoc_ExpectedToFailWithError()
+        {
+            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithRuntimeVersionWithoutFlexByoc_ExpectedToFailWithError), Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(["--docker-only", "--worker-runtime", "powershell", "--runtime-version", "7.4"]);
+
+            funcInitResult.Should().ExitWith(1);
+            funcInitResult.Should().HaveStdErrContaining("The --runtime-version option is supported only with --flex-byoc.");
+        }
+
+        [Fact]
+        public void Init_WithFlexByoc_GeneratesContainerArtifacts()
+        {
+            var funcInitResult = new FuncInitCommand(FuncPath, nameof(Init_WithFlexByoc_GeneratesContainerArtifacts), Log)
+                .WithWorkingDirectory(WorkingDirectory)
+                .Execute(["--docker-only", "--flex-byoc", "--worker-runtime", "powershell"]);
+
+            funcInitResult.Should().ExitWith(0);
+            Assert.True(File.Exists(Path.Combine(WorkingDirectory, "Dockerfile")));
+            Assert.True(File.Exists(Path.Combine(WorkingDirectory, "entrypoint.sh")));
+            Assert.True(File.Exists(Path.Combine(WorkingDirectory, ".dockerignore")));
+        }
+
+        [Fact]
         public void Init_WithManagedDependenciesOnUnsupportedWorkerRuntime_FailsWithError()
         {
             var workingDir = WorkingDirectory;

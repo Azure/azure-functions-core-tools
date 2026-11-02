@@ -19,6 +19,16 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 [WorkerRuntime.Powershell] = new(StringComparer.OrdinalIgnoreCase) { "7.2", "7.4", "7.6" },
             };
 
+        private static readonly IReadOnlyDictionary<WorkerRuntime, string> _defaultVersions =
+            new Dictionary<WorkerRuntime, string>
+            {
+                [WorkerRuntime.DotnetIsolated] = "11",
+                [WorkerRuntime.Python] = "3.15",
+                [WorkerRuntime.Node] = "26",
+                [WorkerRuntime.Java] = "25",
+                [WorkerRuntime.Powershell] = "7.6",
+            };
+
         internal static async Task<FlexByocTemplateArtifacts> GetTemplateArtifactsAsync(
             WorkerRuntime workerRuntime,
             string runtimeVersion,
@@ -31,23 +41,40 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 await LoadRequiredArtifactAsync(artifactNames.DockerIgnore));
         }
 
-        private static FlexByocArtifactNames ResolveArtifactNames(
-            WorkerRuntime workerRuntime,
-            string runtimeVersion,
-            string language)
+        internal static string ResolveRuntimeVersion(WorkerRuntime workerRuntime, string runtimeVersion)
         {
-            if (!_supportedVersions.TryGetValue(workerRuntime, out HashSet<string> supportedVersions))
+            if (!_defaultVersions.TryGetValue(workerRuntime, out string defaultVersion) ||
+                !_supportedVersions.TryGetValue(workerRuntime, out HashSet<string> supportedVersions))
             {
                 throw new CliException(
                     $"Flex BYOC artifact generation is not supported for worker runtime '{workerRuntime.GetDisplayString()}'.");
             }
 
-            string normalizedVersion = NormalizeRuntimeVersion(workerRuntime, runtimeVersion);
+            string requestedVersion = string.IsNullOrWhiteSpace(runtimeVersion) ? defaultVersion : runtimeVersion;
+            string normalizedVersion = NormalizeRuntimeVersion(workerRuntime, requestedVersion);
             if (!supportedVersions.Contains(normalizedVersion))
             {
                 throw new CliException(
-                    $"Flex BYOC artifact generation does not support version '{runtimeVersion}' for worker runtime '{workerRuntime.GetDisplayString()}'. Supported versions are: {string.Join(", ", supportedVersions)}.");
+                    $"Flex BYOC artifact generation does not support version '{requestedVersion}' for worker runtime '{workerRuntime.GetDisplayString()}'. Supported versions are: {string.Join(", ", supportedVersions)}.");
             }
+
+            return normalizedVersion;
+        }
+
+        internal static void ValidateSelection(
+            WorkerRuntime workerRuntime,
+            string runtimeVersion,
+            string language)
+        {
+            _ = ResolveArtifactNames(workerRuntime, runtimeVersion, language);
+        }
+
+        private static FlexByocArtifactNames ResolveArtifactNames(
+            WorkerRuntime workerRuntime,
+            string runtimeVersion,
+            string language)
+        {
+            string normalizedVersion = ResolveRuntimeVersion(workerRuntime, runtimeVersion);
 
             string templateName = workerRuntime switch
             {

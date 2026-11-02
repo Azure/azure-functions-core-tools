@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ConfigurationProfiles;
 using Azure.Functions.Cli.Extensions;
@@ -67,6 +68,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public string Language { get; set; }
 
         public string TargetFramework { get; set; }
+
+        public string RuntimeVersion { get; set; }
 
         public string ConfigurationProfileName { get; set; }
 
@@ -155,6 +158,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(tf => TargetFramework = tf);
 
             Parser
+                .Setup<string>("runtime-version")
+                .SetDefault(null)
+                .WithDescription("Runtime version for Flex BYOC artifacts. Defaults to the latest supported version for the selected worker runtime.")
+                .Callback(version => RuntimeVersion = version);
+
+            Parser
                 .Setup<string>('l', "language")
                 .SetDefault(null)
                 .Callback(l => Language = l);
@@ -220,6 +229,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         {
             if (!FlexByoc)
             {
+                if (!string.IsNullOrWhiteSpace(RuntimeVersion))
+                {
+                    throw new CliArgumentsException("The --runtime-version option is supported only with --flex-byoc.");
+                }
+
                 return;
             }
 
@@ -232,10 +246,24 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 throw new CliArgumentsException("The --docker and --docker-only options cannot be used together with --flex-byoc.");
             }
+
+            if (string.IsNullOrWhiteSpace(WorkerRuntime))
+            {
+                throw new CliArgumentsException("The --flex-byoc option requires --worker-runtime.");
+            }
         }
 
         private async Task InitDockerFileOnly()
         {
+            if (FlexByoc)
+            {
+                (ResolvedWorkerRuntime, ResolvedLanguage) = ResolveWorkerRuntimeAndLanguage(WorkerRuntime, Language);
+                FlexByocArtifactGenerator.ValidateSelection(ResolvedWorkerRuntime, RuntimeVersion, ResolvedLanguage);
+                ApplyFlexByocDotnetTargetFramework();
+                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, TargetFramework, Csx);
+                return;
+            }
+
             await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Language, TargetFramework, Csx);
         }
 
@@ -262,6 +290,13 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                         $"The {ResolvedProgrammingModel.GetDisplayString()} programming model is not supported for worker runtime {ResolvedWorkerRuntime.GetDisplayString()}. Supported programming models for worker runtime {ResolvedWorkerRuntime.GetDisplayString()} are:\n{EnumerationHelper.Join("\n", supportedProgrammingModels)}");
                 }
             }
+
+            if (FlexByoc)
+            {
+                FlexByocArtifactGenerator.ValidateSelection(ResolvedWorkerRuntime, RuntimeVersion, ResolvedLanguage);
+            }
+
+            ApplyFlexByocDotnetTargetFramework();
 
             // If a configuration profile is provided, apply it and return
             if (await TryApplyConfigurationProfileIfProvided())
@@ -300,7 +335,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 await WriteFiles();
 
                 await WriteHostJson(ResolvedWorkerRuntime, managedDependenciesOption, ExtensionBundle);
-                await WriteLocalSettingsJson(ResolvedWorkerRuntime, ResolvedProgrammingModel);
+                string runtimeVersion = FlexByoc
+                    ? FlexByocArtifactGenerator.ResolveRuntimeVersion(ResolvedWorkerRuntime, RuntimeVersion)
+                    : null;
+                await WriteLocalSettingsJson(ResolvedWorkerRuntime, ResolvedProgrammingModel, runtimeVersion);
             }
 
             await WriteExtensionsJson();
@@ -322,6 +360,29 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             else
             {
                 ColoredConsole.Write(AdditionalInfoColor("You skipped \"npm install\". You must run \"npm install\" manually"));
+            }
+        }
+
+        private void ApplyFlexByocDotnetTargetFramework()
+        {
+            if (!FlexByoc || ResolvedWorkerRuntime != Helpers.WorkerRuntime.DotnetIsolated)
+            {
+                return;
+            }
+
+            string runtimeVersion = FlexByocArtifactGenerator.ResolveRuntimeVersion(ResolvedWorkerRuntime, RuntimeVersion);
+            string runtimeTargetFramework = $"net{runtimeVersion}.0";
+
+            if (string.IsNullOrWhiteSpace(TargetFramework))
+            {
+                TargetFramework = runtimeTargetFramework;
+                return;
+            }
+
+            if (!TargetFramework.Equals(runtimeTargetFramework, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new CliArgumentsException(
+                    $"The Flex BYOC runtime version '{runtimeVersion}' does not match target framework '{TargetFramework}'.");
             }
         }
 
@@ -491,7 +552,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
         }
 
-        private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
+        private static async Task WriteLocalSettingsJson(
+            WorkerRuntime workerRuntime,
+            ProgrammingModel programmingModel,
+            string runtimeVersion = null)
         {
             string localSettingsJsonContent = await StaticResources.LocalSettingsJson;
 
@@ -520,14 +584,23 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (workerRuntime == Helpers.WorkerRuntime.Powershell)
             {
-                localSettingsJsonContent = AddLocalSetting(localSettingsJsonContent, Constants.FunctionsWorkerRuntimeVersion, Constants.PowerShellWorkerDefaultVersion);
+                localSettingsJsonContent = AddLocalSetting(
+                    localSettingsJsonContent,
+                    Constants.FunctionsWorkerRuntimeVersion,
+                    runtimeVersion ?? Constants.PowerShellWorkerDefaultVersion);
             }
 
             await FileSystemHelpers.WriteFileIfNotExists("local.settings.json", localSettingsJsonContent);
         }
 
-        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, string targetFramework, bool csx)
+        private async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, string targetFramework, bool csx)
         {
+            if (FlexByoc)
+            {
+                await WriteFlexByocArtifacts(workerRuntime, language);
+                return;
+            }
+
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && string.IsNullOrEmpty(targetFramework) && !csx)
             {
                 var functionAppRoot = ScriptHostHelpers.GetFunctionAppRootDirectory(Environment.CurrentDirectory);
@@ -616,6 +689,63 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
 
             await FileSystemHelpers.WriteFileIfNotExists(".dockerignore", await StaticResources.DockerIgnoreFile);
+        }
+
+        private async Task WriteFlexByocArtifacts(WorkerRuntime workerRuntime, string language)
+        {
+            string runtimeVersion = FlexByocArtifactGenerator.ResolveRuntimeVersion(workerRuntime, RuntimeVersion);
+            FlexByocTemplateArtifacts artifacts = await FlexByocArtifactGenerator.GetTemplateArtifactsAsync(
+                workerRuntime,
+                runtimeVersion,
+                language);
+
+            if (workerRuntime == Helpers.WorkerRuntime.DotnetIsolated)
+            {
+                (string projectFile, string applicationDll) = ResolveDotnetFlexByocProject();
+                artifacts = artifacts with
+                {
+                    Dockerfile = artifacts.Dockerfile.Replace("{{PROJECT_FILE}}", $"'{projectFile}'"),
+                    Entrypoint = artifacts.Entrypoint.Replace("{{APPLICATION_DLL}}", $"'{applicationDll}'"),
+                };
+            }
+
+            string[] outputPaths = ["Dockerfile", "entrypoint.sh", ".dockerignore"];
+            string[] conflicts = outputPaths.Where(FileSystemHelpers.FileExists).ToArray();
+            if (conflicts.Length > 0 && !Force)
+            {
+                throw new CliException(
+                    $"Flex BYOC artifacts were not generated because the following files already exist: {string.Join(", ", conflicts)}. Use --force to replace these generated files.");
+            }
+
+            await FileSystemHelpers.WriteAllTextToFileAsync("Dockerfile", artifacts.Dockerfile);
+            await FileSystemHelpers.WriteAllTextToFileAsync(
+                "entrypoint.sh",
+                artifacts.Entrypoint.Replace("\r\n", "\n").Replace('\r', '\n'));
+            await FileSystemHelpers.WriteAllTextToFileAsync(".dockerignore", artifacts.DockerIgnore);
+        }
+
+        private static (string ProjectFile, string ApplicationDll) ResolveDotnetFlexByocProject()
+        {
+            string projectPath = ProjectHelpers.FindProjectFile(Environment.CurrentDirectory);
+            if (string.IsNullOrWhiteSpace(projectPath))
+            {
+                throw new CliException("Unable to find a .NET project file for Flex BYOC artifact generation.");
+            }
+
+            string projectFile = $"./{Path.GetFileName(projectPath)}";
+            string assemblyName = Path.GetFileNameWithoutExtension(projectPath);
+
+            XDocument project = XDocument.Load(projectPath);
+            string configuredAssemblyName = project
+                .Descendants()
+                .FirstOrDefault(element => element.Name.LocalName == "AssemblyName")
+                ?.Value;
+            if (!string.IsNullOrWhiteSpace(configuredAssemblyName))
+            {
+                assemblyName = configuredAssemblyName.Trim();
+            }
+
+            return (projectFile, $"/home/site/wwwroot/{assemblyName}.dll");
         }
 
         private static async Task WritePythonDockerFile()

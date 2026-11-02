@@ -12,6 +12,20 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
     public class FlexByocArtifactGeneratorTests
     {
         [Theory]
+        [InlineData(WorkerRuntime.DotnetIsolated, "11")]
+        [InlineData(WorkerRuntime.Python, "3.15")]
+        [InlineData(WorkerRuntime.Node, "26")]
+        [InlineData(WorkerRuntime.Java, "25")]
+        [InlineData(WorkerRuntime.Powershell, "7.6")]
+        public void ResolveRuntimeVersion_UsesLatestSupportedVersionByDefault(
+            WorkerRuntime workerRuntime,
+            string expectedVersion)
+        {
+            FlexByocArtifactGenerator.ResolveRuntimeVersion(workerRuntime, null)
+                .Should().Be(expectedVersion);
+        }
+
+        [Theory]
         [InlineData("net8.0")]
         [InlineData("9")]
         [InlineData("10.0")]

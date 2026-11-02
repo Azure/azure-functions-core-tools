@@ -16,6 +16,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(_ => { });
 
             Parser
+                .Setup<string>("runtime-version")
+                .WithDescription("Runtime version for Flex BYOC artifacts.")
+                .Callback(_ => { });
+
+            Parser
                 .Setup<bool>("no-docs")
                 .WithDescription("Skip generating the 'Getting Started' documentation files.")
                 .Callback(_ => { });
