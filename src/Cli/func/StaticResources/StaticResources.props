@@ -52,6 +52,24 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.dotnetIsolated">
       <LogicalName>$(AssemblyName).entrypoint.flexByoc.dotnetIsolated</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.11">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.11</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.12">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.12</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.13">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.13</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.14">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.14</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.15">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.15</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.python">
+      <LogicalName>$(AssemblyName).entrypoint.flexByoc.python</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)dockerignore.flexByoc">
       <LogicalName>$(AssemblyName).dockerignore.flexByoc</LogicalName>
     </EmbeddedResource>

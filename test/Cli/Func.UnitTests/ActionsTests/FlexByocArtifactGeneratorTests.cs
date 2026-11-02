@@ -29,8 +29,24 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         }
 
         [Theory]
-        [InlineData(WorkerRuntime.Python, "3.11", null, "python.3.11")]
-        [InlineData(WorkerRuntime.Python, "3.15", null, "python.3.15")]
+        [InlineData("3.11")]
+        [InlineData("3.12")]
+        [InlineData("3.13")]
+        [InlineData("3.14")]
+        [InlineData("3.15")]
+        public async Task GetTemplateArtifactsAsync_LoadsPythonArtifacts(string runtimeVersion)
+        {
+            FlexByocTemplateArtifacts artifacts = await FlexByocArtifactGenerator.GetTemplateArtifactsAsync(
+                WorkerRuntime.Python,
+                runtimeVersion,
+                null);
+
+            artifacts.Dockerfile.Should().NotBeNullOrWhiteSpace();
+            artifacts.Entrypoint.Should().NotBeNullOrWhiteSpace();
+            artifacts.DockerIgnore.Should().NotBeNullOrWhiteSpace();
+        }
+
+        [Theory]
         [InlineData(WorkerRuntime.Node, "18", Constants.Languages.JavaScript, "node.javascript.18")]
         [InlineData(WorkerRuntime.Node, "26", Constants.Languages.TypeScript, "node.typescript.26")]
         [InlineData(WorkerRuntime.Java, "21", null, "java.21")]
