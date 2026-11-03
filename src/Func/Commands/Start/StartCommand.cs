@@ -134,7 +134,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         CompactDashboardShortcutLabels shortcutLabels,
         IPlatform platform,
         IEnumerable<IStartHostOptionContributor>? startOptionContributors = null,
-        StartDashboardEventStreamFactory? eventStreamFactory = null)
+        StartDashboardEventStreamFactory? eventStreamFactory = null,
+        IEnumerable<IProjectStack>? projectStacks = null)
         : base("run", "Launch the Azure Functions host runtime.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -179,14 +180,17 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(NoAzuriteOption);
         Options.Add(PauseOnErrorOption);
 
-        // Stack workloads (e.g. .NET) contribute their own start options. They are attached after
-        // the built-ins so they group cleanly in --help, and appear only while the owning workload
-        // is installed. The registry de-dupes by name so a shared option is shown once.
+        // Contributors can reuse built-in options; those must remain in the general help section.
+        Option[] builtInOptions = [.. Options];
+        IProjectStack[] installedStacks = [.. projectStacks ?? []];
         var registry = new StartOptionRegistry(this);
         foreach (IStartHostOptionContributor contributor in _startOptionContributors)
         {
             registry.SetActiveStack(contributor.Stack);
-            contributor.GetStartOptions(registry);
+            IReadOnlyList<Option> options = contributor.GetStartOptions(registry);
+            string displayName = installedStacks.FirstOrDefault(
+                stack => string.Equals(stack.Stack, contributor.Stack, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? contributor.Stack;
+            RegisterStackOptionHelp(contributor.Stack, displayName, options.Except(builtInOptions));
         }
     }
 

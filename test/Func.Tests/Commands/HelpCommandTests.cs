@@ -3,7 +3,10 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
@@ -72,6 +75,176 @@ public class HelpCommandTests
         var output = _interaction.AllOutput;
         output.Should().Contain("func workload install");
         output.Should().NotContain("func install ");
+    }
+
+    [Theory]
+    [InlineData("init --help")]
+    [InlineData("init -h")]
+    [InlineData("help init")]
+    public async Task InitHelp_GroupsStackOptionsAlphabeticallyAndKeepsSharedOptionsGeneral(string commandLine)
+    {
+        var first = CreateInitializer("first", "first stack", registry =>
+        [
+            registry.GetOrAdd(new Option<bool>("--first-only", "-f")),
+            registry.GetOrAdd(CommonInitOptions.NoBundle()),
+            registry.GetOrAdd(CommonInitOptions.BundlesChannel()),
+            registry.GetOrAdd(new Option<bool>("--shared")),
+        ]);
+        var second = CreateInitializer("second", "Second stack", registry =>
+        [
+            registry.GetOrAdd(new Option<bool>("--second-only")),
+            registry.GetOrAdd(CommonInitOptions.NoBundle()),
+            registry.GetOrAdd(new Option<bool>("--shared")),
+        ]);
+        var hidden = CreateInitializer("hidden", "Hidden stack", registry =>
+        [
+            registry.GetOrAdd(CommonInitOptions.NoBundle()),
+            registry.GetOrAdd(new Option<bool>("--shared")),
+            registry.GetOrAdd(new Option<bool>("--hidden") { Hidden = true }),
+        ]);
+        var provider = TestParser.BuildServiceProviderWith(_interaction, services =>
+        {
+            services.AddSingleton(second);
+            services.AddSingleton(first);
+            services.AddSingleton(hidden);
+        });
+        var root = Parser.CreateCommand(provider);
+
+        var exitCode = await root.Parse(commandLine).InvokeAsync();
+
+        exitCode.Should().Be(0);
+        _interaction.Lines.Should().ContainInOrder("RULE: Options", "RULE: first stack", "RULE: Second stack");
+        GetHelpSection("Options").Should().Contain("--stack").And.Contain("--no-bundles")
+            .And.Contain("--bundles-channel, -c").And.Contain("--shared")
+            .And.NotContain("--first-only").And.NotContain("--second-only");
+        GetHelpSection("first stack").Should().Contain("--first-only, -f").And.NotContain("--shared")
+            .And.NotContain("--second-only");
+        GetHelpSection("Second stack").Should().Contain("--second-only").And.NotContain("--shared")
+            .And.NotContain("--first-only");
+        _interaction.Lines.Count(line => line.StartsWith("  --no-bundles", StringComparison.Ordinal)).Should().Be(1);
+        _interaction.Lines.Count(line => line.StartsWith("  --shared", StringComparison.Ordinal)).Should().Be(1);
+        _interaction.AllOutput.Should().NotContain("RULE: Hidden stack").And.NotContain("--hidden");
+    }
+
+    [Theory]
+    [InlineData("dotnet", ".NET")]
+    [InlineData("node", "Node.js")]
+    [InlineData("go", "Go")]
+    [InlineData("powershell", "PowerShell")]
+    public async Task InitHelp_WithOneStack_UsesDisplayNameAndKeepsBundleOptionsGeneral(string stackId, string displayName)
+    {
+        var initializer = CreateInitializer(stackId, displayName, registry =>
+        [
+            registry.GetOrAdd(CommonInitOptions.NoBundle()),
+            registry.GetOrAdd(CommonInitOptions.BundlesChannel()),
+            registry.GetOrAdd(new Option<bool>("--stack-specific")),
+        ]);
+        var provider = TestParser.BuildServiceProviderWith(_interaction, services => services.AddSingleton(initializer));
+        var root = Parser.CreateCommand(provider);
+
+        var exitCode = await root.Parse("init --help").InvokeAsync();
+
+        exitCode.Should().Be(0);
+        _interaction.Lines.Should().ContainInOrder("RULE: Options", $"RULE: {displayName}");
+        GetHelpSection("Options").Should().Contain("--no-bundles").And.Contain("--bundles-channel, -c")
+            .And.NotContain("--stack-specific");
+        GetHelpSection(displayName).Should().Contain("--stack-specific").And.NotContain("--no-bundles")
+            .And.NotContain("--bundles-channel");
+    }
+
+    [Theory]
+    [InlineData("run --help")]
+    [InlineData("start --help")]
+    [InlineData("run -h")]
+    [InlineData("help run")]
+    public async Task RunHelp_GroupsStackOptionsAlphabeticallyAndKeepsBuiltInAndSharedOptionsGeneral(string commandLine)
+    {
+        var dotnet = CreateStartContributor("dotnet", registry =>
+        [
+            registry.GetOrAdd(new Option<bool>("--first-only")),
+            registry.GetOrAdd(new Option<int?>("--port")),
+            registry.GetOrAdd(new Option<bool>("--shared")),
+        ]);
+        var node = CreateStartContributor("node", registry =>
+        [
+            registry.GetOrAdd(new Option<bool>("--second-only")),
+            registry.GetOrAdd(new Option<bool>("--shared")),
+        ]);
+        var dotnetStack = Substitute.For<IProjectStack>();
+        dotnetStack.Stack.Returns("dotnet");
+        dotnetStack.DisplayName.Returns(".NET");
+        var nodeStack = Substitute.For<IProjectStack>();
+        nodeStack.Stack.Returns("node");
+        nodeStack.DisplayName.Returns("Node.js");
+        var provider = TestParser.BuildServiceProviderWith(_interaction, services =>
+        {
+            services.AddSingleton(node);
+            services.AddSingleton(dotnet);
+            services.AddSingleton(nodeStack);
+            services.AddSingleton(dotnetStack);
+        });
+        var root = Parser.CreateCommand(provider);
+
+        var exitCode = await root.Parse(commandLine).InvokeAsync();
+
+        exitCode.Should().Be(0);
+        _interaction.Lines.Should().ContainInOrder("RULE: Options", "RULE: .NET", "RULE: Node.js");
+        GetHelpSection("Options").Should().Contain("--port").And.Contain("--shared")
+            .And.NotContain("--first-only").And.NotContain("--second-only");
+        GetHelpSection(".NET").Should().Contain("--first-only").And.NotContain("--port").And.NotContain("--shared")
+            .And.NotContain("--second-only");
+        GetHelpSection("Node.js").Should().Contain("--second-only").And.NotContain("--shared").And.NotContain("--first-only");
+        _interaction.Lines.Count(line => line.StartsWith("  --port", StringComparison.Ordinal)).Should().Be(1);
+        _interaction.Lines.Count(line => line.StartsWith("  --shared", StringComparison.Ordinal)).Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("init")]
+    [InlineData("run")]
+    [InlineData("new")]
+    public void RenderCommandHelp_WithoutStackOptions_OnlyShowsGeneralOptions(string commandName)
+    {
+        var command = _rootCommand.Subcommands.Single(command => command.Name == commandName);
+
+        _helpCommand.RenderCommandHelp(command);
+
+        _interaction.Lines.Where(line => line.StartsWith("RULE: ", StringComparison.Ordinal))
+            .Should().EndWith("RULE: Options");
+        _interaction.AllOutput.Should().NotContain("RULE: .NET").And.NotContain("RULE: Node.js");
+    }
+
+    [Fact]
+    public void GetOptionHelpHeading_NullOption_Throws()
+    {
+        var act = () => _helpCommand.GetOptionHelpHeading(null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("option");
+    }
+
+    private string GetHelpSection(string heading) => string.Join(Environment.NewLine, _interaction.Lines
+        .SkipWhile(line => line != $"RULE: {heading}")
+        .Skip(1)
+        .TakeWhile(line => !line.StartsWith("RULE: ", StringComparison.Ordinal)));
+
+    private static IProjectInitializer CreateInitializer(
+        string stack, string displayName, Func<IInitOptionRegistry, IReadOnlyList<Option>> options)
+    {
+        var initializer = Substitute.For<IProjectInitializer>();
+        initializer.Stack.Returns(stack);
+        initializer.DisplayName.Returns(displayName);
+        initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>())
+            .Returns(call => options(call.Arg<IInitOptionRegistry>()));
+        return initializer;
+    }
+
+    private static IStartHostOptionContributor CreateStartContributor(
+        string stack, Func<StartOptionRegistry, IReadOnlyList<Option>> options)
+    {
+        var contributor = Substitute.For<IStartHostOptionContributor>();
+        contributor.Stack.Returns(stack);
+        contributor.GetStartOptions(Arg.Any<StartOptionRegistry>())
+            .Returns(call => options(call.Arg<StartOptionRegistry>()));
+        return contributor;
     }
 
     [Fact]

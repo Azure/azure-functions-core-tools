@@ -124,10 +124,14 @@ internal class HelpCommand : FuncCliCommand
         WriteArgumentsSection(command);
         WriteSubcommandsSection(command);
 
-        var options = command.Options.Where(o => !o.Hidden && o is not HelpOption).ToList();
-        if (options.Count > 0)
+        IEnumerable<IGrouping<string?, Option>> optionGroups = command.Options
+            .Where(o => !o.Hidden && o is not HelpOption)
+            .GroupBy(o => (command as FuncCliCommand)?.GetOptionHelpHeading(o))
+            .OrderBy(group => group.Key is not null)
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase);
+        foreach (IGrouping<string?, Option> group in optionGroups)
         {
-            WriteOptionsSection("Options", options);
+            WriteOptionsSection(group.Key ?? "Options", group);
         }
     }
 
