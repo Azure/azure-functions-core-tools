@@ -2,7 +2,7 @@
 
 **Status:** Proposed implementation plan
 
-This document describes what Core Tools already provides, what needs to be built, and how to validate the first `func init` and `func new` integration. The [architecture](architecture.md) defines required behavior and safety boundaries.
+This document describes the existing CLI v5 infrastructure, what remains to be implemented, and how to validate the first `func init` and `func new` integration. The [architecture](architecture.md) defines the required behavior and safety boundaries.
 
 ## What exists today
 
@@ -12,14 +12,6 @@ The repository baseline described by the current design includes:
 - `TemplateCatalogEntry` and parameter projection: template identity and display metadata. Projection alone does not evaluate conditional requirements or defaults.
 - Template constraint readers and evaluators: reusable helpers that are not yet wired into the complete command path.
 - `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
-
-The current `func init` path has known safety limitations: it
-can create the destination before validation, perform force
-cleanup before all Stack-specific checks, remove `.git` pointer
-files, and report success after some required configuration
-writes fail. These behaviors belong to the existing
-implementation; the proposed template-based path must correct
-them before replacing an initializer.
 
 - `NewCommand` retains the current public argument surface.
 Its migration handler reports scaffolding and template
@@ -31,6 +23,12 @@ command.
 - `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
 - Test-only local template registration in isolated hives. Workload deployment does not yet establish the required production registration into the CLI template hive.
 
+### Existing initialization limitations
+
+The current `func init` path has known safety limitations: it can create the destination before validation, perform force cleanup before all Stack-specific checks, remove `.git` pointer files, and report success after some required configuration writes fail.
+
+These behaviors belong to the existing implementation. The proposed template-based path must correct them before replacing an initializer.
+
 Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Commands/InitCommand.cs`, `src/Func/Commands/NewCommand.cs`, `src/Abstractions/Projects/`, and `src/Workloads/Stacks/`. Recheck the exact implementation branch before treating any type as available: the legacy cleanup and ongoing feature work may have changed the baseline.
 
 ## Initial implementation
@@ -38,10 +36,15 @@ Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Comma
 Build the smallest working command-facing model first, then fill in behavior incrementally.
 
 1. **Establish the API surface.** Create a `Templater` from the factory and command context. Support listing or resolving installed templates and invoking an exact selected template. Keep the engine session internal. Use the proposed group/catalog/resolved-template concepts where they make the API clearer; do not create wrappers without a consumer.
+
 2. **Qualify the engine seam.** With representative project and parameterized function templates installed in an isolated hive, prove metadata discovery, Stack filtering, exact selection, parameter evaluation, and invocation against selected content. Use multiple metadata variants to expose filtering and ambiguity behavior.
+
 3. **Integrate the CLI commands.** Preserve `func init` adoption/repair and current Stack behavior. Add one template-based project route and one `func new` item route for the same Stack. Keep unmigrated initializers working.
+
 4. **Add guarded publication.** Render privately, validate target effects, preserve non-force behavior, protect Git metadata, persist required configuration correctly, and report failures and partial effects.
+
 5. **Connect production content.** Once template content owners and workload owners confirm package ownership and layout, register installed workload templates into the CLI hive. Do not make discovery install packages.
+
 6. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
 
 Steps 3 and 4 form one safe command increment: no integrated route may change a destination before the guarded publication requirements are in place.
@@ -97,7 +100,7 @@ A `host.json` file, successful listing, or basic text-file fixture alone does no
 - **Parameters:** candidate-specific options before final selection; conditional required/disabled/default values; explicit empty and repeated values; interactive and noninteractive errors.
 - **Content integrity:** changed or missing configuration/assets between selection and invocation; rendering from the verified selected content; unsupported engine features fail before destination effects.
 - **`func init`:** all existing Stack options, adoption/repair, safe occupied non-project directories, write-if-missing behavior, complete-project refusal, force confirmation, `.git` protection, and required configuration failures.
-- **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated init configuration writes.
+- **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated initialization configuration writes. Verify that invoking `func new` outside an initialized Functions project fails with actionable guidance to run `func init`, without initializing a project or modifying the destination.
 - **Publication:** path/ancestor/case checks, guarded no-replace or replacement on supported operating systems, cancellation, cleanup, and truthful partial-effect reporting.
 - **Packaging:** isolated test registration versus real workload registration; missing or incompatible installed content; retry and version coordination.
 

@@ -1,10 +1,10 @@
 # Templates Architecture
 
-CLI v5 Templates Architecture describes the proposed Template Engine for creating Functions projects with `func init` and adding functions with `func new`. Existing Stack initializers remain operative; the current `func new` handler reports scaffolding and template listing temporarily unavailable.
+CLI v5 Templates Architecture describes the proposed Template Engine for creating Functions projects with `func init` and adding functions with `func new`.
 
-- [Architecture](architecture.md) — the Template Engine, its command-facing model, and required behavior.
-- [Implementation](implementation.md) — available infrastructure, work to complete, and validation.
+The existing Stack initializers remain available. Template-based function generation and listing through `func new` are not yet implemented.
 
-The new Template Engine and command integration are proposed and not yet complete. Existing project initializers remain in use until their replacements are validated.
+- [Architecture](architecture.md) — Initial Design, component responsibilities, and required behavior.
+- [Implementation](implementation.md) — existing infrastructure, remaining work, and validation.
 
-Earlier designs and investigations are preserved in the [archive](archive/). They are background material, not an additional implementation specification.
+Earlier designs and investigations are preserved in the [archive](archive/).

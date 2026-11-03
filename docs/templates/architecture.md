@@ -12,7 +12,7 @@ The initial goal is a working local journey: `func init` creates a valid project
 
 The first working journey defines the representative project, item and Functions Host proof.
 
-The Template Engine stays within Core Tools for the initial implementation. Extracting it into a separate assembly is outside this scope.
+The Template Engine is part of CLI v5. Moving it into a separate assembly is outside the initial scope.
 
 ## Initial Design
 
@@ -36,11 +36,17 @@ The command-facing flow is:
 | Template Engine internals | Use Microsoft.TemplateEngine facilities for metadata, authored parameter semantics, and rendering. Manage engine sessions and temporary rendering resources internally. |
 | Content producers and workload installation | Build, package, distribute, and register templates in the CLI hive. |
 
-Use one captured command/project/bundle context and one command-scoped engine session from discovery through evaluation and invocation. Keep engine objects private to the integration. Issued catalog/group collections are immutable views; parameter metadata has one canonical representation. Only an integration-issued exact selection may be invoked, and foreign, stale or disposed selections fail explicitly. The existing session owns temporary rendering resources; do not add another lifecycle owner.
+The CLI captures the command, project, and bundle context once. The Template Engine uses one command-scoped session for discovery, parameter evaluation, and invocation.
+
+The Templater keeps engine objects private. Catalog and group collections are immutable views, and parameter metadata has one canonical representation.
+
+Only an exact selection issued by the Templater can be invoked. Selections from another session, or selections that are stale or disposed, must fail.
+
+The existing session owns temporary rendering resources. No additional lifecycle owner is needed.
 
 These are responsibilities and useful object-model concepts, not a requirement to introduce a public class or interface for each row. Reuse existing types where they fit. The proposed group, resolution, request, and result shapes inform the command-facing API; their exact signatures still need agreement against concrete command calls.
 
-**Terminology:** A *Stack* is an Azure Functions language stack, such as Node.js or Python. *Runtime* means the Azure Functions application/Functions Host runtime, not a language worker. A *hive* is an isolated scope of installed templates. There is one component named **Template Engine**; the previous unshipped implementation is not the design to reproduce.
+**Terminology:** A *Stack* is an Azure Functions language stack, such as Node.js or Python. *Runtime* means the Azure Functions application/Functions Host runtime, not a language worker. A `hive` is an isolated scope of installed templates. There is one component named **Template Engine**; the previous unshipped implementation is not the design to reproduce.
 
 ## Installed templates and discovery
 
@@ -71,29 +77,11 @@ Validate raw mounted template declarations before engine normalization can disca
 
 Template-specific options vary by candidate. The CLI must retain the user's original arguments until it can check their syntax against eligible candidates **before choosing the final variant**. An unknown option's value must not accidentally become the project path. For the initial `func new` grammar, an explicit project path belongs before template-specific options; ambiguous ordering produces guidance rather than silently using the current directory.
 
-Parse the supplied template-specific arguments against each
-eligible candidate before final variant selection. Preserve
-the rejection reason for each candidate that fails syntax
-or eligibility checks. A candidate with missing values that
-can be supplied through prompting remains eligible for
-interactive selection. Do not discard it merely because
-those values were not supplied on the command line.
+The CLI preserves template-specific arguments separately for each command invocation. It retains their original aliases, token positions, and whether values were explicitly supplied. This information is used for candidate parsing and diagnostics; it must not be reconstructed from normalized parameter names.
 
-Preserve template-specific arguments as an immutable sequence
-for each command invocation. Do not share mutable argument
-state between invocations. Keep the existing CLI grammar and
-diagnostics for unsupported `--path`, `--output`, `--dry-run`,
-and `-name` options, including established help and `--`
-behavior. Template aliases must not reinterpret reserved
-CLI options.
+Before selecting a final variant, the CLI checks the arguments against each eligible candidate. It retains the reason when a candidate is rejected. Candidates with missing values that can be supplied through prompting remain eligible for interactive selection.
 
-For each supplied template-specific argument, preserve the
-original option alias, token position, and whether a value
-was explicitly present. Keep this information with the
-immutable per-invocation argument sequence until candidate
-parsing and parameter evaluation are complete. Diagnostics
-must identify the original user input rather than reconstructing
-it from normalized parameter names.
+The existing CLI grammar remains unchanged. Unsupported `--path`, `--output`, `--dry-run`, and `-name` options retain their current diagnostics, including existing help and `--` behavior. Template aliases must not reinterpret reserved CLI options.
 
 After selection, Microsoft.TemplateEngine evaluates authored parameter semantics, including conditional requirements, enabled or disabled parameters, and dependent defaults. The CLI owns input provenance and prompting, not a second expression evaluator. Preserve the distinction between omitted, explicitly empty, repeated, and explicitly supplied default-equal values. Reject conflicting explicit assignments. Prompt only for active required inputs that remain unresolved; noninteractive calls fail with actionable missing-input diagnostics.
 
@@ -105,26 +93,15 @@ If the installed engine cannot evaluate a required template feature, reject that
 
 ## Selected content and rendering
 
-Invoking a template must use the content that was selected, not a later lookup by name or a different variant. Selection binds the candidate to its configuration, metadata, and assets. If required content changes, disappears, becomes unreadable, or cannot be invoked through the available engine API, generation fails before destination changes.
+Invoking a template must use the exact content selected, not a later lookup by name or a different variant.
 
-The initial design establishes a selection-time content baseline. Mutable content requires a bounded, verified private copy that rendering actually consumes; an enforceably immutable, integrity-checked installed mount may be used directly. Recheck the selected source before rendering. A copy made later without comparison, or a verified copy left unused while rendering from the mutable original, does not satisfy the requirement.
+Before a template can be invoked or its parameters prompted for, validate its configuration, metadata, and assets. Reject unsafe paths, unreadable or unsupported content, and assets that exceed the configured size or expansion limits.
 
-Before issuing an invocable selection or prompting for
-parameters, validate the selected assets for safe paths,
-readable content, supported file types, and configured size
-and expansion limits. For mutable content, create and verify
-the private copy at selection time. Rendering must consume
-that verified content. Unsafe, missing, changed, or over-limit
-assets invalidate the selection; the engine must not rediscover
-or substitute another candidate.
+At selection time, record the installed package and mount identity and a deterministic manifest of the selected assets. The manifest includes relative paths and content bytes or digests, raw template configuration, and func-host metadata.
 
-The selection-time content record identifies the installed
-package and mount and contains a deterministic manifest of
-the selected assets. The manifest records relative paths and
-content bytes or digests, including raw template configuration
-and func-host metadata. The verified content used for rendering
-must match this record. Missing, unsafe, unreadable, changed,
-or over-limit assets invalidate the selection.
+Mutable content must be copied and verified at selection time. Rendering must use that verified copy. An installed mount may be used directly only when its immutability and integrity are enforceable.
+
+Before rendering, verify that the selected source still matches the recorded content. Missing, changed, unreadable, or unsafe content invalidates the selection. Do not rediscover or substitute another template.
 
 The exact Microsoft.TemplateEngine mount and invocation API is still to be qualified. Use the existing engine and session facilities rather than introducing a second engine or a separate lifecycle framework.
 
@@ -154,12 +131,16 @@ Diagnose readable malformed CLI configuration without force. Explicit force may 
 
 ## `func new`
 
-`func new` adds an item to an existing Functions project. The initial public command surface retains `[path]`, `--template`, `--name`, `--force`, `--non-interactive`, `--list`, and `--format`; the redesign does not add a positional template selector or a new `--path` option.
+`func new` adds a function to an existing, initialized Functions project.
+
+In CLI v5, `func new` requires an initialized Functions project. If the project has not been initialized, the command fails with an actionable error directing the user to run `func init` first. It does not initialize the project automatically.
+
+The initial public command surface retains `[path]`, `--template`, `--name`, `--force`, `--non-interactive`, `--list`, and `--format`. The redesign does not add a positional template selector or a new `--path` option.
 
 The proposed path is:
 
 1. Parse built-in options while preserving template-specific arguments.
-2. Resolve the explicit project and its Stack/language context.
+2. Resolve the target Functions project and its Stack/language context. If the target is not an initialized Functions project, fail before template discovery or any destination changes.
 3. Discover installed item templates and show choices or resolve the supplied reference.
 4. Check candidate eligibility and parse template-specific arguments for each eligible variant before final selection.
 5. Select one exact template, bind its content, and evaluate parameters using the Template Engine.
