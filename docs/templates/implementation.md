@@ -13,13 +13,8 @@ The repository baseline described by the current design includes:
 - Template constraint readers and evaluators: reusable helpers that are not yet wired into the complete command path.
 - `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
 
-- `NewCommand` retains the current public argument surface.
-Its migration handler reports scaffolding and template
-listing unavailable and returns exit code 1 before modifying
-the target. Successful first-run setup can run before the
-handler, return exit code 0, and ask the user to rerun the
-command.
-- `FirstRunCoordinator`: setup can finish before either command handler and ask the user to rerun.
+- `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
+- `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
 - `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
 - Test-only local template registration in isolated hives. Workload deployment does not yet establish the required production registration into the CLI template hive.
 
