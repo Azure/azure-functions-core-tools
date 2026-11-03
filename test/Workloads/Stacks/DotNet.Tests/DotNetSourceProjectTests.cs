@@ -79,6 +79,12 @@ public class DotNetSourceProjectTests : IDisposable
 
         reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsProjectReportSeverity.Info && entry.Line == "Build succeeded.");
         reporter.Logs.Should().Contain(entry => entry.Severity == FunctionsProjectReportSeverity.Error && entry.Line == "warning XYZ: heads up");
+        await _dotnetCli.Received(1).RunStreamingAsync(
+            Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:Build")),
+            _projectDir.FullName,
+            Arg.Any<Action<string>?>(),
+            Arg.Any<Action<string>?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -97,16 +103,24 @@ public class DotNetSourceProjectTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(assemblyPath)!);
         File.WriteAllText(assemblyPath, string.Empty);
 
-        SetupStreamingBuild("--getTargetResult:GetTargetPath", json);
+        SetupTargetPathResult(json);
 
+        var reporter = new CapturingReporter();
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
+        context.Reporter = reporter;
+        using var cts = new CancellationTokenSource();
 
-        await project.PrepareForHostRunAsync(context, default);
+        await project.PrepareForHostRunAsync(context, cts.Token);
 
-        // Should NOT have called the build target
+        await _dotnetCli.Received(1).RunAsync(
+            Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:GetTargetPath") && !args.Contains("--getTargetResult:Build")),
+            _projectDir.FullName,
+            cts.Token);
+        reporter.Logs.Should().BeEmpty();
+
         await _dotnetCli.DidNotReceive().RunStreamingAsync(
-            Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:Build")),
+            Arg.Any<IReadOnlyList<string>>(),
             Arg.Any<string?>(),
             Arg.Any<Action<string>?>(),
             Arg.Any<Action<string>?>(),
@@ -126,7 +140,7 @@ public class DotNetSourceProjectTests : IDisposable
         string assemblyPath = Path.Combine(_projectDir.FullName, "bin", "Debug", "net10.0", "MyApp.dll");
         string json = BuildTargetResultJson(assemblyPath, "GetTargetPath");
 
-        SetupStreamingBuild("--getTargetResult:GetTargetPath", json);
+        SetupTargetPathResult(json);
 
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
@@ -144,17 +158,24 @@ public class DotNetSourceProjectTests : IDisposable
         string projectFile = Path.Combine(_projectDir.FullName, "MyApp.csproj");
         File.WriteAllText(projectFile, "<Project></Project>");
 
-        SetupStreamingFailure(
-            "--getTargetResult:GetTargetPath",
-            new DotnetCliException(1, "Target path resolution failed", "", "build MyApp.csproj"));
+        var failure = new DotnetCliException(1, "Target path resolution failed", "MSBuild diagnostic", "build MyApp.csproj");
+        _dotnetCli
+            .When(x => x.RunAsync(
+                Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:GetTargetPath")),
+                Arg.Any<string?>(),
+                Arg.Any<CancellationToken>()))
+            .Do(_ => throw failure);
 
         DotNetSourceProject project = CreateProject(projectFile);
         FunctionsProjectHostRunContext context = CreateHostRunContext(skipBuild: true);
 
         GracefulException ex = (await FluentActions.Awaiting(() => project.PrepareForHostRunAsync(context, default)).Should().ThrowAsync<GracefulException>()).Which;
 
-        ex.Message.Should().Contain("dotnet build");
+        ex.Message.Should().Contain("Could not resolve .NET build output");
         ex.Message.Should().Contain("exit 1");
+        ex.Message.Should().Contain("Target path resolution failed");
+        ex.Message.Should().Contain("MSBuild diagnostic");
+        ex.InnerException.Should().BeSameAs(failure);
         ex.IsUserError.Should().BeTrue();
     }
 
@@ -276,6 +297,16 @@ public class DotNetSourceProjectTests : IDisposable
 
     private FunctionsProjectHostRunContext CreateHostRunContext(bool skipBuild = false)
         => new(_projectDir, "dotnet", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), skipBuild);
+
+    private void SetupTargetPathResult(string json)
+    {
+        _dotnetCli
+            .When(x => x.RunAsync(
+                Arg.Is<IReadOnlyList<string>>(args => args.Contains("--getTargetResult:GetTargetPath")),
+                Arg.Any<string?>(),
+                Arg.Any<CancellationToken>()))
+            .Do(callInfo => File.WriteAllText(GetResultFilePath(callInfo.ArgAt<IReadOnlyList<string>>(0)), json));
+    }
 
     private void SetupStreamingBuild(string targetResultArg, string json, string[]? outputLines = null, string[]? errorLines = null)
     {
