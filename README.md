@@ -86,13 +86,11 @@ func <command> [path] [options]
 
 ## Architecture
 
-The function-template engine is implemented under `src/Func/Templates/Engine`
-on `Microsoft.TemplateEngine`. `func new` command integration is in progress. When its handler runs,
-scaffolding and `--list` report temporary unavailability and return
-exit code 1 without modifying the target directory. First-run setup
-may instead complete successfully and ask the user to rerun the
-command before that handler is reached. `func init`, quickstarts,
-setup, and runtime execution remain available.
+The Template Engine infrastructure is implemented under `src/Func/Templates/Engine` using `Microsoft.TemplateEngine`. Command integration for `func new` is still in progress.
+
+Currently, `func new` reports scaffolding and `--list` temporarily unavailable and returns exit code 1 without modifying the target directory. The command skips first-run setup, so this error is returned without running setup.
+
+`func init`, Quickstart, setup, and Functions runtime execution remain available.
 
 The v5 CLI is a ground-up rebuild using:
 

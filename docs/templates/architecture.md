@@ -149,7 +149,7 @@ The proposed path is:
 
 Listing is not proof that generation works. An exact-ID failure cannot fall back to a sibling. Without force, creating an item fails on a destination collision; any approved modification to existing files requires its own guard. `func new` does not write `func init` configuration or acquire packages during discovery.
 
-First-run setup may complete before the command handler and ask the user to rerun. The current command implementation and the proposed generation path must be distinguished during integration and testing.
+`func new` skips first-run setup. The current handler reports template generation and listing unavailable without modifying the destination. The current command implementation and the proposed generation path must be distinguished during integration and testing.
 
 ## Filesystem and failure behavior
 
