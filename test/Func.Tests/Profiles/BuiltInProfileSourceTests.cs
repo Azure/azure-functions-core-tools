@@ -16,7 +16,8 @@ public class BuiltInProfileSourceTests
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
 
         snapshot.Source.Kind.Should().Be(ProfileSourceKind.BuiltIn);
-        snapshot.Profiles.Keys.OrderBy(static p => p, StringComparer.Ordinal).Should().Equal(["flex", "linux-consumption", "linux-premium", "windows-consumption", "windows-dedicated"]);
+        snapshot.Profiles.Keys.OrderBy(static p => p, StringComparer.Ordinal).Should().Equal(
+            ["flex", "linux-consumption", "linux-dedicated", "linux-premium", "windows-consumption", "windows-dedicated", "windows-premium"]);
         snapshot.Profiles["flex"].Status.Should().Be("stable");
         snapshot.Profiles["linux-consumption"].Status.Should().Be("deprecated");
     }
@@ -24,6 +25,8 @@ public class BuiltInProfileSourceTests
     [Theory]
     [InlineData("windows-consumption", false, false)]
     [InlineData("windows-dedicated", false, false)]
+    [InlineData("windows-premium", false, false)]
+    [InlineData("linux-dedicated", true, false)]
     [InlineData("linux-premium", true, false)]
     [InlineData("linux-consumption", true, false)]
     [InlineData("flex", true, true)]
@@ -36,7 +39,7 @@ public class BuiltInProfileSourceTests
 
         var profile = snapshot.Profiles[profileName];
         List<string> expectedRuntimes = ["node", "java", "powershell", "dotnet-isolated", "custom"];
-        List<string> expectedWorkers = ["node"];
+        List<string> expectedWorkers = ["node", "java", "powershell"];
         if (supportsPython)
         {
             expectedRuntimes.Add("python");
@@ -49,6 +52,10 @@ public class BuiltInProfileSourceTests
             expectedWorkers.Add("go");
         }
 
+        profile.Sku.Should().Be(profileName == "flex" ? "flex-consumption" : profileName);
+        profile.Status.Should().Be(profileName == "linux-consumption" ? "deprecated" : "stable");
+        profile.Host!.Version.Should().Be("[1.8.1, 4.1054.200]");
+        profile.ExtensionBundle!.Version.Should().Be("[3.0.0, 5.0.0)");
         profile.SupportedRuntimes.Should().BeEquivalentTo(expectedRuntimes);
         profile.Workers.Should().NotBeNull();
         profile.Workers!.Keys.Should().BeEquivalentTo(expectedWorkers);

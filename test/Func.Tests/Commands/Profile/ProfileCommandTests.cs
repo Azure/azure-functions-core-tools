@@ -95,6 +95,37 @@ public sealed class ProfileCommandTests : IDisposable
         json.Should().Contain("\"source\":\"built-in\"");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task List_BundledRegistry_IncludesAllHostingProfiles(bool json)
+    {
+        ProfileListCommand command = CreateListCommand(ProjectOptions(), new BuiltInProfileSource(new ProfileDocumentParser()));
+        string[] args = json ? ["--source", "built-in", "--json", _tempDir] : ["--source", "built-in", _tempDir];
+        string[] expectedNames =
+        [
+            "flex", "linux-consumption", "linux-dedicated",
+            "linux-premium", "windows-consumption", "windows-dedicated", "windows-premium",
+        ];
+
+        int exit = await InvokeAsync(command, args);
+
+        exit.Should().Be(0);
+        if (json)
+        {
+            string output = _interaction.Lines.Single(l => l.StartsWith("JSON:"));
+            using var document = JsonDocument.Parse(output["JSON:".Length..]);
+            document.RootElement.GetProperty("profiles").EnumerateArray()
+                .Select(p => p.GetProperty("name").GetString()).Should().BeEquivalentTo(expectedNames);
+        }
+        else
+        {
+            _interaction.Lines.Where(l => l.StartsWith("  ROW:")).Should().BeEquivalentTo(
+                expectedNames.Select(name =>
+                    $"  ROW: [{name}, built-in, [1.8.1, 4.1054.200], [3.0.0, 5.0.0), {(name == "linux-consumption" ? "deprecated" : "stable")}]"));
+        }
+    }
+
     [Fact]
     public async Task Show_WritesResolvedProfile()
     {
@@ -134,6 +165,27 @@ public sealed class ProfileCommandTests : IDisposable
         _interaction.Lines.Should().Contain("  Name    staging");
         _interaction.Lines.Should().Contain("  Extends    flex");
         _interaction.Lines.Should().Contain("  Host version    -");
+    }
+
+    [Theory]
+    [InlineData("flex", false)]
+    [InlineData("flex", true)]
+    [InlineData("windows-premium", false)]
+    [InlineData("windows-premium", true)]
+    [InlineData("linux-dedicated", false)]
+    [InlineData("linux-dedicated", true)]
+    public async Task Show_BundledProfile_IncludesJavaAndPowerShellWorkers(string profileName, bool raw)
+    {
+        ProfileShowCommand command = CreateShowCommand(new BuiltInProfileSource(new ProfileDocumentParser()));
+        string[] args = raw ? [profileName, "--raw", _tempDir] : [profileName, _tempDir];
+
+        int exit = await InvokeAsync(command, args);
+
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain($"  Name    {profileName}");
+        _interaction.Lines.Should().Contain("  Source    built-in");
+        string workers = _interaction.Lines.Should().ContainSingle(l => l.StartsWith("  Workers    ")).Which;
+        workers.Should().Contain("java [2.19.5]").And.Contain("powershell [4.0.5362]");
     }
 
     [Fact]
