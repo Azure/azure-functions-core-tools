@@ -81,9 +81,9 @@ public class HelpCommandTests
     [InlineData("init --help")]
     [InlineData("init -h")]
     [InlineData("help init")]
-    public async Task InitHelp_GroupsStackOptionsAndKeepsSharedOptionsGeneral(string commandLine)
+    public async Task InitHelp_GroupsStackOptionsAlphabeticallyAndKeepsSharedOptionsGeneral(string commandLine)
     {
-        var first = CreateInitializer("first", "First stack", registry =>
+        var first = CreateInitializer("first", "first stack", registry =>
         [
             registry.GetOrAdd(new Option<bool>("--first-only", "-f")),
             registry.GetOrAdd(CommonInitOptions.NoBundle()),
@@ -104,8 +104,8 @@ public class HelpCommandTests
         ]);
         var provider = TestParser.BuildServiceProviderWith(_interaction, services =>
         {
-            services.AddSingleton(first);
             services.AddSingleton(second);
+            services.AddSingleton(first);
             services.AddSingleton(hidden);
         });
         var root = Parser.CreateCommand(provider);
@@ -113,11 +113,11 @@ public class HelpCommandTests
         var exitCode = await root.Parse(commandLine).InvokeAsync();
 
         exitCode.Should().Be(0);
-        _interaction.Lines.Should().ContainInOrder("RULE: Options", "RULE: First stack", "RULE: Second stack");
+        _interaction.Lines.Should().ContainInOrder("RULE: Options", "RULE: first stack", "RULE: Second stack");
         GetHelpSection("Options").Should().Contain("--stack").And.Contain("--no-bundles")
             .And.Contain("--bundles-channel, -c").And.Contain("--shared")
             .And.NotContain("--first-only").And.NotContain("--second-only");
-        GetHelpSection("First stack").Should().Contain("--first-only, -f").And.NotContain("--shared")
+        GetHelpSection("first stack").Should().Contain("--first-only, -f").And.NotContain("--shared")
             .And.NotContain("--second-only");
         GetHelpSection("Second stack").Should().Contain("--second-only").And.NotContain("--shared")
             .And.NotContain("--first-only");
@@ -157,7 +157,7 @@ public class HelpCommandTests
     [InlineData("start --help")]
     [InlineData("run -h")]
     [InlineData("help run")]
-    public async Task RunHelp_GroupsStackOptionsAndKeepsBuiltInAndSharedOptionsGeneral(string commandLine)
+    public async Task RunHelp_GroupsStackOptionsAlphabeticallyAndKeepsBuiltInAndSharedOptionsGeneral(string commandLine)
     {
         var dotnet = CreateStartContributor("dotnet", registry =>
         [
@@ -178,10 +178,10 @@ public class HelpCommandTests
         nodeStack.DisplayName.Returns("Node.js");
         var provider = TestParser.BuildServiceProviderWith(_interaction, services =>
         {
-            services.AddSingleton(dotnet);
             services.AddSingleton(node);
-            services.AddSingleton(dotnetStack);
+            services.AddSingleton(dotnet);
             services.AddSingleton(nodeStack);
+            services.AddSingleton(dotnetStack);
         });
         var root = Parser.CreateCommand(provider);
 

@@ -389,7 +389,7 @@ If a newer version is found, a notice is printed after the command completes.
 
 Each registered initializer also contributes options to `func init` via `GetInitOptions(IInitOptionRegistry)`; values are read back inside `InitializeAsync` via the `ParseResult`. The registry collapses same-named contributions across workloads so shared options (e.g. `--no-bundles`) show up once in `--help` and every contributing workload reads the canonical instance.
 
-Help groups stack-specific options under the initializer's `DisplayName` (for example, `.NET` or `Node.js`). Built-in options, bundle options, and options contributed by multiple stacks stay in the general `Options` section. `func run` (alias `start`) follows the same grouping using the matching `IProjectStack.DisplayName`, falling back to the contributor's stack ID when no descriptor is registered. Stack IDs are matched case-insensitively. Empty groups and hidden options are omitted.
+Help groups stack-specific options under the initializer's `DisplayName` (for example, `.NET` or `Node.js`). Built-in options, bundle options, and options contributed by multiple stacks stay in the general `Options` section, followed by stack headings sorted alphabetically using an ordinal, case-insensitive comparison. Options within each group retain their registration order. `func run` (alias `start`) follows the same grouping using the matching `IProjectStack.DisplayName`, falling back to the contributor's stack ID when no descriptor is registered. Stack IDs are matched case-insensitively. Empty groups and hidden options are omitted.
 
 ### `func setup` for Go projects
 

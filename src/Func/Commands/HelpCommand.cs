@@ -127,7 +127,8 @@ internal class HelpCommand : FuncCliCommand
         IEnumerable<IGrouping<string?, Option>> optionGroups = command.Options
             .Where(o => !o.Hidden && o is not HelpOption)
             .GroupBy(o => (command as FuncCliCommand)?.GetOptionHelpHeading(o))
-            .OrderBy(group => group.Key is not null);
+            .OrderBy(group => group.Key is not null)
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase);
         foreach (IGrouping<string?, Option> group in optionGroups)
         {
             WriteOptionsSection(group.Key ?? "Options", group);
