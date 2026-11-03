@@ -35,6 +35,18 @@ internal sealed partial class CliUpdater(
         string installDir = Path.GetDirectoryName(binaryPath)!;
         using IDisposable updateLock = _updateLockProvider.Acquire(installDir);
 
+        // Load process-launch dependencies while the original single-file bundle is still available.
+        ProcessOutcome preflight = await _processRunner.RunAsync(
+            new ProcessRunRequest(binaryPath, ["--version"], installDir, TimeSpan.FromSeconds(30)),
+            cancellationToken);
+        if (preflight.ExitCode is not 0)
+        {
+            throw new GracefulException(
+                "Could not run the current func executable before updating. " +
+                "Check that 'func --version' runs successfully and try again.",
+                isUserError: true);
+        }
+
         // Stage the download on the same volume as the install directory so
         // File.Move never crosses volume boundaries.
         using TempDirectory tempWorkDir = _fileSystem.CreateTempDirectory(installDir);
@@ -77,9 +89,6 @@ internal sealed partial class CliUpdater(
             Log.UpdatingFiles(_logger, extractedFiles.Count);
             progress?.Report(new UpdateProgress(UpdatePhase.Installing));
 
-            // Rename each existing file to .old, then copy the new one in.
-            // On Windows, renaming running executables and loaded DLLs is allowed
-            // by the NT kernel (the file handle follows the inode, not the name).
             foreach (string extractedPath in extractedFiles)
             {
                 string relativePath = Path.GetRelativePath(extractDir.Path, extractedPath);
@@ -95,6 +104,7 @@ internal sealed partial class CliUpdater(
                         isUserError: true);
                 }
 
+                cancellationToken.ThrowIfCancellationRequested();
                 string targetPath = Path.Combine(installDir, relativePath);
                 string backupPath = targetPath + OldFileSuffix;
 

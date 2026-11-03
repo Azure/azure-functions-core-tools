@@ -78,6 +78,15 @@ func
 
 Workloads can add their own subcommands by calling `builder.RegisterCommand(...)` from inside `IWorkload.Configure` (see [building-a-workload.md](building-a-workload.md)). Workload commands are described in parser-independent terms via `FuncCommand` / `FuncCommandOption` / `FuncCommandArgument`; the host wraps each one in an internal `ExternalCommand` adapter that translates the descriptors to `System.CommandLine` and tracks the registering workload for diagnostics.
 
+## In-place CLI updates
+
+`func update` first runs the current executable's `--version` through the process
+runner to preload its process-launch dependencies while the original single-file
+bundle is still available. It then downloads and checks the archive's SHA-256
+checksum, extracts it, and replaces the installed files with backup/rollback.
+The installed executable's `--version` verifies the result. Copy failures,
+verification failures, and cancellation during installation trigger rollback.
+
 ## Command Architecture
 
 All commands extend `FuncCliCommand` → `System.CommandLine.Command`.
