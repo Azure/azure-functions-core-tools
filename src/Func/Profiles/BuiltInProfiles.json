@@ -34,7 +34,8 @@
         "python",
         "java",
         "powershell",
-        "dotnet-isolated"
+        "dotnet-isolated",
+        "custom"
       ]
     },
     "linux-premium": {
@@ -65,7 +66,8 @@
         "python",
         "java",
         "powershell",
-        "dotnet-isolated"
+        "dotnet-isolated",
+        "custom"
       ]
     },
     "linux-dedicated": {
@@ -96,7 +98,8 @@
         "python",
         "java",
         "powershell",
-        "dotnet-isolated"
+        "dotnet-isolated",
+        "custom"
       ]
     },
     "windows-premium": {
@@ -123,7 +126,8 @@
         "node",
         "java",
         "powershell",
-        "dotnet-isolated"
+        "dotnet-isolated",
+        "custom"
       ]
     },
     "windows-consumption": {
@@ -150,7 +154,8 @@
         "node",
         "java",
         "powershell",
-        "dotnet-isolated"
+        "dotnet-isolated",
+        "custom"
       ]
     },
     "windows-dedicated": {
@@ -177,7 +182,8 @@
         "node",
         "java",
         "powershell",
-        "dotnet-isolated"
+        "dotnet-isolated",
+        "custom"
       ]
     },
     "linux-consumption": {
@@ -208,7 +214,8 @@
         "python",
         "java",
         "powershell",
-        "dotnet-isolated"
+        "dotnet-isolated",
+        "custom"
       ]
     }
   }

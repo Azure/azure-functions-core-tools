@@ -38,7 +38,7 @@ public class BuiltInProfileSourceTests
         ProfileSourceSnapshot snapshot = await source.LoadAsync(context, CancellationToken.None);
 
         var profile = snapshot.Profiles[profileName];
-        List<string> expectedRuntimes = ["node", "java", "powershell", "dotnet-isolated"];
+        List<string> expectedRuntimes = ["node", "java", "powershell", "dotnet-isolated", "custom"];
         List<string> expectedWorkers = ["node", "java", "powershell"];
         if (supportsPython)
         {

@@ -77,6 +77,10 @@ The bundled catalog covers Azure Functions hosting plans from the
 
 Python is included only in Linux profiles.
 
+`supportedRuntimes` is an admission allow-list, not a list of worker packages to
+install. All built-in profiles include `custom` to allow custom-handler projects;
+there is no `workers.custom` constraint because no separate worker package is needed.
+
 The registry uses a `$schema` URI for self-description and versioning, following the pattern established by Azure Resource Manager templates:
 
 ```json
@@ -96,7 +100,7 @@ The registry uses a `$schema` URI for self-description and versioning, following
       "features": {
         "proxies": false
       },
-      "supportedRuntimes": ["node", "python", "java", "powershell", "dotnet-isolated"],
+      "supportedRuntimes": ["node", "python", "java", "powershell", "dotnet-isolated", "custom"],
       "notes": "Newest host — Flex gets bits first"
     }
   }
