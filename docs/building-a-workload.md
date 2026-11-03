@@ -377,6 +377,8 @@ var packageManager = parseResult.GetValue(PackageManagerOption);
 
 This is how workloads read their own options without the CLI needing to know about them.
 
+`func init` groups stack-specific options under `IProjectInitializer.DisplayName`; `func run` / `func start` uses the matching `IProjectStack.DisplayName`. Stack IDs are matched case-insensitively, with the contributor's stack ID used when no descriptor is registered. Return the canonical options from the registry so shared options remain in the general `Options` section without duplicates. Built-in and bundle options also stay in that general section.
+
 ## Testing
 
 The contract is plain DI, so tests don't need the host:
