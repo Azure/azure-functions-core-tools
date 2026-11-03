@@ -30,7 +30,15 @@ public class VersionCommandTests
 
         exitCode.Should().Be(0);
         _interaction.Lines.Should().ContainSingle();
-        _interaction.Lines[0].Should().Contain("5.0.0");
+        _interaction.Lines[0].Should().Be("5.0.0");
+    }
+
+    [Fact]
+    public void VersionOptionAction_NullVersionCommand_Throws()
+    {
+        Action act = () => new VersionOptionAction(null!);
+
+        act.Should().Throw<ArgumentNullException>().Which.ParamName.Should().Be("versionCommand");
     }
 
     [Fact]
@@ -52,6 +60,8 @@ public class VersionCommandTests
         exitCode.Should().Be(0);
         _interaction.Lines.Should().Contain(l => l.Contains("Azure Functions CLI"));
         _interaction.AllOutput.Should().Contain("Version");
+        _interaction.Lines.Should().Contain("  ROW: [Version, 5.0.0]");
+        _interaction.Lines.Should().Contain("  ROW: [Build, 5.0.0+abc1234]");
         _interaction.AllOutput.Should().Contain("Runtime");
     }
 }

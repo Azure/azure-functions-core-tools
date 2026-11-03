@@ -3,9 +3,11 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests;
 
@@ -64,6 +66,65 @@ public class ParserTests
         ParseResult result = root.Parse(commandName);
 
         result.Errors.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("--version", "5.0.0", "5.0.0+abc1234")]
+    [InlineData("version", "5.0.0", "5.0.0+abc1234")]
+    [InlineData("--version", "5.0.0-preview.5", "5.0.0-preview.5+9807f091f795388682b93efd2539aa6b3953de42")]
+    [InlineData("version", "5.0.0-preview.5", "5.0.0-preview.5+9807f091f795388682b93efd2539aa6b3953de42")]
+    public async Task Parse_VersionInvocation_PrintsExactSemanticVersion(string command, string version, string informationalVersion)
+    {
+        ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
+        provider.Version.Returns(version);
+        provider.InformationalVersion.Returns(informationalVersion);
+        using var services = (ServiceProvider)TestParser.BuildServiceProviderWith(
+            _interaction, services => services.AddSingleton(provider));
+        FuncRootCommand root = Parser.CreateCommand(services);
+        ParseResult result = root.Parse([command]);
+
+        int exit = await result.InvokeAsync();
+
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Equal(version);
+    }
+
+    [Fact]
+    public async Task Parse_RootVerbose_SeparatesVersionAndBuild()
+    {
+        ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
+        provider.Version.Returns("5.0.0-preview.5");
+        provider.InformationalVersion.Returns("5.0.0-preview.5+9807f091f795388682b93efd2539aa6b3953de42");
+        using var services = (ServiceProvider)TestParser.BuildServiceProviderWith(
+            _interaction, services => services.AddSingleton(provider));
+        FuncRootCommand root = Parser.CreateCommand(services);
+        ParseResult result = root.Parse(["--verbose"]);
+
+        int exit = await result.InvokeAsync();
+
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("  ROW: [Version, 5.0.0-preview.5]");
+        _interaction.Lines.Should().Contain("  ROW: [Build, 5.0.0-preview.5+9807f091f795388682b93efd2539aa6b3953de42]");
+    }
+
+    [Theory]
+    [InlineData("--version", "--verbose")]
+    [InlineData("--version", "--unknown")]
+    [InlineData("--version", "setup", "--format")]
+    public async Task Parse_VersionOptionWithOtherTokens_PreservesShortCircuit(params string[] args)
+    {
+        ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
+        provider.Version.Returns("5.0.0-preview.5");
+        using var services = (ServiceProvider)TestParser.BuildServiceProviderWith(
+            _interaction, services => services.AddSingleton(provider));
+        FuncRootCommand root = Parser.CreateCommand(services);
+        ParseResult result = root.Parse(args);
+
+        int exit = await result.InvokeAsync();
+
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Equal("5.0.0-preview.5");
+        root.Options.OfType<VersionOption>().Should().ContainSingle();
     }
 
     // --- Workload command tracking ---

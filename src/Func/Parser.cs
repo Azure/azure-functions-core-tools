@@ -117,6 +117,7 @@ internal static class Parser
         }
 
         ReplaceHelpAction(rootCommand, helpCommand);
+        rootCommand.Options.OfType<VersionOption>().Single().Action = new VersionOptionAction(versionCommand);
         ConfigureRootAction(rootCommand, helpCommand, versionCommand);
 
         return rootCommand;
