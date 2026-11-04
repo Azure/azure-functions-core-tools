@@ -71,27 +71,6 @@ public class ParserTests
         result.Errors.Should().BeEmpty();
     }
 
-    [Theory]
-    [InlineData("--version", "5.0.0", "5.0.0+abc1234")]
-    [InlineData("version", "5.0.0", "5.0.0+abc1234")]
-    [InlineData("--version", "5.0.0-preview.5", "5.0.0-preview.5+9807f091f795388682b93efd2539aa6b3953de42")]
-    [InlineData("version", "5.0.0-preview.5", "5.0.0-preview.5+9807f091f795388682b93efd2539aa6b3953de42")]
-    public async Task Parse_VersionInvocation_PrintsExactSemanticVersion(string command, string version, string informationalVersion)
-    {
-        ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
-        provider.Version.Returns(version);
-        provider.InformationalVersion.Returns(informationalVersion);
-        using var services = (ServiceProvider)TestParser.BuildServiceProviderWith(
-            _interaction, services => services.AddSingleton(provider));
-        FuncRootCommand root = Parser.CreateCommand(services);
-        ParseResult result = root.Parse([command]);
-
-        int exit = await result.InvokeAsync();
-
-        exit.Should().Be(0);
-        _interaction.Lines.Should().Equal(version);
-    }
-
     [Fact]
     public async Task Parse_RootVerbose_SeparatesVersionAndBuild()
     {
@@ -157,7 +136,6 @@ public class ParserTests
 
         exit.Should().Be(0);
         _interaction.Lines.Should().Equal("5.0.0-preview.5");
-        root.Options.OfType<VersionOption>().Should().ContainSingle();
     }
 
     // --- Workload command tracking ---

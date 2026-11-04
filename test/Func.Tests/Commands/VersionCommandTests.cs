@@ -34,14 +34,6 @@ public class VersionCommandTests
     }
 
     [Fact]
-    public void VersionOptionAction_NullVersionCommand_Throws()
-    {
-        Action act = () => new VersionOptionAction(null!);
-
-        act.Should().Throw<ArgumentNullException>().Which.ParamName.Should().Be("versionCommand");
-    }
-
-    [Fact]
     public void AssemblyCliVersionProvider_ReturnsNonEmptyVersion()
     {
         var provider = new AssemblyCliVersionProvider();

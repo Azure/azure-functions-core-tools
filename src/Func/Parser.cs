@@ -117,7 +117,7 @@ internal static class Parser
         }
 
         ReplaceHelpAction(rootCommand, helpCommand);
-        rootCommand.Options.OfType<VersionOption>().Single().Action = new VersionOptionAction(versionCommand);
+        ReplaceVersionAction(rootCommand, versionCommand);
         ConfigureRootAction(rootCommand, helpCommand, versionCommand);
 
         return rootCommand;
@@ -138,6 +138,11 @@ internal static class Parser
                 SetHelpAction(nested, spectreHelp);
             }
         }
+    }
+
+    private static void ReplaceVersionAction(FuncRootCommand rootCommand, VersionCommand versionCommand)
+    {
+        rootCommand.Options.OfType<VersionOption>().Single().Action = new VersionOptionAction(versionCommand);
     }
 
     private static void SetHelpAction(Command command, SpectreHelpAction action)
