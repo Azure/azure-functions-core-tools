@@ -71,6 +71,8 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             RedirectStandardInput = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
             CreateNoWindow = true,
         };
         if (executablePath is null)

@@ -46,11 +46,8 @@ public class VersionProgramTests(ITestOutputHelper output)
                 result.StandardError.Should().BeEmpty();
                 if (detailed)
                 {
-                    string[] lines = result.StandardOutput.Split(Environment.NewLine);
-                    lines.Should().ContainSingle(line => line.Contains("Version", StringComparison.Ordinal))
-                        .Which.Should().Contain(version).And.NotContain("+");
-                    lines.Should().ContainSingle(line => line.Contains("Build", StringComparison.Ordinal))
-                        .Which.Should().Contain(informationalVersion);
+                    ReadVersionTableValue(result.StandardOutput, "Version").Should().Be(version).And.NotContain("+");
+                    ReadVersionTableValue(result.StandardOutput, "Build").Should().Be(informationalVersion);
                 }
                 else
                 {
@@ -69,5 +66,19 @@ public class VersionProgramTests(ITestOutputHelper output)
                 Directory.Delete(directory, recursive: true);
             }
         }
+    }
+
+    private static string ReadVersionTableValue(string output, string property)
+    {
+        var rows = output.Split(Environment.NewLine)
+            .Select(line => line.Split('\u2502'))
+            .Where(cells => cells.Length == 4);
+        rows.Should().ContainSingle(cells => cells[1].Trim() == property);
+
+        // Spectre wraps long values into continuation rows with an empty property cell.
+        return string.Concat(rows
+            .SkipWhile(cells => cells[1].Trim() != property)
+            .TakeWhile(cells => cells[1].Trim() == property || string.IsNullOrWhiteSpace(cells[1]))
+            .Select(cells => cells[2].Trim()));
     }
 }
