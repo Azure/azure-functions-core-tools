@@ -11,6 +11,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         public override ICommandLineParserResult ParseArgs(string[] args)
         {
             Parser
+                .Setup<string>("runtime-version")
+                .WithDescription("Runtime version for Flex BYOC artifacts.")
+                .Callback(_ => { });
+
+            Parser
                 .Setup<bool>("managed-dependencies")
                 .WithDescription("Installs managed dependencies for the PowerShell function app.")
                 .Callback(_ => { });

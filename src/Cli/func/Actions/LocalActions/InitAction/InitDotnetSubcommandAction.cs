@@ -22,6 +22,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 .Callback(_ => { });
 
             Parser
+                .Setup<string>("runtime-version")
+                .WithDescription("Runtime version for Flex BYOC artifacts.")
+                .Callback(_ => { });
+
+            Parser
                 .Setup<bool>("csx")
                 .WithDescription("Use CSX script-style .NET functions.")
                 .Callback(_ => { });
