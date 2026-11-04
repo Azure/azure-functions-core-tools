@@ -58,6 +58,9 @@ public class UnixTerminalTests
         Marshal.OffsetOf<UnixPollDescriptor>(nameof(UnixPollDescriptor.ReturnedEvents)).ToInt32().Should().Be(6);
         Marshal.SizeOf<UnixWindowSize>().Should().Be(8);
         Marshal.OffsetOf<UnixWindowSize>(nameof(UnixWindowSize.Columns)).ToInt32().Should().Be(2);
+        Marshal.SizeOf<MacSignalAction>().Should().Be(16);
+        Marshal.OffsetOf<MacSignalAction>(nameof(MacSignalAction.Mask)).ToInt32().Should().Be(8);
+        Marshal.OffsetOf<MacSignalAction>(nameof(MacSignalAction.Flags)).ToInt32().Should().Be(12);
     }
 
     [Theory]

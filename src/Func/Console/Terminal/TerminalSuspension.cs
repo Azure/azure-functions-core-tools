@@ -20,6 +20,7 @@ internal sealed class UnixTerminalSignals : IDisposable
 {
     private readonly PosixSignalRegistration _suspend;
     private readonly PosixSignalRegistration _resume;
+    private readonly MacChildStopSignalScope? _childStops;
 
     public UnixTerminalSignals(Action suspend, Action resume)
     {
@@ -38,9 +39,15 @@ internal sealed class UnixTerminalSignals : IDisposable
                 context.Cancel = true;
                 resume();
             });
+            if (OperatingSystem.IsMacOS())
+            {
+                // Child-stop notifications can stall Darwin's runtime signal dispatcher before SIGTSTP.
+                _childStops = new MacChildStopSignalScope();
+            }
         }
         catch
         {
+            _resume?.Dispose();
             _suspend.Dispose();
             throw;
         }
@@ -50,5 +57,6 @@ internal sealed class UnixTerminalSignals : IDisposable
     {
         _suspend.Dispose();
         _resume.Dispose();
+        _childStops?.Dispose();
     }
 }
