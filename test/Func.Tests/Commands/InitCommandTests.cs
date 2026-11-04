@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
@@ -43,8 +44,20 @@ public class InitCommandTests
             .Returns([]);
     }
 
-    private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
+    private InitCommand CreateCommand(
+        IEnumerable<IProjectInitializer> initializers,
+        IEnumerable<IContainerArtifactProvider>? containerProviders = null) =>
+        new(
+            _interaction,
+            _hintRenderer,
+            _localSettings,
+            _projectResolver,
+            new ContainerArtifactOrchestrator(
+                containerProviders ?? [],
+                new ContainerArtifactWriter(new PhysicalFileSystem())),
+            _bundleReader,
+            new InstalledBundleScanner(_installedBundles),
+            initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -56,6 +69,260 @@ public class InitCommandTests
         optionNames.Should().Contain("--name");
         optionNames.Should().Contain("--language");
         optionNames.Should().Contain("--force");
+        optionNames.Should().Contain("--docker");
+        optionNames.Should().Contain("--docker-only");
+        optionNames.Should().Contain("--flex-byoc");
+        optionNames.Should().Contain("--runtime-version");
+    }
+
+    [Theory]
+    [InlineData("--docker", "--docker-only", "--docker and --docker-only are mutually exclusive")]
+    [InlineData("--flex-byoc", null, "--flex-byoc requires either --docker or --docker-only")]
+    [InlineData("--docker", "--runtime-version=3.12", "--runtime-version is supported only with --flex-byoc")]
+    public void InitCommand_InvalidContainerOptions_ReportsParseError(string firstOption, string? secondOption, string expectedError)
+    {
+        var command = CreateCommand([]);
+        var root = new RootCommand { command };
+        List<string> args = ["init", firstOption];
+        if (secondOption is not null)
+        {
+            args.Add(secondOption);
+        }
+
+        ParseResult result = root.Parse([.. args]);
+
+        result.Errors.Should().ContainSingle(error => error.Message.Contains(expectedError, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task InitCommand_DockerOnly_SkipsInitializationAndForwardsFlexParameters()
+    {
+        string directory = Directory.CreateTempSubdirectory("func-init-container-").FullName;
+        try
+        {
+            var initializer = new FakeProjectInitializer("python");
+            var project = new StubFunctionsProject("python", "Python", directory);
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(project, "test project"));
+            var provider = new FakeContainerArtifactProvider(
+                project,
+                ContainerArtifactCapability.FlexByoc,
+                [new ContainerArtifact("Dockerfile", "flex")]);
+
+            int exitCode = await RunInitAsync(
+                directory,
+                [initializer],
+                extraArgs: ["--docker-only", "--flex-byoc", "--runtime-version", "3.12"],
+                containerProviders: [provider]);
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeFalse();
+            provider.Requests.Should().ContainSingle();
+            provider.Requests[0].ProjectRoot.Info.FullName.Should().Be(new DirectoryInfo(directory).FullName);
+            provider.Requests[0].Capability.Should().Be(ContainerArtifactCapability.FlexByoc);
+            provider.Requests[0].ProjectInitializationSkipped.Should().BeTrue();
+            provider.Requests[0].Parameters[ContainerArtifactRequest.RuntimeVersionParameterName].Should().Be("3.12");
+            File.ReadAllText(Path.Combine(directory, "Dockerfile")).Should().Be("flex");
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_Docker_InitializesThenGeneratesArtifacts()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-init-container-{Guid.NewGuid():N}");
+        try
+        {
+            var initializer = new FakeProjectInitializer("python");
+            var project = new StubFunctionsProject("python", "Python", directory);
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(project, "test project"));
+            var provider = new FakeContainerArtifactProvider(
+                project,
+                ContainerArtifactCapability.Docker,
+                [new ContainerArtifact("Dockerfile", "docker")]);
+
+            int exitCode = await RunInitAsync(
+                directory,
+                [initializer],
+                stack: "python",
+                extraArgs: ["--docker"],
+                containerProviders: [provider]);
+
+            exitCode.Should().Be(0);
+            initializer.WasInvoked.Should().BeTrue();
+            provider.Requests.Should().ContainSingle();
+            provider.Requests[0].Capability.Should().Be(ContainerArtifactCapability.Docker);
+            provider.Requests[0].ProjectInitializationSkipped.Should().BeFalse();
+            File.ReadAllText(Path.Combine(directory, "Dockerfile")).Should().Be("docker");
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_ContainerProviderSelection_UsesOnlyMatchingProvider()
+    {
+        string directory = Directory.CreateTempSubdirectory("func-init-container-").FullName;
+        try
+        {
+            var project = new StubFunctionsProject("python", "Python", directory);
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(project, "test project"));
+            var nonMatching = new FakeContainerArtifactProvider(
+                project,
+                ContainerArtifactCapability.FlexByoc,
+                [new ContainerArtifact("wrong", "wrong")]);
+            var matching = new FakeContainerArtifactProvider(
+                project,
+                ContainerArtifactCapability.Docker,
+                [new ContainerArtifact("Dockerfile", "selected")]);
+
+            int exitCode = await RunInitAsync(
+                directory,
+                initializers: [],
+                extraArgs: ["--docker-only"],
+                containerProviders: [nonMatching, matching]);
+
+            exitCode.Should().Be(0);
+            nonMatching.Requests.Should().BeEmpty();
+            matching.Requests.Should().ContainSingle();
+            File.ReadAllText(Path.Combine(directory, "Dockerfile")).Should().Be("selected");
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_ContainerArtifactCollision_PreflightsBeforeWriting()
+    {
+        string directory = Directory.CreateTempSubdirectory("func-init-container-").FullName;
+        try
+        {
+            string dockerfile = Path.Combine(directory, "Dockerfile");
+            File.WriteAllText(dockerfile, "existing");
+            var project = new StubFunctionsProject("python", "Python", directory);
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(project, "test project"));
+            var provider = new FakeContainerArtifactProvider(
+                project,
+                ContainerArtifactCapability.Docker,
+                [
+                    new ContainerArtifact("entrypoint.sh", "entrypoint"),
+                    new ContainerArtifact("Dockerfile", "replacement"),
+                ]);
+            InitCommand command = CreateCommand([], [provider]);
+            var root = new RootCommand { command };
+            ParseResult result = root.Parse(["init", directory, "--docker-only"]);
+
+            GracefulException exception = (await FluentActions.Awaiting(
+                () => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            exception.Message.Should().Contain("Dockerfile").And.Contain("--force");
+            File.ReadAllText(dockerfile).Should().Be("existing");
+            File.Exists(Path.Combine(directory, "entrypoint.sh")).Should().BeFalse();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_ContainerArtifactCollision_ForceOverwritesAllArtifacts()
+    {
+        string directory = Directory.CreateTempSubdirectory("func-init-container-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(directory, "Dockerfile"), "existing");
+            var project = new StubFunctionsProject("python", "Python", directory);
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(project, "test project"));
+            var provider = new FakeContainerArtifactProvider(
+                project,
+                ContainerArtifactCapability.Docker,
+                [
+                    new ContainerArtifact("Dockerfile", "replacement"),
+                    new ContainerArtifact("entrypoint.sh", "entrypoint"),
+                ]);
+
+            int exitCode = await RunInitAsync(
+                directory,
+                initializers: [],
+                force: true,
+                extraArgs: ["--docker-only"],
+                containerProviders: [provider]);
+
+            exitCode.Should().Be(0);
+            File.ReadAllText(Path.Combine(directory, "Dockerfile")).Should().Be("replacement");
+            File.ReadAllText(Path.Combine(directory, "entrypoint.sh")).Should().Be("entrypoint");
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_MissingContainerProvider_ThrowsClearError()
+    {
+        string directory = Directory.CreateTempSubdirectory("func-init-container-").FullName;
+        try
+        {
+            var project = new StubFunctionsProject("python", "Python", directory);
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(project, "test project"));
+            InitCommand command = CreateCommand([]);
+            var root = new RootCommand { command };
+            ParseResult result = root.Parse(["init", directory, "--docker-only", "--flex-byoc"]);
+
+            GracefulException exception = (await FluentActions.Awaiting(
+                () => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            exception.Message.Should().Contain("does not provide Flex BYOC container artifacts");
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_DuplicateContainerProviders_ThrowsClearError()
+    {
+        string directory = Directory.CreateTempSubdirectory("func-init-container-").FullName;
+        try
+        {
+            var project = new StubFunctionsProject("python", "Python", directory);
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(project, "test project"));
+            var first = new FakeContainerArtifactProvider(project, ContainerArtifactCapability.Docker, []);
+            var second = new FakeContainerArtifactProvider(project, ContainerArtifactCapability.Docker, []);
+            InitCommand command = CreateCommand([], [first, second]);
+            var root = new RootCommand { command };
+            ParseResult result = root.Parse(["init", directory, "--docker-only"]);
+
+            GracefulException exception = (await FluentActions.Awaiting(
+                () => result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false }))
+                .Should().ThrowAsync<GracefulException>()).Which;
+
+            exception.Message.Should().Contain("Multiple workload providers claim Docker container artifacts");
+            first.Requests.Should().BeEmpty();
+            second.Requests.Should().BeEmpty();
+        }
+        finally
+        {
+            CleanupDirectory(directory);
+        }
     }
 
     [Fact]
@@ -302,9 +569,10 @@ public class InitCommandTests
         string? language = null,
         string? stack = null,
         bool force = false,
-        IReadOnlyList<string>? extraArgs = null)
+        IReadOnlyList<string>? extraArgs = null,
+        IReadOnlyList<IContainerArtifactProvider>? containerProviders = null)
     {
-        var cmd = CreateCommand(initializers);
+        var cmd = CreateCommand(initializers, containerProviders);
         var root = new RootCommand { cmd };
         var args = new List<string> { "init", path };
         if (stack is not null)
@@ -655,7 +923,15 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [dotnet]);
+            var command = new InitCommand(
+                interactive,
+                _hintRenderer,
+                _localSettings,
+                _projectResolver,
+                new ContainerArtifactOrchestrator([], new ContainerArtifactWriter(new PhysicalFileSystem())),
+                _bundleReader,
+                new InstalledBundleScanner(_installedBundles),
+                [dotnet]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
@@ -819,7 +1095,15 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var python = new FakeProjectInitializer("python");
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [python]);
+            var command = new InitCommand(
+                interactive,
+                _hintRenderer,
+                _localSettings,
+                _projectResolver,
+                new ContainerArtifactOrchestrator([], new ContainerArtifactWriter(new PhysicalFileSystem())),
+                _bundleReader,
+                new InstalledBundleScanner(_installedBundles),
+                [python]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync();
@@ -1277,9 +1561,9 @@ public class InitCommandTests
         }
     }
 
-    private sealed class StubFunctionsProject(string stackName, string? language) : FunctionsProject
+    private sealed class StubFunctionsProject(string stackName, string? language, string? directory = null) : FunctionsProject
     {
-        private readonly WorkingDirectory _workingDirectory = WorkingDirectory.FromExplicit(Environment.CurrentDirectory);
+        private readonly WorkingDirectory _workingDirectory = WorkingDirectory.FromExplicit(directory ?? Environment.CurrentDirectory);
         private readonly FunctionsWorkerReference _workerReference = FunctionsWorkerReference.FromWorkload(stackName);
 
         public override WorkingDirectory WorkingDirectory => _workingDirectory;
@@ -1293,6 +1577,24 @@ public class InitCommandTests
         public override bool SupportsExtensionBundles => false;
 
         public override FunctionsWorkerReference WorkerReference => _workerReference;
+    }
+
+    private sealed class FakeContainerArtifactProvider(
+        FunctionsProject project,
+        ContainerArtifactCapability capability,
+        IReadOnlyList<ContainerArtifact> artifacts) : IContainerArtifactProvider
+    {
+        public List<ContainerArtifactRequest> Requests { get; } = [];
+
+        public bool Supports(FunctionsProject candidate, ContainerArtifactCapability requestedCapability)
+            => ReferenceEquals(candidate, project) && requestedCapability == capability;
+
+        public Task<ContainerArtifactResult> GenerateAsync(ContainerArtifactRequest request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Requests.Add(request);
+            return Task.FromResult(new ContainerArtifactResult(artifacts));
+        }
     }
 
     private sealed class FakeProjectInitializer(

@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Bundles;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
@@ -53,10 +54,31 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Description = "Re-initialize the directory: deletes its contents (except .git) before scaffolding the new project."
     };
 
+    public Option<bool> DockerOption { get; } = new("--docker")
+    {
+        Description = "Generate container artifacts after initializing the project."
+    };
+
+    public Option<bool> DockerOnlyOption { get; } = new("--docker-only")
+    {
+        Description = "Generate container artifacts for an existing project without initializing it."
+    };
+
+    public Option<bool> FlexByocOption { get; } = new("--flex-byoc")
+    {
+        Description = "Generate Flex Consumption bring-your-own-container artifacts. Requires --docker or --docker-only."
+    };
+
+    public Option<string?> RuntimeVersionOption { get; } = new("--runtime-version")
+    {
+        Description = "Runtime version passed to the workload's Flex BYOC artifact provider."
+    };
+
     private readonly IInteractionService _interaction;
     private readonly IWorkloadHintRenderer _hintRenderer;
     private readonly ILocalSettingsProvider _localSettingsProvider;
     private readonly IFunctionsProjectResolver _projectResolver;
+    private readonly ContainerArtifactOrchestrator _containerArtifacts;
     private readonly IHostJsonBundleSectionReader _bundleSectionReader;
     private readonly InstalledBundleScanner _bundleScanner;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
@@ -66,6 +88,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IWorkloadHintRenderer hintRenderer,
         ILocalSettingsProvider localSettingsProvider,
         IFunctionsProjectResolver projectResolver,
+        ContainerArtifactOrchestrator containerArtifacts,
         IHostJsonBundleSectionReader bundleSectionReader,
         InstalledBundleScanner bundleScanner,
         IEnumerable<IProjectInitializer> initializers)
@@ -75,6 +98,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         ArgumentNullException.ThrowIfNull(hintRenderer);
         ArgumentNullException.ThrowIfNull(localSettingsProvider);
         ArgumentNullException.ThrowIfNull(projectResolver);
+        ArgumentNullException.ThrowIfNull(containerArtifacts);
         ArgumentNullException.ThrowIfNull(bundleSectionReader);
         ArgumentNullException.ThrowIfNull(bundleScanner);
         ArgumentNullException.ThrowIfNull(initializers);
@@ -83,6 +107,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _hintRenderer = hintRenderer;
         _localSettingsProvider = localSettingsProvider;
         _projectResolver = projectResolver;
+        _containerArtifacts = containerArtifacts;
         _bundleSectionReader = bundleSectionReader;
         _bundleScanner = bundleScanner;
         _initializers = initializers.ToList();
@@ -95,6 +120,35 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(NameOption);
         Options.Add(LanguageOption);
         Options.Add(ForceOption);
+        Options.Add(DockerOption);
+        Options.Add(DockerOnlyOption);
+        Options.Add(FlexByocOption);
+        Options.Add(RuntimeVersionOption);
+
+        Validators.Add(result =>
+        {
+            bool docker = result.GetValue(DockerOption);
+            bool dockerOnly = result.GetValue(DockerOnlyOption);
+            bool flexByoc = result.GetValue(FlexByocOption);
+            bool hasRuntimeVersion = !string.IsNullOrWhiteSpace(result.GetValue(RuntimeVersionOption));
+
+            if (docker && dockerOnly)
+            {
+                result.AddError("--docker and --docker-only are mutually exclusive.");
+                return;
+            }
+
+            if (flexByoc && !docker && !dockerOnly)
+            {
+                result.AddError("--flex-byoc requires either --docker or --docker-only.");
+                return;
+            }
+
+            if (hasRuntimeVersion && !flexByoc)
+            {
+                result.AddError("--runtime-version is supported only with --flex-byoc.");
+            }
+        });
 
         // The registry shares canonical instances across workloads; help uses
         // their ownership to distinguish shared options from stack-specific ones.
@@ -112,6 +166,33 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
     protected override async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
+        bool docker = parseResult.GetValue(DockerOption);
+        bool dockerOnly = parseResult.GetValue(DockerOnlyOption);
+        bool generateContainerArtifacts = docker || dockerOnly;
+        ContainerArtifactCapability capability = parseResult.GetValue(FlexByocOption)
+            ? ContainerArtifactCapability.FlexByoc
+            : ContainerArtifactCapability.Docker;
+        string? runtimeVersion = NullIfWhiteSpace(parseResult.GetValue(RuntimeVersionOption));
+
+        WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
+        if (dockerOnly)
+        {
+            if (!workingDirectory.Exists)
+            {
+                string displayPath = workingDirectory.OriginalPath ?? workingDirectory.Info.FullName;
+                _interaction.WriteError($"The specified project path does not exist: '{displayPath}'.");
+                return 1;
+            }
+
+            return await GenerateContainerArtifactsAsync(
+                workingDirectory,
+                capability,
+                runtimeVersion,
+                parseResult.GetValue(ForceOption),
+                projectInitializationSkipped: true,
+                cancellationToken);
+        }
+
         // Two workloads claiming the same stack is unrecoverable: `--stack`
         // would be ambiguous and auto-select would silently pick whichever
         // DI returned first. Validated lazily here (rather than in the ctor)
@@ -129,7 +210,6 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 "Run `func workload list` to see them, then `func workload uninstall <name>` to remove one.");
         }
 
-        WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
         workingDirectory.CreateIfNotExists();
         bool force = parseResult.GetValue(ForceOption);
         string? language = parseResult.GetValue(LanguageOption);
@@ -310,7 +390,15 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 .Muted("Existing project completed for ")
                 .Code(initializer.Stack)
                 .Muted("."));
-            return 0;
+            return generateContainerArtifacts
+                ? await GenerateContainerArtifactsAsync(
+                    workingDirectory,
+                    capability,
+                    runtimeVersion,
+                    force,
+                    projectInitializationSkipped: false,
+                    cancellationToken)
+                : 0;
         }
 
         WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force);
@@ -324,7 +412,15 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 .Code(initializer.Stack)
                 .Muted("."));
 
-            return 0;
+            return generateContainerArtifacts
+                ? await GenerateContainerArtifactsAsync(
+                    workingDirectory,
+                    capability,
+                    runtimeVersion,
+                    force,
+                    projectInitializationSkipped: false,
+                    cancellationToken)
+                : 0;
         }
 
         var context = new InitContext(
@@ -343,8 +439,63 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
         await WarnIfBundleChannelNotInstalledAsync(workingDirectory.Info, cancellationToken);
 
+        return generateContainerArtifacts
+            ? await GenerateContainerArtifactsAsync(
+                workingDirectory,
+                capability,
+                runtimeVersion,
+                force,
+                projectInitializationSkipped: false,
+                cancellationToken)
+            : 0;
+    }
+
+    private async Task<int> GenerateContainerArtifactsAsync(
+        WorkingDirectory workingDirectory,
+        ContainerArtifactCapability capability,
+        string? runtimeVersion,
+        bool force,
+        bool projectInitializationSkipped,
+        CancellationToken cancellationToken)
+    {
+        ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(
+            new ProjectResolutionContext(workingDirectory),
+            cancellationToken);
+        if (resolution is ProjectResolutionResult.NotResolved notResolved)
+        {
+            _interaction.WriteError(notResolved.Message);
+            return 1;
+        }
+
+        var resolved = (ProjectResolutionResult.Resolved)resolution;
+        Dictionary<string, string?> parameters = new(StringComparer.Ordinal)
+        {
+            [ContainerArtifactRequest.RuntimeVersionParameterName] = runtimeVersion,
+        };
+
+        IReadOnlyList<ContainerArtifact> artifacts;
+        try
+        {
+            artifacts = await _containerArtifacts.GenerateAsync(
+                resolved.Project,
+                capability,
+                projectInitializationSkipped,
+                parameters,
+                force,
+                cancellationToken);
+        }
+        catch (ContainerArtifactGenerationException ex)
+        {
+            throw new GracefulException(ex.Message, ex, isUserError: true);
+        }
+
+        _interaction.WriteSuccess(
+            $"Generated {artifacts.Count} container artifact{(artifacts.Count == 1 ? string.Empty : "s")} for '{resolved.Project.StackDisplayName}'.");
         return 0;
     }
+
+    private static string? NullIfWhiteSpace(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     // A fresh scaffold may pin a preview/experimental bundle channel (via `-c`).
     // Warn when no bundle workload for that channel is installed, pointing at
