@@ -65,10 +65,10 @@ def run(probe, report=None):
         os.setsid()
         fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
-    def wait_for(marker, complete_line=False):
+    def wait_for(marker, complete_line=False, start=0):
         nonlocal transcript
         wanted = re.compile(re.escape(marker.encode()) + (rb"[^\r\n]*\r?\n" if complete_line else b""))
-        while not wanted.search(transcript):
+        while not wanted.search(transcript, start):
             if time.monotonic() >= deadline:
                 raise RuntimeError("Timed out waiting for " + marker)
             if select.select([master], [], [], 0.1)[0]:
@@ -103,18 +103,21 @@ def run(probe, report=None):
 
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 14, 96, 0, 0))
         wait_for("RESIZE_READY")
-        os.killpg(probe_pid, signal.SIGTSTP)
-        wait_for("PTY_STOPPED:")
-        suspended = termios.tcgetattr(slave)
-        mask = termios.ICANON | termios.ECHO | termios.ISIG
-        if suspended[3] & mask != original[3] & mask or suspended[6][termios.VINTR] != original[6][termios.VINTR]:
-            raise RuntimeError("Terminal input was not restored while suspended")
-        if b"\x1b[?1049l" not in transcript:
-            raise RuntimeError("Suspension did not leave the alternate screen")
+        for scope, send in (("process", os.kill), ("group", os.killpg)):
+            print("SIGNAL_SCOPE:" + scope, file=sys.stderr)
+            start = len(transcript)
+            send(probe_pid, signal.SIGTSTP)
+            wait_for("PTY_STOPPED:", start=start)
+            suspended = termios.tcgetattr(slave)
+            mask = termios.ICANON | termios.ECHO | termios.ISIG
+            if suspended[3] & mask != original[3] & mask or suspended[6][termios.VINTR] != original[6][termios.VINTR]:
+                raise RuntimeError(f"Terminal input was not restored during {scope} suspension")
+            if b"\x1b[?1049l" not in transcript[start:]:
+                raise RuntimeError(f"{scope} suspension did not leave the alternate screen")
 
-        os.killpg(probe_pid, signal.SIGCONT)
-        os.write(master, b"c")
-        wait_for("RESUME_READY:True")
+            send(probe_pid, signal.SIGCONT)
+            os.write(master, b"c")
+            wait_for("RESUME_READY:True", start=start)
         os.write(master, b"q")
         wait_for("RESULT ", complete_line=True)
         exit_code = process.wait(timeout=max(1, deadline - time.monotonic()))
