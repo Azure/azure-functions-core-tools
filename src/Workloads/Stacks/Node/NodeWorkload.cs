@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Workloads;
@@ -28,7 +27,7 @@ public sealed class NodeWorkload : Workload
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<NodeProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, NodeQuickstartProvider>();
-        builder.Services.AddSingleton<IContainerArtifactProvider, NodeContainerArtifactProvider>();
         builder.AddProjectFactory(new NodeProjectFactory());
+        builder.AddTemplatePackage("Templates/FlexByoc");
     }
 }

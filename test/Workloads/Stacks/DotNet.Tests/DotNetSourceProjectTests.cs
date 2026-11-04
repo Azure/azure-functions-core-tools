@@ -293,7 +293,11 @@ public class DotNetSourceProjectTests : IDisposable
     }
 
     private DotNetSourceProject CreateProject(string projectFile)
-        => new(WorkingDirectory.FromExplicit(_projectDir.FullName), projectFile, _dotnetCli);
+        => new(
+            WorkingDirectory.FromExplicit(_projectDir.FullName),
+            projectFile,
+            _dotnetCli,
+            Substitute.For<IDotNetProjectMetadataReader>());
 
     private FunctionsProjectHostRunContext CreateHostRunContext(bool skipBuild = false)
         => new(_projectDir, "dotnet", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), skipBuild);

@@ -13,6 +13,7 @@ using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
 
@@ -40,7 +41,7 @@ public class PromptCapabilityConsumerTests
         installed.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
         var command = new InitCommand(service, Substitute.For<IWorkloadHintRenderer>(), localSettings,
             Substitute.For<IFunctionsProjectResolver>(),
-            new ContainerArtifactOrchestrator([], new ContainerArtifactWriter(Substitute.For<IFileSystem>())),
+            new ContainerArtifactOrchestrator(Substitute.For<ITemplaterFactory>(), new TemplateArgumentParser()),
             Substitute.For<IHostJsonBundleSectionReader>(), new InstalledBundleScanner(installed), [initializer]);
         string directory = Path.Combine(Path.GetTempPath(), $"func-5511-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);

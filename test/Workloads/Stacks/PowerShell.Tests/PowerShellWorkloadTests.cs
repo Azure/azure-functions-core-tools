@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -24,7 +23,7 @@ public class PowerShellWorkloadTests
         initializer.Should().BeOfType<PowerShellProjectInitializer>();
         initializer.Stack.Should().Be("powershell");
         initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("PowerShell");
-        provider.GetRequiredService<IContainerArtifactProvider>().Should().BeOfType<PowerShellContainerArtifactProvider>();
+        builder.Received(1).AddTemplatePackage("Templates/FlexByoc");
 
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeOfType<PowerShellProjectStack>();

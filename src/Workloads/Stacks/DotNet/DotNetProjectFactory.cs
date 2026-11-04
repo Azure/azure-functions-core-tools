@@ -11,9 +11,13 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// Recognizes both source directories (containing a project file) and
 /// pre-built output directories (containing host.json, worker.config.json, and .azurefunctions).
 /// </summary>
-internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFunctionsProjectFactory
+internal sealed class DotNetProjectFactory(
+    IDotnetCliRunner dotnetCli,
+    IDotNetProjectMetadataReader projectMetadataReader) : IFunctionsProjectFactory
 {
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
+    private readonly IDotNetProjectMetadataReader _projectMetadataReader =
+        projectMetadataReader ?? throw new ArgumentNullException(nameof(projectMetadataReader));
 
     public Task<ProjectCreationResult> TryCreateProjectAsync(ProjectCreationContext context, CancellationToken cancellationToken)
     {
@@ -39,7 +43,11 @@ internal sealed class DotNetProjectFactory(IDotnetCliRunner dotnetCli) : IFuncti
         if (projectFiles.Count == 1)
         {
             string projectFile = projectFiles[0].FullName;
-            FunctionsProject project = new DotNetSourceProject(context.WorkingDirectory, projectFile, _dotnetCli);
+            FunctionsProject project = new DotNetSourceProject(
+                context.WorkingDirectory,
+                projectFile,
+                _dotnetCli,
+                _projectMetadataReader);
             return Task.FromResult(Created(project, $"found {Path.GetFileName(projectFile)}"));
         }
 

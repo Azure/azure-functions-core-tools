@@ -8,8 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
-    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Node/Workloads.Node.csproj" />
-    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/Python/Workloads.Python.csproj" />
   </ItemGroup>
 
   <Target Name="RecordCliProductOutput" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="ResolveProjectReferences">

@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Workloads;
@@ -32,7 +31,7 @@ public sealed class DotNetWorkload : Workload
         builder.Services.AddSingleton<IProjectInitializer, DotNetProjectInitializer>();
         builder.Services.AddSingleton<IStartHostOptionContributor, DotNetStartOptionContributor>();
         builder.Services.AddSingleton<IQuickstartProvider, DotNetQuickstartProvider>();
-        builder.Services.AddSingleton<IContainerArtifactProvider, DotNetContainerArtifactProvider>();
         builder.AddProjectFactory<DotNetProjectFactory>();
+        builder.AddTemplatePackage("Templates/FlexByoc");
     }
 }

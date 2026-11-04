@@ -8,7 +8,7 @@ if [ -z "$worker_id" ]; then
 fi
 
 request_id="${FUNCTIONS_WORKER_REQUEST_ID:-$(cat /proc/sys/kernel/random/uuid)}"
-exec dotnet {{APPLICATION_DLL}} \
+exec dotnet '/home/site/wwwroot/{{ASSEMBLY_NAME}}.dll' \
     --functions-uri "${FUNCTIONS_WORKER_PROXY_URI:-http://127.0.0.1:50054}" \
     --functions-worker-id "$worker_id" \
     --functions-request-id "$request_id" \

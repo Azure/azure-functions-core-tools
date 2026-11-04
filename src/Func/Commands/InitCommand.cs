@@ -11,6 +11,7 @@ using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 
 namespace Azure.Functions.Cli.Commands;
@@ -69,9 +70,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Description = "Generate Flex Consumption bring-your-own-container artifacts. Requires --docker or --docker-only."
     };
 
-    public Option<string?> RuntimeVersionOption { get; } = new("--runtime-version")
+    public Option<bool> DryRunOption { get; } = new("--dry-run")
     {
-        Description = "Runtime version passed to the workload's Flex BYOC artifact provider."
+        Description = "Preview container artifact changes without writing files. Requires --docker-only."
     };
 
     private readonly IInteractionService _interaction;
@@ -111,6 +112,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _bundleSectionReader = bundleSectionReader;
         _bundleScanner = bundleScanner;
         _initializers = initializers.ToList();
+        TreatUnmatchedTokensAsErrors = false;
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
         LanguageOption.Description = BuildLanguageOptionDescription(_initializers);
@@ -123,14 +125,14 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         Options.Add(DockerOption);
         Options.Add(DockerOnlyOption);
         Options.Add(FlexByocOption);
-        Options.Add(RuntimeVersionOption);
+        Options.Add(DryRunOption);
 
         Validators.Add(result =>
         {
             bool docker = result.GetValue(DockerOption);
             bool dockerOnly = result.GetValue(DockerOnlyOption);
             bool flexByoc = result.GetValue(FlexByocOption);
-            bool hasRuntimeVersion = !string.IsNullOrWhiteSpace(result.GetValue(RuntimeVersionOption));
+            bool dryRun = result.GetValue(DryRunOption);
 
             if (docker && dockerOnly)
             {
@@ -144,9 +146,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 return;
             }
 
-            if (hasRuntimeVersion && !flexByoc)
+            if (dryRun && !dockerOnly)
             {
-                result.AddError("--runtime-version is supported only with --flex-byoc.");
+                result.AddError("--dry-run currently requires --docker-only.");
             }
         });
 
@@ -172,7 +174,14 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         ContainerArtifactCapability capability = parseResult.GetValue(FlexByocOption)
             ? ContainerArtifactCapability.FlexByoc
             : ContainerArtifactCapability.Docker;
-        string? runtimeVersion = NullIfWhiteSpace(parseResult.GetValue(RuntimeVersionOption));
+        IReadOnlyList<string> templateArguments = parseResult.UnmatchedTokens;
+        bool dryRun = parseResult.GetValue(DryRunOption);
+
+        if (!generateContainerArtifacts && templateArguments.Count > 0)
+        {
+            _interaction.WriteError($"Unrecognized argument: {templateArguments[0]}.");
+            return 1;
+        }
 
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
         if (dockerOnly)
@@ -187,9 +196,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return await GenerateContainerArtifactsAsync(
                 workingDirectory,
                 capability,
-                runtimeVersion,
+                templateArguments,
                 parseResult.GetValue(ForceOption),
-                projectInitializationSkipped: true,
+                dryRun,
                 cancellationToken);
         }
 
@@ -362,6 +371,26 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             language = resolved;
         }
 
+        IReadOnlyDictionary<string, string> containerArtifactParameters =
+            new Dictionary<string, string>(StringComparer.Ordinal);
+        if (generateContainerArtifacts)
+        {
+            try
+            {
+                containerArtifactParameters = await _containerArtifacts.ParseArgumentsAsync(
+                    workingDirectory,
+                    initializer.Stack,
+                    language,
+                    capability,
+                    templateArguments,
+                    cancellationToken);
+            }
+            catch (ContainerArtifactGenerationException ex)
+            {
+                throw new GracefulException(ex.Message, ex, isUserError: true);
+            }
+        }
+
         if (force)
         {
             if (!await ConfirmClearDirectoryAsync(workingDirectory.Info, cancellationToken))
@@ -394,9 +423,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 ? await GenerateContainerArtifactsAsync(
                     workingDirectory,
                     capability,
-                    runtimeVersion,
+                    templateArguments,
                     force,
-                    projectInitializationSkipped: false,
+                    dryRun,
                     cancellationToken)
                 : 0;
         }
@@ -416,17 +445,13 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 ? await GenerateContainerArtifactsAsync(
                     workingDirectory,
                     capability,
-                    runtimeVersion,
+                    templateArguments,
                     force,
-                    projectInitializationSkipped: false,
+                    dryRun,
                     cancellationToken)
                 : 0;
         }
 
-        Dictionary<string, string?> containerArtifactParameters = new(StringComparer.Ordinal)
-        {
-            [ContainerArtifactRequest.RuntimeVersionParameterName] = runtimeVersion,
-        };
         var context = new InitContext(
             WorkingDirectory: workingDirectory,
             ProjectName: parseResult.GetValue(NameOption),
@@ -434,7 +459,10 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             Force: force)
         {
             RequestedContainerArtifactCapability = generateContainerArtifacts ? capability : null,
-            ContainerArtifactParameters = containerArtifactParameters,
+            ContainerArtifactParameters = containerArtifactParameters.ToDictionary(
+                item => item.Key,
+                item => (string?)item.Value,
+                StringComparer.Ordinal),
         };
 
         await initializer.InitializeAsync(context, parseResult, cancellationToken);
@@ -451,9 +479,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             ? await GenerateContainerArtifactsAsync(
                 workingDirectory,
                 capability,
-                runtimeVersion,
+                templateArguments,
                 force,
-                projectInitializationSkipped: false,
+                dryRun,
                 cancellationToken)
             : 0;
     }
@@ -461,9 +489,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private async Task<int> GenerateContainerArtifactsAsync(
         WorkingDirectory workingDirectory,
         ContainerArtifactCapability capability,
-        string? runtimeVersion,
+        IReadOnlyList<string> templateArguments,
         bool force,
-        bool projectInitializationSkipped,
+        bool dryRun,
         CancellationToken cancellationToken)
     {
         ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(
@@ -476,20 +504,15 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         var resolved = (ProjectResolutionResult.Resolved)resolution;
-        Dictionary<string, string?> parameters = new(StringComparer.Ordinal)
-        {
-            [ContainerArtifactRequest.RuntimeVersionParameterName] = runtimeVersion,
-        };
-
-        IReadOnlyList<ContainerArtifact> artifacts;
+        TemplateInvocationResult result;
         try
         {
-            artifacts = await _containerArtifacts.GenerateAsync(
+            result = await _containerArtifacts.GenerateAsync(
                 resolved.Project,
                 capability,
-                projectInitializationSkipped,
-                parameters,
+                templateArguments,
                 force,
+                dryRun,
                 cancellationToken);
         }
         catch (ContainerArtifactGenerationException ex)
@@ -497,13 +520,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             throw new GracefulException(ex.Message, ex, isUserError: true);
         }
 
+        string verb = dryRun ? "Would generate" : "Generated";
         _interaction.WriteSuccess(
-            $"Generated {artifacts.Count} container artifact{(artifacts.Count == 1 ? string.Empty : "s")} for '{resolved.Project.StackDisplayName}'.");
+            $"{verb} {result.FileChanges.Count} container artifact{(result.FileChanges.Count == 1 ? string.Empty : "s")} " +
+            $"for '{resolved.Project.StackDisplayName}'.");
         return 0;
     }
-
-    private static string? NullIfWhiteSpace(string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     // A fresh scaffold may pin a preview/experimental bundle channel (via `-c`).
     // Warn when no bundle workload for that channel is installed, pointing at

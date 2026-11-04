@@ -73,7 +73,7 @@ internal sealed class DotNetProjectInitializer(
 
         string framework = ResolveFramework(context, parseResult);
         IReadOnlyList<string> supportedFrameworks = context.RequestedContainerArtifactCapability == ContainerArtifactCapability.FlexByoc
-            ? DotNetContainerArtifactProvider.SupportedRuntimeVersions.Select(version => $"net{version}.0").ToList()
+            ? [framework]
             : SupportedFrameworks;
         if (!supportedFrameworks.Contains(framework, StringComparer.OrdinalIgnoreCase))
         {
@@ -137,16 +137,8 @@ internal sealed class DotNetProjectInitializer(
             return framework;
         }
 
-        string? requestedVersion = context.ContainerArtifactParameters.GetValueOrDefault(ContainerArtifactRequest.RuntimeVersionParameterName);
-        string runtimeVersion;
-        try
-        {
-            runtimeVersion = DotNetContainerArtifactProvider.ResolveRuntimeVersion(requestedVersion);
-        }
-        catch (ContainerArtifactProviderException ex)
-        {
-            throw new GracefulException(ex.Message, ex, isUserError: true);
-        }
+        string runtimeVersion = context.ContainerArtifactParameters.GetValueOrDefault("RuntimeVersion")
+            ?? throw new InvalidOperationException("The selected Flex BYOC template did not provide its RuntimeVersion value.");
 
         string expectedFramework = $"net{runtimeVersion}.0";
         bool frameworkSpecified = parseResult.GetResult(FrameworkOption) is { Tokens.Count: > 0 };
