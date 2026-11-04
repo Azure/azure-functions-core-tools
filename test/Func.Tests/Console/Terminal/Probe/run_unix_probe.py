@@ -23,7 +23,7 @@ def command_for(probe):
     return ["dotnet", probe] if probe.endswith(".dll") else [probe]
 
 
-def session_child(probe):
+def session_child(probe, release_fd):
     # The supervisor keeps the probe group non-orphaned so SIGTSTP really stops it.
     print("INHERITED_SIGTSTP:" + str(signal.getsignal(signal.SIGTSTP)), flush=True)
     signal.signal(signal.SIGTTOU, signal.SIG_IGN)
@@ -47,9 +47,16 @@ def session_child(probe):
         if os.WIFSTOPPED(status):
             print("PTY_STOPPED:" + str(os.WSTOPSIG(status)), flush=True)
         elif os.WIFEXITED(status):
-            return os.WEXITSTATUS(status)
+            exit_code = os.WEXITSTATUS(status)
+            break
         elif os.WIFSIGNALED(status):
-            return 128 + os.WTERMSIG(status)
+            exit_code = 128 + os.WTERMSIG(status)
+            break
+    # Darwin invalidates the slave when its session leader exits.
+    print("PROBE_EXIT:" + str(exit_code), flush=True)
+    os.read(release_fd, 1)
+    os.close(release_fd)
+    return exit_code
 
 
 def run(probe, report=None):
@@ -59,6 +66,7 @@ def run(probe, report=None):
     transcript = bytearray()
     process = None
     probe_pid = None
+    release_read, release_write = os.pipe()
     deadline = time.monotonic() + 60
 
     def new_session():
@@ -81,14 +89,19 @@ def run(probe, report=None):
                 if not data:
                     raise RuntimeError("PTY reached EOF before " + marker)
                 transcript.extend(data)
+                if b"PROBE_EXIT:" in transcript and not wanted.search(transcript, start):
+                    raise RuntimeError("Probe exited before " + marker)
             elif process.poll() is not None:
                 raise RuntimeError("Supervisor exited before " + marker)
 
     try:
         process = subprocess.Popen(
-            [sys.executable, os.path.abspath(__file__), "--session-child", probe],
-            stdin=slave, stdout=slave, stderr=slave, preexec_fn=new_session,
+            [sys.executable, os.path.abspath(__file__), "--session-child", probe,
+             "--release-fd", str(release_read)],
+            stdin=slave, stdout=slave, stderr=slave, preexec_fn=new_session, pass_fds=(release_read,),
         )
+        os.close(release_read)
+        release_read = None
         wait_for("PROBE_PID:", complete_line=True)
         probe_pid = int(re.search(rb"PROBE_PID:(\d+)", transcript).group(1))
         wait_for("SIGNAL_READY")
@@ -120,8 +133,12 @@ def run(probe, report=None):
             wait_for("RESUME_READY:True", start=start)
         os.write(master, b"q")
         wait_for("RESULT ", complete_line=True)
-        exit_code = process.wait(timeout=max(1, deadline - time.monotonic()))
+        wait_for("PROBE_EXIT:", complete_line=True)
         restored = termios.tcgetattr(slave) == original
+        os.write(release_write, b"1")
+        os.close(release_write)
+        release_write = None
+        exit_code = process.wait(timeout=max(1, deadline - time.monotonic()))
         result_line = transcript.decode(errors="replace").split("RESULT ")[-1].splitlines()[0]
         if exit_code != 0 or not restored or "False" in result_line:
             raise RuntimeError(f"Native qualification failed: exit={exit_code} restored={restored} {result_line}")
@@ -145,7 +162,7 @@ def run(probe, report=None):
         }
         write_report(result, report)
         return 0
-    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+    except (OSError, RuntimeError, subprocess.TimeoutExpired, termios.error) as error:
         print(str(error), file=sys.stderr)
         print(transcript.decode(errors="replace"), file=sys.stderr)
         write_report({
@@ -164,6 +181,9 @@ def run(probe, report=None):
             process.wait()
         os.close(master)
         os.close(slave)
+        for descriptor in (release_read, release_write):
+            if descriptor is not None:
+                os.close(descriptor)
 
 
 def write_report(result, path):
@@ -204,9 +224,12 @@ if __name__ == "__main__":
     parser.add_argument("--build", action="store_true", help="Build the CLI and native probe from this checkout first")
     parser.add_argument("--report", help="Write a machine-readable qualification result to this file")
     parser.add_argument("--session-child", metavar="PROBE", help=argparse.SUPPRESS)
+    parser.add_argument("--release-fd", type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.session_child:
-        sys.exit(session_child(args.session_child))
+        if args.release_fd is None:
+            parser.error("--session-child requires a private release pipe")
+        sys.exit(session_child(args.session_child, args.release_fd))
     if args.build:
         args.probe = build_probe()
     if not args.probe:

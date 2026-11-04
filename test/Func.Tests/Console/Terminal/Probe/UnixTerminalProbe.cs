@@ -71,6 +71,7 @@ internal sealed partial class UnixTerminalProbe
             });
             UnixTerminalNative native = new(OperatingSystem.IsMacOS());
             byte[] original = native.GetAttributes();
+            MacSignalAction? originalChildAction = OperatingSystem.IsMacOS() ? ReadChildSignalAction() : null;
             bool wheel = false;
             bool down = false;
             bool move = false;
@@ -81,12 +82,12 @@ internal sealed partial class UnixTerminalProbe
             bool resized = false;
             bool resumed = false;
             bool readyReported = false;
+            bool childSafe = false;
+            bool childExited = false;
             byte[] active;
             TerminalSessionFactory factory = new(new UnixPlatform());
             await using (ITerminalSession terminal = factory.Open(console))
             {
-                using var suspensionObserver = PosixSignalRegistration.Create(PosixSignal.SIGTSTP, _ =>
-                    System.Console.Error.WriteLine("TSTP_CALLBACK_RECEIVED"));
                 active = native.GetAttributes();
                 TerminalSize size = terminal.Size;
                 terminal.Render(new Text(string.Join("\n",
@@ -110,10 +111,6 @@ internal sealed partial class UnixTerminalProbe
                     if (input.Kind == TerminalInputKind.Resize && terminal.Size == new TerminalSize(96, 14))
                     {
                         resized = true;
-                        ThreadPool.GetMaxThreads(out int maximum, out _);
-                        ThreadPool.GetMinThreads(out int minimum, out _);
-                        terminal.WriteControl($"\r\nTHREADPOOL minimum={minimum} maximum={maximum}"
-                            + $" threads={ThreadPool.ThreadCount} pending={ThreadPool.PendingWorkItemCount}\r\n");
                         terminal.WriteControl("\r\nRESIZE_READY\r\n");
                     }
 
@@ -128,18 +125,25 @@ internal sealed partial class UnixTerminalProbe
                         break;
                     }
                 }
+
+                await child.StandardInput.WriteLineAsync("report".AsMemory(), deadline.Token);
+                await child.StandardInput.FlushAsync(deadline.Token);
+                childSafe = await child.StandardOutput.ReadLineAsync(deadline.Token) == "SIGNALS:0";
+                child.StandardInput.Close();
+                await child.WaitForExitAsync(deadline.Token);
+                childExited = child.ExitCode == 0;
             }
 
             bool restored = native.GetAttributes().SequenceEqual(original);
-            await child.StandardInput.WriteLineAsync("report".AsMemory(), deadline.Token);
-            await child.StandardInput.FlushAsync(deadline.Token);
-            bool childSafe = await child.StandardOutput.ReadLineAsync(deadline.Token) == "SIGNALS:0";
+            bool childSignalRestored = !originalChildAction.HasValue
+                || ReadChildSignalAction().Equals(originalChildAction.Value);
             bool parentSafe = Volatile.Read(ref signals) == 0;
             System.Console.WriteLine($"RESULT wheel={wheel} down={down} move={move} up={up} ctrlc={controlC}"
                 + $" unicode={unicode} paste={paste} resized={resized} resumed={resumed}"
-                + $" restored={restored} parentSafe={parentSafe} childSafe={childSafe}");
+                + $" restored={restored} parentSafe={parentSafe} childSafe={childSafe}"
+                + $" childExited={childExited} childSignalRestored={childSignalRestored}");
             return wheel && down && move && up && controlC && unicode && paste && resized
-                && resumed && restored && parentSafe && childSafe ? 0 : 11;
+                && resumed && restored && parentSafe && childSafe && childExited && childSignalRestored ? 0 : 11;
         }
         finally
         {
@@ -207,6 +211,19 @@ internal sealed partial class UnixTerminalProbe
 
     [LibraryImport("libc", EntryPoint = "tcgetpgrp")]
     private static partial int GetForegroundGroup(int descriptor);
+
+    private static MacSignalAction ReadChildSignalAction()
+    {
+        if (GetSignalAction(20, 0, out MacSignalAction action) != 0)
+        {
+            throw new IOException($"Could not inspect child-signal configuration (errno {Marshal.GetLastPInvokeError()}).");
+        }
+
+        return action;
+    }
+
+    [LibraryImport("libc", EntryPoint = "sigaction", SetLastError = true)]
+    private static partial int GetSignalAction(int signal, nint action, out MacSignalAction previous);
 
     private sealed class UnixPlatform : IPlatform
     {
