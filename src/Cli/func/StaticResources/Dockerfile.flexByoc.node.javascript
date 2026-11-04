@@ -3,7 +3,7 @@
 # FROM <node-worker-source> AS worker-source
 
 # === BYOC: BUILD STAGE ===
-FROM node:20-bookworm-slim AS build
+FROM {{BUILD_IMAGE}} AS build
 WORKDIR /src
 
 # === BYOC: BUILD PACKAGES - customer customization ===
@@ -14,7 +14,7 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 # === BYOC: RUNTIME STAGE ===
-FROM node:20-bookworm-slim AS runtime
+FROM {{RUNTIME_IMAGE}} AS runtime
 WORKDIR /home/site/wwwroot
 
 # === BYOC: RUNTIME PACKAGES - customer customization ===

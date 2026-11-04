@@ -1,37 +1,34 @@
-# === BYOC: WORKER SOURCE - open question ===
-# The source and packaging contract for the Node.js worker is not yet defined.
-# FROM <node-worker-source> AS worker-source
-
 # === BYOC: BUILD STAGE ===
-FROM node:18-bookworm-slim AS build
+FROM {{BUILD_IMAGE}} AS build
 WORKDIR /src
 
 # === BYOC: BUILD PACKAGES - customer customization ===
 # Add build-only tools here.
 
 # === BYOC: BUILD PROJECT ===
-COPY package*.json ./
-RUN npm install
 COPY . ./
-RUN npm run build \
-    && npm prune --omit=dev
+RUN dotnet publish {{PROJECT_FILE}} \
+    --configuration Release \
+    --runtime linux-x64 \
+    --self-contained false \
+    --output /publish \
+    && rm -f /publish/worker.config.json /publish/functions.metadata
 
 # === BYOC: RUNTIME STAGE ===
-FROM node:18-bookworm-slim AS runtime
+FROM {{RUNTIME_IMAGE}} AS runtime
 WORKDIR /home/site/wwwroot
 
 # === BYOC: RUNTIME PACKAGES - customer customization ===
 # Add native runtime dependencies here.
 
 # === BYOC: COPY APPLICATION ===
-COPY --from=build /src/ ./
-# COPY --from=worker-source <node-worker-path> /azure-functions-worker
+COPY --from=build /publish/ ./
 
 # === BYOC: PERMISSIONS - customer customization ===
-RUN chown -R node:node /home/site/wwwroot
+# Configure writable directories before switching users.
 
 # === BYOC: STARTUP SCRIPT ===
 COPY entrypoint.sh /usr/local/bin/byoc-entrypoint
 RUN chmod 755 /usr/local/bin/byoc-entrypoint
-USER node
+USER $APP_UID
 ENTRYPOINT ["/usr/local/bin/byoc-entrypoint"]

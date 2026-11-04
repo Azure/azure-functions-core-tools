@@ -34,9 +34,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             string runtimeVersion,
             string language)
         {
-            var artifactNames = ResolveArtifactNames(workerRuntime, runtimeVersion, language);
+            string normalizedVersion = ResolveRuntimeVersion(workerRuntime, runtimeVersion);
+            var artifactNames = ResolveArtifactNames(workerRuntime, normalizedVersion, language);
+            string dockerfile = await LoadRequiredArtifactAsync(artifactNames.Dockerfile);
+
             return new FlexByocTemplateArtifacts(
-                await LoadRequiredArtifactAsync(artifactNames.Dockerfile),
+                ResolveDockerfileImages(dockerfile, workerRuntime, normalizedVersion),
                 await LoadRequiredArtifactAsync(artifactNames.Entrypoint),
                 await LoadRequiredArtifactAsync(artifactNames.DockerIgnore));
         }
@@ -74,15 +77,15 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             string runtimeVersion,
             string language)
         {
-            string normalizedVersion = ResolveRuntimeVersion(workerRuntime, runtimeVersion);
+            _ = ResolveRuntimeVersion(workerRuntime, runtimeVersion);
 
             string templateName = workerRuntime switch
             {
-                WorkerRuntime.DotnetIsolated => $"dotnetIsolated.{normalizedVersion}",
-                WorkerRuntime.Node => $"node.{NormalizeNodeLanguage(language)}.{normalizedVersion}",
-                WorkerRuntime.Python => $"python.{normalizedVersion}",
-                WorkerRuntime.Java => $"java.{normalizedVersion}",
-                WorkerRuntime.Powershell => $"powershell.{normalizedVersion}",
+                WorkerRuntime.DotnetIsolated => "dotnetIsolated",
+                WorkerRuntime.Node => $"node.{NormalizeNodeLanguage(language)}",
+                WorkerRuntime.Python => "python",
+                WorkerRuntime.Java => "java",
+                WorkerRuntime.Powershell => "powershell",
                 _ => throw new InvalidOperationException(),
             };
 
@@ -100,6 +103,44 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 $"Dockerfile.flexByoc.{templateName}",
                 $"entrypoint.flexByoc.{entrypointName}",
                 "dockerignore.flexByoc");
+        }
+
+        private static string ResolveDockerfileImages(
+            string dockerfile,
+            WorkerRuntime workerRuntime,
+            string runtimeVersion)
+        {
+            FlexByocDockerImages images = workerRuntime switch
+            {
+                WorkerRuntime.DotnetIsolated => new(
+                    $"mcr.microsoft.com/dotnet/sdk:{runtimeVersion}.0-noble",
+                    $"mcr.microsoft.com/dotnet/aspnet:{runtimeVersion}.0-noble"),
+                WorkerRuntime.Node => new(
+                    $"node:{runtimeVersion}-bookworm-slim",
+                    $"node:{runtimeVersion}-bookworm-slim"),
+                WorkerRuntime.Python => new(
+                    $"python:{runtimeVersion}-slim-bookworm",
+                    $"python:{runtimeVersion}-slim-bookworm"),
+                WorkerRuntime.Java => new(
+                    $"maven:3.9-eclipse-temurin-{runtimeVersion}",
+                    $"mcr.microsoft.com/openjdk/jdk:{runtimeVersion}-ubuntu"),
+                WorkerRuntime.Powershell => new(
+                    string.Empty,
+                    ResolvePowerShellRuntimeImage(runtimeVersion)),
+                _ => throw new InvalidOperationException(),
+            };
+
+            return dockerfile
+                .Replace("{{BUILD_IMAGE}}", images.BuildImage)
+                .Replace("{{RUNTIME_IMAGE}}", images.RuntimeImage)
+                .Replace("{{RUNTIME_VERSION}}", runtimeVersion);
+        }
+
+        private static string ResolvePowerShellRuntimeImage(string runtimeVersion)
+        {
+            return runtimeVersion == "7.6"
+                ? "mcr.microsoft.com/powershell:preview-7.6-ubuntu-24.04"
+                : $"mcr.microsoft.com/powershell:{runtimeVersion}-ubuntu-22.04";
         }
 
         private static string NormalizeRuntimeVersion(WorkerRuntime workerRuntime, string runtimeVersion)
@@ -163,5 +204,9 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             string Dockerfile,
             string Entrypoint,
             string DockerIgnore);
+
+        private sealed record FlexByocDockerImages(
+            string BuildImage,
+            string RuntimeImage);
     }
 }

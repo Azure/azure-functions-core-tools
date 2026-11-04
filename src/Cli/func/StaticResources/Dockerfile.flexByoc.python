@@ -3,7 +3,7 @@
 # FROM <python-worker-source> AS worker-source
 
 # === BYOC: BUILD STAGE ===
-FROM python:3.15-slim-bookworm AS build
+FROM {{BUILD_IMAGE}} AS build
 WORKDIR /src
 
 # === BYOC: BUILD PACKAGES - customer customization ===
@@ -18,8 +18,8 @@ RUN pip install \
     --requirement requirements.txt
 
 # === BYOC: RUNTIME STAGE ===
-FROM python:3.15-slim-bookworm AS runtime
-ENV FUNCTIONS_WORKER_RUNTIME_VERSION=3.15
+FROM {{RUNTIME_IMAGE}} AS runtime
+ENV FUNCTIONS_WORKER_RUNTIME_VERSION={{RUNTIME_VERSION}}
 WORKDIR /home/site/wwwroot
 
 # === BYOC: RUNTIME PACKAGES - customer customization ===

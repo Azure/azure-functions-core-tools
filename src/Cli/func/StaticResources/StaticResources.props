@@ -37,89 +37,35 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.dotnet11IsolatedChiseled">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet11IsolatedChiseled</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated.8">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated.8</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated.9">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated.9</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated.10">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated.10</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated.11">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated.11</LogicalName>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.dotnetIsolated">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.dotnetIsolated</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.dotnetIsolated">
       <LogicalName>$(AssemblyName).entrypoint.flexByoc.dotnetIsolated</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.11">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.11</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.12">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.12</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.13">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.13</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.14">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.14</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python.3.15">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python.3.15</LogicalName>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.python">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.python</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.python">
       <LogicalName>$(AssemblyName).entrypoint.flexByoc.python</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.18">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.18</LogicalName>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.20">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.20</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.22">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.22</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.24">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.24</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.javascript.26">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.javascript.26</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.18">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.18</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.20">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.20</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.22">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.22</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.24">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.24</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript.26">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript.26</LogicalName>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.node.typescript">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.node.typescript</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.node">
       <LogicalName>$(AssemblyName).entrypoint.flexByoc.node</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.powershell.7.2">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.powershell.7.2</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.powershell.7.4">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.powershell.7.4</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.powershell.7.6">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.powershell.7.6</LogicalName>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.powershell">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.powershell</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.powershell">
       <LogicalName>$(AssemblyName).entrypoint.flexByoc.powershell</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.java.21">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.java.21</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.java.25">
-      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.java.25</LogicalName>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.flexByoc.java">
+      <LogicalName>$(AssemblyName).Dockerfile.flexByoc.java</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)entrypoint.flexByoc.java">
       <LogicalName>$(AssemblyName).entrypoint.flexByoc.java</LogicalName>

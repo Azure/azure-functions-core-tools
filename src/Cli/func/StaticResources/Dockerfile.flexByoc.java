@@ -1,34 +1,35 @@
 # === BYOC: WORKER SOURCE - open question ===
-# The source and packaging contract for the Python worker is not yet defined.
-# FROM <python-worker-source> AS worker-source
+# The source and packaging contract for the Java worker is not yet defined.
+# FROM <java-worker-source> AS worker-source
 
 # === BYOC: BUILD STAGE ===
-FROM python:3.11-slim-bookworm AS build
+FROM {{BUILD_IMAGE}} AS build
 WORKDIR /src
 
 # === BYOC: BUILD PACKAGES - customer customization ===
 # Add build-only tools here.
 
 # === BYOC: BUILD PROJECT ===
-COPY requirements.txt ./
-RUN pip install \
-    --disable-pip-version-check \
-    --no-cache-dir \
-    --target /python-packages/lib/site-packages \
-    --requirement requirements.txt
+COPY pom.xml ./
+RUN mvn dependency:go-offline
+COPY . ./
+RUN mvn clean package \
+    && mkdir -p /publish \
+    && cd target/azure-functions \
+    && function_app="$(find . -mindepth 1 -maxdepth 1 -type d | head -n 1)" \
+    && test -n "$function_app" \
+    && cp -a "$function_app"/. /publish/
 
 # === BYOC: RUNTIME STAGE ===
-FROM python:3.11-slim-bookworm AS runtime
-ENV FUNCTIONS_WORKER_RUNTIME_VERSION=3.11
+FROM {{RUNTIME_IMAGE}} AS runtime
 WORKDIR /home/site/wwwroot
 
 # === BYOC: RUNTIME PACKAGES - customer customization ===
 # Add native runtime dependencies here.
 
 # === BYOC: COPY APPLICATION ===
-COPY . ./
-COPY --from=build /python-packages/ ./.python_packages/
-# COPY --from=worker-source <python-worker-path> /azure-functions-worker
+COPY --from=build /publish/ ./
+# COPY --from=worker-source <java-worker-path> /azure-functions-worker
 
 # === BYOC: PERMISSIONS - customer customization ===
 RUN groupadd --gid 1000 app \

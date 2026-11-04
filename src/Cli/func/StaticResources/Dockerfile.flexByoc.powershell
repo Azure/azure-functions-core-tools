@@ -3,8 +3,8 @@
 # FROM <powershell-worker-source> AS worker-source
 
 # === BYOC: RUNTIME STAGE ===
-FROM mcr.microsoft.com/powershell:7.4-ubuntu-22.04 AS runtime
-ENV FUNCTIONS_WORKER_RUNTIME_VERSION=7.4
+FROM {{RUNTIME_IMAGE}} AS runtime
+ENV FUNCTIONS_WORKER_RUNTIME_VERSION={{RUNTIME_VERSION}}
 WORKDIR /home/site/wwwroot
 
 # === BYOC: RUNTIME PACKAGES - customer customization ===
