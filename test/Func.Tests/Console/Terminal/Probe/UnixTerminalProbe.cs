@@ -73,6 +73,8 @@ internal sealed partial class UnixTerminalProbe
             TerminalSessionFactory factory = new(new UnixPlatform());
             await using (ITerminalSession terminal = factory.Open(console))
             {
+                using var suspensionObserver = PosixSignalRegistration.Create(PosixSignal.SIGTSTP, _ =>
+                    System.Console.Error.WriteLine("TSTP_CALLBACK_RECEIVED"));
                 active = native.GetAttributes();
                 TerminalSize size = terminal.Size;
                 terminal.Render(new Text(string.Join("\n",

@@ -100,6 +100,15 @@ def run(probe, report=None):
 
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 14, 96, 0, 0))
         wait_for("RESIZE_READY")
+        if platform.system() == "Darwin":
+            diagnostics = subprocess.run(
+                ["ps", "-p", f"{process.pid},{probe_pid}", "-o",
+                 "pid,ppid,pgid,sess,tpgid,jobc,state,sigmask,sigignore,sigcatch,comm"],
+                capture_output=True, text=True, timeout=5, check=False,
+            )
+            print(diagnostics.stdout, end="", file=sys.stderr)
+            if diagnostics.returncode:
+                print(diagnostics.stderr, end="", file=sys.stderr)
         os.killpg(probe_pid, signal.SIGTSTP)
         wait_for("PTY_STOPPED:")
         suspended = termios.tcgetattr(slave)
