@@ -27,14 +27,14 @@ internal class VersionCommand : FuncCliCommand, IBuiltInCommand
     }
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
-        => Task.FromResult(ExecuteBrief());
+        => Task.FromResult(WriteShortVersion());
 
     /// <summary>
-    /// Prints the semantic version without build metadata.
+    /// Writes the semantic version without build metadata or line wrapping.
     /// </summary>
-    internal int ExecuteBrief()
+    internal int WriteShortVersion()
     {
-        _interaction.WriteLine(_versionProvider.Version);
+        _interaction.WriteRawLine(_versionProvider.Version);
         return 0;
     }
 

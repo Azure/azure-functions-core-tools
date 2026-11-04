@@ -2,7 +2,7 @@
 
 #### Changes
 
-- Make `func --version` display the semantic version without commit metadata, matching the Version field in `func --verbose`. Preserve the full build identity separately in the verbose Build field. (#5840)
+- Make `func --version` display the semantic version without commit metadata or line wrapping, matching the Version field in `func --verbose`. Preserve the full build identity separately in the verbose Build field. (#5840)
 
 ## 5.0.0-preview.5
 

@@ -16,5 +16,5 @@ internal sealed class VersionOptionAction(VersionCommand versionCommand) : Synch
     // Preserve the built-in version action's short-circuit behavior for invalid arguments.
     public override bool ClearsParseErrors => true;
 
-    public override int Invoke(ParseResult parseResult) => _versionCommand.ExecuteBrief();
+    public override int Invoke(ParseResult parseResult) => _versionCommand.WriteShortVersion();
 }

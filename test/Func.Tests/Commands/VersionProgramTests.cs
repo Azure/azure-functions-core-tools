@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Hosting.FirstRun;
@@ -46,12 +47,12 @@ public class VersionProgramTests(ITestOutputHelper output)
                 result.StandardError.Should().BeEmpty();
                 if (detailed)
                 {
-                    ReadVersionTableValue(result.StandardOutput, "Version").Should().Be(version).And.NotContain("+");
-                    ReadVersionTableValue(result.StandardOutput, "Build").Should().Be(informationalVersion);
+                    ReadVersionProperty(result.StandardOutput, "Version", "Build").Should().Be(version).And.NotContain("+");
+                    ReadVersionProperty(result.StandardOutput, "Build", "Runtime").Should().Be(informationalVersion);
                 }
                 else
                 {
-                    result.StandardOutput.TrimEnd().Should().Be(version).And.NotContain("+");
+                    result.StandardOutput.Should().Be(version + Environment.NewLine).And.NotContain("+");
                 }
             }
 
@@ -68,17 +69,41 @@ public class VersionProgramTests(ITestOutputHelper output)
         }
     }
 
-    private static string ReadVersionTableValue(string output, string property)
+    [Theory]
+    [InlineData("|", false)]
+    [InlineData("\u2502", false)]
+    [InlineData("\u0393\u00f6\u00e9", true)]
+    public void ReadVersionProperty_ReconstructsExactValuesAcrossWrappedRows(string border, bool unexpectedMetadata)
     {
-        var rows = output.Split(Environment.NewLine)
-            .Select(line => line.Split('\u2502'))
-            .Where(cells => cells.Length == 4);
-        rows.Should().ContainSingle(cells => cells[1].Trim() == property);
+        string version = unexpectedMetadata ? "5.0.0-preview.5+unexpected" : "5.0.0-preview.5";
+        string rendered = string.Join(
+            Environment.NewLine,
+            $"{border} Version {border} {version} {border}",
+            "+-----------------+-----------------+",
+            $"{border} Build {border} 5.0.0-preview.5 {border}",
+            $"{border} {border} +0123456789abcdef0123 {border}",
+            $"{border} {border} 456789abcdef01234567 {border}",
+            $"{border} Runtime {border} .NET 10.0.0 {border}");
 
-        // Spectre wraps long values into continuation rows with an empty property cell.
-        return string.Concat(rows
-            .SkipWhile(cells => cells[1].Trim() != property)
-            .TakeWhile(cells => cells[1].Trim() == property || string.IsNullOrWhiteSpace(cells[1]))
-            .Select(cells => cells[2].Trim()));
+        string actualVersion = ReadVersionProperty(rendered, "Version", "Build");
+        string actualBuild = ReadVersionProperty(rendered, "Build", "Runtime");
+
+        actualVersion.Should().Be(version);
+        actualBuild.Should().Be("5.0.0-preview.5+0123456789abcdef0123456789abcdef01234567");
+    }
+
+    private static string ReadVersionProperty(string output, string property, string nextProperty)
+    {
+        var labels = Regex.Matches(output, $@"(?<=\s){property}(?=\s)");
+        var nextLabels = Regex.Matches(output, $@"(?<=\s){nextProperty}(?=\s)");
+        labels.Count.Should().Be(1);
+        nextLabels.Count.Should().Be(1);
+        int start = labels[0].Index + labels[0].Length;
+        int end = nextLabels[0].Index;
+        end.Should().BeGreaterThan(start);
+
+        // Version values stay ASCII even when redirected table borders decode differently.
+        return string.Concat(Regex.Matches(output[start..end], @"[.+-]*[A-Za-z0-9][A-Za-z0-9.+-]*")
+            .Select(match => match.Value));
     }
 }
