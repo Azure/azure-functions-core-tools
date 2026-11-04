@@ -113,6 +113,70 @@ Tests can be run using:
 dotnet test test/Func.Tests/Func.Tests.csproj
 ```
 
+#### Dashboard and terminal checks
+
+The dashboard model and interaction tests do not require a live terminal:
+
+```powershell
+dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~ConsoleInterruptCoordinatorTests"
+```
+
+With the normal host/project workloads installed, use `func run --demo` from
+an initialized project in a real terminal to qualify mouse scrolling, selection,
+resize, and restoration. The demo replaces the event source, not startup
+prerequisites. Verify Ctrl+C copies selected text without terminating
+the host, then verify Ctrl+C stops it after selection is cleared. Check plain
+and JSON output independently, including redirection.
+
+String-writer tests cannot establish real terminal geometry or native mode
+restoration. Native terminal checks must run on the operating system being
+qualified; cross-publishing an RID is not a native execution test. Include
+Windows Terminal/VS Code, macOS Terminal/iTerm2, Linux terminals, and SSH/tmux
+where support is claimed.
+
+On Windows, opt into the isolated ConPTY qualification (also enabled in the
+public build's Windows terminal job):
+
+```powershell
+$env:FUNC_TERMINAL_NATIVE_TESTS = '1'
+dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~ConPtySmokeTests"
+Remove-Item Env:\FUNC_TERMINAL_NATIVE_TESTS
+```
+
+The probe checks raw keyboard/mouse input, bracketed paste, Unicode, bottom-row
+painting, prompt handoff, and native mode restoration in a test-owned console.
+It does not operate on the developer's interactive terminal or clipboard.
+
+On Linux or macOS, use the pinned .NET SDK and Python 3 (standard library only):
+
+```sh
+python3 test/Func.Tests/Console/Terminal/Probe/run_unix_probe.py --build --report out/tui-native-results.json
+```
+
+This builds the candidate and runs it in a private PTY with a real foreground
+process group. It checks mouse input, Unicode, paste isolation, resize,
+suspend/resume, restored terminal attributes, and that Ctrl+C input does not
+signal either the probe or its child process. The JSON report identifies the
+OS, architecture, kernel, and probe binary hash. Failure exits nonzero and
+retains diagnostic output. It never reads or overwrites the desktop clipboard.
+
+The same probe participates in the opt-in native test suite on Unix:
+
+```sh
+FUNC_TERMINAL_NATIVE_TESTS=1 dotnet test test/Func.Tests/Func.Tests.csproj --filter "FullyQualifiedName~UnixPtySmokeTests"
+```
+
+In addition, manually qualify the actual terminal emulator: select wrapped
+and Unicode log text, copy and paste it into an editor, resize during streaming,
+and verify the host remains running after copying. On macOS, check Terminal.app
+and iTerm2 when available. Automated PTY results do not prove desktop clipboard
+permissions or emulator rendering.
+
+Clipboard unit tests use substitutes. Do not write to a developer's real
+clipboard in unattended tests; use an isolated desktop or explicitly initiated
+manual checks. A successful OSC 52 write means the request was sent, not that
+the terminal accepted it.
+
 #### CLI Process Smoke Tests
 
 `WorkloadProgramSmokeTests` and `SetupProgramAdvisoryTests` run bounded CLI processes with isolated user, workload, cache, and temporary state.

@@ -34,7 +34,9 @@ internal sealed class CompactFooterBuilder(ITheme theme, DashboardRunInfo runInf
         int logScrollOffset,
         bool helpOpen,
         bool functionSearchOpen,
-        bool functionBrowserOpen)
+        bool functionBrowserOpen,
+        string? status = null,
+        bool selectionActive = false)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
@@ -52,20 +54,21 @@ internal sealed class CompactFooterBuilder(ITheme theme, DashboardRunInfo runInf
             : string.Empty;
 
         string logsNavigationLabel = _shortcutLabels.LogsNavigationControlLabel;
+        string quit = functionSearchOpen ? "Ctrl+C quit" : selectionActive ? "q quit" : QuitControlLabel;
         string controls = (helpOpen, functionSearchOpen, functionBrowserOpen, activeFunctionFilter is not null) switch
         {
-            (true, _, _, _) => $"{HelpCloseControlLabel} · {QuitControlLabel}",
-            (_, true, _, _) => "type query · ↑/↓ select · Enter filter · Esc close",
-            (_, _, true, _) => $"↑/↓ navigate · Enter filter · {FunctionFilterToggleControlLabel} · {FunctionBrowserControlLabel}",
-            (_, _, _, true) => $"{logsNavigationLabel} · {FunctionFilterToggleControlLabel} · a all · {HelpControlLabel} · {QuitControlLabel}",
-            _ => $"{logsNavigationLabel} · {FunctionBrowserControlLabel} · {HelpControlLabel} · {QuitControlLabel}",
+            (true, _, _, _) => HelpCloseControlLabel,
+            (_, true, _, _) => "Esc close · type query · ↑/↓ select · Enter filter",
+            (_, _, true, _) => $"Esc close · ↑/↓ navigate · Enter filter · {FunctionFilterToggleControlLabel} · {FunctionBrowserControlLabel}",
+            (_, _, _, true) => $"{HelpControlLabel} · {logsNavigationLabel} · {FunctionFilterToggleControlLabel} · a all",
+            _ => $"{HelpControlLabel} · {logsNavigationLabel} · {FunctionBrowserControlLabel}",
         };
 
         string line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{_runInfo.CliVersion} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}{filter}{errors}{level}{logScroll} │ {controls}");
+            $"{quit} | {status}{filter}{errors}{level}{logScroll} | {controls} | {_runInfo.CliVersion} · {snapshot.Functions.Count} functions · {snapshot.TotalInvocations} invocations · {snapshot.ErrorCount} error{(snapshot.ErrorCount == 1 ? string.Empty : "s")}");
 
-        return new Markup($"[{MutedTag}]{Markup.Escape(line)}[/]");
+        return new Markup($"[{MutedTag}]{LogText.EscapeMarkup(line)}[/]");
     }
 
     private static string FormatMinimumLogLevel(LogLevel minimumLogLevel) => minimumLogLevel switch

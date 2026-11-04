@@ -16,6 +16,21 @@ namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
 public class CompactRendererFunctionBrowserTests
 {
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 24)]
+    public void FullScreenHeader_ShowsFunctionsInsteadOfExpandingOnlyTheBanner(int width, int height)
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        console.Profile.Width = width;
+        console.Profile.Height = height;
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
+
+        writer.ToString().Should().Contain("HttpTrigger1").And.Contain("HttpExtra1");
+    }
+
     [Fact]
     public void BuildHeader_IncludesProfileAndStackMetadata()
     {
@@ -578,7 +593,7 @@ public class CompactRendererFunctionBrowserTests
     }
 
     [Fact]
-    public async Task OnStartAsync_WhenNotMacOS_DoesNotUseAlternateScreen()
+    public async Task OnStartAsync_WhenNotMacOS_UsesAlternateScreen()
     {
         (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: false, ansi: true, alternateBuffer: true);
         await using var rendererLifetime = renderer;
@@ -587,8 +602,8 @@ public class CompactRendererFunctionBrowserTests
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
 
         string output = writer.ToString();
-        output.Should().NotContain("\u001b[?1049h");
-        output.Should().NotContain("\u001b[?1049l");
+        output.Should().Contain("\u001b[?1049h");
+        output.Should().Contain("\u001b[?1049l");
     }
 
     [Fact]
@@ -632,7 +647,8 @@ public class CompactRendererFunctionBrowserTests
         IPlatform platform = Substitute.For<IPlatform>();
         platform.IsMacOS.Returns(isMacOS);
         CompactDashboardShortcutLabels shortcutLabels = new(platform);
-        var renderer = new CompactRenderer(interaction, new FunctionPalette(), shortcutLabels, platform, console, runInfo);
+        var renderer = new CompactRenderer(interaction, new FunctionPalette(), shortcutLabels, console, runInfo,
+            terminal: new TestDashboardTerminal(console));
         return (renderer, console, writer);
     }
 

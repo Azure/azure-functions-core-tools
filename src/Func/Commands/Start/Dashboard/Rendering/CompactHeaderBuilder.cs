@@ -35,10 +35,10 @@ internal sealed class CompactHeaderBuilder(ITheme theme, DashboardRunInfo runInf
 
         bannerTable.AddRow(
             new Markup($"[{WarningTag}]:high_voltage:[/] [{TitleTag}]Azure Functions CLI[/]  " +
-            $"[{MutedTag}]Host:[/] [{EmphasisTag}]{Markup.Escape(host)}[/][{MutedTag}] · " +
-            $"Profile:[/] [{EmphasisTag}]{Markup.Escape(_runInfo.ProfileName)}[/][{MutedTag}] · " +
-            $"Stack:[/] [{EmphasisTag}]{Markup.Escape(_runInfo.StackName)}[/]"),
-            new Markup($"[{HyperlinkTag}]{Markup.Escape(listen)}[/]"));
+            $"[{MutedTag}]Host:[/] [{EmphasisTag}]{LogText.EscapeMarkup(host)}[/][{MutedTag}] · " +
+            $"Profile:[/] [{EmphasisTag}]{LogText.EscapeMarkup(_runInfo.ProfileName)}[/][{MutedTag}] · " +
+            $"Stack:[/] [{EmphasisTag}]{LogText.EscapeMarkup(_runInfo.StackName)}[/]"),
+            new Markup($"[{HyperlinkTag}]{LogText.EscapeMarkup(listen)}[/]"));
 
         return new Panel(bannerTable)
             .Border(BoxBorder.Rounded)

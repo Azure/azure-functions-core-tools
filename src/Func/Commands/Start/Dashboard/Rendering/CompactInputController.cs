@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 
 namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 
@@ -25,6 +26,11 @@ internal sealed class CompactInputController(
     {
         ArgumentNullException.ThrowIfNull(functions);
         ArgumentNullException.ThrowIfNull(state);
+
+        if ((key.Modifiers & (ConsoleModifiers.Control | ConsoleModifiers.Alt)) != 0)
+        {
+            return default;
+        }
 
         if (state.FunctionSearchOpen)
         {
@@ -183,7 +189,8 @@ internal sealed class CompactInputController(
                 return Handled();
 
             case ConsoleKey.Backspace when state.FunctionSearchQuery.Length > 0:
-                state.FunctionSearchQuery = state.FunctionSearchQuery[..^1];
+                int[] boundaries = StringInfo.ParseCombiningCharacters(state.FunctionSearchQuery);
+                state.FunctionSearchQuery = state.FunctionSearchQuery[..boundaries[^1]];
                 state.FunctionSearchSelectedIndex = 0;
                 state.FunctionSearchRowOffset = 0;
                 return Handled();
@@ -191,6 +198,11 @@ internal sealed class CompactInputController(
 
         if (!char.IsControl(key.KeyChar))
         {
+            if (state.FunctionSearchQuery.Length >= 4096)
+            {
+                return new CompactInputResult(true, false, false, "Search text limited to 4096 characters");
+            }
+
             state.FunctionSearchQuery += key.KeyChar;
             state.FunctionSearchSelectedIndex = 0;
             state.FunctionSearchRowOffset = 0;

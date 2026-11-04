@@ -31,6 +31,9 @@ internal sealed class CompactHelpOverlayBuilder(ITheme theme, CompactDashboardSh
         AddHelpRow(table, "t", "Open the function browser.");
         AddHelpRow(table, "/", "Search functions by name, trigger, or route.");
         AddHelpRow(table, "↑/↓", "Scroll logs line by line; in overlays, move selection.");
+        AddHelpRow(table, "Mouse wheel", "Scroll the log pane.");
+        AddHelpRow(table, "Drag", "Select log text; Ctrl+C copies the selection.");
+        AddHelpRow(table, "m", "Release mouse capture and pause the display for native selection.");
         AddHelpRow(table, _shortcutLabels.PageNavigationHelpKey, "Scroll logs; in the function browser, jump through functions.");
         AddHelpRow(table, "Home/End", "Jump to oldest logs / latest logs, or first / last function in the browser.");
         AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");
@@ -41,7 +44,7 @@ internal sealed class CompactHelpOverlayBuilder(ITheme theme, CompactDashboardSh
         AddHelpRow(table, "1/2/3", "Set visible log level: info, warning, or error.");
         AddHelpRow(table, "q", "Stop the host.");
         AddHelpRow(table, "Esc", "Close the active overlay.");
-        AddHelpRow(table, "Ctrl+C", "Stop the host.");
+        AddHelpRow(table, "Ctrl+C", "Copy selected text; otherwise stop the host.");
 
         return new Panel(new Rows(
             new Markup($"[{MutedTag}]Available compact-mode controls[/]"),
