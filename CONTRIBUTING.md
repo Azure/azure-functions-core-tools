@@ -157,7 +157,10 @@ This builds the candidate and runs it in a private PTY with a real foreground
 process group. It checks mouse input, Unicode, paste isolation, resize,
 suspend/resume, restored terminal attributes, and that Ctrl+C input does not
 signal either the probe or its child process. The JSON report identifies the
-OS, architecture, kernel, and probe binary hash. Failure exits nonzero and
+OS, machine and .NET process architectures, runtime version, kernel, and probe
+binary hash. Check the process architecture when qualifying Apple Silicon;
+an x64 .NET SDK under Rosetta does not qualify the ARM64 adapter.
+Failure exits nonzero and
 retains diagnostic output. It never reads or overwrites the desktop clipboard.
 
 The same probe participates in the opt-in native test suite on Unix:

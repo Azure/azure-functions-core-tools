@@ -50,6 +50,7 @@ internal sealed partial class UnixTerminalProbe
                 throw new InvalidOperationException("The signal sentinel did not join the probe's foreground group.");
             }
 
+            System.Console.WriteLine($"RUNTIME {RuntimeInformation.ProcessArchitecture} {Environment.Version}");
             IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
             {
                 Ansi = AnsiSupport.Yes,

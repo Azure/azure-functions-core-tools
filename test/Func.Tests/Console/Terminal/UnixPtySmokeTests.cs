@@ -36,6 +36,8 @@ public class UnixPtySmokeTests
         run.ExitCode.Should().Be(0, run.StandardOutput + run.StandardError);
         run.StandardOutput.Should().Contain("\"status\": \"passed\"")
             .And.Contain("\"terminal_restored\": true")
+            .And.Contain("\"process_architecture\":")
+            .And.Contain("\"dotnet_runtime\":")
             .And.Contain("parentSafe=True childSafe=True");
     }
 

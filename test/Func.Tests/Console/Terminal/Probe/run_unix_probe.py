@@ -112,12 +112,17 @@ def run(probe, report=None):
         result_line = transcript.decode(errors="replace").split("RESULT ")[-1].splitlines()[0]
         if exit_code != 0 or not restored or "False" in result_line:
             raise RuntimeError(f"Native qualification failed: exit={exit_code} restored={restored} {result_line}")
+        runtime = re.search(rb"RUNTIME (\S+) (\S+)\r?\n", transcript)
+        if runtime is None:
+            raise RuntimeError("Probe did not report its process architecture and runtime")
         with open(probe, "rb") as binary:
             probe_hash = hashlib.sha256(binary.read()).hexdigest()
         result = {
             "status": "passed",
             "os": platform.system(),
             "machine": platform.machine(),
+            "process_architecture": runtime.group(1).decode("ascii"),
+            "dotnet_runtime": runtime.group(2).decode("ascii"),
             "kernel": platform.release(),
             "probe": os.path.abspath(probe),
             "probe_sha256": probe_hash,
