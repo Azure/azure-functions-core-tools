@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 #if TERMINAL_NATIVE_PROBE
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -134,7 +135,7 @@ internal sealed partial class UnixTerminalProbe
                 childExited = child.ExitCode == 0;
             }
 
-            bool restored = native.GetAttributes().SequenceEqual(original);
+            bool restored = HasRestoredConfiguration(native.GetAttributes(), original);
             bool childSignalRestored = !originalChildAction.HasValue
                 || ReadChildSignalAction().Equals(originalChildAction.Value);
             bool parentSafe = Volatile.Read(ref signals) == 0;
@@ -220,6 +221,23 @@ internal sealed partial class UnixTerminalProbe
         }
 
         return action;
+    }
+
+    private static bool HasRestoredConfiguration(byte[] actual, byte[] expected)
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            // Darwin sets PENDIN on the canonical-mode transition; it is kernel input state.
+            const ulong pendingInput = 0x20000000;
+            actual = (byte[])actual.Clone();
+            expected = (byte[])expected.Clone();
+            BinaryPrimitives.WriteUInt64LittleEndian(actual.AsSpan(24),
+                BinaryPrimitives.ReadUInt64LittleEndian(actual.AsSpan(24)) & ~pendingInput);
+            BinaryPrimitives.WriteUInt64LittleEndian(expected.AsSpan(24),
+                BinaryPrimitives.ReadUInt64LittleEndian(expected.AsSpan(24)) & ~pendingInput);
+        }
+
+        return actual.SequenceEqual(expected);
     }
 
     [LibraryImport("libc", EntryPoint = "sigaction", SetLastError = true)]

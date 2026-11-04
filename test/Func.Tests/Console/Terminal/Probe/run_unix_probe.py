@@ -23,6 +23,15 @@ def command_for(probe):
     return ["dotnet", probe] if probe.endswith(".dll") else [probe]
 
 
+def same_terminal_configuration(actual, expected):
+    if platform.system() == "Darwin":
+        # The kernel sets PENDIN when ICANON is restored; do not flush pending input to clear it.
+        actual, expected = list(actual), list(expected)
+        actual[3] &= ~termios.PENDIN
+        expected[3] &= ~termios.PENDIN
+    return actual == expected
+
+
 def session_child(probe, release_fd):
     # The supervisor keeps the probe group non-orphaned so SIGTSTP really stops it.
     print("INHERITED_SIGTSTP:" + str(signal.getsignal(signal.SIGTSTP)), flush=True)
@@ -122,8 +131,7 @@ def run(probe, report=None):
             send(probe_pid, signal.SIGTSTP)
             wait_for("PTY_STOPPED:", start=start)
             suspended = termios.tcgetattr(slave)
-            mask = termios.ICANON | termios.ECHO | termios.ISIG
-            if suspended[3] & mask != original[3] & mask or suspended[6][termios.VINTR] != original[6][termios.VINTR]:
+            if not same_terminal_configuration(suspended, original):
                 raise RuntimeError(f"Terminal input was not restored during {scope} suspension")
             if b"\x1b[?1049l" not in transcript[start:]:
                 raise RuntimeError(f"{scope} suspension did not leave the alternate screen")
@@ -135,7 +143,7 @@ def run(probe, report=None):
         wait_for("RESULT ", complete_line=True)
         wait_for("PROBE_EXIT:", complete_line=True)
         final_attributes = termios.tcgetattr(slave)
-        restored = final_attributes == original
+        restored = same_terminal_configuration(final_attributes, original)
         os.write(release_write, b"1")
         os.close(release_write)
         release_write = None

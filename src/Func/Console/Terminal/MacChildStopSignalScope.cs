@@ -22,11 +22,7 @@ internal sealed partial class MacChildStopSignalScope : IDisposable
         }
 
         // Keep the runtime's handler installed, including when a child is started later.
-        _registration = PosixSignalRegistration.Create(PosixSignal.SIGCHLD, static context =>
-        {
-            // Exits are already reaped; suppress the runtime's deferred terminal reconfiguration.
-            context.Cancel = true;
-        });
+        _registration = PosixSignalRegistration.Create(PosixSignal.SIGCHLD, static _ => { });
         try
         {
             Check(GetAction(ChildSignal, 0, out _original));

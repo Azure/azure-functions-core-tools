@@ -166,6 +166,9 @@ binary hash. Check the process architecture when qualifying Apple Silicon;
 an x64 .NET SDK under Rosetta does not qualify the ARM64 adapter.
 Failure exits nonzero and
 retains diagnostic output. It never reads or overwrites the desktop clipboard.
+Darwin restoration checks exclude only `PENDIN`, the kernel's pending-input
+state set when canonical mode is restored; every configurable attribute is
+still compared, and pending input is never flushed to make the check pass.
 
 The same probe participates in the opt-in native test suite on Unix:
 
