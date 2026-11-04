@@ -134,13 +134,16 @@ def run(probe, report=None):
         os.write(master, b"q")
         wait_for("RESULT ", complete_line=True)
         wait_for("PROBE_EXIT:", complete_line=True)
-        restored = termios.tcgetattr(slave) == original
+        final_attributes = termios.tcgetattr(slave)
+        restored = final_attributes == original
         os.write(release_write, b"1")
         os.close(release_write)
         release_write = None
         exit_code = process.wait(timeout=max(1, deadline - time.monotonic()))
         result_line = transcript.decode(errors="replace").split("RESULT ")[-1].splitlines()[0]
         if exit_code != 0 or not restored or "False" in result_line:
+            if not restored:
+                print(f"Original attributes: {original!r}\nFinal attributes: {final_attributes!r}", file=sys.stderr)
             raise RuntimeError(f"Native qualification failed: exit={exit_code} restored={restored} {result_line}")
         runtime = re.search(rb"RUNTIME (\S+) (\S+)\r?\n", transcript)
         if runtime is None:
