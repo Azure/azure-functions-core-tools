@@ -1,6 +1,9 @@
-# === BYOC: WORKER SOURCE - open question ===
-# The source and packaging contract for the PowerShell worker and its .NET runtime dependencies is not yet defined.
-# FROM <powershell-worker-source> AS worker-source
+# === BYOC: WORKER SOURCE ===
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS worker-source
+RUN dotnet new classlib --name WorkerRestore --output /tmp/worker-restore --no-restore \
+    && NUGET_PACKAGES=/worker-packages dotnet add /tmp/worker-restore/WorkerRestore.csproj package {{WORKER_PACKAGE_ID}} \
+        --version {{WORKER_PACKAGE_VERSION}} \
+        --source {{WORKER_PACKAGE_FEED}}
 
 # === BYOC: RUNTIME STAGE ===
 FROM {{RUNTIME_IMAGE}} AS runtime
@@ -15,7 +18,7 @@ WORKDIR /home/site/wwwroot
 
 # === BYOC: COPY APPLICATION ===
 COPY . ./
-# COPY --from=worker-source <powershell-worker-path> /azure-functions-worker
+COPY --from=worker-source /worker-packages/{{WORKER_PACKAGE_CONTENT_PATH}}/ /azure-functions-worker/
 
 # === BYOC: PERMISSIONS - customer customization ===
 RUN groupadd --gid 1000 app \

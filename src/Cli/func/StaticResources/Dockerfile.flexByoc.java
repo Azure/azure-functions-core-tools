@@ -1,6 +1,9 @@
-# === BYOC: WORKER SOURCE - open question ===
-# The source and packaging contract for the Java worker is not yet defined.
-# FROM <java-worker-source> AS worker-source
+# === BYOC: WORKER SOURCE ===
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS worker-source
+RUN dotnet new classlib --name WorkerRestore --output /tmp/worker-restore --no-restore \
+    && NUGET_PACKAGES=/worker-packages dotnet add /tmp/worker-restore/WorkerRestore.csproj package {{WORKER_PACKAGE_ID}} \
+        --version {{WORKER_PACKAGE_VERSION}} \
+        --source {{WORKER_PACKAGE_FEED}}
 
 # === BYOC: BUILD STAGE ===
 FROM {{BUILD_IMAGE}} AS build
@@ -29,7 +32,7 @@ WORKDIR /home/site/wwwroot
 
 # === BYOC: COPY APPLICATION ===
 COPY --from=build /publish/ ./
-# COPY --from=worker-source <java-worker-path> /azure-functions-worker
+COPY --from=worker-source /worker-packages/{{WORKER_PACKAGE_CONTENT_PATH}}/ /azure-functions-worker/
 
 # === BYOC: PERMISSIONS - customer customization ===
 RUN groupadd --gid 1000 app \

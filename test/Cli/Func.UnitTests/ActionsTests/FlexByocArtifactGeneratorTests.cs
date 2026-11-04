@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
     {
         [Theory]
         [InlineData(WorkerRuntime.DotnetIsolated, "11")]
-        [InlineData(WorkerRuntime.Python, "3.15")]
+        [InlineData(WorkerRuntime.Python, "3.14")]
         [InlineData(WorkerRuntime.Node, "26")]
         [InlineData(WorkerRuntime.Java, "25")]
         [InlineData(WorkerRuntime.Powershell, "7.6")]
@@ -47,7 +47,6 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData("3.12")]
         [InlineData("3.13")]
         [InlineData("3.14")]
-        [InlineData("3.15")]
         public async Task GetTemplateArtifactsAsync_LoadsPythonArtifacts(string runtimeVersion)
         {
             FlexByocTemplateArtifacts artifacts = await FlexByocArtifactGenerator.GetTemplateArtifactsAsync(
@@ -118,6 +117,7 @@ namespace Azure.Functions.Cli.UnitTests.ActionsTests
         [InlineData(WorkerRuntime.DotnetIsolated, "net7.0", null)]
         [InlineData(WorkerRuntime.DotnetIsolated, "10.5", null)]
         [InlineData(WorkerRuntime.Python, "3.10", null)]
+        [InlineData(WorkerRuntime.Python, "3.15", null)]
         [InlineData(WorkerRuntime.Node, "16", Constants.Languages.JavaScript)]
         [InlineData(WorkerRuntime.Java, "17", null)]
         [InlineData(WorkerRuntime.Powershell, "7.0", null)]
