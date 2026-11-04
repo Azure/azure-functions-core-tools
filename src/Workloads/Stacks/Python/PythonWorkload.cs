@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Quickstart;
 using Azure.Functions.Cli.Workloads;
@@ -27,6 +28,7 @@ public sealed class PythonWorkload : Workload
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<PythonProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, PythonProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, PythonQuickstartProvider>();
+        builder.Services.AddSingleton<IContainerArtifactProvider, PythonContainerArtifactProvider>();
         builder.AddProjectFactory(new PythonProjectFactory());
     }
 }

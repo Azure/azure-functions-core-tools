@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,7 @@ public class JavaWorkloadTests
         Assert.IsType<JavaProjectInitializer>(initializer);
         Assert.Equal("java", initializer.Stack);
         Assert.Equal("Java", Assert.Single(initializer.SupportedLanguages));
+        Assert.IsType<JavaContainerArtifactProvider>(provider.GetRequiredService<IContainerArtifactProvider>());
 
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeOfType<JavaProjectStack>();

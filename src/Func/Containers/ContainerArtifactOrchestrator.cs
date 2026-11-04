@@ -50,7 +50,16 @@ internal sealed class ContainerArtifactOrchestrator(
             capability,
             projectInitializationSkipped,
             parameters);
-        ContainerArtifactResult result = await matches[0].GenerateAsync(request, cancellationToken);
+        ContainerArtifactResult result;
+        try
+        {
+            result = await matches[0].GenerateAsync(request, cancellationToken);
+        }
+        catch (ContainerArtifactProviderException ex)
+        {
+            throw new ContainerArtifactGenerationException(ex.Message, ex);
+        }
+
         await _writer.WriteAsync(project.WorkingDirectory, result.Artifacts, force, cancellationToken);
         return result.Artifacts;
     }

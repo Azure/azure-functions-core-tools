@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,7 @@ public sealed class PowerShellWorkload : Workload
         builder.Services.AddSingleton<PowerShellProjectStack>();
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<PowerShellProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, PowerShellProjectInitializer>();
+        builder.Services.AddSingleton<IContainerArtifactProvider, PowerShellContainerArtifactProvider>();
         builder.AddProjectFactory(new PowerShellProjectFactory());
     }
 }

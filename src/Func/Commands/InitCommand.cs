@@ -423,11 +423,19 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 : 0;
         }
 
+        Dictionary<string, string?> containerArtifactParameters = new(StringComparer.Ordinal)
+        {
+            [ContainerArtifactRequest.RuntimeVersionParameterName] = runtimeVersion,
+        };
         var context = new InitContext(
             WorkingDirectory: workingDirectory,
             ProjectName: parseResult.GetValue(NameOption),
             Language: language,
-            Force: force);
+            Force: force)
+        {
+            RequestedContainerArtifactCapability = generateContainerArtifacts ? capability : null,
+            ContainerArtifactParameters = containerArtifactParameters,
+        };
 
         await initializer.InitializeAsync(context, parseResult, cancellationToken);
 

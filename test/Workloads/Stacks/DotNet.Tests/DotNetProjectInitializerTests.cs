@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using NSubstitute;
 
@@ -127,6 +128,66 @@ public class DotNetProjectInitializerTests : IDisposable
         await _dotnetCli.Received(1).RunAsync(
             Arg.Is<IReadOnlyList<string>>(args => args.Contains("net10.0") && !args.Contains("net11.0")),
             projectPath,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(null, "net11.0")]
+    [InlineData("8", "net8.0")]
+    [InlineData("net9.0", "net9.0")]
+    [InlineData("10.0", "net10.0")]
+    public async Task InitializeAsync_FlexByocWithoutFramework_UsesRuntimeVersion(
+        string? runtimeVersion,
+        string expectedFramework)
+    {
+        DotNetProjectInitializer initializer = CreateInitializer();
+        RootCommand root = [];
+        initializer.GetInitOptions(new InitOptionRegistry(root));
+        string projectPath = Path.Combine(_hivePath, "project");
+        var context = new InitContext(WorkingDirectory.FromExplicit(projectPath), "MyApp", "C#", Force: false)
+        {
+            RequestedContainerArtifactCapability = ContainerArtifactCapability.FlexByoc,
+            ContainerArtifactParameters = new Dictionary<string, string?>
+            {
+                [ContainerArtifactRequest.RuntimeVersionParameterName] = runtimeVersion,
+            },
+        };
+
+        await initializer.InitializeAsync(context, root.Parse([]), CancellationToken.None);
+
+        await _dotnetCli.Received(1).RunAsync(
+            Arg.Is<IReadOnlyList<string>>(args => args.Contains(expectedFramework)),
+            projectPath,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_FlexByocMismatchedFramework_RejectsBeforeInstallingTemplates()
+    {
+        DotNetProjectInitializer initializer = CreateInitializer();
+        RootCommand root = [];
+        initializer.GetInitOptions(new InitOptionRegistry(root));
+        var context = new InitContext(
+            WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project")),
+            "MyApp",
+            "C#",
+            Force: false)
+        {
+            RequestedContainerArtifactCapability = ContainerArtifactCapability.FlexByoc,
+            ContainerArtifactParameters = new Dictionary<string, string?>
+            {
+                [ContainerArtifactRequest.RuntimeVersionParameterName] = "11",
+            },
+        };
+
+        await FluentActions.Awaiting(
+            () => initializer.InitializeAsync(context, root.Parse(["--target-framework", "net10.0"]), CancellationToken.None))
+            .Should().ThrowExactlyAsync<GracefulException>()
+            .WithMessage("The Flex BYOC runtime version '11' does not match target framework 'net10.0'.");
+
+        await _dotnetCli.DidNotReceive().RunAsync(
+            Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
     }
 

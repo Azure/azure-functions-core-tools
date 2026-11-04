@@ -3,4 +3,5 @@
 
 namespace Azure.Functions.Cli.Containers;
 
-internal sealed class ContainerArtifactGenerationException(string message) : InvalidOperationException(message);
+internal sealed class ContainerArtifactGenerationException(string message, Exception? innerException = null)
+    : InvalidOperationException(message, innerException);

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -43,6 +44,7 @@ public class DotNetWorkloadTests
         initializer.Should().BeOfType<DotNetProjectInitializer>();
         initializer.Stack.Should().Be("dotnet");
         initializer.SupportedLanguages.Should().Equal(["C#", "F#"]);
+        provider.GetRequiredService<IContainerArtifactProvider>().Should().BeOfType<DotNetContainerArtifactProvider>();
 
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeOfType<DotNetProjectStack>();

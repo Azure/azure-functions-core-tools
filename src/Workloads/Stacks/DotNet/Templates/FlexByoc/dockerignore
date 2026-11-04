@@ -1,0 +1,10 @@
+.git
+.gitignore
+.vscode
+.azure
+bin
+obj
+local.settings.json
+*.user
+.env
+.env.*
