@@ -25,6 +25,7 @@ def command_for(probe):
 
 def session_child(probe):
     # The supervisor keeps the probe group non-orphaned so SIGTSTP really stops it.
+    print("INHERITED_SIGTSTP:" + str(signal.getsignal(signal.SIGTSTP)), flush=True)
     signal.signal(signal.SIGTTOU, signal.SIG_IGN)
     environment = os.environ.copy()
     environment["FUNC_TERMINAL_PROBE_SESSION"] = str(os.getsid(0))
@@ -32,6 +33,12 @@ def session_child(probe):
     def foreground():
         os.setpgid(0, 0)
         os.tcsetpgrp(0, os.getpid())
+        # Match an interactive shell; CI may ignore or block job-control signals.
+        signals = {signal.SIGINT, signal.SIGQUIT, signal.SIGTSTP,
+                   signal.SIGTTIN, signal.SIGTTOU, signal.SIGCONT}
+        for number in signals:
+            signal.signal(number, signal.SIG_DFL)
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, signals)
 
     child = subprocess.Popen(command_for(probe), env=environment, preexec_fn=foreground)
     print("PROBE_PID:" + str(child.pid), flush=True)

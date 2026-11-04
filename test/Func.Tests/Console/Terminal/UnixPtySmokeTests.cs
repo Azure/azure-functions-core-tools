@@ -8,8 +8,10 @@ namespace Azure.Functions.Cli.Tests.Console.Terminal;
 
 public class UnixPtySmokeTests
 {
-    [UnixPtyFact]
-    public async Task PrivatePty_QualifiesInputSignalsResizeSuspensionAndRestoration()
+    [UnixPtyTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PrivatePty_QualifiesInputSignalsResizeSuspensionAndRestoration(bool inheritIgnoredJobControl)
     {
         string root = FindCheckout();
         string folder = Path.Combine(root, "test", "Func.Tests", "Console", "Terminal", "Probe");
@@ -29,8 +31,21 @@ public class UnixPtySmokeTests
 
         Path.IsPathFullyQualified(probe).Should().BeTrue("the native probe must be an explicit absolute target");
         File.Exists(probe).Should().BeTrue();
+        const string ignoredJobControl = """
+            import runpy, signal, sys
+            signals = {signal.SIGTSTP, signal.SIGCONT, signal.SIGTTIN, signal.SIGTTOU}
+            for number in signals:
+                signal.signal(number, signal.SIG_IGN)
+            signal.pthread_sigmask(signal.SIG_BLOCK, signals)
+            sys.argv = sys.argv[1:]
+            runpy.run_path(sys.argv[0], run_name="__main__")
+            """;
+        string script = Path.Combine(folder, "run_unix_probe.py");
+        IReadOnlyList<string> arguments = inheritIgnoredJobControl
+            ? ["-c", ignoredJobControl, script, probe]
+            : [script, probe];
         ProcessOutcome run = await runner.RunAsync(new ProcessRunRequest("python3",
-            [Path.Combine(folder, "run_unix_probe.py"), probe], root, TimeSpan.FromSeconds(70)), deadline.Token);
+            arguments, root, TimeSpan.FromSeconds(70)), deadline.Token);
         run.ExecutableNotFound.Should().BeFalse("opt-in Unix PTY qualification requires Python 3");
         run.TimedOut.Should().BeFalse(run.StandardOutput + run.StandardError);
         run.ExitCode.Should().Be(0, run.StandardOutput + run.StandardError);
@@ -55,9 +70,9 @@ public class UnixPtySmokeTests
         throw new DirectoryNotFoundException("Unix PTY qualification requires the built tests to remain in their source checkout.");
     }
 
-    private sealed class UnixPtyFactAttribute : FactAttribute
+    private sealed class UnixPtyTheoryAttribute : TheoryAttribute
     {
-        public UnixPtyFactAttribute()
+        public UnixPtyTheoryAttribute()
         {
             if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
             {
