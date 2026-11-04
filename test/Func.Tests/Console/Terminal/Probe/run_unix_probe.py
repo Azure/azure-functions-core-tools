@@ -89,9 +89,12 @@ def run(probe, report=None):
             [sys.executable, os.path.abspath(__file__), "--session-child", probe],
             stdin=slave, stdout=slave, stderr=slave, preexec_fn=new_session,
         )
-        wait_for("PROBE_PID:")
-        wait_for("INPUT_READY")
+        wait_for("PROBE_PID:", complete_line=True)
         probe_pid = int(re.search(rb"PROBE_PID:(\d+)", transcript).group(1))
+        wait_for("SIGNAL_READY")
+        os.kill(probe_pid, signal.SIGTSTP)
+        wait_for("SIGNAL_PROVEN")
+        wait_for("INPUT_READY")
         os.write(master, (
             "\x1b[<64;5;3M\x1b[<0;5;3M\x1b[<32;6;4M\x1b[<0;6;4m"
             "😀\x03\x1b[200~cq\x03\x1b[201~"
@@ -100,15 +103,6 @@ def run(probe, report=None):
 
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 14, 96, 0, 0))
         wait_for("RESIZE_READY")
-        if platform.system() == "Darwin":
-            diagnostics = subprocess.run(
-                ["ps", "-p", f"{process.pid},{probe_pid}", "-o",
-                 "pid,ppid,pgid,sess,tpgid,jobc,state,sigmask,sigignore,sigcatch,comm"],
-                capture_output=True, text=True, timeout=5, check=False,
-            )
-            print(diagnostics.stdout, end="", file=sys.stderr)
-            if diagnostics.returncode:
-                print(diagnostics.stderr, end="", file=sys.stderr)
         os.killpg(probe_pid, signal.SIGTSTP)
         wait_for("PTY_STOPPED:")
         suspended = termios.tcgetattr(slave)

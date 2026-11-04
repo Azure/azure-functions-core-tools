@@ -41,6 +41,18 @@ internal sealed partial class UnixTerminalProbe
             Interlocked.Increment(ref signals);
         });
 
+        TaskCompletionSource signalReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (var signal = PosixSignalRegistration.Create(PosixSignal.SIGTSTP, context =>
+        {
+            context.Cancel = true;
+            signalReady.TrySetResult();
+        }))
+        {
+            System.Console.WriteLine("SIGNAL_READY");
+            await signalReady.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        System.Console.WriteLine("SIGNAL_PROVEN");
         using Process child = StartSignalChild();
         try
         {
@@ -98,6 +110,10 @@ internal sealed partial class UnixTerminalProbe
                     if (input.Kind == TerminalInputKind.Resize && terminal.Size == new TerminalSize(96, 14))
                     {
                         resized = true;
+                        ThreadPool.GetMaxThreads(out int maximum, out _);
+                        ThreadPool.GetMinThreads(out int minimum, out _);
+                        terminal.WriteControl($"\r\nTHREADPOOL minimum={minimum} maximum={maximum}"
+                            + $" threads={ThreadPool.ThreadCount} pending={ThreadPool.PendingWorkItemCount}\r\n");
                         terminal.WriteControl("\r\nRESIZE_READY\r\n");
                     }
 
