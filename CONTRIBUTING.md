@@ -153,6 +153,10 @@ On Linux or macOS, use the pinned .NET SDK and Python 3 (standard library only):
 python3 test/Func.Tests/Console/Terminal/Probe/run_unix_probe.py --build --report out/tui-native-results.json
 ```
 
+The `Native macOS terminal tests` GitHub Actions workflow runs this command
+on both ARM64 and Intel hosted Macs, verifies the actual .NET process
+architecture, and preserves native JSON and test-result artifacts.
+
 This builds the candidate and runs it in a private PTY with a real foreground
 process group. It checks mouse input, Unicode, paste isolation, resize,
 suspend/resume, restored terminal attributes, and that Ctrl+C input does not
@@ -179,6 +183,11 @@ Clipboard unit tests use substitutes. Do not write to a developer's real
 clipboard in unattended tests; use an isolated desktop or explicitly initiated
 manual checks. A successful OSC 52 write means the request was sent, not that
 the terminal accepted it.
+
+The separate `FUNC_CLIPBOARD_NATIVE_TESTS=1` opt-in enables real `pbcopy`/`pbpaste`
+round-trip tests on disposable macOS desktops. The macOS CI workflow enables it
+only on its hosted VMs. Unlike `FUNC_TERMINAL_NATIVE_TESTS`, this replaces the
+desktop clipboard and must not be enabled in ordinary developer test runs.
 
 #### CLI Process Smoke Tests
 
