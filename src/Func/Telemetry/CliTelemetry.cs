@@ -92,16 +92,27 @@ internal static class CliTelemetry
     /// </summary>
     public static bool TryGetConnectionString([NotNullWhen(true)] out string? connectionString)
     {
+        return TryGetConnectionString(
+            Constants.TelemetryInstrumentationKey,
+            Environment.GetEnvironmentVariable(Constants.TelemetryOptOutEnvVar),
+            Environment.GetEnvironmentVariable(Constants.LegacyTelemetryOptOutEnvVar),
+            out connectionString);
+    }
+
+    /// <summary>
+    /// Evaluates the configured key and both opt-out values without reading process state.
+    /// </summary>
+    internal static bool TryGetConnectionString(
+        string? key, string? optOutValue, string? legacyOptOutValue, [NotNullWhen(true)] out string? connectionString)
+    {
         connectionString = null;
 
-        string key = Constants.TelemetryInstrumentationKey;
         if (string.IsNullOrEmpty(key) || key == EmptyInstrumentationKey)
         {
             return false;
         }
 
-        if (IsOptedOut(Constants.TelemetryOptOutEnvVar) ||
-            IsOptedOut(Constants.LegacyTelemetryOptOutEnvVar))
+        if (IsOptedOut(optOutValue) || IsOptedOut(legacyOptOutValue))
         {
             return false;
         }
@@ -110,9 +121,8 @@ internal static class CliTelemetry
         return true;
     }
 
-    private static bool IsOptedOut(string envVarName)
+    private static bool IsOptedOut(string? value)
     {
-        string? value = Environment.GetEnvironmentVariable(envVarName);
         if (string.IsNullOrEmpty(value))
         {
             return false;

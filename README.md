@@ -252,6 +252,8 @@ The data is anonymous and doesn't include any user specific or personal informat
 
 You can opt-out of telemetry by setting the `FUNC_CLI_TELEMETRY_OPTOUT` environment variable to any value other than `no`, `n`, `0`, `false`, or `off`. The legacy `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` variable from Core Tools v4 is still honored.
 
+These values are case-insensitive and ignore surrounding whitespace. An unset or empty variable does not opt out; a whitespace-only value does. If either variable opts out, telemetry is disabled regardless of the other variable's value.
+
 [Microsoft privacy statement](https://privacy.microsoft.com/privacystatement)
 
 ## License
