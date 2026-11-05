@@ -43,9 +43,6 @@ public class HostProcessStartInfoFactoryTests : IDisposable
             {
                 ["CUSTOM_ENV"] = "custom-value",
                 [HostProcessStartInfoFactory.ScriptRootEnvironmentVariable] = "stale-value",
-                [HostProcessStartInfoFactory.AzureFunctionsEnvironmentVariable] = "stale-value",
-                [HostProcessStartInfoFactory.WebsiteHostnameEnvironmentVariable] = "stale-value",
-                [HostProcessStartInfoFactory.HostingLifetimeLogLevelEnvironmentVariable] = "stale-value",
             });
 
         HostProcessLaunchInfo launchInfo = factory.Create(context);

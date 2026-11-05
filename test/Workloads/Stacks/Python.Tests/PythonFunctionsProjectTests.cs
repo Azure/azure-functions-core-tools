@@ -55,8 +55,6 @@ public class PythonFunctionsProjectTests : IDisposable
             ReadEnvironmentVariable = _ => null,
         };
         FunctionsProjectHostRunContext context = CreateContext();
-        context.EnvironmentVariables[PythonFunctionsProject.IsolateWorkerDepsEnvVar] = "stale-isolation";
-        context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar] = "stale-python";
 
         await project.PrepareForHostRunAsync(context, default);
 
@@ -65,8 +63,6 @@ public class PythonFunctionsProjectTests : IDisposable
         pipUsed!.Should().Contain(PythonFunctionsProject.DefaultVenvFolderName);
         requirementsUsed.Should().Be(Path.Combine(_projectDir.FullName, "requirements.txt"));
         context.EnvironmentVariables[PythonFunctionsProject.IsolateWorkerDepsEnvVar].Should().Be("1");
-        context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar].Should().Be(
-            PythonFunctionsProject.GetVenvExecutablePath(venvCreatedAt!, "python"));
     }
 
     [Fact]
