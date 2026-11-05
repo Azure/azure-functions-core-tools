@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
@@ -159,11 +160,463 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task ResolveAsync_FullIdentity_IgnoresCaseAndDoesNotWidenToSiblingVariants()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("javascript", "Func.Tests.Http.JavaScript", "http", "Func.Tests.Http", "JavaScript", null, null),
+            ("python", "Func.Tests.Http.Python", "http", "Func.Tests.Http", "Python", null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult exact = await templater.ResolveAsync("func.tests.http.javascript", TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult alias = await templater.ResolveAsync("http", TemplateType.Item, CancellationToken.None);
+
+        exact.Status.Should().Be(TemplateResolutionStatus.Selected);
+        exact.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Http.JavaScript");
+        exact.Candidates.Should().ContainSingle();
+        alias.Status.Should().Be(TemplateResolutionStatus.Ambiguous);
+        alias.SelectedTemplate.Should().BeNull();
+        alias.Candidates.Select(candidate => candidate.Identity)
+            .Should().BeEquivalentTo(["Func.Tests.Http.JavaScript", "Func.Tests.Http.Python"]);
+
+        TemplateCatalogEntry chosen = alias.Candidates.Single(candidate => candidate.Identity == "Func.Tests.Http.JavaScript");
+        TemplateResolutionResult chosenResult = await templater.ResolveAsync(chosen, TemplateType.Item, CancellationToken.None);
+        chosenResult.Status.Should().Be(TemplateResolutionStatus.Selected);
+        chosenResult.SelectedTemplate!.Descriptor.Identity.Should().Be(chosen.Identity);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_FullIdentityMatchingAnotherAlias_PrefersTheIdentity()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("identity", "Func.Tests.Shared", "identity-alias", null, null, null, null),
+            ("alias", "Func.Tests.Other", "Func.Tests.Shared", null, null, null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ResolveAsync("func.tests.shared", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Selected);
+        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Shared");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AliasMatchingOneVariant_DoesNotIncludeSiblingsWithDifferentAliases()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("first", "Func.Tests.First", "first", "Func.Tests.Family", null, null, null),
+            ("second", "Func.Tests.Second", "second", "Func.Tests.Family", null, null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ResolveAsync("first", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Selected);
+        result.Candidates.Should().ContainSingle().Which.Identity.Should().Be("Func.Tests.First");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AliasMatchingDifferentFamilies_ReportsAmbiguity()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("first", "Func.Tests.First", "shared", "Func.Tests.FamilyA", null, null, null),
+            ("second", "Func.Tests.Second", "shared", "Func.Tests.FamilyB", null, null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ResolveAsync("shared", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Ambiguous);
+        result.SelectedTemplate.Should().BeNull();
+        result.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == "ambiguous" && diagnostic.Message.Contains("families"));
+        result.Candidates.Select(candidate => candidate.Identity).Should().BeEquivalentTo(["Func.Tests.First", "Func.Tests.Second"]);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_UnknownReferenceAndWrongKind_ReportDistinctFailures()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult missing = await templater.ResolveAsync("not-installed", TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult wrongKind = await templater.ResolveAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Item, CancellationToken.None);
+
+        missing.Status.Should().Be(TemplateResolutionStatus.NotFound);
+        wrongKind.Status.Should().Be(TemplateResolutionStatus.WrongKind);
+        missing.SelectedTemplate.Should().BeNull();
+        wrongKind.SelectedTemplate.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResolveAsync_DuplicateIdentitiesAcrossPackages_FailsRegardlessOfCase()
+    {
+        string first = TemplateFixtures.WriteSelectionPackage(
+            Path.Combine(_root, "first"),
+            ("one", "Func.Tests.Duplicate", "first", null, null, null, null));
+        string second = TemplateFixtures.WriteSelectionPackage(
+            Path.Combine(_root, "second"),
+            ("two", "func.tests.duplicate", "second", null, null, null, null));
+        await TemplateFixtures.InstallAsync(first, _hive);
+        await TemplateFixtures.InstallAsync(second, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ResolveAsync("FUNC.TESTS.DUPLICATE", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.DuplicateIdentity);
+        result.SelectedTemplate.Should().BeNull();
+        result.Diagnostics.Should().ContainSingle().Which.Message.Should().Contain("first").And.Contain("second");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AliasOfDuplicateIdentity_FailsInsteadOfChoosingOnePackage()
+    {
+        string first = TemplateFixtures.WriteSelectionPackage(
+            Path.Combine(_root, "first"),
+            ("one", "Func.Tests.Duplicate", "shared", null, null, null, null));
+        string second = TemplateFixtures.WriteSelectionPackage(
+            Path.Combine(_root, "second"),
+            ("two", "Func.Tests.Duplicate", "shared", null, null, null, null));
+        await TemplateFixtures.InstallAsync(first, _hive);
+        await TemplateFixtures.InstallAsync(second, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ResolveAsync("shared", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.DuplicateIdentity);
+        result.SelectedTemplate.Should().BeNull();
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("duplicate-identity");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_DuplicateIdentityWithinPackage_Fails()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("one", "Func.Tests.Duplicate", "first", null, null, null, null),
+            ("two", "Func.Tests.Duplicate", "second", null, null, null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ResolveAsync("Func.Tests.Duplicate", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.DuplicateIdentity);
+        result.SelectedTemplate.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResolveAsync_IneligibleExactIdentity_DoesNotSubstituteMatchingAlias()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("python", "Func.Tests.Python", "python", null, "Python", null, null),
+            ("javascript", "Func.Tests.JavaScript", "Func.Tests.Python", null, "JavaScript", null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater(context: ProjectContext("node", "JavaScript"), projectStacks: ProjectStacks());
+
+        TemplateResolutionResult result = await templater.ResolveAsync("Func.Tests.Python", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        result.SelectedTemplate.Should().BeNull();
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("language-mismatch");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AliasFiltersLanguages_RetainsTheRejectedCandidateDiagnostic()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("javascript", "Func.Tests.JavaScript", "shared", null, "JavaScript", null, null),
+            ("python", "Func.Tests.Python", "shared", null, "Python", null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater(context: ProjectContext("node", "JavaScript"), projectStacks: ProjectStacks());
+
+        TemplateResolutionResult result = await templater.ResolveAsync("shared", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Selected);
+        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.JavaScript");
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("language-mismatch");
+    }
+
+    [Theory]
+    [InlineData("JavaScript")]
+    [InlineData("js")]
+    public async Task ResolveAsync_ProjectLanguageOrAlias_MatchesTheCanonicalTemplateLanguage(string language)
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("javascript", "Func.Tests.JavaScript", "javascript", null, "JavaScript", null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater(context: ProjectContext("node", language), projectStacks: ProjectStacks());
+
+        TemplateResolutionResult result = await templater.ResolveAsync("javascript", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Selected);
+        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.JavaScript");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_SingleLanguageStackWithoutStoredLanguage_UsesItsOnlyLanguage()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("python", "Func.Tests.Python", "python", null, "Python", null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater(context: ProjectContext("python", null), projectStacks: ProjectStacks());
+
+        TemplateResolutionResult result = await templater.ResolveAsync("python", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Selected);
+        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Python");
+    }
+
+    [Theory]
+    [InlineData(null, "JavaScript", "missing-project-stack")]
+    [InlineData("node", null, "missing-project-language")]
+    [InlineData("unknown", "JavaScript", "unsupported-project-stack")]
+    [InlineData("node", "py", "inconsistent-project-context")]
+    public async Task ResolveAsync_IncompleteOrInconsistentProjectContext_FailsClosed(
+        string? stack,
+        string? language,
+        string expectedCode)
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("javascript", "Func.Tests.JavaScript", "javascript", null, "JavaScript", null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater(context: ProjectContext(stack, language), projectStacks: ProjectStacks());
+
+        TemplateResolutionResult result = await templater.ResolveAsync("javascript", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        result.SelectedTemplate.Should().BeNull();
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be(expectedCode);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_HiddenOrInvalidHostMetadata_FailsClosed()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteMetadataPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult hidden = await templater.ResolveAsync(TemplateFixtures.HiddenTemplateIdentity, TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult invalid = await templater.ResolveAsync(TemplateFixtures.InvalidHostTemplateIdentity, TemplateType.Item, CancellationToken.None);
+
+        hidden.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        hidden.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("hidden");
+        invalid.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        invalid.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("invalid-metadata");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_UnknownConstraintAndAbsentWorkloadInventory_FailClosed()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("unknown", "Func.Tests.Unknown", "unknown", null, null, "future-constraint", null),
+            ("workload", "Func.Tests.Workload", "workload", null, null, "func-workload", "node"));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult unknown = await templater.ResolveAsync("unknown", TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult workload = await templater.ResolveAsync("workload", TemplateType.Item, CancellationToken.None);
+
+        unknown.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        unknown.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-not-evaluated");
+        workload.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        workload.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-not-evaluated");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_BundleConstraint_UsesTheResolvedBundleContext()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("bundle", "Func.Tests.Bundle", "bundle", null, null, "func-bundle", new { id = "test.bundle", version = "[4.20.0,5.0.0)" }));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater matching = CreateTemplater(context: new(
+            WorkingDirectory.FromExplicit(_root),
+            bundle: new TemplateEngineBundleContext("test.bundle", "4.25.0")));
+        using Templater restricted = CreateTemplater(context: new(
+            WorkingDirectory.FromExplicit(_root),
+            bundle: new TemplateEngineBundleContext("other.bundle", "4.25.0")));
+        using Templater missing = CreateTemplater();
+
+        TemplateResolutionResult allowed = await matching.ResolveAsync("bundle", TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult wrongBundle = await restricted.ResolveAsync("bundle", TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult noBundle = await missing.ResolveAsync("bundle", TemplateType.Item, CancellationToken.None);
+
+        allowed.Status.Should().Be(TemplateResolutionStatus.Selected);
+        wrongBundle.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        wrongBundle.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-restricted");
+        noBundle.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        noBundle.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-restricted");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ChangedMountedHostConstraint_UsesTheMountedArguments()
+    {
+        using var args = System.Text.Json.JsonDocument.Parse("""[{"hostname":"func"}]""");
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("host", "Func.Tests.Host", "host", null, null, "host", args.RootElement.Clone()));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+        _ = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+        string configPath = Path.Combine(packageDirectory, "host", ".template.config", "template.json");
+        string configuration = await File.ReadAllTextAsync(configPath);
+
+        TemplateResolutionResult eligible = await templater.ResolveAsync("host", TemplateType.Item, CancellationToken.None);
+        await File.WriteAllTextAsync(configPath, configuration.Replace("\"hostname\":\"func\"", "\"hostname\":\"other\"", StringComparison.Ordinal));
+        TemplateResolutionResult restricted = await templater.ResolveAsync("host", TemplateType.Item, CancellationToken.None);
+
+        eligible.Status.Should().Be(TemplateResolutionStatus.Selected);
+        restricted.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        restricted.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-restricted");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_MalformedMountedConstraint_ReportsInvalidMetadata()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("workload", "Func.Tests.Workload", "workload", null, null, "func-workload", "node"));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+        _ = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+        string configPath = Path.Combine(packageDirectory, "workload", ".template.config", "template.json");
+        System.Text.Json.Nodes.JsonObject configuration = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(configPath))!.AsObject();
+        configuration["constraints"]!["func-workload"]!["args"] = new System.Text.Json.Nodes.JsonArray();
+        await File.WriteAllTextAsync(configPath, configuration.ToJsonString());
+
+        TemplateResolutionResult result = await templater.ResolveAsync("workload", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("invalid-constraints");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AdditionalConfiguration_FailsClosedWithoutEvaluatingPartialConstraints()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("merged", "Func.Tests.Merged", "merged", null, null, null, null));
+        string configDirectory = Path.Combine(packageDirectory, "merged", ".template.config");
+        string configPath = Path.Combine(configDirectory, "template.json");
+        System.Text.Json.Nodes.JsonObject configuration = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(configPath))!.AsObject();
+        configuration["AdditionalConfigFiles"] = new System.Text.Json.Nodes.JsonArray("overrides.template.json");
+        await File.WriteAllTextAsync(configPath, configuration.ToJsonString());
+        await File.WriteAllTextAsync(
+            Path.Combine(configDirectory, "overrides.template.json"),
+            """{"constraints":{"host":{"type":"host","args":[{"hostname":"other"}]}}}""");
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ResolveAsync("merged", TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Ineligible);
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("additional-configuration-not-evaluated");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CatalogSelection_IsBoundToTheIssuingLiveSession()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
+        using Templater owner = CreateTemplater();
+        using Templater foreign = CreateTemplater();
+        TemplateCatalogEntry entry = (await owner.ListAsync(TemplateType.Item, CancellationToken.None)).Single();
+
+        TemplateResolutionResult resolved = await owner.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult copied = await owner.ResolveAsync(entry with { }, TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult foreignEntry = await foreign.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
+
+        resolved.Status.Should().Be(TemplateResolutionStatus.Selected);
+        ResolvedTemplate selection = resolved.SelectedTemplate!;
+        owner.ValidateSelectionOwner(selection);
+        Action validateForeign = () => foreign.ValidateSelectionOwner(selection);
+        validateForeign.Should().Throw<InvalidOperationException>();
+        copied.Status.Should().Be(TemplateResolutionStatus.InvalidSelection);
+        foreignEntry.Status.Should().Be(TemplateResolutionStatus.InvalidSelection);
+
+        owner.Dispose();
+        selection.Descriptor.Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
+        Action validateDisposed = () => owner.ValidateSelectionOwner(selection);
+        validateDisposed.Should().Throw<ObjectDisposedException>();
+        Func<Task> resolveDisposed = () => owner.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
+        await resolveDisposed.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CatalogSelectionWhoseConfigurationWasRemoved_FailsClosed()
+    {
+        string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+        TemplateCatalogEntry entry = (await templater.ListAsync(TemplateType.Item, CancellationToken.None)).Single();
+        File.Delete(Path.Combine(packageDirectory, "item", ".template.config", "template.json"));
+
+        TemplateResolutionResult result = await templater.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
+
+        result.SelectedTemplate.Should().BeNull();
+        result.Status.Should().BeOneOf(TemplateResolutionStatus.Ineligible, TemplateResolutionStatus.InvalidSelection);
+        result.Diagnostics.Should().ContainSingle(diagnostic =>
+            diagnostic.Code == "constraint-source-unavailable" || diagnostic.Code == "stale-selection");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CanceledToken_ThrowsOperationCanceledException()
+    {
+        using Templater templater = CreateTemplater();
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        Func<Task> act = () => templater.ResolveAsync("item", TemplateType.Item, cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task ResolveAsync_NullOrWhitespaceReference_Throws()
+    {
+        using Templater templater = CreateTemplater();
+        Func<Task> nullReference = () => templater.ResolveAsync((string)null!, TemplateType.Item, CancellationToken.None);
+        Func<Task> blankReference = () => templater.ResolveAsync(" ", TemplateType.Item, CancellationToken.None);
+        Func<Task> nullEntry = () => templater.ResolveAsync((TemplateCatalogEntry)null!, TemplateType.Item, CancellationToken.None);
+
+        await nullReference.Should().ThrowAsync<ArgumentNullException>().WithParameterName("reference");
+        await blankReference.Should().ThrowAsync<ArgumentException>().WithParameterName("reference");
+        await nullEntry.Should().ThrowAsync<ArgumentNullException>().WithParameterName("selectedEntry");
+    }
+
+    [Fact]
+    public void ValidateSelectionOwner_NullSelection_Throws()
+    {
+        using Templater templater = CreateTemplater();
+
+        Action act = () => templater.ValidateSelectionOwner(null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("selection");
+    }
+
+    [Fact]
     public void Constructor_NullSession_Throws()
     {
-        Action act = () => _ = new Templater(null!);
+        Action act = () => _ = new Templater(null!, ProjectStacks());
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("session");
+    }
+
+    [Fact]
+    public void Constructor_NullProjectStacks_Throws()
+    {
+        using TemplateEngineSession session = new(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive);
+
+        Action act = () => _ = new Templater(session, null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("projectStacks");
     }
 
     private async Task<IReadOnlyList<TemplateCatalogEntry>> ListMetadataTemplatesAsync()
@@ -181,6 +634,40 @@ public sealed class TemplaterTests : IDisposable
     private static TemplateCatalogEntry Entry(IReadOnlyList<TemplateCatalogEntry> entries, string identity)
         => entries.Should().ContainSingle(candidate => candidate.Identity == identity).Subject;
 
-    private Templater CreateTemplater()
-        => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive));
+    private Templater CreateTemplater(TemplateEngineContext? context = null, InstalledProjectStackCatalog? projectStacks = null)
+        => new(
+            new TemplateEngineSession(context ?? new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive),
+            projectStacks ?? new InstalledProjectStackCatalog([]));
+
+    private TemplateEngineContext ProjectContext(string? stack, string? language)
+        => new(
+            WorkingDirectory.FromExplicit(_root),
+            new TemplateEngineProjectContext(WorkingDirectory.FromExplicit(_root), stack, language));
+
+    private static InstalledProjectStackCatalog ProjectStacks() => new([new NodeProjectStack(), new PythonProjectStack()]);
+
+    private sealed class NodeProjectStack : IProjectStack
+    {
+        public string Stack => "node";
+
+        public IReadOnlyList<string> SupportedLanguages => ["JavaScript", "TypeScript"];
+
+        public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["JavaScript"] = ["js"],
+            ["TypeScript"] = ["ts"],
+        };
+    }
+
+    private sealed class PythonProjectStack : IProjectStack
+    {
+        public string Stack => "python";
+
+        public IReadOnlyList<string> SupportedLanguages => ["Python"];
+
+        public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; } = new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["Python"] = ["py"],
+        };
+    }
 }

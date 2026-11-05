@@ -22,13 +22,32 @@ internal static class TemplateConstraintDeclarationReader
     /// </summary>
     /// <exception cref="InvalidTemplateMetadataException">The configuration or a constraint declaration is invalid.</exception>
     public static IReadOnlyList<TemplateConstraintDeclaration> Read(string configuration, IReadOnlyCollection<string>? packageTypes = null)
+        => Read(configuration, packageTypes, inspectAdditionalConfiguration: false, out _);
+
+    /// <summary>
+    /// Also reports whether the template declares additional configuration files.
+    /// </summary>
+    public static IReadOnlyList<TemplateConstraintDeclaration> Read(
+        string configuration,
+        out bool hasAdditionalConfiguration,
+        IReadOnlyCollection<string>? packageTypes = null)
+        => Read(configuration, packageTypes, inspectAdditionalConfiguration: true, out hasAdditionalConfiguration);
+
+    private static IReadOnlyList<TemplateConstraintDeclaration> Read(
+        string configuration,
+        IReadOnlyCollection<string>? packageTypes,
+        bool inspectAdditionalConfiguration,
+        out bool hasAdditionalConfiguration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
         try
         {
             using var document = JsonDocument.Parse(configuration, _options);
-            return ReadRoot(document.RootElement, packageTypes);
+            IReadOnlyList<TemplateConstraintDeclaration> declarations = ReadRoot(document.RootElement, packageTypes);
+            hasAdditionalConfiguration = inspectAdditionalConfiguration
+                && FindProperty(document.RootElement, "AdditionalConfigFiles", "template.json") is not null;
+            return declarations;
         }
         catch (JsonException exception)
         {

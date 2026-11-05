@@ -51,6 +51,16 @@ internal sealed class TemplateEngineSession : IDisposable
         }
     }
 
+    public void ValidateSelectionOwner(ResolvedTemplate selection)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(selection);
+        if (!selection.IsOwnedBy(this))
+        {
+            throw new InvalidOperationException("The selected template belongs to a different engine session.");
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)

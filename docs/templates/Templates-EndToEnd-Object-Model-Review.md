@@ -5,8 +5,11 @@
 ## Status key
 
 - **Committed baseline:** Present at accepted Core Tools commit `883b02ee9bc10c431a67c044a7f059a082b2fcad`.
-- **Local candidate:** Modified or untracked in the Lane 3 worktree; not represented by baseline GitHub links.
+- **PR 1 foundation:** Present in the staged candidate; factory creation, installed-template listing, and session-bound resolution.
+- **Deferred prototype:** Local rendering code and invocation tests; not included in PR 1.
 - **Proposed:** Intended behavior not yet implemented.
+
+**PR 1 contains factory creation, installed-template listing, and session-bound resolution only. The private-rendering prototype and invocation tests described below are separate deferred work and are not included in this PR.**
 
 ## 1. High-level component architecture
 
@@ -110,13 +113,13 @@ classDiagram
     style TemplateEngineSession fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
     style TemplateCatalogEntry fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
     style TemplateParameterDefinition fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
-    style TemplateResolutionResult fill:#fff3e0,stroke:#ef6c00,color:#4e342e
-    style ResolvedTemplate fill:#fff3e0,stroke:#ef6c00,color:#4e342e
+    style TemplateResolutionResult fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
+    style ResolvedTemplate fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
     style TemplateRenderResult fill:#fff3e0,stroke:#ef6c00,color:#4e342e
     style PrivateTemplateFileSystem fill:#fff3e0,stroke:#ef6c00,color:#4e342e
 ```
 
-Green indicates committed types; orange indicates local candidate types. Some committed types also have local edits. The command-to-factory edges are proposed, not current calls. Writing files and Stack-owned compatibility are responsibilities, not mandatory new classes. The model does not require `TemplateGroup` or a request/result wrapper for every operation.
+Green indicates committed baseline types; blue indicates PR 1 foundation types; orange indicates the deferred rendering prototype. Some baseline types also have staged edits. The command-to-factory edges are proposed, not current calls. Writing files and Stack-owned compatibility are responsibilities, not mandatory new classes. The model does not require `TemplateGroup` or a request/result wrapper for every operation.
 
 ### Object journey: `func init`
 
@@ -232,15 +235,18 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    subgraph implemented["LOCAL CANDIDATE - INTERNAL PATH"]
-        catalog["Internal template discovery / selection"]
+    subgraph foundation["PR 1 FOUNDATION - STAGED CANDIDATE"]
+        catalog["Factory creation and installed-template listing"]
         resolved["Session-bound exact resolution"]
+        catalog --> resolved
+    end
+    subgraph deferred["DEFERRED PROTOTYPE - LOCAL / UNCOMMITTED"]
         fixture["Pinned Node HTTP fixture invocation"]
         memory["Generate files privately in memory"]
         output["Immutable planned output"]
-        catalog --> resolved --> fixture --> memory --> output
+        fixture --> memory --> output
     end
-    subgraph pending["PENDING - PRODUCT INTEGRATION / QUALIFICATION"]
+    subgraph pending["PROPOSED INTEGRATION - NOT IMPLEMENTED"]
         registration["Production workload registration"]
         snapshot["Installed hive to verified private snapshot"]
         wiring["Production render-session / factory wiring"]
@@ -256,10 +262,11 @@ flowchart TD
         newcmd -.-> host
         initcmd -.-> host
     end
+    resolved -. "prototype-only selection path" .-> fixture
     output -. "planned output is not written" .-> write
 ```
 
-The renderer is fixture-specific, not a general installed-template API or working command journey. The regular factory does not yet create the private filesystem session. Latest Principal verdict: **PASS WITH NONBLOCKING FINDING** for the bounded fixture; write-time quotas, bounded source reads, cancellation checks, and exact-byte assertions were inspected statically. Inventory enumeration does not establish general resource isolation. Lane 3 build/test and Host execution are not established by this document. Lane 4's Windows probe is separate evidence and is not Lane 3 runtime qualification.
+The renderer is fixture-specific, not a general installed-template API or working command journey. The regular factory does not yet create the private filesystem session. The latest Principal verdict of **PASS WITH NONBLOCKING FINDING** applies only to the deferred bounded fixture prototype: write-time quotas, bounded source reads, cancellation checks, and exact-byte assertions were inspected statically. It does not review or qualify the PR 1 foundation. Inventory enumeration does not establish general resource isolation. Lane 3 build/test and Host execution are not established by this document. Lane 4's Windows probe is separate evidence and is not Lane 3 runtime qualification.
 
 ## Object-model review
 
@@ -267,24 +274,32 @@ The renderer is fixture-specific, not a general installed-template API or workin
 |---|---|---|---|
 | `InitCommand`, `NewCommand` | Committed CLI entry points | One command | Own parsing, orchestration, finalization, and user-facing results; template paths proposed. |
 | `IFunctionsProjectResolver`, `FunctionsProject` | Committed; project resolution and future `func new` admission | One resolution / command | Reuse project recognition; recognition is not full template compatibility. |
-| `TemplateEngineContext` | Committed; factory/session | One command | Captures project/Stack/language/bundle context; immutable snapshot is the intended contract. |
-| `ITemplaterFactory`, `Templater` | Committed types with local edits; future command consumers | One engine session per command | Factory hides construction; Templater keeps Microsoft.TemplateEngine types internal. |
-| `TemplateEngineSession` | Committed with local edits; Templater-owned | One command | Owns host, environment, and package manager; no second lifecycle owner. |
+| `TemplateEngineContext`, `ITemplaterFactory` | Committed baseline; factory/session input | One command | Captures project/Stack/language/bundle context and hides Microsoft.TemplateEngine construction from commands. |
+| `TemplaterFactory`, `Templater` | PR 1 foundation; staged discovery and exact-selection changes | One engine session per command | Creates the command-scoped Templater; lists metadata and resolves one exact candidate. Commands do not call it yet. |
+| `TemplateEngineSession` | PR 1 foundation changes staged; rendering filesystem additions deferred | One command | Owns the engine environment and package manager; remains internal to Templater. |
 | `TemplateCatalogEntry`, `TemplateParameterDefinition` | Committed metadata | Catalog/session | Describe choices and inputs; not conditional/default evaluation or invocation authority. |
-| `TemplateResolutionResult`, `ResolvedTemplate` | Local candidate; Templater and future command | Originating session | Preserve reasons and exact candidate; installed-content snapshot bridge pending. |
-| `PrivateTemplateFileSystem`, `TemplateRenderResult` | Local candidate; internal renderer | Render/session | Generate fixture files privately and return immutable planned output; not general sandbox or disk writing. |
+| `TemplateResolutionResult`, `ResolvedTemplate` | PR 1 foundation; staged candidate returned by Templater | Originating session | Preserve reasons and bind the exact selection to its issuing session; they do not expose an invocation locator in PR 1. |
+| `PrivateTemplateFileSystem`, `TemplateRenderResult` | Deferred prototype; local and uncommitted | Render/session | Generate fixture files privately and return immutable planned output; not a general sandbox or disk writer. |
 | Stack-owned compatibility | Proposed workload responsibility | Per decision | Keep project interpretation outside engine; no mandatory new class. |
 | Write Files to Project | Proposed CLI responsibility | Per operation | Authorize filesystem changes and report partial outcomes; concrete type only when a real consumer justifies it. |
 
 The historical Initial Proposal also sketches `TemplateGroup`, `TemplateSelectionCriteria`, `TemplateInvocationRequest`, and `TemplateInvocationResult`. Their names and signatures are not approved API. Use existing descriptors and ordinary method arguments first.
 
-## Discussion points and open decisions
+## Implementation direction
 
-- Align representative HTTP content: Lane 3 fixture is query-aware; Lane 4 package has a fixed greeting and historical metadata. Neither establishes approved production content.
-- Confirm initial parameter semantics and candidate-specific parsing before final variant selection.
-- Assign production package ownership, workload registration into the CLI hive, and selected-content integrity policy.
-- Confirm resolver admission, Stack-owned item compatibility, writing files to the project, and partial-outcome reporting.
-- Preserve the current Quickstart route; defer broader Template Engine reuse and physical extraction (#5330) until after Ignite.
+The CLI uses one Template Engine for project and item templates.
+Commands resolve the requested project or Stack, select an eligible
+template, and generate its content privately before writing
+authorized changes to disk.
+
+The Template Engine coordinates supported template-defined tasks,
+including tasks contributed by individual Stacks. Template packages
+use the same Hive registration and discovery contract regardless
+of how they are delivered.
+
+Implementation will proceed through small, reviewable increments,
+beginning with the command-facing object model and existing
+Template Engine infrastructure.
 
 ## Code and evidence references
 
@@ -298,8 +313,9 @@ Committed references point to accepted baseline `883b02ee9bc10c431a67c044a7f059a
 | Project/Stack | `IFunctionsProjectResolver`; `FunctionsProject`; `NodeWorkload`; `NodeProjectStack`; `NodeProjectFactory` |
 | Initializer/Quickstart | `NodeProjectInitializer`; `QuickstartCommand` |
 | Committed engine models | `src/Func/Templates/Engine/ITemplaterFactory.cs`; `TemplateEngineContext.cs`; `TemplateCatalogEntry.cs`; `TemplateParameterDefinition.cs` |
-| Local renderer/tests | **LOCAL / UNCOMMITTED:** `src/Func/Templates/Engine/Templater.cs`, `TemplaterFactory.cs`, `TemplateEngineSession.cs`, `PrivateTemplateFileSystem.cs`, `TemplateResolutionResult.cs`, `TemplateRenderResult.cs`; `test/Func.Tests/Templates/Engine/TemplaterInvocationTests.cs` |
-| Local implementation plan | **LOCAL / MODIFIED:** `docs/templates/implementation.md` |
+| PR 1 staged code/tests | **STAGED CANDIDATE:** `src/Func/Templates/Engine/TemplateConstraintDeclarationReader.cs`, `TemplaterFactory.cs`, `Templater.cs`, `TemplateEngineSession.cs`, `TemplateResolutionResult.cs`; `test/Func.Tests/Templates/Engine/TemplateConstraintDeclarationReaderTests.cs`, `TemplaterFactoryTests.cs`, `TemplaterTests.cs`; `test/Func.Tests/Templates/TemplateFixtures.cs` (selection fixture only). |
+| Deferred rendering code/tests | **LOCAL / UNCOMMITTED — NOT IN PR 1:** `FuncTemplateEngineHost.cs`, `PrivateTemplateFileSystem.cs`, `TemplateRenderResult.cs`, `TemplaterInvocationTests.cs`; render-only portions of `Templater.cs`, `TemplateEngineSession.cs`, and `TemplateFixtures.cs`; invocation locator members in the worktree version of `TemplateResolutionResult.cs`. |
+| PR 1 documentation | **STAGED CANDIDATE:** `docs/templates/README.md`, `architecture.md`, `implementation.md`, `Templates-EndToEnd-Object-Model-Review.md`. |
 | Initial Proposal | **LOCAL / HISTORICAL:** `context/source-evidence/initial-proposal.md` |
 | Lane 4 content | **SEPARATE LOCAL CANDIDATE:** `Templates-NodeHttp-Qualification/azure-functions-templates/Docs/node-http-qualification.md` and `Functions.Templates/NodeHttpQualification/content/` |
 

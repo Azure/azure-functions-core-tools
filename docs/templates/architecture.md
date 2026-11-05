@@ -1,62 +1,53 @@
 # Templates Architecture
 
-**Status:** Proposed
+**Status:** Approved architecture; implementation proceeds through small increments.
 
 ## Overview
 
-The Template Engine enables `func init` to create a Functions project and `func new` to add a function using installed templates. It discovers templates, uses their metadata to find suitable choices, evaluates template parameters, and invokes the selected template.
+The CLI uses one **Template Engine** for project and item templates. `func init` selects project templates; `func new` selects item templates. Quickstarts are project templates, not a third template kind.
 
-The initial goal is a working local journey: `func init` creates a valid project; `func new` adds a parameterized function; the Functions Host discovers that function. A small set of representative templates can establish this integration before the complete template catalog is migrated. This is not, by itself, release qualification.
+Commands own public parsing, interaction, project resolution, destination authorization, file writing, and user-facing results. The Template Engine owns installed-template discovery, exact selection, supported parameter processing, private generation, and coordination of approved template-defined tasks. The owning workload supplies Stack-specific compatibility and task behavior. This does not require a generic task framework or one production type per responsibility.
+
+Template packages use one Hive registration and discovery contract regardless of how they are delivered. The Template Engine consumes installed content; discovery does not acquire or install packages. The Template Engine remains in Core Tools for this milestone. Physical extraction under issue #5330 is deferred until after Ignite.
+
+The eventual representative journey is `func init` creating a project, `func new` adding a function, and the Functions Host discovering it. That end-to-end proof is not a prerequisite for the first object-model foundation and does not, by itself, establish release qualification.
 
 <a id="end-to-end-proof"></a>
 
-The first working journey defines the representative project, item and Functions Host proof.
-
-The Template Engine is part of CLI v5. Moving it into a separate assembly is outside the initial scope.
-
-## Initial Design
+## Responsibilities and object model
 
 The command-facing flow is:
 
-1. The CLI parses the command and identifies the project or requested language stack.
-2. The template factory creates a `Templater` with the relevant context.
-3. The `Templater` lists or resolves templates installed in the CLI's template hive.
-4. The CLI presents choices when necessary and supplies template-specific arguments.
-5. The Template Engine resolves one exact template, evaluates its parameters, and renders it.
-6. The CLI validates and publishes the resulting files and reports the outcome.
+1. A command resolves the requested project or Stack and captures the context needed by the Template Engine.
+2. `ITemplaterFactory` creates a command-scoped `Templater` from `TemplateEngineContext`.
+3. `Templater` lists installed metadata or resolves one exact eligible template.
+4. The command handles any interaction and supplies supported inputs.
+5. The Template Engine processes supported parameters, generates privately, and coordinates approved template-defined tasks.
+6. The command validates and writes authorized files, completes command or Stack work, and reports actual results.
 
 | Component | Responsibility |
 | --- | --- |
-| CLI commands | Parse public options, identify project and language stack, prompt for input, authorize filesystem changes, persist project configuration, and report results. |
-| Template factory and context | Create the command-facing `Templater` with the installed-template scope and required command context. |
-| `Templater` | Expose installed template metadata and the operations needed to list, resolve, and invoke templates. |
-| Template catalog entry | Describe an available template, including identity, metadata, and parameters; it is not itself permission to invoke a template. |
-| Template group | Present related template variants together when useful for selection. |
-| Resolved template | Represent the exact selected template that can be invoked within its valid session. |
-| Template Engine internals | Use Microsoft.TemplateEngine facilities for metadata, authored parameter semantics, and rendering. Manage engine sessions and temporary rendering resources internally. |
-| Content producers and workload installation | Build, package, distribute, and register templates in the CLI hive. |
+| CLI commands | Own public options and interaction, resolve the project or requested Stack, authorize and write destination changes, complete command-specific work, and report results. |
+| `TemplateEngineContext` | Capture the command, project, and bundle context used to create `Templater`. Retain this name; it already describes the factory input. |
+| `ITemplaterFactory` and `TemplaterFactory` | Create the command-scoped `Templater` without exposing Microsoft.TemplateEngine construction to commands. |
+| `Templater` | List installed catalog metadata and resolve an exact template or return actionable diagnostics. It owns the engine session. |
+| `TemplateEngineSession` | Internal to `Templater`; owns the Microsoft.TemplateEngine environment and package manager for the command lifetime. Commands do not depend on it. |
+| `TemplateCatalogEntry` | Describe installed template metadata and parameters; it does not authorize invocation. |
+| `ResolvedTemplate` and `TemplateResolutionResult` | Bind one exact selection to its issuing session and carry either that selection or candidates and diagnostics. |
+| Template Engine internals | Use Microsoft.TemplateEngine for metadata, supported parameter semantics, private generation, and approved task orchestration. |
+| Template and workload owners | Supply project/item content and Stack-specific tasks; workload installation registers packages in the CLI Hive. |
 
-The CLI captures the command, project, and bundle context once. The Template Engine uses one command-scoped session for discovery, parameter evaluation, and invocation.
-
-The Templater keeps engine objects private. Catalog and group collections are immutable views, and parameter metadata has one canonical representation.
-
-Only an exact selection issued by the Templater can be invoked. Selections from another session, or selections that are stale or disposed, must fail.
-
-The existing session owns temporary rendering resources. No additional lifecycle owner is needed.
-
-These are responsibilities and useful object-model concepts, not a requirement to introduce a public class or interface for each row. Reuse existing types where they fit. The proposed group, resolution, request, and result shapes inform the command-facing API; their exact signatures still need agreement against concrete command calls.
-
-**Terminology:** A *Stack* is an Azure Functions language stack, such as Node.js or Python. *Runtime* means the Azure Functions application/Functions Host runtime, not a language worker. A `hive` is an isolated scope of installed templates. There is one component named **Template Engine**; the previous unshipped implementation is not the design to reproduce.
+Keep Microsoft.TemplateEngine types private to the engine implementation. Use the existing command-facing context and catalog types; do not add a group, request wrapper, task framework, or lifecycle owner without a concrete consumer. Catalog entries describe choices; only an exact session-bound selection can be used by a later invocation. A selection does not prove that its mounted content is unchanged or safe to render.
 
 ## Installed templates and discovery
 
-The Template Engine consumes templates already installed in a dedicated CLI hive. The `Templater` provides access to the metadata available in that scope. Discovery does not download packages or install templates as a side effect.
+The Template Engine consumes templates installed in the dedicated CLI Hive. Template packages share the same registration and discovery contract regardless of delivery mechanism. Workload installation owns package acquisition and registration; discovery does not download packages or install templates as a side effect.
 
-A command supplies the relevant project or Stack context. The command-facing API should return usable template choices and meaningful reasons when candidates are unavailable. Prefer a straightforward call that accepts context and returns the relevant collection; do not require the CLI to orchestrate multiple discovery passes merely to obtain that list. Whether filtering happens internally during discovery or in a subsequent resolution operation is an API detail for the CLI team to settle.
+A command supplies the project or Stack context. `Templater` lists metadata and resolves a requested identity or alias to one exact eligible candidate, returning reasons when candidates are unavailable or a reference is ambiguous. A catalog entry is descriptive metadata, not permission to invoke a template.
 
 Template producers can develop project and item content independently. Representative local templates with different Stack metadata should exercise discovery, filtering, and selection. Production workload registration is a separate integration task: test-only registration in an isolated hive does not prove that installed workloads populate the CLI hive.
 
-Ordinary listing excludes hidden items while retaining diagnostics for unavailable candidates. Listing does not impose creation-only bundle gates. Resolve the explicit project target without introducing upward search, and keep selection within the chosen source/channel scope.
+Listing retains hidden or unusable entries as metadata with diagnostics; resolution rejects hidden or invalid entries. Listing does not impose creation-only bundle gates. Resolve the explicit project target without introducing upward search, and keep selection within the selected source scope.
 
 <a id="parameter-evaluation"></a>
 <a id="token-capture"></a>
@@ -91,7 +82,7 @@ If the installed engine cannot evaluate a required template feature, reject that
 
 <a id="selected-content-and-constraints"></a>
 
-## Selected content and rendering
+## Generate Files Privately
 
 Invoking a template must use the exact content selected, not a later lookup by name or a different variant.
 
@@ -151,7 +142,7 @@ Listing is not proof that generation works. An exact-ID failure cannot fall back
 
 `func new` skips first-run setup. The current handler reports template generation and listing unavailable without modifying the destination. The current command implementation and the proposed generation path must be distinguished during integration and testing.
 
-## Filesystem and failure behavior
+## Write Files to Project
 
 The CLI owns destination safety. Before publishing, it validates relative paths, path aliases, ancestor links, collisions, originals, and the exact authorized force-deletion scope. A replace or append operation must check that its original has not changed, even when force was requested. File publication must be qualified on supported operating systems; an ordinary move operation is not automatically a safe guarded replacement.
 
@@ -174,11 +165,29 @@ The existing .NET project-template workflow uses its own template hive. That is 
 
 Installation/setup registers a validated local package from an installed, versioned workload into the existing CLI hive before reporting template content ready. Registration and retry are idempotent for that workload identity/version. Missing content, unsupported metadata or registration failure reports incomplete availability, retains prior usable registration where possible, and provides an explicit repair path. Package-relative location, version/channel policy and replacement coordination remain owner decisions; discovery never scans arbitrary directories or acquires content.
 
+## Production Template Content Contract
+
+This contract scopes the first production content contribution to one Node.js JavaScript project template and one Node.js JavaScript HTTP item template for the Node.js programming model v4. It does not implement package creation or workload registration.
+
+**Established:** Use Microsoft.TemplateEngine `template.json` metadata with `tags.type` set to `project` or `item` and `tags.language` set to the canonical `JavaScript` value. The canonical Node Stack identifier is `node`. The owning workload supplies Stack compatibility; model-v4 compatibility means the Node.js programming model and `@azure/functions` v4 APIs, not Azure Functions Runtime v4. The HTTP item must use the model-v4 `app.http()` programming model. The two starter templates are visible; omit `func.host.json` `isHidden` or set it to `false`.
+
+**Proposed command/content contract:** Bind the built-in string parameter `name` to the generated function name and use `sourceName` for source substitution; do not define a second function-name option. The HTTP request query value `name` is runtime input, not a template parameter. The command owns any missing-name prompt or default. Lane 4 qualified only name-only binding for its HTTP fixture, not general parameter processing. Keep the first content pair to unconditional parameter values: the current implementation does not evaluate conditional requiredness, disabled parameters, or conditional defaults.
+
+Each template has its own package-relative root, with `.template.config/template.json` and all source assets beneath that root. Keep configuration and assets in the immutable package version, avoid external or additional configuration files, and verify the selected configuration and assets before invocation as required by [Generate Files Privately](#selected-content-and-constraints). The package must not use authored post-actions or unsupported custom operations.
+
+**Proposed for approval:** Publish the two starter templates in one NuGet template package referenced by the Node workload. Pin the exact package version in workload release metadata and keep it on the workload's release channel, without requiring identical numeric versions. Omit `shortName` aliases and `groupIdentity` for the initial pair: exact identities are sufficient, and a project template and an item template are not sibling variants. Add aliases or groups only when a later supported selection experience needs them.
+
+**Decision required:** Existing production packages do not establish an identity or version rule for this new content package. The templates repository has separate WebJobs, Worker, and Extension Bundle package IDs and release trains; the Node workload has its own version and embeds workload assets but does not register a companion template package. The qualified HTTP identity `Azure.Functions.Templates.Node.Basic.Http.JavaScript` is a local fixture identity, not an approved production identity. Owners must approve the NuGet package ID, the project and item `identity` values, and the package-version pin/replacement policy before production content is authored. These values must remain stable after publication.
+
+The Engine classifies templates by `type` and `language`; the Node workload must enforce Stack compatibility and verify that an existing project supports programming model v4 before offering the HTTP item. The current `NodeProjectFactory` detects an `@azure/functions` dependency but does not check its version, so model-v4 admission remains implementation work. Do not add a `func-workload` constraint to these templates yet: the PR 1 `TemplateEngineContext` contains no workload inventory and selection fails closed when that constraint cannot be evaluated. Production registration must make the package available in the dedicated CLI Hive before discovery. Registration must be idempotent for a workload identity/version and report missing or invalid content as incomplete availability; discovery does not download or install packages.
+
+**Decision required:** Confirm whether the Node workload bundles the referenced package bytes or acquires that exact NuGet version during workload installation. Either path must register the same validated package in the CLI Hive before reporting template content ready; the CLI must not acquire it during discovery.
+
 <a id="normative-authority"></a>
 
 ## Scope and compatibility
 
-This document defines the proposed initial contract. Archived task lists are not implementation instructions; the dispositions below preserve their relevant requirements without making the historical specifications jointly authoritative.
+This document defines the approved architecture. Archived task lists are historical context, not implementation instructions or additional sources of current requirements.
 
 | Historical area | Disposition for this increment |
 | --- | --- |
@@ -187,17 +196,19 @@ This document defines the proposed initial contract. Archived task lists are not
 | Engine integration | Retain host context, catalog metadata, explicit group identity, func-host aliases, fail-closed eligibility and exact invocation. Projection-driven conditional evaluation and full-ID widening are superseded. General selection frameworks and authored action plumbing are deferred. |
 | Constraints | Raw validation, fail-closed evaluation and selected-content checks apply now. Installer/update preflight and producer-specific rules are deferred with those workflows. |
 | Package lifecycle | Install/update/uninstall/search and feed UX are deferred. Package provenance and failure-safe replacement remain requirements to revisit when those workflows enter scope; local workload registration is separate. |
-| Quickstarts | Preserve the existing Quickstart route. Template-first, multi-project, topology/action and browse proposals are deferred. |
+| Quickstarts | Quickstarts are project templates, not a third template kind. Keep the existing route until its Template Engine replacement is implemented and qualified. |
 | Umbrella and producer pipeline | Preserve program and producer history, not a requirement to complete all historical changes before the first engine proof. Producer automation remains deferred. |
 
 The historical research reports `docs/research/historical-design-reconciliation.md` and `docs/research/v4-command-behavior-baseline.md` are unavailable in this checkout, as are historical package bytes and artifact-exact parity evidence. Their citations do not establish parity or executed qualification.
 
-## Decisions to finish with the team
+## Remaining implementation and qualification
 
-- **CLI team:** the smallest command-facing API and object shapes; template group/variant selection and alias policy; supported parameter semantics and token handoff.
-- **Template content owners and workload owners:** representative project/item packages, production package location, workload-to-hive registration, versioning, and content integrity.
-- **CLI team and release owners:** initial supported Stack scope, public activation, force-policy changes, and release qualification.
+The architecture is settled; the following work remains before template-backed commands can be activated:
 
-The CLI team and release owners must settle explicit hidden-ID access, profile/no-bundle policy and supported item-Stack scope, including Go, Java and PowerShell. Until approved, these decisions do not change current public behavior or activate unavailable generation.
+- Register production workload packages in the CLI Hive and qualify package identity, versioning, and content integrity.
+- Verify selected content before invocation; reject unsupported template effects before destination changes.
+- Generate privately, validate the complete output, and publish only guarded, authorized changes with truthful partial-effect reporting.
+- Integrate `func init` and `func new` without changing their public grammar or replacing existing Stack behavior before replacements qualify.
+- Qualify supported Stack content, Functions Host discovery, cancellation, cleanup, and guarded publication on supported platforms.
 
-The first implementation can proceed with representative installed content while these production-content decisions are resolved. Public availability requires the appropriate real content, registration, and qualification.
+The first foundation PR does not require the complete Node.js end-to-end journey. Current initializers and command behavior remain in place until their replacements are integrated and qualified.

@@ -172,6 +172,47 @@ internal static class TemplateFixtures
         return packageDirectory;
     }
 
+    public static string WriteSelectionPackage(
+        string parentDirectory,
+        params (string DirectoryName, string Identity, string ShortName, string? GroupIdentity, string? Language, string? ConstraintType, object? ConstraintArgs)[] templates)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "selection-templates");
+        foreach (var template in templates)
+        {
+            string groupIdentity = template.GroupIdentity is null
+                ? string.Empty
+                : $", \"groupIdentity\": {System.Text.Json.JsonSerializer.Serialize(template.GroupIdentity)}";
+            string language = template.Language is null
+                ? string.Empty
+                : $", \"language\": {System.Text.Json.JsonSerializer.Serialize(template.Language)}";
+            string constraint = template.ConstraintType is null
+                ? string.Empty
+                : $$"""
+                  , "constraints": {
+                    {{System.Text.Json.JsonSerializer.Serialize(template.ConstraintType)}}: {
+                      "type": {{System.Text.Json.JsonSerializer.Serialize(template.ConstraintType)}},
+                      "args": {{System.Text.Json.JsonSerializer.Serialize(template.ConstraintArgs)}}
+                    }
+                  }
+                  """;
+
+            WriteTemplate(
+                Path.Combine(packageDirectory, template.DirectoryName),
+                $$"""
+                {
+                  "$schema": "http://json.schemastore.org/template",
+                  "identity": {{System.Text.Json.JsonSerializer.Serialize(template.Identity)}},
+                  "name": {{System.Text.Json.JsonSerializer.Serialize(template.DirectoryName)}},
+                  "shortName": {{System.Text.Json.JsonSerializer.Serialize(template.ShortName)}},
+                  "tags": { "type": "item"{{language}} }{{groupIdentity}}{{constraint}}
+                }
+                """,
+                ($"{template.DirectoryName}.txt", $"content from {template.Identity}"));
+        }
+
+        return packageDirectory;
+    }
+
     /// <summary>
     /// Installs a folder package into the template engine settings at <paramref name="settingsLocation"/>.
     /// </summary>

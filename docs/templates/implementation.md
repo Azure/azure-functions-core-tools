@@ -1,22 +1,28 @@
 # Implementing the Template Engine
 
-**Status:** Proposed implementation plan
+**Status:** Incremental implementation plan. The [architecture](architecture.md) is the normative description of the Template Engine.
 
-This document describes the existing CLI v5 infrastructure, what remains to be implemented, and how to validate the first `func init` and `func new` integration. The [architecture](architecture.md) defines the required behavior and safety boundaries.
+This document distinguishes the PR 1 foundation from deferred rendering, command integration, and qualification. PR 1 does not require the complete `func init` / `func new` / Functions Host journey.
 
-## What exists today
+## Existing committed infrastructure
 
-The repository baseline described by the current design includes:
+The existing object model includes `ITemplaterFactory`, `TemplateEngineContext`, `TemplateEngineSession`, `Templater`, `TemplateCatalogEntry`, and `TemplateParameterDefinition`. The host registers the factory, and the engine session uses the dedicated CLI template Hive. Catalog and parameter projectors, func-host metadata readers, and constraint helpers provide reusable metadata handling. Commands do not yet call the factory.
 
-- `TemplaterFactory`, `TemplateEngineContext`, `TemplateEngineSession`, and `Templater`: creation/disposal, a dedicated CLI template hive, installed-template listing, and metadata projection. The new command-facing resolution and invocation behavior is not complete.
-- `TemplateCatalogEntry` and parameter projection: template identity and display metadata. Projection alone does not evaluate conditional requirements or defaults.
-- Template constraint readers and evaluators: reusable helpers that are not yet wired into the complete command path.
-- `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
+## PR 1 foundation
 
-- `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
-- `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
-- `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
-- Test-only local template registration in isolated hives. Workload deployment does not yet establish the required production registration into the CLI template hive.
+The foundation provides a command-facing creation context, factory, command-scoped `Templater`, installed catalog metadata, and exact session-bound selection with actionable diagnostics. `TemplateEngineSession` remains internal to `Templater`. The implementation reuses `TemplateEngineContext`, `TemplateCatalogEntry`, and existing metadata/constraint helpers; it adds no group model or general task framework. The first production-content scope and its remaining identity/version decisions are defined in the [Production Template Content Contract](architecture.md#production-template-content-contract).
+
+PR 1 does not change `InitCommand` or `NewCommand`, activate template listing or generation, or replace existing Stack initializers.
+
+## Deferred work
+
+- `TemplateEngineSession` and `Templater` use the dedicated CLI template Hive. Local test packages can be registered there; production workload registration into that Hive is still required. Production package identity, template identities, and version coordination remain owner decisions.
+- A fixture-specific private-rendering prototype has been developed separately, including bounded source/output handling and planned output. It is not part of this PR, is not wired through the normal factory or a command, and has not been built or tested.
+- Installed-content snapshot verification, general supported parameter processing, Stack-owned task contributions, guarded destination publication, and actual-effect reporting remain later work.
+- `InitCommand` and its six existing Stack initializers continue to handle project creation, adoption, and configuration repair until replacements qualify.
+- `NewCommand` retains its existing public argument surface. Its current migration handler reports listing and scaffolding unavailable before changing the target; PR 1 does not alter that behavior.
+- Quickstarts are project templates in the approved architecture. The existing Quickstart route remains until its migration is implemented and qualified.
+- The Template Engine remains in Core Tools for this milestone. Physical extraction under issue #5330 is deferred until after Ignite.
 
 ### Existing initialization limitations
 
@@ -24,27 +30,18 @@ The current `func init` path has known safety limitations: it can create the des
 
 These behaviors belong to the existing implementation. The proposed template-based path must correct them before replacing an initializer.
 
-Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Commands/InitCommand.cs`, `src/Func/Commands/NewCommand.cs`, `src/Abstractions/Projects/`, and `src/Workloads/Stacks/`. Recheck the exact implementation branch before treating any type as available: the legacy cleanup and ongoing feature work may have changed the baseline.
+Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Commands/InitCommand.cs`, `src/Func/Commands/NewCommand.cs`, `src/Abstractions/Projects/`, and `src/Workloads/Stacks/`. Current source and tests define the implemented compatibility behavior.
 
-## Initial implementation
+## Incremental delivery
 
-Build the smallest working command-facing model first, then fill in behavior incrementally.
+1. **PR 1 — establish the object-model foundation.** Create `Templater` from the existing command context and factory; list installed template metadata; resolve one exact eligible selection or return diagnostics. Keep the engine session internal and leave commands unchanged.
+2. **Connect installed content.** Register workload-provided packages through the shared CLI Hive contract and verify the selected source before invocation. Delivery mechanism must not change discovery behavior.
+3. **Qualify private generation.** Use representative project and item content to validate exact invocation, supported parameter processing, bounded private output, cancellation, and approved template-defined tasks. Stack-specific tasks come from the owning workload; do not introduce a generic task framework.
+4. **Add guarded publication.** Validate all intended destination effects, protect existing and Git metadata, preserve non-force behavior, and report partial effects truthfully.
+5. **Integrate commands incrementally.** Preserve `func init` adoption/repair and current Stack behavior; add project-template and item-template paths without changing public grammar until each path is ready.
+6. **Qualify production content and runtime behavior.** Verify production workload registration, Functions Host discovery, supported platforms, and the approved Stack scope before activating public paths.
 
-1. **Establish the API surface.** Create a `Templater` from the factory and command context. Support listing or resolving installed templates and invoking an exact selected template. Keep the engine session internal. Use the proposed group/catalog/resolved-template concepts where they make the API clearer; do not create wrappers without a consumer.
-
-2. **Qualify the engine seam.** With representative project and parameterized function templates installed in an isolated hive, prove metadata discovery, Stack filtering, exact selection, parameter evaluation, and invocation against selected content. Use multiple metadata variants to expose filtering and ambiguity behavior.
-
-3. **Integrate the CLI commands.** Preserve `func init` adoption/repair and current Stack behavior. Add one template-based project route and one `func new` item route for the same Stack. Keep unmigrated initializers working.
-
-4. **Add guarded publication.** Render privately, validate target effects, preserve non-force behavior, protect Git metadata, persist required configuration correctly, and report failures and partial effects.
-
-5. **Connect production content.** Once template content owners and workload owners confirm package ownership and layout, register installed workload templates into the CLI hive. Do not make discovery install packages.
-
-6. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
-
-Steps 3 and 4 form one safe command increment: no integrated route may change a destination before the guarded publication requirements are in place.
-
-This order is a delivery plan, not a mandate for a large framework or a complete catalog before the first engine proof.
+These increments keep the first PR reviewable. The complete Node.js end-to-end journey is a later integration milestone, not a prerequisite for PR 1.
 
 ## Stack behavior to preserve
 
@@ -63,21 +60,25 @@ Common bundle options include `--no-bundles` and `--bundles-channel`. Preserve S
 
 Keep the distinction between the language Stack and the Azure Functions Runtime. Do not interpret a worker alias or a public `--runtime-version` option as a new architecture term.
 
-## Dependencies and open decisions
+## Remaining implementation gates
 
 | Area | Needed before |
 | --- | --- |
-| Command-facing API, group/variant and alias behavior | Freezing signatures and public selection behavior |
-| Microsoft.TemplateEngine parameter and selected-content APIs | Claiming supported evaluation and exact invocation |
-| Representative real project and item content | Completing the first useful end-to-end proof |
-| Workload package layout and production registration | Making templates available through installed workloads |
-| Supported Stack scope, platform policy, and force behavior | Public activation and release acceptance |
+| Production workload package registration | Production templates are available in the CLI Hive |
+| Verified source snapshot and supported parameter semantics | Invoking selected installed content |
+| Approved template-defined task contracts | Coordinating tasks contributed by a Stack |
+| Guarded destination publication | Writing generated files to a project |
+| Supported content, Functions Host, and platform qualification | Activating public template-backed command paths |
 
 Engine work with isolated representative content does not need to wait for the entire production catalog. A public template-backed journey does need approved content and production registration.
 
-## Tests and acceptance
+## Focused tests and later acceptance
 
-### First working journey
+### PR 1 tests
+
+PR 1 covers factory creation, catalog listing, exact identity selection, alias ambiguity, duplicate identities, ineligible candidates, selection ownership, invalid selection, and actionable diagnostics. The focused filter ran against an isolated snapshot of the exact staged candidate with .NET SDK 10.0.403: 108 passed, 0 failed, and 0 skipped.
+
+### Later end-to-end journey
 
 Use a real project template and a parameterized HTTP-function template for one supported Stack:
 
@@ -99,10 +100,12 @@ A `host.json` file, successful listing, or basic text-file fixture alone does no
 - **Publication:** path/ancestor/case checks, guarded no-replace or replacement on supported operating systems, cancellation, cleanup, and truthful partial-effect reporting.
 - **Packaging:** isolated test registration versus real workload registration; missing or incompatible installed content; retry and version coordination.
 
-## Qualification and limitations
+## Validation status and limitations
 
-Static source and tests do not prove the published engine works end to end. Runtime qualification is still required for Microsoft.TemplateEngine parameter and mount behavior, selected-content integrity, actual Host discovery, filesystem operations across supported OS/RIDs, package acquisition/registration, and supported Stack coverage.
+The latest Lane 3 Principal delta review passed with a nonblocking finding; that review was inspection-only. The focused PR 1 tests were executed against an isolated snapshot of the exact staged 13-file candidate with .NET SDK 10.0.403: 108 passed, 0 failed, and 0 skipped. An earlier attempt to validate from the lane runtime stopped because it lacked `dotnet.exe`; this publication run used the installed SDK. **RUNTIME VALIDATION REQUIRED** for production generation and host qualification.
 
-Keep current initializers and the separate Quickstart route until their replacement or migration is explicitly in scope and validated. Package install/update/uninstall/search, producer pipeline expansion, template-first or multi-project Quickstart UX, general template actions, and physical engine extraction are outside this initial increment.
+Lane 4's Windows qualification is separate evidence and does not qualify this Lane 3 candidate. Focused unit tests do not establish installed-hive snapshot integration, general source integrity, guarded physical publication, cross-platform behavior, Functions Host discovery, or supported Stack coverage; these remain unqualified.
+
+Keep current initializers and the existing Quickstart route until their replacements or migrations are implemented and qualified. Package install/update/uninstall/search, producer-pipeline expansion, a general task framework, and physical engine extraction are outside PR 1.
 
 Earlier investigations are preserved in the [archive](archive/). They do not replace current source, accepted API decisions, or executed qualification evidence.
