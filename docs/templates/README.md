@@ -6,5 +6,6 @@ Existing Stack initializers remain in use. The PR 1 foundation adds installed-te
 
 - [Architecture](architecture.md) — component ownership, template selection, the production-content authoring contract, generation, and publication requirements.
 - [Implementation](implementation.md) — current foundation, deferred work, and validation status.
+- [Packaging and acquisition](packaging-and-acquisition.md) — proposed cross-Stack content and workload contract.
 
 Implementation proceeds through small, reviewable increments. A complete Node.js `func init` / `func new` / Functions Host journey is not a prerequisite for the first object-model foundation. Earlier designs and investigations remain in the [archive](archive/).
