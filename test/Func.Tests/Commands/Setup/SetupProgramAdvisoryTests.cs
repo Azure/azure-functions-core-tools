@@ -186,7 +186,7 @@ public sealed class SetupProgramAdvisoryTests(ITestOutputHelper output)
                 string expectedVersion = cliAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
                     ?? cliAssembly.GetName().Version?.ToString() ?? string.Empty;
                 using StringReader lines = new(result.StandardOutput);
-                lines.ReadLine().Should().Be(expectedVersion);
+                lines.ReadLine().Should().Be(expectedVersion.Split('+')[0]);
             }
             else if (!args.Contains("[suggest]")) result.StandardOutput.Should().Contain("func setup").And.Contain("--format");
 

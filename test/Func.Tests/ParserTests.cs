@@ -3,9 +3,14 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Tests.Console;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests;
 
@@ -64,6 +69,73 @@ public class ParserTests
         ParseResult result = root.Parse(commandName);
 
         result.Errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Parse_RootVerbose_SeparatesVersionAndBuild()
+    {
+        ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
+        provider.Version.Returns("5.0.0-preview.5");
+        provider.InformationalVersion.Returns("5.0.0-preview.5+9807f091f795388682b93efd2539aa6b3953de42");
+        using var services = (ServiceProvider)TestParser.BuildServiceProviderWith(
+            _interaction, services => services.AddSingleton(provider));
+        FuncRootCommand root = Parser.CreateCommand(services);
+        ParseResult result = root.Parse(["--verbose"]);
+
+        int exit = await result.InvokeAsync();
+
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Contain("  ROW: [Version, 5.0.0-preview.5]");
+        _interaction.Lines.Should().Contain("  ROW: [Build, 5.0.0-preview.5+9807f091f795388682b93efd2539aa6b3953de42]");
+    }
+
+    [Theory]
+    [InlineData("--version", "5.0.0", 4)]
+    [InlineData("version", "5.0.0", 4)]
+    [InlineData("--version", "5.0.0-preview.5", 8)]
+    [InlineData("version", "5.0.0-preview.5", 8)]
+    [InlineData("--version", "5.0.0-preview.5.pr.26554.0", 20)]
+    [InlineData("version", "5.0.0-preview.5.pr.26554.0", 20)]
+    [InlineData("--version", "5.0.0-preview.5.pr.26554.0", 80)]
+    [InlineData("version", "5.0.0-preview.5.pr.26554.0", 80)]
+    public async Task Parse_VersionInvocation_WritesSingleUnwrappedLine(string command, string version, int width)
+    {
+        using var stdout = new BufferedConsole(interactive: false, ansi: false, noColor: true);
+        using var stderr = new BufferedConsole(interactive: false, ansi: false, noColor: true);
+        stdout.Profile.Width = width;
+        var interaction = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
+        ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
+        provider.Version.Returns(version);
+        provider.InformationalVersion.Returns($"{version}+9807f091f795388682b93efd2539aa6b3953de42");
+        using var services = (ServiceProvider)TestParser.BuildServiceProviderWith(
+            interaction, services => services.AddSingleton(provider));
+        FuncRootCommand root = Parser.CreateCommand(services);
+        ParseResult result = root.Parse([command]);
+
+        int exit = await result.InvokeAsync();
+
+        exit.Should().Be(0);
+        stdout.Output.Should().Be(version + Environment.NewLine);
+        stderr.Output.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("--version", "--verbose")]
+    [InlineData("--version", "--unknown")]
+    [InlineData("--version", "setup", "--format")]
+    public async Task Parse_VersionOptionWithOtherTokens_PreservesShortCircuit(params string[] args)
+    {
+        ICliVersionProvider provider = Substitute.For<ICliVersionProvider>();
+        provider.Version.Returns("5.0.0-preview.5");
+        using var services = (ServiceProvider)TestParser.BuildServiceProviderWith(
+            _interaction, services => services.AddSingleton(provider));
+        FuncRootCommand root = Parser.CreateCommand(services);
+        ParseResult result = root.Parse(args);
+
+        int exit = await result.InvokeAsync();
+
+        exit.Should().Be(0);
+        _interaction.Lines.Should().Equal("5.0.0-preview.5");
     }
 
     // --- Workload command tracking ---
