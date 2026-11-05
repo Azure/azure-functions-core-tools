@@ -67,10 +67,6 @@ public class PythonFunctionsProjectTests : IDisposable
         context.EnvironmentVariables[PythonFunctionsProject.IsolateWorkerDepsEnvVar].Should().Be("1");
         context.EnvironmentVariables[PythonFunctionsProject.WorkerExecutablePathEnvVar].Should().Be(
             PythonFunctionsProject.GetVenvExecutablePath(venvCreatedAt!, "python"));
-        project.GuaranteesHostRunEnvironmentVariableOverride(PythonFunctionsProject.IsolateWorkerDepsEnvVar.ToLowerInvariant()).Should().BeTrue();
-        project.GuaranteesHostRunEnvironmentVariableOverride(PythonFunctionsProject.WorkerExecutablePathEnvVar).Should().BeTrue();
-        project.GuaranteesHostRunEnvironmentVariableOverride(PythonFunctionsProject.WorkerRuntimeVersionEnvVar).Should().BeFalse();
-        project.GuaranteesHostRunEnvironmentVariableOverride(PythonFunctionsProject.VirtualEnvEnvVar).Should().BeFalse();
     }
 
     [Fact]

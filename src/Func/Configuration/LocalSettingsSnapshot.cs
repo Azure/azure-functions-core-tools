@@ -9,8 +9,6 @@ internal sealed class LocalSettingsSnapshot
 
     public bool IsEncrypted { get; init; }
 
-    public IReadOnlyCollection<string> EncryptedValueNames { get; init; } = [];
-
     public IReadOnlyDictionary<string, string> Values { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 

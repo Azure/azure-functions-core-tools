@@ -20,7 +20,6 @@ public sealed class LocalSettingsProviderTests : IDisposable
         LocalSettingsSnapshot snapshot = _provider.Get(_dir);
 
         snapshot.IsEncrypted.Should().BeFalse();
-        snapshot.EncryptedValueNames.Should().BeEmpty();
         snapshot.Values.Should().BeEmpty();
         snapshot.WorkerRuntime.Should().BeNull();
         snapshot.Host.Should().BeNull();
@@ -51,7 +50,6 @@ public sealed class LocalSettingsProviderTests : IDisposable
         LocalSettingsSnapshot snapshot = _provider.Get(_dir);
 
         snapshot.IsEncrypted.Should().BeFalse();
-        snapshot.EncryptedValueNames.Should().BeEmpty();
         snapshot.WorkerRuntime.Should().Be("python");
         snapshot.Values["AzureWebJobsStorage"].Should().Be("UseDevelopmentStorage=true");
         snapshot.Values.ContainsKey("IgnoredNumber").Should().BeFalse();
@@ -88,13 +86,28 @@ public sealed class LocalSettingsProviderTests : IDisposable
         LocalSettingsSnapshot snapshot = _provider.Get(_dir);
 
         snapshot.IsEncrypted.Should().BeTrue();
-        snapshot.EncryptedValueNames.Should().BeEquivalentTo("FUNCTIONS_WORKER_RUNTIME", "PrivateSetting");
         snapshot.Values.Should().BeEmpty();
         snapshot.WorkerRuntime.Should().BeNull();
         snapshot.Host!.LocalHttpPort.Should().Be(7072);
         File.ReadAllBytes(path).Should().Equal(originalBytes);
         File.GetLastWriteTimeUtc(path).Should().Be(originalWriteTime);
         Directory.Exists(Path.Combine(_dir.FullName, CliConfigurationNames.ProjectConfigFolderName)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("""{"IsEncrypted":true}""")]
+    [InlineData("""{"IsEncrypted":true,"Values":null}""")]
+    [InlineData("""{"IsEncrypted":true,"Values":[]}""")]
+    [InlineData("""{"IsEncrypted":true,"Values":{"IgnoredNumber":42}}""")]
+    public void Get_EncryptedMarkerWithoutStringValues_ReturnsEncryptedSnapshot(string settings)
+    {
+        WriteSettings(settings);
+
+        LocalSettingsSnapshot snapshot = _provider.Get(_dir);
+
+        snapshot.IsEncrypted.Should().BeTrue();
+        snapshot.Values.Should().BeEmpty();
+        snapshot.WorkerRuntime.Should().BeNull();
     }
 
     [Fact]

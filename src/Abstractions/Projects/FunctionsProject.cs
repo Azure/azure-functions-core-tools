@@ -27,12 +27,6 @@ public abstract class FunctionsProject
 
     public abstract FunctionsWorkerReference WorkerReference { get; }
 
-    /// <summary>
-    /// Returns whether successful preparation always supplies the named environment variable
-    /// without consuming its incoming value.
-    /// </summary>
-    public virtual bool GuaranteesHostRunEnvironmentVariableOverride(string name) => false;
-
     public virtual Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);

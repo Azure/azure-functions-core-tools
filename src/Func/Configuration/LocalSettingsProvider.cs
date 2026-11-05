@@ -43,13 +43,11 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
             }
 
             bool isEncrypted = ReadNullableBoolean(document.RootElement, "IsEncrypted") == true;
-            IReadOnlyDictionary<string, string> values = ReadValues(document.RootElement);
 
             return new LocalSettingsSnapshot
             {
                 IsEncrypted = isEncrypted,
-                EncryptedValueNames = isEncrypted ? [.. values.Keys] : [],
-                Values = isEncrypted ? LocalSettingsSnapshot.Empty.Values : values,
+                Values = isEncrypted ? LocalSettingsSnapshot.Empty.Values : ReadValues(document.RootElement),
                 Host = ReadHost(document.RootElement),
             };
         }
