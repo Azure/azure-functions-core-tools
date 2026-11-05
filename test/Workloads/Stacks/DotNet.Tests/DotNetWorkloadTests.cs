@@ -43,6 +43,7 @@ public class DotNetWorkloadTests
         initializer.Should().BeOfType<DotNetProjectInitializer>();
         initializer.Stack.Should().Be("dotnet");
         initializer.SupportedLanguages.Should().Equal(["C#", "F#"]);
+        builder.Received(1).AddTemplatePackage("Templates/FlexByoc");
 
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeOfType<DotNetProjectStack>();

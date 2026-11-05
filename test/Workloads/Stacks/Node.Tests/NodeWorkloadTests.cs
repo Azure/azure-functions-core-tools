@@ -23,6 +23,7 @@ public class NodeWorkloadTests
         initializer.Should().BeOfType<NodeProjectInitializer>();
         initializer.Stack.Should().Be("node");
         initializer.SupportedLanguages.Should().Equal(["JavaScript", "TypeScript"]);
+        builder.Received(1).AddTemplatePackage("Templates/FlexByoc");
 
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeOfType<NodeProjectStack>();

@@ -27,5 +27,6 @@ public sealed class JavaWorkload : Workload
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<JavaProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, JavaProjectInitializer>();
         builder.AddProjectFactory(new JavaProjectFactory());
+        builder.AddTemplatePackage("Templates/FlexByoc");
     }
 }

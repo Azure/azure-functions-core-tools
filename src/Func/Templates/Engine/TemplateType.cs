@@ -17,4 +17,9 @@ internal enum TemplateType
     /// A project template, which <c>func init</c> creates a project from.
     /// </summary>
     Project,
+
+    /// <summary>
+    /// An add-on artifact template invoked by core orchestration rather than <c>func new</c>.
+    /// </summary>
+    Artifact,
 }

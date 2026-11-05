@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "identity": "Azure.Functions.Cli.PowerShell.FlexByoc",
+  "name": "PowerShell Flex BYOC container artifacts",
+  "shortName": "flex-byoc",
+  "precedence": 100,
+  "tags": {
+    "type": "artifact",
+    "func-capability": "flex-byoc",
+    "func-stack": "powershell"
+  },
+  "symbols": {
+    "RuntimeVersion": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "7.6",
+      "choices": [
+        { "choice": "7.2" },
+        { "choice": "7.4" },
+        { "choice": "7.6" }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "source": "Shared",
+      "target": "",
+      "modifiers": [
+        {
+          "rename": {
+            "dockerignore.template": ".dockerignore"
+          }
+        }
+      ]
+    },
+    {
+      "source": "Versions/7.2",
+      "target": "",
+      "condition": "(RuntimeVersion == \"7.2\")",
+      "modifiers": [
+        {
+          "rename": {
+            "Dockerfile.template": "Dockerfile"
+          }
+        }
+      ]
+    },
+    {
+      "source": "Versions/7.4",
+      "target": "",
+      "condition": "(RuntimeVersion == \"7.4\")",
+      "modifiers": [
+        {
+          "rename": {
+            "Dockerfile.template": "Dockerfile"
+          }
+        }
+      ]
+    },
+    {
+      "source": "Versions/7.6",
+      "target": "",
+      "condition": "(RuntimeVersion == \"7.6\")",
+      "modifiers": [
+        {
+          "rename": {
+            "Dockerfile.template": "Dockerfile"
+          }
+        }
+      ]
+    }
+  ]
+}

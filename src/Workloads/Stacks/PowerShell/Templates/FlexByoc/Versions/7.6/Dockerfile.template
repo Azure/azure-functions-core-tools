@@ -1,0 +1,32 @@
+# === BYOC: WORKER SOURCE ===
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS worker-source
+RUN dotnet new classlib --name WorkerRestore --output /tmp/worker-restore --no-restore \
+    && NUGET_PACKAGES=/worker-packages dotnet add /tmp/worker-restore/WorkerRestore.csproj package Microsoft.Azure.Functions.PowerShellWorker.PS7.6 \
+        --version 4.0.5362 \
+        --source https://pkgs.dev.azure.com/azfunc/public/_packaging/infra/nuget/v3/index.json
+
+# === BYOC: RUNTIME STAGE ===
+FROM mcr.microsoft.com/powershell:preview-7.6-ubuntu-24.04 AS runtime
+ENV FUNCTIONS_WORKER_RUNTIME_VERSION=7.6
+WORKDIR /home/site/wwwroot
+
+# === BYOC: RUNTIME PACKAGES - customer customization ===
+# Add native runtime dependencies here.
+
+# === BYOC: MANAGED DEPENDENCIES - open question ===
+# The installation contract for modules declared in requirements.psd1 is not yet defined.
+
+# === BYOC: COPY APPLICATION ===
+COPY . ./
+COPY --from=worker-source /worker-packages/microsoft.azure.functions.powershellworker.ps7.6/4.0.5362/contentFiles/any/any/workers/powershell/ /azure-functions-worker/
+
+# === BYOC: PERMISSIONS - customer customization ===
+RUN groupadd --gid 1000 app \
+    && useradd --uid 1000 --gid app --create-home app \
+    && chown -R app:app /home/site/wwwroot
+
+# === BYOC: STARTUP SCRIPT ===
+COPY entrypoint.sh /usr/local/bin/byoc-entrypoint
+RUN chmod 755 /usr/local/bin/byoc-entrypoint
+USER app
+ENTRYPOINT ["/usr/local/bin/byoc-entrypoint"]

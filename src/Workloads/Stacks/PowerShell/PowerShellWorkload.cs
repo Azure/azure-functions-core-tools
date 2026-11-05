@@ -26,5 +26,6 @@ public sealed class PowerShellWorkload : Workload
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<PowerShellProjectStack>());
         builder.Services.AddSingleton<IProjectInitializer, PowerShellProjectInitializer>();
         builder.AddProjectFactory(new PowerShellProjectFactory());
+        builder.AddTemplatePackage("Templates/FlexByoc");
     }
 }

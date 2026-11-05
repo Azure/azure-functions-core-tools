@@ -23,6 +23,7 @@ public class PythonWorkloadTests
         initializer.Should().BeOfType<PythonProjectInitializer>();
         initializer.Stack.Should().Be("python");
         initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("Python");
+        builder.Received(1).AddTemplatePackage("Templates/FlexByoc");
 
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeOfType<PythonProjectStack>();

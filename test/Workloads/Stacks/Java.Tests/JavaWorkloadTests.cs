@@ -25,6 +25,7 @@ public class JavaWorkloadTests
         Assert.IsType<JavaProjectInitializer>(initializer);
         Assert.Equal("java", initializer.Stack);
         Assert.Equal("Java", Assert.Single(initializer.SupportedLanguages));
+        builder.Received(1).AddTemplatePackage("Templates/FlexByoc");
 
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeOfType<JavaProjectStack>();

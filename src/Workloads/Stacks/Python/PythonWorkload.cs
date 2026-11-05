@@ -28,5 +28,6 @@ public sealed class PythonWorkload : Workload
         builder.Services.AddSingleton<IProjectInitializer, PythonProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, PythonQuickstartProvider>();
         builder.AddProjectFactory(new PythonProjectFactory());
+        builder.AddTemplatePackage("Templates/FlexByoc");
     }
 }

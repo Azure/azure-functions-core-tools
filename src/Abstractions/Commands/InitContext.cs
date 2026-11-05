@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Commands;
@@ -14,4 +15,16 @@ namespace Azure.Functions.Cli.Commands;
 /// <param name="ProjectName">Project name (from <c>--name</c> or the directory name).</param>
 /// <param name="Language">Programming language (from <c>--language</c> or a prompt). May be null.</param>
 /// <param name="Force">True if <c>--force</c> was supplied.</param>
-public sealed record InitContext(WorkingDirectory WorkingDirectory, string? ProjectName, string? Language, bool Force);
+public sealed record InitContext(WorkingDirectory WorkingDirectory, string? ProjectName, string? Language, bool Force)
+{
+    /// <summary>
+    /// Gets the container artifact capability requested after initialization, when applicable.
+    /// </summary>
+    public ContainerArtifactCapability? RequestedContainerArtifactCapability { get; init; }
+
+    /// <summary>
+    /// Gets generic container artifact parameter values that the workload may interpret during initialization.
+    /// </summary>
+    public IReadOnlyDictionary<string, string?> ContainerArtifactParameters { get; init; } =
+        new Dictionary<string, string?>(StringComparer.Ordinal);
+}
