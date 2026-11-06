@@ -888,16 +888,18 @@ internal sealed class CompactRenderer(
 
     private IRenderable BuildLogDivider()
     {
-        List<string> state = [_stopping ? "Stopping" : !_mouseCapture ? "Mouse off" : _viewport.Following ? "Live" : "Paused"];
-        if (!_stopping && _status is not null)
+        List<string> state =
+        [
+            _stopping ? "Stopping"
+                : _viewport.SelectionExpired ? "Selection expired"
+                : !_mouseCapture ? "Mouse off"
+                : _viewport.Following ? "Live" : "Paused",
+        ];
+        if (!_stopping && !_viewport.SelectionExpired && _status is not null)
         {
             state.Add(_statusCaption ?? _status);
         }
-        if (_viewport.SelectionExpired)
-        {
-            state.Add("Selection expired");
-        }
-        else if (_viewport.HasSelection)
+        if (_viewport.HasSelection)
         {
             state.Add("Text selected");
         }
@@ -913,13 +915,13 @@ internal sealed class CompactRenderer(
         {
             state.Add(_minimumLogLevel >= LogLevel.Error ? "L:error" : "L:warn");
         }
-        if (_activeFunctionFilter is not null)
-        {
-            state.Add("Filter " + _activeFunctionFilter);
-        }
         if (_viewport.Evicted > 0)
         {
             state.Add("History trimmed");
+        }
+        if (_activeFunctionFilter is not null)
+        {
+            state.Add("Filter " + _activeFunctionFilter);
         }
 
         return _headerBuilder.BuildLogDivider(GetViewportWidth(), state);

@@ -72,6 +72,30 @@ public class CompactRendererFunctionBrowserTests
     }
 
     [Fact]
+    public async Task BuildLayout_ExpiredSelectionTakesPrecedenceOverPreviousCopyFeedback()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        console.Profile.Width = 40;
+        SetPrivate(renderer, "_state", BuildState(functionCount: 1));
+        await renderer.OnEventAsync(Log("HttpTrigger1", "selected text"), [], CancellationToken.None);
+        InvokePrivate<DashboardFrame>(renderer, "BuildLayout");
+        var viewport = (LogViewport)GetPrivate(renderer, "_viewport")!;
+        viewport.BeginDrag(0, 0);
+        viewport.Drag(5, 0);
+        SetPrivate(renderer, "_status", "Previous copy feedback that must not hide an expired selection");
+        SetPrivate(renderer, "_statusCaption", "Copy unconfirmed");
+        ((CompactLogBuffer)GetPrivate(renderer, "_logBuffer")!).Clear();
+
+        DashboardFrame frame = InvokePrivate<DashboardFrame>(renderer, "BuildLayout");
+        Render(console, writer, frame);
+
+        viewport.SelectionExpired.Should().BeTrue();
+        string[] rows = writer.ToString().Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
+        rows[frame.LogTop - 1].Should().Contain("Selection expired").And.NotContain("Copy unconfirmed");
+        rows[^1].Should().Contain("Esc clear").And.Contain("q quit").And.NotContain("Ctrl+C");
+    }
+
+    [Fact]
     public void BuildHeader_IncludesProfileAndStackMetadata()
     {
         var runInfo = new DashboardRunInfo(ProfileName: "flex", StackName: ".NET");
