@@ -1,6 +1,6 @@
 # Templates Architecture
 
-**Status:** Approved architecture; implementation proceeds through small increments.
+**Status:** Approved supporting architecture. The [component model](Templates-EndToEnd-Object-Model-Review.md) is the implementation authority; work proceeds through small increments.
 
 ## Overview
 
@@ -33,15 +33,15 @@ The command-facing flow is:
 | `Templater` | List installed catalog metadata and resolve an exact template or return actionable diagnostics. It owns the engine session. |
 | `TemplateEngineSession` | Internal to `Templater`; owns the Microsoft.TemplateEngine environment and package manager for the command lifetime. Commands do not depend on it. |
 | `TemplateCatalogEntry` | Describe installed template metadata and parameters; it does not authorize invocation. |
-| `ResolvedTemplate` and `TemplateResolutionResult` | Bind one exact selection to its issuing session and carry either that selection or candidates and diagnostics. |
+| `ResolvedTemplate` and `TemplateResolutionResult` | Carry the selected descriptor or candidates and diagnostics; re-resolving a catalog entry is restricted to the `Templater` instance that issued it. |
 | Template Engine internals | Use Microsoft.TemplateEngine for metadata, supported parameter semantics, private generation, and approved task orchestration. |
 | Template and workload owners | Supply project/item content and Stack-specific tasks; workload installation registers packages in the CLI Hive. |
 
-Keep Microsoft.TemplateEngine types private to the engine implementation. Use the existing command-facing context and catalog types; do not add a group, request wrapper, task framework, or lifecycle owner without a concrete consumer. Catalog entries describe choices; only an exact session-bound selection can be used by a later invocation. A selection does not prove that its mounted content is unchanged or safe to render.
+Keep Microsoft.TemplateEngine types private to the engine implementation. Use the existing command-facing context and catalog types; do not add a group, request wrapper, task framework, or lifecycle owner without a concrete consumer. Template resolution uses the command-scoped session; only the issuing `Templater` can re-resolve an issued catalog entry. A future invocation must remain in that session and verify the exact selected source before private generation; session ownership does not prove that installed content is unchanged or safe to render.
 
 ## Installed templates and discovery
 
-The Template Engine consumes templates installed in the dedicated CLI Hive. Template packages share the same registration and discovery contract regardless of delivery mechanism. Workload installation owns package acquisition and registration; discovery does not download packages or install templates as a side effect.
+The Template Engine uses Microsoft.TemplateEngine to discover templates installed in the dedicated CLI Hive. Template packages share the same registration and discovery contract regardless of delivery mechanism. Workload installation owns package acquisition and registration; discovery does not download packages or install templates as a side effect.
 
 A command supplies the project or Stack context. `Templater` lists metadata and resolves a requested identity or alias to one exact eligible candidate, returning reasons when candidates are unavailable or a reference is ambiguous. A catalog entry is descriptive metadata, not permission to invoke a template.
 
@@ -62,9 +62,11 @@ A template can be selected by an explicit identifier or through an interactive c
 - Project, Stack, language, template kind, and declared constraints determine eligibility. Invalid or unreadable declarations must not silently become successful selections.
 - A catalog entry describes a candidate. Only the exact resolved candidate within its valid session may be invoked.
 
-Group variants only by explicit GroupIdentity; an ungrouped template is an identity-keyed singleton. Within the selected source scope, match full identity before aliases or eligibility filtering. Duplicate applicable full IDs are an error. An alias matching one variant does not widen to its siblings, and matching display names do not establish a family. Preserve established supported IDs and known aliases; changes to alias, case or precedence policy require agreement. A concrete catalog selection stays pinned to its issued candidate; family selection is explicit.
+The foundation returns `Selected`, `NotFound`, `Ambiguous`, or `Failed`. An ambiguous result contains the eligible candidates; the caller must choose explicitly. Resolution does not prompt or select a candidate automatically, and failures retain their diagnostics.
 
-Validate raw mounted template declarations before engine normalization can discard invalid or duplicate requirements. Evaluate engine constraints and func workload/bundle requirements against one captured context. Failed, restricted, unknown or unevaluated required constraints block selection and invocation, including with force. Preserve their diagnostics; unreadable or corrupt installed content is not an empty-success catalog.
+When variants are grouped, use only an explicit GroupIdentity; an ungrouped template is an identity-keyed singleton. The foundation does not need grouping to report an ambiguous alias. Within the selected source scope, match full identity before aliases or eligibility filtering. Duplicate applicable full IDs are an error. An alias matching one variant does not widen to its siblings, and matching display names do not establish a family. Preserve established supported IDs and known aliases; changes to alias, case or precedence policy require agreement. A concrete catalog selection stays pinned to its issued candidate; family selection is explicit.
+
+Validate raw mounted template declarations before engine normalization can discard invalid or duplicate requirements. Evaluate engine constraints and func workload/bundle requirements against one captured context. Failed, restricted, unknown or unevaluated required constraints block selection and invocation, including with force. Preserve their diagnostics. Report unavailable returned mounts and missing, unreadable, or malformed template configurations when observed; Microsoft.TemplateEngine may suppress provider-enumeration failures without a typed completeness result, so `NotFound` does not prove the installed catalog was completely enumerated. See the [implementation limitation](implementation.md#pr-1-foundation).
 
 Template-specific options vary by candidate. The CLI must retain the user's original arguments until it can check their syntax against eligible candidates **before choosing the final variant**. An unknown option's value must not accidentally become the project path. For the initial `func new` grammar, an explicit project path belongs before template-specific options; ambiguous ordering produces guidance rather than silently using the current directory.
 
@@ -94,7 +96,7 @@ Mutable content must be copied and verified at selection time. Rendering must us
 
 Before rendering, verify that the selected source still matches the recorded content. Missing, changed, unreadable, or unsafe content invalidates the selection. Do not rediscover or substitute another template.
 
-The exact Microsoft.TemplateEngine mount and invocation API is still to be qualified. Use the existing engine and session facilities rather than introducing a second engine or a separate lifecycle framework.
+The exact Microsoft.TemplateEngine mount and invocation configuration still needs production qualification; the separate fixture probe does not establish general support. Use the existing engine and session facilities rather than introducing a second engine or a separate lifecycle framework.
 
 Render into session-owned private temporary output within defined asset and expansion limits. Return bounded planned file bytes, explicit directories and diagnostics; these are not completed destination effects. Preserve the supported func host bindings, but do not execute authored post-actions or unapproved custom bind sources. Reject unsupported effects before touching the destination. Rendering failures must not become empty success, and unexpected internal errors remain distinct from invalid user input.
 
@@ -122,16 +124,18 @@ Diagnose readable malformed CLI configuration without force. Explicit force may 
 
 ## `func new`
 
-`func new` adds a function to an existing, initialized Functions project.
+The intended `func new` journey adds a function to an existing, initialized Functions project.
 
-In CLI v5, `func new` requires an initialized Functions project. If the project has not been initialized, the command fails with an actionable error directing the user to run `func init` first. It does not initialize the project automatically.
+The proposed CLI v5 `func new` path requires an initialized Functions project. If the project is confirmed to be uninitialized, the command must fail with an actionable error directing the user to run `func init` first. It must not initialize the project automatically.
+
+An unsuccessful project resolution is not evidence that initialization is required. Report ambiguity for conflicting project matches, inspection/access failures for inaccessible targets, configuration errors for corrupt or malformed configuration, and the corresponding unsupported-project or incompatibility diagnostic. Preserve the existing resolution message when the cause is undetermined; do not replace it with `func init` guidance. Project recognition remains the resolver's responsibility, compatibility remains workload-owned, and the command owns diagnostic presentation.
 
 The initial public command surface retains `[path]`, `--template`, `--name`, `--force`, `--non-interactive`, `--list`, and `--format`. The redesign does not add a positional template selector or a new `--path` option.
 
 The proposed path is:
 
 1. Parse built-in options while preserving template-specific arguments.
-2. Resolve the target Functions project and its Stack/language context. If the target is not an initialized Functions project, fail before template discovery or any destination changes.
+2. Resolve the target Functions project and its Stack/language context. If resolution or inspection fails, report the cause before template discovery or any destination changes; offer `func init` guidance only for a confirmed uninitialized target. After resolution, reject unsupported or incompatible projects with the corresponding diagnostic before generation or file changes.
 3. Discover installed item templates and show choices or resolve the supplied reference.
 4. Check candidate eligibility and parse template-specific arguments for each eligible variant before final selection.
 5. Select one exact template, bind its content, and evaluate parameters using the Template Engine.
@@ -175,7 +179,7 @@ This contract scopes the first production content contribution to one Node.js Ja
 
 Each template has its own package-relative root, with `.template.config/template.json` and all source assets beneath that root. Keep configuration and assets in the immutable package version, avoid external or additional configuration files, and verify the selected configuration and assets before invocation as required by [Generate Files Privately](#selected-content-and-constraints). The package must not use authored post-actions or unsupported custom operations.
 
-**Proposed for approval:** Publish the two starter templates in one NuGet template package referenced by the Node workload. Pin the exact package version in workload release metadata and keep it on the workload's release channel, without requiring identical numeric versions. Omit `shortName` aliases and `groupIdentity` for the initial pair: exact identities are sufficient, and a project template and an item template are not sibling variants. Add aliases or groups only when a later supported selection experience needs them.
+**Proposed for approval:** Publish the two starter templates in one NuGet template package referenced by the Node workload. Pin the exact package version in workload release metadata and keep it on the workload's release channel, without requiring identical numeric versions. Each template needs a non-empty `shortName`: the pinned engine requires the field, and the CLI catalog rejects empty values. Retain established names where they exist and have content owners choose any new names. Do not invent extra aliases. Omit `groupIdentity` for the initial project and item templates because they are not sibling variants.
 
 **Decision required:** Existing production packages do not establish an identity or version rule for this new content package. The templates repository has separate WebJobs, Worker, and Extension Bundle package IDs and release trains; the Node workload has its own version and embeds workload assets but does not register a companion template package. The qualified HTTP identity `Azure.Functions.Templates.Node.Basic.Http.JavaScript` is a local fixture identity, not an approved production identity. Owners must approve the NuGet package ID, the project and item `identity` values, and the package-version pin/replacement policy before production content is authored. These values must remain stable after publication.
 
@@ -187,14 +191,14 @@ The Engine classifies templates by `type` and `language`; the Node workload must
 
 ## Scope and compatibility
 
-This document defines the approved architecture. Archived task lists are historical context, not implementation instructions or additional sources of current requirements.
+This document supports the approved [component model](Templates-EndToEnd-Object-Model-Review.md), which is the implementation authority. Archived task lists are historical context, not implementation instructions or additional sources of current requirements.
 
 | Historical area | Disposition for this increment |
 | --- | --- |
 | `func new` | Retain item-only scope, explicit `--template`, candidate-specific validation and noninteractive failure. Positional-template syntax, `--path`, `--output`, upward project search and bundle-gated listing are superseded. Public dry-run, lifecycle commands and fallback parameter aliases are deferred. |
 | `func init` | Retain existing Stack selection, adoption/repair and configuration behavior. Occupied non-project targets preserve safe files. Public template selection, new noninteractive/dry-run options, template-first UX, a general action framework and removal of working initializers are deferred. |
 | Engine integration | Retain host context, catalog metadata, explicit group identity, func-host aliases, fail-closed eligibility and exact invocation. Projection-driven conditional evaluation and full-ID widening are superseded. General selection frameworks and authored action plumbing are deferred. |
-| Constraints | Raw validation, fail-closed evaluation and selected-content checks apply now. Installer/update preflight and producer-specific rules are deferred with those workflows. |
+| Constraints | Raw constraint validation and fail-closed constraint evaluation are foundation behavior. Selected-content checks are required before future invocation; installer/update preflight and producer-specific rules are deferred with those workflows. |
 | Package lifecycle | Install/update/uninstall/search and feed UX are deferred. Package provenance and failure-safe replacement remain requirements to revisit when those workflows enter scope; local workload registration is separate. |
 | Quickstarts | Quickstarts are project templates, not a third template kind. Keep the existing route until its Template Engine replacement is implemented and qualified. |
 | Umbrella and producer pipeline | Preserve program and producer history, not a requirement to complete all historical changes before the first engine proof. Producer automation remains deferred. |

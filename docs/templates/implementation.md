@@ -1,6 +1,6 @@
 # Implementing the Template Engine
 
-**Status:** Incremental implementation plan. The [architecture](architecture.md) is the normative description of the Template Engine.
+**Status:** Incremental implementation plan. The [component model](Templates-EndToEnd-Object-Model-Review.md) is the implementation authority; the [architecture](architecture.md) supplies supporting design.
 
 This document distinguishes the PR 1 foundation from deferred rendering, command integration, and qualification. PR 1 does not require the complete `func init` / `func new` / Functions Host journey.
 
@@ -10,9 +10,13 @@ The existing object model includes `ITemplaterFactory`, `TemplateEngineContext`,
 
 ## PR 1 foundation
 
-The foundation provides a command-facing creation context, factory, command-scoped `Templater`, installed catalog metadata, and exact session-bound selection with actionable diagnostics. `TemplateEngineSession` remains internal to `Templater`. The implementation reuses `TemplateEngineContext`, `TemplateCatalogEntry`, and existing metadata/constraint helpers; it adds no group model or general task framework. The first production-content scope and its remaining identity/version decisions are defined in the [Production Template Content Contract](architecture.md#production-template-content-contract).
+The PR 1 candidate provides a command-facing creation context, factory, command-scoped `Templater`, installed catalog metadata, and exact resolution with actionable diagnostics. `TemplateEngineSession` remains internal to `Templater` and owns the Microsoft.TemplateEngine environment and installed-template package manager for the command. Only the issuing live `Templater` can re-resolve an issued catalog entry; the selected descriptor does not authorize invocation or verify that installed content is unchanged. The implementation reuses `TemplateEngineContext`, `TemplateCatalogEntry`, and existing metadata/constraint helpers; it adds no group model or general task framework. The first production-content scope and its remaining identity/version decisions are defined in the [Production Template Content Contract](architecture.md#production-template-content-contract).
 
 PR 1 does not change `InitCommand` or `NewCommand`, activate template listing or generation, or replace existing Stack initializers.
+
+Resolution reports unavailable registered mounts and malformed template configurations rather than treating those scans as complete. The underlying `TemplatePackageManager.GetTemplatePackagesAsync` contract can suppress a provider-enumeration exception, log it, and return packages from providers that succeeded. The current host uses a null logger, and the available log record is not a supported, typed completeness result. The foundation therefore cannot reliably distinguish every suppressed provider failure from genuine absence. An incomplete catalog can appear empty, and `NotFound` does not always prove that all providers were available.
+
+A focused observation exercised this boundary with the existing CLI hive: after a template was installed and selected successfully, corrupting `packages.json` left the template files present while listing returned no entries and resolution returned `NotFound`. This observes the existing failure mode; it is not a passing correctness regression. The foundation must not parse localized log text, enumerate providers again, or maintain a second discovery mechanism to infer completeness. Production command activation remains subject to provider-availability and failure-handling qualification.
 
 ## Deferred work
 
@@ -76,7 +80,7 @@ Engine work with isolated representative content does not need to wait for the e
 
 ### PR 1 tests
 
-PR 1 covers factory creation, catalog listing, exact identity selection, alias ambiguity, duplicate identities, ineligible candidates, selection ownership, invalid selection, and actionable diagnostics. The focused filter ran against an isolated snapshot of the exact staged candidate with .NET SDK 10.0.403: 108 passed, 0 failed, and 0 skipped.
+PR 1 covers factory creation, catalog listing, exact identity selection, alias ambiguity, duplicate identities, ineligible candidates, selection ownership, invalid selection, and actionable diagnostics. At foundation commit `fe9a0d9861f02596c68ad64c567e3ec0b16bad15`, the focused filter ran against an isolated snapshot with .NET SDK 10.0.403: 108 passed, 0 failed, and 0 skipped. That run does not cover subsequent review changes. A separate foundation-only snapshot with the local review corrections passed 52 `TemplaterTests` and `TemplaterFactoryTests`: 0 failed and 0 skipped. It does not include the deferred renderer.
 
 ### Later end-to-end journey
 
@@ -96,13 +100,13 @@ A `host.json` file, successful listing, or basic text-file fixture alone does no
 - **Parameters:** candidate-specific options before final selection; conditional required/disabled/default values; explicit empty and repeated values; interactive and noninteractive errors.
 - **Content integrity:** changed or missing configuration/assets between selection and invocation; rendering from the verified selected content; unsupported engine features fail before destination effects.
 - **`func init`:** all existing Stack options, adoption/repair, safe occupied non-project directories, write-if-missing behavior, complete-project refusal, force confirmation, `.git` protection, and required configuration failures.
-- **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated initialization configuration writes. Verify that invoking `func new` outside an initialized Functions project fails with actionable guidance to run `func init`, without initializing a project or modifying the destination.
+- **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated initialization configuration writes. Verify that a confirmed uninitialized target receives actionable `func init` guidance, while ambiguity, inspection/access failures, corrupt or malformed configuration, unsupported projects, and incompatibility retain their corresponding diagnostics. An undetermined resolution failure must not imply initialization is required. Resolution failures stop before discovery; incompatibility stops before generation. None of these failures may initialize a project or modify the destination.
 - **Publication:** path/ancestor/case checks, guarded no-replace or replacement on supported operating systems, cancellation, cleanup, and truthful partial-effect reporting.
 - **Packaging:** isolated test registration versus real workload registration; missing or incompatible installed content; retry and version coordination.
 
 ## Validation status and limitations
 
-The latest Lane 3 Principal delta review passed with a nonblocking finding; that review was inspection-only. The focused PR 1 tests were executed against an isolated snapshot of the exact staged 13-file candidate with .NET SDK 10.0.403: 108 passed, 0 failed, and 0 skipped. An earlier attempt to validate from the lane runtime stopped because it lacked `dotnet.exe`; this publication run used the installed SDK. **RUNTIME VALIDATION REQUIRED** for production generation and host qualification.
+An independent review of the deferred fixture prototype passed with a nonblocking finding; it was inspection-only and did not review the foundation. The historical 108-test run above applies to the foundation commit, not later review changes. **RUNTIME VALIDATION REQUIRED** for production generation and host qualification.
 
 Lane 4's Windows qualification is separate evidence and does not qualify this Lane 3 candidate. Focused unit tests do not establish installed-hive snapshot integration, general source integrity, guarded physical publication, cross-platform behavior, Functions Host discovery, or supported Stack coverage; these remain unqualified.
 
