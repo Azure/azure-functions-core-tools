@@ -55,7 +55,7 @@ The diagram and walkthroughs describe the intended journey, not the current comm
 4. If resolution does not succeed, the CLI stops before template discovery or file changes and reports the cause: initialization guidance only for a genuinely uninitialized target, an ambiguity diagnostic for conflicting project matches, inspection/access guidance for an inaccessible target, a configuration diagnostic for corrupt or malformed configuration, or the corresponding unsupported-project diagnostic. An unsuccessful resolution alone does not establish that initialization is required.
 5. After successful resolution, the owning workload checks item-template compatibility. An incompatible project receives the corresponding diagnostic rather than initialization guidance, without rendering or changing files.
 6. **Installed Templates** supplies item-template metadata and content from the dedicated CLI hive.
-7. The **Template Engine** filters candidates, checks the supplied arguments, and selects one exact eligible template.
+7. The **Template Engine** filters candidates. The CLI checks the supplied arguments against each eligible candidate and selects one for exact resolution.
 8. **Generate Files Privately** invokes that template without changing the project.
 9. The CLI validates paths, collisions, and authorization.
 10. **Write Files to Project** writes the authorized function files.
@@ -148,13 +148,13 @@ Green indicates committed baseline types; blue indicates PR 1 foundation types; 
 6. `NewCommand` creates a **`TemplateEngineContext`** from the command and resolved project information.
 7. **`ITemplaterFactory`** creates one command-scoped **`Templater`**.
 8. `Templater` uses its **`TemplateEngineSession`** to discover installed item-template metadata.
-9. `Templater` returns a **`TemplateResolutionResult`** containing eligible candidates, diagnostics, or one exact **`ResolvedTemplate`**.
-10. The original command arguments are checked against that candidate's **`TemplateParameterDefinition`** values.
-11. `Templater` invokes the exact resolved template through **`PrivateTemplateFileSystem`**.
+9. `Templater` returns eligible candidates and diagnostics to `NewCommand`.
+10. `NewCommand` checks the original command arguments against each eligible candidate's **`TemplateParameterDefinition`** values.
+11. `NewCommand` selects one exact candidate. `Templater` resolves it, returning a **`TemplateResolutionResult`** with a **`ResolvedTemplate`** on success and diagnostics as applicable. On success, the proposed path uses the Template Engine to evaluate supported parameters and invoke the selected template through **`PrivateTemplateFileSystem`**.
 12. **`TemplateRenderResult`** returns immutable planned function files and directories.
 13. `NewCommand` validates and writes the authorized files and reports the actual result.
 
-> **Short version:** `NewCommand` resolves the project, creates a context, and gets a command-scoped `Templater`. The `Templater` selects one exact item template and, in the proposed path, verifies its source and generates it privately in the same session. `NewCommand` validates the planned files, writes the authorized changes, and reports the outcome.
+> **Short version:** `NewCommand` resolves the project, creates a context, and gets a command-scoped `Templater`. The `Templater` resolves the selected item template and, in the proposed path, verifies its source and generates it privately in the same session. `NewCommand` validates the planned files, writes the authorized changes, and reports the outcome.
 
 ## 3. `func init` flow
 
