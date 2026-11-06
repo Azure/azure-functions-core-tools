@@ -19,7 +19,7 @@ local-settings snapshot.
 
 The startup diagnostic is fixed and does not include setting names or values:
 
-> Encrypted local.settings.json files are not supported. Decrypt the file before starting the Functions Host with Azure Functions CLI, or remove the file if it is no longer needed.
+> Azure Functions CLI cannot start the Functions Host while local.settings.json is encrypted. Decrypt the file before trying again, or remove it if it is no longer needed.
 
 Use independently supported tooling to decrypt the file before startup, or
 remove it if it is no longer needed. This guard does not decrypt, migrate,

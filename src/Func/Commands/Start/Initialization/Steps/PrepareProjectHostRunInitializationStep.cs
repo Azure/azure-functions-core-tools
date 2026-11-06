@@ -86,9 +86,9 @@ internal sealed class PrepareProjectHostRunInitializationStep(
         if (localSettings.IsEncrypted)
         {
             throw new GracefulException(
-                "Encrypted local.settings.json files are not supported. "
-                + "Decrypt the file before starting the Functions Host with Azure Functions CLI, "
-                + "or remove the file if it is no longer needed.",
+                "Azure Functions CLI cannot start the Functions Host while local.settings.json is encrypted. "
+                + "Decrypt the file before trying again, "
+                + "or remove it if it is no longer needed.",
                 isUserError: true);
         }
 

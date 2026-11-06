@@ -18,9 +18,9 @@ public class PrepareProjectHostRunInitializationStepTests : IDisposable
 {
     private const string EncryptedSecretSentinel = "S1_SYNTHETIC_CIPHERTEXT_SENTINEL";
     private const string EncryptedSettingsError =
-        "Encrypted local.settings.json files are not supported. "
-        + "Decrypt the file before starting the Functions Host with Azure Functions CLI, "
-        + "or remove the file if it is no longer needed.";
+        "Azure Functions CLI cannot start the Functions Host while local.settings.json is encrypted. "
+        + "Decrypt the file before trying again, "
+        + "or remove it if it is no longer needed.";
 
     private readonly string _projectDir;
     private readonly IInteractionService _interaction = Substitute.For<IInteractionService>();
