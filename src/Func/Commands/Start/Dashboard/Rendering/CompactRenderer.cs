@@ -40,8 +40,8 @@ internal sealed class CompactRenderer(
     private readonly ConsoleInterruptCoordinator? _interrupts = interrupts;
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private readonly CompactHeaderBuilder _headerBuilder = new(interaction.Theme, runInfo ?? new());
-    private readonly CompactFooterBuilder _footerBuilder = new(interaction.Theme, runInfo ?? new(), shortcutLabels);
-    private readonly CompactHelpOverlayBuilder _helpOverlayBuilder = new(interaction.Theme, shortcutLabels);
+    private readonly CompactFooterBuilder _footerBuilder = new(interaction.Theme, shortcutLabels);
+    private readonly CompactHelpOverlayBuilder _helpOverlayBuilder = new(interaction.Theme, shortcutLabels, runInfo ?? new());
     private readonly CompactFunctionSearchBuilder _functionSearchBuilder = new(interaction.Theme, palette);
     private readonly CompactFunctionBrowserBuilder _functionBrowserBuilder = new(interaction.Theme, palette);
     private readonly Lock _uiLock = new();
@@ -68,6 +68,7 @@ internal sealed class CompactRenderer(
     private int _dragX;
     private int _dragY;
     private string? _status;
+    private string? _statusCaption;
     private int? _hostExitCode;
 
     private DashboardState _state = null!;
@@ -130,7 +131,7 @@ internal sealed class CompactRenderer(
             _manualRedraw = true;
             _viewport.ClearSelection();
             _copyCts?.Cancel();
-            _status = "Stopping host; Ctrl+C forces exit";
+            SetStatus("Stopping host; Ctrl+C forces exit");
             _interrupts?.MarkStopping();
         }
 
@@ -320,12 +321,12 @@ internal sealed class CompactRenderer(
             {
                 if (_viewport.SelectionExpired)
                 {
-                    _status = "Selection expired; select again or Esc to clear";
+                    SetStatus("Selection expired; select again or Esc to clear");
                 }
                 else if (_copyTask is null || _copyTask.IsCompleted)
                 {
                     LogCopySnapshot copy = _viewport.CaptureSelection();
-                    _status = "Copying selection...";
+                    SetStatus("Copying selection...", "Copying");
                     _copyCts?.Dispose();
                     _copyCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     CancellationToken copyToken = _copyCts.Token;
@@ -357,7 +358,7 @@ internal sealed class CompactRenderer(
                 if (_functionSearchQuery.Length > 4096)
                 {
                     _functionSearchQuery = _functionSearchQuery[..LogText.BoundaryBefore(_functionSearchQuery, 4096)];
-                    _status = "Search text limited to 4096 characters";
+                    SetStatus("Search text limited to 4096 characters");
                 }
             }
 
@@ -372,13 +373,13 @@ internal sealed class CompactRenderer(
                 _terminal!.SetMouseCapture(_mouseCapture);
                 _viewport.ClearSelection();
                 _viewport.Pause();
-                _status = _mouseCapture ? null : "Mouse off; display paused; m resumes";
+                SetStatus(null);
             }
             else if (!_functionSearchOpen && !_helpOpen && !_functionBrowserOpen
                 && input.Key.Key == ConsoleKey.Escape && (_viewport.HasSelection || _viewport.SelectionExpired))
             {
                 _viewport.ClearSelection();
-                _status = null;
+                SetStatus(null);
             }
             else
             {
@@ -413,7 +414,7 @@ internal sealed class CompactRenderer(
                 _viewport.Scroll(input.Delta);
                 break;
             case TerminalInputKind.PointerDown when inside:
-                _status = null;
+                SetStatus(null);
                 _dragX = input.X;
                 _dragY = y;
                 _viewport.BeginDrag(input.X, y);
@@ -439,7 +440,12 @@ internal sealed class CompactRenderer(
             lock (_uiLock)
             {
                 _viewport.CompleteCopy(copy.SelectionVersion, result.Status == ClipboardCopyStatus.Confirmed);
-                _status = result.Message;
+                SetStatus(result.Message, result.Status switch
+                {
+                    ClipboardCopyStatus.Confirmed => "Copied",
+                    ClipboardCopyStatus.Sent => "Copy unconfirmed",
+                    _ => "Copy failed",
+                });
                 _manualRedraw = true;
             }
 
@@ -463,7 +469,7 @@ internal sealed class CompactRenderer(
             if (!overlays && key.Key == ConsoleKey.End)
             {
                 _viewport.Follow();
-                _status = null;
+                SetStatus(null);
                 _logScrollOffset = 0;
                 return true;
             }
@@ -487,7 +493,7 @@ internal sealed class CompactRenderer(
             }
             if (result.Message is not null)
             {
-                _status = result.Message;
+                SetStatus(result.Message);
             }
             if (!overlays && state.LogScrollOffset != previousOffset)
             {
@@ -645,8 +651,8 @@ internal sealed class CompactRenderer(
                 rows = [new Text(LogText.Sanitize(GetEmptyLogMessage(_activeFunctionFilter)), Theme.Muted)];
             }
 
-            return new DashboardFrame(GetViewportWidth(), GetViewportHeight(), header, _logTop - 1, rows,
-                BuildFooterCore(snapshot, _activeFunctionFilter, _errorsOnly, _minimumLogLevel), Theme.Muted);
+            return new DashboardFrame(GetViewportWidth(), GetViewportHeight(), header, _logTop - 1,
+                BuildLogDivider(), rows, BuildFooter());
         }
     }
 
@@ -696,7 +702,7 @@ internal sealed class CompactRenderer(
         }
 
 
-        IRenderable bannerPanel = _headerBuilder.BuildBanner(snapshot.HostVersion, snapshot.ListenUri);
+        IRenderable bannerPanel = _headerBuilder.BuildBanner(snapshot, GetViewportWidth());
 
         int truncatedRows = GetTruncatedFunctionVisibleRows(snapshot.Functions.Count);
         IRenderable functions = snapshot.Functions.Count switch
@@ -770,7 +776,7 @@ internal sealed class CompactRenderer(
     }
 
     private IRenderable BuildHelpOverlay()
-        => _helpOverlayBuilder.Build();
+        => _helpOverlayBuilder.Build(GetViewportWidth(), _status);
 
     private IRenderable BuildFunctionSearch(DashboardSnapshot snapshot)
     {
@@ -864,51 +870,65 @@ internal sealed class CompactRenderer(
             $"  [{EmphasisTag}]{snapshot.Functions.Count}[/] functions  ·  [{SuccessTag}]● {ready} ready[/]  ·  [{ActiveTag}]◉ {active} active[/]  ·  [{ErrorTag}]✗ {errored} error{(errored == 1 ? string.Empty : "s")}[/]"));
     }
 
-    private IRenderable BuildFooter(DashboardSnapshot snapshot, string? activeFunctionFilter)
-        => BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly: false, LogLevel.Information);
-
-    private IRenderable BuildFooterCore(DashboardSnapshot snapshot, string? activeFunctionFilter, bool errorsOnly, LogLevel minimumLogLevel)
+    private IRenderable BuildFooter()
     {
-        int logScrollOffset;
-        bool helpOpen;
-        bool functionSearchOpen;
-        bool functionBrowserOpen;
-
         lock (_uiLock)
         {
-            logScrollOffset = _logScrollOffset;
-            helpOpen = _helpOpen;
-            functionSearchOpen = _functionSearchOpen;
-            functionBrowserOpen = _functionBrowserOpen;
+            CompactFooterMode mode = _stopping ? CompactFooterMode.Stopping
+                : _functionSearchOpen ? CompactFooterMode.Search
+                : _helpOpen ? CompactFooterMode.Help
+                : _functionBrowserOpen ? CompactFooterMode.Functions
+                : !_mouseCapture ? CompactFooterMode.MouseReleased
+                : _viewport.SelectionExpired ? CompactFooterMode.ExpiredSelection
+                : _viewport.HasSelection ? CompactFooterMode.Selection
+                : CompactFooterMode.Logs;
+            return _footerBuilder.Build(GetViewportWidth(), mode, _viewport.Following, _activeFunctionFilter is not null);
         }
+    }
 
-        if (GetViewportWidth() < 60)
+    private IRenderable BuildLogDivider()
+    {
+        List<string> state = [_stopping ? "Stopping" : !_mouseCapture ? "Mouse off" : _viewport.Following ? "Live" : "Paused"];
+        if (!_stopping && _status is not null)
         {
-            string text = _functionSearchOpen || _functionBrowserOpen || _helpOpen
-                ? "Esc close | Ctrl+C stop"
-                : _stopping ? "Stopping; Ctrl+C force exit"
-                : _viewport.SelectionExpired ? "q quit | Selection expired; Esc clear"
-                : _viewport.HasSelection ? $"q quit | {_status ?? "Ctrl+C copy | Esc clear"}"
-                : $"q quit | ? help | {_status ?? (_viewport.Following ? "Live" : "End live")}";
-            return new Text(text, Theme.Muted);
+            state.Add(_statusCaption ?? _status);
+        }
+        if (_viewport.SelectionExpired)
+        {
+            state.Add("Selection expired");
+        }
+        else if (_viewport.HasSelection)
+        {
+            state.Add("Text selected");
+        }
+        if (_viewport.UnreadEntries > 0)
+        {
+            state.Add(string.Create(CultureInfo.InvariantCulture, $"{_viewport.UnreadEntries} new"));
+        }
+        if (_errorsOnly)
+        {
+            state.Add("Errors only");
+        }
+        else if (_minimumLogLevel >= LogLevel.Warning)
+        {
+            state.Add(_minimumLogLevel >= LogLevel.Error ? "L:error" : "L:warn");
+        }
+        if (_activeFunctionFilter is not null)
+        {
+            state.Add("Filter " + _activeFunctionFilter);
+        }
+        if (_viewport.Evicted > 0)
+        {
+            state.Add("History trimmed");
         }
 
-        return _footerBuilder.Build(
-            snapshot,
-            activeFunctionFilter,
-            errorsOnly,
-            minimumLogLevel,
-            logScrollOffset,
-            helpOpen,
-            functionSearchOpen,
-            functionBrowserOpen,
-            _stopping ? "Stopping; Ctrl+C force exit"
-                : _viewport.SelectionExpired ? "Selection expired; Esc clear"
-                : _viewport.HasSelection ? $"Ctrl+C copy | Esc clear{(_status is null ? string.Empty : " | " + _status)}"
-                : _status ?? (_viewport.Following ? "Live"
-                    : $"Scrollback | {_viewport.UnreadEntries} new | End live")
-                    + (_viewport.Evicted > 0 ? " | older history discarded" : string.Empty),
-            selectionActive: _viewport.HasSelection || _viewport.SelectionExpired);
+        return _headerBuilder.BuildLogDivider(GetViewportWidth(), state);
+    }
+
+    private void SetStatus(string? message, string? caption = null)
+    {
+        _status = message;
+        _statusCaption = caption;
     }
 
     private static string FormatTrigger(string trigger) => trigger switch

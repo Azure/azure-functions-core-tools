@@ -37,6 +37,15 @@ mode with a notice rather than risk losing bytes buffered by the prompt reader.
 Windows transfers pending prompt keys before acquiring native input. A later run
 that does not need those startup prompts can use full-screen mode normally.
 
+The labelled **Logs** divider shows live/paused state, unread entries, selection
+and copy status, and active filters. Aggregate counts sit in the main banner.
+The footer remains one row high and shows shortcuts for the current context:
+scrolling, selection, search, function browsing, native selection, or shutdown.
+As the window narrows, lower-priority shortcuts disappear as whole items rather
+than being cut off or wrapped. A stop action remains visible; `?` opens the full
+keyboard reference, CLI version, and complete copy/status feedback outside search.
+Changing footer hints does not move the log viewport.
+
 ### Reading logs
 
 | Input | Action |
@@ -54,7 +63,7 @@ that does not need those startup prompts can use full-screen mode normally.
 | `?` | Show controls |
 
 Scrolling away from the live tail keeps the reading position anchored while
-new logs arrive. The footer shows unread matching entries. Selection also
+new logs arrive. The Logs divider shows unread matching entries. Selection also
 pauses following. Resize reflows retained text without changing its logical
 identity.
 
@@ -62,7 +71,7 @@ History is bounded by both **10,000 display entries** and **16 MiB of retained
 display text**. Text accounting includes owned text and filtering metadata
 as UTF-16 payload bytes, not total process memory. Entries larger than the
 display budget are visibly truncated. Old entries are evicted when necessary;
-the footer indicates discarded history.
+the Logs divider indicates discarded history.
 
 These are display limits only. `--log-file=<path>` continues receiving events
 independently of filters, scrolling, selection, clear, and display truncation.

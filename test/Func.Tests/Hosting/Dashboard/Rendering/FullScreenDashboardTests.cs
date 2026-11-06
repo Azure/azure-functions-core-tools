@@ -95,14 +95,17 @@ public class FullScreenDashboardTests
         terminal.Disposed.Should().BeTrue();
     }
 
-    [Fact]
-    public async Task FailedCopy_KeepsSelectionAndSurfacesFailure()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UnconfirmedCopy_KeepsSelectionAndSurfacesDetails(bool sent)
     {
         using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
         ScriptedTerminal terminal = new();
         IClipboardWriter clipboard = Substitute.For<IClipboardWriter>();
+        string message = sent ? "Copy request sent; not confirmed" : "Clipboard denied";
         clipboard.CopyAsync(Arg.Any<string>(), terminal, Arg.Any<CancellationToken>())
-            .Returns(new ClipboardCopyResult(ClipboardCopyStatus.Failed, "Clipboard denied"));
+            .Returns(new ClipboardCopyResult(sent ? ClipboardCopyStatus.Sent : ClipboardCopyStatus.Failed, message));
         int stopped = 0;
         ConsoleInterruptCoordinator interrupts = new(() => stopped++, _ => stopped++);
         await using CompactRenderer renderer = Renderer(terminal, Interaction(), clipboard, interrupts);
@@ -112,9 +115,12 @@ public class FullScreenDashboardTests
         terminal.Select("retain me");
         await terminal.WaitForTextAsync("Ctrl+C copy", timeout.Token);
         terminal.Send(Interrupt());
-        await terminal.WaitForTextAsync("Clipboard denied", timeout.Token);
+        await terminal.WaitForTextAsync(sent ? "Copy unconfirmed" : "Copy failed", timeout.Token);
         terminal.Text.Should().Contain("Ctrl+C copy");
         stopped.Should().Be(0);
+
+        terminal.Send(new TerminalInputEvent(TerminalInputKind.Key, new ConsoleKeyInfo('?', ConsoleKey.Oem2, true, false, false)));
+        await terminal.WaitForTextAsync(message, timeout.Token);
     }
 
     [Fact]
@@ -143,7 +149,7 @@ public class FullScreenDashboardTests
     {
         StringWriter writer = new();
         IAnsiConsole console = CreateConsole(writer, width, height);
-        DashboardFrame frame = new(width, height, new Text("HEADER"), 2, [new Text("log")], new Text("q quit"), Style.Plain);
+        DashboardFrame frame = new(width, height, new Text("HEADER"), 2, new Text("Logs"), [new Text("log")], new Text("q quit"));
         console.Write(frame);
         string output = writer.ToString().Replace("\r", string.Empty, StringComparison.Ordinal);
         output.Split('\n').Should().HaveCount(height);
@@ -165,7 +171,7 @@ public class FullScreenDashboardTests
         viewport.Refresh(buffer.Capture(), 3, 3, new LogFilter());
         viewport.BeginDrag(0, 0);
         viewport.Drag(1, 1);
-        DashboardFrame frame = new(3, 6, new Text("H"), 1, viewport.RenderRows(new DefaultTheme().Selection), new Text("q"), Style.Plain);
+        DashboardFrame frame = new(3, 6, new Text("H"), 1, new Text("Logs"), viewport.RenderRows(new DefaultTheme().Selection), new Text("q"));
         console.Write(frame);
         string output = writer.ToString();
 

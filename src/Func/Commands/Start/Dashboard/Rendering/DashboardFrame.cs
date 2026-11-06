@@ -11,11 +11,12 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// Paints a bounded cell grid without relative cursor history or a bottom-row newline.
 /// </summary>
 internal sealed class DashboardFrame(int width, int height, IRenderable header, int headerRows,
-    IReadOnlyList<IRenderable> logs, IRenderable footer, Style muted) : Renderable
+    IRenderable logHeader, IReadOnlyList<IRenderable> logs, IRenderable footer) : Renderable
 {
     private readonly int _width = width > 0 ? width : throw new ArgumentOutOfRangeException(nameof(width));
     private readonly int _height = height > 0 ? height : throw new ArgumentOutOfRangeException(nameof(height));
     private readonly IRenderable _header = header ?? throw new ArgumentNullException(nameof(header));
+    private readonly IRenderable _logHeader = logHeader ?? throw new ArgumentNullException(nameof(logHeader));
     private readonly IReadOnlyList<IRenderable> _logs = logs ?? throw new ArgumentNullException(nameof(logs));
     private readonly IRenderable _footer = footer ?? throw new ArgumentNullException(nameof(footer));
 
@@ -43,7 +44,7 @@ internal sealed class DashboardFrame(int width, int height, IRenderable header, 
 
             IEnumerable<Segment> content = row == _height - 1 ? footer.FirstOrDefault() ?? []
                 : row < headerHeight ? row < heading.Count ? heading[row] : []
-                : row == headerHeight ? [new Segment(" logs ", muted)]
+                : row == headerHeight ? _logHeader.Render(options, width)
                 : row - LogTop < _logs.Count ? _logs[row - LogTop].Render(options, width)
                 : [];
             int column = 0;

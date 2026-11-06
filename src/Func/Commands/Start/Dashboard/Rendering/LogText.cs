@@ -81,6 +81,20 @@ internal static class LogText
 
     public static string EscapeMarkup(string value) => Markup.Escape(Sanitize(value));
 
+    public static int Measure(string value)
+    {
+        string text = Sanitize(value).Replace('\n', ' ');
+        int column = 0;
+        for (int offset = 0; offset < text.Length;)
+        {
+            int length = ElementLength(text, offset);
+            column += CellWidth(text, offset, length, column);
+            offset += length;
+        }
+
+        return column;
+    }
+
     public static string Clip(string value, int width)
     {
         string text = Sanitize(value).Replace('\n', ' ');

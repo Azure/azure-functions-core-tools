@@ -10,16 +10,19 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// <summary>
 /// Builds the compact dashboard help overlay.
 /// </summary>
-internal sealed class CompactHelpOverlayBuilder(ITheme theme, CompactDashboardShortcutLabels shortcutLabels)
+internal sealed class CompactHelpOverlayBuilder(ITheme theme, CompactDashboardShortcutLabels shortcutLabels, DashboardRunInfo runInfo)
 {
     private readonly ITheme _theme = theme ?? throw new ArgumentNullException(nameof(theme));
     private readonly CompactDashboardShortcutLabels _shortcutLabels = shortcutLabels ?? throw new ArgumentNullException(nameof(shortcutLabels));
+    private readonly DashboardRunInfo _runInfo = runInfo ?? throw new ArgumentNullException(nameof(runInfo));
 
     private string CommandTag => field ??= _theme.Command.ToMarkup();
     private string MutedTag => field ??= _theme.Muted.ToMarkup();
 
-    public IRenderable Build()
+    public IRenderable Build(int width, string? status = null)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+
         Table table = new Table()
             .Border(TableBorder.None)
             .HideHeaders()
@@ -27,30 +30,38 @@ internal sealed class CompactHelpOverlayBuilder(ITheme theme, CompactDashboardSh
             .AddColumn(new TableColumn(string.Empty).PadLeft(1).PadRight(3).NoWrap())
             .AddColumn(new TableColumn(string.Empty).PadRight(0));
 
-        AddHelpRow(table, "?", "Toggle this help panel.");
-        AddHelpRow(table, "t", "Open the function browser.");
-        AddHelpRow(table, "/", "Search functions by name, trigger, or route.");
-        AddHelpRow(table, "↑/↓", "Scroll logs line by line; in overlays, move selection.");
-        AddHelpRow(table, "Mouse wheel", "Scroll the log pane.");
-        AddHelpRow(table, "Drag", "Select log text; Ctrl+C copies the selection.");
-        AddHelpRow(table, "m", "Release mouse capture and pause the display for native selection.");
-        AddHelpRow(table, _shortcutLabels.PageNavigationHelpKey, "Scroll logs; in the function browser, jump through functions.");
-        AddHelpRow(table, "Home/End", "Jump to oldest logs / latest logs, or first / last function in the browser.");
-        AddHelpRow(table, "Enter", "Filter logs to the selected function in the function browser.");
-        AddHelpRow(table, "a", "Clear the active function filter.");
-        AddHelpRow(table, "f", "Cycle the active function filter.");
-        AddHelpRow(table, "c", "Clear visible log output.");
-        AddHelpRow(table, "e", "Toggle errors-only log view.");
-        AddHelpRow(table, "1/2/3", "Set visible log level: info, warning, or error.");
-        AddHelpRow(table, "q", "Stop the host.");
-        AddHelpRow(table, "Esc", "Close the active overlay.");
-        AddHelpRow(table, "Ctrl+C", "Copy selected text; otherwise stop the host.");
+        void Add(string key, string description, string compact)
+            => AddHelpRow(table, key, width < 80 ? compact : description);
 
-        return new Panel(new Rows(
-            new Markup($"[{MutedTag}]Available compact-mode controls[/]"),
-            table))
+        Add("?", "Toggle this help panel.", "Toggle help");
+        Add("t", "Open the function browser.", "Browse functions");
+        Add("/", "Search functions by name, trigger, or route.", "Search functions");
+        Add("↑/↓", "Scroll logs; move selection in an overlay.", "Scroll / select");
+        Add("Mouse wheel", "Scroll the log pane.", "Scroll logs");
+        Add("Drag", "Select log text; Ctrl+C copies.", "Select text");
+        Add("m", "Release capture / pause redraw; press again to resume.", "Native selection");
+        Add(_shortcutLabels.PageNavigationHelpKey, "Page through logs or functions.", "Page");
+        Add("Home/End", "Go to oldest/latest logs or first/last function.", "Oldest / latest");
+        Add("Enter", "Filter logs to the selected function.", "Filter");
+        Add("a", "Clear the function filter.", "Clear filter");
+        Add("f", "Cycle the function filter.", "Next filter");
+        Add("c", "Clear visible logs; keep file and counters.", "Clear logs");
+        Add("e", "Toggle errors-only logs.", "Errors only");
+        Add("1/2/3", "Minimum log level: info / warning / error.", "Info / warn / error");
+        Add("q / Ctrl+C", "Stop host; Ctrl+C copies an active selection.", "Quit / copy");
+        Add("Esc", "Close overlay or clear selection.", "Close / clear");
+
+        List<IRenderable> content = [];
+        if (!string.IsNullOrEmpty(status))
         {
-            Header = new PanelHeader("Help"),
+            content.Add(new Text(LogText.Sanitize(status), _theme.Emphasis));
+        }
+        content.Add(new Markup($"[{MutedTag}]Available compact-mode controls[/]"));
+        content.Add(table);
+
+        return new Panel(new Rows(content))
+        {
+            Header = new PanelHeader($"Help · Azure Functions CLI {LogText.EscapeMarkup(_runInfo.CliVersion)}"),
             Border = BoxBorder.Rounded,
             BorderStyle = _theme.Muted,
             Expand = true,

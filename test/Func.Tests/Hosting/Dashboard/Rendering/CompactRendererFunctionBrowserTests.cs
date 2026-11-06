@@ -31,6 +31,46 @@ public class CompactRendererFunctionBrowserTests
         writer.ToString().Should().Contain("HttpTrigger1").And.Contain("HttpExtra1");
     }
 
+    [Theory]
+    [InlineData(40)]
+    [InlineData(60)]
+    [InlineData(80)]
+    [InlineData(120)]
+    public void BuildLayout_ViewStateStaysAboveLogsWithoutMovingTheViewport(int width)
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        console.Profile.Width = width;
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+        DashboardFrame before = InvokePrivate<DashboardFrame>(renderer, "BuildLayout");
+        SetPrivate(renderer, "_activeFunctionFilter", "HttpTrigger1");
+        SetPrivate(renderer, "_minimumLogLevel", LogLevel.Warning);
+
+        DashboardFrame after = InvokePrivate<DashboardFrame>(renderer, "BuildLayout");
+        Render(console, writer, after);
+
+        after.LogTop.Should().Be(before.LogTop);
+        after.LogHeight.Should().Be(before.LogHeight);
+        string[] rows = writer.ToString().Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
+        rows.Should().HaveCount(console.Profile.Height);
+        rows[after.LogTop - 1].Should().Contain("Logs").And.Contain("L:warn").And.Contain("─");
+        rows[^1].Should().Contain("? help").And.Contain("q quit").And.NotContain("L:warn").And.NotContain("HttpTrigger1");
+    }
+
+    [Theory]
+    [InlineData(40)]
+    [InlineData(80)]
+    public void BuildFooter_ShutdownTakesPrecedenceOverAnOpenOverlay(int width)
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        console.Profile.Width = width;
+        SetPrivate(renderer, "_functionSearchOpen", true);
+        SetPrivate(renderer, "_stopping", true);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter"));
+
+        writer.ToString().Should().Contain("Ctrl+C force exit").And.NotContain("Esc close").And.NotContain("q quit");
+    }
+
     [Fact]
     public void BuildHeader_IncludesProfileAndStackMetadata()
     {
@@ -45,33 +85,31 @@ public class CompactRendererFunctionBrowserTests
         output.Should().Contain("Host: 4.834.0");
         output.Should().Contain("Profile: flex");
         output.Should().Contain("Stack: .NET");
+        output.Should().Contain("12 functions").And.Contain("0 invocations").And.Contain("0 errors");
     }
 
     [Fact]
     public void BuildFooter_WhenManyFunctionsLoaded_ShowsControls()
     {
         (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
-        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
-
-        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter"));
 
         string output = writer.ToString();
-        output.Should().Contain("12 functions");
-        output.Should().Contain("↑/↓, PgUp/PgDn logs");
+        output.Should().NotContain("12 functions");
+        output.Should().Contain("↑/↓ scroll").And.Contain("PgUp/PgDn page");
         output.Should().NotContain("Fn+↑/↓");
         output.Should().NotContain("Ctrl+U/D");
-        output.Should().Contain("L:info");
-        output.Should().Contain("q/Ctrl+C");
+        output.Should().NotContain("L:info");
+        output.Should().Contain("q quit").And.Contain("Ctrl+C stop").And.Contain("? help");
     }
 
     [Fact]
     public void BuildFooter_WhenHelpOpen_ShowsHelpCloseControls()
     {
         (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
-        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
         SetPrivate(renderer, "_helpOpen", true);
 
-        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter"));
 
         string output = writer.ToString();
         output.Should().Contain("?/Esc close");
@@ -91,11 +129,11 @@ public class CompactRendererFunctionBrowserTests
         output.Should().Contain("Available compact-mode controls");
         output.Should().Contain("Toggle this help panel");
         output.Should().Contain("Search functions by name");
-        output.Should().Contain("Scroll logs line by line");
-        output.Should().Contain("Clear visible log output");
-        output.Should().Contain("Cycle the active function filter");
-        output.Should().Contain("Toggle errors-only log view");
-        output.Should().Contain("Set visible log level");
+        output.Should().Contain("Scroll logs; move selection");
+        output.Should().Contain("Clear visible logs");
+        output.Should().Contain("Cycle the function filter");
+        output.Should().Contain("Toggle errors-only logs");
+        output.Should().Contain("Minimum log level");
         output.Should().Contain("Scroll logs");
         output.Should().Contain("PgUp/PgDn");
         output.Should().NotContain("Fn+↑/↓");
@@ -121,6 +159,26 @@ public class CompactRendererFunctionBrowserTests
         string output = writer.ToString();
         output.Should().Contain("Help");
         (CountRenderedLines(output) <= console.Profile.Height).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(40)]
+    [InlineData(80)]
+    [InlineData(120)]
+    public void BuildLayout_HelpKeepsTheFullKeyReferenceVisible(int width)
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        console.Profile.Width = width;
+        SetPrivate(renderer, "_state", BuildState(functionCount: 3));
+        SetPrivate(renderer, "_helpOpen", true);
+        DashboardFrame frame = InvokePrivate<DashboardFrame>(renderer, "BuildLayout");
+
+        Render(console, writer, frame);
+
+        string[] rows = writer.ToString().Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
+        string help = string.Join("\n", rows.Take(frame.LogTop - 1));
+        help.Should().Contain("Mouse wheel").And.Contain("PgUp/PgDn").And.Contain("1/2/3")
+            .And.Contain("q / Ctrl+C").And.Contain("Esc");
     }
 
     [Fact]
@@ -395,7 +453,7 @@ public class CompactRendererFunctionBrowserTests
         output.Should().Contain("info compact log");
         output.Should().Contain("warning compact log");
         output.Should().Contain("error compact log");
-        output.Should().Contain("L:info");
+        output.Should().NotContain("L:warn").And.NotContain("L:error");
     }
 
     [Fact]
@@ -442,7 +500,7 @@ public class CompactRendererFunctionBrowserTests
         output = writer.ToString();
         output.Should().Contain("compact log 01");
         output.Should().NotContain("compact log 20");
-        output.Should().Contain("Scrollback");
+        output.Should().Contain("Paused").And.Contain("End live");
 
         await renderer.OnEventAsync(Log("HttpTrigger1", "compact log 21"), [], CancellationToken.None);
         Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildLayout"));
@@ -550,12 +608,10 @@ public class CompactRendererFunctionBrowserTests
     public void BuildFooter_OnMacOS_ShowsMacOSNavigationControls()
     {
         (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer(isMacOS: true);
-        DashboardSnapshot snapshot = BuildSnapshot(functionCount: 12);
-
-        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter", snapshot, null));
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter"));
 
         string output = writer.ToString();
-        output.Should().Contain("↑/↓, Fn+↑/↓ logs");
+        output.Should().Contain("↑/↓ scroll").And.Contain("Fn+↑/↓ page");
         output.Should().NotContain("PgUp/PgDn");
         output.Should().NotContain("Ctrl+U/D");
     }
