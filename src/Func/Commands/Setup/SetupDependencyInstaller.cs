@@ -81,6 +81,14 @@ internal sealed class SetupDependencyInstaller(
                     $"Skipped {dependency.DisplayName}: no workload package published for this runtime.");
             }
 
+            if (resolution.PackageMissing && dependency.Kind == SetupDependencyKind.Worker)
+            {
+                return SetupDependencyResult.Failed(
+                    dependency,
+                    $"Cannot resolve setup feature '{dependency.Name}': {resolution.FailureMessage} "
+                    + "Check the feature name or use '--source' to select a catalog containing its worker workload.");
+            }
+
             return SetupDependencyResult.Failed(dependency, resolution.FailureMessage);
         }
 

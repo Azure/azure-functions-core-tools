@@ -822,8 +822,109 @@ public sealed class SetupRunnerTests : IDisposable
         _interaction.Lines.Should().Contain(line => line.Contains("func workload search bundles --prerelease", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public async Task RunAsync_UnresolvedFeature_FailsWithoutReportingCompletion(bool check, bool json, bool includeSupportedFeature)
+    {
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([
+            Entry(_hostPackageId, "4.1.0"),
+            Entry("Azure.Functions.Cli.Workloads.Node", "1.0.0"),
+            Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0"),
+        ]);
+        SetupRunner runner = CreateRunner(Catalog());
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(
+                features: includeSupportedFeature ? ["node", "validation-bogus"] : ["validation-bogus"],
+                installPolicy: SetupInstallPolicy.IfNeeded,
+                check: check,
+                outputMode: json ? SetupOutputMode.Json : SetupOutputMode.Plain),
+            CancellationToken.None);
+
+        result.ExitCode.Should().Be(1);
+        _interaction.Lines.Should().NotContain(line => line.Contains("setup is complete", StringComparison.Ordinal));
+        _installer.ReceivedCalls().Should().BeEmpty();
+        if (json)
+        {
+            JsonElement[] events = [.. _interaction.Lines.Select(line =>
+            {
+                using var document = JsonDocument.Parse(line);
+                return document.RootElement.Clone();
+            })];
+            JsonElement failure = events.Should().ContainSingle(item =>
+                item.GetProperty("type").GetString() == "dependency.result"
+                && item.GetProperty("name").GetString() == "validation-bogus").Which;
+            failure.GetProperty("status").GetString().Should().Be("failed");
+            failure.GetProperty("message").GetString().Should().Contain("Cannot resolve setup feature 'validation-bogus'");
+            events[^1].GetProperty("type").GetString().Should().Be("setup.failed");
+            events.Should().NotContain(item => item.GetProperty("type").GetString() == "setup.completed");
+        }
+        else
+        {
+            _interaction.Lines.Should().Contain(line => line.Contains("Cannot resolve setup feature 'validation-bogus'", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("node", "Node")]
+    [InlineData("python", "Python")]
+    [InlineData("go", "Go")]
+    [InlineData("java", "Java")]
+    [InlineData("powershell", "PowerShell")]
+    public async Task RunAsync_StackFeatureWithoutPublishedWorker_SkipsOptionalWorker(string runtime, string packageSuffix)
+    {
+        FakeCatalog catalog = Catalog()
+            .WithLatest(_hostPackageId, "4.1.0")
+            .WithLatest($"Azure.Functions.Cli.Workloads.{packageSuffix}", "1.0.0")
+            .WithLatest(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0");
+        SetupRunner runner = CreateRunner(catalog);
+
+        SetupRunResult result = await runner.RunAsync(Options(features: [runtime]), CancellationToken.None);
+
+        result.ExitCode.Should().Be(0);
+        _interaction.Lines.Should().Contain(line => line.Contains($"Skipped {runtime} worker", StringComparison.Ordinal));
+        _interaction.Lines.Should().Contain(line => line.Contains($"Installed {runtime} stack", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task RunAsync_InstalledCustomWorkerWithoutCatalogVersion_SatisfiesFeature(bool check, bool ifNeeded)
+    {
+        string workerPackageId = WorkerPackage("custom");
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([
+            Entry(_hostPackageId, "4.1.0"),
+            Entry(workerPackageId, "1.0.0"),
+            Entry(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.10.0"),
+        ]);
+        SetupRunner runner = CreateRunner(Catalog());
+
+        SetupRunResult result = await runner.RunAsync(
+            Options(
+                features: ["custom"],
+                installPolicy: ifNeeded ? SetupInstallPolicy.IfNeeded : SetupInstallPolicy.LatestCompatible,
+                check: check),
+            CancellationToken.None);
+
+        result.ExitCode.Should().Be(0);
+        string expectedMessage = ifNeeded
+            ? "custom worker is already installed."
+            : "custom worker is satisfied by installed version 1.0.0";
+        _interaction.Lines.Should().Contain(line => line.Contains(expectedMessage, StringComparison.Ordinal));
+        _installer.ReceivedCalls().Should().BeEmpty();
+    }
+
     [Fact]
-    public async Task RunAsync_FeatureWithoutStackMapping_DoesNotInstallStack()
+    public async Task RunAsync_FeatureWithoutStackMapping_InstallsCustomWorkerWithoutStack()
     {
         string workerPackageId = WorkerPackage("custom");
         FakeCatalog catalog = Catalog()
@@ -835,6 +936,15 @@ public sealed class SetupRunnerTests : IDisposable
         SetupRunResult result = await runner.RunAsync(Options(features: ["custom"]), CancellationToken.None);
 
         result.ExitCode.Should().Be(0);
+        await _installer.Received(1).InstallFromCatalogAsync(
+            Arg.Is<string>(id => string.Equals(id, workerPackageId, StringComparison.OrdinalIgnoreCase)),
+            Arg.Is<NuGetVersion>(version => version.ToNormalizedString() == "1.0.0"),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            Arg.Any<IProgress<WorkloadInstallProgress>?>(),
+            cancellationToken: Arg.Any<CancellationToken>());
         await _installer.DidNotReceive().InstallFromCatalogAsync(
             Arg.Is<string>(id => id.StartsWith("Azure.Functions.Cli.Workloads.", StringComparison.OrdinalIgnoreCase)
                 && !id.StartsWith("Azure.Functions.Cli.Workloads.Workers.", StringComparison.OrdinalIgnoreCase)

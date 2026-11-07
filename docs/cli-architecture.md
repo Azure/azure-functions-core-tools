@@ -400,7 +400,15 @@ Each registered initializer also contributes options to `func init` via `GetInit
 
 Help groups stack-specific options under the initializer's `DisplayName` (for example, `.NET` or `Node.js`). Built-in options, bundle options, and options contributed by multiple stacks stay in the general `Options` section, followed by stack headings sorted alphabetically using an ordinal, case-insensitive comparison. Options within each group retain their registration order. `func run` (alias `start`) follows the same grouping using the matching `IProjectStack.DisplayName`, falling back to the contributor's stack ID when no descriptor is registered. Stack IDs are matched case-insensitively. Empty groups and hidden options are omitted.
 
-### `func setup` for Go projects
+### `func setup`
+
+Runtime features without a built-in stack mapping are resolved through their worker
+workload, allowing custom runtimes. If neither an installed compatible worker nor
+a matching catalog version is available, setup reports a feature-resolution error
+and exits nonzero, including with `--check`. Missing worker packages remain optional
+for features with a stack mapping; setup still requires their stack workload.
+
+#### Go projects
 
 When inferring setup features from project configuration, `func setup` maps the Go
 worker runtime `native` to the `go` feature, even before the Go stack is installed.
