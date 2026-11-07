@@ -44,6 +44,150 @@ Defines how `func init` discovers and runs installed quickstart project template
 - **WHEN** an uninstalled template could be identified as first-party
 - **THEN** the initial capability still does not install it implicitly
 
+### Requirement: Stack acquisition supplies basic companions only
+
+Explicit stack installation through setup or direct stack install SHALL acquire approved basic project/item companions under the acquisition design. It MUST NOT preinstall curated quickstarts or expose a curated preinstallation option. Existing installed quickstart packages SHALL NOT be removed by this policy change.
+
+#### Scenario: Fresh stack installation
+
+- **WHEN** a supported stack installation completes
+- **THEN** approved basic project and item templates are installed without separate package commands
+- **AND** no curated quickstart payload is acquired by that stack operation
+
+### Requirement: Curated discovery precedes payload acquisition
+
+CLI browse/search SHALL expose sanctioned available templates without payload installation. The existing reviewed source manifest SHALL remain the curated registration and initial discovery authority, with an approved versioned publishing extension and verified publication references. It MUST NOT require a second manually maintained onboarding registry or general feed scanning for the initial curated GA flow. Legacy fields/URL/schema consumers SHALL be preserved or qualified through coordinated migration. Cached public metadata MUST NOT authorize publication or substitute for the installed TemplateEngine catalog. Generic explicit third-party package installation SHALL remain supported. Browsing/searching MUST NOT mutate installed package state, and empty/unknown init cases SHALL identify the agreed CLI discovery route without implicit acquisition.
+
+#### Scenario: Empty picker or unknown installed reference
+
+- **WHEN** init has no installed selection or the requested template is not installed
+- **THEN** its guidance identifies the agreed CLI discovery route and stable browse destination
+- **AND** viewing that route does not authorize installation
+
+#### Scenario: Curated package is not installed
+
+- **WHEN** a valid discovery entry describes a sanctioned quickstart absent from the installed catalog
+- **THEN** the user can inspect and select it from metadata without downloading its payload
+- **AND** merely viewing or filtering the catalog does not install it
+
+### Requirement: Guided use has explicit acquisition authorization
+
+A guided use action SHALL show the concrete package ID, version, source, full template identity, and verified curation before acquisition through the lifecycle. It SHALL require confirmation or explicit non-interactive authorization and preserve installed source/pin choices. After acquisition it SHALL finish the lifecycle session, open a fresh init session under the shared-read contract, and bind the selected entry to the authorized package owner, actual installed version, recorded source, and approved artifact/provenance before validating constraints or creating files. A template name alone MUST NOT authorize selection from another package. Unknown curation, unexpected owners, or unverifiable artifacts SHALL block guided use. The verified entry SHALL remain authoritative through the integration's snapshot/locking rules. The flow MUST NOT silently update template packages or workloads.
+
+#### Scenario: User authorizes install and use
+
+- **WHEN** a user authorizes acquisition of a sanctioned discovery selection
+- **THEN** the lifecycle acquires the selected package under its source/version rules
+- **AND** the shared init path runs only after installed identity, parameters, constraints, and output effects are validated
+
+#### Scenario: Another installed package advertises the same template identity
+
+- **WHEN** a different installed package advertises the sanctioned template's identity or short name
+- **THEN** guided use verifies the concrete owning package against its authorized reference
+- **AND** rejects an unexpected owner rather than substitute its template
+- **AND** no project files are created from that substitution
+
+#### Scenario: Acquisition is declined or fails
+
+- **WHEN** the user declines, acquisition is cancelled, or installation fails
+- **THEN** project creation does not start and the target remains unchanged
+- **AND** the lifecycle retains its existing failure-safe package behavior
+
+#### Scenario: Non-interactive discovery lacks acquisition authorization
+
+- **WHEN** a non-interactive selection needs installation but no explicit acquisition authorization was supplied
+- **THEN** the flow provides an actionable authorization/install hint
+- **AND** does not acquire a package or create project files
+
+#### Scenario: Installed package conflicts with discovery version
+
+- **WHEN** discovery advertises a different version or source from the installed selection
+- **THEN** guided use does not silently override the installed version, source, or pin
+- **AND** any replacement requires an explicit lifecycle action under its existing policy
+
+### Requirement: Guided dry-run does not acquire payloads
+
+Guided dry-run SHALL not download, install, update, or register template packages. An uninstalled selection SHALL report that explicit installation is required for full engine preview, while metadata/acquisition intent may be displayed read-only. Installed selections SHALL retain normal no-filesystem-write preview and approval rules. Force or dry-run SHALL NOT imply acquisition authorization.
+
+#### Scenario: Uninstalled selection is previewed
+
+- **WHEN** guided dry-run selects a sanctioned template whose payload is not installed
+- **THEN** it reports the installation requirement without mutating the global template store or target
+
+### Requirement: Guided curation proof identifies the actual artifact
+
+Guided use SHALL validate authenticated approval evidence for the actual selected package ID, installed version, recorded source, artifact digest, and full template identity. Approval of only the latest advertised version or package family SHALL NOT authorize another installed artifact. Revoked, stale, unknown, or mismatched evidence SHALL block acquisition/creation. Offline proof SHALL be accepted only under an agreed policy validating the exact artifact and permitted freshness; otherwise the flow SHALL fail closed. Approval transport, revocation/freshness distribution, offline validity, and explicit script-authorization grammar SHALL be qualified before removing the legacy command.
+
+#### Scenario: Installed artifact is older than the approved catalog entry
+
+- **WHEN** an older installed artifact lacks valid approval for its own exact version/source/digest
+- **THEN** guided use rejects it rather than borrow the newer entry's approval or silently update it
+
+#### Scenario: Approval is revoked or unverifiable
+
+- **WHEN** current approval is revoked, stale, unknown, or does not identify the actual artifact
+- **THEN** guided use fails before project creation with an approval diagnostic
+
+#### Scenario: Offline proof policy is not satisfied
+
+- **WHEN** offline guided use cannot establish valid cached exact-artifact evidence under the agreed policy
+- **THEN** it does not acquire or create the project merely because metadata or a package is cached
+
+### Requirement: Quickstart removal requires a qualified replacement
+
+The existing `func quickstart` command SHALL remain available until a pinned supported-entry inventory has usable published replacements, basic companion acquisition works on fresh and upgraded installs, guided metadata discovery/acquisition/creation and migration guidance are available, replacement regression tests pass, and the responsible owners agree the handoff. Every currently supported entry SHALL record a source/scope, replacement reference or unresolved gap, owner, blocker, and reviewed disposition, including sources outside the initial publisher allowlist and independent subfolders. Unresolved coverage SHALL block removal, not narrow support or expand trust implicitly. The command switch SHALL remove the old creation path rather than keep a permanent alias. It SHALL NOT remove the shared manifest from unrelated consumers.
+
+The inventory SHALL be pinned from the reviewed production quickstart manifest, not test fixtures, and reconciled with the currently published legacy manifest immediately before removal. Newly supported entries SHALL receive qualified replacements/dispositions or block cutover; additions SHALL NOT be silently ignored or frozen without owner agreement.
+
+#### Scenario: Legacy manifest adds a supported entry after the pin
+
+- **WHEN** cutover reconciliation finds a currently supported entry absent from the earlier inventory
+- **THEN** removal is blocked until the new entry has a qualified replacement/disposition
+
+#### Scenario: Repository exposes separate subfolder samples
+
+- **WHEN** two supported manifest entries select different folders from one repository
+- **THEN** the replacement retains two independently selectable project templates
+- **AND** each generates its intended source scope rather than a combined solution
+
+#### Scenario: Source is not yet publishable
+
+- **WHEN** a supported sample lacks an eligible release, required template metadata, or a supported packaging scope
+- **THEN** that sample remains an unresolved migration dependency
+- **AND** the old command is not removed while its replacement coverage is incomplete
+
+#### Scenario: User discovers a sample outside installed companions
+
+- **WHEN** a user wants a sample not present in the installed catalog
+- **THEN** working CLI browse/search identifies the sample and offers the authorized guided use flow without requiring a known package ID
+- **AND** discovery exposes relevant language, resource, infrastructure-as-code, and sample information
+- **AND** `func init` does not install the selected package implicitly
+
+#### Scenario: Package remains at its installed version
+
+- **WHEN** a newer curated package is published but the installed package has not been updated
+- **THEN** initialization uses the installed version
+- **AND** this migration does not imply an automatic template or workload update
+
+### Requirement: Force migration has explicit failure boundaries
+
+The replacement SHALL preserve removal of non-`.git` target contents under explicit `--force`, interactive warning/confirmation, and explicit non-interactive force authorization. Dry-run SHALL not delete content. Guided acquisition, approval and combined execution preflight SHALL finish before cleanup. Failures or declined/canceled authorization before cleanup SHALL preserve the old target. Failures after cleanup begins SHALL return nonzero and report partial state without claiming rollback or restoration of original files. This sequencing change from legacy fetch-after-cleanup SHALL be documented and qualified before command removal.
+
+#### Scenario: Acquisition fails before forced cleanup
+
+- **WHEN** a forced guided request cannot acquire or approve its package before cleanup
+- **THEN** the existing target contents remain unchanged
+
+#### Scenario: Creation fails after forced cleanup
+
+- **WHEN** authorized non-`.git` cleanup completes and template creation or configuration then fails
+- **THEN** the command reports nonzero partial state and does not claim restoration of deleted originals
+
+#### Scenario: Forced cleanup is declined or previewed
+
+- **WHEN** the user declines cleanup, cancellation is observed before deletion, or dry-run is requested
+- **THEN** no target content is deleted
+
 ### Requirement: Interactive initialization is template-first
 
 When no template is supplied and prompting is available, `func init` SHALL present installed project-template groups, narrowed by any explicit stack and language filters, before resolving template variants or template parameters. After a template group is selected, the command SHALL resolve only the remaining choices required by that group.
