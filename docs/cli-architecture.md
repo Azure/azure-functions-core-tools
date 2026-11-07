@@ -78,6 +78,10 @@ func
 
 Workloads can add their own subcommands by calling `builder.RegisterCommand(...)` from inside `IWorkload.Configure` (see [building-a-workload.md](building-a-workload.md)). Workload commands are described in parser-independent terms via `FuncCommand` / `FuncCommandOption` / `FuncCommandArgument`; the host wraps each one in an internal `ExternalCommand` adapter that translates the descriptors to `System.CommandLine` and tracks the registering workload for diagnostics.
 
+`func help` shows general help. Supply a command path, such as `func help workload install`,
+to show the same command help as `func workload install --help` without executing the command.
+Paths can include nested subcommands and aliases; an unknown path reports an error and exits with code 1.
+
 ## In-place CLI updates
 
 `func update` first runs the current executable's `--version` through the process

@@ -13,10 +13,10 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal class HelpCommand : FuncCliCommand
 {
-    public Argument<string?> CommandArgument { get; } = new("command")
+    public Argument<string[]> CommandArgument { get; } = new("command")
     {
         Description = "The command to get help for.",
-        Arity = ArgumentArity.ZeroOrOne
+        Arity = ArgumentArity.ZeroOrMore
     };
 
     private readonly IInteractionService _interaction;
@@ -38,11 +38,11 @@ internal class HelpCommand : FuncCliCommand
 
     protected override Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        string? commandName = parseResult.GetValue(CommandArgument);
+        string[] commandPath = parseResult.GetValue(CommandArgument) ?? [];
 
-        return Task.FromResult(string.IsNullOrEmpty(commandName)
+        return Task.FromResult(commandPath.Length == 0
             ? ShowGeneralHelp()
-            : ShowCommandHelp(commandName));
+            : ShowCommandHelp(commandPath));
     }
 
     /// <summary>Shows top-level help: product banner, command list, global options.</summary>
@@ -95,16 +95,31 @@ internal class HelpCommand : FuncCliCommand
         return 0;
     }
 
-    /// <summary>Shows help for a named subcommand.</summary>
-    internal int ShowCommandHelp(string commandName)
+    /// <summary>
+    /// Shows help for a command path.
+    /// </summary>
+    internal int ShowCommandHelp(params string[] commandPath)
     {
-        Command? command = _rootCommand.Subcommands
-            .FirstOrDefault(c => c.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase));
+        ArgumentNullException.ThrowIfNull(commandPath);
 
-        if (command is null)
+        if (commandPath.Length == 0)
         {
-            _interaction.WriteError($"Unknown command: '{commandName}'. Run 'func help' for available commands.");
-            return 1;
+            return ShowGeneralHelp();
+        }
+
+        Command command = _rootCommand;
+        foreach (string segment in commandPath)
+        {
+            Command? subcommand = command.Subcommands.FirstOrDefault(c =>
+                c.Name.Equals(segment, StringComparison.OrdinalIgnoreCase) ||
+                c.Aliases.Contains(segment, StringComparer.OrdinalIgnoreCase));
+            if (subcommand is null)
+            {
+                _interaction.WriteError($"Unknown command: '{string.Join(' ', commandPath)}'. Run 'func help' for available commands.");
+                return 1;
+            }
+
+            command = subcommand;
         }
 
         RenderCommandHelp(command);
@@ -112,7 +127,7 @@ internal class HelpCommand : FuncCliCommand
     }
 
     /// <summary>
-    /// Renders help for any <see cref="Command"/>. Used by both <c>func help &lt;command&gt;</c>
+    /// Renders help for any <see cref="Command"/>. Used by both <c>func help &lt;command&gt; [&lt;subcommand&gt;...]</c>
     /// and the global <c>--help</c> / <c>-h</c> handler.
     /// </summary>
     internal void RenderCommandHelp(Command command)
