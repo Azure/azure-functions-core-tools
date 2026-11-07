@@ -1,19 +1,14 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Microsoft.TemplateEngine.Abstractions;
-
 namespace Azure.Functions.Cli.Templates.Engine;
 
 internal enum TemplateResolutionStatus
 {
     Selected,
     NotFound,
-    WrongKind,
-    Ineligible,
     Ambiguous,
-    DuplicateIdentity,
-    InvalidSelection,
+    Failed,
 }
 
 internal sealed record TemplateResolutionDiagnostic(string Code, string Message, string? TemplateIdentity = null);
@@ -44,7 +39,7 @@ internal sealed class TemplateResolutionResult
 }
 
 /// <summary>
-/// Binds a catalog selection to its originating engine session.
+/// Represents a candidate selected by a templater session.
 /// </summary>
 /// <remarks>
 /// Selection does not establish scan completeness, metadata freshness, or asset integrity. Invocation must validate
@@ -52,26 +47,8 @@ internal sealed class TemplateResolutionResult
 /// </remarks>
 internal sealed class ResolvedTemplate
 {
-    private readonly TemplateEngineSession _owner;
-    private readonly ITemplateInfo _templateInfo;
-
-    internal ResolvedTemplate(TemplateEngineSession owner, TemplateCatalogEntry descriptor, ITemplateInfo templateInfo)
-    {
-        _owner = owner ?? throw new ArgumentNullException(nameof(owner));
-        Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
-        _templateInfo = templateInfo ?? throw new ArgumentNullException(nameof(templateInfo));
-
-        if (!string.Equals(Descriptor.Identity, _templateInfo.Identity, StringComparison.Ordinal))
-        {
-            throw new ArgumentException("The selected template must match its catalog identity.", nameof(templateInfo));
-        }
-    }
+    internal ResolvedTemplate(TemplateCatalogEntry descriptor)
+        => Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
 
     internal TemplateCatalogEntry Descriptor { get; }
-
-
-    internal bool IsOwnedBy(TemplateEngineSession session)
-        => ReferenceEquals(_owner, session)
-            && string.Equals(Descriptor.Identity, _templateInfo.Identity, StringComparison.Ordinal);
-
 }

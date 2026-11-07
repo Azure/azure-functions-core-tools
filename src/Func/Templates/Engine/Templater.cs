@@ -16,12 +16,12 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// Command-scoped entry point to the template engine. Create it through <see cref="ITemplaterFactory"/> and dispose
 /// it when the command is finished with templates.
 /// </summary>
+/// <remarks>The templater and its session are intended for sequential use by one command.</remarks>
 internal sealed class Templater(TemplateEngineSession session, InstalledProjectStackCatalog projectStacks) : IDisposable
 {
     private readonly TemplateEngineSession _session = session ?? throw new ArgumentNullException(nameof(session));
     private readonly InstalledProjectStackCatalog _projectStacks = projectStacks ?? throw new ArgumentNullException(nameof(projectStacks));
     private readonly Dictionary<TemplateCatalogEntry, ITemplateInfo> _issuedEntries = new(ReferenceEqualityComparer.Instance);
-    private readonly object _issuedEntriesLock = new();
 
     public TemplateEngineContext Context => _session.Context;
 
@@ -29,11 +29,18 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
     /// Lists the installed templates of <paramref name="type"/>, including hidden templates and templates whose func
     /// host metadata can't be used.
     /// </summary>
+    /// <exception cref="InvalidOperationException">The installed template inventory cannot be inspected completely.</exception>
     public async Task<IReadOnlyList<TemplateCatalogEntry>> ListAsync(TemplateType type, CancellationToken cancellationToken = default)
     {
-        List<(ITemplateInfo Template, TemplateCatalogEntry? Entry)> candidates = (await LoadCatalogAsync(cancellationToken, type)).Candidates;
+        (List<(ITemplateInfo Template, TemplateCatalogEntry? Entry, string[] ShortNames)> candidates, _, TemplateResolutionDiagnostic? diagnostic)
+            = await LoadCatalogAsync(cancellationToken, type);
+        if (diagnostic is not null)
+        {
+            throw new InvalidOperationException(diagnostic.Message);
+        }
+
         List<TemplateCatalogEntry> entries = [];
-        foreach ((ITemplateInfo template, TemplateCatalogEntry? entry) in candidates)
+        foreach ((ITemplateInfo template, TemplateCatalogEntry? entry, string[] _) in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (entry?.Type != type)
@@ -49,7 +56,8 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
     }
 
     /// <summary>
-    /// Resolves an installed identity or short name without choosing between ambiguous candidates.
+    /// Resolves an installed identity or short name. An ambiguous result returns eligible candidates for the caller
+    /// to choose from; this method does not prompt or select one automatically.
     /// </summary>
     /// <remarks>
     /// Selection does not pin content or authorize invocation. Any later invocation must validate the selected source
@@ -58,12 +66,15 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
     public async Task<TemplateResolutionResult> ResolveAsync(string reference, TemplateType type, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
-        (List<(ITemplateInfo Template, TemplateCatalogEntry? Entry)> candidates, IReadOnlyList<ITemplatePackage> packages)
-            = await LoadCatalogAsync(cancellationToken);
-        Dictionary<string, List<(TemplateType? Type, string[] ShortNames, string Source)>> duplicates
-            = await FindDuplicateTemplatesAsync(packages, cancellationToken);
+        (List<(ITemplateInfo Template, TemplateCatalogEntry? Entry, string[] ShortNames)> candidates,
+            Dictionary<string, List<(TemplateType? Type, string[] ShortNames, string Source)>> duplicates,
+            TemplateResolutionDiagnostic? inventoryDiagnostic) = await LoadCatalogAsync(cancellationToken, reference: reference);
+        if (inventoryDiagnostic is not null)
+        {
+            return Failure(TemplateResolutionStatus.Failed, inventoryDiagnostic);
+        }
 
-        (ITemplateInfo Template, TemplateCatalogEntry? Entry)[] exactMatches = [.. candidates.Where(candidate =>
+        (ITemplateInfo Template, TemplateCatalogEntry? Entry, string[] ShortNames)[] exactMatches = [.. candidates.Where(candidate =>
             string.Equals(candidate.Template.Identity, reference, StringComparison.OrdinalIgnoreCase))];
         if (duplicates.TryGetValue(reference, out List<(TemplateType? Type, string[] ShortNames, string Source)>? exactDuplicates)
             && exactDuplicates.Count > 1)
@@ -76,14 +87,14 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
             if (exactMatches.Length > 1)
             {
                 return DuplicateIdentityFailure(reference, [.. exactMatches.Select(match =>
-                    (match.Entry?.Type, match.Template.ShortNameList.ToArray(), $"{match.Template.MountPointUri}::{match.Template.ConfigPlace}"))]);
+                    (match.Entry?.Type, match.ShortNames, $"{match.Template.MountPointUri}::{match.Template.ConfigPlace}"))]);
             }
 
             TemplateCatalogEntry? entry = exactMatches[0].Entry;
             if (entry is null || entry.Type != type)
             {
                 return Failure(
-                    TemplateResolutionStatus.WrongKind,
+                    TemplateResolutionStatus.Failed,
                     new("wrong-kind", $"Template '{reference}' is not a {type.ToString().ToLowerInvariant()} template."));
             }
 
@@ -102,8 +113,8 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
             return DuplicateIdentityFailure(duplicateEntry.Key, duplicateEntry.Value);
         }
 
-        (ITemplateInfo Template, TemplateCatalogEntry? Entry)[] aliasMatches = [.. candidates.Where(candidate =>
-            candidate.Template.ShortNameList.Contains(reference, StringComparer.OrdinalIgnoreCase))];
+        (ITemplateInfo Template, TemplateCatalogEntry? Entry, string[] ShortNames)[] aliasMatches = [.. candidates.Where(candidate =>
+            candidate.ShortNames.Contains(reference, StringComparer.OrdinalIgnoreCase))];
         if (aliasMatches.Length == 0)
         {
             return Failure(TemplateResolutionStatus.NotFound, new("not-found", $"No installed template matches '{reference}'."));
@@ -115,7 +126,7 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
         if (kindMatches.Length == 0)
         {
             return Failure(
-                TemplateResolutionStatus.WrongKind,
+                TemplateResolutionStatus.Failed,
                 new("wrong-kind", $"Template alias '{reference}' does not identify a {type.ToString().ToLowerInvariant()} template."));
         }
 
@@ -138,15 +149,11 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
         cancellationToken.ThrowIfCancellationRequested();
         if (eligible.Count == 0)
         {
-            return new(TemplateResolutionStatus.Ineligible, null, kindMatches.Select(candidate => candidate.Entry), diagnostics);
+            return new(TemplateResolutionStatus.Failed, null, kindMatches.Select(candidate => candidate.Entry), diagnostics);
         }
 
         if (eligible.Count > 1)
         {
-            int familyCount = eligible.Select(candidate => FamilyKey(candidate.Entry)).Distinct().Count();
-            string message = familyCount > 1
-                ? $"Template alias '{reference}' matches multiple eligible families."
-                : $"Template alias '{reference}' matches multiple eligible variants in one family.";
             foreach ((ITemplateInfo template, TemplateCatalogEntry entry) in eligible)
             {
                 RegisterIssuedEntry(entry, template);
@@ -156,7 +163,7 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
                 TemplateResolutionStatus.Ambiguous,
                 null,
                 eligible.Select(candidate => candidate.Entry),
-                [new("ambiguous", message), .. diagnostics]);
+                [new("ambiguous", $"Template alias '{reference}' matches multiple eligible templates."), .. diagnostics]);
         }
 
         (ITemplateInfo selectedTemplate, TemplateCatalogEntry selectedEntry) = eligible[0];
@@ -178,23 +185,20 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
         _ = _session.PackageManager;
         cancellationToken.ThrowIfCancellationRequested();
 
-        ITemplateInfo? issuedTemplate;
-        lock (_issuedEntriesLock)
-        {
-            _issuedEntries.TryGetValue(selectedEntry, out issuedTemplate);
-        }
-
-        if (issuedTemplate is null)
+        if (!_issuedEntries.TryGetValue(selectedEntry, out ITemplateInfo? issuedTemplate))
         {
             return Failure(
-                TemplateResolutionStatus.InvalidSelection,
+                TemplateResolutionStatus.Failed,
                 new("invalid-selection", "The catalog entry was not issued by this templater session.", selectedEntry.Identity));
         }
 
-        (List<(ITemplateInfo Template, TemplateCatalogEntry? Entry)> candidates, IReadOnlyList<ITemplatePackage> packages)
-            = await LoadCatalogAsync(cancellationToken);
-        Dictionary<string, List<(TemplateType? Type, string[] ShortNames, string Source)>> duplicates
-            = await FindDuplicateTemplatesAsync(packages, cancellationToken);
+        (List<(ITemplateInfo Template, TemplateCatalogEntry? Entry, string[] ShortNames)> candidates,
+            Dictionary<string, List<(TemplateType? Type, string[] ShortNames, string Source)>> duplicates,
+            TemplateResolutionDiagnostic? inventoryDiagnostic) = await LoadCatalogAsync(cancellationToken, reference: selectedEntry.Identity);
+        if (inventoryDiagnostic is not null)
+        {
+            return Failure(TemplateResolutionStatus.Failed, inventoryDiagnostic);
+        }
         if (duplicates.TryGetValue(selectedEntry.Identity, out List<(TemplateType? Type, string[] ShortNames, string Source)>? duplicateEntries)
             && duplicateEntries.Count > 1)
         {
@@ -204,11 +208,11 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
         if (selectedEntry.Type != type)
         {
             return Failure(
-                TemplateResolutionStatus.WrongKind,
+                TemplateResolutionStatus.Failed,
                 new("wrong-kind", $"Template '{selectedEntry.Identity}' is not a {type.ToString().ToLowerInvariant()} template.", selectedEntry.Identity));
         }
 
-        (ITemplateInfo Template, TemplateCatalogEntry? Entry)[] currentMatches = [.. candidates.Where(candidate =>
+        (ITemplateInfo Template, TemplateCatalogEntry? Entry, string[] ShortNames)[] currentMatches = [.. candidates.Where(candidate =>
             candidate.Entry is not null
             && string.Equals(candidate.Template.Identity, issuedTemplate.Identity, StringComparison.Ordinal)
             && string.Equals(candidate.Template.MountPointUri, issuedTemplate.MountPointUri, StringComparison.Ordinal)
@@ -217,87 +221,280 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
         if (currentMatches.Length != 1 || currentMatches[0].Entry is not { } currentEntry)
         {
             return Failure(
-                TemplateResolutionStatus.InvalidSelection,
+                TemplateResolutionStatus.Failed,
                 new("stale-selection", $"Template '{selectedEntry.Identity}' is no longer available from the selected source.", selectedEntry.Identity));
         }
 
         return await ResolveExactAsync(currentMatches[0].Template, currentEntry, cancellationToken);
     }
 
-    public void ValidateSelectionOwner(ResolvedTemplate selection) => _session.ValidateSelectionOwner(selection);
-
     public void Dispose()
     {
-        lock (_issuedEntriesLock)
-        {
-            _issuedEntries.Clear();
-            _session.Dispose();
-        }
+        _issuedEntries.Clear();
+        _session.Dispose();
     }
 
-    private async Task<(List<(ITemplateInfo Template, TemplateCatalogEntry? Entry)> Candidates, IReadOnlyList<ITemplatePackage> Packages)> LoadCatalogAsync(
+    private async Task<(
+        List<(ITemplateInfo Template, TemplateCatalogEntry? Entry, string[] ShortNames)> Candidates,
+        Dictionary<string, List<(TemplateType? Type, string[] ShortNames, string Source)>> Occurrences,
+        TemplateResolutionDiagnostic? Diagnostic)> LoadCatalogAsync(
         CancellationToken cancellationToken,
-        TemplateType? projectionType = null)
+        TemplateType? projectionType = null,
+        string? reference = null)
     {
         TemplatePackageManager packageManager = _session.PackageManager;
         cancellationToken.ThrowIfCancellationRequested();
-        IReadOnlyList<ITemplatePackage> packages = await packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
-        IReadOnlyList<ITemplateInfo> templates = await packageManager.GetTemplatesAsync(cancellationToken);
+        IReadOnlyList<ITemplatePackage> packages;
+        IReadOnlyList<ITemplateInfo> templates;
+        try
+        {
+            packages = await packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
+            templates = await packageManager.GetTemplatesAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            return ([], new(StringComparer.OrdinalIgnoreCase), new(
+                "installed-package-unavailable",
+                $"Installed template packages could not be inspected: {exception.Message}"));
+        }
+
+        string? exactIdentity = reference is not null && templates.Any(template =>
+            string.Equals(template.Identity, reference, StringComparison.OrdinalIgnoreCase))
+                ? reference
+                : null;
+        (Dictionary<string, List<(TemplateType? Type, string[] ShortNames, string Source)>> occurrences,
+            Dictionary<(string Mount, string Configuration, Guid Generator, string Identity), string[]> availableTemplates,
+            TemplateResolutionDiagnostic? diagnostic) = await InspectInstalledTemplatesAsync(packages, templates, exactIdentity, cancellationToken);
+        if (diagnostic is not null)
+        {
+            return ([], occurrences, diagnostic);
+        }
+
+        HashSet<string> cachedIdentities = new(templates.Select(template => template.Identity), StringComparer.OrdinalIgnoreCase);
+        foreach ((string Mount, string Configuration, Guid Generator, string Identity) available in availableTemplates.Keys)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!cachedIdentities.Contains(available.Identity))
+            {
+                return ([], occurrences, new(
+                    "installed-template-inventory-stale",
+                    $"Installed template '{available.Identity}' is missing from the template catalog. Retry the command after repairing the installed package.",
+                    available.Identity));
+            }
+        }
+
         Dictionary<string, ITemplatePackage> packagesByMountPoint = new(StringComparer.Ordinal);
         foreach (ITemplatePackage package in packages)
         {
             packagesByMountPoint.TryAdd(package.MountPointUri, package);
         }
 
-        List<(ITemplateInfo Template, TemplateCatalogEntry? Entry)> candidates = [];
+        List<(ITemplateInfo Template, TemplateCatalogEntry? Entry, string[] ShortNames)> candidates = [];
         foreach (ITemplateInfo template in templates)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!availableTemplates.TryGetValue((template.MountPointUri, template.ConfigPlace, template.GeneratorId, template.Identity), out string[]? shortNames))
+            {
+                return ([], occurrences, new(
+                    "installed-template-unavailable",
+                    $"Installed template '{template.Identity}' is no longer available from '{template.MountPointUri}::{template.ConfigPlace}'.",
+                    template.Identity));
+            }
+
             TemplateType? templateType = TemplateCatalogProjector.GetTemplateType(template);
             TemplateCatalogEntry? entry = templateType is not null && (projectionType is null || templateType == projectionType)
-                ? TemplateCatalogProjector.Project(template, packagesByMountPoint.GetValueOrDefault(template.MountPointUri))
+                ? TemplateCatalogProjector.Project(template, packagesByMountPoint.GetValueOrDefault(template.MountPointUri)) with { ShortNames = shortNames }
                 : null;
-            candidates.Add((template, entry));
+            candidates.Add((template, entry, shortNames));
         }
 
-        return (candidates, packages);
+        return (candidates, occurrences, null);
     }
 
-    private async Task<Dictionary<string, List<(TemplateType? Type, string[] ShortNames, string Source)>>> FindDuplicateTemplatesAsync(
+    private async Task<(
+        Dictionary<string, List<(TemplateType? Type, string[] ShortNames, string Source)>> Occurrences,
+        Dictionary<(string Mount, string Configuration, Guid Generator, string Identity), string[]> AvailableTemplates,
+        TemplateResolutionDiagnostic? Diagnostic)> InspectInstalledTemplatesAsync(
         IReadOnlyList<ITemplatePackage> packages,
+        IReadOnlyList<ITemplateInfo> cachedTemplates,
+        string? exactIdentity,
         CancellationToken cancellationToken)
     {
-        Scanner scanner = new(_session.Settings);
         Dictionary<string, List<(TemplateType? Type, string[] ShortNames, string Source)>> occurrences = new(StringComparer.OrdinalIgnoreCase);
-        foreach (ITemplatePackage package in packages)
+        Dictionary<(string Mount, string Configuration, Guid Generator, string Identity), string[]> availableTemplates = [];
+        Dictionary<(string Mount, string Configuration, Guid Generator, string Identity), ITemplateInfo> cachedBySource = [];
+        foreach (ITemplateInfo template in cachedTemplates)
+        {
+            cachedBySource.TryAdd((template.MountPointUri, template.ConfigPlace, template.GeneratorId, template.Identity), template);
+        }
+
+        foreach (ITemplatePackage package in packages.DistinctBy(package => package.MountPointUri, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using ScanResult scan = await scanner.ScanAsync(
-                package.MountPointUri,
-                returnInvalidTemplates: true,
-                cancellationToken: cancellationToken);
-            foreach (IScanTemplateInfo template in scan.Templates)
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!occurrences.TryGetValue(template.Identity, out List<(TemplateType? Type, string[] ShortNames, string Source)>? templates))
+                if (!_session.Settings.TryGetMountPoint(package.MountPointUri, out IMountPoint? mountPoint) || mountPoint is null)
                 {
-                    templates = [];
-                    occurrences.Add(template.Identity, templates);
+                    return (occurrences, availableTemplates, new(
+                        "installed-package-unavailable",
+                        $"Installed template package '{package.MountPointUri}' is unavailable. Repair or reinstall the package."));
                 }
 
-                TemplateType? type = template.TagsCollection.TryGetValue("type", out string? typeTag)
-                    ? typeTag?.ToLowerInvariant() switch
+                using (mountPoint)
+                {
+                    if (!mountPoint.Root.Exists)
                     {
-                        "item" => TemplateType.Item,
-                        "project" => TemplateType.Project,
-                        _ => null,
+                        return (occurrences, availableTemplates, new(
+                            "installed-package-unavailable",
+                            $"Installed template package '{package.MountPointUri}' is unavailable. Repair or reinstall the package."));
                     }
-                    : null;
-                templates.Add((type, [.. template.ShortNameList], $"{package.MountPointUri}::{template.ConfigPlace}"));
+
+                    // The generator can log and omit a malformed configuration instead of returning it.
+                    HashSet<string> configurations = new(StringComparer.Ordinal);
+                    foreach (IFile file in mountPoint.Root.EnumerateFiles("template.json", SearchOption.AllDirectories))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (string.Equals(file.Parent?.Name, ".template.config", StringComparison.OrdinalIgnoreCase))
+                        {
+                            configurations.Add(file.FullPath);
+                        }
+                    }
+
+                    foreach (IGenerator generator in _session.Settings.Components.OfType<IGenerator>())
+                    {
+                        IReadOnlyList<IScanTemplateInfo> scannedTemplates =
+                            await generator.GetTemplatesFromMountPointAsync(mountPoint, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        foreach (IScanTemplateInfo template in scannedTemplates)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            configurations.Remove(template.ConfigPlace);
+                            if (!template.IsValid)
+                            {
+                                string? detail = template.ValidationErrors.FirstOrDefault()?.ErrorMessage;
+                                return (occurrences, availableTemplates, new(
+                                    "invalid-template-configuration",
+                                    $"Installed template configuration '{package.MountPointUri}::{template.ConfigPlace}' is invalid{(detail is null ? "." : $": {detail}")}"));
+                            }
+
+                            if (!template.ShortNameList.Any(name => !string.IsNullOrWhiteSpace(name)))
+                            {
+                                return (occurrences, availableTemplates, new(
+                                    "invalid-template-configuration",
+                                    $"Installed template configuration '{package.MountPointUri}::{template.ConfigPlace}' must declare a non-empty shortName."));
+                            }
+
+                            (string Mount, string Configuration, Guid Generator, string Identity) source =
+                                (package.MountPointUri, template.ConfigPlace, template.GeneratorId, template.Identity);
+                            availableTemplates.TryAdd(source, [.. template.ShortNameList]);
+                            if ((exactIdentity is null || string.Equals(exactIdentity, template.Identity, StringComparison.OrdinalIgnoreCase))
+                                && cachedBySource.TryGetValue(source, out ITemplateInfo? cached))
+                            {
+                                string? changedMetadata = await GetChangedSelectionMetadataAsync(cached, template, mountPoint, cancellationToken);
+                                if (changedMetadata is not null)
+                                {
+                                    return (occurrences, availableTemplates, new(
+                                        "installed-template-inventory-stale",
+                                        $"Installed template '{template.Identity}' has changed {changedMetadata} in '{package.MountPointUri}::{template.ConfigPlace}' since it was cached. Repair or reinstall the package, then retry.",
+                                        template.Identity));
+                                }
+                            }
+
+                            if (!occurrences.TryGetValue(template.Identity, out List<(TemplateType? Type, string[] ShortNames, string Source)>? matches))
+                            {
+                                matches = [];
+                                occurrences.Add(template.Identity, matches);
+                            }
+
+                            TemplateType? type = template.TagsCollection.TryGetValue("type", out string? typeTag)
+                                ? typeTag?.ToLowerInvariant() switch
+                                {
+                                    "item" => TemplateType.Item,
+                                    "project" => TemplateType.Project,
+                                    _ => null,
+                                }
+                                : null;
+                            matches.Add((type, [.. template.ShortNameList], $"{package.MountPointUri}::{template.ConfigPlace}"));
+                        }
+                    }
+
+                    if (configurations.Count > 0)
+                    {
+                        string configuration = configurations.Order(StringComparer.Ordinal).First();
+                        return (occurrences, availableTemplates, new(
+                            "invalid-template-configuration",
+                            $"Installed template configuration '{package.MountPointUri}::{configuration}' could not be loaded. Repair or reinstall the package."));
+                    }
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                return (occurrences, availableTemplates, new(
+                    "installed-package-unavailable",
+                    $"Installed template package '{package.MountPointUri}' could not be inspected: {exception.Message}"));
             }
         }
 
-        return occurrences;
+        return (occurrences, availableTemplates, null);
+    }
+
+    private static async Task<string?> GetChangedSelectionMetadataAsync(
+        ITemplateInfo cached,
+        IScanTemplateInfo current,
+        IMountPoint mountPoint,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(GetTag(cached, "type"), GetTag(current, "type"), StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(GetTag(cached, "language"), GetTag(current, "language"), StringComparison.OrdinalIgnoreCase))
+        {
+            return "type or language metadata";
+        }
+
+        string? hostConfigPlace = null;
+        string? hostData = null;
+        if (current.HostConfigFiles.TryGetValue(FuncTemplateEngineHost.Identifier, out hostConfigPlace))
+        {
+            IFile? hostFile = mountPoint.FileInfo(hostConfigPlace);
+            if (hostFile is null || !hostFile.Exists)
+            {
+                throw new FileNotFoundException($"Template host metadata '{hostConfigPlace}' is unavailable.");
+            }
+
+            using Stream stream = hostFile.OpenRead();
+            using StreamReader reader = new(stream);
+            hostData = await reader.ReadToEndAsync(cancellationToken);
+        }
+
+        FuncHostTemplateMetadata? cachedMetadata = ReadHostMetadata(
+            cached.HostConfigPlace,
+            (cached as ITemplateInfoHostJsonCache)?.HostData);
+        FuncHostTemplateMetadata? currentMetadata = ReadHostMetadata(hostConfigPlace, hostData);
+        if (cachedMetadata is null || currentMetadata is null)
+        {
+            // If both are invalid, the existing projection reports the metadata diagnostic.
+            return cachedMetadata is null && currentMetadata is null ? null : "func.host.json metadata";
+        }
+
+        bool matches = cachedMetadata.IsHidden == currentMetadata.IsHidden
+            && cachedMetadata.Symbols.Count == currentMetadata.Symbols.Count
+            && cachedMetadata.Symbols.All(symbol =>
+                currentMetadata.Symbols.TryGetValue(symbol.Key, out FuncHostSymbolMetadata? value) && symbol.Value == value);
+        return matches ? null : "func.host.json metadata";
+    }
+
+    private static string? GetTag(ITemplateMetadata template, string name)
+        => template.TagsCollection.TryGetValue(name, out string? value) && !string.IsNullOrEmpty(value) ? value : null;
+
+    private static FuncHostTemplateMetadata? ReadHostMetadata(string? hostConfigPlace, string? hostData)
+    {
+        try
+        {
+            return FuncHostTemplateMetadataReader.Read(hostConfigPlace, hostData);
+        }
+        catch (InvalidTemplateMetadataException)
+        {
+            return null;
+        }
     }
 
     private static TemplateResolutionResult DuplicateIdentityFailure(
@@ -307,7 +504,7 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
         string[] sources = [.. occurrences.Select(occurrence => occurrence.Source).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
         string sourceDetail = sources.Length == 0 ? string.Empty : $" Sources: {string.Join(", ", sources)}.";
         return Failure(
-            TemplateResolutionStatus.DuplicateIdentity,
+            TemplateResolutionStatus.Failed,
             new("duplicate-identity", $"Installed templates contain duplicate identity '{identity}'.{sourceDetail}", identity));
     }
 
@@ -320,7 +517,7 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
         cancellationToken.ThrowIfCancellationRequested();
         return diagnostic is null
             ? Selected(template, entry)
-            : new(TemplateResolutionStatus.Ineligible, null, [entry], [diagnostic]);
+            : new(TemplateResolutionStatus.Failed, null, [entry], [diagnostic]);
     }
 
     private async Task<TemplateResolutionDiagnostic?> CheckEligibilityAsync(
@@ -521,15 +718,9 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
 
     private void RegisterIssuedEntry(TemplateCatalogEntry entry, ITemplateInfo template)
     {
-        lock (_issuedEntriesLock)
-        {
-            _ = _session.PackageManager;
-            _issuedEntries.TryAdd(entry, template);
-        }
+        _ = _session.PackageManager;
+        _issuedEntries.TryAdd(entry, template);
     }
-
-    private static (bool HasGroup, string Identity) FamilyKey(TemplateCatalogEntry entry)
-        => entry.GroupIdentity is { Length: > 0 } groupIdentity ? (true, groupIdentity) : (false, entry.Identity);
 
     private TemplateResolutionResult Selected(
         ITemplateInfo template,
@@ -537,7 +728,7 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
         IReadOnlyList<TemplateResolutionDiagnostic>? diagnostics = null)
     {
         RegisterIssuedEntry(entry, template);
-        return new(TemplateResolutionStatus.Selected, new ResolvedTemplate(_session, entry, template), [entry], diagnostics ?? []);
+        return new(TemplateResolutionStatus.Selected, new ResolvedTemplate(entry), [entry], diagnostics ?? []);
     }
 
     private static TemplateResolutionResult Failure(TemplateResolutionStatus status, TemplateResolutionDiagnostic diagnostic)
