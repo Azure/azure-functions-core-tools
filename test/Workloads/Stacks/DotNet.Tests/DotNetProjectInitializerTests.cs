@@ -14,12 +14,18 @@ public class DotNetProjectInitializerTests : IDisposable
     private readonly IDotnetCliRunner _dotnetCli = Substitute.For<IDotnetCliRunner>();
     private readonly ITemplateHivePathProvider _hivePathProvider = Substitute.For<ITemplateHivePathProvider>();
     private readonly string _hivePath;
+    private readonly string _templateEngineHivePath;
+    private readonly string _templatePackageDirectory;
 
     public DotNetProjectInitializerTests()
     {
         _hivePath = Path.Combine(Path.GetTempPath(), "func-test-hive-" + Guid.NewGuid().ToString("N"));
+        _templateEngineHivePath = Path.Combine(_hivePath, "templates");
+        _templatePackageDirectory = Path.Combine(_hivePath, "payload");
         _hivePathProvider.HivePath.Returns(_hivePath);
         _hivePathProvider.TimestampPath.Returns(Path.Combine(_hivePath, ".installed"));
+        _hivePathProvider.TemplateEngineHivePath.Returns(_templateEngineHivePath);
+        _hivePathProvider.TemplatePackageDirectory.Returns(_templatePackageDirectory);
     }
 
     public void Dispose()
@@ -30,7 +36,7 @@ public class DotNetProjectInitializerTests : IDisposable
         }
     }
 
-    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli, _hivePathProvider, new DotNetProjectStack());
+    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli, _hivePathProvider, new DotNetProjectStack(_dotnetCli));
 
     [Fact]
     public void Stack_IsDotNet()
@@ -130,6 +136,46 @@ public class DotNetProjectInitializerTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public void GetTemplateRequest_CSharpNet10_SelectsProjectTemplateAndFramework()
+    {
+        DotNetProjectInitializer initializer = CreateInitializer();
+        RootCommand root = [];
+        initializer.GetInitOptions(new InitOptionRegistry(root));
+        InitContext context = new(WorkingDirectory.FromExplicit(_hivePath), "MyApp", "C#", Force: false);
+
+        ProjectTemplateRequest request = initializer.GetTemplateRequest(context, root.Parse([]))!;
+
+        request.TemplateIdentity.Should().Be(DotNetProjectInitializer.CSharpIsolatedProjectTemplateIdentity);
+        request.Parameters.Should().ContainSingle();
+        request.Parameters["Framework"].Should().Be("net10.0");
+    }
+
+    [Fact]
+    public void GetTemplateRequest_UnqualifiedDestination_PreservesExistingInitializer()
+    {
+        DotNetProjectInitializer initializer = CreateInitializer();
+        RootCommand root = [];
+        initializer.GetInitOptions(new InitOptionRegistry(root));
+        InitContext context = new(WorkingDirectory.FromExplicit(@"\\server\share\project"), "MyApp", "C#", Force: false);
+
+        initializer.GetTemplateRequest(context, root.Parse([])).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("F#", "net10.0", false)]
+    [InlineData("C#", "net11.0", false)]
+    [InlineData("C#", "net10.0", true)]
+    public void GetTemplateRequest_UnqualifiedInput_PreservesExistingInitializer(string language, string framework, bool force)
+    {
+        DotNetProjectInitializer initializer = CreateInitializer();
+        RootCommand root = [];
+        initializer.GetInitOptions(new InitOptionRegistry(root));
+        InitContext context = new(WorkingDirectory.FromExplicit(_hivePath), "MyApp", language, force);
+
+        initializer.GetTemplateRequest(context, root.Parse(["--target-framework", framework])).Should().BeNull();
+    }
+
     [Theory]
     [InlineData("fsharp", "net11.0", "--target-framework")]
     [InlineData("F#", "NET11.0", "--target-framework")]
@@ -194,14 +240,14 @@ public class DotNetProjectInitializerTests : IDisposable
     [Fact]
     public void Constructor_ThrowsOnNullRunner()
     {
-        FluentActions.Invoking(() => new DotNetProjectInitializer(null!, _hivePathProvider, new DotNetProjectStack()))
+        FluentActions.Invoking(() => new DotNetProjectInitializer(null!, _hivePathProvider, new DotNetProjectStack(_dotnetCli)))
             .Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullHivePathProvider()
     {
-        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, null!, new DotNetProjectStack()))
+        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, null!, new DotNetProjectStack(_dotnetCli)))
             .Should().ThrowExactly<ArgumentNullException>();
     }
 
@@ -244,4 +290,5 @@ public class DotNetProjectInitializerTests : IDisposable
             Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
     }
+
 }

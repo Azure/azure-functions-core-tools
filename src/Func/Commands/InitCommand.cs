@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Immutable;
 using System.CommandLine;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Functions.Cli.Bundles;
@@ -10,7 +12,10 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Projects.FileWriting;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
+using Microsoft.TemplateEngine.Abstractions;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -59,6 +64,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IFunctionsProjectResolver _projectResolver;
     private readonly IHostJsonBundleSectionReader _bundleSectionReader;
     private readonly InstalledBundleScanner _bundleScanner;
+    private readonly InstalledProjectStackCatalog _projectStacks;
+    private readonly ITemplaterFactory _templaterFactory;
+    private readonly ProjectFileWriter _fileWriter;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
 
     public InitCommand(
@@ -68,6 +76,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IFunctionsProjectResolver projectResolver,
         IHostJsonBundleSectionReader bundleSectionReader,
         InstalledBundleScanner bundleScanner,
+        InstalledProjectStackCatalog projectStacks,
+        ITemplaterFactory templaterFactory,
+        ProjectFileWriter fileWriter,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
@@ -77,6 +88,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         ArgumentNullException.ThrowIfNull(projectResolver);
         ArgumentNullException.ThrowIfNull(bundleSectionReader);
         ArgumentNullException.ThrowIfNull(bundleScanner);
+        ArgumentNullException.ThrowIfNull(projectStacks);
+        ArgumentNullException.ThrowIfNull(templaterFactory);
+        ArgumentNullException.ThrowIfNull(fileWriter);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
@@ -85,6 +99,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _projectResolver = projectResolver;
         _bundleSectionReader = bundleSectionReader;
         _bundleScanner = bundleScanner;
+        _projectStacks = projectStacks;
+        _templaterFactory = templaterFactory;
+        _fileWriter = fileWriter;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -131,7 +148,6 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         }
 
         WorkingDirectory workingDirectory = parseResult.GetValue(PathArgument!)!;
-        workingDirectory.CreateIfNotExists();
         bool force = parseResult.GetValue(ForceOption);
         string? language = parseResult.GetValue(LanguageOption);
         if (!string.IsNullOrWhiteSpace(language))
@@ -245,6 +261,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 initializer = await PromptForAdoptionStackAsync(cancellationToken);
                 if (initializer is null)
                 {
+                    workingDirectory.CreateIfNotExists();
                     return 1;
                 }
             }
@@ -256,6 +273,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             initializer = await SelectInitializerAsync(requestedStack, cancellationToken);
             if (initializer is null)
             {
+                workingDirectory.CreateIfNotExists();
                 return 1;
             }
         }
@@ -277,12 +295,26 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             (string? resolved, int? errorCode) = await ResolveLanguageAsync(language, initializer, cancellationToken);
             if (errorCode is int code)
             {
+                workingDirectory.CreateIfNotExists();
                 return code;
             }
 
             language = resolved;
         }
 
+        var context = new InitContext(
+            WorkingDirectory: workingDirectory,
+            ProjectName: parseResult.GetValue(NameOption),
+            Language: language,
+            Force: force);
+        if (!force && !adoptExisting && !healExisting
+            && initializer.GetTemplateRequest(context, parseResult) is { } templateRequest)
+        {
+            return await InitializeFromTemplateAsync(
+                initializer, context, templateRequest, persistedLanguage: initializer.SupportedLanguages.Count == 1 ? null : language, cancellationToken);
+        }
+
+        workingDirectory.CreateIfNotExists();
         if (force)
         {
             if (!await ConfirmClearDirectoryAsync(workingDirectory.Info, cancellationToken))
@@ -328,12 +360,6 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             return 0;
         }
 
-        var context = new InitContext(
-            WorkingDirectory: workingDirectory,
-            ProjectName: parseResult.GetValue(NameOption),
-            Language: language,
-            Force: force);
-
         await initializer.InitializeAsync(context, parseResult, cancellationToken);
 
         _interaction.WriteLine(l => l
@@ -345,6 +371,277 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         await WarnIfBundleChannelNotInstalledAsync(workingDirectory.Info, cancellationToken);
 
         return 0;
+    }
+
+    private async Task<int> InitializeFromTemplateAsync(
+        IProjectInitializer initializer,
+        InitContext context,
+        ProjectTemplateRequest request,
+        string? persistedLanguage,
+        CancellationToken cancellationToken)
+    {
+        IProjectStack? stack = _projectStacks.FindStack(initializer.Stack);
+        if (stack is not IProjectTemplateTasks tasks)
+        {
+            _interaction.WriteError($"The '{initializer.Stack}' workload cannot validate this project's template effects.");
+            return 1;
+        }
+
+        string projectName = context.ProjectName ?? context.WorkingDirectory.Info.Name;
+        if (string.IsNullOrWhiteSpace(projectName))
+        {
+            _interaction.WriteError("A project name could not be determined for template generation.");
+            return 1;
+        }
+
+        TemplateEngineContext engineContext = new(
+            context.WorkingDirectory,
+            new TemplateEngineProjectContext(context.WorkingDirectory, initializer.Stack, context.Language));
+        Templater templater;
+        try
+        {
+            templater = await _templaterFactory.CreateAsync(engineContext, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException)
+        {
+            _interaction.WriteError($"Template generation is unavailable: {exception.Message}");
+            return 1;
+        }
+
+        using (templater)
+        {
+            TemplateResolutionResult resolution = await templater.ResolveAsync(request.TemplateIdentity, TemplateType.Project, cancellationToken);
+            if (resolution.Status != TemplateResolutionStatus.Selected || resolution.SelectedTemplate is null)
+            {
+                string details = string.Join("; ", resolution.Diagnostics.Select(diagnostic => diagnostic.Message));
+                _interaction.WriteError($"The project template '{request.TemplateIdentity}' could not be resolved. {details}".Trim());
+                return 1;
+            }
+
+            TemplateRenderResult rendered;
+            try
+            {
+                rendered = await templater.RenderAsync(resolution.SelectedTemplate, projectName, request.Parameters, cancellationToken);
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException)
+            {
+                _interaction.WriteError($"Project template generation failed before project changes: {exception.Message}");
+                return 1;
+            }
+
+            IReadOnlyList<(Guid ActionId, IReadOnlyDictionary<string, string> Arguments, bool ContinueOnError)> pendingTasks;
+            try
+            {
+                pendingTasks = await templater.PrepareTasksAsync(rendered, tasks, cancellationToken);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException)
+            {
+                _interaction.WriteError($"The project template requires an unsupported or unverified effect: {exception.Message}");
+                return 1;
+            }
+
+            string[] missingDirectories = CaptureMissingDirectories(context.WorkingDirectory.Info);
+            bool destinationCreated = false;
+            if (missingDirectories.Length > 0)
+            {
+                string destinationParent = Path.GetDirectoryName(missingDirectories[^1])
+                    ?? throw new InvalidOperationException("The missing project destination has no existing parent.");
+                string[] relativeDirectories = [.. missingDirectories
+                    .Reverse()
+                    .Select(path => Path.GetRelativePath(destinationParent, path))];
+                ProjectWriteResult directoryResult;
+                try
+                {
+                    directoryResult = await _fileWriter.WriteAsync(
+                        destinationParent,
+                        ImmutableDictionary<string, ImmutableArray<byte>>.Empty,
+                        relativeDirectories,
+                        cancellationToken);
+                }
+                catch (Exception exception) when (exception.Data[typeof(ProjectWriteResult)] is ProjectWriteResult partialResult)
+                {
+                    ReportWriteEffects(partialResult);
+                    throw new GracefulException($"Project destination directory creation failed after partial effects: {exception.Message}", exception, isUserError: true);
+                }
+
+                ReportWriteEffects(directoryResult);
+                if (directoryResult.Canceled)
+                {
+                    throw directoryResult.Cancellation!;
+                }
+
+                if (!directoryResult.Succeeded)
+                {
+                    _interaction.WriteError("Project destination directories could not be created; no project files were published.");
+                    return 1;
+                }
+
+                string destinationRelativePath = Path.GetRelativePath(destinationParent, context.WorkingDirectory.Info.FullName);
+                destinationCreated = directoryResult.Effects.Any(effect =>
+                    effect.IsDirectory
+                    && string.Equals(effect.Path, destinationRelativePath, StringComparison.OrdinalIgnoreCase)
+                    && effect.Status == ProjectWriteStatus.Created);
+            }
+
+            ProjectWriteResult writeResult;
+            try
+            {
+                writeResult = await _fileWriter.WriteAsync(
+                    context.WorkingDirectory.Info.FullName,
+                    rendered.Files,
+                    rendered.Directories,
+                    cancellationToken);
+            }
+            catch (Exception exception) when (exception.Data[typeof(ProjectWriteResult)] is ProjectWriteResult partialResult)
+            {
+                ReportWriteEffects(partialResult, destinationCreated);
+                throw new GracefulException($"Project template publication failed after partial project effects: {exception.Message}", exception, isUserError: true);
+            }
+
+            if (writeResult.Canceled)
+            {
+                ReportWriteEffects(writeResult, destinationCreated);
+                throw writeResult.Cancellation!;
+            }
+
+            ReportWriteEffects(writeResult, destinationCreated);
+            if (!writeResult.Succeeded)
+            {
+                _interaction.WriteError("Project template publication did not complete; no rollback was attempted.");
+                return 1;
+            }
+
+            context.WorkingDirectory.Info.Refresh();
+            ProjectResolutionResult projectResolution = await _projectResolver.ResolveProjectAsync(
+                new ProjectResolutionContext(context.WorkingDirectory),
+                cancellationToken);
+            if (projectResolution is not ProjectResolutionResult.Resolved resolved
+                || !string.Equals(resolved.Project.StackName, initializer.Stack, StringComparison.OrdinalIgnoreCase))
+            {
+                string message = projectResolution is ProjectResolutionResult.NotResolved notResolved
+                    ? notResolved.Message
+                    : $"The generated project resolved to an unexpected stack instead of '{initializer.Stack}'.";
+                _interaction.WriteError($"Generated project files were written, but the project could not be resolved: {message}");
+                return 1;
+            }
+
+            IReadOnlyList<string> taskFailures;
+            try
+            {
+                taskFailures = await templater.ExecuteTasksAsync(pendingTasks, tasks, cancellationToken);
+            }
+            catch (GracefulException exception)
+            {
+                _interaction.WriteError($"Project files were written, but a required template task failed: {exception.Message}");
+                return 1;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _interaction.WriteError("Project files were written, but a required template task was canceled; no rollback was attempted.");
+                throw;
+            }
+
+            foreach (string failure in taskFailures)
+            {
+                _interaction.WriteError($"A project template task failed but the template allowed processing to continue: {failure}");
+            }
+
+            if (taskFailures.Count > 0)
+            {
+                return 1;
+            }
+
+            ProjectWriteResult configurationResult;
+            try
+            {
+                configurationResult = await _fileWriter.WriteAsync(
+                    context.WorkingDirectory.Info.FullName,
+                    ImmutableDictionary<string, ImmutableArray<byte>>.Empty
+                        .Add(CliConfigurationPathsOptions.ProjectConfigDisplayPath,
+                            [.. CreateCliConfigurationContent(initializer.Stack, persistedLanguage)]),
+                    [],
+                    cancellationToken);
+            }
+            catch (Exception exception) when (exception.Data[typeof(ProjectWriteResult)] is ProjectWriteResult partialResult)
+            {
+                ReportWriteEffects(partialResult, destinationCreated);
+                throw new GracefulException($"Project files were written, but CLI configuration publication failed after partial effects: {exception.Message}", exception, isUserError: true);
+            }
+
+            if (configurationResult.Canceled)
+            {
+                ReportWriteEffects(configurationResult, destinationCreated);
+                throw configurationResult.Cancellation!;
+            }
+
+            ReportWriteEffects(configurationResult, destinationCreated);
+            if (!configurationResult.Succeeded)
+            {
+                _interaction.WriteError("Project files and required tasks completed, but CLI configuration could not be written.");
+                return 1;
+            }
+        }
+
+        _interaction.WriteLine(l => l
+            .Success("✓ ")
+            .Muted("Project initialized for ")
+            .Code(initializer.Stack)
+            .Muted("."));
+        await WarnIfBundleChannelNotInstalledAsync(context.WorkingDirectory.Info, cancellationToken);
+        return 0;
+    }
+
+    private void ReportWriteEffects(ProjectWriteResult result, bool destinationCreated = false)
+    {
+        foreach (ProjectWriteEffect effect in result.Effects)
+        {
+            bool isDestinationRoot = effect.IsDirectory && Path.IsPathRooted(effect.Path);
+            if (destinationCreated && isDestinationRoot && effect.Status == ProjectWriteStatus.Preserved)
+            {
+                continue;
+            }
+
+            string path = isDestinationRoot ? "project directory" : effect.Path;
+            switch (effect.Status)
+            {
+                case ProjectWriteStatus.Created:
+                    _interaction.WriteLine($"Created {path}.");
+                    break;
+                case ProjectWriteStatus.Preserved:
+                    _interaction.WriteLine($"Preserved existing {path}.");
+                    break;
+                case ProjectWriteStatus.Failed:
+                    _interaction.WriteError($"Could not create {path}: {effect.Error?.Message ?? "unknown filesystem error"}");
+                    break;
+                case ProjectWriteStatus.RemovedAfterFailure:
+                    _interaction.WriteWarning($"Removed {path} after a failed write.");
+                    break;
+                case ProjectWriteStatus.CleanupPending:
+                case ProjectWriteStatus.Uncertain:
+                    _interaction.WriteWarning($"The effect on {path} is uncertain: {effect.CleanupError?.Message ?? effect.CompletionError?.Message ?? effect.Error?.Message}");
+                    break;
+                case ProjectWriteStatus.NotAttempted:
+                    _interaction.WriteLine($"Not attempted: {path}.");
+                    break;
+            }
+        }
+    }
+
+    private static string[] CaptureMissingDirectories(DirectoryInfo destination)
+    {
+        List<string> missing = [];
+        for (DirectoryInfo? current = destination; current is not null; current = current.Parent)
+        {
+            current.Refresh();
+            if (current.Exists)
+            {
+                break;
+            }
+
+            missing.Add(current.FullName);
+        }
+
+        return [.. missing];
     }
 
     // A fresh scaffold may pin a preview/experimental bundle channel (via `-c`).
@@ -588,28 +885,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         {
             Directory.CreateDirectory(folder);
 
-            var stackConfig = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (!string.IsNullOrWhiteSpace(stack))
-            {
-                stackConfig[CliConfigurationNames.StackRuntimeKey] = stack;
-            }
-            if (!string.IsNullOrWhiteSpace(language))
-            {
-                stackConfig[CliConfigurationNames.StackLanguageKey] = language;
-            }
-
-            var payload = new Dictionary<string, object>(StringComparer.Ordinal);
-            if (stackConfig.Count > 0)
-            {
-                payload[CliConfigurationNames.StackSectionName] = stackConfig;
-            }
-
-            string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-            });
-
-            File.WriteAllText(path, json + Environment.NewLine);
+            File.WriteAllBytes(path, CreateCliConfigurationContent(stack, language));
 
             _interaction.WriteLine(l => l
                 .Muted("· Wrote ")
@@ -626,6 +902,31 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 .Code(ex.Message)
                 .Muted(")."));
         }
+    }
+
+    private static byte[] CreateCliConfigurationContent(string? stack, string? language)
+    {
+        var stackConfig = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(stack))
+        {
+            stackConfig[CliConfigurationNames.StackRuntimeKey] = stack;
+        }
+        if (!string.IsNullOrWhiteSpace(language))
+        {
+            stackConfig[CliConfigurationNames.StackLanguageKey] = language;
+        }
+
+        var payload = new Dictionary<string, object>(StringComparer.Ordinal);
+        if (stackConfig.Count > 0)
+        {
+            payload[CliConfigurationNames.StackSectionName] = stackConfig;
+        }
+
+        string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+        });
+        return Encoding.UTF8.GetBytes(json + Environment.NewLine);
     }
 
     // Patches stack.language into an existing .func/config.json without

@@ -102,8 +102,7 @@ public sealed class FirstRunCoordinatorTests
             .Returns(markerPresent ? FirstRunState.MarkerWithoutWorkloads : FirstRunState.NeverPrompted);
         _setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
             .Returns(new SetupRunResult(0));
-        var root = new FuncRootCommand();
-        root.Subcommands.Add(new NewCommand(_interaction));
+        FuncRootCommand root = TestParser.CreateRoot(_interaction);
         ParseResult parseResult = root.Parse(invocation);
         parseResult.Errors.Should().BeEmpty();
         string commandName = CommandNameResolver.ResolveCommandName(parseResult, root);
@@ -114,9 +113,14 @@ public sealed class FirstRunCoordinatorTests
         int exitCode = firstRunExitCode ?? await parseResult.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
         exitCode.Should().Be(1);
+        string expectedDiagnostic = invocation.Contains("--list", StringComparison.Ordinal)
+            ? "Template listing is not available"
+            : invocation.Contains("--force", StringComparison.Ordinal)
+                ? "Overwriting files is not supported for template generation; existing files are preserved."
+                : "Select an item template with --template.";
         _interaction.Lines.Should().Contain(line =>
             line.StartsWith("ERROR:", StringComparison.Ordinal)
-            && line.Contains("temporarily unavailable"));
+            && line.Contains(expectedDiagnostic, StringComparison.Ordinal));
         _interaction.Lines.Should().NotContain(line => line.Contains("`func setup`"));
         _interaction.ConfirmCalls.Should().Be(0);
         await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);

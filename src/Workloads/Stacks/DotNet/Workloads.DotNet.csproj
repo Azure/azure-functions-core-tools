@@ -7,6 +7,7 @@
     <PackAsWorkload>true</PackAsWorkload>
     <WorkloadKind>workload</WorkloadKind>
     <WorkloadAlias>dotnet</WorkloadAlias>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +16,15 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ProjectTemplates" Version="[4.0.5708]" />
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ItemTemplates" Version="[4.0.5708]" />
+    <None Include="$(NuGetPackageRoot)/microsoft.azure.functions.worker.projecttemplates/4.0.5708/microsoft.azure.functions.worker.projecttemplates.4.0.5708.nupkg"
+          Link="templates/project.nupkg" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="tools/any/templates/" />
+    <None Include="$(NuGetPackageRoot)/microsoft.azure.functions.worker.itemtemplates/4.0.5708/microsoft.azure.functions.worker.itemtemplates.4.0.5708.nupkg"
+          Link="templates/item.nupkg" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="tools/any/templates/" />
   </ItemGroup>
 
 </Project>

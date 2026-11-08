@@ -4,22 +4,35 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Projects.FileWriting;
+using Azure.Functions.Cli.Templates.Engine;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
 public class NewCommandTests
 {
     private readonly TestInteractionService _interaction;
+    private readonly IFunctionsProjectResolver _projectResolver;
+    private readonly ITemplaterFactory _templaterFactory;
+    private readonly IFileSystem _fileSystem;
 
     public NewCommandTests()
     {
         _interaction = new TestInteractionService();
+        _projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ProjectResolutionResult>(ProjectResolutionResults.NotResolved("No installed workload recognized this directory.")));
+        _templaterFactory = Substitute.For<ITemplaterFactory>();
+        _fileSystem = Substitute.For<IFileSystem>();
     }
 
     [Fact]
     public void NewCommand_HasExpectedOptions()
     {
-        var cmd = new NewCommand(_interaction);
+        NewCommand cmd = CreateCommand();
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         optionNames.Should().Contain("--name");
@@ -36,13 +49,13 @@ public class NewCommandTests
     [InlineData("json")]
     public async Task NewCommand_List_FailsWithMigrationDiagnostic(string format)
     {
-        var command = new NewCommand(_interaction);
+        NewCommand command = CreateCommand();
         ParseResult result = command.Parse(["--list", "--format", format]);
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
         exitCode.Should().Be(1);
-        _interaction.AllOutput.Should().Contain("temporarily unavailable");
+        _interaction.AllOutput.Should().Contain("not available");
     }
 
     [Theory]
@@ -51,7 +64,7 @@ public class NewCommandTests
     [InlineData("--output:json")]
     public void NewCommand_RemovedOutputOption_ReportsUnrecognizedOption(params string[] args)
     {
-        var command = new NewCommand(_interaction);
+        NewCommand command = CreateCommand();
         ParseResult result = command.Parse(["--list", .. args]);
 
         result.Errors.Should().Contain(error =>
@@ -65,7 +78,7 @@ public class NewCommandTests
     [InlineData("--output:json")]
     public void NewCommand_RemovedOutputOptionWithExplicitPath_ReportsUnrecognizedOption(params string[] args)
     {
-        var command = new NewCommand(_interaction);
+        NewCommand command = CreateCommand();
         ParseResult result = command.Parse([".", "--list", .. args]);
 
         result.Errors.Should().Contain(error =>
@@ -85,7 +98,7 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_HasPathArgument()
     {
-        var cmd = new NewCommand(_interaction);
+        NewCommand cmd = CreateCommand();
         cmd.Arguments.Should().ContainSingle();
         cmd.Arguments[0].Name.Should().Be("path");
     }
@@ -124,7 +137,7 @@ public class NewCommandTests
 
         try
         {
-            var command = new NewCommand(_interaction);
+            NewCommand command = CreateCommand();
             string[] args = [directory, "--template", "HttpTrigger", "--name", "Example", "--non-interactive"];
             if (force)
             {
@@ -134,7 +147,10 @@ public class NewCommandTests
             int exitCode = await command.Parse(args).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
             exitCode.Should().Be(1);
-            _interaction.AllOutput.Should().Contain("temporarily unavailable");
+            string expectedDiagnostic = force
+                ? "Overwriting files is not supported for template generation; existing files are preserved."
+                : "No installed workload recognized";
+            _interaction.AllOutput.Should().Contain(expectedDiagnostic);
             Directory.Exists(directory).Should().Be(exists);
             if (exists)
             {
@@ -156,8 +172,22 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_NullInteraction_Throws()
     {
-        Action act = () => _ = new NewCommand(null!);
+        Action act = () => _ = new NewCommand(
+            null!,
+            _projectResolver,
+            new InstalledProjectStackCatalog(Array.Empty<IProjectStack>()),
+            _templaterFactory,
+            new ProjectTemplateInputLease(_fileSystem),
+            new ProjectFileWriter(new WindowsProjectFileSystem()));
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("interaction");
     }
+
+    private NewCommand CreateCommand() => new(
+        _interaction,
+        _projectResolver,
+        new InstalledProjectStackCatalog(Array.Empty<IProjectStack>()),
+        _templaterFactory,
+        new ProjectTemplateInputLease(_fileSystem),
+        new ProjectFileWriter(new WindowsProjectFileSystem()));
 }

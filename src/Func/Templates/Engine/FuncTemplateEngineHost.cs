@@ -3,6 +3,8 @@
 
 using Azure.Functions.Cli.Common;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Components;
+using Microsoft.TemplateEngine.Abstractions.PhysicalFileSystem;
 using Microsoft.TemplateEngine.Edge;
 
 using OrchestratorComponents = Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components;
@@ -12,8 +14,8 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <summary>
 /// Template engine host that exposes one command's <see cref="TemplateEngineContext"/> as host parameters.
 /// </summary>
-internal class FuncTemplateEngineHost(TemplateEngineContext context)
-    : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), _builtIns)
+internal class FuncTemplateEngineHost(TemplateEngineContext context, IPhysicalFileSystem? fileSystem = null)
+    : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), CreateComponents(context)), ITemplateEngineHost
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
@@ -33,6 +35,29 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
     ];
 
     private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    public new IPhysicalFileSystem FileSystem => fileSystem ?? base.FileSystem;
+
+    private static IReadOnlyList<(Type, IIdentifiedComponent)> CreateComponents(TemplateEngineContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (context.Bindings.Count == 0)
+        {
+            return _builtIns;
+        }
+
+        string[] prefixes = [.. context.Bindings.Keys.Select(key => key.Split(':', 2)[0]).Distinct(StringComparer.Ordinal)];
+        if (prefixes.Length != 1 || context.Bindings.Any(pair =>
+            !pair.Key.StartsWith(prefixes[0] + ":", StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(pair.Key[(prefixes[0].Length + 1)..])
+            || string.IsNullOrWhiteSpace(pair.Value)))
+        {
+            throw new ArgumentException("Operation bindings must use one non-empty source prefix.", nameof(context));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(prefixes[0]);
+        return [.. _builtIns, (typeof(IBindSymbolSource), new OperationBindingSource(prefixes[0], context.Bindings))];
+    }
 
     public override bool TryGetHostParamDefault(string paramName, out string? value)
     {

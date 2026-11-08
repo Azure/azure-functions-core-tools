@@ -19,19 +19,30 @@ internal sealed class TemplateEngineSession : IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
     private readonly TemplatePackageManager _packageManager;
+    private readonly PrivateTemplateFileSystem? _privateFileSystem;
     private bool _disposed;
 
-    public TemplateEngineSession(TemplateEngineContext context, string settingsLocation)
+    public TemplateEngineSession(TemplateEngineContext context, string settingsLocation, PrivateTemplateFileSystem? privateFileSystem = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
 
         Context = context;
-        _settings = new(new FuncTemplateEngineHost(context), settingsLocation: settingsLocation);
+        _privateFileSystem = privateFileSystem;
+        _settings = new(new FuncTemplateEngineHost(context, privateFileSystem), settingsLocation: settingsLocation);
         _packageManager = new(_settings);
     }
 
     public TemplateEngineContext Context { get; }
+
+    internal PrivateTemplateFileSystem? PrivateFileSystem
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _privateFileSystem;
+        }
+    }
 
     public IEngineEnvironmentSettings Settings
     {
@@ -59,7 +70,20 @@ internal sealed class TemplateEngineSession : IDisposable
         }
 
         _disposed = true;
-        _packageManager.Dispose();
-        _settings.Dispose();
+        try
+        {
+            _packageManager.Dispose();
+        }
+        finally
+        {
+            try
+            {
+                _settings.Dispose();
+            }
+            finally
+            {
+                _privateFileSystem?.Dispose();
+            }
+        }
     }
 }

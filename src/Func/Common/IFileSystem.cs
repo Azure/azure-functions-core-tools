@@ -28,6 +28,11 @@ internal interface IFileSystem
     public Stream? OpenReadIfExists(string path);
 
     /// <summary>
+    /// Opens a local Windows file without following reparse points, retaining its ancestry handles until disposal.
+    /// </summary>
+    public Stream OpenReadNoFollow(string path, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Writes <paramref name="contents"/> to <paramref name="path"/> atomically
     /// (via temp-file-and-rename), creating parent directories if needed.
     /// </summary>

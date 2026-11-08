@@ -64,6 +64,32 @@ public sealed class WorkloadInstallerPackageTests : WorkloadInstallerTestBase
     }
 
     [Fact]
+    public async Task InstallFromPackage_EnsuresTemplateReadinessAfterWorkloadIsPersisted()
+    {
+        string nupkg = BuildNupkg();
+        List<string> operations = [];
+        _store.SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                operations.Add("persist");
+                return Task.CompletedTask;
+            });
+        TemplateReadiness.EnsureReadyAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                operations.Add("ready");
+                return Task.CompletedTask;
+            });
+
+        await NewInstaller().InstallFromPackageAsync(nupkg);
+
+        operations.Should().Equal("persist", "ready");
+        await TemplateReadiness.Received(1).EnsureReadyAsync(
+            Arg.Is<WorkloadEntry>(entry => entry.PackageId == "test.workload" && entry.PackageVersion == "1.0.0"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task InstallFromPackage_NonAliasTagsIgnored()
     {
         string nupkg = BuildNupkg(tags: "search-keyword another-keyword");

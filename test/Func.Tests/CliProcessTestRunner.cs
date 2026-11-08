@@ -57,6 +57,100 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
         CancellationToken cancellationToken,
         IReadOnlyDictionary<string, string>? environmentOverrides)
     {
+        ProcessStartInfo startInfo = CreateStartInfoCore(directory, home, workloadsHome, project, args, executablePath, environmentOverrides);
+
+        _output.WriteLine("Command: func {0}; host: {1}; working directory: {2}", string.Join(" ", args), startInfo.FileName, project);
+        _output.WriteLine("Isolated root: {0}; CLI home: {1}; workload home: {2}", directory, home, workloadsHome);
+
+        var duration = Stopwatch.StartNew();
+        using var execution = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        execution.CancelAfter(ExecutionTimeout);
+        try
+        {
+            if (executablePath is not null)
+            {
+                await WriteExecutableProvenanceAsync(executablePath, execution.Token);
+            }
+
+            using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start the CLI test process.");
+            process.StandardInput.Close();
+            using StreamReader standardOutput = process.StandardOutput;
+            using StreamReader standardError = process.StandardError;
+            using CancellationTokenSource streams = new();
+            Task<string> stdout = standardOutput.ReadToEndAsync(streams.Token);
+            Task<string> stderr = standardError.ReadToEndAsync(streams.Token);
+            try
+            {
+                await process.WaitForExitAsync(execution.Token);
+                await Task.WhenAll(stdout, stderr).WaitAsync(execution.Token);
+                _output.WriteLine("CLI exit code: {0}", process.ExitCode);
+                return new CliResult(process.ExitCode, await stdout, await stderr, duration.Elapsed);
+            }
+            finally
+            {
+                using CancellationTokenSource cleanup = new(_cleanupTimeout);
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        try
+                        {
+                            process.Kill(entireProcessTree: true);
+                        }
+                        catch (InvalidOperationException) when (process.HasExited)
+                        {
+                            // The owned process exited between the check and kill.
+                        }
+
+                        await process.WaitForExitAsync(cleanup.Token);
+                    }
+
+                    await Task.WhenAll(stdout, stderr).WaitAsync(cleanup.Token);
+                }
+                catch (OperationCanceledException ex) when (cleanup.IsCancellationRequested)
+                {
+                    throw new TimeoutException($"CLI process/stream cleanup exceeded {_cleanupTimeout.TotalSeconds} seconds.", ex);
+                }
+                finally
+                {
+                    streams.Cancel();
+                    _output.WriteLine("stdout: {0}{1}stderr: {2}",
+                        stdout.IsCompletedSuccessfully ? await stdout : $"<capture incomplete: {stdout.Status}>",
+                        Environment.NewLine,
+                        stderr.IsCompletedSuccessfully ? await stderr : $"<capture incomplete: {stderr.Status}>");
+                }
+            }
+        }
+        catch (OperationCanceledException ex) when (execution.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"CLI execution exceeded {ExecutionTimeout.TotalSeconds} seconds.", ex);
+        }
+        finally
+        {
+            duration.Stop();
+            _output.WriteLine("CLI duration (including cleanup): {0:F0} ms; execution limit: {1} s; cleanup limit: {2} s.",
+                duration.Elapsed.TotalMilliseconds, ExecutionTimeout.TotalSeconds, _cleanupTimeout.TotalSeconds);
+        }
+    }
+
+    internal ProcessStartInfo CreateStartInfo(
+        string directory,
+        string home,
+        string workloadsHome,
+        string project,
+        IReadOnlyList<string> args,
+        IReadOnlyDictionary<string, string>? environmentOverrides = null)
+        => CreateStartInfoCore(directory, home, workloadsHome, project, args, executablePath: null, environmentOverrides);
+
+    private ProcessStartInfo CreateStartInfoCore(
+        string directory,
+        string home,
+        string workloadsHome,
+        string project,
+        IReadOnlyList<string> args,
+        string? executablePath,
+        IReadOnlyDictionary<string, string>? environmentOverrides)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentException.ThrowIfNullOrWhiteSpace(home);
         ArgumentException.ThrowIfNullOrWhiteSpace(workloadsHome);
@@ -147,78 +241,7 @@ internal sealed class CliProcessTestRunner(ITestOutputHelper output)
             }
         }
 
-        _output.WriteLine("Command: func {0}; host: {1}; working directory: {2}", string.Join(" ", args), startInfo.FileName, project);
-        _output.WriteLine("Isolated root: {0}; CLI home: {1}; workload home: {2}", directory, home, workloadsHome);
-
-        var duration = Stopwatch.StartNew();
-        using var execution = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        execution.CancelAfter(ExecutionTimeout);
-        try
-        {
-            if (executablePath is not null)
-            {
-                await WriteExecutableProvenanceAsync(executablePath, execution.Token);
-            }
-
-            using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start the CLI test process.");
-            process.StandardInput.Close();
-            using StreamReader standardOutput = process.StandardOutput;
-            using StreamReader standardError = process.StandardError;
-            using CancellationTokenSource streams = new();
-            Task<string> stdout = standardOutput.ReadToEndAsync(streams.Token);
-            Task<string> stderr = standardError.ReadToEndAsync(streams.Token);
-            try
-            {
-                await process.WaitForExitAsync(execution.Token);
-                await Task.WhenAll(stdout, stderr).WaitAsync(execution.Token);
-                _output.WriteLine("CLI exit code: {0}", process.ExitCode);
-                return new CliResult(process.ExitCode, await stdout, await stderr, duration.Elapsed);
-            }
-            finally
-            {
-                using CancellationTokenSource cleanup = new(_cleanupTimeout);
-                try
-                {
-                    if (!process.HasExited)
-                    {
-                        try
-                        {
-                            process.Kill(entireProcessTree: true);
-                        }
-                        catch (InvalidOperationException) when (process.HasExited)
-                        {
-                            // The owned process exited between the check and kill.
-                        }
-
-                        await process.WaitForExitAsync(cleanup.Token);
-                    }
-
-                    await Task.WhenAll(stdout, stderr).WaitAsync(cleanup.Token);
-                }
-                catch (OperationCanceledException ex) when (cleanup.IsCancellationRequested)
-                {
-                    throw new TimeoutException($"CLI process/stream cleanup exceeded {_cleanupTimeout.TotalSeconds} seconds.", ex);
-                }
-                finally
-                {
-                    streams.Cancel();
-                    _output.WriteLine("stdout: {0}{1}stderr: {2}",
-                        stdout.IsCompletedSuccessfully ? await stdout : $"<capture incomplete: {stdout.Status}>",
-                        Environment.NewLine,
-                        stderr.IsCompletedSuccessfully ? await stderr : $"<capture incomplete: {stderr.Status}>");
-                }
-            }
-        }
-        catch (OperationCanceledException ex) when (execution.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-        {
-            throw new TimeoutException($"CLI execution exceeded {ExecutionTimeout.TotalSeconds} seconds.", ex);
-        }
-        finally
-        {
-            duration.Stop();
-            _output.WriteLine("CLI duration (including cleanup): {0:F0} ms; execution limit: {1} s; cleanup limit: {2} s.",
-                duration.Elapsed.TotalMilliseconds, ExecutionTimeout.TotalSeconds, _cleanupTimeout.TotalSeconds);
-        }
+        return startInfo;
     }
 
     private async Task WriteExecutableProvenanceAsync(string executablePath, CancellationToken cancellationToken)

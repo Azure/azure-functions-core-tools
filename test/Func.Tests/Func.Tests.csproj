@@ -8,12 +8,26 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SrcRoot)Func/Func.csproj" />
+    <ProjectReference Include="$(SrcRoot)Workloads/Stacks/DotNet/Workloads.DotNet.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="$(SrcRoot)Workloads/Host/Workloads.Host.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ProjectTemplates" Version="[4.0.5708]" />
+    <PackageDownload Include="Microsoft.Azure.Functions.Worker.ItemTemplates" Version="[4.0.5708]" />
+    <None Include="$(NuGetPackageRoot)/microsoft.azure.functions.worker.projecttemplates/4.0.5708/microsoft.azure.functions.worker.projecttemplates.4.0.5708.nupkg"
+          Link="Templates/Fixtures/DotNet/project.nupkg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(NuGetPackageRoot)/microsoft.azure.functions.worker.itemtemplates/4.0.5708/microsoft.azure.functions.worker.itemtemplates.4.0.5708.nupkg"
+          Link="Templates/Fixtures/DotNet/item.nupkg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Target Name="RecordCliProductOutput" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="ResolveProjectReferences">
     <ItemGroup>
       <_CliProductAssembly Include="@(_ResolvedProjectReferencePaths)" Condition="'%(_ResolvedProjectReferencePaths.Filename)' == 'func'" />
       <AssemblyMetadata Include="CliProductAssemblyPath" Value="%(_CliProductAssembly.FullPath)" />
+      <AssemblyMetadata Include="NuGetPackageRoot" Value="$(NuGetPackageRoot)" />
+      <AssemblyMetadata Include="RepositoryRoot" Value="$(RepoRoot)" />
     </ItemGroup>
     <Error Condition="'@(_CliProductAssembly)' == ''" Text="Could not resolve the normal CLI product output for process tests." />
   </Target>

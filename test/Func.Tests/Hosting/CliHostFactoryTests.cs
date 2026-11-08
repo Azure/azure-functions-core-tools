@@ -78,6 +78,16 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     [Fact]
+    public void CreateBuilder_DoesNotRegisterTemplateReadinessAtHostStartup()
+    {
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(new TestInteractionService());
+
+        builder.Services.Should().NotContain(descriptor =>
+            descriptor.ServiceType == typeof(IHostedService)
+            && descriptor.ImplementationType == typeof(InstalledTemplateReadinessService));
+    }
+
+    [Fact]
     public async Task CreateHostAsync_LoadsInstalledWorkloads_AndAddsTheirCommandsToRoot()
     {
         StageFixtureWorkload("withcommand.fixture", "1.0.0", CommandWorkloadType);

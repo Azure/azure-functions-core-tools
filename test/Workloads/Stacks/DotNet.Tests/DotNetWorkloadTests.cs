@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -27,6 +28,24 @@ public class DotNetWorkloadTests
 
         // Act & Assert
         workload.Description.Should().Be("Azure Functions CLI tooling for .NET (C#) projects.");
+    }
+
+    [Fact]
+    public void RequiredTemplatePackages_DeclaresPinnedProjectAndItemPackages()
+    {
+        WorkloadTemplatePackage[] packages = [.. new DotNetWorkload().RequiredTemplatePackages];
+
+        packages.Should().BeEquivalentTo(
+        [
+            new WorkloadTemplatePackage(
+                "Microsoft.Azure.Functions.Worker.ProjectTemplates",
+                "4.0.5708",
+                Path.Combine("templates", "microsoft.azure.functions.worker.projecttemplates.4.0.5708.nupkg")),
+            new WorkloadTemplatePackage(
+                "Microsoft.Azure.Functions.Worker.ItemTemplates",
+                "4.0.5708",
+                Path.Combine("templates", "microsoft.azure.functions.worker.itemtemplates.4.0.5708.nupkg")),
+        ], options => options.WithStrictOrdering());
     }
 
     [Fact]

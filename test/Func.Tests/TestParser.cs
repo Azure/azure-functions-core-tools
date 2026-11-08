@@ -7,7 +7,11 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
+using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Projects.FileWriting;
 using Azure.Functions.Cli.Quickstart;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
@@ -71,7 +75,17 @@ internal static class TestParser
         services.AddOptions<HostStartupOptions>();
         services.AddBuiltInCommands();
         services.AddProfiles();
-        services.AddSingleton(Substitute.For<Cli.Projects.IFunctionsProjectResolver>());
+        Cli.Projects.IFunctionsProjectResolver projectResolver = Substitute.For<Cli.Projects.IFunctionsProjectResolver>();
+        projectResolver.ResolveProjectAsync(Arg.Any<Cli.Projects.ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Cli.Projects.ProjectResolutionResult>(
+                Cli.Projects.ProjectResolutionResults.NotResolved("No installed workload recognized this directory.")));
+        services.AddSingleton(projectResolver);
+        services.AddSingleton<IFileSystem>(Substitute.For<IFileSystem>());
+        services.AddSingleton(new InstalledProjectStackCatalog(Array.Empty<IProjectStack>()));
+        services.AddSingleton(Substitute.For<ITemplaterFactory>());
+        services.AddSingleton<ProjectTemplateInputLease>();
+        services.AddSingleton<WindowsProjectFileSystem>();
+        services.AddSingleton<ProjectFileWriter>();
         services.AddSingleton(Substitute.For<Cli.Workloads.Storage.IWorkloadPaths>());
         services.AddSingleton(Substitute.For<Cli.Bundles.IHostJsonBundleSectionReader>());
         services.AddSingleton(Substitute.For<Cli.Bundles.IInstalledBundleWorkloads>());

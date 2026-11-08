@@ -33,5 +33,13 @@ internal sealed class TemplateHivePathProvider : ITemplateHivePathProvider
 
         HivePath = Path.GetFullPath(hivePath);
         TimestampPath = Path.Combine(HivePath, ".installed");
+        TemplateEngineHivePath = Path.Combine(FuncHomeResolver.Resolve(), "templates");
+        string workloadDirectory = Path.GetDirectoryName(typeof(TemplateHivePathProvider).Assembly.Location)
+            ?? throw new InvalidOperationException("The .NET workload assembly has no package payload directory.");
+        TemplatePackageDirectory = Path.Combine(workloadDirectory, "templates");
     }
+
+    public string TemplateEngineHivePath { get; }
+
+    public string TemplatePackageDirectory { get; }
 }

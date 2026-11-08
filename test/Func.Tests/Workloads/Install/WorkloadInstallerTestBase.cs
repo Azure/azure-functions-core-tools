@@ -24,6 +24,7 @@ public abstract class WorkloadInstallerTestBase : IDisposable
     private readonly IWorkloadCatalog _catalog = Substitute.For<IWorkloadCatalog>();
     private readonly IWorkloadRuntimeIdentifierProvider _runtimeIdentifierProvider =
         Substitute.For<IWorkloadRuntimeIdentifierProvider>();
+    private readonly IWorkloadTemplateReadiness _templateReadiness = Substitute.For<IWorkloadTemplateReadiness>();
     private readonly IWorkloadPaths _paths;
 
     protected WorkloadInstallerTestBase()
@@ -72,6 +73,8 @@ public abstract class WorkloadInstallerTestBase : IDisposable
 
     private protected IWorkloadCatalog Catalog => _catalog;
 
+    private protected IWorkloadTemplateReadiness TemplateReadiness => _templateReadiness;
+
     private protected IWorkloadPaths Paths => _paths;
 
     private protected static WorkloadEntry ExistingEntry(string id, string version) => new()
@@ -88,7 +91,7 @@ public abstract class WorkloadInstallerTestBase : IDisposable
         => new(id, NuGetVersion.Parse(version), new PackageSource("https://example/v3/index.json", "test"));
 
     private protected WorkloadInstaller NewInstaller(bool includePrerelease = false, IWorkloadMetadataReader? metadataReader = null,
-        IWorkloadPackageTrust? packageTrust = null)
+        IWorkloadPackageTrust? packageTrust = null, IWorkloadTemplateReadiness? templateReadiness = null)
     {
         IWorkloadMetadataReader reader = metadataReader ?? _metadataReader;
         WorkloadRidPackageSelector selector = new(_runtimeIdentifierProvider);
@@ -103,7 +106,7 @@ public abstract class WorkloadInstallerTestBase : IDisposable
                 .Returns(call => new WorkloadPackageTrust().AcquireAsync(call.Arg<string>(), true, call.Arg<CancellationToken>()));
         }
 
-        return new WorkloadInstaller(packageSource, inspector, selector, deploymentService, trust);
+        return new WorkloadInstaller(packageSource, inspector, selector, deploymentService, trust, templateReadiness ?? _templateReadiness);
     }
 
     private protected string BuildNupkg(string? tags = null, bool includeFuncCliWorkloadType = true, string version = "1.0.0",

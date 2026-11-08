@@ -8,7 +8,9 @@ using Azure.Functions.Cli.Commands.Quickstart;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Projects.FileWriting;
 using Azure.Functions.Cli.Quickstart;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Tests.Commands.Quickstart;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
@@ -83,7 +85,8 @@ public class ForceConfirmationCancellationTests
             bundles.ListInstalledAsync(Arg.Any<CancellationToken>()).Returns([]);
             command = new InitCommand(interaction, Substitute.For<IWorkloadHintRenderer>(), localSettings,
                 Substitute.For<IFunctionsProjectResolver>(), Substitute.For<IHostJsonBundleSectionReader>(),
-                new InstalledBundleScanner(bundles), [initializer]);
+                new InstalledBundleScanner(bundles), new InstalledProjectStackCatalog([]), Substitute.For<ITemplaterFactory>(),
+                new ProjectFileWriter(new WindowsProjectFileSystem()), [initializer]);
         }
         commandConstructed = true;
 

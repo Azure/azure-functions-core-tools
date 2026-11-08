@@ -10,18 +10,18 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 
 /// <summary>
 /// Project initializer for .NET (C# and F#) Azure Functions.
-/// Uses the <c>Microsoft.Azure.Functions.Worker.ProjectTemplates</c> NuGet
-/// template package to scaffold projects via <c>dotnet new func</c>.
+/// Retains the legacy <c>dotnet new</c> initializer.
 /// </summary>
 internal sealed class DotNetProjectInitializer(
     IDotnetCliRunner dotnetCli, ITemplateHivePathProvider hivePathProvider, DotNetProjectStack stack) : IProjectInitializer
 {
     internal const string TemplatesPackageName = "Microsoft.Azure.Functions.Worker.ProjectTemplates";
+    internal const string ItemTemplatesPackageName = "Microsoft.Azure.Functions.Worker.ItemTemplates";
     internal const string TemplateShortName = "func";
+    internal const string CSharpIsolatedProjectTemplateIdentity = "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x";
     internal const string DefaultFramework = "net10.0";
 
     internal static readonly IReadOnlyList<string> SupportedFrameworks = ["net10.0", "net11.0"];
-
     internal static readonly TimeSpan HiveTtl = TimeSpan.FromDays(30);
     internal static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
 
@@ -40,6 +40,25 @@ internal sealed class DotNetProjectInitializer(
     public IReadOnlyList<string> SupportedLanguages => _stack.SupportedLanguages;
 
     public Option<string> FrameworkOption { get; private set; } = default!;
+
+    public ProjectTemplateRequest? GetTemplateRequest(InitContext context, ParseResult parseResult)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(parseResult);
+        if (context.Force
+            || !string.Equals(NormalizeLanguage(context.Language), "C#", StringComparison.Ordinal)
+            || !string.Equals(parseResult.GetValue(FrameworkOption), DefaultFramework, StringComparison.OrdinalIgnoreCase)
+            || !_stack.IsTemplateRouteQualified(context.WorkingDirectory.Info.FullName)
+            || !_stack.IsTemplateRouteQualified(_hivePathProvider.TemplateEngineHivePath)
+            || !_stack.IsTemplateRouteQualified(_hivePathProvider.TemplatePackageDirectory))
+        {
+            return null;
+        }
+
+        return new ProjectTemplateRequest(
+            CSharpIsolatedProjectTemplateIdentity,
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["Framework"] = DefaultFramework });
+    }
 
     public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry)
     {
@@ -151,7 +170,7 @@ internal sealed class DotNetProjectInitializer(
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             throw new GracefulException(
-                $"The dotnet CLI operation timed out after {OperationTimeout.TotalMinutes:0} minutes. Check your network connection and try again.",
+                $"The dotnet CLI operation timed out after {OperationTimeout.TotalMinutes:0} minutes. Check the CLI and local workload state, then try again.",
                 isUserError: true);
         }
     }

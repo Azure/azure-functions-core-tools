@@ -34,6 +34,11 @@ public abstract class Workload
     public abstract string Description { get; }
 
     /// <summary>
+    /// Template packages that must be registered before this workload is ready.
+    /// </summary>
+    public virtual IReadOnlyList<WorkloadTemplatePackage> RequiredTemplatePackages => [];
+
+    /// <summary>
     /// Registers the workload's services with the host. Called once during
     /// CLI bootstrap, before the root command tree is built.
     /// </summary>

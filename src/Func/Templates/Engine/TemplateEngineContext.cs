@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
+using System.Collections.Immutable;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -17,12 +18,16 @@ internal sealed record TemplateEngineContext
     public TemplateEngineContext(
         WorkingDirectory commandDirectory,
         TemplateEngineProjectContext? project = null,
-        TemplateEngineBundleContext? bundle = null)
+        TemplateEngineBundleContext? bundle = null,
+        IReadOnlyDictionary<string, string>? bindings = null)
     {
         ArgumentNullException.ThrowIfNull(commandDirectory);
         CommandDirectory = commandDirectory;
         Project = project;
         Bundle = bundle;
+        Bindings = bindings is null
+            ? ImmutableDictionary.Create<string, string>(StringComparer.Ordinal)
+            : bindings.ToImmutableDictionary(StringComparer.Ordinal);
     }
 
     public WorkingDirectory CommandDirectory { get; }
@@ -30,6 +35,8 @@ internal sealed record TemplateEngineContext
     public TemplateEngineProjectContext? Project { get; }
 
     public TemplateEngineBundleContext? Bundle { get; }
+
+    public IReadOnlyDictionary<string, string> Bindings { get; }
 }
 
 /// <summary>

@@ -333,6 +333,7 @@ public sealed class ProfileCommandTests : IDisposable
         }
 
         public Stream? OpenReadIfExists(string path) => throw new NotImplementedException();
+        public Stream OpenReadNoFollow(string path, CancellationToken cancellationToken) => throw new NotImplementedException();
 
         public Task WriteAllTextAsync(string path, string contents, CancellationToken cancellationToken)
         {

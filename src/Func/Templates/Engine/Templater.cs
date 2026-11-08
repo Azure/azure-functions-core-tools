@@ -1,12 +1,15 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Immutable;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.Mount;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Settings;
+using Microsoft.TemplateEngine.Edge.Template;
 using Microsoft.TemplateEngine.Utils;
 using NuGet.Versioning;
 
@@ -232,6 +235,113 @@ internal sealed class Templater(TemplateEngineSession session, InstalledProjectS
     {
         _issuedEntries.Clear();
         _session.Dispose();
+    }
+
+    internal async Task<IReadOnlyList<(Guid ActionId, IReadOnlyDictionary<string, string> Arguments, bool ContinueOnError)>> PrepareTasksAsync(
+        TemplateRenderResult result, IProjectTemplateTasks workload, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(workload);
+        List<(Guid ActionId, IReadOnlyDictionary<string, string> Arguments, bool ContinueOnError)> required = [];
+        foreach ((Guid ActionId, ImmutableDictionary<string, string> Arguments, bool ContinueOnError) action in result.PostActions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (action.ActionId == new Guid("84C0DA21-51C8-4541-9940-6CA19AF04EE6"))
+            {
+                continue;
+            }
+
+            if (await workload.RequiresExecutionAsync(Context.CommandDirectory, action.ActionId, action.Arguments, cancellationToken))
+            {
+                required.Add((action.ActionId, action.Arguments, action.ContinueOnError));
+            }
+        }
+
+        return required.AsReadOnly();
+    }
+
+    internal async Task<IReadOnlyList<string>> ExecuteTasksAsync(
+        IReadOnlyList<(Guid ActionId, IReadOnlyDictionary<string, string> Arguments, bool ContinueOnError)> tasks,
+        IProjectTemplateTasks workload,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentNullException.ThrowIfNull(workload);
+        List<string> failures = [];
+        foreach ((Guid actionId, IReadOnlyDictionary<string, string> arguments, bool continueOnError) in tasks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await workload.ExecuteAsync(Context.CommandDirectory, actionId, arguments, cancellationToken);
+            }
+            catch (GracefulException exception) when (continueOnError)
+            {
+                failures.Add(exception.Message);
+            }
+        }
+
+        return failures.AsReadOnly();
+    }
+
+    /// <summary>
+    /// Evaluates and generates the selected template against captured content without project writes or post-action execution.
+    /// </summary>
+    public async Task<TemplateRenderResult> RenderAsync(
+        ResolvedTemplate selected, string name, IReadOnlyDictionary<string, string> parameters, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(selected);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(parameters);
+        cancellationToken.ThrowIfCancellationRequested();
+        PrivateTemplateFileSystem memory = _session.PrivateFileSystem
+            ?? throw new InvalidOperationException("Generation requires an operation-private captured-content session.");
+        TemplateResolutionResult resolution = await ResolveAsync(selected.Descriptor, selected.Descriptor.Type, cancellationToken);
+        if (resolution.Status != TemplateResolutionStatus.Selected
+            || !_issuedEntries.TryGetValue(resolution.SelectedTemplate!.Descriptor, out ITemplateInfo? template))
+        {
+            throw new InvalidDataException($"The selected template cannot be generated: {string.Join("; ", resolution.Diagnostics.Select(diagnostic => diagnostic.Message))}");
+        }
+
+        foreach (string parameter in parameters.Keys)
+        {
+            if (!selected.Descriptor.Parameters.Any(definition => string.Equals(definition.CanonicalName, parameter, StringComparison.Ordinal)))
+            {
+                throw new ArgumentException($"Template '{selected.Descriptor.Identity}' does not accept parameter '{parameter}'.", nameof(parameters));
+            }
+        }
+
+        TemplateCreator creator = new(_session.Settings);
+        var input = parameters.ToDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.Ordinal);
+        memory.BeginRendering(cancellationToken);
+        ITemplateCreationResult result = await creator.InstantiateAsync(
+            template, name, name, memory.OutputRoot, input, forceCreation: false, baselineName: null, dryRun: false, cancellationToken);
+        memory.ThrowIfRenderFailed();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (result.Status != CreationResultStatus.Success || result.CreationResult is null)
+        {
+            throw new InvalidDataException($"Template generation failed ({result.Status}): {result.ErrorMessage}");
+        }
+
+        ImmutableDictionary<string, ImmutableArray<byte>>.Builder files = ImmutableDictionary.CreateBuilder<string, ImmutableArray<byte>>(StringComparer.Ordinal);
+        foreach (string path in memory.EnumerateFiles(memory.OutputRoot, "*", SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            files.Add(Path.GetRelativePath(memory.OutputRoot, path), [.. memory.ReadAllBytes(path)]);
+        }
+
+        ImmutableArray<string> directories = [.. memory.EnumerateDirectories(memory.OutputRoot, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(memory.OutputRoot, path))];
+        ImmutableArray<string> primaryOutputs = [.. result.CreationResult.PrimaryOutputs.Select(output =>
+            Path.GetRelativePath(memory.OutputRoot, Path.Combine(memory.OutputRoot, output.Path)))];
+        if (primaryOutputs.Any(path => !files.ContainsKey(path)))
+        {
+            throw new InvalidDataException("The template declares a primary output that was not generated privately.");
+        }
+
+        return new(selected.Descriptor.Identity, files.ToImmutable(), directories,
+            [.. result.CreationResult.PostActions.Select(action =>
+                (action.ActionId, action.Args.ToImmutableDictionary(StringComparer.Ordinal), action.ContinueOnError))]);
     }
 
     private async Task<(

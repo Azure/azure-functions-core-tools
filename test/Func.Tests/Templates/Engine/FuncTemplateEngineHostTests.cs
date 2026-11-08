@@ -122,4 +122,27 @@ public class FuncTemplateEngineHostTests
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("context");
     }
+
+    [Fact]
+    public void Context_BindingsAreCopied()
+    {
+        Dictionary<string, string> bindings = new() { ["msbuild:TargetFramework"] = "net10.0" };
+        TemplateEngineContext context = new(_commandDirectory, bindings: bindings);
+        bindings["msbuild:TargetFramework"] = "net6.0";
+
+        context.Bindings["msbuild:TargetFramework"].Should().Be("net10.0");
+    }
+
+    [Theory]
+    [InlineData("missing-prefix")]
+    [InlineData(":value")]
+    [InlineData("msbuild:")]
+    public void Constructor_InvalidBinding_Throws(string key)
+    {
+        TemplateEngineContext context = new(_commandDirectory, bindings: new Dictionary<string, string> { [key] = "value" });
+
+        Action act = () => _ = new FuncTemplateEngineHost(context);
+
+        act.Should().Throw<ArgumentException>();
+    }
 }

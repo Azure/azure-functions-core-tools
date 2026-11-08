@@ -29,7 +29,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Create_BindsTheSuppliedContext()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
         TemplateEngineContext context = Context("command");
 
         using Templater templater = factory.Create(context);
@@ -41,7 +41,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_ReadsTemplatesFromTemplatesDirectoryUnderFuncHome()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
 
         using Templater templater = factory.Create(Context("command"));
         IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
@@ -53,7 +53,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_EachCallReturnsAnIndependentTemplater()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
         Templater first = factory.Create(Context("first"));
         using Templater second = factory.Create(Context("second"));
 
@@ -66,7 +66,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Create_NullContext_Throws()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
 
         Action act = () => factory.Create(null!);
 
@@ -76,7 +76,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Constructor_NullConfigurationPaths_Throws()
     {
-        Action act = () => _ = new TemplaterFactory(null!, new InstalledProjectStackCatalog([]));
+        Action act = () => _ = new TemplaterFactory(null!, new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("configurationPaths");
     }
@@ -84,9 +84,36 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Constructor_NullProjectStacks_Throws()
     {
-        Action act = () => _ = new TemplaterFactory(new CliConfigurationPathsOptions(Home), null!);
+        Action act = () => _ = new TemplaterFactory(new CliConfigurationPathsOptions(Home), null!, new PhysicalFileSystem());
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("projectStacks");
+    }
+
+    [Fact]
+    public void Constructor_NullFileSystem_Throws()
+    {
+        Action act = () => _ = new TemplaterFactory(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
+    }
+
+    [Fact]
+    public async Task CreateAsync_NullContext_Throws()
+    {
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => factory.CreateAsync(null!, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CreateAsync_PreCanceled_DoesNotCreateSettings()
+    {
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => factory.CreateAsync(Context("command"), cancellation.Token));
+        Assert.False(Directory.Exists(Home));
     }
 
     private async Task InstallFixturesUnderHomeAsync()

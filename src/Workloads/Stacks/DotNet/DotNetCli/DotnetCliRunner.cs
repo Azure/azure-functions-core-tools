@@ -127,6 +127,8 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        psi.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1";
+        psi.Environment["DOTNET_GENERATE_ASPNET_CERTIFICATE"] = "false";
 
         if (workingDirectory is not null)
         {

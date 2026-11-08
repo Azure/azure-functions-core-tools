@@ -63,6 +63,7 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
         await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
         await _store.DidNotReceive().RemoveWorkloadAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await TemplateReadiness.Received(1).EnsureReadyAsync(current, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -116,6 +117,9 @@ public sealed class WorkloadInstallerUpdateTests : WorkloadInstallerTestBase
             Arg.Is<WorkloadEntry>(entry =>
                 entry.PackageId == "test.workload"
                 && entry.PackageVersion == "1.1.0"),
+            Arg.Any<CancellationToken>());
+        await TemplateReadiness.Received(1).EnsureReadyAsync(
+            Arg.Is<WorkloadEntry>(entry => entry.PackageId == "test.workload" && entry.PackageVersion == "1.1.0"),
             Arg.Any<CancellationToken>());
     }
 

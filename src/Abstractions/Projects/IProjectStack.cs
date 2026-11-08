@@ -33,4 +33,25 @@ public interface IProjectStack
     /// Gets accepted aliases keyed by canonical language name, matched case-insensitively.
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; }
+
+    /// <summary>
+    /// Evaluates a project for one template operation. The result owns source evidence pinned through <paramref name="pinInputs"/>.
+    /// </summary>
+    /// <param name="project">The resolved project to inspect.</param>
+    /// <param name="pinInputs">Pins the evaluated source inputs until the result is disposed.</param>
+    /// <param name="cancellationToken">The cancellation token for evaluation.</param>
+    public Task<ProjectTemplateCompatibility> EvaluateTemplateCompatibilityAsync(
+        FunctionsProject project,
+        Func<IReadOnlyList<string>, CancellationToken, IDisposable> pinInputs,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(pinInputs);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(new ProjectTemplateCompatibility(
+            false,
+            $"Stack '{Stack}' does not support this template operation.",
+            new Dictionary<string, string>(),
+            null));
+    }
 }

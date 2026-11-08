@@ -66,7 +66,16 @@ public sealed class NewCommandProgramTests(ITestOutputHelper output)
                 directory, paths.Home, workloads.Home, directory, args, cancellation.Token);
 
             result.ExitCode.Should().Be(1, "stdout: {0}; stderr: {1}", result.StandardOutput, result.StandardError);
-            result.StandardError.Should().Contain("temporarily unavailable").And.Contain("new templating engine");
+            if (list)
+            {
+                result.StandardError.Should().Contain("Template listing is not available");
+            }
+            else
+            {
+                result.StandardError.Should().Contain(force
+                    ? "Overwriting files is not supported for template generation"
+                    : "No installed workload recognized");
+            }
             Directory.Exists(project).Should().Be(exists);
             if (exists)
             {

@@ -12,4 +12,9 @@ internal interface ITemplaterFactory
     /// Creates a templater bound to <paramref name="context"/>. The caller disposes it when the command is finished.
     /// </summary>
     public Templater Create(TemplateEngineContext context);
+
+    /// <summary>
+    /// Captures registered local archives before creating an operation-private generation session.
+    /// </summary>
+    public Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken);
 }

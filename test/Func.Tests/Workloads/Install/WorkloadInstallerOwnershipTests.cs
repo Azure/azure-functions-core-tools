@@ -49,6 +49,7 @@ public sealed class WorkloadInstallerOwnershipTests : WorkloadInstallerTestBase
         await _store.DidNotReceive().SaveWorkloadAsync(Arg.Any<WorkloadEntry>(), Arg.Any<CancellationToken>());
         await _store.DidNotReceive().RemoveWorkloadAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await TemplateReadiness.Received(1).EnsureReadyAsync(priorEntry, Arg.Any<CancellationToken>());
     }
 
     [Fact]

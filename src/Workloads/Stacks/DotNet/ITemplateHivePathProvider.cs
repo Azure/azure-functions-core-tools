@@ -18,4 +18,14 @@ internal interface ITemplateHivePathProvider
     /// Path to the timestamp file that records when templates were last installed.
     /// </summary>
     public string TimestampPath { get; }
+
+    /// <summary>
+    /// The CLI hive shared with Microsoft.TemplateEngine.
+    /// </summary>
+    public string TemplateEngineHivePath { get; }
+
+    /// <summary>
+    /// The template package archives delivered with this workload.
+    /// </summary>
+    public string TemplatePackageDirectory { get; }
 }

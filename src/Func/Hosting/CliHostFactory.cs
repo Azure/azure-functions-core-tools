@@ -9,6 +9,7 @@ using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Projects.FileWriting;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Http;
 using Azure.Functions.Cli.Quickstart;
@@ -100,6 +101,9 @@ internal static class CliHostFactory
         builder.Services.AddSingleton<IFunctionsWorkerInstaller, DefaultFunctionsWorkerInstaller>();
         builder.Services.AddSingleton<IFunctionsProjectResolver, FunctionsProjectResolver>();
         builder.Services.AddSingleton<InstalledProjectStackCatalog>();
+        builder.Services.AddSingleton<ProjectTemplateInputLease>();
+        builder.Services.AddSingleton<WindowsProjectFileSystem>();
+        builder.Services.AddSingleton<ProjectFileWriter>();
         builder.Services.AddSingleton<IInstalledBundleWorkloads, InstalledBundleWorkloads>();
         builder.Services.AddSingleton<InstalledBundleScanner>();
         builder.Services.AddSingleton<IHostJsonBundleSectionReader, HostJsonBundleSectionReader>();

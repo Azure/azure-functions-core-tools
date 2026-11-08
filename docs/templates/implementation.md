@@ -1,51 +1,64 @@
 # Implementing the Template Engine
 
-**Status:** Incremental implementation plan. The [component model](Templates-EndToEnd-Object-Model-Review.md) is the implementation authority; the [architecture](architecture.md) supplies supporting design.
+**Status:** The accepted Stack PR 3 candidate connects the qualified .NET C# isolated `net10.0` project and HTTP-item journeys. This document distinguishes implemented and wired behavior from narrower runtime qualification and broader Stack coverage that remain. The [component model](Templates-EndToEnd-Object-Model-Review.md) remains the implementation authority.
 
-This document distinguishes the PR 1 foundation from deferred rendering, command integration, and qualification. PR 1 does not require the complete `func init` / `func new` / Functions Host journey.
+Node.js and other Stacks remain gated; this candidate does not qualify their content, project interpretation, task behavior, or runtime journeys.
 
-## Existing committed infrastructure
+| Status | Scope |
+| --- | --- |
+| **IMPLEMENTED** | The .NET path integrates the existing Template Engine and workload readiness, then uses Generate Files Privately followed by CLI-owned guarded Write Files to Project. |
+| **QUALIFIED** | Representative C# isolated `net10.0` project and HTTP-item generation with Functions Host invocation on Windows x64 local fixed NTFS/ReFS paths. |
+| **DEFERRED** | Node.js and other Stacks, broader platform/content coverage, remote acquisition, and broader package lifecycle. |
+| **KNOWN LIMITATION** | G03 remains unresolved outside the representative path; unknown compatibility fails closed, and provider enumeration can be incomplete, so `NotFound` does not prove catalog completeness. |
 
-**IMPLEMENTED:** The existing object model includes `ITemplaterFactory`, `TemplateEngineContext`, `TemplateEngineSession`, `Templater`, `TemplateCatalogEntry`, and `TemplateParameterDefinition`. The host registers the factory, and the engine session uses the dedicated CLI template Hive. Catalog and parameter projectors, func-host metadata readers, and constraint helpers provide reusable metadata handling. Commands do not yet call the factory.
+## Current candidate
 
-## PR 1 foundation
+`InitCommand` and `NewCommand` orchestrate the existing Microsoft.TemplateEngine session, private generation, approved .NET tasks, and guarded `Write Files to Project` publication. The session remains internal to `Templater`; the workload owns project interpretation and Stack-specific effects, while the .NET workload supplies pinned packages and its workload-readiness integration registers and verifies them through Installed Templates. The route is limited to the supported Windows x64 local fixed NTFS/ReFS boundary and the representative .NET content.
 
-**IMPLEMENTED:** The PR 1 foundation provides a command-facing creation context, factory, command-scoped `Templater`, installed catalog metadata, and exact resolution with actionable diagnostics. `TemplateEngineSession` remains internal to `Templater` and owns the Microsoft.TemplateEngine environment and installed-template package manager for the command. Only the issuing live `Templater` can re-resolve an issued catalog entry; the selected descriptor does not authorize invocation or verify that installed content is unchanged. The implementation reuses `TemplateEngineContext`, `TemplateCatalogEntry`, and existing metadata/constraint helpers; it adds no group model or general task framework. The first Node starter-content scope is described in the [architecture](architecture.md#node-starter-content); package and lifecycle requirements are defined by the [packaging and acquisition contract](packaging-and-acquisition.md).
+The [packaging and acquisition contract](packaging-and-acquisition.md) remains authoritative for workload supply, Installed Templates registration, and deferred package lifecycle.
 
-PR 1 does not change `InitCommand` or `NewCommand`, activate template listing or generation, or replace existing Stack initializers.
+The .NET workload declares its required project and item package identities, pinned versions, and content-root-relative archive paths. A successful workload install, reuse, or update loads the installed workload and, when it declares required template packages, configures it before registering and verifying the complete set in the CLI hive. General CLI host startup and ordinary `func init`/`func new` execution do not register packages. Package identity/version policy for other Stacks and production replacement/repair remains outside this increment.
 
-Resolution reports unavailable registered mounts and malformed template configurations rather than treating those scans as complete. The underlying `TemplatePackageManager.GetTemplatePackagesAsync` contract can suppress a provider-enumeration exception, log it, and return packages from providers that succeeded. The current host uses a null logger, and the available log record is not a supported, typed completeness result. The foundation therefore cannot reliably distinguish every suppressed provider failure from genuine absence. An incomplete catalog can appear empty, and `NotFound` does not always prove that all providers were available.
+Resolution reports unavailable registered mounts and malformed template configurations rather than treating those scans as complete. The underlying `TemplatePackageManager.GetTemplatePackagesAsync` contract can suppress a provider-enumeration exception, log it, and return packages from providers that succeeded. The current host uses a null logger, and the available log record is not a supported, typed completeness result. The candidate therefore cannot reliably distinguish every suppressed provider failure from genuine absence. An incomplete catalog can appear empty, and `NotFound` does not always prove that all providers were available.
 
-A focused observation exercised this boundary with the existing CLI hive: after a template was installed and selected successfully, corrupting `packages.json` left the template files present while listing returned no entries and resolution returned `NotFound`. This observes the existing failure mode; it is not a passing correctness regression. The foundation must not parse localized log text, enumerate providers again, or maintain a second discovery mechanism to infer completeness. Production command activation remains subject to provider-availability and failure-handling qualification.
+A focused observation exercised this boundary with the existing CLI hive: after a template was installed and selected successfully, corrupting `packages.json` left the template files present while listing returned no entries and resolution returned `NotFound`. This observes the existing failure mode; it is not a passing correctness regression. The candidate must not parse localized log text, enumerate providers again, or maintain a second discovery mechanism to infer completeness. This limitation remains for the active .NET route.
+
+## Operation-private generation
+
+`ITemplaterFactory.CreateAsync` captures registered local NuGet archives before constructing the operation's Template Engine session. The same bounded private content is used for registration, discovery, explicit invalid/duplicate checks, exact resolution, parameter evaluation, and generation; no original source is reopened after capture.
+
+Capture uses the existing ancestry-pinned `OpenReadNoFollow` operation and BCL `ZipArchive`, not another template parser. It checks unsafe names, file/directory and case aliases, links, entry counts, declared and actual expanded lengths, and aggregate limits before the operation session is created. Capture supports Windows x64 on the safe reader's supported local fixed NTFS/ReFS paths; folder delivery remains disabled.
+
+Each operation allows at most four packages, 4 MiB compressed per archive, 512 entries per archive, depth 16, 1 MiB per asset, 64 KiB per configuration asset, and 32 MiB of expanded content in total. These are bounded implementation limits, not new production packaging or distribution decisions.
+
+Captured archives and the built-in managed provider's installed copies are sealed in `PrivateTemplateFileSystem`. The installed package identities and versions must match the original registrations. Disposing `Templater` disposes the private state.
+
+`Templater.RenderAsync` uses Microsoft.TemplateEngine's `TemplateCreator`, including authored defaults, choices, generated/computed values and conditional processing. Private output permits only bounded rewinding/truncation of existing bytes needed by the engine's conditional processor; cumulative write, file and directory quotas remain enforced. It validates declared primary outputs and returns private files plus evaluated post-action identifiers, arguments and `continueOnError` flags. It does not execute post-actions or publish project files.
+
+The .NET workload evaluates and pins project inputs before item generation, supplies only validated engine-neutral bindings, and interprets the supported restore and package-reference task metadata. `func init` publishes generated project files before restore/configuration finalization; `func new` publishes only after compatibility and task preflight. Existing project/package mutations outside the already-satisfied representative reference remain unsupported.
+
+The writer remains create-only and reports actual/partial publication effects; no atomic rollback is claimed. Project input pinning detects source changes across compatibility evaluation and publication.
 
 ## Deferred work
 
-- **NOT WIRED:** The GA workload integration must supply each Stack's curated starter templates and ensure they are registered through Installed Templates before the supported template experience is reported ready. Local fixtures can be registered in isolated hives; they do not prove production workload supply or registration. The exact repository mechanism must be verified and reused. Production template identities, package identity if a separate package is chosen, and version/servicing policy remain owner decisions.
-- A fixture-specific private-rendering prototype has been developed separately, including bounded source/output handling and planned output. It is not part of this PR, is not wired through the normal factory or a command, and has not been built or tested.
-- Installed-content snapshot verification, general supported parameter processing, Stack-owned task contributions, guarded destination publication, and actual-effect reporting remain later work.
-- `InitCommand` and its six existing Stack initializers continue to handle project creation, adoption, and configuration repair until replacements qualify.
-- `NewCommand` retains its existing public argument surface. Its current migration handler reports listing and scaffolding unavailable before changing the target; PR 1 does not alter that behavior.
+- Node.js package registration/content and Node.js project/item journeys remain unimplemented and unqualified.
+- Runtime qualification beyond the representative .NET content and currently qualified platform remains deferred.
+- Remote acquisition, search/install/update/uninstall UX, production package update, repair, replacement, distribution-channel, and publication decisions remain deferred.
+- Template listing and broader `func new` command grammar remain unavailable in this migration increment.
 - Quickstarts are project templates in the approved architecture. The existing Quickstart route remains until its migration is implemented and qualified.
-- The Template Engine remains part of the CLI for this milestone. Physical extraction under issue #5330 remains deferred.
+- The Template Engine remains in Core Tools for this milestone. Physical extraction under issue #5330 is deferred until after Ignite.
 
 ### Existing initialization limitations
 
-The current `func init` path has known safety limitations: it can create the destination before validation, perform force cleanup before all Stack-specific checks, remove `.git` pointer files, and report success after some required configuration writes fail.
+Legacy `func init` routes retain their existing safety limitations: they can create the destination before validation, perform force cleanup before all Stack-specific checks, remove `.git` pointer files, and report success after some required configuration writes fail.
 
-These behaviors belong to the existing implementation. The proposed template-based path must correct them before replacing an initializer.
+The qualified template-backed .NET path does not use `--force` and preserves adoption and repair behavior.
 
 Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Commands/InitCommand.cs`, `src/Func/Commands/NewCommand.cs`, `src/Abstractions/Projects/`, and `src/Workloads/Stacks/`. Current source and tests define the implemented compatibility behavior.
 
-## Incremental delivery
+## Candidate boundary
 
-1. **PR 1 — establish the object-model foundation.** Create `Templater` from the existing command context and factory; list installed template metadata; resolve one exact eligible selection or return diagnostics. Keep the engine session internal and leave commands unchanged.
-2. **Supply and register GA starters.** Use the existing workload install/enablement infrastructure to make each Stack's curated starter templates locally available and register them through Installed Templates before reporting the template experience ready. Verify the selected source before invocation; physical delivery must not change discovery behavior.
-3. **Qualify private generation.** Use representative project and item content to validate exact invocation, supported parameter processing, bounded private output, cancellation, and approved template-defined tasks. Stack-specific tasks come from the owning workload; do not introduce a generic task framework.
-4. **Add guarded publication.** Validate all intended destination effects, protect existing and Git metadata, preserve non-force behavior, and report partial effects truthfully.
-5. **Integrate commands incrementally.** Preserve `func init` adoption/repair and current Stack behavior; add project-template and item-template paths without changing public grammar until each path is ready.
-6. **Qualify production content and runtime behavior.** Verify production workload registration, Functions Host discovery, supported platforms, and the approved Stack scope before activating public paths.
-
-These increments keep the first PR reviewable. The complete Node.js end-to-end journey is a later integration milestone, not a prerequisite for PR 1.
+The representative .NET journey is implemented and wired. Node.js and remaining Stack coverage, platform expansion, and production publication remain gated on accepted content, compatibility and runtime evidence.
 
 ## Stack behavior to preserve
 
@@ -53,7 +66,7 @@ The six existing initializers provide the compatibility baseline. The exact supp
 
 | Stack | Current project languages and important options |
 | --- | --- |
-| .NET | C# and F#; `--target-framework` defaults to `net10.0` in the documented baseline. `net11.0` is a C# case; existing .NET templates use a separate `dotnet new` hive. |
+| .NET | C# and F#; `--target-framework` defaults to `net10.0` in the documented baseline. `net11.0` is a C# case. The qualified C# isolated `net10.0` route uses the CLI Template Engine hive; other routes retain the existing initializer. |
 | Node.js | JavaScript and TypeScript; bundle options and `--skip-npm-install` (default false). |
 | Python | Python (`py` alias); bundle options and the current Python project scaffold. |
 | Go | Go (`golang` alias; existing worker identifier `native`); bundle options and `--skip-go-mod-tidy` (default false). |
@@ -64,37 +77,38 @@ Common bundle options include `--no-bundles` and `--bundles-channel`. Preserve S
 
 Keep the distinction between the language Stack and the Azure Functions Runtime. Do not interpret a worker alias or a public `--runtime-version` option as a new architecture term.
 
-## Remaining implementation gates
+## Remaining qualification gates
 
-| Area | Needed before |
+| Area | Current status |
 | --- | --- |
-| GA workload starter supply and registration | Required starter templates are locally available and registered through Installed Templates before the supported template experience is reported ready |
-| Verified source snapshot and supported parameter semantics | Invoking selected installed content |
-| Approved template-defined task contracts | Coordinating tasks contributed by a Stack |
-| Guarded destination publication | Writing generated files to a project |
-| Supported content, Functions Host, and platform qualification | Activating public template-backed command paths |
+| .NET local package registration | Wired from the versioned workload payload into the CLI hive |
+| Operation-private source capture and generation | Implemented for registered local NuGet archives within the documented bounds |
+| .NET C# isolated `net10.0` task and binding path | Wired for the representative project and HTTP-item templates |
+| Guarded publication | Create-only on the qualified Windows x64 local fixed NTFS/ReFS boundary |
+| Node.js and remaining Stacks | Not implemented or qualified by this candidate |
+| Production publication, package replacement, and expanded platforms | Deferred pending owner decisions and qualification |
 
-Engine work with isolated representative content does not need to wait for the entire production catalog. A public template-backed journey does need approved content and production workload supply and registration.
-
-## Focused tests and later acceptance
+## Historical foundation validation
 
 ### PR 1 tests
 
 PR 1 covers factory creation, catalog listing, exact identity selection, alias ambiguity, duplicate identities, ineligible candidates, selection ownership, invalid selection, and actionable diagnostics. At foundation commit `fe9a0d9861f02596c68ad64c567e3ec0b16bad15`, the focused filter ran against an isolated snapshot with .NET SDK 10.0.403: 108 passed, 0 failed, and 0 skipped. That run does not cover subsequent review changes. A separate foundation-only snapshot with the local review corrections passed 52 `TemplaterTests` and `TemplaterFactoryTests`: 0 failed and 0 skipped. It does not include the deferred renderer.
 
-### Later end-to-end journey
+### Representative .NET end-to-end journey
 
-Use a real project template and a parameterized HTTP-function template for one supported Stack:
+The retained Stack PR 3 representative journey uses a real .NET project template and HTTP-function template:
 
-1. Install both into an isolated CLI hive.
+1. Stage the versioned workload payload and let `func init` register its local project and item packages into an isolated CLI hive.
 2. Run `func init` and verify the resulting project with the normal project resolver.
 3. Run `func new` against that project, passing a required parameter.
 4. Verify the generated function uses the supplied parameter.
 5. Start the approved Functions Host and verify actual function discovery and invocation.
 
-A `host.json` file, successful listing, or basic text-file fixture alone does not establish this proof. One representative Stack does not establish GA coverage.
+A `host.json` file, successful listing, or basic text-file fixture alone does not establish this proof. One representative Stack does not establish broad production coverage.
 
-### Focused correctness cases
+### Additional acceptance coverage for broader delivery
+
+The following scenarios are not established by the representative .NET increment unless explicitly listed in its retained validation evidence:
 
 - **Discovery and selection:** missing content, multiple metadata variants, ambiguous aliases, ineligible exact IDs, duplicate identities, unavailable constraints, and no sibling substitution.
 - **Parameters:** candidate-specific options before final selection; conditional required/disabled/default values; explicit empty and repeated values; interactive and noninteractive errors.
@@ -106,9 +120,11 @@ A `host.json` file, successful listing, or basic text-file fixture alone does no
 
 ## Validation status and limitations
 
-An independent review of the deferred fixture prototype passed with a nonblocking finding; it was inspection-only and did not review the foundation. The historical 108-test run above applies to the foundation commit, not later review changes. **RUNTIME VALIDATION REQUIRED** for production generation and host qualification.
+The retained Stack PR 3 validation evidence records 2,851 passed / 0 failed / 1 skipped Func tests, 96 passed / 0 failed / 0 skipped .NET workload tests, and 61 passed focused readiness/lifecycle tests. It also records `git diff --check` passing. The Func suite includes the packaged workload journey: `func workload install` registers and verifies both pinned packages before `func init`; package identity, version, and archive hashes remain unchanged through `func init`, `func new`, and Host startup; the journey then builds the project and invokes the HTTP function. The host loaded `HttpExample`, logged a successful invocation, and the test verified the successful response body. MSBuild reported 2 project inputs; completion with the known root project produced 3 total inputs (1 `.csproj`, 0 `.props`, 2 `.targets`, 0 other), within the 256-input limit. These are retained results from the accepted candidate, not rerun during base integration.
 
-Separate Windows fixture qualification does not qualify this candidate. Focused unit tests do not establish installed-hive snapshot integration, general source integrity, guarded physical publication, cross-platform behavior, Functions Host discovery, or supported Stack coverage; these remain unqualified.
+The isolated host journey disables the generated local-storage connection in its child process and uses file-based secrets, so it does not require Azurite. Validation used isolated CLI and SDK first-run state and did not install machine-wide tooling.
+
+The validation was run on Windows x64 with local fixed NTFS/ReFS paths. It does not qualify other platforms, Node.js or remaining Stacks, broader template content, production package replacement/update/repair, or production publication. A prior SDK invocation installed an ASP.NET Core HTTPS development certificate; it was not removed, modified, or trusted. Subsequent CLI validation used isolated process state and first-run environment flags.
 
 Keep current initializers and the existing Quickstart route until their replacements or migrations are implemented and qualified. Package install/update/uninstall/search, producer-pipeline expansion, a general task framework, and physical engine extraction are outside PR 1.
 

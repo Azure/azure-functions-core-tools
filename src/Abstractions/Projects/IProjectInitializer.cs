@@ -67,6 +67,17 @@ public interface IProjectInitializer
     public IReadOnlyList<Option> GetInitOptions(IInitOptionRegistry registry);
 
     /// <summary>
+    /// Selects the exact project template and ordinary input values for a qualified template-backed initialization.
+    /// Returning <see langword="null"/> preserves this initializer's existing implementation.
+    /// </summary>
+    public ProjectTemplateRequest? GetTemplateRequest(InitContext context, ParseResult parseResult)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(parseResult);
+        return null;
+    }
+
+    /// <summary>
     /// Scaffolds a new project at <see cref="WorkloadContext.WorkingDirectory"/>.
     /// </summary>
     public Task InitializeAsync(InitContext context, ParseResult parseResult, CancellationToken cancellationToken = default);

@@ -15,9 +15,23 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// </summary>
 public sealed class DotNetWorkload : Workload
 {
+    private const string TemplatePackageVersion = "4.0.5708";
+
     public override string DisplayName => ".NET Stack";
 
     public override string Description => "Azure Functions CLI tooling for .NET (C#) projects.";
+
+    public override IReadOnlyList<WorkloadTemplatePackage> RequiredTemplatePackages =>
+    [
+        new(
+            "Microsoft.Azure.Functions.Worker.ProjectTemplates",
+            TemplatePackageVersion,
+            Path.Combine("templates", $"microsoft.azure.functions.worker.projecttemplates.{TemplatePackageVersion}.nupkg")),
+        new(
+            "Microsoft.Azure.Functions.Worker.ItemTemplates",
+            TemplatePackageVersion,
+            Path.Combine("templates", $"microsoft.azure.functions.worker.itemtemplates.{TemplatePackageVersion}.nupkg")),
+    ];
 
     public override void Configure(FunctionsCliBuilder builder)
     {
