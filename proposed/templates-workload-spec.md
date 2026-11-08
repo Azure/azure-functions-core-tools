@@ -1,6 +1,6 @@
 # Template Engine and Packages
 
-Navigation gateway, not an approved package or integration specification. Start with [Templates Architecture](../docs/templates/README.md), then the [proposed behavior contract](../docs/templates/architecture.md) and [implementation baseline and authorization gates](../docs/templates/implementation.md).
+Navigation gateway, not an approved package or integration specification. Start with [Templates Architecture](../docs/templates/README.md), then the [supporting architecture](../docs/templates/architecture.md), the [implementation baseline and authorization gates](../docs/templates/implementation.md), and the [approved package contract](../docs/templates/packaging-and-acquisition.md).
 
 ## Current boundaries
 
@@ -8,4 +8,4 @@ Navigation gateway, not an approved package or integration specification. Start 
 
 [TemplateFixtures](../test/Func.Tests/Templates/TemplateFixtures.cs) explicitly registers local content in isolated test hives. [WorkloadDeploymentService](../src/Func/Workloads/Install/WorkloadDeploymentService.cs) deploys workload payloads and store metadata, not production template registration. The working .NET initializer uses a separate `dotnet new` hive. Existing setup must not be described as making template content ready.
 
-Production workload-to-CLI-hive registration, approved package-relative location, version/channel/integrity, ownership and retry policy require Sarah/Fabio decisions. Workers and extension bundles retain their workload responsibilities. No discovery-time installation, new registry, package manager or `func new install/update/uninstall` is authorized by this gateway.
+For GA, installing or enabling a Stack workload supplies that Stack's curated starter templates and ensures locally available content reaches Installed Templates before the supported template experience is reported ready. This responsibility is approved; the repository mechanism and production integration remain unverified. Package identity, delivery details, versioning, servicing, and future lifecycle experiences remain subject to the package contract and separate owner decisions. Workers and extension bundles retain their workload responsibilities. Discovery does not acquire content, and this gateway authorizes no new registry, package manager, or future lifecycle command UX.
