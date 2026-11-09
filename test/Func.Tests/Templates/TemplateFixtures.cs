@@ -25,6 +25,7 @@ internal static class TemplateFixtures
     public const string InvalidHostTemplateIdentity = "Func.Tests.InvalidHost";
     public const string DotnetHostOnlyTemplateIdentity = "Func.Tests.DotnetHostOnly";
     public const string HiddenTemplateIdentity = "Func.Tests.Hidden";
+    public const string ArtifactTemplateIdentity = "Func.Tests.Artifact";
 
     /// <summary>
     /// Writes a folder package with one item template, one basic project template, and two templates without an item
@@ -168,6 +169,45 @@ internal static class TemplateFixtures
             """,
             ("Hidden.txt", "Hidden content"),
             ("func.host.json", """{ "isHidden": true }"""));
+
+        return packageDirectory;
+    }
+
+    /// <summary>
+    /// Writes a physical package containing an artifact template, and returns its path.
+    /// </summary>
+    public static string WriteArtifactPackage(string parentDirectory)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "artifact-templates");
+
+        WriteTemplate(
+            Path.Combine(packageDirectory, "artifact"),
+            $$"""
+            {
+              "$schema": "http://json.schemastore.org/template",
+              "author": "func-tests",
+              "identity": "{{ArtifactTemplateIdentity}}",
+              "name": "Func Tests Artifact",
+              "shortName": "func-tests-artifact",
+              "tags": {
+                "type": "artifact",
+                "language": "C#",
+                "func-stack": "dotnet",
+                "func-capability": "container"
+              },
+              "symbols": {
+                "Runtime": {
+                  "type": "parameter",
+                  "datatype": "choice",
+                  "isRequired": true,
+                  "choices": [ { "choice": "8.0" }, { "choice": "9.0" } ],
+                  "replaces": "__RUNTIME__"
+                }
+              }
+            }
+            """,
+            ("artifact.txt", "runtime=__RUNTIME__"),
+            ("func.host.json", """{ "symbolInfo": { "Runtime": { "longName": "runtime", "shortName": "r" } } }"""));
 
         return packageDirectory;
     }

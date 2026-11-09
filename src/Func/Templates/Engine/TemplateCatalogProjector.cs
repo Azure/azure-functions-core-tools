@@ -13,8 +13,11 @@ internal static class TemplateCatalogProjector
 {
     private const string TypeTag = "type";
     private const string LanguageTag = "language";
+    private const string StackTag = "func-stack";
+    private const string CapabilityTag = "func-capability";
     private const string ItemType = "item";
     private const string ProjectType = "project";
+    private const string ArtifactType = "artifact";
 
     /// <summary>
     /// Returns the type <paramref name="template"/> declares in <c>tags.type</c>, or <c>null</c> when it's missing or
@@ -29,6 +32,7 @@ internal static class TemplateCatalogProjector
         {
             string type when type.Equals(ItemType, StringComparison.OrdinalIgnoreCase) => TemplateType.Item,
             string type when type.Equals(ProjectType, StringComparison.OrdinalIgnoreCase) => TemplateType.Project,
+            string type when type.Equals(ArtifactType, StringComparison.OrdinalIgnoreCase) => TemplateType.Artifact,
             _ => null,
         };
     }
@@ -100,7 +104,9 @@ internal static class TemplateCatalogProjector
             package is IManagedTemplatePackage managed ? new(managed.Identifier, NullIfEmpty(managed.Version)) : null,
             metadata.IsHidden,
             parameters,
-            metadataDiagnostic);
+            metadataDiagnostic,
+            NullIfEmpty(GetTag(template, StackTag)),
+            NullIfEmpty(GetTag(template, CapabilityTag)));
     }
 
     private static string? GetTag(ITemplateInfo template, string name)

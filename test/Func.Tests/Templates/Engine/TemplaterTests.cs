@@ -148,6 +148,128 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task ResolveArtifactTemplatesAsync_MatchingSelectors_ProjectsArguments()
+    {
+        using Templater templater = CreateArtifactTemplater();
+
+        IReadOnlyList<ResolvedTemplate> templates = await templater.ResolveArtifactTemplatesAsync(
+            "container",
+            "dotnet",
+            "C#",
+            CancellationToken.None);
+
+        ResolvedTemplate template = templates.Should().ContainSingle().Subject;
+        template.Entry.Identity.Should().Be(TemplateFixtures.ArtifactTemplateIdentity);
+        template.Entry.Type.Should().Be(TemplateType.Artifact);
+        template.Entry.Stack.Should().Be("dotnet");
+        template.Entry.Capability.Should().Be("container");
+        template.Parameters.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new TemplateParameterDefinition(
+                CanonicalName: "Runtime",
+                LongName: "runtime",
+                ShortName: "r",
+                Description: null,
+                DataType: "choice",
+                Choices:
+                [
+                    new TemplateParameterChoice("8.0", null, null),
+                    new TemplateParameterChoice("9.0", null, null),
+                ],
+                DefaultValue: null,
+                IsRequired: true,
+                IsHidden: false,
+                AlwaysShow: false));
+    }
+
+    [Fact]
+    public async Task ResolveArtifactTemplatesAsync_NonMatchingSelectors_ReturnsEmpty()
+    {
+        using Templater templater = CreateArtifactTemplater();
+
+        IReadOnlyList<ResolvedTemplate> templates = await templater.ResolveArtifactTemplatesAsync(
+            "container",
+            "python",
+            "Python",
+            CancellationToken.None);
+
+        templates.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_DryRun_ReturnsChangesWithoutWritingFiles()
+    {
+        using Templater templater = CreateArtifactTemplater();
+        ResolvedTemplate template = (await templater.ResolveArtifactTemplatesAsync(
+            "container",
+            "dotnet",
+            "C#",
+            CancellationToken.None)).Should().ContainSingle().Subject;
+        string outputPath = Path.Combine(_root, "dry-run-output");
+
+        TemplateInvocationResult result = await template.InvokeAsync(
+            new(outputPath, new Dictionary<string, string> { ["Runtime"] = "8.0" }, Force: false, TemplateInvocationMode.DryRun),
+            CancellationToken.None);
+
+        result.WasCreated.Should().BeFalse();
+        result.FileChanges.Should().ContainSingle().Which.Should().Be(new TemplateFileChange("artifact.txt", TemplateFileChangeKind.Create));
+        File.Exists(Path.Combine(outputPath, "artifact.txt")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_Create_WritesProjectedArtifact()
+    {
+        using Templater templater = CreateArtifactTemplater();
+        ResolvedTemplate template = (await templater.ResolveArtifactTemplatesAsync(
+            "container",
+            "dotnet",
+            "C#",
+            CancellationToken.None)).Should().ContainSingle().Subject;
+        string outputPath = Path.Combine(_root, "create-output");
+
+        TemplateInvocationResult result = await template.InvokeAsync(
+            new(outputPath, new Dictionary<string, string> { ["Runtime"] = "9.0" }, Force: false, TemplateInvocationMode.Create),
+            CancellationToken.None);
+
+        result.WasCreated.Should().BeTrue();
+        File.ReadAllText(Path.Combine(outputPath, "artifact.txt")).Should().Be("runtime=9.0");
+    }
+
+    [Fact]
+    public async Task TemplateArgumentParser_ValidAliases_SelectsTemplateAndProjectsValues()
+    {
+        using Templater templater = CreateArtifactTemplater();
+        IReadOnlyList<ResolvedTemplate> templates = await templater.ResolveArtifactTemplatesAsync(
+            "container",
+            "dotnet",
+            "C#",
+            CancellationToken.None);
+        TemplateArgumentParser parser = new();
+
+        TemplateArgumentParseResult result = parser.Parse(templates, ["-r", "8.0"]);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Template!.Entry.Identity.Should().Be(TemplateFixtures.ArtifactTemplateIdentity);
+        result.Values.Should().Contain("Runtime", "8.0");
+    }
+
+    [Fact]
+    public async Task TemplateArgumentParser_InvalidChoice_ReturnsSupportedValues()
+    {
+        using Templater templater = CreateArtifactTemplater();
+        IReadOnlyList<ResolvedTemplate> templates = await templater.ResolveArtifactTemplatesAsync(
+            "container",
+            "dotnet",
+            "C#",
+            CancellationToken.None);
+        TemplateArgumentParser parser = new();
+
+        TemplateArgumentParseResult result = parser.Parse(templates, ["--runtime", "10.0"]);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Diagnostics.Should().ContainSingle().Which.Message.Should().ContainAll("10.0", "8.0", "9.0");
+    }
+
+    [Fact]
     public async Task ListAsync_AfterDispose_ThrowsObjectDisposedException()
     {
         Templater templater = CreateTemplater();
@@ -183,4 +305,13 @@ public sealed class TemplaterTests : IDisposable
 
     private Templater CreateTemplater()
         => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive));
+
+    private Templater CreateArtifactTemplater()
+    {
+        string packageDirectory = TemplateFixtures.WriteArtifactPackage(_root);
+        return new(new TemplateEngineSession(
+            new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)),
+            _hive,
+            [new WorkloadTemplatePackageSource("Test.Workload", packageDirectory)]));
+    }
 }
