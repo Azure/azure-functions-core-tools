@@ -25,12 +25,21 @@ internal sealed class ResolveFunctionsProjectInitializationStep(IFunctionsProjec
         var projectResolutionContext = new ProjectResolutionContext(context.Options.WorkingDirectory);
         ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(projectResolutionContext, cancellationToken);
 
-        if (resolution is ProjectResolutionResult.NotResolved notResolved)
+        string? diagnostic = resolution switch
         {
-            throw new GracefulException(notResolved.Message, isUserError: true);
+            ProjectResolutionResult.Uninitialized uninitialized => uninitialized.Message,
+            ProjectResolutionResult.NotResolved notResolved => notResolved.Message,
+            _ => null
+        };
+        if (diagnostic is not null)
+        {
+            throw new GracefulException(diagnostic, isUserError: true);
         }
 
-        var resolved = (ProjectResolutionResult.Resolved)resolution;
+        if (resolution is not ProjectResolutionResult.Resolved resolved)
+        {
+            throw new InvalidOperationException($"Unexpected project resolution result: {resolution.GetType().Name}.");
+        }
         context.State.Project = resolved.Project;
 
         return StartInitializationStepResult.Completed(resolved.Project.StackDisplayName);

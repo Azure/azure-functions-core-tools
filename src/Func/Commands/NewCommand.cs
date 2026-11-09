@@ -14,7 +14,7 @@ using Microsoft.TemplateEngine.Abstractions;
 namespace Azure.Functions.Cli.Commands;
 
 /// <summary>
-/// Retains the function scaffolding command surface during the template engine migration.
+/// Retains the function scaffolding command surface during the Template Engine migration.
 /// </summary>
 internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand
 {
@@ -113,7 +113,13 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand
         ProjectResolutionResult projectResolution = await _projectResolver.ResolveProjectAsync(new(directory), cancellationToken);
         if (projectResolution is not ProjectResolutionResult.Resolved resolved)
         {
-            _interaction.WriteError(((ProjectResolutionResult.NotResolved)projectResolution).Message);
+            string diagnostic = projectResolution switch
+            {
+                ProjectResolutionResult.Uninitialized uninitialized => uninitialized.Message,
+                ProjectResolutionResult.NotResolved notResolved => notResolved.Message,
+                _ => throw new InvalidOperationException($"Unexpected project resolution result: {projectResolution.GetType().Name}.")
+            };
+            _interaction.WriteError(diagnostic);
             return 1;
         }
 
@@ -245,7 +251,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand
                 catch (Exception exception) when (exception.Data[typeof(ProjectWriteResult)] is ProjectWriteResult partialResult)
                 {
                     ReportWriteEffects(partialResult);
-                    throw new GracefulException($"Template publication failed after partial project effects: {exception.Message}", exception, isUserError: true);
+                    throw new GracefulException($"Writing template files failed after partial project effects: {exception.Message}", exception, isUserError: true);
                 }
 
                 if (writeResult.Canceled)

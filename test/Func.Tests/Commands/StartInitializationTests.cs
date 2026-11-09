@@ -47,6 +47,42 @@ public class StartInitializationTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ResolveProjectStep_UnresolvedProjectPreservesDiagnostic(bool inspectionFails)
+    {
+        IFunctionsProjectResolver projectResolver = Substitute.For<IFunctionsProjectResolver>();
+        projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(inspectionFails
+                ? ProjectResolutionResults.NotResolved(
+                    "The project directory could not be inspected. Check that it exists and is accessible, then try again.")
+                : ProjectResolutionResults.Uninitialized());
+        ResolveFunctionsProjectInitializationStep step = new(projectResolver);
+        StartInitializationContext initialization = CreateContext(
+            WorkingDirectory.FromExplicit(_tempDir),
+            cliVersion: "5.0.0-test",
+            demoFunctionCount: 0,
+            demoSpeedMultiplier: 1,
+            demoAutoExit: false);
+        var renderer = new RecordingStartInitializationRenderer();
+        StartInitializationStepContext context = new(
+            initialization,
+            new StartInitializationState(),
+            step,
+            renderer,
+            TimeProvider.System);
+
+        GracefulException exception = await Assert.ThrowsAsync<GracefulException>(
+            () => step.ExecuteAsync(context, CancellationToken.None));
+
+        string expected = inspectionFails
+            ? "The project directory could not be inspected. Check that it exists and is accessible, then try again."
+            : "This directory is not an initialized Azure Functions project. Run 'func init' to initialize a Functions project.";
+        Assert.Equal(expected, exception.Message);
+        Assert.Null(context.State.Project);
+    }
+
     [Fact]
     public async Task DemoRunner_SimulatesHostInstallAndSkipsBundle_ForDotNet()
     {

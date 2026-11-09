@@ -7,7 +7,7 @@ using System.Collections.Immutable;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Immutable snapshot of the command context that every template engine operation in one command observes.
+/// Immutable snapshot of the command context that every Template Engine operation in one command observes.
 /// </summary>
 /// <remarks>
 /// Commands resolve these values before creating a <see cref="Templater"/>. Template host parameters come only from

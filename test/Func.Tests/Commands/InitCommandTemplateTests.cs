@@ -38,7 +38,14 @@ public class InitCommandTemplateTests(ITestOutputHelper output)
     private readonly CliProcessTestRunner _processRunner = new(output);
 
     [WindowsX64TemplateSourceFact]
-    public async Task Init_CSharpNet10_UsesTemplateEngineAndPublishesConfigAfterRestore()
+    public Task Init_CSharpNet10_UsesTemplateEngineAndWritesConfigAfterRestore()
+        => InitializeTemplateAsync(uninitialized: false);
+
+    [WindowsX64TemplateSourceFact]
+    public Task Init_CSharpNet10_UnexpectedUninitializedAfterWritingFiles_ReportsWrittenFiles()
+        => InitializeTemplateAsync(uninitialized: true);
+
+    private async Task InitializeTemplateAsync(bool uninitialized)
     {
         string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
         string target = Path.Combine(root, "project");
@@ -96,8 +103,13 @@ public class InitCommandTemplateTests(ITestOutputHelper output)
 
             var projectResolver = Substitute.For<IFunctionsProjectResolver>();
             projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
-                .Returns(call => Task.FromResult<ProjectResolutionResult>(
-                    new ProjectResolutionResult.Resolved(new TestProject(call.Arg<ProjectResolutionContext>().WorkingDirectory), "resolved")));
+                .Returns(call =>
+                {
+                    Assert.True(File.Exists(Path.Combine(target, "MyApp.csproj")));
+                    return Task.FromResult<ProjectResolutionResult>(uninitialized
+                        ? ProjectResolutionResults.Uninitialized()
+                        : new ProjectResolutionResult.Resolved(new TestProject(call.Arg<ProjectResolutionContext>().WorkingDirectory), "resolved"));
+                });
             var localSettings = Substitute.For<ILocalSettingsProvider>();
             localSettings.Get(Arg.Any<DirectoryInfo>()).Returns(LocalSettingsSnapshot.Empty);
             var bundleReader = Substitute.For<IHostJsonBundleSectionReader>();
@@ -127,11 +139,26 @@ public class InitCommandTemplateTests(ITestOutputHelper output)
             int exitCode = await rootCommand.Parse(["init", target, "--stack", "dotnet", "--language", "C#", "--name", "MyApp"])
                 .InvokeAsync();
 
-            Assert.Equal(0, exitCode);
-            Assert.True(restoreObserved);
             Assert.False(initializer.WasInvoked);
             Assert.True(File.Exists(Path.Combine(target, "MyApp.csproj")));
             Assert.True(File.Exists(Path.Combine(target, "host.json")));
+            if (uninitialized)
+            {
+                Assert.Equal(1, exitCode);
+                interaction.Received(1).WriteError(
+                    "Generated project files were written, but the project could not be resolved: The project is still not recognized as an initialized Functions project.");
+                interaction.Received(1).WriteLine("Created MyApp.csproj.");
+                await projectResolver.Received(1).ResolveProjectAsync(
+                    Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>());
+                Assert.False(restoreObserved);
+                Assert.False(File.Exists(Path.Combine(target, ".func", "config.json")));
+                await tasks.DidNotReceive().ExecuteAsync(
+                    Arg.Any<WorkingDirectory>(), Arg.Any<Guid>(), Arg.Any<IReadOnlyDictionary<string, string>>(), Arg.Any<CancellationToken>());
+                return;
+            }
+
+            Assert.Equal(0, exitCode);
+            Assert.True(restoreObserved);
             using var configuration = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(target, ".func", "config.json")));
             Assert.Equal("dotnet", configuration.RootElement.GetProperty("stack").GetProperty("runtime").GetString());
             Assert.Equal("c#", configuration.RootElement.GetProperty("stack").GetProperty("language").GetString());

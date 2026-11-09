@@ -6,7 +6,7 @@ using System.Collections.Immutable;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Immutable output generated privately by the template engine, before project publication.
+/// Immutable output generated privately by the Template Engine, before files are written to the project.
 /// </summary>
 internal sealed record TemplateRenderResult(
     string TemplateIdentity,

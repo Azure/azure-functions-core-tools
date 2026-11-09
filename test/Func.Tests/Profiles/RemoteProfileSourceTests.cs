@@ -324,6 +324,7 @@ public class RemoteProfileSourceTests
         public void CopyFile(string sourcePath, string destinationPath) => throw new NotImplementedException();
         public void DeleteFile(string path) => Files.Remove(path);
         public bool DirectoryExists(string path) => throw new NotImplementedException();
+        public bool DirectoryHasEntries(string path) => throw new NotImplementedException();
         public void CreateDirectory(string path) => throw new NotImplementedException();
         public TempDirectory CreateTempDirectory() => throw new NotImplementedException();
         public TempDirectory CreateTempDirectory(string parentDirectory) => throw new NotImplementedException();

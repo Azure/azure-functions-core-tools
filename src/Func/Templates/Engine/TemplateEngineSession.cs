@@ -8,7 +8,7 @@ using Microsoft.TemplateEngine.Edge.Settings;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Owns the template engine host, environment and package manager for one command.
+/// Owns the Template Engine host, environment and package manager for one command.
 /// </summary>
 /// <remarks>
 /// Engine components capture the environment when they are created, so every phase of a command shares this

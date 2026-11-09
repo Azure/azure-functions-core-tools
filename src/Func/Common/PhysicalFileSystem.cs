@@ -134,6 +134,8 @@ internal sealed partial class PhysicalFileSystem : IFileSystem
 
     public bool DirectoryExists(string path) => Directory.Exists(path);
 
+    public bool DirectoryHasEntries(string path) => Directory.EnumerateFileSystemEntries(path).Any();
+
     public void CreateDirectory(string path) => Directory.CreateDirectory(path);
 
     public TempDirectory CreateTempDirectory()

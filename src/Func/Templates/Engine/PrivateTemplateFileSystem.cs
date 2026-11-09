@@ -8,7 +8,7 @@ using Microsoft.TemplateEngine.Utils;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Restricts template engine I/O to an in-memory source and bounded output tree.
+/// Restricts Template Engine I/O to an in-memory source and bounded output tree.
 /// </summary>
 internal sealed class PrivateTemplateFileSystem : IPhysicalFileSystem, IDisposable
 {

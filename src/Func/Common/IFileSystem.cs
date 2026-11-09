@@ -75,6 +75,14 @@ internal interface IFileSystem
     public bool DirectoryExists(string path);
 
     /// <summary>
+    /// Returns whether a directory contains any immediate files or directories.
+    /// </summary>
+    /// <exception cref="DirectoryNotFoundException">The directory does not exist.</exception>
+    /// <exception cref="UnauthorizedAccessException">The directory cannot be accessed.</exception>
+    /// <exception cref="IOException">The directory cannot be inspected.</exception>
+    public bool DirectoryHasEntries(string path);
+
+    /// <summary>
     /// Creates a directory (and any missing parents) at <paramref name="path"/>.
     /// </summary>
     public void CreateDirectory(string path);

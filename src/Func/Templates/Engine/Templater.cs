@@ -16,7 +16,7 @@ using NuGet.Versioning;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Command-scoped entry point to the template engine. Create it through <see cref="ITemplaterFactory"/> and dispose
+/// Command-scoped entry point to the Template Engine. Create it through <see cref="ITemplaterFactory"/> and dispose
 /// it when the command is finished with templates.
 /// </summary>
 /// <remarks>The templater and its session are intended for sequential use by one command.</remarks>

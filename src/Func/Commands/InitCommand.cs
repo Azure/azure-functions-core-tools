@@ -472,7 +472,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
 
                 if (!directoryResult.Succeeded)
                 {
-                    _interaction.WriteError("Project destination directories could not be created; no project files were published.");
+                    _interaction.WriteError("Project destination directories could not be created; no project files were written.");
                     return 1;
                 }
 
@@ -495,7 +495,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             catch (Exception exception) when (exception.Data[typeof(ProjectWriteResult)] is ProjectWriteResult partialResult)
             {
                 ReportWriteEffects(partialResult, destinationCreated);
-                throw new GracefulException($"Project template publication failed after partial project effects: {exception.Message}", exception, isUserError: true);
+                throw new GracefulException($"Writing project template files failed after partial project effects: {exception.Message}", exception, isUserError: true);
             }
 
             if (writeResult.Canceled)
@@ -507,7 +507,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             ReportWriteEffects(writeResult, destinationCreated);
             if (!writeResult.Succeeded)
             {
-                _interaction.WriteError("Project template publication did not complete; no rollback was attempted.");
+                _interaction.WriteError("Writing project template files did not complete; no rollback was attempted.");
                 return 1;
             }
 
@@ -518,9 +518,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             if (projectResolution is not ProjectResolutionResult.Resolved resolved
                 || !string.Equals(resolved.Project.StackName, initializer.Stack, StringComparison.OrdinalIgnoreCase))
             {
-                string message = projectResolution is ProjectResolutionResult.NotResolved notResolved
-                    ? notResolved.Message
-                    : $"The generated project resolved to an unexpected stack instead of '{initializer.Stack}'.";
+                string message = projectResolution switch
+                {
+                    ProjectResolutionResult.Uninitialized => "The project is still not recognized as an initialized Functions project.",
+                    ProjectResolutionResult.NotResolved notResolved => notResolved.Message,
+                    _ => $"The generated project resolved to an unexpected stack instead of '{initializer.Stack}'."
+                };
                 _interaction.WriteError($"Generated project files were written, but the project could not be resolved: {message}");
                 return 1;
             }
@@ -565,7 +568,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             catch (Exception exception) when (exception.Data[typeof(ProjectWriteResult)] is ProjectWriteResult partialResult)
             {
                 ReportWriteEffects(partialResult, destinationCreated);
-                throw new GracefulException($"Project files were written, but CLI configuration publication failed after partial effects: {exception.Message}", exception, isUserError: true);
+                throw new GracefulException($"Project files were written, but writing CLI configuration failed after partial effects: {exception.Message}", exception, isUserError: true);
             }
 
             if (configurationResult.Canceled)

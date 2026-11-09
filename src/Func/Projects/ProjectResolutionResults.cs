@@ -13,4 +13,8 @@ internal static class ProjectResolutionResults
 
     public static ProjectResolutionResult NotResolved(string message, ProjectCreationFailure? failure = null)
         => new ProjectResolutionResult.NotResolved(message, failure);
+
+    public static ProjectResolutionResult Uninitialized()
+        => new ProjectResolutionResult.Uninitialized(
+            "This directory is not an initialized Azure Functions project. Run 'func init' to initialize a Functions project.");
 }

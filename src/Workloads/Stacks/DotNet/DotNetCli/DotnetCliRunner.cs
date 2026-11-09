@@ -117,7 +117,7 @@ internal sealed class DotnetCliRunner(IDotnetPathResolver pathResolver) : IDotne
         }
     }
 
-    private ProcessStartInfo CreateStartInfo(IReadOnlyList<string> arguments, string? workingDirectory)
+    internal ProcessStartInfo CreateStartInfo(IReadOnlyList<string> arguments, string? workingDirectory)
     {
         ProcessStartInfo psi = new()
         {

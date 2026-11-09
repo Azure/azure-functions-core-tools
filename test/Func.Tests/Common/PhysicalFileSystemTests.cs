@@ -23,6 +23,51 @@ public sealed class PhysicalFileSystemTests : IDisposable
     }
 
     [Fact]
+    public void DirectoryHasEntries_EmptyDirectory_ReturnsFalse()
+    {
+        _fileSystem.DirectoryHasEntries(_tempDirectory).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DirectoryHasEntries_ImmediateFileOrDirectory_ReturnsTrue(bool directory)
+    {
+        string path = Path.Combine(_tempDirectory, directory ? ".git" : "item.txt");
+        if (directory)
+        {
+            Directory.CreateDirectory(path);
+        }
+        else
+        {
+            File.WriteAllText(path, string.Empty);
+        }
+
+        _fileSystem.DirectoryHasEntries(_tempDirectory).Should().BeTrue();
+    }
+
+    [Fact]
+    public void DirectoryHasEntries_HiddenFile_ReturnsTrue()
+    {
+        string path = Path.Combine(_tempDirectory, ".hidden");
+        File.WriteAllText(path, string.Empty);
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.Hidden);
+        }
+
+        _fileSystem.DirectoryHasEntries(_tempDirectory).Should().BeTrue();
+    }
+
+    [Fact]
+    public void DirectoryHasEntries_MissingDirectory_Throws()
+    {
+        Action act = () => _fileSystem.DirectoryHasEntries(Path.Combine(_tempDirectory, "missing"));
+
+        act.Should().Throw<DirectoryNotFoundException>();
+    }
+
+    [Fact]
     public async Task OpenReadIfExists_ExistingFile_ReturnsReadableStream()
     {
         // Arrange

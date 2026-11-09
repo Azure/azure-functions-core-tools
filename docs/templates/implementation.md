@@ -13,7 +13,7 @@ Node.js and other Stacks remain gated; this candidate does not qualify their con
 
 ## Current candidate
 
-`InitCommand` and `NewCommand` orchestrate the existing Microsoft.TemplateEngine session, private generation, approved .NET tasks, and guarded `Write Files to Project` publication. The session remains internal to `Templater`; the workload owns project interpretation and Stack-specific effects, while the .NET workload supplies pinned packages and its workload-readiness integration registers and verifies them through Installed Templates. The route is limited to the supported Windows x64 local fixed NTFS/ReFS boundary and the representative .NET content.
+`InitCommand` and `NewCommand` orchestrate the existing Microsoft.TemplateEngine session, private generation, approved .NET tasks, and guarded writing of files to the project. The session remains internal to `Templater`; the workload owns project interpretation and Stack-specific effects, while the .NET workload supplies pinned packages and its workload-readiness integration registers and verifies them through Installed Templates. The route is limited to the supported Windows x64 local fixed NTFS/ReFS boundary and the representative .NET content.
 
 The [packaging and acquisition contract](packaging-and-acquisition.md) remains authoritative for workload supply, Installed Templates registration, and deferred package lifecycle.
 
@@ -33,20 +33,20 @@ Each operation allows at most four packages, 4 MiB compressed per archive, 512 e
 
 Captured archives and the built-in managed provider's installed copies are sealed in `PrivateTemplateFileSystem`. The installed package identities and versions must match the original registrations. Disposing `Templater` disposes the private state.
 
-`Templater.RenderAsync` uses Microsoft.TemplateEngine's `TemplateCreator`, including authored defaults, choices, generated/computed values and conditional processing. Private output permits only bounded rewinding/truncation of existing bytes needed by the engine's conditional processor; cumulative write, file and directory quotas remain enforced. It validates declared primary outputs and returns private files plus evaluated post-action identifiers, arguments and `continueOnError` flags. It does not execute post-actions or publish project files.
+`Templater.RenderAsync` uses Microsoft.TemplateEngine's `TemplateCreator`, including authored defaults, choices, generated/computed values and conditional processing. Private output permits only bounded rewinding/truncation of existing bytes needed by the Template Engine's conditional processor; cumulative write, file and directory quotas remain enforced. It validates declared primary outputs and returns private files plus evaluated post-action identifiers, arguments and `continueOnError` flags. It does not execute post-actions or write project files.
 
-The .NET workload evaluates and pins project inputs before item generation, supplies only validated engine-neutral bindings, and interprets the supported restore and package-reference task metadata. `func init` publishes generated project files before restore/configuration finalization; `func new` publishes only after compatibility and task preflight. Existing project/package mutations outside the already-satisfied representative reference remain unsupported.
+The .NET workload evaluates project inputs through the CLI-provided pinning callback before item generation and returns immutable engine-neutral bindings with an operation-scoped evidence lease. `func new` owns and disposes that compatibility result after selection, private generation, task preflight, and guarded file writing, keeping the evaluated inputs pinned throughout. The workload interprets the supported restore and package-reference task metadata. `func init` writes generated project files before restore/configuration finalization; `func new` writes files only after compatibility and task preflight. Existing project/package mutations outside the already-satisfied representative reference remain unsupported.
 
-The writer remains create-only and reports actual/partial publication effects; no atomic rollback is claimed. Project input pinning detects source changes across compatibility evaluation and publication.
+The writer remains create-only and reports actual and partial file-writing effects; no atomic rollback is claimed. Project input pinning detects source changes across compatibility evaluation and file writing.
 
 ## Deferred work
 
 - Node.js package registration/content and Node.js project/item journeys remain unimplemented and unqualified.
 - Runtime qualification beyond the representative .NET content and currently qualified platform remains deferred.
-- Remote acquisition, search/install/update/uninstall UX, production package update, repair, replacement, distribution-channel, and publication decisions remain deferred.
+- Remote acquisition, search/install/update/uninstall UX, production package update, repair, replacement, distribution-channel, and package distribution decisions remain deferred.
 - Template listing and broader `func new` command grammar remain unavailable in this migration increment.
 - Quickstarts are project templates in the approved architecture. The existing Quickstart route remains until its migration is implemented and qualified.
-- The Template Engine remains in Core Tools for this milestone. Physical extraction under issue #5330 is deferred until after Ignite.
+- The Template Engine remains in the CLI for this milestone. Physical extraction under issue #5330 is deferred until after Ignite.
 
 ### Existing initialization limitations
 
@@ -58,7 +58,7 @@ Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Comma
 
 ## Candidate boundary
 
-The representative .NET journey is implemented and wired. Node.js and remaining Stack coverage, platform expansion, and production publication remain gated on accepted content, compatibility and runtime evidence.
+The representative .NET journey is implemented and wired. Node.js and remaining Stack coverage, platform expansion, and production package distribution remain gated on accepted content, compatibility and runtime evidence.
 
 ## Stack behavior to preserve
 
@@ -84,9 +84,9 @@ Keep the distinction between the language Stack and the Azure Functions Runtime.
 | .NET local package registration | Wired from the versioned workload payload into the CLI hive |
 | Operation-private source capture and generation | Implemented for registered local NuGet archives within the documented bounds |
 | .NET C# isolated `net10.0` task and binding path | Wired for the representative project and HTTP-item templates |
-| Guarded publication | Create-only on the qualified Windows x64 local fixed NTFS/ReFS boundary |
+| Guarded file writing | Create-only on the qualified Windows x64 local fixed NTFS/ReFS boundary |
 | Node.js and remaining Stacks | Not implemented or qualified by this candidate |
-| Production publication, package replacement, and expanded platforms | Deferred pending owner decisions and qualification |
+| Production package distribution, replacement, and expanded platforms | Deferred pending owner decisions and qualification |
 
 ## Historical foundation validation
 
@@ -114,8 +114,8 @@ The following scenarios are not established by the representative .NET increment
 - **Parameters:** candidate-specific options before final selection; conditional required/disabled/default values; explicit empty and repeated values; interactive and noninteractive errors.
 - **Content integrity:** changed or missing configuration/assets between selection and invocation; rendering from the verified selected content; unsupported engine features fail before destination effects.
 - **`func init`:** all existing Stack options, adoption/repair, safe occupied non-project directories, write-if-missing behavior, complete-project refusal, force confirmation, `.git` protection, and required configuration failures.
-- **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated initialization configuration writes. Verify that a confirmed uninitialized target receives actionable `func init` guidance, while ambiguity, inspection/access failures, corrupt or malformed configuration, unsupported projects, and incompatibility retain their corresponding diagnostics. An undetermined resolution failure must not imply initialization is required. Resolution failures stop before discovery; incompatibility stops before generation. None of these failures may initialize a project or modify the destination.
-- **Publication:** path/ancestor/case checks, guarded no-replace or replacement on supported operating systems, cancellation, cleanup, and truthful partial-effect reporting.
+- **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated initialization configuration writes. An existing empty directory with at least one installed workload factory receives actionable `func init` guidance; other unresolved results retain their existing handling and do not imply initialization is required. Resolution failures stop before discovery; incompatibility stops before generation. None of these failures may initialize a project or modify the destination.
+- **File writing:** path/ancestor/case checks, guarded no-replace or replacement on supported operating systems, cancellation, cleanup, and truthful partial-effect reporting.
 - **Packaging:** isolated test registration versus real workload registration; missing or incompatible installed content; retry and version coordination.
 
 ## Validation status and limitations
@@ -124,7 +124,7 @@ The retained Stack PR 3 validation evidence records 2,851 passed / 0 failed / 1 
 
 The isolated host journey disables the generated local-storage connection in its child process and uses file-based secrets, so it does not require Azurite. Validation used isolated CLI and SDK first-run state and did not install machine-wide tooling.
 
-The validation was run on Windows x64 with local fixed NTFS/ReFS paths. It does not qualify other platforms, Node.js or remaining Stacks, broader template content, production package replacement/update/repair, or production publication. A prior SDK invocation installed an ASP.NET Core HTTPS development certificate; it was not removed, modified, or trusted. Subsequent CLI validation used isolated process state and first-run environment flags.
+The validation was run on Windows x64 with local fixed NTFS/ReFS paths. It does not qualify other platforms, Node.js or remaining Stacks, broader template content, production package replacement/update/repair, or production package distribution. A prior SDK invocation installed an ASP.NET Core HTTPS development certificate; it was not removed, modified, or trusted. Subsequent CLI validation used isolated process state and first-run environment flags.
 
 Keep current initializers and the existing Quickstart route until their replacements or migrations are implemented and qualified. Package install/update/uninstall/search, producer-pipeline expansion, a general task framework, and physical engine extraction are outside PR 1.
 

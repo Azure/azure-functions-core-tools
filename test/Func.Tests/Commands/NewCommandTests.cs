@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Projects.FileWriting;
 using Azure.Functions.Cli.Templates.Engine;
+using Azure.Functions.Cli.Workloads;
 using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Commands;
@@ -147,6 +148,9 @@ public class NewCommandTests
             int exitCode = await command.Parse(args).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
             exitCode.Should().Be(1);
+            await _templaterFactory.DidNotReceive().CreateAsync(
+                Arg.Any<TemplateEngineContext>(),
+                Arg.Any<CancellationToken>());
             string expectedDiagnostic = force
                 ? "Overwriting files is not supported for template generation; existing files are preserved."
                 : "No installed workload recognized";
@@ -166,6 +170,75 @@ public class NewCommandTests
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NewCommand_UnresolvedDirectory_StopsBeforeTemplateEffects(bool inspectionFails)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-new-uninitialized-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            IFunctionsProjectFactory factory = Substitute.For<IFunctionsProjectFactory>();
+            factory.TryCreateProjectAsync(Arg.Any<ProjectCreationContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectCreationResults.NotCreated("not mine"));
+            IFileSystem inspectionFileSystem = inspectionFails ? Substitute.For<IFileSystem>() : new PhysicalFileSystem();
+            if (inspectionFails)
+            {
+                inspectionFileSystem.DirectoryHasEntries(directory).Returns(_ => throw new UnauthorizedAccessException());
+            }
+            IFunctionsProjectResolver resolver = new FunctionsProjectResolver(
+            [
+                new WorkloadProjectFactoryRegistration(TestWorkloads.CreateInfo("Test.Workload"), factory)
+            ], inspectionFileSystem);
+            IProjectStack stack = Substitute.For<IProjectStack>();
+            stack.Stack.Returns("test");
+            stack.DisplayName.Returns("Test");
+            stack.WorkerRuntimeAliases.Returns([]);
+            stack.SupportedLanguages.Returns(["Test"]);
+            stack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>());
+            WindowsProjectFileSystem projectFileSystem = Substitute.For<WindowsProjectFileSystem>();
+            NewCommand command = new(
+                _interaction,
+                resolver,
+                new InstalledProjectStackCatalog([stack]),
+                _templaterFactory,
+                new ProjectTemplateInputLease(_fileSystem),
+                new ProjectFileWriter(projectFileSystem));
+
+            int exitCode = await command.Parse(
+                [directory, "--template", "HttpTrigger", "--name", "Example", "--non-interactive"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+            exitCode.Should().Be(1);
+            string expected = inspectionFails
+                ? "The project directory could not be inspected. Check that it exists and is accessible, then try again."
+                : "This directory is not an initialized Azure Functions project. Run 'func init' to initialize a Functions project.";
+            _interaction.AllOutput.Should().Contain(expected);
+            if (inspectionFails)
+            {
+                _interaction.AllOutput.Should().NotContain("func init");
+            }
+            await factory.Received(1).TryCreateProjectAsync(
+                Arg.Any<ProjectCreationContext>(),
+                Arg.Any<CancellationToken>());
+            await stack.DidNotReceive().EvaluateTemplateCompatibilityAsync(
+                Arg.Any<FunctionsProject>(),
+                Arg.Any<Func<IReadOnlyList<string>, CancellationToken, IDisposable>>(),
+                Arg.Any<CancellationToken>());
+            await _templaterFactory.DidNotReceive().CreateAsync(
+                Arg.Any<TemplateEngineContext>(),
+                Arg.Any<CancellationToken>());
+            projectFileSystem.DidNotReceive().OpenSession(Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Directory.GetFileSystemEntries(directory).Should().BeEmpty();
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
         }
     }
 

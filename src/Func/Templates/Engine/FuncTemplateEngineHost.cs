@@ -12,7 +12,7 @@ using OrchestratorComponents = Microsoft.TemplateEngine.Orchestrator.RunnablePro
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Template engine host that exposes one command's <see cref="TemplateEngineContext"/> as host parameters.
+/// Template Engine host that exposes one command's <see cref="TemplateEngineContext"/> as host parameters.
 /// </summary>
 internal class FuncTemplateEngineHost(TemplateEngineContext context, IPhysicalFileSystem? fileSystem = null)
     : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), CreateComponents(context)), ITemplateEngineHost
