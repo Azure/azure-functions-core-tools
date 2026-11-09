@@ -17,4 +17,8 @@
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Templates/**" />
+  </ItemGroup>
+
 </Project>
