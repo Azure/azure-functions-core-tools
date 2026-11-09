@@ -71,6 +71,32 @@ public class CompactRendererFunctionBrowserTests
         writer.ToString().Should().Contain("Ctrl+C force exit").And.NotContain("Esc close").And.NotContain("q quit");
     }
 
+    [Theory]
+    [InlineData("_helpOpen")]
+    [InlineData("_functionBrowserOpen")]
+    public void BuildFooter_TerminalSelectionKeepsReturnVisibleOverNonTypingOverlays(string overlay)
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        SetPrivate(renderer, overlay, true);
+        SetPrivate(renderer, "_mouseCapture", false);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter"));
+
+        writer.ToString().Should().Contain("m return to TUI").And.Contain("Ctrl+C stop").And.NotContain("Ctrl+C copy");
+    }
+
+    [Fact]
+    public void BuildFooter_SearchDoesNotAdvertiseMouseToggleAsACommand()
+    {
+        (CompactRenderer renderer, IAnsiConsole console, StringWriter writer) = NewRenderer();
+        SetPrivate(renderer, "_functionSearchOpen", true);
+        SetPrivate(renderer, "_mouseCapture", false);
+
+        Render(console, writer, InvokePrivate<IRenderable>(renderer, "BuildFooter"));
+
+        writer.ToString().Should().Contain("Esc close").And.Contain("Ctrl+C stop").And.NotContain("m return");
+    }
+
     [Fact]
     public async Task BuildLayout_ExpiredSelectionTakesPrecedenceOverPreviousCopyFeedback()
     {
@@ -202,7 +228,7 @@ public class CompactRendererFunctionBrowserTests
         string[] rows = writer.ToString().Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
         string help = string.Join("\n", rows.Take(frame.LogTop - 1));
         help.Should().Contain("Mouse wheel").And.Contain("PgUp/PgDn").And.Contain("1/2/3")
-            .And.Contain("q / Ctrl+C").And.Contain("Esc");
+            .And.Contain("q / Ctrl+C").And.Contain("Esc").And.Contain("Advanced");
     }
 
     [Fact]

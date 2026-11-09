@@ -160,14 +160,16 @@ internal sealed class CompactRenderer(
         _interaction.WriteBlankLine();
         _interaction.WriteLine($"  Azure Functions host stopped after {uptime.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture)}");
         _interaction.WriteLine($"  {summary.FunctionCount} functions  ·  {summary.TotalInvocations} invocations  ·  {summary.ErrorCount} error{(summary.ErrorCount == 1 ? string.Empty : "s")}");
-        if (_hostExitCode is not null and not 0)
+        if (_hostExitCode is null or 0)
         {
-            _interaction.WriteError($"The host exited with code {_hostExitCode.Value}.");
+            return;
         }
+
+        _interaction.WriteError($"The host exited with code {_hostExitCode.Value}.");
         CompactLogLine? failure = _logBuffer.Snapshot().LastOrDefault(line => line.IsError);
         if (failure is not null)
         {
-            _interaction.WriteLine("  Last error:");
+            _interaction.WriteLine("  Last logged error:");
             using StringReader errorText = new(failure.Text);
             for (int index = 0; index < 8 && errorText.ReadLine() is { } line; index++)
             {
@@ -435,12 +437,15 @@ internal sealed class CompactRenderer(
         try
         {
             ClipboardCopyResult result = _clipboard is null
-                ? new ClipboardCopyResult(ClipboardCopyStatus.Failed, "Clipboard access is unavailable; use m for native selection")
+                ? new ClipboardCopyResult(ClipboardCopyStatus.Failed, "Clipboard access is unavailable.")
                 : await _clipboard.CopyAsync(copy.Text, _terminal!, cancellationToken);
             lock (_uiLock)
             {
                 _viewport.CompleteCopy(copy.SelectionVersion, result.Status == ClipboardCopyStatus.Confirmed);
-                SetStatus(result.Message, result.Status switch
+                string message = result.Status == ClipboardCopyStatus.Confirmed ? result.Message
+                    : result.Message + " Press m for advanced terminal selection, then use your terminal's Copy command."
+                        + " Ctrl+C sent to the CLI stops the host.";
+                SetStatus(message, result.Status switch
                 {
                     ClipboardCopyStatus.Confirmed => "Copied",
                     ClipboardCopyStatus.Sent => "Copy unconfirmed",
@@ -876,9 +881,9 @@ internal sealed class CompactRenderer(
         {
             CompactFooterMode mode = _stopping ? CompactFooterMode.Stopping
                 : _functionSearchOpen ? CompactFooterMode.Search
+                : !_mouseCapture ? CompactFooterMode.MouseReleased
                 : _helpOpen ? CompactFooterMode.Help
                 : _functionBrowserOpen ? CompactFooterMode.Functions
-                : !_mouseCapture ? CompactFooterMode.MouseReleased
                 : _viewport.SelectionExpired ? CompactFooterMode.ExpiredSelection
                 : _viewport.HasSelection ? CompactFooterMode.Selection
                 : CompactFooterMode.Logs;
@@ -888,11 +893,16 @@ internal sealed class CompactRenderer(
 
     private IRenderable BuildLogDivider()
     {
+        if (!_stopping && !_mouseCapture)
+        {
+            return _headerBuilder.BuildLogDivider(GetViewportWidth(),
+                ["host running", "display paused", "use terminal Copy"], "Terminal selection");
+        }
+
         List<string> state =
         [
             _stopping ? "Stopping"
                 : _viewport.SelectionExpired ? "Selection expired"
-                : !_mouseCapture ? "Mouse off"
                 : _viewport.Following ? "Live" : "Paused",
         ];
         if (!_stopping && !_viewport.SelectionExpired && _status is not null)

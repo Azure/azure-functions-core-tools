@@ -58,13 +58,14 @@ internal sealed class CompactHeaderBuilder(ITheme theme, DashboardRunInfo runInf
             .Expand();
     }
 
-    public IRenderable BuildLogDivider(int width, IReadOnlyList<string> state)
+    public IRenderable BuildLogDivider(int width, IReadOnlyList<string> state, string label = "Logs")
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentNullException.ThrowIfNull(state);
+        ArgumentException.ThrowIfNullOrWhiteSpace(label);
 
         int available = Math.Max(0, width - 6);
-        string title = "Logs";
+        string title = LogText.Clip(label, available);
         foreach (string item in state)
         {
             string text = LogText.Sanitize(item).Replace('\n', ' ');
@@ -82,7 +83,7 @@ internal sealed class CompactHeaderBuilder(ITheme theme, DashboardRunInfo runInf
         }
 
         return width < 10
-            ? new Text(LogText.Clip("Logs", width), _theme.Muted)
+            ? new Text(LogText.Clip(label, width), _theme.Muted)
             : new Rule(LogText.EscapeMarkup(title)).LeftJustified().RuleStyle(_theme.Muted);
     }
 }

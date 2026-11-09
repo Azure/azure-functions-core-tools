@@ -121,6 +121,104 @@ public class FullScreenDashboardTests
 
         terminal.Send(new TerminalInputEvent(TerminalInputKind.Key, new ConsoleKeyInfo('?', ConsoleKey.Oem2, true, false, false)));
         await terminal.WaitForTextAsync(message, timeout.Token);
+        string details = string.Join(" ", terminal.Text.Split('\n').Select(line => line.Trim(' ', '\r', '│')));
+        details.Should().Contain("advanced terminal selection").And.Contain("terminal's Copy command")
+            .And.Contain("Ctrl+C sent to the CLI stops the host");
+    }
+
+    [Theory]
+    [InlineData(40)]
+    [InlineData(80)]
+    [InlineData(120)]
+    public async Task TerminalSelection_ReturnPreservesReadingPosition_AndControlCStopsRatherThanCopies(int width)
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        using CancellationTokenSource run = new();
+        ScriptedTerminal terminal = new() { Size = new TerminalSize(width, 24) };
+        IClipboardWriter clipboard = Substitute.For<IClipboardWriter>();
+        ConsoleInterruptCoordinator interrupts = new(run.Cancel, _ => { });
+        await using CompactRenderer renderer = Renderer(terminal, Interaction(), clipboard, interrupts);
+        await renderer.OnStartAsync(new DashboardState(), run.Token);
+        await renderer.OnEventAsync(Log("anchor"), [], timeout.Token);
+        await terminal.WaitForTextAsync("anchor", timeout.Token);
+        int logTop = terminal.LogTop;
+        terminal.Select("anchor");
+        await terminal.WaitForTextAsync("Ctrl+C copy", timeout.Token);
+
+        terminal.Send(Key('m', ConsoleKey.M));
+        await terminal.WaitForTextAsync("Terminal selection", timeout.Token);
+
+        terminal.MouseCapture.Should().BeFalse();
+        terminal.LogTop.Should().Be(logTop);
+        terminal.Text.Should().Contain("host running").And.Contain("m return to TUI").And.Contain("Ctrl+C stop")
+            .And.NotContain("Ctrl+C copy");
+        run.IsCancellationRequested.Should().BeFalse();
+        await renderer.OnEventAsync(Log("collected while paused"), [], timeout.Token);
+
+        terminal.Send(Key('m', ConsoleKey.M));
+        await terminal.WaitForTextAsync("End live", timeout.Token);
+
+        terminal.MouseCapture.Should().BeTrue();
+        terminal.LogTop.Should().Be(logTop);
+        terminal.Text.Should().Contain("Paused").And.NotContain("Terminal selection");
+        terminal.Send(Key('\0', ConsoleKey.End));
+        await terminal.WaitForTextAsync("Logs · Live", timeout.Token);
+        terminal.Text.Should().Contain("collected while paused");
+
+        terminal.Send(Key('m', ConsoleKey.M));
+        await terminal.WaitForTextAsync("Terminal selection", timeout.Token);
+        terminal.Send(Interrupt());
+        await terminal.WaitForTextAsync("Stopping", timeout.Token);
+
+        run.IsCancellationRequested.Should().BeTrue();
+        _ = clipboard.DidNotReceiveWithAnyArgs().CopyAsync(default!, default!, default);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    public async Task NormalSummary_RestoresTerminalAndPrintsOnlyDurationAndCounts(int? hostExitCode)
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        ScriptedTerminal terminal = new();
+        IInteractionService interaction = Interaction();
+        interaction.When(value => value.WriteLine(Arg.Any<string>())).Do(_ => terminal.Disposed.Should().BeTrue());
+        await using CompactRenderer renderer = Renderer(terminal, interaction);
+        await renderer.OnStartAsync(new DashboardState(), timeout.Token);
+        await renderer.OnEventAsync(Log("earlier invocation failure", LogLevel.Error), [], timeout.Token);
+        renderer.BeginShutdown(hostExitCode);
+        SummaryEvent summary = new(DateTimeOffset.UnixEpoch, hostExitCode is null ? "sigint" : "source_completed",
+            UptimeSeconds: 564, FunctionCount: 12, TotalInvocations: 64,
+            SucceededInvocations: 60, FailedInvocations: 4, ErrorCount: 4);
+
+        await renderer.OnSummaryAsync(summary, timeout.Token);
+
+        interaction.Received(1).WriteBlankLine();
+        interaction.Received(1).WriteLine("  Azure Functions host stopped after 00:09:24");
+        interaction.Received(1).WriteLine("  12 functions  ·  64 invocations  ·  4 errors");
+        interaction.Received(2).WriteLine(Arg.Any<string>());
+        interaction.DidNotReceiveWithAnyArgs().WriteRawLine(default!);
+        interaction.DidNotReceiveWithAnyArgs().WriteError(default!);
+    }
+
+    [Fact]
+    public async Task FailedHostSummary_PreservesExitCodeAndLoggedFailureContextAfterRestoration()
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        ScriptedTerminal terminal = new();
+        IInteractionService interaction = Interaction();
+        interaction.When(value => value.WriteError(Arg.Any<string>())).Do(_ => terminal.Disposed.Should().BeTrue());
+        interaction.When(value => value.WriteRawLine(Arg.Any<string>())).Do(_ => terminal.Disposed.Should().BeTrue());
+        await using CompactRenderer renderer = Renderer(terminal, interaction);
+        await renderer.OnStartAsync(new DashboardState(), timeout.Token);
+        await renderer.OnEventAsync(Log("host failed to continue", LogLevel.Error), [], timeout.Token);
+        renderer.BeginShutdown(42);
+
+        await renderer.OnSummaryAsync(new DashboardState().BuildSummary("source_completed", DateTimeOffset.UtcNow), timeout.Token);
+
+        interaction.Received(1).WriteError("The host exited with code 42.");
+        interaction.Received(1).WriteLine("  Last logged error:");
+        interaction.Received(1).WriteRawLine(Arg.Is<string>(line => line.Contains("host failed to continue", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -195,8 +293,11 @@ public class FullScreenDashboardTests
             clipboard: clipboard, interrupts: interrupts, terminal: terminal);
     }
 
-    private static HostLogEntry Log(string message)
-        => new(DateTimeOffset.UnixEpoch, "Host.Test", LogLevel.Information, default, message, null, HostLogEntry.EmptyAttributes);
+    private static HostLogEntry Log(string message, LogLevel level = LogLevel.Information)
+        => new(DateTimeOffset.UnixEpoch, "Host.Test", level, default, message, null, HostLogEntry.EmptyAttributes);
+
+    private static TerminalInputEvent Key(char character, ConsoleKey key)
+        => new(TerminalInputKind.Key, new ConsoleKeyInfo(character, key, false, false, false));
 
     private static TerminalInputEvent Interrupt()
         => new(TerminalInputKind.Key, new ConsoleKeyInfo('\u0003', ConsoleKey.C, false, false, true));
@@ -230,9 +331,11 @@ public class FullScreenDashboardTests
         private string _text = string.Empty;
         private int _logTop;
 
-        public TerminalSize Size => new(120, 24);
+        public TerminalSize Size { get; init; } = new(120, 24);
+        public bool MouseCapture { get; private set; } = true;
         public bool Disposed { get; private set; }
         public string Text { get { lock (_lock) { return _text; } } }
+        public int LogTop { get { lock (_lock) { return _logTop; } } }
 
         public void Send(TerminalInputEvent input) => _input.Writer.TryWrite(input);
 
@@ -287,7 +390,7 @@ public class FullScreenDashboardTests
         }
 
         public void WriteControl(string sequence) { }
-        public void SetMouseCapture(bool enabled) { }
+        public void SetMouseCapture(bool enabled) => MouseCapture = enabled;
         public void Restore() { }
         public ValueTask DisposeAsync()
         {

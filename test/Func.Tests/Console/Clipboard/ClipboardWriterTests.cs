@@ -173,13 +173,13 @@ public class ClipboardWriterTests
     }
 
     [Fact]
-    public async Task UnsupportedTerminal_ExplainsNativeCopyEscapeRoute()
+    public async Task UnsupportedTerminal_ReportsTransportFailure()
     {
         Fixture fixture = new();
         fixture.Variables["TERM"] = "dumb";
         var result = await fixture.Writer.CopyAsync("data", fixture.Terminal, CancellationToken.None);
         result.Status.Should().Be(ClipboardCopyStatus.Failed);
-        result.Message.Should().Contain("Release mouse capture");
+        result.Message.Should().Contain("does not have a supported clipboard transport");
         fixture.Terminal.DidNotReceiveWithAnyArgs().WriteControl(default!);
     }
 

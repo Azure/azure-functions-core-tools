@@ -33,9 +33,9 @@ public class CompactDashboardChromeTests
         string[] completeShortcuts =
         [
             "q", "q quit", "Ctrl+C", "Ctrl+C stop", "Ctrl+C force exit", "? help",
-            "Ctrl+C copy", "Esc clear", "m native copy", "Esc close", "Enter filter",
+            "Ctrl+C copy", "Esc clear", "Esc close", "Enter filter",
             "↑/↓ select", "type query", "↑/↓ navigate", "f next", "/ search",
-            "?/Esc close", "m resume", "↑/↓ scroll", "t functions", "PgUp/PgDn page",
+            "?/Esc close", "m", "m return", "m return to TUI", "↑/↓ scroll", "t functions", "PgUp/PgDn page",
             "a all", "End live",
         ];
 
@@ -47,13 +47,17 @@ public class CompactDashboardChromeTests
             string[] shortcuts = [.. Regex.Split(lines[0].Trim(), " {2,}").Where(value => value.Length > 0)];
             shortcuts.Should().OnlyContain(value => completeShortcuts.Contains(value));
 
-            if (mode is CompactFooterMode.Search or CompactFooterMode.Stopping)
+            if (mode is CompactFooterMode.Search or CompactFooterMode.Stopping or CompactFooterMode.MouseReleased)
             {
                 if (width >= 6)
                 {
                     lines[0].Should().Contain("Ctrl+C");
                 }
-                lines[0].Should().NotContain("q quit").And.NotContain("? help");
+                lines[0].Should().NotContain("q quit");
+                if (mode != CompactFooterMode.MouseReleased)
+                {
+                    lines[0].Should().NotContain("? help");
+                }
             }
             else
             {
@@ -91,7 +95,7 @@ public class CompactDashboardChromeTests
         expired.Should().NotContain("Ctrl+C");
 
         string released = Lines(builder.Build(40, CompactFooterMode.MouseReleased), 1000).Single();
-        released.Should().Contain("m resume").And.EndWith("q quit");
+        released.Should().Contain("m return to TUI").And.EndWith("Ctrl+C stop");
 
         string stopping = Lines(builder.Build(24, CompactFooterMode.Stopping), 1000).Single();
         stopping.Trim().Should().Be("Ctrl+C force exit");
@@ -105,6 +109,33 @@ public class CompactDashboardChromeTests
         string row = Lines(builder.Build(40, CompactFooterMode.Logs, following: false, filtered: true), 1000).Single();
 
         row.Should().Contain("End live").And.Contain("a all").And.Contain("? help").And.EndWith("q quit");
+    }
+
+    [Fact]
+    public void Footer_TerminalSelectionIsNotAdvertisedOutsideItsActiveMode()
+    {
+        CompactFooterBuilder builder = new(new DefaultTheme(), Shortcuts());
+        foreach (CompactFooterMode mode in Enum.GetValues<CompactFooterMode>().Where(mode => mode != CompactFooterMode.MouseReleased))
+        {
+            string row = Lines(builder.Build(240, mode), 1000).Single();
+
+            row.Should().NotMatchRegex(@"(^|\s)m(\s|$)").And.NotContain("native copy").And.NotContain("terminal selection");
+        }
+    }
+
+    [Theory]
+    [InlineData(24)]
+    [InlineData(40)]
+    [InlineData(80)]
+    [InlineData(120)]
+    public void Footer_TerminalSelectionKeepsReturnAndStopVisible(int width)
+    {
+        CompactFooterBuilder builder = new(new DefaultTheme(), Shortcuts());
+
+        string row = Lines(builder.Build(width, CompactFooterMode.MouseReleased), 1000).Single();
+
+        row.Should().Contain(width >= 28 ? "m return to TUI" : "m return").And.EndWith("Ctrl+C stop");
+        row.Should().NotContain("Ctrl+C copy").And.NotContain("m resume");
     }
 
     [Theory]
@@ -125,6 +156,31 @@ public class CompactDashboardChromeTests
         lines[0].Should().NotContain("\ufffd").And.NotContain("\n");
         Action encode = () => new UTF8Encoding(false, true).GetBytes(lines[0]);
         encode.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(24)]
+    [InlineData(40)]
+    [InlineData(80)]
+    [InlineData(120)]
+    public void TerminalSelectionDivider_DistinguishesTheRunningHostFromPausedDisplay(int width)
+    {
+        CompactHeaderBuilder builder = new(new DefaultTheme(), new DashboardRunInfo());
+
+        string[] lines = Lines(builder.BuildLogDivider(width,
+            ["host running", "display paused", "use terminal Copy"], "Terminal selection"), width);
+
+        lines.Should().ContainSingle();
+        lines[0].Should().Contain("Terminal selection");
+        LogText.Measure(lines[0]).Should().BeLessThanOrEqualTo(width);
+        if (width >= 40)
+        {
+            lines[0].Should().Contain("host running");
+        }
+        if (width >= 80)
+        {
+            lines[0].Should().Contain("display paused").And.Contain("use terminal Copy");
+        }
     }
 
     [Fact]
@@ -148,6 +204,7 @@ public class CompactDashboardChromeTests
         string output = string.Join("\n", Lines(builder.Build(120, status), 120));
 
         output.Should().Contain(version).And.Contain(status).And.Contain("Available compact-mode controls");
+        output.Should().Contain("Advanced: terminal selection").And.Contain("terminal's Copy command");
     }
 
     [Fact]
@@ -163,6 +220,7 @@ public class CompactDashboardChromeTests
         CompactHeaderBuilder header = new(theme, new DashboardRunInfo());
         FluentActions.Invoking(() => header.BuildLogDivider(0, [])).Should().Throw<ArgumentOutOfRangeException>();
         FluentActions.Invoking(() => header.BuildLogDivider(80, null!)).Should().Throw<ArgumentNullException>();
+        FluentActions.Invoking(() => header.BuildLogDivider(80, [], " ")).Should().Throw<ArgumentException>();
         FluentActions.Invoking(() => header.BuildBanner(null!, 80)).Should().Throw<ArgumentNullException>();
     }
 

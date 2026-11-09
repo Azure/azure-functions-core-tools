@@ -39,31 +39,34 @@ internal sealed class CompactFooterBuilder(ITheme theme, CompactDashboardShortcu
         string stop = mode switch
         {
             CompactFooterMode.Stopping => "Ctrl+C force exit",
-            CompactFooterMode.Search => "Ctrl+C stop",
+            CompactFooterMode.Search or CompactFooterMode.MouseReleased => "Ctrl+C stop",
             _ => "q quit",
         };
         if (LogText.Measure(stop) > width)
         {
-            stop = mode is CompactFooterMode.Stopping or CompactFooterMode.Search ? "Ctrl+C" : "q";
+            stop = mode is CompactFooterMode.Stopping or CompactFooterMode.Search or CompactFooterMode.MouseReleased ? "Ctrl+C" : "q";
         }
 
         string right = LogText.Measure(stop) <= width ? stop : string.Empty;
-        if (mode is not (CompactFooterMode.Search or CompactFooterMode.Help or CompactFooterMode.Stopping)
+        if (mode is not (CompactFooterMode.Search or CompactFooterMode.Help or CompactFooterMode.Stopping or CompactFooterMode.MouseReleased)
             && LogText.Measure("? help" + Separator + right) <= width)
         {
             right = "? help" + Separator + right;
         }
 
+        int available = width - LogText.Measure(right) - (right.Length == 0 ? 0 : Separator.Length);
+        string returnToTui = available >= LogText.Measure("m return to TUI") ? "m return to TUI"
+            : available >= LogText.Measure("m return") ? "m return" : "m";
         List<string> actions = mode switch
         {
-            CompactFooterMode.Selection => ["Ctrl+C copy", "Esc clear", "m native copy"],
-            CompactFooterMode.ExpiredSelection => ["Esc clear", "m native copy"],
+            CompactFooterMode.Selection => ["Ctrl+C copy", "Esc clear"],
+            CompactFooterMode.ExpiredSelection => ["Esc clear"],
             CompactFooterMode.Search => ["Esc close", "Enter filter", "↑/↓ select", "type query"],
             CompactFooterMode.Functions => ["Esc close", "Enter filter", "↑/↓ navigate", "f next", "/ search"],
             CompactFooterMode.Help => ["?/Esc close", "Ctrl+C stop"],
-            CompactFooterMode.MouseReleased => ["m resume", "Ctrl+C stop"],
+            CompactFooterMode.MouseReleased => [returnToTui, "? help"],
             CompactFooterMode.Stopping => [],
-            _ => ["↑/↓ scroll", "t functions", "Ctrl+C stop", "/ search", $"{_shortcutLabels.PageNavigationHelpKey} page", "m native copy"],
+            _ => ["↑/↓ scroll", "t functions", "Ctrl+C stop", "/ search", $"{_shortcutLabels.PageNavigationHelpKey} page"],
         };
         if (mode == CompactFooterMode.Logs)
         {
@@ -77,7 +80,6 @@ internal sealed class CompactFooterBuilder(ITheme theme, CompactDashboardShortcu
             }
         }
 
-        int available = width - LogText.Measure(right) - (right.Length == 0 ? 0 : Separator.Length);
         string left = string.Empty;
         foreach (string action in actions)
         {

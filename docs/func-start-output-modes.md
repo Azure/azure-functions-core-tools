@@ -40,7 +40,7 @@ that does not need those startup prompts can use full-screen mode normally.
 The labelled **Logs** divider shows live/paused state, unread entries, selection
 and copy status, and active filters. Aggregate counts sit in the main banner.
 The footer remains one row high and shows shortcuts for the current context:
-scrolling, selection, search, function browsing, native selection, or shutdown.
+scrolling, selection, search, function browsing, terminal selection, or shutdown.
 As the window narrows, lower-priority shortcuts disappear as whole items rather
 than being cut off or wrapped. A stop action remains visible; `?` opens the full
 keyboard reference, CLI version, and complete copy/status feedback outside search.
@@ -119,11 +119,25 @@ automatically when selecting. Terminal-native shortcuts such as macOS Cmd+C
 may be intercepted by the terminal and do not necessarily operate on
 application-owned selections.
 
-### Native terminal selection
+### Advanced: terminal selection
 
-Press **`m`** to release mouse capture and pause automatic screen updates for
-native terminal selection. The host and bounded log collection keep running.
-Press `m` again to resume the dashboard. Some terminals also support a native
+Terminal selection is an advanced fallback listed in `?` help, not the normal
+shortcut footer. Use it to select other visible dashboard content or when
+application clipboard access fails or is unconfirmed.
+
+Press **`m`** to release mouse capture, clear the application-owned selection,
+and pause automatic screen updates. The divider shows **Terminal selection**
+and that the host is still running. Log collection continues within its usual
+retention limits. Keyboard actions and resizing can still redraw the screen.
+
+Select text with the terminal, then use **the terminal's Copy command**.
+Pressing `m` does not itself copy anything. Ctrl+C forwarded to the CLI stops
+the host in this mode; it is not the application-selection copy gesture.
+The terminal copies rendered text, so wrapping and padding depend on the
+terminal rather than the CLI's logical log representation.
+
+Press `m` again to return to TUI mouse handling and redraws at the paused reading
+position; `End` returns to live following. Some terminals also support a native
 bypass gesture such as Shift-drag; the modifier varies by terminal.
 
 Keyboard navigation remains available when the terminal does not report mouse
@@ -133,9 +147,11 @@ that work better with streaming text.
 ### Shutdown
 
 On completion, the CLI restores the previous screen and terminal modes, then
-prints a concise summary and relevant retained failure context. It does not
-replay dashboard history into shell scrollback. During graceful shutdown,
-another Ctrl+C requests force exit.
+prints a concise summary of duration, invocations, and errors. A normal quit
+does not replay earlier invocation errors from the dashboard. An actual nonzero
+host exit still reports the exit code and the last logged error when available;
+startup, terminal, and cleanup failures are not suppressed. During graceful
+shutdown, another Ctrl+C requests force exit.
 
 On Unix, Ctrl+Z suspends the foreground job after restoring terminal state.
 Use `fg` to resume the dashboard; the owned input and display modes are reapplied.

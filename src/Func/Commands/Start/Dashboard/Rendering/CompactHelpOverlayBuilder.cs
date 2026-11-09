@@ -39,7 +39,6 @@ internal sealed class CompactHelpOverlayBuilder(ITheme theme, CompactDashboardSh
         Add("↑/↓", "Scroll logs; move selection in an overlay.", "Scroll / select");
         Add("Mouse wheel", "Scroll the log pane.", "Scroll logs");
         Add("Drag", "Select log text; Ctrl+C copies.", "Select text");
-        Add("m", "Release capture / pause redraw; press again to resume.", "Native selection");
         Add(_shortcutLabels.PageNavigationHelpKey, "Page through logs or functions.", "Page");
         Add("Home/End", "Go to oldest/latest logs or first/last function.", "Oldest / latest");
         Add("Enter", "Filter logs to the selected function.", "Filter");
@@ -50,6 +49,7 @@ internal sealed class CompactHelpOverlayBuilder(ITheme theme, CompactDashboardSh
         Add("1/2/3", "Minimum log level: info / warning / error.", "Info / warn / error");
         Add("q / Ctrl+C", "Stop host; Ctrl+C copies an active selection.", "Quit / copy");
         Add("Esc", "Close overlay or clear selection.", "Close / clear");
+        Add("m", "Advanced: terminal selection; use terminal's Copy command.", "Advanced selection");
 
         List<IRenderable> content = [];
         if (!string.IsNullOrEmpty(status))

@@ -77,7 +77,7 @@ internal sealed class ClipboardWriter(
             if (EqualsVariable("TERM", "dumb") || HasVariable("STY"))
             {
                 return new ClipboardCopyResult(
-                    ClipboardCopyStatus.Failed, "This terminal does not have a supported clipboard transport. Release mouse capture and use native terminal copy.");
+                    ClipboardCopyStatus.Failed, "This terminal does not have a supported clipboard transport.");
             }
 
             if (bytes > MaximumOsc52Bytes)
@@ -104,7 +104,7 @@ internal sealed class ClipboardWriter(
         {
             // Helper output and exception messages may contain selected text; neither is exposed or logged.
             return new ClipboardCopyResult(
-                ClipboardCopyStatus.Failed, "The clipboard transport failed. The selection is retained; release mouse capture to use native terminal copy.");
+                ClipboardCopyStatus.Failed, "The clipboard transport failed. The selection is retained.");
         }
         finally
         {
@@ -123,7 +123,7 @@ internal sealed class ClipboardWriter(
         if (outcome.ExecutableNotFound)
         {
             return new ClipboardCopyResult(
-                ClipboardCopyStatus.Failed, $"{executable} is unavailable. Nothing was copied; release mouse capture to use native terminal copy.");
+                ClipboardCopyStatus.Failed, $"{executable} is unavailable. Nothing was copied.");
         }
 
         if (outcome.TimedOut)
