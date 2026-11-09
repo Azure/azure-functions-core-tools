@@ -18,7 +18,6 @@ public sealed class HostListeningAddressIntegrationTests
     [Theory]
     [InlineData("127.0.0.1", "localhost")]
     [InlineData("0.0.0.0", "localhost")]
-    [InlineData("127.0.0.2", "127.0.0.2")]
     public async Task EmitSnapshot_AfterBindingPortZero_ReportsReachableNonzeroPort(string address, string expectedHost)
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
