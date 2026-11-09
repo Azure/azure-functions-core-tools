@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.ComponentModel;
+using System.Net;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
@@ -36,7 +37,7 @@ internal sealed class DefaultHostProcessRunner(
         cancellationToken.ThrowIfCancellationRequested();
 
         HostProcessLaunchInfo launchInfo = _startInfoFactory.Create(context);
-        if (!_portAvailability.IsAvailable(launchInfo.Port))
+        if (launchInfo.Port != 0 && !_portAvailability.IsAvailable(IPAddress.Parse(launchInfo.ListenUri.DnsSafeHost), launchInfo.Port))
         {
             throw new GracefulException(
                 $"Port {launchInfo.Port} is unavailable. Close the process using that port, or specify another port using --port [-p].",

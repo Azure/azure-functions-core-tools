@@ -32,11 +32,34 @@ directory.
 | Argument | Owner | Description |
 | --- | --- | --- |
 | `--enable-auth` | Host workload shell | Enables the host's full authentication pipeline. When omitted, the shell starts the host with local auth bypassed, matching local Core Tools behavior. This argument is consumed by the shell and is not forwarded to the host. |
-| `--urls <value>` | Azure Functions Host / ASP.NET Core | Listener URL configuration forwarded to the host. The CLI launches with `http://0.0.0.0:<port>` and presents local URLs as `http://localhost:<port>`. |
+| `--urls <value>` | Azure Functions Host / ASP.NET Core | Listener URL configuration forwarded to the host. By default, the CLI launches with `http://127.0.0.1:<port>` and presents local URLs as `http://localhost:<port>`. |
 | Any other host-supported argument | Azure Functions Host | Forwarded unchanged. The workload shell does not validate, normalize, or translate host arguments. |
 
+Use `func run . --port 0` (or its `func start` alias) to let the OS assign an
+available port. By default, the host binds directly to `http://127.0.0.1:0`, without reserving
+and releasing a candidate port first. After binding, the shell reads the
+server's actual listening address and emits `host.listen_uri` in a structured
+log record, before its function metadata snapshot. The CLI uses the selected
+port for local URLs in plain, JSON, and dashboard output. For example:
+
+```bash
+func run . --no-build --format json --port 0 --no-azurite
+```
+
+In JSON output, read `attributes["host.listen_uri"]` on the `HostListening`
+log record to obtain the selected base URL. A zero port is not advertised as a
+listening URL.
+
+## Bind address
+
+Use `--address` to specify an IPv4 or IPv6 bind address, or set
+`Host.LocalHttpAddress` in the app's `local.settings.json`. The command-line
+option takes precedence over the setting. `func start` accepts the same option.
+Explicit addresses other than `127.0.0.1`, `::1`, and wildcard addresses are
+preserved in reported URLs rather than rewritten to `localhost`.
+
 The shell does not support private CLI options such as `--script-root`, `--port`,
-`--cors`, `--cors-credentials`, or `--functions`. The CLI should resolve those
+`--address`, `--cors`, `--cors-credentials`, or `--functions`. The CLI should resolve those
 concepts before process launch and express them using the host's expected
 environment/configuration surface.
 
