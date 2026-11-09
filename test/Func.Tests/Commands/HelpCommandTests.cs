@@ -126,6 +126,61 @@ public class HelpCommandTests
     }
 
     [Theory]
+    [InlineData("workload", "--unknown")]
+    [InlineData("workload", "--unknown value")]
+    [InlineData("workload", "--unknown=value")]
+    [InlineData("workload", "-unknown")]
+    [InlineData("workload install", "--unknown")]
+    [InlineData("workload install", "--unknown value")]
+    [InlineData("workload install", "--unknown=value")]
+    [InlineData("workload install", "-unknown")]
+    public async Task Help_WithUnknownOption_ReportsParserErrorWithoutExecutingTarget(string commandPath, string option)
+    {
+        var targetExecuted = false;
+        var install = _rootCommand.Subcommands.Single(command => command.Name == "workload")
+            .Subcommands.Single(command => command.Name == "install");
+        install.SetAction(_ =>
+        {
+            targetExecuted = true;
+            return 0;
+        });
+        var result = _rootCommand.Parse($"help {commandPath} {option}",
+            new ParserConfiguration { EnablePosixBundling = false });
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        using var cancellation = new CancellationTokenSource();
+
+        var exitCode = await result.InvokeAsync(new InvocationConfiguration
+        {
+            EnableDefaultExceptionHandler = false,
+            Output = output,
+            Error = error,
+        }, cancellation.Token);
+
+        exitCode.Should().Be(1);
+        result.Errors.Should().Contain(parseError => parseError.Message.Contains("Unrecognized option", StringComparison.Ordinal));
+        error.ToString().Should().Contain($"Unrecognized option '{option.Split(' ')[0]}'").And.NotContain("Unknown command");
+        _interaction.AllOutput.Should().NotContain($"TITLE: func {commandPath}").And.NotContain("Unknown command");
+        targetExecuted.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("help --verbose workload install")]
+    [InlineData("help workload --verbose install")]
+    [InlineData("help workload install --verbose")]
+    public async Task Help_WithRegisteredGlobalOption_ShowsCommandHelp(string commandLine)
+    {
+        var result = _rootCommand.Parse(commandLine);
+
+        var exitCode = await result.InvokeAsync();
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue(_rootCommand.VerboseOption).Should().BeTrue();
+        exitCode.Should().Be(0);
+        _interaction.AllOutput.Should().Contain("TITLE: func workload install");
+    }
+
+    [Theory]
     [InlineData("cloud deployment create")]
     [InlineData("CLOUD DEPLOYMENT CREATE")]
     [InlineData("cloud deploy add")]

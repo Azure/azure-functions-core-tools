@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.CommandLine.Help;
+using System.CommandLine.Parsing;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Console;
 
@@ -33,6 +34,16 @@ internal class HelpCommand : FuncCliCommand
         _interaction = interaction;
         _rootCommand = rootCommand;
         _versionProvider = versionProvider;
+        CommandArgument.Validators.Add(result =>
+        {
+            foreach (Token token in result.Tokens)
+            {
+                if (token.Value.StartsWith('-'))
+                {
+                    result.AddError($"Unrecognized option '{token.Value}'.");
+                }
+            }
+        });
         Arguments.Add(CommandArgument);
     }
 
