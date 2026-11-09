@@ -96,7 +96,7 @@ internal class TestInteractionService : IInteractionService
         return await action(cancellationToken);
     }
 
-    public async Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default)
+    public async Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default, bool writeCompletion = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _lines.Add($"STATUS: {statusMessage}");
@@ -106,7 +106,8 @@ internal class TestInteractionService : IInteractionService
     public async Task<T> RunWithProgressAsync<T>(
         string initialDescription,
         Func<IProgressContext, CancellationToken, Task<T>> action,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool writeCompletion = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _lines.Add($"PROGRESS: {initialDescription}");

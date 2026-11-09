@@ -142,41 +142,27 @@ internal class SpectreInteractionService : IInteractionService
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public async Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
+    public Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
+        => RunWithProgressAsync(statusMessage, (_, ct) => action(ct), cancellationToken);
+
+    public async Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default, bool writeCompletion = true)
     {
-        if (!IsInteractive)
-        {
-            _stderr.Write(new Paragraph($"{statusMessage}...", _theme.Muted).Append(Environment.NewLine));
-            return await action(cancellationToken);
-        }
-
-        T result = default!;
-        await _stderr.Status()
-            .Spinner(Spinner.Known.Dots)
-            .StartAsync(statusMessage, async _ =>
-            {
-                result = await action(cancellationToken);
-            });
-
-        return result;
-    }
-
-    public async Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default)
-    {
-        await ShowStatusAsync(statusMessage, async ct =>
+        await RunWithProgressAsync(statusMessage, async (_, ct) =>
         {
             await action(ct);
             return 0;
-        }, cancellationToken);
+        }, cancellationToken, writeCompletion);
     }
 
     public async Task<T> RunWithProgressAsync<T>(
         string initialDescription,
         Func<IProgressContext, CancellationToken, Task<T>> action,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool writeCompletion = true)
     {
         ArgumentNullException.ThrowIfNull(initialDescription);
         ArgumentNullException.ThrowIfNull(action);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!IsInteractive)
         {
@@ -188,51 +174,47 @@ internal class SpectreInteractionService : IInteractionService
             return await action(logging, cancellationToken);
         }
 
-        T result = default!;
-        await _stderr.Progress()
-            .AutoRefresh(true)
-            .AutoClear(true)
-            .HideCompleted(true)
-            .Columns(
-                new TaskDescriptionColumn { Alignment = Justify.Left },
-                new ProgressBarColumn { Width = 30 },
-                new SpinnerColumn(Spinner.Known.Dots))
-            .StartAsync(async ctx =>
+        var display = new OperationProgressColumn(initialDescription, _theme, _stderr.Profile.Capabilities.Unicode);
+        ProgressTask? task = null;
+        bool succeeded = false;
+        try
+        {
+            T result = default!;
+            await _stderr.Progress()
+                .AutoRefresh(true)
+                .AutoClear(true)
+                .HideCompleted(false)
+                .Columns(display)
+                .StartAsync(async ctx =>
+                {
+                    task = ctx.AddTask(Markup.Escape(initialDescription), autoStart: true, maxValue: 1d);
+                    task.IsIndeterminate = true;
+
+                    var live = new SpectreProgressContext(task, ctx.Refresh);
+                    result = await action(live, cancellationToken);
+                    task.StopTask();
+                });
+            succeeded = true;
+            return result;
+        }
+        finally
+        {
+            if (task is not null && (!succeeded || writeCompletion))
             {
-                ProgressTask task = ctx.AddTask(initialDescription, autoStart: true, maxValue: 1d);
-                task.IsIndeterminate = true;
-
-                var live = new SpectreProgressContext(task);
-                result = await action(live, cancellationToken);
-
-                // Snap to 100% on success so the bar doesn't linger as a
-                // half-filled fragment when the action finishes without
-                // having called Report.
-                if (task.IsIndeterminate)
-                {
-                    task.IsIndeterminate = false;
-                    task.MaxValue = 1d;
-                    task.Value = 1d;
-                }
-                else if (task.MaxValue > 0)
-                {
-                    task.Value = task.MaxValue;
-                }
-
-                task.StopTask();
-            });
-
-        return result;
+                _stderr.Write(display.BuildResult(task, succeeded));
+            }
+        }
     }
 
-    private sealed class SpectreProgressContext(ProgressTask task) : IProgressContext
+    private sealed class SpectreProgressContext(ProgressTask task, Action refresh) : IProgressContext
     {
         private readonly ProgressTask _task = task;
 
         public void SetDescription(string description)
         {
             ArgumentNullException.ThrowIfNull(description);
-            _task.Description = description;
+            _task.Description = Markup.Escape(description);
+            refresh();
         }
 
         public void SetTotal(double? total)
