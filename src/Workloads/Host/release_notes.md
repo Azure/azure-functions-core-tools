@@ -7,6 +7,9 @@
 ## 4.1055.100-preview.1
 
 - Updated the host payload to `Microsoft.Azure.WebJobs.Script.WebHost` 4.1055.100, matching [Azure/azure-functions-host v4.1055.100](https://github.com/Azure/azure-functions-host/releases/tag/v4.1055.100).
+## Unreleased
+
+- Report actual bound listening URLs after startup so the Azure Functions CLI can display the OS-assigned port for local runs using `--port 0`. (#5861)
 
 ## 4.1054.200-preview.3
 
