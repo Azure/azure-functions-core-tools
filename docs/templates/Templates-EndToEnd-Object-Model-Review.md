@@ -197,51 +197,55 @@ Existing Stack initializers continue serving unmigrated Stacks. Adoption and rep
 
 ```mermaid
 sequenceDiagram
-    actor User
-    participant New as NewCommand
-    participant Resolver as IFunctionsProjectResolver
-    participant Stack as Owning workload / Stack
-    participant Engine as Templater
-    participant Hive as Installed template hive
-    participant Render as Generate files privately
-    participant Write as Write files to project
+ actor User
+ participant New as NewCommand
+ participant Resolver as IFunctionsProjectResolver
+ participant Stack as Owning workload / Stack
+ participant Engine as Templater
+ participant Hive as Installed template hive
+ participant Render as Generate files privately
+ participant Write as Write files to project
 
-    Note over New,Write: PROPOSED - NOT YET IMPLEMENTED
-    User->>New: func new [path] --template TEMPLATE_ID --name hello
-    New->>Resolver: Resolve target Functions project
-    alt Resolution or inspection fails
-        Resolver-->>New: Resolution diagnostic or inspection failure
-        alt Target confirmed uninitialized
-            New-->>User: Run func init to initialize a Functions project.
-        else Project is ambiguous
-            New-->>User: Report conflicting project matches.
-        else Target cannot be inspected or accessed
-            New-->>User: Report inspection/access failure and next step.
-        else Configuration is corrupt or malformed
-            New-->>User: Report configuration error and repair guidance.
-        else Project is unsupported or cause remains undetermined
-            New-->>User: Preserve the corresponding resolution diagnostic.
-        end
-    else Project is resolved
-        Resolver-->>New: FunctionsProject with Stack and language
-        New->>Stack: Determine item-template compatibility
-        Stack-->>New: Compatibility decision and diagnostic
-        alt Project is incompatible
-            New-->>User: Report incompatibility; do not render or write files.
-        else Project is compatible
-            New->>Engine: Discover item templates for resolved context
-            Engine->>Hive: Read installed metadata and content
-            Hive-->>Engine: Item candidates
-            Engine-->>New: Eligible candidates and reasons
-            New->>New: Parse original arguments and select exact candidate
-            New->>Engine: Evaluate supported parameters
-            Engine->>Render: Invoke selected template
-            Render-->>New: Planned files, directories, diagnostics
-            New->>Write: Validate and write authorized files
-            Write-->>New: Actual changes, failures, or partial effects
-            New-->>User: Report actual result
-        end
-    end
+ Note over New,Write: PROPOSED - NOT YET IMPLEMENTED
+ User->>New: func new [path] --template TEMPLATE_ID --name hello
+ New->>Resolver: Resolve target Functions project
+
+ alt Target confirmed uninitialized
+  Resolver-->>New: Uninitialized target
+  New-->>User: Run func init to initialize a Functions project.
+ else Project is ambiguous
+  Resolver-->>New: Conflicting project matches
+  New-->>User: Report conflicting project matches.
+ else Target cannot be inspected or accessed
+  Resolver-->>New: Inspection or access failure
+  New-->>User: Report inspection/access failure and next step.
+ else Configuration is corrupt or malformed
+  Resolver-->>New: Configuration failure
+  New-->>User: Report configuration error and repair guidance.
+ else Project is unsupported or cause remains undetermined
+  Resolver-->>New: Resolution diagnostic
+  New-->>User: Preserve the corresponding resolution diagnostic.
+ else Project is resolved
+  Resolver-->>New: FunctionsProject with Stack and language
+  New->>Stack: Determine item-template compatibility
+  Stack-->>New: Compatibility decision and diagnostic
+
+  alt Project is incompatible
+   New-->>User: Report incompatibility and stop before rendering or writing files.
+  else Project is compatible
+   New->>Engine: Discover item templates for resolved context
+   Engine->>Hive: Read installed metadata and content
+   Hive-->>Engine: Item candidates
+   Engine-->>New: Eligible candidates and reasons
+   New->>New: Parse original arguments and select exact candidate
+   New->>Engine: Evaluate supported parameters
+   Engine->>Render: Invoke selected template
+   Render-->>New: Planned files, directories, diagnostics
+   New->>Write: Validate and write authorized files
+   Write-->>New: Actual changes, failures, or partial effects
+   New-->>User: Report actual result
+  end
+ end
 ```
 
 `func new` does not automatically initialize a project. The resolver supplies project facts; the owning Stack determines item-template compatibility. Candidate-specific parsing precedes final selection. Exact-ID failure never widens to a sibling. The current post-cleanup handler does not execute this proposed path.
@@ -340,4 +344,4 @@ Baseline references point to accepted commit `883b02ee9bc10c431a67c044a7f059a082
 | Initial Proposal | **LOCAL / HISTORICAL:** `context/source-evidence/initial-proposal.md` |
 | Qualification evidence | The separate Windows fixture probe is not qualification of the production implementation. |
 
-The Template Engine remains inside Core Tools for this milestone. Physical extraction under issue #5330 is deferred until after Ignite.
+The Template Engine remains inside the CLI for this milestone. Physical extraction under issue #5330 is deferred until after Ignite.
