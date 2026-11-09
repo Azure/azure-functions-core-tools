@@ -65,25 +65,6 @@ extends:
           sign: true
           includeNpmPackage: true
 
-    - stage: ApproveRelease
-      displayName: Approve CLI release
-      dependsOn: Release
-      jobs:
-      - job: Approve
-        displayName: Review CLI release artifacts
-        pool: server
-        timeoutInMinutes: 1500
-        templateContext:
-          type: validationJob
-        steps:
-        - task: ManualValidation@1
-          timeoutInMinutes: 1440
-          inputs:
-            notifyUsers: '[internal]\Azure Functions Core'
-            approvers: '[internal]\Azure Functions Core'
-            allowApproversToApproveTheirOwnRuns: false
-            onTimeout: reject
-
     - stage: Publish
       dependsOn: ApproveRelease
       jobs:
