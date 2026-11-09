@@ -15,11 +15,11 @@
   -->
 
   <PropertyGroup>
-    <WorkerVersion>4.0.5362</WorkerVersion>
-    <WorkerVersionPS74>4.0.5361</WorkerVersionPS74>
-    <WorkerVersionPS76>4.0.5362</WorkerVersionPS76>
+    <WorkerVersion>4.0.5489</WorkerVersion>
+    <WorkerVersionPS74>4.0.5485</WorkerVersionPS74>
+    <WorkerVersionPS76>4.0.5489</WorkerVersionPS76>
     <VersionPrefix>$(WorkerVersion)</VersionPrefix>
-    <VersionSuffix>preview.1</VersionSuffix>
+    <VersionSuffix>preview</VersionSuffix>
   </PropertyGroup>
 
 </Project>
