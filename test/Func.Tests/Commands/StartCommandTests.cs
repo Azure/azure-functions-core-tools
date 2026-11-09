@@ -327,6 +327,33 @@ public class StartCommandTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("run")]
+    [InlineData("start")]
+    public async Task StartCommand_ExplicitZeroPort_OverridesConfiguredPort(string command)
+    {
+        var source = new InMemoryHostEventStream();
+        source.Complete();
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(CreateInitializationResult(source));
+        var options = Substitute.For<IOptionsMonitor<HostStartupOptions>>();
+        options.Get(Arg.Any<string>()).Returns(new HostStartupOptions { Port = 9091 });
+        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options, _shortcutLabels, _platform);
+        var root = new RootCommand { cmd };
+
+        int exitCode = await root.Parse([command, _tempDir, "--format", "plain", "--port", "0", "--no-build", "--no-azurite"])
+            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        exitCode.Should().Be(0);
+        await _initializationRunner.Received(1).RunAsync(
+            Arg.Is<StartInitializationContext>(context => context.Options.Port == 0),
+            Arg.Any<IStartInitializationRenderer>(),
+            Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task StartCommand_UsesConfiguredHostStartupDefaults_WhenOptionsAreNotProvided()
     {
@@ -342,6 +369,7 @@ public class StartCommandTests : IDisposable
         var startupOptions = new HostStartupOptions
         {
             Port = 9091,
+            Address = "0.0.0.0",
             Cors = "http://localhost,http://example",
             CorsCredentials = true,
         };
@@ -357,8 +385,38 @@ public class StartCommandTests : IDisposable
         await _initializationRunner.Received(1).RunAsync(
             Arg.Is<StartInitializationContext>(context =>
                 context.Options.Port == 9091
+                && context.Options.Address == "0.0.0.0"
                 && context.Options.Cors.SequenceEqual(new[] { "http://localhost", "http://example" })
                 && context.Options.CorsCredentials),
+            Arg.Any<IStartInitializationRenderer>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("run", "0.0.0.0")]
+    [InlineData("start", "0.0.0.0")]
+    [InlineData("run", "127.0.0.1")]
+    [InlineData("start", "::1")]
+    public async Task StartCommand_ExplicitAddress_OverridesConfiguredAddress(string command, string address)
+    {
+        var source = new InMemoryHostEventStream();
+        source.Complete();
+        _initializationRunner.RunAsync(
+                Arg.Any<StartInitializationContext>(),
+                Arg.Any<IStartInitializationRenderer>(),
+                Arg.Any<CancellationToken>())
+            .Returns(CreateInitializationResult(source));
+        var options = Substitute.For<IOptionsMonitor<HostStartupOptions>>();
+        options.Get(Arg.Any<string>()).Returns(new HostStartupOptions { Address = "192.0.2.1" });
+        var cmd = new StartCommand(_interaction, _palette, _cliVersionProvider, _initializationRunner, options, _shortcutLabels, _platform);
+        var root = new RootCommand { cmd };
+
+        int exitCode = await root.Parse([command, _tempDir, "--format", "plain", "--port", "0", "--address", address])
+            .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        exitCode.Should().Be(0);
+        await _initializationRunner.Received(1).RunAsync(
+            Arg.Is<StartInitializationContext>(context => context.Options.Port == 0 && context.Options.Address == address),
             Arg.Any<IStartInitializationRenderer>(),
             Arg.Any<CancellationToken>());
     }

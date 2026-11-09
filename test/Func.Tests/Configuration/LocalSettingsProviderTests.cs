@@ -35,6 +35,7 @@ public sealed class LocalSettingsProviderTests : IDisposable
               },
               "Host": {
                 "LocalHttpPort": 7072,
+                "LocalHttpAddress": "127.0.0.1",
                 "CORS": "http://localhost,http://example",
                 "CORSCredentials": true
               }
@@ -48,6 +49,7 @@ public sealed class LocalSettingsProviderTests : IDisposable
         snapshot.Values.ContainsKey("IgnoredNumber").Should().BeFalse();
         snapshot.Host.Should().NotBeNull();
         snapshot.Host!.LocalHttpPort.Should().Be(7072);
+        snapshot.Host.LocalHttpAddress.Should().Be("127.0.0.1");
         snapshot.Host.Cors.Should().Be("http://localhost,http://example");
         snapshot.Host.CorsCredentials.Should().BeTrue();
     }

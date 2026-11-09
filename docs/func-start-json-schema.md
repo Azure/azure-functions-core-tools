@@ -122,6 +122,13 @@ Kinds:
 A verbatim host log record. This is the lowest-level form and is emitted
 for every entry the host produces.
 
+For `func run . --port 0 --format json` (also available through `func start`),
+wait for the `log` record with `event_name: "HostListening"`. Its
+`attributes["host.listen_uri"]` contains the actual local base URL, including
+the nonzero port assigned by the OS. The host emits this record after binding
+and before its function metadata snapshot; the initial process-start record
+does not advertise a listening URL for port `0`.
+
 ```json
 {
   "schema_version": 1,

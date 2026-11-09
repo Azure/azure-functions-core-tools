@@ -133,15 +133,21 @@ internal sealed partial class HostProcessEventStream : IHostEventStream, IHostEv
         {
             [HostLogAttributeKeys.Stream] = HostProcessStreamNames.Cli,
             [HostLogAttributeKeys.HostVersion] = launchInfo.HostVersion,
-            [HostLogAttributeKeys.HostListenUri] = launchInfo.LocalBaseUri.ToString(),
         };
+
+        if (launchInfo.Port != 0)
+        {
+            attributes[HostLogAttributeKeys.HostListenUri] = launchInfo.LocalBaseUri.ToString();
+        }
 
         _channel.Writer.TryWrite(new HostLogEntry(
             _timeProvider.GetUtcNow(),
             "Host.Process",
             LogLevel.Information,
             default,
-            $"Host process started. Listening on {launchInfo.LocalBaseUri}",
+            launchInfo.Port == 0
+                ? "Host process started. Waiting for the host to report its listening address."
+                : $"Host process started. Listening on {launchInfo.LocalBaseUri}",
             Exception: null,
             attributes));
     }

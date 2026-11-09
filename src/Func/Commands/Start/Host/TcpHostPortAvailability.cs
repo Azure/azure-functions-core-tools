@@ -8,12 +8,14 @@ namespace Azure.Functions.Cli.Commands.Start.Host;
 
 internal sealed class TcpHostPortAvailability : IHostPortAvailability
 {
-    public bool IsAvailable(int port)
+    public bool IsAvailable(IPAddress address, int port)
     {
+        ArgumentNullException.ThrowIfNull(address);
+
         TcpListener? listener = null;
         try
         {
-            listener = new TcpListener(IPAddress.Any, port);
+            listener = new TcpListener(address, port);
             listener.Start();
             return true;
         }

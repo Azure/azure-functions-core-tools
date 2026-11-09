@@ -85,6 +85,7 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
         return new LocalSettingsHostSnapshot
         {
             LocalHttpPort = ReadNullableInt32(host, "LocalHttpPort"),
+            LocalHttpAddress = ReadNullableString(host, "LocalHttpAddress"),
             Cors = ReadNullableString(host, "CORS"),
             CorsCredentials = ReadNullableBoolean(host, "CORSCredentials"),
         };
