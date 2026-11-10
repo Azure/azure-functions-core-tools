@@ -142,7 +142,8 @@ internal sealed class SetupDependencyInstaller(
                         force: false,
                         new WorkloadInstallProgressAdapter(ctx),
                         cancellationToken: ct),
-                    cancellationToken);
+                    cancellationToken,
+                    writeCompletion: false);
 
             string installedVersion = installResult.Entry.PackageVersion;
             return installResult.AlreadyInstalled

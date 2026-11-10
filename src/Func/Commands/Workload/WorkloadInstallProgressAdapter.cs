@@ -8,7 +8,7 @@ namespace Azure.Functions.Cli.Commands.Workload;
 
 /// <summary>
 /// Bridges <see cref="IProgress{T}"/> reports from <see cref="IWorkloadInstaller"/>
-/// onto the live progress bar exposed by <see cref="IInteractionService.RunWithProgressAsync{T}"/>.
+/// onto the subordinate task detail exposed by <see cref="IInteractionService.RunWithProgressAsync{T}"/>.
 /// </summary>
 internal sealed class WorkloadInstallProgressAdapter(IProgressContext context) : IProgress<WorkloadInstallProgress>
 {
