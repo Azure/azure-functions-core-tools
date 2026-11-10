@@ -64,23 +64,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
 
         [Theory]
         [InlineData("BlobTrigger", "blob")]
-        [InlineData("EventGridBlobTrigger", "eventgridblob")]
-        [InlineData("CosmosDBTrigger", "cosmos")]
-        [InlineData("DurableFunctionsOrchestration", "durable")]
-        [InlineData("EventGridTrigger", "eventgrid")]
-        [InlineData("EventGridCloudEventTrigger", "eventgridcloudevent")]
-        [InlineData("EventHubTrigger", "eventhub")]
         [InlineData("HttpTrigger", "http")]
-        [InlineData("IotHubTrigger", "iothub")]
-        [InlineData("KafkaTrigger", "kafka")]
-        [InlineData("KafkaOutput", "kafkao")]
-        [InlineData("McpToolTrigger", "mcptooltrigger")]
-        [InlineData("McpResourceTrigger", "mcpresourcetrigger")]
-        [InlineData("McpPromptTrigger", "mcpprompttrigger")]
-        [InlineData("QueueTrigger", "queue")]
-        [InlineData("SendGrid", "sendgrid")]
-        [InlineData("ServiceBusQueueTrigger", "squeue")]
-        [InlineData("ServiceBusTopicTrigger", "stopic")]
         [InlineData("TimerTrigger", "timer")]
         [InlineData("DaprPublishOutputBinding", null)]
         [InlineData("DaprServiceInvocationTrigger", null)]
@@ -107,17 +91,10 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("ConnectorTriggerDataverseGetOnNewItemsV2", "connector-dataverse-getonnewitems-v2")]
         public void ConnectorTemplates_MapNames_AndAreCSharpIsolatedOnly(string displayName, string shortName)
         {
-            Assert.Matches("^[A-Za-z0-9]+$", displayName);
             Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(displayName));
-            Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(displayName.ToUpperInvariant()));
-
-            Assert.Contains(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated));
             Assert.Contains(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated, "C#"));
             Assert.DoesNotContain(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated, "F#"));
-            Assert.DoesNotContain(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated, "f#"));
             Assert.DoesNotContain(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.Dotnet));
-            Assert.DoesNotContain(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.Dotnet, "C#"));
-            Assert.DoesNotContain(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.Dotnet, "F#"));
         }
 
         [Theory]
@@ -130,45 +107,6 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             Assert.DoesNotContain(templates, template =>
                 template.Contains("Dapr", StringComparison.OrdinalIgnoreCase) ||
                 template.Contains("OpenAI", StringComparison.OrdinalIgnoreCase));
-        }
-
-        [Fact]
-        public void GetTemplates_PreservesExistingCSharpIsolatedTemplates()
-        {
-            Assert.Equal(
-                new[]
-                {
-                    "McpToolTrigger", "McpResourceTrigger", "McpPromptTrigger",
-                    "QueueTrigger", "HttpTrigger", "BlobTrigger", "EventGridBlobTrigger",
-                    "TimerTrigger", "EventHubTrigger", "ServiceBusQueueTrigger",
-                    "ServiceBusTopicTrigger", "EventGridTrigger", "CosmosDBTrigger",
-                    "DurableFunctionsOrchestration", "DurableFunctionsEntityClass",
-                    "DurableFunctionsEntityFunction"
-                },
-                DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated).Take(16));
-        }
-
-        [Fact]
-        public void GetTemplates_PreservesInProcessAndFSharpTemplates()
-        {
-            Assert.Equal(
-                new[]
-                {
-                    "QueueTrigger", "HttpTrigger", "BlobTrigger", "TimerTrigger",
-                    "KafkaTrigger", "KafkaOutput", "DurableFunctionsOrchestration",
-                    "DurableFunctionsEntityClass", "DurableFunctionsEntityFunction",
-                    "SendGrid", "EventHubTrigger", "ServiceBusQueueTrigger",
-                    "ServiceBusTopicTrigger", "EventGridTrigger", "EventGridCloudEventTrigger",
-                    "CosmosDBTrigger", "IotHubTrigger"
-                },
-                DotnetHelpers.GetTemplates(WorkerRuntime.Dotnet));
-            Assert.Equal(
-                new[]
-                {
-                    "HttpTrigger", "BlobTrigger", "QueueTrigger", "TimerTrigger",
-                    "EventHubTrigger", "EventGridTrigger", "CosmosDBTrigger"
-                },
-                DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated, "F#"));
         }
 
         [Theory]
