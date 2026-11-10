@@ -10,10 +10,9 @@ The schema is designed for programmatic consumers (CI logs, log shippers, AI
 agents) and is versioned via the `schema_version` field. v1 is the contract
 described in this document.
 
-> Status: **prototype**. The current implementation streams from a scripted
-> in-memory event source so the UX can be reviewed before host integration
-> lands. The shape of the stream is the contract we commit to. Field values
-> in this prototype come from a fake source; field semantics are stable.
+The JSON renderer consumes real Host events during normal runs. `--demo`
+uses a scripted in-memory event source, so its values are synthetic. This
+document describes the JSON output contract.
 
 ## Top-level invariants
 
