@@ -19,25 +19,43 @@ public sealed class TemplateConstraintDeclarationReaderTests
 
     [Theory]
     [InlineData("{}", false)]
-    [InlineData("{\"AdditionalConfigFiles\":[]}", true)]
+    [InlineData("{\"AdditionalConfigFiles\":[]}", false)]
     [InlineData("{\"additionalconfigfiles\":[\"extra.template.json\"]}", true)]
     public void Read_ReportsAdditionalConfigurationWithoutChangingConstraintParsing(string configuration, bool expected)
     {
+        IReadOnlyList<TemplateConstraintDeclaration> withoutFlag = TemplateConstraintDeclarationReader.Read(configuration);
         IReadOnlyList<TemplateConstraintDeclaration> declarations =
             TemplateConstraintDeclarationReader.Read(configuration, out bool hasAdditionalConfiguration);
 
+        withoutFlag.Should().BeEquivalentTo(declarations);
         declarations.Should().BeEmpty();
         hasAdditionalConfiguration.Should().Be(expected);
     }
 
     [Fact]
-    public void Read_RepeatedAdditionalConfigurationProperty_Throws()
+    public void Read_RepeatedAdditionalConfigurationProperty_ThrowsWithBothOverloads()
     {
-        Action action = () => TemplateConstraintDeclarationReader.Read(
-            """{"AdditionalConfigFiles":[],"additionalconfigfiles":[]}""",
-            out _);
+        const string Configuration = """{"AdditionalConfigFiles":[],"additionalconfigfiles":[]}""";
 
-        action.Should().Throw<InvalidTemplateMetadataException>();
+        Action withoutFlag = () => TemplateConstraintDeclarationReader.Read(Configuration);
+        Action withFlag = () => TemplateConstraintDeclarationReader.Read(Configuration, out _);
+
+        withoutFlag.Should().Throw<InvalidTemplateMetadataException>();
+        withFlag.Should().Throw<InvalidTemplateMetadataException>();
+    }
+
+    [Theory]
+    [InlineData("{\"AdditionalConfigFiles\":null}")]
+    [InlineData("{\"AdditionalConfigFiles\":\"extra.template.json\"}")]
+    [InlineData("{\"AdditionalConfigFiles\":[null]}")]
+    [InlineData("{\"AdditionalConfigFiles\":[\"\"]}")]
+    public void Read_MalformedAdditionalConfigurationIsRejectedByBothOverloads(string configuration)
+    {
+        Action withoutFlag = () => TemplateConstraintDeclarationReader.Read(configuration);
+        Action withFlag = () => TemplateConstraintDeclarationReader.Read(configuration, out _);
+
+        withoutFlag.Should().Throw<InvalidTemplateMetadataException>();
+        withFlag.Should().Throw<InvalidTemplateMetadataException>();
     }
 
     [Fact]

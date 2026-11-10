@@ -22,7 +22,7 @@ internal static class TemplateConstraintDeclarationReader
     /// </summary>
     /// <exception cref="InvalidTemplateMetadataException">The configuration or a constraint declaration is invalid.</exception>
     public static IReadOnlyList<TemplateConstraintDeclaration> Read(string configuration, IReadOnlyCollection<string>? packageTypes = null)
-        => Read(configuration, packageTypes, inspectAdditionalConfiguration: false, out _);
+        => Read(configuration, packageTypes, out _);
 
     /// <summary>
     /// Also reports whether the template declares additional configuration files.
@@ -31,12 +31,11 @@ internal static class TemplateConstraintDeclarationReader
         string configuration,
         out bool hasAdditionalConfiguration,
         IReadOnlyCollection<string>? packageTypes = null)
-        => Read(configuration, packageTypes, inspectAdditionalConfiguration: true, out hasAdditionalConfiguration);
+        => Read(configuration, packageTypes, out hasAdditionalConfiguration);
 
     private static IReadOnlyList<TemplateConstraintDeclaration> Read(
         string configuration,
         IReadOnlyCollection<string>? packageTypes,
-        bool inspectAdditionalConfiguration,
         out bool hasAdditionalConfiguration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -45,14 +44,35 @@ internal static class TemplateConstraintDeclarationReader
         {
             using var document = JsonDocument.Parse(configuration, _options);
             IReadOnlyList<TemplateConstraintDeclaration> declarations = ReadRoot(document.RootElement, packageTypes);
-            hasAdditionalConfiguration = inspectAdditionalConfiguration
-                && FindProperty(document.RootElement, "AdditionalConfigFiles", "template.json") is not null;
+            hasAdditionalConfiguration = ReadAdditionalConfigFiles(document.RootElement);
             return declarations;
         }
         catch (JsonException exception)
         {
             throw new InvalidTemplateMetadataException("template.json is not valid JSON.", exception);
         }
+    }
+
+    private static bool ReadAdditionalConfigFiles(JsonElement root)
+    {
+        JsonElement? additionalConfiguration = FindProperty(root, "AdditionalConfigFiles", "template.json");
+        if (additionalConfiguration is null)
+        {
+            return false;
+        }
+
+        JsonElement files = additionalConfiguration.Value;
+        if (files.ValueKind != JsonValueKind.Array)
+        {
+            throw Invalid("AdditionalConfigFiles must be an array of non-empty file names.");
+        }
+
+        foreach (JsonElement file in files.EnumerateArray())
+        {
+            _ = RequireString(file, "AdditionalConfigFiles entry");
+        }
+
+        return files.GetArrayLength() > 0;
     }
 
     private static IReadOnlyList<TemplateConstraintDeclaration> ReadRoot(JsonElement root, IReadOnlyCollection<string>? packageTypes)

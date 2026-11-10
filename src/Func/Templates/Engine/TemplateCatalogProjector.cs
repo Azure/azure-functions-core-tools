@@ -7,7 +7,7 @@ using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Projects installed engine templates into func-owned catalog entries.
+/// Projects installed engine templates into func-owned catalog entries and validates required CLI metadata.
 /// </summary>
 internal static class TemplateCatalogProjector
 {
@@ -20,7 +20,7 @@ internal static class TemplateCatalogProjector
     /// Returns the type <paramref name="template"/> declares in <c>tags.type</c>, or <c>null</c> when it's missing or
     /// isn't <c>item</c> or <c>project</c>.
     /// </summary>
-    public static TemplateType? GetTemplateType(ITemplateInfo template)
+    public static TemplateType? GetTemplateType(ITemplateMetadata template)
     {
         ArgumentNullException.ThrowIfNull(template);
 
@@ -54,13 +54,14 @@ internal static class TemplateCatalogProjector
             packagesByMountPoint.TryAdd(package.MountPointUri, package);
         }
 
-        return [.. templates
+        TemplateCatalogEntry[] entries = [.. templates
             .Where(template => GetTemplateType(template) == type)
             .Select(template => Project(template, packagesByMountPoint.GetValueOrDefault(template.MountPointUri)))];
+        return Array.AsReadOnly(entries);
     }
 
     /// <summary>
-    /// Projects <paramref name="template"/> into a catalog entry, reporting unusable func host metadata on the entry.
+    /// Projects <paramref name="template"/> into a catalog entry, reporting unusable Functions or required template metadata.
     /// </summary>
     /// <param name="template">Installed template with an item or project type.</param>
     /// <param name="package">
@@ -74,7 +75,9 @@ internal static class TemplateCatalogProjector
 
         FuncHostTemplateMetadata metadata;
         IReadOnlyList<TemplateParameterDefinition> parameters;
+        IReadOnlyList<string> shortNames = [.. template.ShortNameList.Where(shortName => !string.IsNullOrWhiteSpace(shortName))];
         string? metadataDiagnostic = null;
+        Exception? metadataDiagnosticCause = null;
         try
         {
             metadata = FuncHostTemplateMetadataReader.Read(template);
@@ -86,6 +89,15 @@ internal static class TemplateCatalogProjector
             metadata = FuncHostTemplateMetadata.Empty;
             parameters = [];
             metadataDiagnostic = ex.Message;
+            metadataDiagnosticCause = ex;
+        }
+
+        if (shortNames.Count == 0)
+        {
+            const string shortNameDiagnostic = "Template metadata must declare at least one non-empty shortName.";
+            metadataDiagnostic = metadataDiagnostic is null
+                ? shortNameDiagnostic
+                : $"{metadataDiagnostic} {shortNameDiagnostic}";
         }
 
         return new(
@@ -93,17 +105,18 @@ internal static class TemplateCatalogProjector
             template.Name,
             NullIfEmpty(template.Description),
             type,
-            [.. template.ShortNameList],
+            shortNames,
             NullIfEmpty(template.GroupIdentity),
             NullIfEmpty(GetTag(template, LanguageTag)),
             template.Precedence,
             package is IManagedTemplatePackage managed ? new(managed.Identifier, NullIfEmpty(managed.Version)) : null,
             metadata.IsHidden,
             parameters,
-            metadataDiagnostic);
+            metadataDiagnostic,
+            metadataDiagnosticCause);
     }
 
-    private static string? GetTag(ITemplateInfo template, string name)
+    private static string? GetTag(ITemplateMetadata template, string name)
         => template.TagsCollection.TryGetValue(name, out string? value) ? value : null;
 
     private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
