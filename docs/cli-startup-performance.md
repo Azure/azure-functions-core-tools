@@ -85,7 +85,15 @@ may be GitHub's merge revision rather than the branch head; provenance records
 the actual checked-out HEAD.
 
 The `cli-startup-<runner>-<attempt>` artifact retains provenance, measurements and
-build/test logs for 30 days. Upload is attempted even after failure or cancellation;
+build/test logs for 30 days. The Actions run's **Summary** page also displays a
+table per platform with valid sample counts, median/mean/min/max milliseconds,
+target RID, SDK, source revision, attempt, measurement status and cleanup status.
+No download is needed for this overview. Failed reports are labeled as partial;
+missing reports show an explicit no-results message. Harness test outcomes remain
+in the **Validate startup harness** step logs. Raw data and executable identity
+remain in the artifacts.
+
+Summary generation and upload are attempted even after failure or cancellation;
 early setup failures may leave no files, and hosted job termination can prevent
 cleanup/upload. Restore, publish, functional tests and invalid measurements fail
 the job; **slow successful measurements do not**. There is no automatic baseline

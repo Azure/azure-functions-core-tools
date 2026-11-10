@@ -143,6 +143,53 @@ jobs:
               -OutputPath (Join-Path $env:RESULTS_DIRECTORY 'measurements.json') *>&1 |
               Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'measurements.log')
 
+      - name: Display startup results in run summary
+        if: always()
+        env:
+          RUNNER_LABEL: ${{ matrix.os }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+          function ConvertTo-SummaryText([object] $Value) {
+              [Net.WebUtility]::HtmlEncode([string]$Value).Replace('|', '&#124;').Replace("`r", ' ').Replace("`n", ' ')
+          }
+          function Format-Milliseconds([double] $Value) {
+              $Value.ToString('F2', [Globalization.CultureInfo]::InvariantCulture)
+          }
+          $lines = [Collections.Generic.List[string]]::new()
+          $lines.Add("## CLI startup observations: $(ConvertTo-SummaryText $env:RUNNER_LABEL)")
+          $lines.Add('')
+          $lines.Add('**Reporting only: no performance budget is enforced.** Times cover fresh process start through exit, not guaranteed cold OS caches.')
+          $lines.Add('')
+          $provenancePath = Join-Path $env:RESULTS_DIRECTORY 'provenance.json'
+          if (Test-Path -LiteralPath $provenancePath) {
+              $provenance = Get-Content -LiteralPath $provenancePath -Raw | ConvertFrom-Json
+              $lines.Add("Target: **$(ConvertTo-SummaryText $provenance.rid)**; SDK: **$(ConvertTo-SummaryText $provenance.sdkVersion)**; attempt: **$(ConvertTo-SummaryText $provenance.runAttempt)**.")
+              $lines.Add("Source revision: $(ConvertTo-SummaryText $provenance.sourceRevision)")
+              $lines.Add('')
+          }
+          $measurementPath = Join-Path $env:RESULTS_DIRECTORY 'measurements.json'
+          if (Test-Path -LiteralPath $measurementPath) {
+              $report = Get-Content -LiteralPath $measurementPath -Raw | ConvertFrom-Json
+              $lines.Add("Measurement status: **$(ConvertTo-SummaryText $report.status)**; cleanup: **$(ConvertTo-SummaryText $report.cleanupStatus)**; budget: **$(ConvertTo-SummaryText $report.budgetStatus)**.")
+              $lines.Add('')
+              if ($report.status -ne 'completed') {
+                  $lines.Add('**Measurements did not complete successfully. Any rows below are partial observations, not a successful benchmark. Inspect the failed step and retained diagnostics.**')
+                  $lines.Add('')
+              }
+              $lines.Add('| Command | Category | Valid samples | Median (ms) | Mean (ms) | Min (ms) | Max (ms) |')
+              $lines.Add('| --- | --- | ---: | ---: | ---: | ---: | ---: |')
+              foreach ($row in $report.summary) {
+                  $lines.Add("| $(ConvertTo-SummaryText $row.command) | $(ConvertTo-SummaryText $row.kind) | $(ConvertTo-SummaryText $row.count) | $(Format-Milliseconds $row.medianMs) | $(Format-Milliseconds $row.meanMs) | $(Format-Milliseconds $row.minMs) | $(Format-Milliseconds $row.maxMs) |")
+              }
+          }
+          else {
+              $lines.Add('**No measurement report was produced.** Collection was skipped or failed before a report was written. Inspect the job steps and available logs; this is not a performance pass.')
+          }
+          $lines.Add('')
+          $lines.Add('Harness test results are in **Validate startup harness**. Download this attempt''s platform artifact for raw samples, executable identity, provenance and diagnostics.')
+          $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
       - name: Retain observations and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
