@@ -53,7 +53,11 @@ Run the focused harness checks, including actual CLI measurements:
 ```
 
 The tests use real child processes and synthetic summary inputs; they do not
-assert a latency threshold on a shared machine. Windows validation does not
+assert a latency threshold on a shared machine. Working-directory isolation is
+checked using an owned marker file through direct and linked paths, with a
+wrong-directory negative control, rather than comparing platform-dependent path
+spellings. Environment fields are checked separately for useful diagnostics.
+Windows validation does not
 qualify Linux, macOS or ARM64.
 
 ## Reporting-only CI

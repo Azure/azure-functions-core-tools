@@ -72,17 +72,58 @@ if ([Console]::ReadLine() -ne $null) { exit 7 }
     }
 
     Test-Case 'Process_ExplicitEnvironmentAndDirectory_DoesNotInheritCliState' {
-        $code = '[Console]::Write("$env:FUNC_CLI_HOME|$env:FUNC_CLI_WORKLOADS_HOME|$env:FUNC_CLI_BENCHMARK_SENTINEL|$([Environment]::CurrentDirectory)")'
+        $directory = Join-Path $root 'isolation'
+        [void][IO.Directory]::CreateDirectory($directory)
+        $markerName = "marker-$([Guid]::NewGuid().ToString('N')).txt"
+        $markerValue = [Guid]::NewGuid().ToString('N')
+        [IO.File]::WriteAllText((Join-Path $directory $markerName), $markerValue)
+        $linkedDirectory = Join-Path $root 'isolation-link'
+        if ($IsWindows) {
+            [void](New-Item -ItemType Junction -Path $linkedDirectory -Target $directory)
+        }
+        else {
+            [void][IO.Directory]::CreateSymbolicLink($linkedDirectory, $directory)
+        }
+        $code = @'
+$marker = [IO.Path]::Combine([Environment]::CurrentDirectory, $env:STARTUP_TEST_MARKER)
+[ordered]@{
+    home = $env:FUNC_CLI_HOME
+    workloads = $env:FUNC_CLI_WORKLOADS_HOME
+    sentinel = $env:FUNC_CLI_BENCHMARK_SENTINEL
+    directory = [Environment]::CurrentDirectory
+    marker = if ([IO.File]::Exists($marker)) { [IO.File]::ReadAllText($marker) } else { $null }
+} | ConvertTo-Json -Compress
+'@
         $old = [Environment]::GetEnvironmentVariable('FUNC_CLI_BENCHMARK_SENTINEL')
         try {
             [Environment]::SetEnvironmentVariable('FUNC_CLI_BENCHMARK_SENTINEL', 'must-not-leak')
-            $observed = Invoke-StartupProcess -Executable $pwsh -Arguments @('-NoProfile', '-NonInteractive', '-Command', $code) `
-                -Directory $root -EnvironmentVariables @{ FUNC_CLI_HOME = 'owned'; FUNC_CLI_WORKLOADS_HOME = 'workloads' } `
-                -TimeoutMilliseconds 30000
-            Assert-True ($observed.exitCode -eq 0 -and $observed.stdout -eq "owned|workloads||$root") 'Environment or working directory isolation failed.'
+            foreach ($workingDirectory in @($directory, $linkedDirectory, $root)) {
+                $observed = Invoke-StartupProcess -Executable $pwsh -Arguments @('-NoProfile', '-NonInteractive', '-Command', $code) `
+                    -Directory $workingDirectory -EnvironmentVariables @{
+                        FUNC_CLI_HOME = 'owned'
+                        FUNC_CLI_WORKLOADS_HOME = 'workloads'
+                        STARTUP_TEST_MARKER = $markerName
+                    } -TimeoutMilliseconds 30000
+                Assert-True ($observed.status -eq 'exited' -and $observed.exitCode -eq 0) `
+                    "Isolation child failed for '$workingDirectory': $($observed | ConvertTo-Json -Compress)"
+                Assert-True ($observed.stderr -ceq '') "Unexpected isolation stderr: $($observed.stderr)"
+                $fields = $observed.stdout | ConvertFrom-Json
+                Assert-True ($fields.home -ceq 'owned') "Expected home 'owned'; actual: '$($fields.home)'."
+                Assert-True ($fields.workloads -ceq 'workloads') "Expected workloads 'workloads'; actual: '$($fields.workloads)'."
+                Assert-True ([string]::IsNullOrEmpty($fields.sentinel)) "Inherited sentinel leaked: '$($fields.sentinel)'."
+                if ($workingDirectory -eq $root) {
+                    Assert-True ($null -eq $fields.marker) "Wrong directory unexpectedly found the marker: '$($fields.directory)'."
+                }
+                else {
+                    # The child may report a physical path rather than the supplied symlink spelling.
+                    Assert-True ($fields.marker -ceq $markerValue) `
+                        "Expected marker '$markerValue' via '$workingDirectory'; actual '$($fields.marker)' in '$($fields.directory)'."
+                }
+            }
         }
         finally {
             [Environment]::SetEnvironmentVariable('FUNC_CLI_BENCHMARK_SENTINEL', $old)
+            [IO.Directory]::Delete($linkedDirectory)
         }
     }
 
