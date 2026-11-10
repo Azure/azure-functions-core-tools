@@ -19,6 +19,290 @@ namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
 public class FullScreenDashboardTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MouseControlOutput_LeavesStopAndEscalationResponsive(bool quit)
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        using CancellationTokenSource run = new();
+        using ManualResetEventSlim release = new();
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        ScriptedTerminal terminal = new()
+        {
+            MouseCaptureChanging = enabled =>
+            {
+                if (!enabled)
+                {
+                    entered.TrySetResult();
+                    release.Wait(timeout.Token);
+                }
+            },
+        };
+        int forced = 0;
+        ConsoleInterruptCoordinator interrupts = new(run.Cancel, _ => Interlocked.Increment(ref forced));
+        await using CompactRenderer renderer = Renderer(terminal, Interaction(), interrupts: interrupts);
+        renderer.ShutdownRequested += run.Cancel;
+        await renderer.OnStartAsync(new DashboardState(), run.Token);
+        await terminal.WaitForTextAsync("Logs", timeout.Token);
+        try
+        {
+            terminal.Send(Key('m', ConsoleKey.M));
+            await entered.Task.WaitAsync(timeout.Token);
+            terminal.Send(new TerminalInputEvent(TerminalInputKind.PointerDown, X: 0, Y: terminal.LogTop));
+
+            await terminal.SendAndWaitAsync(quit ? Key('q', ConsoleKey.Q) : Interrupt(), timeout.Token);
+            run.IsCancellationRequested.Should().BeTrue();
+            await terminal.SendAndWaitAsync(Interrupt(), timeout.Token);
+
+            forced.Should().Be(1);
+            terminal.Restored.Should().BeTrue();
+        }
+        finally
+        {
+            release.Set();
+        }
+    }
+
+    [Theory]
+    [InlineData('\u00e7', ConsoleKey.C)]
+    [InlineData('@', ConsoleKey.Q)]
+    public async Task NativeAltGrText_ReachesSearchWithoutCopyingOrStopping(char character, ConsoleKey key)
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        ScriptedTerminal terminal = new();
+        IClipboardWriter clipboard = Substitute.For<IClipboardWriter>();
+        await using CompactRenderer renderer = Renderer(terminal, Interaction(), clipboard);
+        int shutdown = 0;
+        renderer.ShutdownRequested += () => shutdown++;
+        await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
+        terminal.Send(Key('/', ConsoleKey.Oem2));
+        await terminal.WaitForTextAsync("Search functions", timeout.Token);
+        WindowsInputRecord record = new()
+        {
+            EventType = 1,
+            Key = new WindowsKeyRecord
+            {
+                KeyDown = 1,
+                RepeatCount = 1,
+                VirtualKeyCode = (ushort)key,
+                UnicodeCharacter = character,
+                ControlKeyState = 8 | 1,
+            },
+        };
+
+        terminal.Send(new WindowsInputNormalizer().Decode(record, default).Single());
+        await terminal.WaitForTextAsync(character.ToString(), timeout.Token);
+
+        shutdown.Should().Be(0);
+        _ = clipboard.DidNotReceiveWithAnyArgs().CopyAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task EvictedMouseDownAnchor_ControlCReportsExpiryInsteadOfStopping()
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        ScriptedTerminal terminal = new();
+        CompactLogBuffer buffer = new(1);
+        IClipboardWriter clipboard = Substitute.For<IClipboardWriter>();
+        await using CompactRenderer renderer = Renderer(terminal, Interaction(), clipboard, logBuffer: buffer);
+        int shutdown = 0;
+        renderer.ShutdownRequested += () => shutdown++;
+        await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
+        await renderer.OnEventAsync(Log("old"), [], timeout.Token);
+        await terminal.WaitForTextAsync("old", timeout.Token);
+        await terminal.SendAndWaitAsync(new TerminalInputEvent(TerminalInputKind.PointerDown, X: 0, Y: terminal.LogTop), timeout.Token);
+
+        await renderer.OnEventAsync(Log("new"), [], timeout.Token);
+        await terminal.WaitForTextAsync("Selection expired", timeout.Token);
+        await terminal.SendAndWaitAsync(new TerminalInputEvent(TerminalInputKind.PointerMove, X: 5, Y: terminal.LogTop), timeout.Token);
+        await terminal.SendAndWaitAsync(new TerminalInputEvent(TerminalInputKind.PointerUp, X: 5, Y: terminal.LogTop), timeout.Token);
+        await terminal.SendAndWaitAsync(Interrupt(), timeout.Token);
+
+        shutdown.Should().Be(0);
+        _ = clipboard.DidNotReceiveWithAnyArgs().CopyAsync(default!, default!, default);
+        terminal.Text.Should().Contain("Selection expired");
+    }
+
+    [Fact]
+    public async Task TerminalSelection_ReleasesEvictedHistoryWithoutRepainting()
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        ScriptedTerminal terminal = new();
+        CompactLogBuffer buffer = new(2, 1024);
+        await using CompactRenderer renderer = Renderer(terminal, Interaction(), logBuffer: buffer);
+        await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
+        await renderer.OnEventAsync(Log("old payload " + new string('x', 100)), [], timeout.Token);
+        await terminal.WaitForTextAsync("old payload", timeout.Token);
+        WeakReference<string> oldText = FirstText(buffer);
+        terminal.Send(Key('m', ConsoleKey.M));
+        await terminal.WaitForTextAsync("Terminal selection", timeout.Token);
+        int frames = terminal.FrameCount;
+
+        await renderer.OnEventAsync(Log("new one"), [], timeout.Token);
+        await renderer.OnEventAsync(Log("new two"), [], timeout.Token);
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            if (!IsAlive(oldText))
+            {
+                break;
+            }
+            await Task.Delay(10, timeout.Token);
+        }
+
+        IsAlive(oldText).Should().BeFalse("the terminal owns the frozen pixels, not a second retained history");
+        terminal.FrameCount.Should().Be(frames);
+        buffer.Capture().Entries.Should().HaveCount(2);
+        GC.KeepAlive(renderer);
+        GC.KeepAlive(buffer);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LateCopyCompletion_DoesNotRepaintTerminalSelection(bool confirmed)
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        ScriptedTerminal terminal = new();
+        IClipboardWriter clipboard = Substitute.For<IClipboardWriter>();
+        TaskCompletionSource<ClipboardCopyResult> completion = new();
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        clipboard.CopyAsync(Arg.Any<string>(), terminal, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            entered.TrySetResult();
+            return completion.Task;
+        });
+        await using CompactRenderer renderer = Renderer(terminal, Interaction(), clipboard);
+        await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
+        await renderer.OnEventAsync(Log("copy target"), [], timeout.Token);
+        await terminal.WaitForTextAsync("copy target", timeout.Token);
+        terminal.Select("copy target");
+        await terminal.WaitForTextAsync("Ctrl+C copy", timeout.Token);
+        terminal.Send(Interrupt());
+        await entered.Task.WaitAsync(timeout.Token);
+        terminal.Send(Key('m', ConsoleKey.M));
+        await terminal.WaitForTextAsync("Terminal selection", timeout.Token);
+        int frames = terminal.FrameCount;
+
+        completion.SetResult(new ClipboardCopyResult(confirmed ? ClipboardCopyStatus.Confirmed : ClipboardCopyStatus.Failed, "late result"));
+        await renderer.OnEventAsync(Log("arrived after capture release"), [], timeout.Token);
+        await Task.Delay(200, timeout.Token);
+
+        terminal.FrameCount.Should().Be(frames);
+        terminal.Text.Should().NotContain("late result");
+        terminal.MouseCapture.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(40, 24)]
+    [InlineData(40, 10)]
+    public async Task Help_RealCopyFeedbackAndLastShortcutAreReachableWithoutResizing(int width, int height)
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        ScriptedTerminal terminal = new() { Size = new TerminalSize(width, height) };
+        IClipboardWriter clipboard = Substitute.For<IClipboardWriter>();
+        clipboard.CopyAsync(Arg.Any<string>(), terminal, Arg.Any<CancellationToken>())
+            .Returns(new ClipboardCopyResult(ClipboardCopyStatus.Sent,
+                "Copy request sent to the terminal, not confirmed. Terminal or tmux permissions may prevent copying; the selection is retained."));
+        await using CompactRenderer renderer = Renderer(terminal, Interaction(), clipboard);
+        await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
+        await renderer.OnEventAsync(Log("select"), [], timeout.Token);
+        await terminal.WaitForTextAsync("select", timeout.Token);
+        terminal.Select("select");
+        await terminal.WaitForTextAsync("Ctrl+C copy", timeout.Token);
+        terminal.Send(Interrupt());
+        await terminal.WaitForTextAsync("Copy unconfirmed", timeout.Token);
+        terminal.Send(Key('?', ConsoleKey.Oem2));
+        await terminal.WaitForTextAsync("Copy request sent", timeout.Token);
+        terminal.Text.Should().Contain("↑/↓ scroll");
+
+        terminal.Send(Key('\0', ConsoleKey.End));
+        await terminal.WaitForTextAsync("Advanced", timeout.Token);
+        terminal.Text.Should().NotContain("Copy request sent");
+        terminal.Send(Key('\0', ConsoleKey.Home));
+        await terminal.WaitForTextAsync("Copy request sent", timeout.Token);
+
+        terminal.Text.Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n').Should().HaveCount(height);
+    }
+
+    [Fact]
+    public async Task RedrawNotifications_CoalesceWhileOutputIsBusyAndRenderTheLatestUpdate()
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        using ManualResetEventSlim release = new();
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int block = 1;
+        ScriptedTerminal terminal = new()
+        {
+            Rendering = () =>
+            {
+                if (Interlocked.Exchange(ref block, 0) == 1)
+                {
+                    entered.TrySetResult();
+                    release.Wait(timeout.Token);
+                }
+            },
+        };
+        await using CompactRenderer renderer = Renderer(terminal, Interaction());
+        await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
+        try
+        {
+            await entered.Task.WaitAsync(timeout.Token);
+            await Parallel.ForAsync(0, 1000, timeout.Token,
+                async (index, token) => await renderer.OnEventAsync(Log($"entry {index}"), [], token));
+            await renderer.OnEventAsync(Log("final notification"), [], timeout.Token);
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        await terminal.WaitForTextAsync("final notification", timeout.Token);
+        renderer.Completion.IsCompleted.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task BusyOutput_DoesNotReinterpretAQueuedSearchCharacterAsQuit()
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        using ManualResetEventSlim release = new();
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int block = 1;
+        ScriptedTerminal terminal = new()
+        {
+            Rendering = () =>
+            {
+                if (Interlocked.Exchange(ref block, 0) == 1)
+                {
+                    entered.TrySetResult();
+                    release.Wait(timeout.Token);
+                }
+            },
+        };
+        await using CompactRenderer renderer = Renderer(terminal, Interaction());
+        int shutdown = 0;
+        renderer.ShutdownRequested += () => shutdown++;
+        await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
+        try
+        {
+            await entered.Task.WaitAsync(timeout.Token);
+            await terminal.SendAndWaitAsync(Key('/', ConsoleKey.Oem2), timeout.Token);
+            await terminal.SendAndWaitAsync(Key('q', ConsoleKey.Q), timeout.Token);
+            shutdown.Should().Be(0);
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        await terminal.WaitForTextAsync("Search: q", timeout.Token);
+        shutdown.Should().Be(0);
+    }
+
     [Fact]
     public async Task StalledOutput_DoesNotPreventInputRestorationDuringShutdown()
     {
@@ -286,12 +570,18 @@ public class FullScreenDashboardTests
     }
 
     private static CompactRenderer Renderer(ScriptedTerminal terminal, IInteractionService interaction,
-        IClipboardWriter? clipboard = null, ConsoleInterruptCoordinator? interrupts = null)
+        IClipboardWriter? clipboard = null, ConsoleInterruptCoordinator? interrupts = null, CompactLogBuffer? logBuffer = null)
     {
         IPlatform platform = Substitute.For<IPlatform>();
         return new CompactRenderer(interaction, new FunctionPalette(), new CompactDashboardShortcutLabels(platform),
-            clipboard: clipboard, interrupts: interrupts, terminal: terminal);
+            clipboard: clipboard, interrupts: interrupts, terminal: terminal, logBuffer: logBuffer);
     }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference<string> FirstText(CompactLogBuffer buffer) => new(buffer.Snapshot()[0].Text);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool IsAlive(WeakReference<string> reference) => reference.TryGetTarget(out _);
 
     private static HostLogEntry Log(string message, LogLevel level = LogLevel.Information)
         => new(DateTimeOffset.UnixEpoch, "Host.Test", level, default, message, null, HostLogEntry.EmptyAttributes);
@@ -325,19 +615,32 @@ public class FullScreenDashboardTests
 
     private sealed class ScriptedTerminal : ITerminalSession
     {
-        private readonly Channel<TerminalInputEvent> _input = Channel.CreateUnbounded<TerminalInputEvent>();
+        private readonly Channel<(TerminalInputEvent Input, TaskCompletionSource? Processed)> _input =
+            Channel.CreateUnbounded<(TerminalInputEvent, TaskCompletionSource?)>();
         private readonly Channel<bool> _frames = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest });
         private readonly Lock _lock = new();
         private string _text = string.Empty;
         private int _logTop;
+        private int _frameCount;
 
         public TerminalSize Size { get; init; } = new(120, 24);
+        public Action<bool>? MouseCaptureChanging { get; init; }
+        public Action? Rendering { get; init; }
         public bool MouseCapture { get; private set; } = true;
         public bool Disposed { get; private set; }
+        public bool Restored { get; private set; }
         public string Text { get { lock (_lock) { return _text; } } }
         public int LogTop { get { lock (_lock) { return _logTop; } } }
+        public int FrameCount { get { lock (_lock) { return _frameCount; } } }
 
-        public void Send(TerminalInputEvent input) => _input.Writer.TryWrite(input);
+        public void Send(TerminalInputEvent input) => _input.Writer.TryWrite((input, null));
+
+        public async Task SendAndWaitAsync(TerminalInputEvent input, CancellationToken cancellationToken)
+        {
+            TaskCompletionSource processed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _input.Writer.TryWrite((input, processed));
+            await processed.Task.WaitAsync(cancellationToken);
+        }
 
         public void Select(string text)
         {
@@ -370,28 +673,35 @@ public class FullScreenDashboardTests
 
         public async IAsyncEnumerable<TerminalInputEvent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            await foreach (TerminalInputEvent input in _input.Reader.ReadAllAsync(cancellationToken))
+            await foreach ((TerminalInputEvent input, TaskCompletionSource? processed) in _input.Reader.ReadAllAsync(cancellationToken))
             {
                 yield return input;
+                processed?.TrySetResult();
             }
         }
 
         public void Render(IRenderable frame)
         {
+            Rendering?.Invoke();
             using StringWriter writer = new();
             CreateConsole(writer, Size.Width, Size.Height).Write(frame);
             lock (_lock)
             {
                 _text = writer.ToString();
                 _logTop = ((DashboardFrame)frame).LogTop;
+                _frameCount++;
             }
 
             _frames.Writer.TryWrite(true);
         }
 
         public void WriteControl(string sequence) { }
-        public void SetMouseCapture(bool enabled) => MouseCapture = enabled;
-        public void Restore() { }
+        public void SetMouseCapture(bool enabled)
+        {
+            MouseCaptureChanging?.Invoke(enabled);
+            MouseCapture = enabled;
+        }
+        public void Restore() => Restored = true;
         public ValueTask DisposeAsync()
         {
             Disposed = true;

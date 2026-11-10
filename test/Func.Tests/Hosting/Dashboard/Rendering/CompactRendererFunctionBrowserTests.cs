@@ -179,7 +179,7 @@ public class CompactRendererFunctionBrowserTests
         output.Should().Contain("Available compact-mode controls");
         output.Should().Contain("Toggle this help panel");
         output.Should().Contain("Search functions by name");
-        output.Should().Contain("Scroll logs; move selection");
+        output.Should().Contain("Scroll logs or help");
         output.Should().Contain("Clear visible logs");
         output.Should().Contain("Cycle the function filter");
         output.Should().Contain("Toggle errors-only logs");

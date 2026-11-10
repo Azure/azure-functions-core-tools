@@ -201,10 +201,38 @@ public class CompactDashboardChromeTests
         const string status = "Clipboard access was denied by the operating system. The selection is retained.";
         CompactHelpOverlayBuilder builder = new(new DefaultTheme(), Shortcuts(), new DashboardRunInfo(version));
 
-        string output = string.Join("\n", Lines(builder.Build(120, status), 120));
+        string output = string.Join("\n", Lines(builder.Build(120, 40, status: status).Content, 120));
 
         output.Should().Contain(version).And.Contain(status).And.Contain("Available compact-mode controls");
         output.Should().Contain("Advanced: terminal selection").And.Contain("terminal's Copy command");
+    }
+
+    [Theory]
+    [InlineData(80, 21)]
+    [InlineData(40, 21)]
+    [InlineData(40, 7)]
+    public void Help_PagesLongFeedbackAndAllShortcutsWithinItsHeight(int width, int height)
+    {
+        string status = string.Join(" ", Enumerable.Range(0, 60).Select(index => $"feedback{index}"));
+        CompactHelpOverlayBuilder builder = new(new DefaultTheme(), Shortcuts(), new DashboardRunInfo());
+        CompactHelpPage first = builder.Build(width, height, status: status);
+        first.MaximumRowOffset.Should().BeGreaterThan(0);
+        string[] full = [.. Lines(builder.Build(width, 1000, status: status).Content, width).Skip(1).SkipLast(1)];
+        List<string> visited = [];
+        for (int offset = 0; offset < full.Length; offset++)
+        {
+            CompactHelpPage page = builder.Build(width, height, offset, status);
+            string[] lines = Lines(page.Content, width);
+            lines.Length.Should().BeLessThanOrEqualTo(height);
+            visited.AddRange(lines.Skip(1).SkipLast(1));
+        }
+
+        full.Should().OnlyContain(line => visited.Contains(line));
+        string last = string.Join("\n", Lines(builder.Build(width, height, int.MaxValue, status).Content, width));
+        last.Should().Contain("Advanced");
+        string footer = string.Join("\n", Lines(new CompactFooterBuilder(new DefaultTheme(), Shortcuts())
+            .Build(width, CompactFooterMode.Help, helpScrollable: true), width));
+        footer.Should().Contain("↑/↓ scroll").And.Contain("q quit");
     }
 
     [Fact]

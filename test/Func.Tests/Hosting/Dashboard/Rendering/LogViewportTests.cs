@@ -125,6 +125,69 @@ public class LogViewportTests
         viewport.SelectionExpired.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DragAnchor_EvictionBeforeFirstMovementExpiresEvenDuringResize(bool resize)
+    {
+        var buffer = new CompactLogBuffer(1);
+        buffer.Add(Line("old"));
+        var viewport = new LogViewport();
+        viewport.Refresh(buffer.Capture(), 40, 8, new LogFilter());
+        viewport.BeginDrag(0, 0);
+
+        buffer.Add(Line("new"));
+        int width = resize ? 80 : 40;
+        viewport.Refresh(buffer.Capture(), width, 8, new LogFilter());
+        viewport.Drag(2, 0);
+        viewport.EndDrag();
+        viewport.Refresh(buffer.Capture(), width, 8, new LogFilter());
+
+        viewport.SelectionExpired.Should().BeTrue();
+        viewport.HasSelection.Should().BeFalse();
+        FluentActions.Invoking(viewport.CaptureSelection).Should().Throw<InvalidOperationException>().WithMessage("*expired*");
+    }
+
+    [Fact]
+    public void Invalidation_PreservesTheReadingAnchorButRejectsStalePointerGeometry()
+    {
+        var buffer = new CompactLogBuffer(3);
+        buffer.Add(Line("first"));
+        buffer.Add(Line("second"));
+        buffer.Add(Line("third"));
+        var viewport = new LogViewport();
+        viewport.Refresh(buffer.Capture(), 40, 1, new LogFilter());
+        viewport.Scroll(1);
+
+        long oldest = buffer.Add(Line("fourth"))!.Value;
+        viewport.Invalidate(oldest);
+        viewport.BeginDrag(0, 0);
+        viewport.Drag(3, 0);
+        viewport.HasSelection.Should().BeFalse();
+        viewport.Refresh(buffer.Capture(), 40, 1, new LogFilter());
+        viewport.BeginDrag(0, 0);
+        viewport.Drag(5, 0);
+
+        viewport.CaptureSelection().Text.Should().Be("second");
+    }
+
+    [Fact]
+    public void Invalidation_ExpiresTheDragAnchorWithoutNeedingARepaint()
+    {
+        var buffer = new CompactLogBuffer(1);
+        buffer.Add(Line("old"));
+        var viewport = new LogViewport();
+        viewport.Refresh(buffer.Capture(), 40, 1, new LogFilter());
+        viewport.BeginDrag(0, 0);
+
+        viewport.Invalidate(buffer.Add(Line("new"))!.Value);
+        viewport.BeginDrag(0, 0);
+        viewport.Drag(2, 0);
+
+        viewport.SelectionExpired.Should().BeTrue();
+        FluentActions.Invoking(viewport.CaptureSelection).Should().Throw<InvalidOperationException>().WithMessage("*expired*");
+    }
+
     [Fact]
     public void CopyCompletion_DoesNotClearANewerSelection()
     {

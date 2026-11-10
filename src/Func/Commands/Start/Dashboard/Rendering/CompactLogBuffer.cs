@@ -20,7 +20,10 @@ internal sealed class CompactLogBuffer(int capacity = CompactLogBuffer.DefaultCa
     private long _revision;
     private long _evicted;
 
-    public void Add(CompactLogLine line)
+    /// <summary>
+    /// Adds display text and returns the oldest remaining ID when eviction invalidates cached projections.
+    /// </summary>
+    public long? Add(CompactLogLine line)
     {
         ArgumentNullException.ThrowIfNull(line);
 
@@ -35,13 +38,16 @@ internal sealed class CompactLogBuffer(int capacity = CompactLogBuffer.DefaultCa
 
             _tail.Enqueue(new BufferedLogEntry(++_sequence, line));
             _textBytes += line.TextBytes;
+            bool evicted = false;
             while (_tail.Count > _capacity || _textBytes > _textBudget)
             {
                 _textBytes -= _tail.Dequeue().Line.TextBytes;
                 _evicted++;
+                evicted = true;
             }
 
             _revision++;
+            return evicted ? _tail.Peek().Id : null;
         }
     }
 

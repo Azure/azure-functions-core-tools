@@ -119,8 +119,7 @@ internal sealed class WindowsInputNormalizer
             | ((key.ControlKeyState & 0x03) != 0 ? ConsoleModifiers.Alt : 0)
             | ((key.ControlKeyState & 0x0c) != 0 ? ConsoleModifiers.Control : 0);
 
-        if (key.VirtualKeyCode == (ushort)ConsoleKey.C
-            && (modifiers & (ConsoleModifiers.Control | ConsoleModifiers.Alt)) == ConsoleModifiers.Control)
+        if (TerminalKey.IsInterrupt(character, (ConsoleKey)key.VirtualKeyCode, modifiers))
         {
             character = '\u0003';
         }

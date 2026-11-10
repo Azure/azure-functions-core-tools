@@ -332,19 +332,14 @@ internal sealed class TerminalSession(IAnsiConsole console, ITerminalDriver driv
 
             try
             {
-                if (System.Threading.Monitor.TryEnter(_outputGate))
+                // Keep cleanup pending behind transient output contention. Restore/Dispose bound
+                // their own waits; the worker must finish the protocol before restoring output modes.
+                lock (_outputGate)
                 {
-                    try
+                    if (_protocolTouched)
                     {
-                        if (_protocolTouched)
-                        {
-                            WriteCore(LeaveScreen);
-                            _protocolTouched = false;
-                        }
-                    }
-                    finally
-                    {
-                        System.Threading.Monitor.Exit(_outputGate);
+                        WriteCore(LeaveScreen);
+                        _protocolTouched = false;
                     }
                 }
             }

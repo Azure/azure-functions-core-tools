@@ -5,6 +5,10 @@ namespace Azure.Functions.Cli.Console.Terminal;
 
 internal static class TerminalKey
 {
+    public static bool IsInterrupt(char character, ConsoleKey key, ConsoleModifiers modifiers)
+        => character == '\u0003'
+            || (key == ConsoleKey.C && (modifiers & (ConsoleModifiers.Control | ConsoleModifiers.Alt)) == ConsoleModifiers.Control);
+
     public static TerminalInputEvent Create(char character, ConsoleKey key = default, ConsoleModifiers modifiers = default)
     {
         if (character == '\u0003')

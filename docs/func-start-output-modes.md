@@ -46,6 +46,11 @@ than being cut off or wrapped. A stop action remains visible; `?` opens the full
 keyboard reference, CLI version, and complete copy/status feedback outside search.
 Changing footer hints does not move the log viewport.
 
+Help is height-bounded. When feedback or shortcuts do not fit, use Up/Down,
+Page Up/Page Down, Home/End, or the mouse wheel over the help panel to scroll.
+The help heading shows the visible range, so full copy feedback and every
+shortcut remain accessible without resizing the terminal.
+
 ### Reading logs
 
 | Input | Action |
@@ -72,6 +77,8 @@ display text**. Text accounting includes owned text and filtering metadata
 as UTF-16 payload bytes, not total process memory. Entries larger than the
 display budget are visibly truncated. Old entries are evicted when necessary;
 the Logs divider indicates discarded history.
+Evicted display text is released even while terminal selection pauses redraws;
+the frozen terminal image does not keep a second history in the CLI.
 
 These are display limits only. `--log-file=<path>` continues receiving events
 independently of filters, scrolling, selection, clear, and display truncation.
@@ -157,7 +164,9 @@ On Unix, Ctrl+Z suspends the foreground job after restoring terminal state.
 Use `fg` to resume the dashboard; the owned input and display modes are reapplied.
 
 Uncatchable termination, such as SIGKILL or externally terminating the process,
-cannot guarantee terminal restoration. Mouse/clipboard support through SSH,
+cannot guarantee terminal restoration. An unresponsive output transport can
+also prevent visible restoration; input restoration is attempted first and
+shutdown waits remain bounded. Mouse/clipboard support through SSH,
 tmux, and individual terminal versions depends on their configuration.
 
 ## `plain`

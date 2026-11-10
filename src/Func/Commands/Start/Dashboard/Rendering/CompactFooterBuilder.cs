@@ -28,7 +28,7 @@ internal sealed class CompactFooterBuilder(ITheme theme, CompactDashboardShortcu
     private readonly ITheme _theme = theme ?? throw new ArgumentNullException(nameof(theme));
     private readonly CompactDashboardShortcutLabels _shortcutLabels = shortcutLabels ?? throw new ArgumentNullException(nameof(shortcutLabels));
 
-    public IRenderable Build(int width, CompactFooterMode mode, bool following = true, bool filtered = false)
+    public IRenderable Build(int width, CompactFooterMode mode, bool following = true, bool filtered = false, bool helpScrollable = false)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         if (!Enum.IsDefined(mode))
@@ -63,6 +63,7 @@ internal sealed class CompactFooterBuilder(ITheme theme, CompactDashboardShortcu
             CompactFooterMode.ExpiredSelection => ["Esc clear"],
             CompactFooterMode.Search => ["Esc close", "Enter filter", "↑/↓ select", "type query"],
             CompactFooterMode.Functions => ["Esc close", "Enter filter", "↑/↓ navigate", "f next", "/ search"],
+            CompactFooterMode.Help when helpScrollable => ["?/Esc close", "↑/↓ scroll", $"{_shortcutLabels.PageNavigationHelpKey} page", "Ctrl+C stop"],
             CompactFooterMode.Help => ["?/Esc close", "Ctrl+C stop"],
             CompactFooterMode.MouseReleased => [returnToTui, "? help"],
             CompactFooterMode.Stopping => [],

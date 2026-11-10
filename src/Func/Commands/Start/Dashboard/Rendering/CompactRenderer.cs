@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Globalization;
+using System.Threading.Channels;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Clipboard;
 using Azure.Functions.Cli.Console.Terminal;
@@ -26,7 +27,8 @@ internal sealed class CompactRenderer(
     IClipboardWriter? clipboard = null,
     ConsoleInterruptCoordinator? interrupts = null,
     ITerminalSession? terminal = null,
-    TimeProvider? timeProvider = null) : IDashboardRenderer, IDashboardShutdownRequester, IDashboardRendererLifetime
+    TimeProvider? timeProvider = null,
+    CompactLogBuffer? logBuffer = null) : IDashboardRenderer, IDashboardShutdownRequester, IDashboardRendererLifetime
 {
     private const int MaxLogTailLines = CompactLogBuffer.DefaultCapacity;
 
@@ -45,7 +47,7 @@ internal sealed class CompactRenderer(
     private readonly CompactFunctionSearchBuilder _functionSearchBuilder = new(interaction.Theme, palette);
     private readonly CompactFunctionBrowserBuilder _functionBrowserBuilder = new(interaction.Theme, palette);
     private readonly Lock _uiLock = new();
-    private readonly CompactLogBuffer _logBuffer = new(MaxLogTailLines);
+    private readonly CompactLogBuffer _logBuffer = logBuffer ?? new(MaxLogTailLines);
     private readonly CompactLogLineFormatter _logLineFormatter = new(interaction.Theme, palette);
     private readonly LogViewport _viewport = new();
     private readonly List<TerminalInputEvent> _deferredInput = [];
@@ -55,7 +57,12 @@ internal sealed class CompactRenderer(
     private Task? _completion;
     private Task? _copyTask;
     private CancellationTokenSource? _copyCts;
-    private int _dirty = 1;
+    private readonly Channel<bool> _redrawSignal = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
+    {
+        SingleReader = true,
+        FullMode = BoundedChannelFullMode.DropOldest,
+        AllowSynchronousContinuations = false,
+    });
     private bool _disposed;
     private bool _stopped;
     private bool _stopping;
@@ -73,12 +80,14 @@ internal sealed class CompactRenderer(
 
     private DashboardState _state = null!;
     private CancellationTokenSource? _liveCts;
-    private SemaphoreSlim? _redrawSignal;
     private Task? _liveTask;
     private Task? _inputTask;
     private int _lastKnownWidth;
     private int _lastKnownHeight;
     private bool _helpOpen;
+    private int _helpRowOffset;
+    private int _helpMaximumRowOffset;
+    private int _helpVisibleRows = 1;
     private bool _functionBrowserOpen;
     private bool _functionSearchOpen;
     private int _functionBrowserSelectedIndex;
@@ -112,7 +121,7 @@ internal sealed class CompactRenderer(
         _terminal ??= _interaction.OpenFullScreen(_terminalFactory
             ?? throw new InvalidOperationException("A terminal session factory is required."), cancellationToken);
         _interruptRegistration = _interrupts?.RegisterTerminal(_terminal.Restore);
-        _redrawSignal = new SemaphoreSlim(initialCount: 1, maxCount: 1);
+        SignalRedraw();
         // Keep raw Ctrl+C available for escalation while the host drains and shuts down.
         _liveCts = new CancellationTokenSource();
         _cancellationRegistration = cancellationToken.Register(() => BeginShutdown());
@@ -146,7 +155,13 @@ internal sealed class CompactRenderer(
             return Task.CompletedTask;
         }
 
-        _logBuffer.Add(line);
+        lock (_uiLock)
+        {
+            if (_logBuffer.Add(line) is { } oldestEntryId)
+            {
+                _viewport.Invalidate(oldestEntryId);
+            }
+        }
 
         SignalRedraw();
         return Task.CompletedTask;
@@ -197,7 +212,7 @@ internal sealed class CompactRenderer(
             _interruptRegistration?.Dispose();
             _copyCts?.Dispose();
             _liveCts?.Dispose();
-            _redrawSignal?.Dispose();
+            _redrawSignal.Writer.TryComplete();
         }
     }
 
@@ -253,20 +268,7 @@ internal sealed class CompactRenderer(
         }
     }
 
-    private void SignalRedraw()
-    {
-        try
-        {
-            if (Interlocked.Exchange(ref _dirty, 1) == 0)
-            {
-                _redrawSignal?.Release();
-            }
-        }
-        catch (ObjectDisposedException)
-        {
-            // Live loop already torn down.
-        }
-    }
+    private void SignalRedraw() => _redrawSignal.Writer.TryWrite(true);
 
     private string? GetListenUriForLogFormatting(IReadOnlyList<DashboardEvent> events)
         => events.Any(static ev => ev is FunctionDiscoveredEvent) && _state is not null
@@ -279,10 +281,14 @@ internal sealed class CompactRenderer(
         {
             lock (_uiLock)
             {
-                bool interrupt = input.Kind == TerminalInputKind.Key && input.Key.KeyChar == '\u0003';
-                bool canStopImmediately = interrupt && (_stopping
+                bool interrupt = input.Kind == TerminalInputKind.Key
+                    && TerminalKey.IsInterrupt(input.Key.KeyChar, input.Key.Key, input.Key.Modifiers);
+                bool quit = input.Kind == TerminalInputKind.Key && !_functionSearchOpen
+                    && input.Key.Key == ConsoleKey.Q && (input.Key.Modifiers & (ConsoleModifiers.Control | ConsoleModifiers.Alt)) == 0
+                    && !_deferredInput.Any(item => item.Kind is TerminalInputKind.Key or TerminalInputKind.Text or TerminalInputKind.Paste);
+                bool canStopImmediately = quit || (interrupt && (_stopping
                     || (!_viewport.HasSelection && !_viewport.SelectionExpired
-                        && !_deferredInput.Any(item => item.Kind is TerminalInputKind.PointerDown or TerminalInputKind.PointerMove)));
+                        && (!_mouseCapture || !_deferredInput.Any(item => item.Kind is TerminalInputKind.PointerDown or TerminalInputKind.PointerMove)))));
                 if (_painting && !canStopImmediately)
                 {
                     if (input.Kind == TerminalInputKind.PointerMove && _deferredInput.Count > 0
@@ -315,8 +321,8 @@ internal sealed class CompactRenderer(
 
     private void HandleInput(TerminalInputEvent input, CancellationToken cancellationToken)
     {
-        if (input.Kind == TerminalInputKind.Key && (input.Key.KeyChar == '\u0003'
-            || input.Key.Key == ConsoleKey.C && input.Key.Modifiers.HasFlag(ConsoleModifiers.Control)))
+        if (input.Kind == TerminalInputKind.Key
+            && TerminalKey.IsInterrupt(input.Key.KeyChar, input.Key.Key, input.Key.Modifiers))
         {
             RefreshViewport(_state.Snapshot());
             if (!_stopping && (_viewport.HasSelection || _viewport.SelectionExpired))
@@ -372,7 +378,6 @@ internal sealed class CompactRenderer(
             if (!_functionSearchOpen && input.Key.Key == ConsoleKey.M && input.Key.Modifiers == 0)
             {
                 _mouseCapture = !_mouseCapture;
-                _terminal!.SetMouseCapture(_mouseCapture);
                 _viewport.ClearSelection();
                 _viewport.Pause();
                 SetStatus(null);
@@ -400,6 +405,13 @@ internal sealed class CompactRenderer(
         if (_frameSize is { } presentedSize && _terminal is not null && _terminal.Size != presentedSize)
         {
             _viewport.EndDrag();
+            return;
+        }
+
+        if (_mouseCapture && _helpOpen && input.Kind == TerminalInputKind.Wheel
+            && input.Y >= 0 && input.Y < _logTop - 1 && input.X >= 0 && input.X < GetViewportWidth())
+        {
+            _helpRowOffset = (int)Math.Clamp((long)_helpRowOffset - input.Delta, 0, _helpMaximumRowOffset);
             return;
         }
 
@@ -441,6 +453,12 @@ internal sealed class CompactRenderer(
                 : await _clipboard.CopyAsync(copy.Text, _terminal!, cancellationToken);
             lock (_uiLock)
             {
+                if (_stopping || !_mouseCapture || _viewport.SelectionVersion != copy.SelectionVersion)
+                {
+                    // A completed clipboard operation must not repaint an abandoned selection or terminal-selection mode.
+                    return;
+                }
+
                 _viewport.CompleteCopy(copy.SelectionVersion, result.Status == ClipboardCopyStatus.Confirmed);
                 string message = result.Status == ClipboardCopyStatus.Confirmed ? result.Message
                     : result.Message + " Press m for advanced terminal selection, then use your terminal's Copy command."
@@ -470,6 +488,11 @@ internal sealed class CompactRenderer(
         lock (_uiLock)
         {
             RefreshViewport(snapshot);
+            if (_helpOpen && TryScrollHelp(key))
+            {
+                return true;
+            }
+
             bool overlays = _functionSearchOpen || _functionBrowserOpen || _helpOpen;
             if (!overlays && key.Key == ConsoleKey.End)
             {
@@ -492,6 +515,10 @@ internal sealed class CompactRenderer(
                 _viewport.MaximumScroll);
 
             ApplyInputState(state);
+            if (!_helpOpen)
+            {
+                _helpRowOffset = 0;
+            }
             if (choosingFilter && result.Handled && !state.FunctionSearchOpen && !state.FunctionBrowserOpen)
             {
                 _viewport.Follow();
@@ -513,7 +540,7 @@ internal sealed class CompactRenderer(
             if (result.ClearLogsRequested)
             {
                 _logBuffer.Clear();
-                _viewport.Follow();
+                _viewport.Clear();
             }
 
             if (result.ShutdownRequested)
@@ -562,16 +589,40 @@ internal sealed class CompactRenderer(
 
     private async Task RunLiveLoopAsync(CancellationToken cancellationToken)
     {
+        using PeriodicTimer poll = new(TimeSpan.FromMilliseconds(100), _timeProvider);
+        Task<bool> tick = poll.WaitForNextTickAsync(cancellationToken).AsTask();
+        Task<bool> redraw = _redrawSignal.Reader.WaitToReadAsync(cancellationToken).AsTask();
+        bool appliedMouseCapture = true;
         while (!cancellationToken.IsCancellationRequested)
         {
-            bool changed = await _redrawSignal!.WaitAsync(TimeSpan.FromMilliseconds(100), cancellationToken);
-            Interlocked.Exchange(ref _dirty, 0);
+            await Task.WhenAny(redraw, tick);
+            cancellationToken.ThrowIfCancellationRequested();
+            bool changed = _redrawSignal.Reader.TryRead(out _);
+            if (redraw.IsCompleted)
+            {
+                if (!await redraw)
+                {
+                    return;
+                }
+                redraw = _redrawSignal.Reader.WaitToReadAsync(cancellationToken).AsTask();
+            }
+            if (tick.IsCompleted)
+            {
+                if (!await tick)
+                {
+                    return;
+                }
+                tick = poll.WaitForNextTickAsync(cancellationToken).AsTask();
+            }
+
             IRenderable? frame = null;
             Task? copy;
+            bool requestedMouseCapture;
+            TerminalSize size = _terminal!.Size;
             lock (_uiLock)
             {
                 copy = _copyTask;
-                TerminalSize size = _terminal!.Size;
+                requestedMouseCapture = _mouseCapture;
                 int width = size.Width;
                 int height = size.Height;
                 bool resized = width != _lastKnownWidth || height != _lastKnownHeight;
@@ -606,10 +657,16 @@ internal sealed class CompactRenderer(
             {
                 try
                 {
+                    if (appliedMouseCapture != requestedMouseCapture)
+                    {
+                        _terminal!.SetMouseCapture(requestedMouseCapture);
+                        appliedMouseCapture = requestedMouseCapture;
+                    }
                     _terminal!.Render(frame);
                 }
                 finally
                 {
+                    frame = null;
                     lock (_uiLock)
                     {
                         _painting = false;
@@ -781,7 +838,39 @@ internal sealed class CompactRenderer(
     }
 
     private IRenderable BuildHelpOverlay()
-        => _helpOverlayBuilder.Build(GetViewportWidth(), _status);
+    {
+        CompactHelpPage page = _helpOverlayBuilder.Build(GetViewportWidth(), Math.Max(3, GetViewportHeight() - 3), _helpRowOffset, _status);
+        _helpRowOffset = page.RowOffset;
+        _helpMaximumRowOffset = page.MaximumRowOffset;
+        _helpVisibleRows = page.VisibleRows;
+        return page.Content;
+    }
+
+    private bool TryScrollHelp(ConsoleKeyInfo key)
+    {
+        if ((key.Modifiers & (ConsoleModifiers.Control | ConsoleModifiers.Alt)) != 0)
+        {
+            return false;
+        }
+
+        int? row = key.Key switch
+        {
+            ConsoleKey.UpArrow => _helpRowOffset - 1,
+            ConsoleKey.DownArrow => _helpRowOffset + 1,
+            ConsoleKey.PageUp => _helpRowOffset - _helpVisibleRows,
+            ConsoleKey.PageDown => _helpRowOffset + _helpVisibleRows,
+            ConsoleKey.Home => 0,
+            ConsoleKey.End => _helpMaximumRowOffset,
+            _ => null,
+        };
+        if (row is null)
+        {
+            return false;
+        }
+
+        _helpRowOffset = Math.Clamp(row.Value, 0, _helpMaximumRowOffset);
+        return true;
+    }
 
     private IRenderable BuildFunctionSearch(DashboardSnapshot snapshot)
     {
@@ -887,7 +976,8 @@ internal sealed class CompactRenderer(
                 : _viewport.SelectionExpired ? CompactFooterMode.ExpiredSelection
                 : _viewport.HasSelection ? CompactFooterMode.Selection
                 : CompactFooterMode.Logs;
-            return _footerBuilder.Build(GetViewportWidth(), mode, _viewport.Following, _activeFunctionFilter is not null);
+            return _footerBuilder.Build(GetViewportWidth(), mode, _viewport.Following, _activeFunctionFilter is not null,
+                helpScrollable: _helpMaximumRowOffset > 0);
         }
     }
 

@@ -27,7 +27,9 @@ internal sealed class CompactInputController(
         ArgumentNullException.ThrowIfNull(functions);
         ArgumentNullException.ThrowIfNull(state);
 
-        if ((key.Modifiers & (ConsoleModifiers.Control | ConsoleModifiers.Alt)) != 0)
+        ConsoleModifiers commandModifiers = key.Modifiers & (ConsoleModifiers.Control | ConsoleModifiers.Alt);
+        bool altGrText = commandModifiers == (ConsoleModifiers.Control | ConsoleModifiers.Alt) && !char.IsControl(key.KeyChar);
+        if (commandModifiers != 0 && !(state.FunctionSearchOpen && altGrText))
         {
             return default;
         }

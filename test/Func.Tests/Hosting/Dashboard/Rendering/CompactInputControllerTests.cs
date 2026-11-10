@@ -10,6 +10,29 @@ namespace Azure.Functions.Cli.Tests.Hosting.Dashboard.Rendering;
 
 public class CompactInputControllerTests
 {
+    [Theory]
+    [InlineData('\u00e7', ConsoleKey.C)]
+    [InlineData('@', ConsoleKey.Q)]
+    [InlineData('\u20ac', ConsoleKey.E)]
+    public void HandleKey_PrintableAltGrIsSearchTextButNeverACommand(char character, ConsoleKey key)
+    {
+        CompactInputController controller = CreateController();
+        ConsoleKeyInfo input = new(character, key, false, true, true);
+        CompactInputState search = new() { FunctionSearchOpen = true };
+        CompactInputState normal = new();
+
+        CompactInputResult text = controller.HandleKey(input, [], search, 24, 3, 200);
+        CompactInputResult command = controller.HandleKey(input, [], normal, 24, 3, 200);
+
+        search.FunctionSearchQuery.Should().Be(character.ToString());
+        text.Handled.Should().BeTrue();
+        text.ShutdownRequested.Should().BeFalse();
+        command.Handled.Should().BeFalse();
+        command.ShutdownRequested.Should().BeFalse();
+        command.ClearLogsRequested.Should().BeFalse();
+        normal.ErrorsOnly.Should().BeFalse();
+    }
+
     [Fact]
     public void HandleKey_Question_TogglesHelpAndClosesBrowser()
     {

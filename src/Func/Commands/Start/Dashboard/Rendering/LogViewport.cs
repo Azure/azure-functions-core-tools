@@ -68,11 +68,7 @@ internal sealed class LogViewport
             return;
         }
 
-        if (_width != width)
-        {
-            EndDrag();
-        }
-
+        bool resized = _width != width;
         _filter = filter;
         _revision = buffer.Revision;
         _width = width;
@@ -92,10 +88,16 @@ internal sealed class LogViewport
             TotalRows += index.Count;
         }
 
-        if (HasSelection && (!Contains(_selectionStart!.Value.EntryId) || !Contains(_selectionEnd!.Value.EntryId)))
+        if ((HasSelection && (!Contains(_selectionStart!.Value.EntryId) || !Contains(_selectionEnd!.Value.EntryId)))
+            || (_dragAnchor is { } drag && !Contains(drag.Before.EntryId)))
         {
             ClearSelection();
             SelectionExpired = true;
+        }
+
+        if (resized)
+        {
+            EndDrag();
         }
 
         if (Following)
@@ -111,6 +113,33 @@ internal sealed class LogViewport
         }
 
         SaveAnchor();
+    }
+
+    /// <summary>
+    /// Releases cached display text after eviction without repainting or discarding logical reading positions.
+    /// </summary>
+    public void Invalidate(long oldestEntryId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(oldestEntryId);
+        if ((_selectionStart is { } start && start.EntryId < oldestEntryId)
+            || (_selectionEnd is { } end && end.EntryId < oldestEntryId)
+            || (_dragAnchor is { } drag && drag.Before.EntryId < oldestEntryId))
+        {
+            ClearSelection();
+            SelectionExpired = true;
+        }
+
+        _entries.Clear();
+        _revision = -1;
+        TotalRows = 0;
+    }
+
+    public void Clear()
+    {
+        _entries.Clear();
+        _revision = -1;
+        TotalRows = 0;
+        Follow();
     }
 
     public void Scroll(int rows)
@@ -163,8 +192,13 @@ internal sealed class LogViewport
 
     public void BeginDrag(int x, int y)
     {
+        if (Hit(x, y) is not { } anchor)
+        {
+            return;
+        }
+
         ClearSelection();
-        _dragAnchor = Hit(x, y);
+        _dragAnchor = anchor;
         Pause();
     }
 
@@ -201,6 +235,11 @@ internal sealed class LogViewport
         if (_selectionStart is not { } start || _selectionEnd is not { } end)
         {
             throw new InvalidOperationException("No log text is selected.");
+        }
+
+        if (_revision < 0)
+        {
+            throw new InvalidOperationException("Refresh the log viewport before copying its selection.");
         }
 
         StringBuilder text = new();

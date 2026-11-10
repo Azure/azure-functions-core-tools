@@ -182,9 +182,14 @@ public class TerminalSessionTests
         elapsed.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
         driver.InputRestored.Should().BeTrue();
         render.IsCompleted.Should().BeFalse();
+        driver.RestoreCount.Should().Be(0, "native output modes must remain enabled until protocol cleanup can write");
+        Task disposal = session.DisposeAsync().AsTask();
+        disposal.IsCompleted.Should().BeFalse("the skipped protocol work must remain pending");
         writer.Release.Set();
         await render.WaitAsync(TimeSpan.FromSeconds(5));
-        await session.DisposeAsync();
+        await disposal.WaitAsync(TimeSpan.FromSeconds(5));
+        writer.ToString().Split(TerminalSession.LeaveScreen, StringSplitOptions.None).Length.Should().Be(2);
+        driver.RestoreCount.Should().Be(1);
         driver.ActiveReads.Should().Be(0);
     }
 
