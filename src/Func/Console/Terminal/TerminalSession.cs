@@ -83,14 +83,7 @@ internal sealed class TerminalSession(IAnsiConsole console, ITerminalDriver driv
                 // Acquisition must retain its original failure even if emergency restoration also fails.
             }
 
-            _suspension?.Dispose();
-            if (_restoration?.IsCompleted == true)
-            {
-                _driver.Dispose();
-                _stop.Dispose();
-                _stopDisposed = true;
-                _restorationCompleted.Dispose();
-            }
+            _ = RequestDisposal();
 
             throw;
         }
@@ -195,11 +188,22 @@ internal sealed class TerminalSession(IAnsiConsole console, ITerminalDriver driv
     }
 
     public ValueTask DisposeAsync()
+        => new(RequestDisposal().WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None));
+
+    private Task RequestDisposal()
     {
         lock (_lifetimeGate)
         {
-            _disposal ??= DisposeCoreAsync();
-            return new ValueTask(_disposal);
+            if (_disposal is null)
+            {
+                _disposal = DisposeCoreAsync();
+                // Failed acquisition and timed-out callers cannot await the remaining cleanup.
+                // Keep its ownership intact and observe any late fault without replacing the original failure.
+                _ = _disposal.ContinueWith(static task => { _ = task.Exception; }, CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            }
+
+            return _disposal;
         }
     }
 
@@ -260,7 +264,16 @@ internal sealed class TerminalSession(IAnsiConsole console, ITerminalDriver driv
         try
         {
             _suspension?.Dispose();
-            await restoration.WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            // Signal cleanup must not prevent the native restoration worker from finishing.
+            failure ??= ExceptionDispatchInfo.Capture(exception);
+        }
+
+        try
+        {
+            await restoration;
             _restorationFailure?.Throw();
         }
         catch (Exception exception)
@@ -270,25 +283,22 @@ internal sealed class TerminalSession(IAnsiConsole console, ITerminalDriver driv
         }
         finally
         {
-            if (restoration.IsCompleted)
+            try
             {
-                try
+                _driver.Dispose();
+            }
+            catch (Exception exception)
+            {
+                // Finish releasing managed lifetime resources even when native disposal reports a failure.
+                failure ??= ExceptionDispatchInfo.Capture(exception);
+            }
+            finally
+            {
+                lock (_lifetimeGate)
                 {
-                    _driver.Dispose();
-                }
-                catch (Exception exception)
-                {
-                    // Finish releasing managed lifetime resources even when native disposal reports a failure.
-                    failure ??= ExceptionDispatchInfo.Capture(exception);
-                }
-                finally
-                {
-                    lock (_lifetimeGate)
-                    {
-                        _stop.Dispose();
-                        _stopDisposed = true;
-                        _restorationCompleted.Dispose();
-                    }
+                    _stop.Dispose();
+                    _stopDisposed = true;
+                    _restorationCompleted.Dispose();
                 }
             }
         }

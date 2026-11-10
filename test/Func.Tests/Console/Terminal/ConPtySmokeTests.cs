@@ -14,8 +14,10 @@ namespace Azure.Functions.Cli.Tests.Console.Terminal;
 
 public sealed partial class ConPtySmokeTests
 {
-    [ConPtyFact]
-    public async Task IsolatedConsole_RawMouseControlCUnicodeBottomRowAndRestoration()
+    [ConPtyTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task IsolatedConsole_RawMouseControlCUnicodeBottomRowAndRestoration(bool azurePipelines)
     {
         string root = FindCheckout();
         string project = Path.Combine(root, "test", "Func.Tests", "Console", "Terminal", "Probe", "Terminal.Native.Probe.csproj");
@@ -28,7 +30,7 @@ public sealed partial class ConPtySmokeTests
             root, TimeSpan.FromSeconds(40)), deadline.Token);
         build.ExitCode.Should().Be(0, build.StandardOutput + build.StandardError);
 
-        await using ConPtyProcess process = new($"dotnet \"{assembly}\"", root);
+        await using ConPtyProcess process = new($"dotnet \"{assembly}\"", root, azurePipelines);
         await process.WaitForOutputAsync("HANDOFF_READY", deadline.Token);
         await process.SendAsync("ab", deadline.Token);
         await process.WaitForOutputAsync("INPUT_READY", deadline.Token);
@@ -55,9 +57,9 @@ public sealed partial class ConPtySmokeTests
         throw new DirectoryNotFoundException("Native terminal qualification requires the test output to remain within its source checkout.");
     }
 
-    private sealed class ConPtyFactAttribute : FactAttribute
+    private sealed class ConPtyTheoryAttribute : TheoryAttribute
     {
-        public ConPtyFactAttribute()
+        public ConPtyTheoryAttribute()
         {
             if (!OperatingSystem.IsWindows())
             {
@@ -72,16 +74,19 @@ public sealed partial class ConPtySmokeTests
 
     private sealed partial class ConPtyProcess : IAsyncDisposable
     {
+        private const uint ExtendedStartupInfoPresent = 0x00080000;
+        private const uint CreateUnicodeEnvironment = 0x00000400;
+
         private readonly object _outputGate = new();
         private readonly StringBuilder _output = new();
         private readonly CancellationTokenSource _stop = new();
         private readonly FileStream _input;
         private readonly FileStream _reader;
         private readonly SafeProcessHandle _process;
-        private readonly nint _pseudoConsole;
+        private nint _pseudoConsole;
         private readonly Task _capture;
 
-        public ConPtyProcess(string command, string directory)
+        public ConPtyProcess(string command, string directory, bool azurePipelines)
         {
             SafeFileHandle? inputRead = null;
             SafeFileHandle? inputWrite = null;
@@ -111,7 +116,7 @@ public sealed partial class ConPtySmokeTests
                 };
                 Marshal.SizeOf<StartupInfoEx>().Should().Be(112);
                 Marshal.OffsetOf<StartupInfoEx>(nameof(StartupInfoEx.AttributeList)).ToInt64().Should().Be(104);
-                ProcessInformation information = Start(command, directory, ref startup);
+                ProcessInformation information = Start(command, directory, ChildEnvironment(azurePipelines), ref startup);
                 CloseHandle(information.Thread);
                 _process = new SafeProcessHandle(information.Process, ownsHandle: true);
                 _pseudoConsole = pseudoConsole;
@@ -167,14 +172,23 @@ public sealed partial class ConPtySmokeTests
         {
             while (!Output.Contains(marker, StringComparison.Ordinal))
             {
-                if (_capture.IsCompleted || WaitForSingleObject(_process, 0) != 0x00000102)
+                bool exited = WaitForSingleObject(_process, 0) != 0x00000102;
+                if (_capture.IsCompleted || exited)
                 {
-                    if (_capture.IsCompleted)
+                    if (exited)
                     {
-                        await _capture;
+                        CloseConsole();
                     }
 
-                    throw new IOException($"The probe closed before '{marker}'. {Output}");
+                    // Process exit can precede capture of its final diagnostics or success marker.
+                    await _capture.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+                    if (Output.Contains(marker, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+
+                    Check(GetExitCodeProcess(_process, out uint exitCode));
+                    throw new IOException($"The probe closed before '{marker}' (exit code {exitCode}). {Output}");
                 }
 
                 await Task.Delay(10, cancellationToken);
@@ -203,7 +217,7 @@ public sealed partial class ConPtySmokeTests
                 }
 
                 _input.Dispose();
-                ClosePseudoConsole(_pseudoConsole);
+                CloseConsole();
             }
             finally
             {
@@ -220,6 +234,15 @@ public sealed partial class ConPtySmokeTests
 
                 _process.Dispose();
                 _stop.Dispose();
+            }
+        }
+
+        private void CloseConsole()
+        {
+            nint console = Interlocked.Exchange(ref _pseudoConsole, 0);
+            if (console != 0)
+            {
+                ClosePseudoConsole(console);
             }
         }
 
@@ -241,12 +264,31 @@ public sealed partial class ConPtySmokeTests
             }
         }
 
-        private static unsafe ProcessInformation Start(string command, string directory, ref StartupInfoEx startup)
+        private static string ChildEnvironment(bool azurePipelines)
+        {
+            ProcessStartInfo environment = new();
+            if (azurePipelines)
+            {
+                environment.Environment["TF_BUILD"] = "True";
+            }
+            else
+            {
+                environment.Environment.Remove("TF_BUILD");
+            }
+
+            return string.Join('\0', environment.Environment
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => $"{pair.Key}={pair.Value}")) + "\0\0";
+        }
+
+        private static unsafe ProcessInformation Start(string command, string directory, string environment, ref StartupInfoEx startup)
         {
             char[] buffer = [.. command, '\0'];
             fixed (char* pointer = buffer)
+            fixed (char* environmentPointer = environment)
             {
-                Check(CreateProcess(0, pointer, 0, 0, false, 0x00080000, 0, directory, ref startup, out ProcessInformation information));
+                Check(CreateProcess(0, pointer, 0, 0, false, ExtendedStartupInfoPresent | CreateUnicodeEnvironment,
+                    (nint)environmentPointer, directory, ref startup, out ProcessInformation information));
                 return information;
             }
         }

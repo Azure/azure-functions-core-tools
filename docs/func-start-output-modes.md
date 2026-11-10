@@ -166,8 +166,9 @@ Use `fg` to resume the dashboard; the owned input and display modes are reapplie
 Uncatchable termination, such as SIGKILL or externally terminating the process,
 cannot guarantee terminal restoration. An unresponsive output transport can
 also prevent visible restoration; input restoration is attempted first and
-shutdown waits remain bounded. Mouse/clipboard support through SSH,
-tmux, and individual terminal versions depends on their configuration.
+shutdown waits remain bounded. Pending cleanup continues if the transport recovers
+before the process exits. Mouse/clipboard support through SSH, tmux, and individual
+terminal versions depends on their configuration.
 
 ## `plain`
 

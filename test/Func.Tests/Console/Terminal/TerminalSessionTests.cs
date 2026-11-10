@@ -136,7 +136,7 @@ public class TerminalSessionTests
     }
 
     [Fact]
-    public void PartialActivation_RestoresNativeModesEvenWhenOutputFails()
+    public async Task PartialActivation_RestoresNativeModesEvenWhenOutputFails()
     {
         FailingWriter writer = new() { Fail = true };
         FakeDriver driver = new();
@@ -144,9 +144,78 @@ public class TerminalSessionTests
         Action activate = session.Activate;
 
         activate.Should().Throw<IOException>();
+        await FluentActions.Awaiting(() => session.DisposeAsync().AsTask()).Should().ThrowAsync<IOException>();
         driver.RestoreCount.Should().Be(1);
         driver.DisposeCount.Should().Be(1);
         driver.ActiveReads.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task FailedActivation_OwnsCleanupEvenWhenRestorationFinishesAfterTheException()
+    {
+        using FailedActivationWriter writer = new();
+        FakeDriver driver = new();
+        TerminalSession session = new(CreateConsole(writer), driver);
+        try
+        {
+            Action activate = session.Activate;
+            activate.Should().Throw<IOException>().Which.Should().BeSameAs(writer.Failure);
+            await writer.Restoring.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            driver.DisposeCount.Should().Be(0);
+        }
+        finally
+        {
+            writer.Release.Set();
+        }
+
+        await driver.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        driver.RestoreCount.Should().Be(1);
+        driver.DisposeCount.Should().Be(1);
+        driver.ActiveReads.Should().Be(0);
+        writer.ToString().Should().Contain(TerminalSession.LeaveScreen);
+        await session.DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DisposeDeadline_DoesNotAbandonCleanupWhenOutputLaterRecovers(bool signalCleanupFails)
+    {
+        using BlockingWriter writer = new() { BlockSequence = "\u001b[H" };
+        IOException? signalFailure = signalCleanupFails ? new("signal cleanup failure") : null;
+        FakeDriver driver = new() { SignalDisposeFailure = signalFailure };
+        TerminalSession session = new(CreateConsole(writer), driver);
+        session.Activate();
+        var render = Task.Run(() => session.Render(new Text("blocked frame")));
+        try
+        {
+            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            await FluentActions.Awaiting(() => session.DisposeAsync().AsTask())
+                .Should().ThrowAsync<TimeoutException>();
+
+            driver.InputRestored.Should().BeTrue();
+            driver.DisposeCount.Should().Be(0);
+        }
+        finally
+        {
+            writer.Release.Set();
+        }
+
+        await render.WaitAsync(TimeSpan.FromSeconds(5));
+        await driver.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        driver.RestoreCount.Should().Be(1);
+        driver.DisposeCount.Should().Be(1);
+        writer.ToString().Split(TerminalSession.LeaveScreen, StringSplitOptions.None).Length.Should().Be(2);
+        if (signalFailure is null)
+        {
+            await session.DisposeAsync();
+        }
+        else
+        {
+            (await FluentActions.Awaiting(() => session.DisposeAsync().AsTask()).Should().ThrowAsync<IOException>())
+                .Which.Should().BeSameAs(signalFailure);
+        }
     }
 
     [Fact]
@@ -349,6 +418,40 @@ public class TerminalSessionTests
         }
     }
 
+    private sealed class FailedActivationWriter : StringWriter
+    {
+        public IOException Failure { get; } = new("injected activation failure");
+
+        public TaskCompletionSource Restoring { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ManualResetEventSlim Release { get; } = new();
+
+        public override void Write(string? value)
+        {
+            if (value == TerminalSession.EnterScreen)
+            {
+                throw Failure;
+            }
+
+            if (value == TerminalSession.LeaveScreen)
+            {
+                Restoring.TrySetResult();
+                if (!Release.WaitHandle.WaitOne(TimeSpan.FromSeconds(5)))
+                {
+                    throw new TimeoutException("The test did not release its restoration writer.");
+                }
+            }
+
+            base.Write(value);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            Release.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
     private sealed class FakeDriver : ITerminalDriver, ITerminalSuspension, ITerminalEmergencyRestoration
     {
         private int _activeReads;
@@ -359,11 +462,15 @@ public class TerminalSessionTests
 
         public TaskCompletionSource ReadEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public TaskCompletionSource Disposed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public BlockingCollection<TerminalInputEvent> Input { get; } = new(8);
 
         public Exception? ReadFailure { get; init; }
 
         public Exception? RestoreInputFailure { get; init; }
+
+        public Exception? SignalDisposeFailure { get; init; }
 
         public int ActiveReads => Volatile.Read(ref _activeReads);
 
@@ -426,6 +533,7 @@ public class TerminalSessionTests
         {
             DisposeCount++;
             Input.Dispose();
+            Disposed.TrySetResult();
         }
 
         public IDisposable ObserveSuspension(Action suspend, Action resume)
@@ -441,7 +549,14 @@ public class TerminalSessionTests
 
         private sealed class Registration(FakeDriver driver) : IDisposable
         {
-            public void Dispose() => driver.SignalsDisposed = true;
+            public void Dispose()
+            {
+                driver.SignalsDisposed = true;
+                if (driver.SignalDisposeFailure is not null)
+                {
+                    throw driver.SignalDisposeFailure;
+                }
+            }
         }
     }
 }

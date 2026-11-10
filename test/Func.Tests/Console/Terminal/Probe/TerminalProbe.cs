@@ -36,12 +36,16 @@ internal sealed partial class TerminalProbe
         {
             Ansi = AnsiSupport.Yes,
             Interactive = InteractionSupport.Yes,
+            // CI metadata must not override this isolated console's interactive capabilities.
+            Enrichment = new ProfileEnrichment { UseDefaultEnrichers = false },
         });
         TerminalSessionFactory factory = new(new WindowsPlatform());
         System.Console.Write("HANDOFF_READY\r\n");
         ConsoleKeyInfo? promptKey = await console.Input.ReadKeyAsync(true, deadline.Token);
         if (promptKey?.KeyChar != 'a')
         {
+            System.Console.Error.WriteLine($"HANDOFF_FAILED interactive={console.Profile.Capabilities.Interactive}"
+                + $" key={(promptKey.HasValue ? ((int)promptKey.Value.KeyChar).ToString("X4") : "null")}");
             return 10;
         }
 
@@ -50,7 +54,8 @@ internal sealed partial class TerminalProbe
             await Task.Delay(5, deadline.Token);
         }
 
-        bool handedOff = factory.DrainManagedInput(console, deadline.Token).Any(input => input.Key.KeyChar == 'b');
+        TerminalInputEvent[] startupInput = [.. factory.DrainManagedInput(console, deadline.Token)];
+        bool handedOff = startupInput.Any(input => input.Key.KeyChar == 'b');
         WindowsTerminalNative native = new();
         uint inputMode = native.GetInputMode();
         uint outputMode = native.GetOutputMode();
