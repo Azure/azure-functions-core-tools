@@ -112,6 +112,7 @@ public class FullScreenDashboardTests
         await renderer.OnEventAsync(Log("old"), [], timeout.Token);
         await terminal.WaitForTextAsync("old", timeout.Token);
         await terminal.SendAndWaitAsync(new TerminalInputEvent(TerminalInputKind.PointerDown, X: 0, Y: terminal.LogTop), timeout.Token);
+        await terminal.WaitForTextAsync("Logs · Paused", timeout.Token);
 
         await renderer.OnEventAsync(Log("new"), [], timeout.Token);
         await terminal.WaitForTextAsync("Selection expired", timeout.Token);
