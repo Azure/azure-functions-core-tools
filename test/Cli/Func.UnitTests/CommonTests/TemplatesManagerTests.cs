@@ -247,5 +247,63 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
 
             Assert.Empty(Directory.GetFiles(_testWorkingDir, "function.json", SearchOption.AllDirectories));
         }
+
+        [Theory]
+        [MemberData(nameof(NodeConnectorTemplates))]
+        public async Task ConnectorTemplates_IncludeInstructionsCommentAndRequiredSettings(
+            string id, string name, string defaultName, string language, string extension)
+        {
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == id);
+            Assert.Equal(name, template.Metadata.Name);
+
+            Assert.True(TemplatesManager.IsConnectorTriggerTemplate(template));
+            Assert.Contains(
+                "// Visit aka.ms/connectortrigger to local testing and deployment instructions.",
+                template.Files[$"%functionName%.{extension}"]);
+
+            var settings = TemplatesManager.GetConnectorTriggerSettings(template);
+            Assert.Contains("ConnectorNamespace__pollingEndpoint", settings.Keys);
+            Assert.Contains(settings.Keys, k => k.EndsWith("TriggerConfigName", StringComparison.Ordinal));
+            Assert.DoesNotContain(settings.Keys, k => k.Equals("functionName", StringComparison.OrdinalIgnoreCase));
+
+            var readme = TemplatesManager.BuildConnectorTriggerReadme(
+                await StaticResources.ConnectorTriggerReadme, defaultName, $"{defaultName}.{extension}", template, settings);
+            Assert.DoesNotMatch(@"\{[A-Za-z]+\}", readme);
+            Assert.Contains(defaultName, readme);
+            Assert.Contains(language, readme);
+            Assert.All(settings.Keys, key => Assert.Contains(key, readme));
+        }
+
+        [Theory]
+        [MemberData(nameof(NodeConnectorTemplates))]
+        public async Task Deploy_EmbeddedNodeConnector_WritesReadmeAndMergesLocalSettings(
+            string id, string name, string defaultName, string language, string extension)
+        {
+            Directory.CreateDirectory(Path.Combine(_testWorkingDir, "src", "functions"));
+            var localSettingsPath = Path.Combine(_testWorkingDir, Constants.LocalSettingsJsonFileName);
+            await File.WriteAllTextAsync(
+                localSettingsPath,
+                "{\"IsEncrypted\":false,\"Values\":{\"FUNCTIONS_WORKER_RUNTIME\":\"node\",\"ConnectorNamespace__pollingEndpoint\":\"https://existing\"}}");
+
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == id);
+            Assert.Equal(name, template.Metadata.Name);
+
+            await manager.Deploy(defaultName, null, template);
+
+            Assert.True(File.Exists(Path.Combine(_testWorkingDir, "src", "functions", $"{defaultName}.{extension}")));
+            var readmePath = Path.Combine(_testWorkingDir, $"{defaultName}.README.md");
+            Assert.True(File.Exists(readmePath));
+            Assert.Contains(language, await File.ReadAllTextAsync(readmePath));
+
+            var values = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(await File.ReadAllTextAsync(localSettingsPath))["Values"];
+            Assert.Equal("node", (string)values["FUNCTIONS_WORKER_RUNTIME"]);
+            Assert.Equal("https://existing", (string)values["ConnectorNamespace__pollingEndpoint"]);
+            foreach (var key in TemplatesManager.GetConnectorTriggerSettings(template).Keys)
+            {
+                Assert.NotNull(values[key]);
+            }
+        }
     }
 }

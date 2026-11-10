@@ -110,6 +110,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> PythonGettingStartedMarkdown => GetValue("getting_started_python_function.md");
 
+        public static Task<string> ConnectorTriggerReadme => GetValue("connector-trigger-README.md");
+
         public static Task<string> PrintFunctionJson => GetValue("print-functions.sh");
 
         public static Task<string> KedaV1Template => GetValue("keda-v1.yaml");

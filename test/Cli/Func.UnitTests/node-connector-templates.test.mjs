@@ -97,6 +97,10 @@ try {
                 assert.doesNotMatch(source, /\bcardinality\s*:/, 'Single-event templates must rely on the library default.');
                 assert.ok(source.includes(`triggerConfigName: '%${connector.setting}%'`));
                 assert.doesNotMatch(source, /\bany\b|console\.log|function\.json|deliveryMode: 'Webhook'/);
+                const lines = source.split(/\r?\n/);
+                const triggerLine = lines.findIndex((line) => /^(connectors\.\w+\.\w+|connectorTrigger(<[^>]*>)?)\(/.test(line));
+                assert.ok(triggerLine > 0, 'Template must register a connector trigger.');
+                assert.equal(lines[triggerLine - 1], '// Visit aka.ms/connectortrigger to local testing and deployment instructions.');
                 assert.ok(payloadDocumentation.length >= 2, 'List the selected and alternative operation payloads.');
                 assert.ok(payloadDocumentation.some(({ operation }) => operation === connector.operation));
                 if (expectedPayloadDocumentation) {

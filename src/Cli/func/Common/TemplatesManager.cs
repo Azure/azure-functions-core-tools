@@ -147,6 +147,7 @@ namespace Azure.Functions.Cli.Common
             {
                 await DeployNewNodeProgrammingModel(name, fileName, template);
                 await EnsureDurableFunctionsNpmPackage(template);
+                await EnsureConnectorTriggerScaffolding(name, fileName, template);
             }
             else
             {
@@ -266,6 +267,129 @@ namespace Azure.Functions.Cli.Common
             catch (Exception)
             {
                 ColoredConsole.Error.WriteLine(WarningColor("Warning: You must run \"npm install\" manually"));
+            }
+        }
+
+        internal const string ConnectorTriggerType = "connectorTrigger";
+        internal const string ConnectorPollingEndpointSetting = "ConnectorNamespace__pollingEndpoint";
+        internal const string ConnectorPollingEndpointPlaceholder = "https://<connector-namespace-host>";
+        internal const string ConnectorTriggerConfigPlaceholder = "<poll-trigger-config-name>";
+
+        private static readonly Dictionary<string, string> ConnectorDisplayNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["OutlookTrigger"] = "Office 365 Outlook",
+            ["SharepointTrigger"] = "SharePoint",
+            ["OneDriveTrigger"] = "OneDrive for Business",
+            ["DataverseTrigger"] = "Dataverse",
+            ["TeamsTrigger"] = "Microsoft Teams",
+        };
+
+        internal static bool IsConnectorTriggerTemplate(Template template) =>
+            string.Equals(template?.Metadata?.TriggerType, ConnectorTriggerType, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Gets the app settings (with placeholder values) required by a connector trigger template.
+        /// </summary>
+        internal static IDictionary<string, string> GetConnectorTriggerSettings(Template template)
+        {
+            var settings = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var content in template.Files?.Values ?? Enumerable.Empty<string>())
+            {
+                foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(content, "%([A-Za-z0-9_]+)%"))
+                {
+                    var key = match.Groups[1].Value;
+                    if (!key.Equals("functionName", StringComparison.OrdinalIgnoreCase) && !settings.ContainsKey(key))
+                    {
+                        settings[key] = ConnectorTriggerConfigPlaceholder;
+                    }
+                }
+            }
+
+            settings[ConnectorPollingEndpointSetting] = ConnectorPollingEndpointPlaceholder;
+            return settings;
+        }
+
+        internal static string BuildConnectorTriggerReadme(string readmeTemplate, string functionName, string fileName, Template template, IDictionary<string, string> settings)
+        {
+            var isTypeScript = template.Id.EndsWith("TypeScript-4.x", StringComparison.OrdinalIgnoreCase);
+            var prefix = template.Id.Split('-')[0];
+            var displayName = ConnectorDisplayNames.TryGetValue(prefix, out var dn) ? dn : prefix;
+
+            var rows = settings.Select(kv => kv.Key == ConnectorPollingEndpointSetting
+                ? $"| `{kv.Key}` | Endpoint of the connector namespace (used by `connection: 'ConnectorNamespace'`). |"
+                : $"| `{kv.Key}` | Name of the {displayName} poll trigger config in the connector namespace. |");
+
+            var typeScriptNote = isTypeScript
+                ? Environment.NewLine + "For TypeScript, make sure `tsconfig.json` sets `\"module\": \"Node16\"` and `\"moduleResolution\": \"Node16\"`, then run `npm run build`." + Environment.NewLine
+                : string.Empty;
+
+            return readmeTemplate
+                .Replace("{FunctionName}", functionName)
+                .Replace("{ConnectorDisplayName}", displayName)
+                .Replace("{Language}", isTypeScript ? "TypeScript" : "JavaScript")
+                .Replace("{TemplateName}", template.Metadata?.Name ?? template.Id)
+                .Replace("{FileName}", fileName)
+                .Replace("{SettingsTable}", string.Join(Environment.NewLine, rows))
+                .Replace("{TypeScriptNote}", typeScriptNote);
+        }
+
+        private async Task EnsureConnectorTriggerScaffolding(string functionName, string fileName, Template template)
+        {
+            if (!IsConnectorTriggerTemplate(template))
+            {
+                return;
+            }
+
+            var settings = GetConnectorTriggerSettings(template);
+
+            try
+            {
+                var localSettingsPath = Path.Combine(Environment.CurrentDirectory, Constants.LocalSettingsJsonFileName);
+                var localSettings = FileSystemHelpers.FileExists(localSettingsPath)
+                    ? JObject.Parse(await FileSystemHelpers.ReadAllTextFromFileAsync(localSettingsPath))
+                    : new JObject { ["IsEncrypted"] = false };
+
+                if (localSettings["Values"] is not JObject values)
+                {
+                    values = new JObject();
+                    localSettings["Values"] = values;
+                }
+
+                var added = new List<string>();
+                foreach (var setting in settings)
+                {
+                    if (values[setting.Key] == null)
+                    {
+                        values[setting.Key] = setting.Value;
+                        added.Add(setting.Key);
+                    }
+                }
+
+                if (added.Count > 0)
+                {
+                    await FileSystemHelpers.WriteAllTextToFileAsync(localSettingsPath, JsonConvert.SerializeObject(localSettings, Formatting.Indented));
+                    ColoredConsole.WriteLine(AdditionalInfoColor($"Added connector trigger settings to {Constants.LocalSettingsJsonFileName}: {string.Join(", ", added)}. Replace the placeholder values before running."));
+                }
+            }
+            catch (Exception ex)
+            {
+                ColoredConsole.Error.WriteLine(WarningColor($"Warning: Unable to update {Constants.LocalSettingsJsonFileName}. Add these settings manually: {string.Join(", ", settings.Keys)}. {ex.Message}"));
+            }
+
+            try
+            {
+                var readmePath = Path.Combine(Environment.CurrentDirectory, $"{functionName}.README.md");
+                if (!FileSystemHelpers.FileExists(readmePath))
+                {
+                    var functionFileName = fileName ?? ReplaceFunctionNamePlaceholder(template.Files.Keys.First(k => !k.EndsWith(".dat")), functionName);
+                    var readme = BuildConnectorTriggerReadme(await StaticResources.ConnectorTriggerReadme, functionName, functionFileName, template, settings);
+                    await FileSystemHelpers.WriteAllTextToFileAsync(readmePath, readme);
+                    ColoredConsole.WriteLine(AdditionalInfoColor($"Created {Path.GetFileName(readmePath)} with setup instructions. Visit aka.ms/connectortrigger for more details."));
+                }
+            }
+            catch (Exception ex)
+            {
+                ColoredConsole.Error.WriteLine(WarningColor($"Warning: Unable to create the connector trigger README. Visit aka.ms/connectortrigger for instructions. {ex.Message}"));
             }
         }
 
