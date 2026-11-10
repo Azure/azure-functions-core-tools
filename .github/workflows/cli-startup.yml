@@ -1,0 +1,153 @@
+name: CLI startup measurements
+
+on:
+  pull_request:
+    branches:
+      - vnext
+    paths:
+      - src/**
+      - eng/build/**
+      - eng/res/**
+      - eng/scripts/measure-cli-startup.ps1
+      - test/Performance/**
+      - Directory.Build.*
+      - Directory.Packages.props
+      - global.json
+      - NuGet.Config
+      - stylecop.json
+      - .editorconfig
+      - .github/workflows/cli-startup.yml
+  push:
+    branches:
+      - vnext
+    paths:
+      - src/**
+      - eng/build/**
+      - eng/res/**
+      - eng/scripts/measure-cli-startup.ps1
+      - test/Performance/**
+      - Directory.Build.*
+      - Directory.Packages.props
+      - global.json
+      - NuGet.Config
+      - stylecop.json
+      - .editorconfig
+      - .github/workflows/cli-startup.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-startup-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: Startup observations (${{ matrix.os }})
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            rid-prefix: win
+          - os: ubuntu-24.04
+            rid-prefix: linux
+          - os: macos-15
+            rid-prefix: osx
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+      DOTNET_NOLOGO: 'true'
+      RESULTS_DIRECTORY: ${{ github.workspace }}/out/startup-observations
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Record native target and build provenance
+        id: target
+        env:
+          RID_PREFIX: ${{ matrix.rid-prefix }}
+          RUNNER_LABEL: ${{ matrix.os }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [void][IO.Directory]::CreateDirectory($env:RESULTS_DIRECTORY)
+          $architecture = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+          $osArchitecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+          if ($architecture -ne $osArchitecture -or $architecture -notin @('x64', 'arm64')) {
+              throw "Expected a native x64/ARM64 process; process=$architecture, OS=$osArchitecture."
+          }
+          $rid = "$env:RID_PREFIX-$architecture"
+          $executableName = if ($IsWindows) { 'func.exe' } else { 'func' }
+          $executable = Join-Path $env:GITHUB_WORKSPACE "out/startup-cli/$executableName"
+          "rid=$rid" >> $env:GITHUB_OUTPUT
+          "executable=$executable" >> $env:GITHUB_OUTPUT
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0) { throw 'SDK selection failed.' }
+          $head = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Source identity lookup failed.' }
+          [ordered]@{
+              schemaVersion = 1
+              sourceRevision = $head
+              eventRevision = $env:GITHUB_SHA
+              repository = $env:GITHUB_REPOSITORY
+              runId = $env:GITHUB_RUN_ID
+              runAttempt = $env:GITHUB_RUN_ATTEMPT
+              runnerLabel = $env:RUNNER_LABEL
+              runnerImage = $env:ImageOS
+              runnerImageVersion = $env:ImageVersion
+              rid = $rid
+              sdkVersion = $sdk
+              dotnetPath = (Get-Command dotnet).Source
+              configuration = 'Release'
+              telemetry = 'opted-out'
+              budgetStatus = 'not-evaluated'
+          } | ConvertTo-Json | Set-Content (Join-Path $env:RESULTS_DIRECTORY 'provenance.json') -Encoding utf8
+
+      - name: Restore native CLI
+        env:
+          TARGET_RID: ${{ steps.target.outputs.rid }}
+        run: |
+          dotnet restore src/Func/Func.csproj -r $env:TARGET_RID 2>&1 |
+              Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'restore.log')
+          if ($LASTEXITCODE -ne 0) { throw 'CLI restore failed.' }
+
+      - name: Publish Release CLI
+        env:
+          TARGET_RID: ${{ steps.target.outputs.rid }}
+        run: |
+          dotnet publish src/Func/Func.csproj -c Release -r $env:TARGET_RID --no-restore -p:CI=true -o out/startup-cli 2>&1 |
+              Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'publish.log')
+          if ($LASTEXITCODE -ne 0) { throw 'CLI publish failed.' }
+
+      - name: Validate startup harness
+        env:
+          CLI_EXECUTABLE: ${{ steps.target.outputs.executable }}
+        run: |
+          & ./test/Performance/MeasureCliStartup.Tests.ps1 -ExecutablePath $env:CLI_EXECUTABLE *>&1 |
+              Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'harness-tests.log')
+
+      - name: Collect startup observations (no performance gate)
+        env:
+          CLI_EXECUTABLE: ${{ steps.target.outputs.executable }}
+        run: |
+          & ./eng/scripts/measure-cli-startup.ps1 -ExecutablePath $env:CLI_EXECUTABLE `
+              -OutputPath (Join-Path $env:RESULTS_DIRECTORY 'measurements.json') *>&1 |
+              Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'measurements.log')
+
+      - name: Retain observations and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-startup-${{ matrix.os }}-${{ github.run_attempt }}
+          path: out/startup-observations/
+          if-no-files-found: warn
+          retention-days: 30
