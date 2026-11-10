@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
-using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
@@ -29,7 +28,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Create_BindsTheSuppliedContext()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]));
+        TemplaterFactory factory = CreateFactory();
         TemplateEngineContext context = Context("command");
 
         using Templater templater = factory.Create(context);
@@ -41,7 +40,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_ReadsTemplatesFromTemplatesDirectoryUnderFuncHome()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]));
+        TemplaterFactory factory = CreateFactory();
 
         using Templater templater = factory.Create(Context("command"));
         IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
@@ -53,7 +52,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_EachCallReturnsAnIndependentTemplater()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]));
+        TemplaterFactory factory = CreateFactory();
         Templater first = factory.Create(Context("first"));
         using Templater second = factory.Create(Context("second"));
 
@@ -64,9 +63,29 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_DoesNotConstructFunctionsEvaluatorWithoutFunctionsConstraints()
+    {
+        await InstallFixturesUnderHomeAsync();
+        bool evaluatorCreated = false;
+        Lazy<FuncTemplateConstraintEvaluator> evaluator = new(() =>
+        {
+            evaluatorCreated = true;
+            return new(new TemplateConstraintRequirementMatcher());
+        });
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), evaluator);
+
+        using Templater templater = factory.Create(Context("command"));
+        TemplateCatalogEntry entry = (await templater.ListAsync(TemplateType.Item, CancellationToken.None)).Single();
+        TemplateResolutionResult result = await templater.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Selected);
+        evaluatorCreated.Should().BeFalse();
+    }
+
+    [Fact]
     public void Create_NullContext_Throws()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]));
+        TemplaterFactory factory = CreateFactory();
 
         Action act = () => factory.Create(null!);
 
@@ -76,18 +95,21 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Constructor_NullConfigurationPaths_Throws()
     {
-        Action act = () => _ = new TemplaterFactory(null!, new InstalledProjectStackCatalog([]));
+        Action act = () => _ = new TemplaterFactory(null!, FuncConstraintEvaluator());
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("configurationPaths");
     }
 
     [Fact]
-    public void Constructor_NullProjectStacks_Throws()
+    public void Constructor_NullFunctionsEvaluator_Throws()
     {
         Action act = () => _ = new TemplaterFactory(new CliConfigurationPathsOptions(Home), null!);
 
-        act.Should().Throw<ArgumentNullException>().WithParameterName("projectStacks");
+        act.Should().Throw<ArgumentNullException>().WithParameterName("funcConstraintEvaluator");
     }
+
+    private TemplaterFactory CreateFactory()
+        => new(new CliConfigurationPathsOptions(Home), FuncConstraintEvaluator());
 
     private async Task InstallFixturesUnderHomeAsync()
     {
@@ -97,4 +119,7 @@ public sealed class TemplaterFactoryTests : IDisposable
 
     private TemplateEngineContext Context(string directory)
         => new(WorkingDirectory.FromExplicit(Path.Combine(_root, directory)));
+
+    private static Lazy<FuncTemplateConstraintEvaluator> FuncConstraintEvaluator()
+        => new(() => new(new TemplateConstraintRequirementMatcher()));
 }

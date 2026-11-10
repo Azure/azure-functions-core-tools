@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 
@@ -19,6 +20,7 @@ internal sealed class TemplateEngineSession : IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
     private readonly TemplatePackageManager _packageManager;
+    private (IReadOnlyList<ITemplatePackage> Packages, IReadOnlyList<ITemplateInfo> Templates)? _inventory;
     private bool _disposed;
 
     public TemplateEngineSession(TemplateEngineContext context, string settingsLocation)
@@ -33,11 +35,13 @@ internal sealed class TemplateEngineSession : IDisposable
 
     public TemplateEngineContext Context { get; }
 
+    internal void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+
     public IEngineEnvironmentSettings Settings
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfDisposed();
             return _settings;
         }
     }
@@ -46,9 +50,28 @@ internal sealed class TemplateEngineSession : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfDisposed();
             return _packageManager;
         }
+    }
+
+    public async Task<(IReadOnlyList<ITemplatePackage> Packages, IReadOnlyList<ITemplateInfo> Templates)> GetInventoryAsync(
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_inventory is { } inventory)
+        {
+            return inventory;
+        }
+
+        IReadOnlyList<ITemplatePackage> packages = await _packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
+        IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        packages = Array.AsReadOnly(packages.ToArray());
+        templates = Array.AsReadOnly(templates.ToArray());
+        _inventory = (packages, templates);
+        return _inventory.Value;
     }
 
     public void Dispose()
@@ -59,6 +82,7 @@ internal sealed class TemplateEngineSession : IDisposable
         }
 
         _disposed = true;
+        _inventory = null;
         _packageManager.Dispose();
         _settings.Dispose();
     }

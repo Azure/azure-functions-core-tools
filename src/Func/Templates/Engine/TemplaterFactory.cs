@@ -2,28 +2,29 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Configuration;
-using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
 internal sealed class TemplaterFactory(
     CliConfigurationPathsOptions configurationPaths,
-    InstalledProjectStackCatalog projectStacks) : ITemplaterFactory
+    Lazy<FuncTemplateConstraintEvaluator> funcConstraintEvaluator) : ITemplaterFactory
 {
     /// <summary>
     /// Sub-directory (under the func home) that holds the engine's settings,
     /// installed template packages, and caches.
     /// </summary>
     private const string SettingsDirectoryName = "templates";
-
     private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
-    private readonly InstalledProjectStackCatalog _projectStacks = projectStacks ?? throw new ArgumentNullException(nameof(projectStacks));
+    private readonly Lazy<FuncTemplateConstraintEvaluator> _funcConstraintEvaluator =
+        funcConstraintEvaluator ?? throw new ArgumentNullException(nameof(funcConstraintEvaluator));
 
     public Templater Create(TemplateEngineContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new Templater(new TemplateEngineSession(context, settingsLocation), _projectStacks);
+        TemplateEngineSession session = new(context, settingsLocation);
+        TemplateSelection selection = new(session, new TemplateEligibilityEvaluator(session, _funcConstraintEvaluator));
+        return new Templater(session, selection);
     }
 }
