@@ -687,6 +687,7 @@ public class SpectreInteractionServiceTests
             ColorSystem = ColorSystemSupport.NoColors,
             Interactive = interactive ? InteractionSupport.Yes : InteractionSupport.No,
             Out = new AnsiConsoleOutput(writer),
+            Enrichment = new ProfileEnrichment { UseDefaultEnrichers = false },
         });
         console.Profile.Capabilities.Unicode = unicode;
         console.Profile.Width = 120;
