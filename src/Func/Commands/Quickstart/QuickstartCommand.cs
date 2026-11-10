@@ -186,7 +186,6 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
             writeCompletion: false);
 
         // 7. Next steps
-        _interaction.WriteBlankLine();
         _interaction.WriteLine(l => l
             .Success(QuickstartMessages.SuccessIcon)
             .Muted("Scaffolded ")

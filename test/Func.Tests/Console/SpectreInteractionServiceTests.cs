@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Azure.Functions.Cli.Console;
@@ -469,6 +470,78 @@ public class SpectreInteractionServiceTests
     }
 
     [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(false, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public async Task Progress_CompletionStaysOnSpinnerRow(bool unicode, bool writeCompletion, bool hasDetail)
+    {
+        var writer = new CaptureWriter();
+        IAnsiConsole console = CreateConsole(writer, interactive: true, unicode);
+        var service = new SpectreInteractionService(new DefaultTheme(), console, console);
+        service.WriteLine("Before operation");
+        int spinnerRow = -1;
+
+        await service.RunWithProgressAsync("Installing workload", (progress, _) =>
+        {
+            if (hasDetail)
+            {
+                progress.SetDescription("Downloading");
+            }
+
+            spinnerRow = GetRenderedRow(writer.GetStringBuilder().ToString(), "Installing workload");
+            Assert.Equal(1, spinnerRow);
+            return Task.FromResult(0);
+        }, writeCompletion: writeCompletion);
+
+        if (!writeCompletion)
+        {
+            service.WriteSuccess("Installed workload");
+        }
+
+        Assert.Equal(spinnerRow, GetRenderedRow(
+            writer.GetStringBuilder().ToString(), writeCompletion ? "Installing workload" : "Installed workload"));
+        Assert.DoesNotContain("\x1b[0A", writer.GetStringBuilder().ToString());
+    }
+
+    [Fact]
+    public async Task Progress_FailureStaysOnSpinnerRow()
+    {
+        var (service, _, stderr) = CreateService(interactive: true);
+        int spinnerRow = -1;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.RunWithProgressAsync<int>("Installing workload", (progress, _) =>
+            {
+                progress.SetDescription("Extracting");
+                spinnerRow = GetRenderedRow(stderr.GetStringBuilder().ToString(), "Installing workload");
+                Assert.Equal(0, spinnerRow);
+                throw new InvalidOperationException("Invalid package");
+            }, writeCompletion: false));
+
+        Assert.Equal(spinnerRow, GetRenderedRow(stderr.GetStringBuilder().ToString(), "Installing workload"));
+    }
+
+    [Fact]
+    public async Task Progress_RefreshesWhileWaitingForOperation()
+    {
+        var (service, _, stderr) = CreateService(interactive: true);
+
+        await service.RunWithProgressAsync("Downloading", async (_, _) =>
+        {
+            await Task.Delay(250);
+            return 0;
+        });
+
+        // Include a refresh beyond the initial frame, final frame, and completion row.
+        Assert.True(Regex.Matches(stderr.ToString(), "Downloading").Count >= 4);
+    }
+
+    [Theory]
     [InlineData(true, "\u00d7", "\u2514")]
     [InlineData(false, "[!]", "`")]
     public async Task Progress_FailureRetainsLatestDetailAndPropagates(bool unicode, string failure, string gutter)
@@ -623,6 +696,8 @@ public class SpectreInteractionServiceTests
 
         Assert.Contains($"\u2713 First{Environment.NewLine}", stderr.ToString());
         Assert.EndsWith($"\u2713 Second{Environment.NewLine}", stderr.ToString());
+        Assert.Equal(0, GetRenderedRow(stderr.GetStringBuilder().ToString(), "First"));
+        Assert.Equal(1, GetRenderedRow(stderr.GetStringBuilder().ToString(), "Second"));
     }
 
     [Fact]
@@ -692,6 +767,23 @@ public class SpectreInteractionServiceTests
         console.Profile.Capabilities.Unicode = unicode;
         console.Profile.Width = 120;
         return console;
+    }
+
+    private static int GetRenderedRow(string output, string text)
+    {
+        int textIndex = output.LastIndexOf(text, StringComparison.Ordinal);
+        Assert.True(textIndex >= 0, $"Expected rendered text '{text}'.");
+        int row = 0;
+
+        // These short rows do not wrap; only newlines and vertical cursor movements change their position.
+        foreach (Match movement in Regex.Matches(output[..textIndex], @"\n|\x1b\[(\d*)([ABEF])"))
+        {
+            int distance = movement.Groups[1].Value is ""
+                ? 1 : Math.Max(1, int.Parse(movement.Groups[1].Value, CultureInfo.InvariantCulture));
+            row = Math.Max(0, row + (movement.Groups[2].Value is "A" or "F" ? -distance : distance));
+        }
+
+        return row;
     }
 
     private sealed class CaptureWriter : StringWriter

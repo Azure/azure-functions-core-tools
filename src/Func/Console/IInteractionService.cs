@@ -111,8 +111,9 @@ internal interface IInteractionService
     /// has distinct phases the user benefits from seeing (e.g. resolve →
     /// download → extract). Phases with a known total surface as a real
     /// percentage; phases without one render without a progress bar. Description
-    /// changes appear beneath the stable task title and collapse to a checked
-    /// title on success. Failed operations retain their latest phase detail.
+    /// changes appear beneath the stable task title. On success, the check replaces
+    /// the spinner on the same row and phase details collapse. Failed operations
+    /// retain their latest phase detail.
     /// Set <paramref name="writeCompletion"/> to false when the caller writes its
     /// own result, including warning/no-op outcomes, immediately after this call.
     /// </remarks>

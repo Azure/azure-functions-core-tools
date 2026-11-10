@@ -174,34 +174,44 @@ internal class SpectreInteractionService : IInteractionService
             return await action(logging, cancellationToken);
         }
 
-        var display = new OperationProgressColumn(initialDescription, _theme, _stderr.Profile.Capabilities.Unicode);
-        ProgressTask? task = null;
+        var task = new ProgressTask(0, Markup.Escape(initialDescription), maxValue: 1d, autoStart: false)
+        {
+            IsIndeterminate = true,
+        };
+        var display = new OperationProgressDisplay(initialDescription, task, _theme, _stderr.Profile.Capabilities.Unicode);
         bool succeeded = false;
         try
         {
             T result = default!;
-            await _stderr.Progress()
-                .AutoRefresh(true)
+            // Live avoids the padding that Spectre's Progress renderer adds above and below each task.
+            await _stderr.Live(display)
                 .AutoClear(true)
-                .HideCompleted(false)
-                .Columns(display)
                 .StartAsync(async ctx =>
                 {
-                    task = ctx.AddTask(Markup.Escape(initialDescription), autoStart: true, maxValue: 1d);
-                    task.IsIndeterminate = true;
-
+                    task.StartTask();
+                    ctx.Refresh();
                     var live = new SpectreProgressContext(task, ctx.Refresh);
-                    result = await action(live, cancellationToken);
-                    task.StopTask();
+                    Task<T> operation = action(live, cancellationToken);
+                    while (!operation.IsCompleted)
+                    {
+                        await Task.WhenAny(operation, Task.Delay(100));
+                        ctx.Refresh();
+                    }
+
+                    result = await operation;
                 });
             succeeded = true;
             return result;
         }
         finally
         {
-            if (task is not null && (!succeeded || writeCompletion))
+            if (task.IsStarted)
             {
-                _stderr.Write(display.BuildResult(task, succeeded));
+                task.StopTask();
+                if (!succeeded || writeCompletion)
+                {
+                    _stderr.Write(display.BuildResult(succeeded));
+                }
             }
         }
     }

@@ -7,12 +7,18 @@ using Spectre.Console.Rendering;
 
 namespace Azure.Functions.Cli.Console;
 
-internal sealed class OperationProgressColumn(string title, ITheme theme, bool unicode) : ProgressColumn
+internal sealed class OperationProgressDisplay(string title, ProgressTask task, ITheme theme, bool unicode) : Renderable
 {
     private readonly Spinner _spinner = unicode ? Spinner.Known.Dots : Spinner.Known.Line;
     private readonly ProgressBarColumn _bar = new() { Width = 30 };
 
-    public override IRenderable Render(RenderOptions options, ProgressTask task, TimeSpan deltaTime)
+    protected override Measurement Measure(RenderOptions options, int maxWidth)
+        => BuildProgress(options).Measure(options, maxWidth);
+
+    protected override IEnumerable<Segment> Render(RenderOptions options, int maxWidth)
+        => BuildProgress(options).Render(options, maxWidth);
+
+    private IRenderable BuildProgress(RenderOptions options)
     {
         int frame = (int)(task.ElapsedTime?.TotalMilliseconds / _spinner.Interval.TotalMilliseconds ?? 0);
         var rows = new List<IRenderable>
@@ -20,20 +26,26 @@ internal sealed class OperationProgressColumn(string title, ITheme theme, bool u
             BuildTitle(_spinner.Frames[frame % _spinner.Frames.Count], theme.Active),
         };
 
-        AddDetail(rows, task);
+        AddDetail(rows);
 
         if (!task.IsIndeterminate)
         {
             rows.Add(new Columns(
                 new Text("  "),
-                _bar.Render(options, task, deltaTime),
+                _bar.Render(options, task, TimeSpan.Zero),
                 new Text($"{task.Percentage,3:0}%", theme.Muted)));
+        }
+
+        if (rows.Count == 1)
+        {
+            // Spectre 0.49.1 emits CSI 0 A for a single live row, which terminals interpret as moving up one row.
+            rows.Add(new Text(" "));
         }
 
         return new Rows(rows);
     }
 
-    internal IRenderable BuildResult(ProgressTask task, bool succeeded)
+    internal IRenderable BuildResult(bool succeeded)
     {
         var rows = new List<IRenderable>
         {
@@ -44,7 +56,7 @@ internal sealed class OperationProgressColumn(string title, ITheme theme, bool u
 
         if (!succeeded)
         {
-            AddDetail(rows, task);
+            AddDetail(rows);
         }
 
         return new Rows(rows);
@@ -53,7 +65,7 @@ internal sealed class OperationProgressColumn(string title, ITheme theme, bool u
     private Paragraph BuildTitle(string icon, Style style)
         => new Paragraph().Append(icon, style).Append(" ").Append(title);
 
-    private void AddDetail(List<IRenderable> rows, ProgressTask task)
+    private void AddDetail(List<IRenderable> rows)
     {
         string description = Markup.Remove(task.Description);
         if (!string.Equals(description, title, StringComparison.Ordinal))
