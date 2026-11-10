@@ -12,6 +12,8 @@ internal sealed class TestDashboardTerminal : ITerminalSession
 {
     private readonly IAnsiConsole _console;
     private readonly bool _readKeys;
+    private readonly TaskCompletionSource _inputStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _firstFrame = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _entered;
     private bool _disposed;
 
@@ -28,8 +30,11 @@ internal sealed class TestDashboardTerminal : ITerminalSession
 
     public TerminalSize Size => new(_console.Profile.Width, _console.Profile.Height);
 
+    public Task Started => Task.WhenAll(_inputStarted.Task, _firstFrame.Task);
+
     public async IAsyncEnumerable<TerminalInputEvent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        _inputStarted.TrySetResult();
         if (!_readKeys)
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
@@ -49,6 +54,7 @@ internal sealed class TestDashboardTerminal : ITerminalSession
     public void Render(IRenderable frame)
     {
         _console.Write(frame);
+        _firstFrame.TrySetResult();
     }
 
     public void WriteControl(string sequence) => _console.Write(new ControlCode(sequence));

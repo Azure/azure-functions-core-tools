@@ -307,6 +307,20 @@ public class FullScreenDashboardTests
     [Fact]
     public async Task StalledOutput_DoesNotPreventInputRestorationDuringShutdown()
     {
+        TaskCompletionSource<(TimeSpan Delay, Action Expire)> shutdownDeadline = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TimeProvider time = Substitute.For<TimeProvider>();
+        time.CreateTimer(Arg.Any<TimerCallback>(), Arg.Any<object?>(), Arg.Any<TimeSpan>(), Arg.Any<TimeSpan>())
+            .Returns(call =>
+            {
+                if (call.ArgAt<TimeSpan>(3) == Timeout.InfiniteTimeSpan)
+                {
+                    TimerCallback callback = call.ArgAt<TimerCallback>(0);
+                    object? state = call.ArgAt<object?>(1);
+                    shutdownDeadline.TrySetResult((call.ArgAt<TimeSpan>(2), () => callback(state)));
+                }
+
+                return Substitute.For<ITimer>();
+            });
         ITerminalSession terminal = Substitute.For<ITerminalSession>();
         terminal.Size.Returns(new TerminalSize(80, 24));
         terminal.ReadAsync(Arg.Any<CancellationToken>()).Returns(call => IdleInput(call.Arg<CancellationToken>()));
@@ -321,14 +335,18 @@ public class FullScreenDashboardTests
         });
         IPlatform platform = Substitute.For<IPlatform>();
         await using CompactRenderer renderer = new(Interaction(), new FunctionPalette(),
-            new CompactDashboardShortcutLabels(platform), terminal: terminal);
+            new CompactDashboardShortcutLabels(platform), terminal: terminal, timeProvider: time);
         await renderer.OnStartAsync(new DashboardState(), CancellationToken.None);
         try
         {
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            await FluentActions.Awaiting(() => renderer.OnSummaryAsync(
-                    new DashboardState().BuildSummary("sigint", DateTimeOffset.UtcNow), CancellationToken.None)
-                .WaitAsync(TimeSpan.FromSeconds(5)))
+            Task summary = renderer.OnSummaryAsync(
+                new DashboardState().BuildSummary("sigint", DateTimeOffset.UtcNow), CancellationToken.None);
+            (TimeSpan delay, Action expire) = await shutdownDeadline.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            delay.Should().Be(TimeSpan.FromSeconds(2));
+            expire();
+
+            await FluentActions.Awaiting(() => summary.WaitAsync(TimeSpan.FromSeconds(5)))
                 .Should().ThrowAsync<IOException>().WithMessage("*did not stop*");
             terminal.Received().Restore();
             await terminal.Received().DisposeAsync();

@@ -684,10 +684,12 @@ public class CompactRendererFunctionBrowserTests
     [Fact]
     public async Task OnStartAsync_WhenMacOSAndAlternateBufferSupported_UsesAlternateScreen()
     {
-        (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: true, ansi: true, alternateBuffer: true);
+        (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(out TestDashboardTerminal terminal,
+            isMacOS: true, ansi: true, alternateBuffer: true);
         await using var rendererLifetime = renderer;
 
         await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
+        await terminal.Started.WaitAsync(TimeSpan.FromSeconds(5));
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
 
         string output = writer.ToString();
@@ -701,10 +703,12 @@ public class CompactRendererFunctionBrowserTests
     [Fact]
     public async Task OnStartAsync_WhenNotMacOS_UsesAlternateScreen()
     {
-        (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: false, ansi: true, alternateBuffer: true);
+        (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(out TestDashboardTerminal terminal,
+            isMacOS: false, ansi: true, alternateBuffer: true);
         await using var rendererLifetime = renderer;
 
         await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
+        await terminal.Started.WaitAsync(TimeSpan.FromSeconds(5));
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
 
         string output = writer.ToString();
@@ -715,10 +719,12 @@ public class CompactRendererFunctionBrowserTests
     [Fact]
     public async Task OnStartAsync_WhenMacOSWithoutAlternateBuffer_DoesNotUseAlternateScreen()
     {
-        (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(isMacOS: true, ansi: true, alternateBuffer: false);
+        (CompactRenderer renderer, _, StringWriter writer) = NewRenderer(out TestDashboardTerminal terminal,
+            isMacOS: true, ansi: true, alternateBuffer: false);
         await using var rendererLifetime = renderer;
 
         await renderer.OnStartAsync(BuildState(functionCount: 1), CancellationToken.None);
+        await terminal.Started.WaitAsync(TimeSpan.FromSeconds(5));
         await renderer.OnSummaryAsync(CreateSummary(), CancellationToken.None);
 
         string output = writer.ToString();
@@ -731,6 +737,11 @@ public class CompactRendererFunctionBrowserTests
         bool isMacOS = false,
         bool ansi = false,
         bool alternateBuffer = false)
+        => NewRenderer(out _, runInfo, isMacOS, ansi, alternateBuffer);
+
+    private static (CompactRenderer Renderer, IAnsiConsole Console, StringWriter Writer) NewRenderer(
+        out TestDashboardTerminal terminal, DashboardRunInfo? runInfo = null, bool isMacOS = false,
+        bool ansi = false, bool alternateBuffer = false)
     {
         var writer = new StringWriter();
         IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
@@ -753,8 +764,9 @@ public class CompactRendererFunctionBrowserTests
         IPlatform platform = Substitute.For<IPlatform>();
         platform.IsMacOS.Returns(isMacOS);
         CompactDashboardShortcutLabels shortcutLabels = new(platform);
+        terminal = new TestDashboardTerminal(console);
         var renderer = new CompactRenderer(interaction, new FunctionPalette(), shortcutLabels, console, runInfo,
-            terminal: new TestDashboardTerminal(console));
+            terminal: terminal);
         return (renderer, console, writer);
     }
 
