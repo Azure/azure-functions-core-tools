@@ -13,10 +13,10 @@
                           bundle id (see DownloadDefaultBundle.targets) and
                           the workload pkg's prerelease label.
 
-    Derived $(VersionPrefix):
-      stable        -> 4.35.0
-      preview       -> 4.35.0-preview
-      experimental  -> 4.35.0-experimental
+    Derived package versions:
+      stable        -> 4.39.1
+      preview       -> 4.50.0-preview.1
+      experimental  -> 4.8.0-experimental.1
   -->
 
   <PropertyGroup Condition="'$(BundleChannel)' == '' AND '$(PublicReleaseTag)' != ''">
@@ -27,7 +27,7 @@
 
   <PropertyGroup>
     <VersionPrefix>$(BundleVersion)</VersionPrefix>
-    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel)</VersionSuffix>
+    <VersionSuffix Condition="'$(BundleChannel)' != 'stable'">$(BundleChannel).1</VersionSuffix>
   </PropertyGroup>
 
 </Project>

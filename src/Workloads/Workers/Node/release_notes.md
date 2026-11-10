@@ -1,6 +1,6 @@
 # Azure.Functions.Cli.Workloads.Workers.Node
 
-## 3.16.1-preview
+## 3.16.1-preview.1
 
 - Updated the Node.js worker payload to 3.16.1, matching host release 4.1055.100.
 

@@ -1,6 +1,6 @@
 # Azure.Functions.Cli.Workloads.Workers.PowerShell
 
-## 4.0.5489-preview
+## 4.0.5489-preview.1
 
 - Updated the PowerShell 7.4 worker payload to 4.0.5485 and the PowerShell 7.6 worker payload to 4.0.5489, matching host release 4.1055.100.
 

@@ -1,10 +1,10 @@
 # Azure.Functions.Cli.Workloads.ExtensionBundles
 
-## 4.50.0-preview
+## 4.50.0-preview.1
 
 - Updated the preview extension bundle payload from 4.42.0 to [4.50.0](https://github.com/Azure/azure-functions-extension-bundles/releases/tag/4.50.0-Preview).
 
-## 4.8.0-experimental
+## 4.8.0-experimental.1
 
 - Updated the experimental extension bundle payload from 4.6.0 to [4.8.0](https://github.com/Azure/azure-functions-extension-bundles/releases/tag/4.8.0-Experimental).
 

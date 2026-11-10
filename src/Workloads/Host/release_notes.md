@@ -1,6 +1,6 @@
 # Azure.Functions.Cli.Workloads.Host
 
-## 4.1055.100-preview
+## 4.1055.100-preview.1
 
 - Updated the host payload to `Microsoft.Azure.WebJobs.Script.WebHost` 4.1055.100, matching [Azure/azure-functions-host v4.1055.100](https://github.com/Azure/azure-functions-host/releases/tag/v4.1055.100).
 

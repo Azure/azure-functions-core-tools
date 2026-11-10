@@ -19,7 +19,7 @@
     <WorkerVersionPS74>4.0.5485</WorkerVersionPS74>
     <WorkerVersionPS76>4.0.5489</WorkerVersionPS76>
     <VersionPrefix>$(WorkerVersion)</VersionPrefix>
-    <VersionSuffix>preview</VersionSuffix>
+    <VersionSuffix>preview.1</VersionSuffix>
   </PropertyGroup>
 
 </Project>
