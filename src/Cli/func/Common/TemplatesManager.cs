@@ -15,7 +15,21 @@ namespace Azure.Functions.Cli.Common
 {
     internal class TemplatesManager : ITemplatesManager
     {
+        internal const string ConnectorTriggerType = "connectorTrigger";
+        internal const string ConnectorPollingEndpointSetting = "ConnectorNamespace__pollingEndpoint";
+        internal const string ConnectorPollingEndpointPlaceholder = "https://<connector-namespace-host>";
+        internal const string ConnectorTriggerConfigPlaceholder = "<poll-trigger-config-name>";
         private const string BundleTemplatesLockFileName = "func_bundle_templates.lock";
+
+        private static readonly Dictionary<string, string> _connectorDisplayNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["OutlookTrigger"] = "Office 365 Outlook",
+            ["SharepointTrigger"] = "SharePoint",
+            ["OneDriveTrigger"] = "OneDrive for Business",
+            ["DataverseTrigger"] = "Dataverse",
+            ["TeamsTrigger"] = "Microsoft Teams",
+        };
+
         private readonly ISecretsManager _secretsManager;
 
         public TemplatesManager(ISecretsManager secretsManager)
@@ -270,20 +284,6 @@ namespace Azure.Functions.Cli.Common
             }
         }
 
-        internal const string ConnectorTriggerType = "connectorTrigger";
-        internal const string ConnectorPollingEndpointSetting = "ConnectorNamespace__pollingEndpoint";
-        internal const string ConnectorPollingEndpointPlaceholder = "https://<connector-namespace-host>";
-        internal const string ConnectorTriggerConfigPlaceholder = "<poll-trigger-config-name>";
-
-        private static readonly Dictionary<string, string> ConnectorDisplayNames = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["OutlookTrigger"] = "Office 365 Outlook",
-            ["SharepointTrigger"] = "SharePoint",
-            ["OneDriveTrigger"] = "OneDrive for Business",
-            ["DataverseTrigger"] = "Dataverse",
-            ["TeamsTrigger"] = "Microsoft Teams",
-        };
-
         internal static bool IsConnectorTriggerTemplate(Template template) =>
             string.Equals(template?.Metadata?.TriggerType, ConnectorTriggerType, StringComparison.OrdinalIgnoreCase);
 
@@ -313,7 +313,7 @@ namespace Azure.Functions.Cli.Common
         {
             var isTypeScript = template.Id.EndsWith("TypeScript-4.x", StringComparison.OrdinalIgnoreCase);
             var prefix = template.Id.Split('-')[0];
-            var displayName = ConnectorDisplayNames.TryGetValue(prefix, out var dn) ? dn : prefix;
+            var displayName = _connectorDisplayNames.TryGetValue(prefix, out var dn) ? dn : prefix;
 
             var rows = settings.Select(kv => kv.Key == ConnectorPollingEndpointSetting
                 ? $"| `{kv.Key}` | Endpoint of the connector namespace (used by `connection: 'ConnectorNamespace'`). |"
