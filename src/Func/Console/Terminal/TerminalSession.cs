@@ -187,8 +187,7 @@ internal sealed class TerminalSession(IAnsiConsole console, ITerminalDriver driv
         _restorationFailure?.Throw();
     }
 
-    public ValueTask DisposeAsync()
-        => new(RequestDisposal().WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None));
+    public ValueTask DisposeAsync() => new(RequestDisposal());
 
     private Task RequestDisposal()
     {
@@ -197,8 +196,7 @@ internal sealed class TerminalSession(IAnsiConsole console, ITerminalDriver driv
             if (_disposal is null)
             {
                 _disposal = DisposeCoreAsync();
-                // Failed acquisition and timed-out callers cannot await the remaining cleanup.
-                // Keep its ownership intact and observe any late fault without replacing the original failure.
+                // Failed acquisition must rethrow its original error without abandoning cleanup.
                 _ = _disposal.ContinueWith(static task => { _ = task.Exception; }, CancellationToken.None,
                     TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             }
@@ -271,35 +269,45 @@ internal sealed class TerminalSession(IAnsiConsole console, ITerminalDriver driv
             failure ??= ExceptionDispatchInfo.Capture(exception);
         }
 
+        Task cleanup = restoration.ContinueWith(_ => DisposeResources(), CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        // Keep resource cleanup owned and observed even after a caller's restoration wait expires.
+        _ = cleanup.ContinueWith(static task => { _ = task.Exception; }, CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+
         try
         {
-            await restoration;
-            _restorationFailure?.Throw();
+            await restoration.WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
+            await cleanup;
         }
         catch (Exception exception)
         {
             // A cleanup error must not replace the input failure that initiated shutdown.
             failure ??= ExceptionDispatchInfo.Capture(exception);
         }
+
+        failure?.Throw();
+    }
+
+    private void DisposeResources()
+    {
+        ExceptionDispatchInfo? failure = _restorationFailure;
+        try
+        {
+            _driver.Dispose();
+        }
+        catch (Exception exception)
+        {
+            // Finish releasing managed lifetime resources even when native disposal reports a failure.
+            failure ??= ExceptionDispatchInfo.Capture(exception);
+        }
         finally
         {
-            try
+            lock (_lifetimeGate)
             {
-                _driver.Dispose();
-            }
-            catch (Exception exception)
-            {
-                // Finish releasing managed lifetime resources even when native disposal reports a failure.
-                failure ??= ExceptionDispatchInfo.Capture(exception);
-            }
-            finally
-            {
-                lock (_lifetimeGate)
-                {
-                    _stop.Dispose();
-                    _stopDisposed = true;
-                    _restorationCompleted.Dispose();
-                }
+                _stop.Dispose();
+                _stopDisposed = true;
+                _restorationCompleted.Dispose();
             }
         }
 

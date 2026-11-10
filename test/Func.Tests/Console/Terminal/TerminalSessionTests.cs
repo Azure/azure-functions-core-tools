@@ -191,8 +191,15 @@ public class TerminalSessionTests
         {
             await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            await FluentActions.Awaiting(() => session.DisposeAsync().AsTask())
-                .Should().ThrowAsync<TimeoutException>();
+            Func<Task> dispose = () => session.DisposeAsync().AsTask();
+            if (signalFailure is null)
+            {
+                await dispose.Should().ThrowAsync<TimeoutException>();
+            }
+            else
+            {
+                (await dispose.Should().ThrowAsync<IOException>()).Which.Should().BeSameAs(signalFailure);
+            }
 
             driver.InputRestored.Should().BeTrue();
             driver.DisposeCount.Should().Be(0);
@@ -207,15 +214,52 @@ public class TerminalSessionTests
         driver.RestoreCount.Should().Be(1);
         driver.DisposeCount.Should().Be(1);
         writer.ToString().Split(TerminalSession.LeaveScreen, StringSplitOptions.None).Length.Should().Be(2);
-        if (signalFailure is null)
+    }
+
+    [Fact]
+    public async Task CompletedRestoration_DoesNotTimeOutWhileDisposalContinuationIsDeferred()
+    {
+        using BlockingWriter writer = new() { BlockSequence = "\u001b[?1049l" };
+        FakeDriver driver = new();
+        TerminalSession session = new(CreateConsole(writer), driver);
+        session.Activate();
+        await using IAsyncEnumerator<TerminalInputEvent> reader = session.ReadAsync(CancellationToken.None).GetAsyncEnumerator();
+        Task<bool> read = reader.MoveNextAsync().AsTask();
+        DeferredSynchronizationContext context = new();
+        Task? disposal = null;
+        try
         {
-            await session.DisposeAsync();
+            session.Restore();
+            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await FluentActions.Awaiting(async () => await read).Should().ThrowAsync<OperationCanceledException>();
+
+            SynchronizationContext? previous = SynchronizationContext.Current;
+            try
+            {
+                SynchronizationContext.SetSynchronizationContext(context);
+                disposal = session.DisposeAsync().AsTask();
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previous);
+            }
+
+            writer.Release.Set();
+            await context.Posted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(1500));
+
+            disposal.IsCompleted.Should().BeFalse("the completed restoration must not time out waiting for the caller's context");
+            driver.DisposeCount.Should().Be(1);
         }
-        else
+        finally
         {
-            (await FluentActions.Awaiting(() => session.DisposeAsync().AsTask()).Should().ThrowAsync<IOException>())
-                .Which.Should().BeSameAs(signalFailure);
+            writer.Release.Set();
+            context.RunPosted();
         }
+
+        await disposal!.WaitAsync(TimeSpan.FromSeconds(5));
+        driver.RestoreCount.Should().Be(1);
+        driver.DisposeCount.Should().Be(1);
     }
 
     [Fact]
@@ -415,6 +459,27 @@ public class TerminalSessionTests
         {
             Release.Dispose();
             base.Dispose(disposing);
+        }
+    }
+
+    private sealed class DeferredSynchronizationContext : SynchronizationContext
+    {
+        private readonly ConcurrentQueue<(SendOrPostCallback Callback, object? State)> _callbacks = new();
+
+        public TaskCompletionSource Posted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+            _callbacks.Enqueue((callback, state));
+            Posted.TrySetResult();
+        }
+
+        public void RunPosted()
+        {
+            while (_callbacks.TryDequeue(out (SendOrPostCallback Callback, object? State) work))
+            {
+                work.Callback(work.State);
+            }
         }
     }
 
