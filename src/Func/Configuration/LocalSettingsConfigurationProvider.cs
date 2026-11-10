@@ -28,6 +28,11 @@ internal sealed class LocalSettingsConfigurationProvider(
             data[$"{HostStartupOptions.SectionName}:{nameof(HostStartupOptions.Port)}"] = port.ToString(CultureInfo.InvariantCulture);
         }
 
+        if (localSettings.Host?.LocalHttpAddress is { } address)
+        {
+            data[$"{HostStartupOptions.SectionName}:{nameof(HostStartupOptions.Address)}"] = address;
+        }
+
         if (localSettings.Host?.Cors is { Length: > 0 } cors)
         {
             data[$"{HostStartupOptions.SectionName}:{nameof(HostStartupOptions.Cors)}"] = cors;

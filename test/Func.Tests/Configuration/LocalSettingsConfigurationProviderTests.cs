@@ -34,6 +34,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
               },
               "Host": {
                 "LocalHttpPort": "7073",
+                "LocalHttpAddress": "0.0.0.0",
                 "CORS": "*",
                 "CORSCredentials": "true"
               }
@@ -46,6 +47,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
 
         configuration["stack:runtime"].Should().Be("node");
         configuration["HostStartup:Port"].Should().Be("7073");
+        configuration["HostStartup:Address"].Should().Be("0.0.0.0");
         configuration["HostStartup:Cors"].Should().Be("*");
         configuration["HostStartup:CorsCredentials"].Should().Be("True");
         configuration["AzureWebJobsStorage"].Should().BeNull();
@@ -208,7 +210,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
     [Fact]
     public void HostStartupOptionsSetup_NamedOptionsUseRequestedProjectDirectory()
     {
-        WriteSettings("""{"Host":{"LocalHttpPort":7074}}""");
+        WriteSettings("""{"Host":{"LocalHttpPort":7074,"LocalHttpAddress":"::1"}}""");
         IConfigurationRoot defaultConfiguration = new ConfigurationBuilder().Build();
         var configurationProvider = new CliConfigurationProvider(new LocalSettingsProvider(), _userDir);
         var setup = new HostStartupOptionsSetup(defaultConfiguration, configurationProvider);
@@ -217,6 +219,7 @@ public sealed class LocalSettingsConfigurationProviderTests : IDisposable
         setup.Configure(_dir.FullName, options);
 
         options.Port.Should().Be(7074);
+        options.Address.Should().Be("::1");
     }
 
     [Fact]

@@ -2,6 +2,8 @@
 
 #### Changes
 
+- Allow `func run` and `func start` to use `--port 0` for an OS-assigned available port and report the selected URL in plain, JSON, and dashboard output. Requires an updated host workload that reports its bound address. (#5861)
+- Bind local runs to `127.0.0.1` by default. Support `--address` and `Host.LocalHttpAddress` for selecting another interface, with command-line options taking precedence. Preserve explicit noncanonical addresses in reported URLs. (#5861)
 - Make `func --version` display the semantic version without commit metadata or line wrapping, matching the Version field in `func --verbose`. Preserve the full build identity separately in the verbose Build field. (#5840)
 
 ## 5.0.0-preview.5

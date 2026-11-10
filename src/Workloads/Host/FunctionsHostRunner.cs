@@ -36,24 +36,22 @@ internal sealed class FunctionsHostRunner : IFunctionsHostRunner
                 services.AddSingleton<IStartup>(new FunctionsHostStartup(context.Configuration, enableAuth, hostOptions));
                 services.AddSingleton<IDiagnosticEventRepository, DiagnosticEventNullRepository>();
                 services.AddSingleton<IConfigureBuilder<ILoggingBuilder>, HostStructuredScriptLoggingBuilder>();
+                services.AddSingleton<BoundHostAddressReader>();
+                services.AddSingleton<HostListeningEventEmitter>();
             })
             .Build();
 
-        RegisterFunctionMetadataEmission(host.Services);
+        RegisterStartupEmission(host.Services);
         await host.RunAsync(cancellationToken);
     }
 
-    private static void RegisterFunctionMetadataEmission(IServiceProvider services)
+    private static void RegisterStartupEmission(IServiceProvider services)
     {
-        IHostApplicationLifetime? lifetime = services.GetService<IHostApplicationLifetime>();
-        if (lifetime is null)
-        {
-            return;
-        }
-
+        IHostApplicationLifetime lifetime = services.GetRequiredService<IHostApplicationLifetime>();
         lifetime.ApplicationStarted.Register(static state =>
         {
             var services = (IServiceProvider)state!;
+            services.GetRequiredService<HostListeningEventEmitter>().EmitSnapshot();
             HostFunctionMetadataEmitter.EmitSnapshot(services);
         }, services);
     }
