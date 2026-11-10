@@ -121,6 +121,66 @@ dotnet test test/Cli/Func.E2ETests/Azure.Functions.Cli.E2ETests.csproj
 export FUNC_PATH=/path/to/custom/func
 ```
 
+#### Node.js connector template tests
+
+The Office 365, SharePoint, OneDrive, Dataverse, and Teams templates for JavaScript and TypeScript v4 are embedded in `src/Cli/func/StaticResources/node-v4-templates.json`. They are not delivered through the templates repository's extension bundles. No bundle catalog injection or shared-cache replacement is required.
+
+On Windows, use the .NET SDK pinned by `global.json` to make a generation-only build without downloading language workers:
+
+```powershell
+dotnet build .\src\Cli\func\Azure.Functions.Cli.csproj -p:NoWorkers=true -p:RuntimeIdentifiers=win-x64 -r win-x64
+$func = (Resolve-Path .\out\bin\Azure.Functions.Cli\debug_win-x64\func.exe).Path
+& $func --version
+```
+
+Use this executable, not an older global `func` installation. The `NoWorkers` build is sufficient for `init`, `templates list`, and `new`, but is not intended for starting a Functions host. The following generates all five connectors in both languages with default and custom names, without configuring an extension bundle or installing npm packages:
+
+```powershell
+$testRoot = Join-Path $env:TEMP ("coretools-connectors-" + [guid]::NewGuid().ToString('N'))
+$templates = @(
+    @{ Template = 'Office 365 trigger'; Name = 'office365NewEmailPoll' },
+    @{ Template = 'SharePoint trigger'; Name = 'sharepointNewFilePoll' },
+    @{ Template = 'OneDrive trigger'; Name = 'oneDriveNewFilePoll' },
+    @{ Template = 'Dataverse trigger'; Name = 'dataverseNewRowPoll' },
+    @{ Template = 'Teams trigger'; Name = 'teamsNewChannelMessagePoll' }
+)
+foreach ($language in 'javascript', 'typescript') {
+    $project = Join-Path $testRoot $language
+    & $func init $project --worker-runtime node --language $language --model V4 --no-bundle --skip-npm-install
+    Push-Location $project
+    try {
+        & $func templates list --language $language
+        foreach ($template in $templates) {
+            foreach ($name in @($template.Name, ('custom' + $template.Name))) {
+                & $func new --language $language --template $template.Template --name $name
+            }
+        }
+    } finally {
+        Pop-Location
+    }
+}
+```
+
+Check the generated modules in both projects' `src\functions` folders. Install the matching SDK dependencies and apply the TypeScript compiler settings in the [connector setup guide](docs/connector-templates.md#create-and-configure-a-function), then run `npm run build` in the TypeScript project. JavaScript templates are CommonJS-only; the guide describes the ESM alternative and the separate host requirements for live polling.
+
+Run the focused native tests from the repository root:
+
+```powershell
+dotnet test .\test\Cli\Func.UnitTests\Azure.Functions.Cli.UnitTests.csproj -p:NoWorkers=true -p:RuntimeIdentifiers=win-x64 -r win-x64 --filter "FullyQualifiedName~TemplatesManagerTests"
+$env:FUNC_PATH = $func
+dotnet test .\test\Cli\Func.E2ETests\Azure.Functions.Cli.E2ETests.csproj -p:NoWorkers=true -p:RuntimeIdentifiers=win-x64 -r win-x64 --filter "FullyQualifiedName~FuncNew_NodeV4Connector_UsesEmbeddedTemplateWithoutBundle"
+```
+
+These process-level tests generate code only and do not require Azurite, Azure credentials, or live connections. The unit tests verify discovery from the actual embedded resource and replacement of both function names. The process tests verify the rebuilt CLI creates the expected JavaScript and TypeScript modules without a bundle.
+
+Windows and Linux PR unit jobs also run the dependency-free Node.js 24 catalog/syntax checks:
+
+```powershell
+node --test .\test\Cli\Func.UnitTests\node-connector-templates.test.mjs
+```
+
+For actual SDK registration, binding defaults, payload normalization, and strict TypeScript checks, set `NODE_CONNECTOR_TEST_DEPENDENCIES` to a project containing TypeScript, `@types/node`, and the SDK versions in the connector guide before running that command. Without it, SDK-dependent checks are explicitly skipped. Neither profile starts a host or validates live event delivery. Remove the isolated `$testRoot` when finished.
+
 #### Missing Templates
 
 If tests fail due to missing templates, download them:

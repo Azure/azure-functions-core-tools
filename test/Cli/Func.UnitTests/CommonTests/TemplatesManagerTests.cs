@@ -165,5 +165,78 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             manager.Should().NotBeNull();
             manager.Should().BeAssignableTo<ITemplatesManager>();
         }
+
+        public static IEnumerable<object[]> NodeConnectorTemplates()
+        {
+            (string Id, string Name, string DefaultName)[] connectors =
+            [
+                ("Outlook", "Office 365 trigger", "office365NewEmailPoll"),
+                ("Sharepoint", "SharePoint trigger", "sharepointNewFilePoll"),
+                ("OneDrive", "OneDrive trigger", "oneDriveNewFilePoll"),
+                ("Dataverse", "Dataverse trigger", "dataverseNewRowPoll"),
+                ("Teams", "Teams trigger", "teamsNewChannelMessagePoll"),
+            ];
+
+            foreach (var connector in connectors)
+            {
+                foreach (var (language, extension) in new[] { ("JavaScript", "js"), ("TypeScript", "ts") })
+                {
+                    yield return
+                    [
+                        $"{connector.Id}Trigger-{language}-4.x",
+                        connector.Name,
+                        connector.DefaultName,
+                        language,
+                        extension,
+                    ];
+                }
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(NodeConnectorTemplates))]
+        public async Task Templates_IncludesEmbeddedNodeConnectorWithoutBundle(
+            string id, string name, string defaultName, string language, string extension)
+        {
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == id);
+
+            Assert.Equal(name, template.Metadata.Name);
+            Assert.Equal(defaultName, template.Metadata.DefaultFunctionName);
+            Assert.Equal(language, template.Metadata.Language);
+            Assert.Equal("connectorTrigger", template.Metadata.TriggerType);
+            Assert.Empty(template.Metadata.UserPrompt);
+            Assert.Null(template.Function);
+            Assert.Single(template.Files);
+            var code = template.Files[$"%functionName%.{extension}"];
+            Assert.Contains("deliveryMode: DeliveryMode.Poll", code);
+            Assert.DoesNotContain("cardinality:", code);
+            Assert.DoesNotContain("maxBatchSize:", code);
+        }
+
+        [Theory]
+        [MemberData(nameof(NodeConnectorTemplates))]
+        public async Task Deploy_EmbeddedNodeConnector_ReplacesDefaultAndCustomNames(
+            string id, string name, string defaultName, string language, string extension)
+        {
+            Directory.CreateDirectory(Path.Combine(_testWorkingDir, "src", "functions"));
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == id);
+            Assert.Equal(name, template.Metadata.Name);
+            Assert.Equal(language, template.Metadata.Language);
+
+            foreach (var functionName in new[] { defaultName, $"custom{defaultName}" })
+            {
+                await manager.Deploy(functionName, null, template);
+
+                var file = Path.Combine(_testWorkingDir, "src", "functions", $"{functionName}.{extension}");
+                Assert.Equal(
+                    template.Files[$"%functionName%.{extension}"].Replace("%functionName%", functionName),
+                    await File.ReadAllTextAsync(file));
+                Assert.False(Directory.Exists(Path.Combine(_testWorkingDir, functionName)));
+            }
+
+            Assert.Empty(Directory.GetFiles(_testWorkingDir, "function.json", SearchOption.AllDirectories));
+        }
     }
 }

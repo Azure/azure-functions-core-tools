@@ -678,5 +678,215 @@
       "enabledInTryMode": false,
       "userPrompt": []
     }
+  },
+  {
+    "id": "OutlookTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { DeliveryMode } = require('@azure/functions');\r\nconst { connectors } = require('@azure/functions-extensions-connectors');\r\n\r\n// Connector operations and normalized payload types (Office365Extensions):\r\n// OnNewEmailV3 - GraphClientReceiveMessage[]\r\n// OnFlaggedEmailV4 - GraphClientReceiveMessage[]\r\n// OnNewMentionMeEmailV3 - GraphClientReceiveMessage[]\r\n// SharedMailboxOnNewEmailV2 - GraphClientReceiveMessage[]\r\n// CalendarGetOnNewItemsV3 - GraphCalendarEventClientReceive[]\r\n// CalendarGetOnUpdatedItemsV3 - GraphCalendarEventClientReceive[]\r\n// OnUpcomingEventsV3 - GraphCalendarEventClientReceive[]\r\n// CalendarGetOnChangedItemsV3 - GraphCalendarEventClientWithActionType[]\r\n// Use the matching typed helper or connectorTrigger<TItem> for another operation.\r\n// Configure a Poll trigger config with that operation's required parameters.\r\nconnectors.office365.onNewEmail('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnNewEmailTriggerConfigName%',\r\n    handler: async (trigger, context) => {\r\n        context.log(`Received ${trigger.emails.length} Office 365 email(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "office365NewEmailPoll",
+      "description": "A Node.js function for new Office 365 email, with polling delivery.",
+      "name": "Office 365 trigger",
+      "language": "JavaScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "OutlookTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { DeliveryMode, type InvocationContext } from '@azure/functions';\r\nimport { connectors, type EmailTriggerContext } from '@azure/functions-extensions-connectors';\r\n\r\n// Connector operations and normalized payload types (Office365Extensions):\r\n// OnNewEmailV3 - GraphClientReceiveMessage[]\r\n// OnFlaggedEmailV4 - GraphClientReceiveMessage[]\r\n// OnNewMentionMeEmailV3 - GraphClientReceiveMessage[]\r\n// SharedMailboxOnNewEmailV2 - GraphClientReceiveMessage[]\r\n// CalendarGetOnNewItemsV3 - GraphCalendarEventClientReceive[]\r\n// CalendarGetOnUpdatedItemsV3 - GraphCalendarEventClientReceive[]\r\n// OnUpcomingEventsV3 - GraphCalendarEventClientReceive[]\r\n// CalendarGetOnChangedItemsV3 - GraphCalendarEventClientWithActionType[]\r\n// Use the matching typed helper or connectorTrigger<TItem> for another operation.\r\n// Configure a Poll trigger config with that operation's required parameters.\r\nconnectors.office365.onNewEmail('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnNewEmailTriggerConfigName%',\r\n    handler: async (trigger: EmailTriggerContext, context: InvocationContext): Promise<void> => {\r\n        context.log(`Received ${trigger.emails.length} Office 365 email(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "office365NewEmailPoll",
+      "description": "A Node.js function for new Office 365 email, with polling delivery.",
+      "name": "Office 365 trigger",
+      "language": "TypeScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "SharepointTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { DeliveryMode } = require('@azure/functions');\r\nconst { connectors } = require('@azure/functions-extensions-connectors');\r\n\r\n// Connector operations and normalized payload types (SharepointonlineExtensions):\r\n// GetOnNewFileItems - Item[]\r\n// GetOnUpdatedFileItems - Item[]\r\n// GetOnNewItems - Item[]\r\n// GetOnUpdatedItems - Item[]\r\n// GetOnChangedItems - Item[]\r\n// GetOnNewItemsFromForm - Item[]\r\n// GetOnRecurrenceDigest - Item[]\r\n// GetOnUpdatedFileClassifiedTimes - Item[]\r\n// GetOnDeletedItems - DeletedItem[]\r\n// GetOnDeletedFileItems - DeletedItem[]\r\n// Use the matching typed helper or connectorTrigger<TItem> for another operation.\r\n// Configure a Poll trigger config with that operation's required parameters.\r\nconnectors.sharepoint.onNewFileItems('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnSharepointNewFileTriggerConfigName%',\r\n    handler: async (trigger, context) => {\r\n        context.log(`Received ${trigger.records.length} SharePoint file item(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "sharepointNewFilePoll",
+      "description": "A Node.js function for new SharePoint Online file properties, with polling delivery.",
+      "name": "SharePoint trigger",
+      "language": "JavaScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "SharepointTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { DeliveryMode, type InvocationContext } from '@azure/functions';\r\nimport { connectors, type SharepointItemTriggerContext } from '@azure/functions-extensions-connectors';\r\n\r\n// Connector operations and normalized payload types (SharepointonlineExtensions):\r\n// GetOnNewFileItems - Item[]\r\n// GetOnUpdatedFileItems - Item[]\r\n// GetOnNewItems - Item[]\r\n// GetOnUpdatedItems - Item[]\r\n// GetOnChangedItems - Item[]\r\n// GetOnNewItemsFromForm - Item[]\r\n// GetOnRecurrenceDigest - Item[]\r\n// GetOnUpdatedFileClassifiedTimes - Item[]\r\n// GetOnDeletedItems - DeletedItem[]\r\n// GetOnDeletedFileItems - DeletedItem[]\r\n// Use the matching typed helper or connectorTrigger<TItem> for another operation.\r\n// Configure a Poll trigger config with that operation's required parameters.\r\nconnectors.sharepoint.onNewFileItems('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnSharepointNewFileTriggerConfigName%',\r\n    handler: async (trigger: SharepointItemTriggerContext, context: InvocationContext): Promise<void> => {\r\n        context.log(`Received ${trigger.records.length} SharePoint file item(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "sharepointNewFilePoll",
+      "description": "A Node.js function for new SharePoint Online file properties, with polling delivery.",
+      "name": "SharePoint trigger",
+      "language": "TypeScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "OneDriveTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { DeliveryMode } = require('@azure/functions');\r\nconst { connectors } = require('@azure/functions-extensions-connectors');\r\n\r\n// Connector operations and normalized metadata payloads (OnedriveforbusinessExtensions):\r\n// OnNewFilesV2 - BlobMetadata[]\r\n// OnUpdatedFilesV2 - BlobMetadata[]\r\n// OnNewFileV2 / OnUpdatedFileV2 return file content, not BlobMetadata.\r\n// Use a raw app.connectorTrigger for file content instead of this metadata helper.\r\n// Configure a Poll trigger config with the selected operation's required parameters.\r\nconnectors.onedriveforbusiness.onNewFiles('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnOneDriveNewFileTriggerConfigName%',\r\n    handler: async (trigger, context) => {\r\n        context.log(`Received ${trigger.files.length} OneDrive file(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "oneDriveNewFilePoll",
+      "description": "A Node.js function for new OneDrive for Business file metadata, with polling delivery.",
+      "name": "OneDrive trigger",
+      "language": "JavaScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "OneDriveTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { DeliveryMode, type InvocationContext } from '@azure/functions';\r\nimport { connectors, type OneDriveFileTriggerContext } from '@azure/functions-extensions-connectors';\r\n\r\n// Connector operations and normalized metadata payloads (OnedriveforbusinessExtensions):\r\n// OnNewFilesV2 - BlobMetadata[]\r\n// OnUpdatedFilesV2 - BlobMetadata[]\r\n// OnNewFileV2 / OnUpdatedFileV2 return file content, not BlobMetadata.\r\n// Use a raw app.connectorTrigger for file content instead of this metadata helper.\r\n// Configure a Poll trigger config with the selected operation's required parameters.\r\nconnectors.onedriveforbusiness.onNewFiles('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnOneDriveNewFileTriggerConfigName%',\r\n    handler: async (trigger: OneDriveFileTriggerContext, context: InvocationContext): Promise<void> => {\r\n        context.log(`Received ${trigger.files.length} OneDrive file(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "oneDriveNewFilePoll",
+      "description": "A Node.js function for new OneDrive for Business file metadata, with polling delivery.",
+      "name": "OneDrive trigger",
+      "language": "TypeScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "DataverseTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { DeliveryMode } = require('@azure/functions');\r\nconst { connectorTrigger } = require('@azure/functions-extensions-connectors');\r\n\r\n// Connector operations and normalized payload types (CommondataserviceExtensions):\r\n// GetOnNewItems_V2 - Item[]\r\n// GetOnUpdatedItems_V2 - Item[]\r\n// The selected legacy Admin Only operation is deprecated and receives new rows only.\r\n// GetOnDeletedItems_V2, SubscribeWebhookTrigger and BusinessEventsTrigger are not\r\n// exported by @azure/connectors@0.4.0-preview; do not assume Python types exist here.\r\n// Configure a Poll trigger config with the selected operation's required parameters.\r\nconnectorTrigger('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnDataverseRowChangedTriggerConfigName%',\r\n    handler: async (trigger, context) => {\r\n        context.log(`Received ${trigger.items.length} Dataverse new row(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "dataverseNewRowPoll",
+      "description": "A Node.js function for new Dataverse rows only using the deprecated Admin Only operation, with polling delivery.",
+      "name": "Dataverse trigger",
+      "language": "JavaScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "DataverseTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { DeliveryMode, type InvocationContext } from '@azure/functions';\r\nimport type { Item } from '@azure/connectors/generated/CommondataserviceExtensions';\r\nimport { connectorTrigger, type ConnectorTriggerContext } from '@azure/functions-extensions-connectors';\r\n\r\n// Connector operations and normalized payload types (CommondataserviceExtensions):\r\n// GetOnNewItems_V2 - Item[]\r\n// GetOnUpdatedItems_V2 - Item[]\r\n// The selected legacy Admin Only operation is deprecated and receives new rows only.\r\n// GetOnDeletedItems_V2, SubscribeWebhookTrigger and BusinessEventsTrigger are not\r\n// exported by @azure/connectors@0.4.0-preview; do not assume Python types exist here.\r\n// Configure a Poll trigger config with the selected operation's required parameters.\r\nconnectorTrigger<Item>('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnDataverseRowChangedTriggerConfigName%',\r\n    handler: async (trigger: ConnectorTriggerContext<Item>, context: InvocationContext): Promise<void> => {\r\n        context.log(`Received ${trigger.items.length} Dataverse new row(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "dataverseNewRowPoll",
+      "description": "A Node.js function for new Dataverse rows only using the deprecated Admin Only operation, with polling delivery.",
+      "name": "Dataverse trigger",
+      "language": "TypeScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "TeamsTrigger-JavaScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.js": "const { DeliveryMode } = require('@azure/functions');\r\nconst { connectors } = require('@azure/functions-extensions-connectors');\r\n\r\n// Connector operations and normalized payload types (TeamsExtensions):\r\n// OnNewChannelMessage - ChatMessage[]\r\n// OnNewChannelMessageMentioningMe - ChatMessage[]\r\n// OnGroupMembershipAdd - OnGroupMemberChangeResponse\r\n// OnGroupMembershipRemoval - OnGroupMemberChangeResponse\r\n// WebhookChatMessageTrigger - ChatMessageWebhookResponseSchema[]\r\n// WebhookNewMessageTrigger - DynamicNewMessageWebhookTriggerResponseSchema[]\r\n// WebhookAtMentionTrigger - DynamicAtMentionWebhookTriggerResponseSchema[]\r\n// WebhookKeywordTrigger - DynamicKeywordWebhookTriggerResponseSchema[]\r\n// WebhookMessageReactionTrigger - MessageReactionWebhookResponseSchema[]\r\n// RecordingTrigger - RecordingWebhookResponseSchema[]\r\n// TranscriptTrigger - TranscriptWebhookResponseSchema[]\r\n// OnGroupMemberChangeResponse is already an array of records.\r\n// Use the matching typed helper or connectorTrigger<TItem> for another operation.\r\n// An operation name containing Webhook does not select Functions delivery mode.\r\n// Configure a Poll trigger config with that operation's required parameters.\r\nconnectors.teams.onNewChannelMessage('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnNewChannelMessageTriggerConfigName%',\r\n    handler: async (trigger, context) => {\r\n        context.log(`Received ${trigger.messages.length} Teams channel message(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "teamsNewChannelMessagePoll",
+      "description": "A Node.js function for new Microsoft Teams channel messages, with polling delivery.",
+      "name": "Teams trigger",
+      "language": "JavaScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
+  },
+  {
+    "id": "TeamsTrigger-TypeScript-4.x",
+    "runtime": "2",
+    "files": {
+      "%functionName%.ts": "import { DeliveryMode, type InvocationContext } from '@azure/functions';\r\nimport { connectors, type ChannelMessageTriggerContext } from '@azure/functions-extensions-connectors';\r\n\r\n// Connector operations and normalized payload types (TeamsExtensions):\r\n// OnNewChannelMessage - ChatMessage[]\r\n// OnNewChannelMessageMentioningMe - ChatMessage[]\r\n// OnGroupMembershipAdd - OnGroupMemberChangeResponse\r\n// OnGroupMembershipRemoval - OnGroupMemberChangeResponse\r\n// WebhookChatMessageTrigger - ChatMessageWebhookResponseSchema[]\r\n// WebhookNewMessageTrigger - DynamicNewMessageWebhookTriggerResponseSchema[]\r\n// WebhookAtMentionTrigger - DynamicAtMentionWebhookTriggerResponseSchema[]\r\n// WebhookKeywordTrigger - DynamicKeywordWebhookTriggerResponseSchema[]\r\n// WebhookMessageReactionTrigger - MessageReactionWebhookResponseSchema[]\r\n// RecordingTrigger - RecordingWebhookResponseSchema[]\r\n// TranscriptTrigger - TranscriptWebhookResponseSchema[]\r\n// OnGroupMemberChangeResponse is already an array of records.\r\n// Use the matching typed helper or connectorTrigger<TItem> for another operation.\r\n// An operation name containing Webhook does not select Functions delivery mode.\r\n// Configure a Poll trigger config with that operation's required parameters.\r\nconnectors.teams.onNewChannelMessage('%functionName%', {\r\n    deliveryMode: DeliveryMode.Poll,\r\n    connection: 'ConnectorNamespace',\r\n    triggerConfigName: '%OnNewChannelMessageTriggerConfigName%',\r\n    handler: async (trigger: ChannelMessageTriggerContext, context: InvocationContext): Promise<void> => {\r\n        context.log(`Received ${trigger.messages.length} Teams channel message(s).`);\r\n    }\r\n});\r\n"
+    },
+    "metadata": {
+      "defaultFunctionName": "teamsNewChannelMessagePoll",
+      "description": "A Node.js function for new Microsoft Teams channel messages, with polling delivery.",
+      "name": "Teams trigger",
+      "language": "TypeScript",
+      "category": [
+        "$temp_category_core",
+        "$temp_category_dataProcessing"
+      ],
+      "categoryStyle": "other",
+      "enabledInTryMode": false,
+      "triggerType": "connectorTrigger",
+      "userPrompt": []
+    }
   }
 ]
