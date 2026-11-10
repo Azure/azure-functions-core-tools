@@ -58,6 +58,11 @@ option takes precedence over the setting. `func start` accepts the same option.
 Explicit addresses other than `127.0.0.1`, `::1`, and wildcard addresses are
 preserved in reported URLs rather than rewritten to `localhost`.
 
+**Limitation:** With explicit addresses other than `127.0.0.1`, `::1`, or
+wildcard addresses, the host may generate HTTPS extension webhook URLs even
+though the local listener uses HTTP. This also applies to fixed ports.
+Default fixed-port runs are unaffected. See [#5889](https://github.com/Azure/azure-functions-core-tools/issues/5889).
+
 The shell does not support private CLI options such as `--script-root`, `--port`,
 `--address`, `--cors`, `--cors-credentials`, or `--functions`. The CLI should resolve those
 concepts before process launch and express them using the host's expected
