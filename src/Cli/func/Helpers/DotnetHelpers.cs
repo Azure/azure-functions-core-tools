@@ -178,6 +178,11 @@ namespace Azure.Functions.Cli.Helpers
             "blobtrigger" => "blob",
             "eventgridblobtrigger" => "eventgridblob",
             "cosmosdbtrigger" => "cosmos",
+            "connectortrigger-office365-onnewemailv3" or "connector-office365-onnewemailv3" => "connector-office365-onnewemailv3",
+            "connectortrigger-sharepoint-getonnewfileitems" or "connector-sharepoint-getonnewfileitems" => "connector-sharepoint-getonnewfileitems",
+            "connectortrigger-teams-onnewchannelmessage" or "connector-teams-onnewchannelmessage" => "connector-teams-onnewchannelmessage",
+            "connectortrigger-onedrive-onnewfilesv2" or "connector-onedrive-onnewfilesv2" => "connector-onedrive-onnewfilesv2",
+            "connectortrigger-dataverse-getonnewitems_v2" or "connector-dataverse-getonnewitems-v2" => "connector-dataverse-getonnewitems-v2",
             "durablefunctionsorchestration" => "durable",
             "eventgridtrigger" => "eventgrid",
             "eventgridcloudeventtrigger" => "eventgridcloudevent",
@@ -232,7 +237,12 @@ namespace Azure.Functions.Cli.Helpers
                     "CosmosDBTrigger",
                     "DurableFunctionsOrchestration",
                     "DurableFunctionsEntityClass",
-                    "DurableFunctionsEntityFunction"
+                    "DurableFunctionsEntityFunction",
+                    "Connector Trigger - Office365 - OnNewEmailV3",
+                    "Connector Trigger - SharePoint - GetOnNewFileItems",
+                    "Connector Trigger - Teams - OnNewChannelMessage",
+                    "Connector Trigger - OneDrive - OnNewFilesV2",
+                    "Connector Trigger - Dataverse - GetOnNewItems_V2"
                 ];
             }
 
