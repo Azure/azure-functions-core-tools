@@ -14,6 +14,10 @@ Full-screen dashboard interaction does not change this output contract.
 Programmatic consumers should explicitly select JSON rather than consume
 interactive dashboard output.
 
+The JSON renderer consumes real Host events during normal runs. `--demo`
+uses a scripted in-memory event source, so its values are synthetic. This
+document describes the JSON output contract.
+
 ## Top-level invariants
 
 - **One JSON object per line.** Lines are terminated with `\n` (LF). Records
