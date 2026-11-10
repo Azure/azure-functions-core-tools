@@ -100,18 +100,16 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
-        [InlineData("Connector Trigger - Office365 - OnNewEmailV3", "connector-office365-onnewemailv3")]
-        [InlineData("Connector Trigger - SharePoint - GetOnNewFileItems", "connector-sharepoint-getonnewfileitems")]
-        [InlineData("Connector Trigger - Teams - OnNewChannelMessage", "connector-teams-onnewchannelmessage")]
-        [InlineData("Connector Trigger - OneDrive - OnNewFilesV2", "connector-onedrive-onnewfilesv2")]
-        [InlineData("Connector Trigger - Dataverse - GetOnNewItems_V2", "connector-dataverse-getonnewitems-v2")]
-        public void ConnectorTemplates_MapDisplayAndShortNames_AndAreCSharpIsolatedOnly(string displayName, string shortName)
+        [InlineData("ConnectorTriggerOffice365OnNewEmailV3", "connector-office365-onnewemailv3")]
+        [InlineData("ConnectorTriggerSharePointGetOnNewFileItems", "connector-sharepoint-getonnewfileitems")]
+        [InlineData("ConnectorTriggerTeamsOnNewChannelMessage", "connector-teams-onnewchannelmessage")]
+        [InlineData("ConnectorTriggerOneDriveOnNewFilesV2", "connector-onedrive-onnewfilesv2")]
+        [InlineData("ConnectorTriggerDataverseGetOnNewItemsV2", "connector-dataverse-getonnewitems-v2")]
+        public void ConnectorTemplates_MapNames_AndAreCSharpIsolatedOnly(string displayName, string shortName)
         {
-            string normalizedName = displayName.Replace(" ", string.Empty);
-            Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(normalizedName));
-            Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(normalizedName.ToUpperInvariant()));
-            Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(shortName));
-            Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(shortName.ToUpperInvariant()));
+            Assert.Matches("^[A-Za-z0-9]+$", displayName);
+            Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(displayName));
+            Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(displayName.ToUpperInvariant()));
 
             Assert.Contains(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated));
             Assert.Contains(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated, "C#"));
