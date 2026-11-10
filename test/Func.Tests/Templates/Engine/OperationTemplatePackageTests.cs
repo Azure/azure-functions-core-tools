@@ -75,7 +75,7 @@ public class OperationTemplatePackageTests
                 Assert.True(Assert.Single(installed).Success);
             }
 
-            TemplaterFactory factory = new(new CliConfigurationPathsOptions(home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+            TemplaterFactory factory = CreateFactory(home);
             using Templater operation = await factory.CreateAsync(context, CancellationToken.None);
             TemplateResolutionResult selection = await operation.ResolveAsync("Azure.Function.CSharp.Isolated.HttpTrigger.3.x", TemplateType.Item);
             Assert.Equal(TemplateResolutionStatus.Selected, selection.Status);
@@ -109,9 +109,7 @@ public class OperationTemplatePackageTests
     {
         string root = Path.Combine(Path.GetTempPath(), $"func-task-order-{Guid.NewGuid():N}");
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(root));
-        using Templater templater = new(
-            new TemplateEngineSession(context, Path.Combine(root, "settings")),
-            new InstalledProjectStackCatalog([]));
+        using Templater templater = CreateTemplater(context, Path.Combine(root, "settings"));
         IProjectTemplateTasks workload = Substitute.For<IProjectTemplateTasks>();
         var first = Guid.NewGuid();
         var second = Guid.NewGuid();
@@ -169,7 +167,7 @@ public class OperationTemplatePackageTests
                     .Select(package => package.MountPointUri)];
             }
 
-            TemplaterFactory factory = new(new CliConfigurationPathsOptions(home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+            TemplaterFactory factory = CreateFactory(home);
             using Templater operation = await factory.CreateAsync(context, CancellationToken.None);
             foreach (string path in installedPaths)
             {
@@ -308,7 +306,7 @@ public class OperationTemplatePackageTests
             IFileSystem fileSystem = Substitute.For<IFileSystem>();
             fileSystem.OpenReadNoFollow(Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(_ => new MemoryStream(invalid, writable: false));
-            TemplaterFactory factory = new(new CliConfigurationPathsOptions(home), new InstalledProjectStackCatalog([]), fileSystem);
+            TemplaterFactory factory = CreateFactory(home, fileSystem);
 
             await Assert.ThrowsAsync<InvalidDataException>(() => factory.CreateAsync(context, CancellationToken.None));
             Assert.False(Directory.Exists(Path.Combine(home, "template-operations")));
@@ -323,10 +321,8 @@ public class OperationTemplatePackageTests
         }
     }
 
-    [Theory]
-    [InlineData(false, "duplicate-identity")]
-    [InlineData(true, "invalid-template-configuration")]
-    public async Task CapturedCatalog_RejectsDuplicatesAndInvalidTemplates(bool invalidConfiguration, string diagnosticCode)
+    [Fact]
+    public async Task CapturedCatalog_EvaluatesSelectedTemplateFromStagedContent()
     {
         string root = Path.Combine(Path.GetTempPath(), $"func-catalog-integrity-{Guid.NewGuid():N}");
         try
@@ -349,9 +345,12 @@ public class OperationTemplatePackageTests
 
                 configuration.Delete();
                 using StreamWriter output = new(archive.CreateEntry(configurationPath).Open());
-                await output.WriteAsync(invalidConfiguration ? "{ malformed }" : json.Replace(
-                    "Azure.Function.CSharp.Isolated.HttpTrigger.3.x",
-                    "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x", StringComparison.Ordinal));
+                string constrained = json.Replace(
+                    "\"primaryOutputs\": [",
+                    "\"constraints\": { \"stack\": { \"type\": \"func-workload\", \"args\": \"not-installed\" } }, \"primaryOutputs\": [",
+                    StringComparison.Ordinal);
+                Assert.NotEqual(json, constrained);
+                await output.WriteAsync(constrained);
             }
 
             byte[] itemBytes = changedItem.ToArray();
@@ -370,14 +369,14 @@ public class OperationTemplatePackageTests
             IFileSystem fileSystem = Substitute.For<IFileSystem>();
             fileSystem.OpenReadNoFollow(Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(call => new MemoryStream(packages[call.ArgAt<string>(0)], writable: false));
-            TemplaterFactory factory = new(new CliConfigurationPathsOptions(home), new InstalledProjectStackCatalog([]), fileSystem);
+            TemplaterFactory factory = CreateFactory(home, fileSystem);
             using Templater operation = await factory.CreateAsync(context, CancellationToken.None);
 
             TemplateResolutionResult result = await operation.ResolveAsync(
-                "Microsoft.AzureFunctions.ProjectTemplate.CSharp.Isolated.3.x", TemplateType.Project);
+                "Azure.Function.CSharp.Isolated.HttpTrigger.3.x", TemplateType.Item);
 
             Assert.Equal(TemplateResolutionStatus.Failed, result.Status);
-            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == diagnosticCode);
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "constraint-not-evaluated");
             Assert.False(Directory.Exists(Path.Combine(home, "template-operations")));
         }
         finally
@@ -389,4 +388,16 @@ public class OperationTemplatePackageTests
         }
     }
 
+    private static TemplaterFactory CreateFactory(string home, IFileSystem? fileSystem = null)
+        => new(new CliConfigurationPathsOptions(home), FuncConstraintEvaluator(), fileSystem ?? new PhysicalFileSystem());
+
+    private static Templater CreateTemplater(TemplateEngineContext context, string settingsLocation)
+    {
+        TemplateEngineSession session = new(context, settingsLocation);
+        TemplateSelection selection = new(session, new TemplateEligibilityEvaluator(session, FuncConstraintEvaluator()));
+        return new(session, selection);
+    }
+
+    private static Lazy<FuncTemplateConstraintEvaluator> FuncConstraintEvaluator()
+        => new(() => new(new TemplateConstraintRequirementMatcher()));
 }

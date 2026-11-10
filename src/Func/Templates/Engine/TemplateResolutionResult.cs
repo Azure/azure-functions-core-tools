@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Microsoft.TemplateEngine.Abstractions;
+
 namespace Azure.Functions.Cli.Templates.Engine;
 
 internal enum TemplateResolutionStatus
@@ -11,7 +13,12 @@ internal enum TemplateResolutionStatus
     Failed,
 }
 
-internal sealed record TemplateResolutionDiagnostic(string Code, string Message, string? TemplateIdentity = null);
+internal sealed record TemplateResolutionDiagnostic(
+    string Code,
+    string Message,
+    string? TemplateIdentity = null,
+    string? PackageIdentity = null,
+    Exception? Cause = null);
 
 internal sealed class TemplateResolutionResult
 {
@@ -23,10 +30,29 @@ internal sealed class TemplateResolutionResult
     {
         ArgumentNullException.ThrowIfNull(candidates);
         ArgumentNullException.ThrowIfNull(diagnostics);
+        if (!Enum.IsDefined(status))
+        {
+            throw new ArgumentOutOfRangeException(nameof(status));
+        }
+
+        TemplateCatalogEntry[] candidateArray = [.. candidates];
+        TemplateResolutionDiagnostic[] diagnosticArray = [.. diagnostics];
+        switch (status)
+        {
+            case TemplateResolutionStatus.Selected when selectedTemplate is null || candidateArray.Length != 0:
+                throw new ArgumentException("A selected result requires a selection and cannot contain ambiguity candidates.", nameof(selectedTemplate));
+            case TemplateResolutionStatus.NotFound when selectedTemplate is not null || candidateArray.Length != 0:
+                throw new ArgumentException("A not-found result cannot contain a selection or candidates.", nameof(candidates));
+            case TemplateResolutionStatus.Ambiguous when selectedTemplate is not null || candidateArray.Length < 2:
+                throw new ArgumentException("An ambiguous result requires multiple candidates and no selection.", nameof(candidates));
+            case TemplateResolutionStatus.Failed when selectedTemplate is not null || diagnosticArray.Length == 0:
+                throw new ArgumentException("A failed result requires diagnostics and cannot contain a selection.", nameof(diagnostics));
+        }
+
         Status = status;
         SelectedTemplate = selectedTemplate;
-        Candidates = Array.AsReadOnly<TemplateCatalogEntry>([.. candidates]);
-        Diagnostics = Array.AsReadOnly<TemplateResolutionDiagnostic>([.. diagnostics]);
+        Candidates = Array.AsReadOnly(candidateArray);
+        Diagnostics = Array.AsReadOnly(diagnosticArray);
     }
 
     public TemplateResolutionStatus Status { get; }
@@ -41,14 +67,38 @@ internal sealed class TemplateResolutionResult
 /// <summary>
 /// Represents a candidate selected by a templater session.
 /// </summary>
-/// <remarks>
-/// Selection does not establish scan completeness, metadata freshness, or asset integrity. Invocation must validate
-/// the same source and remain within a separately qualified rendering path.
-/// </remarks>
 internal sealed class ResolvedTemplate
 {
-    internal ResolvedTemplate(TemplateCatalogEntry descriptor)
-        => Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
+    private readonly TemplateEngineSession _session;
+    private readonly ITemplateInfo _template;
+
+    internal ResolvedTemplate(TemplateEngineSession session, TemplateCatalogEntry descriptor, ITemplateInfo template)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
+        _template = template ?? throw new ArgumentNullException(nameof(template));
+    }
+
+    internal ITemplateInfo GetTemplate(TemplateEngineSession session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        _session.ThrowIfDisposed();
+        if (!ReferenceEquals(_session, session))
+        {
+            throw new InvalidOperationException("The selected template belongs to a different Template Engine session.");
+        }
+
+        return _template;
+    }
+
+    internal ITemplateInfo Template
+    {
+        get
+        {
+            _session.ThrowIfDisposed();
+            return _template;
+        }
+    }
 
     internal TemplateCatalogEntry Descriptor { get; }
 }

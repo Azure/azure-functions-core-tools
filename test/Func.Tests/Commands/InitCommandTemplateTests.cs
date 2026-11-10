@@ -121,7 +121,7 @@ public class InitCommandTemplateTests(ITestOutputHelper output)
             var initializer = new TemplateProjectInitializer();
             var templaterFactory = new TemplaterFactory(
                 new CliConfigurationPathsOptions(home),
-                new InstalledProjectStackCatalog([stack]),
+                new Lazy<FuncTemplateConstraintEvaluator>(() => new(new TemplateConstraintRequirementMatcher())),
                 new PhysicalFileSystem());
             var command = new InitCommand(
                 interaction,

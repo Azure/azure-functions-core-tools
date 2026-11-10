@@ -4,7 +4,6 @@
 using System.IO.Compression;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
-using Azure.Functions.Cli.Projects;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Settings;
@@ -13,7 +12,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 
 internal sealed class TemplaterFactory(
     CliConfigurationPathsOptions configurationPaths,
-    InstalledProjectStackCatalog projectStacks,
+    Lazy<FuncTemplateConstraintEvaluator> funcConstraintEvaluator,
     IFileSystem fileSystem) : ITemplaterFactory
 {
     /// <summary>
@@ -29,7 +28,8 @@ internal sealed class TemplaterFactory(
     internal const int MaximumContentBytes = 32 * 1024 * 1024;
 
     private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
-    private readonly InstalledProjectStackCatalog _projectStacks = projectStacks ?? throw new ArgumentNullException(nameof(projectStacks));
+    private readonly Lazy<FuncTemplateConstraintEvaluator> _funcConstraintEvaluator =
+        funcConstraintEvaluator ?? throw new ArgumentNullException(nameof(funcConstraintEvaluator));
     private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public Templater Create(TemplateEngineContext context)
@@ -37,7 +37,7 @@ internal sealed class TemplaterFactory(
         ArgumentNullException.ThrowIfNull(context);
 
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new Templater(new TemplateEngineSession(context, settingsLocation), _projectStacks);
+        return CreateTemplater(new TemplateEngineSession(context, settingsLocation));
     }
 
     public async Task<Templater> CreateAsync(TemplateEngineContext context, CancellationToken cancellationToken)
@@ -125,7 +125,7 @@ internal sealed class TemplaterFactory(
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            Templater templater = new(operation, _projectStacks);
+            Templater templater = CreateTemplater(operation);
             transferred = true;
             return templater;
         }
@@ -143,6 +143,12 @@ internal sealed class TemplaterFactory(
                 }
             }
         }
+    }
+
+    private Templater CreateTemplater(TemplateEngineSession session)
+    {
+        TemplateEligibilityEvaluator eligibilityEvaluator = new(session, _funcConstraintEvaluator);
+        return new(session, new TemplateSelection(session, eligibilityEvaluator));
     }
 
     private static async Task<long> ValidateArchiveAsync(

@@ -3,7 +3,6 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
-using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Templates.Engine;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
@@ -29,7 +28,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Create_BindsTheSuppliedContext()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+        TemplaterFactory factory = CreateFactory();
         TemplateEngineContext context = Context("command");
 
         using Templater templater = factory.Create(context);
@@ -41,7 +40,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_ReadsTemplatesFromTemplatesDirectoryUnderFuncHome()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+        TemplaterFactory factory = CreateFactory();
 
         using Templater templater = factory.Create(Context("command"));
         IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
@@ -53,7 +52,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_EachCallReturnsAnIndependentTemplater()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+        TemplaterFactory factory = CreateFactory();
         Templater first = factory.Create(Context("first"));
         using Templater second = factory.Create(Context("second"));
 
@@ -64,9 +63,29 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_DoesNotConstructFunctionsEvaluatorWithoutFunctionsConstraints()
+    {
+        await InstallFixturesUnderHomeAsync();
+        bool evaluatorCreated = false;
+        Lazy<FuncTemplateConstraintEvaluator> evaluator = new(() =>
+        {
+            evaluatorCreated = true;
+            return new(new TemplateConstraintRequirementMatcher());
+        });
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), evaluator, new PhysicalFileSystem());
+
+        using Templater templater = factory.Create(Context("command"));
+        TemplateCatalogEntry entry = (await templater.ListAsync(TemplateType.Item, CancellationToken.None)).Single();
+        TemplateResolutionResult result = await templater.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Selected);
+        evaluatorCreated.Should().BeFalse();
+    }
+
+    [Fact]
     public void Create_NullContext_Throws()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+        TemplaterFactory factory = CreateFactory();
 
         Action act = () => factory.Create(null!);
 
@@ -76,23 +95,23 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Constructor_NullConfigurationPaths_Throws()
     {
-        Action act = () => _ = new TemplaterFactory(null!, new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+        Action act = () => _ = new TemplaterFactory(null!, FuncConstraintEvaluator(), new PhysicalFileSystem());
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("configurationPaths");
     }
 
     [Fact]
-    public void Constructor_NullProjectStacks_Throws()
+    public void Constructor_NullFunctionsEvaluator_Throws()
     {
         Action act = () => _ = new TemplaterFactory(new CliConfigurationPathsOptions(Home), null!, new PhysicalFileSystem());
 
-        act.Should().Throw<ArgumentNullException>().WithParameterName("projectStacks");
+        act.Should().Throw<ArgumentNullException>().WithParameterName("funcConstraintEvaluator");
     }
 
     [Fact]
     public void Constructor_NullFileSystem_Throws()
     {
-        Action act = () => _ = new TemplaterFactory(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), null!);
+        Action act = () => _ = new TemplaterFactory(new CliConfigurationPathsOptions(Home), FuncConstraintEvaluator(), null!);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("fileSystem");
     }
@@ -100,7 +119,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public async Task CreateAsync_NullContext_Throws()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+        TemplaterFactory factory = CreateFactory();
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => factory.CreateAsync(null!, CancellationToken.None));
     }
@@ -110,7 +129,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     {
         using CancellationTokenSource cancellation = new();
         cancellation.Cancel();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), new InstalledProjectStackCatalog([]), new PhysicalFileSystem());
+        TemplaterFactory factory = CreateFactory();
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => factory.CreateAsync(Context("command"), cancellation.Token));
         Assert.False(Directory.Exists(Home));
@@ -124,4 +143,10 @@ public sealed class TemplaterFactoryTests : IDisposable
 
     private TemplateEngineContext Context(string directory)
         => new(WorkingDirectory.FromExplicit(Path.Combine(_root, directory)));
+
+    private TemplaterFactory CreateFactory()
+        => new(new CliConfigurationPathsOptions(Home), FuncConstraintEvaluator(), new PhysicalFileSystem());
+
+    private static Lazy<FuncTemplateConstraintEvaluator> FuncConstraintEvaluator()
+        => new(() => new(new TemplateConstraintRequirementMatcher()));
 }

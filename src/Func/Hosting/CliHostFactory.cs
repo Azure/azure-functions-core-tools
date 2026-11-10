@@ -134,6 +134,10 @@ internal static class CliHostFactory
         builder.Services.AddWorkloadInstaller();
         builder.Services.AddQuickstartManifest();
         builder.Services.AddManagedAzurite();
+        builder.Services.AddSingleton<TemplateConstraintRequirementMatcher>();
+        builder.Services.AddSingleton<FuncTemplateConstraintEvaluator>();
+        builder.Services.AddSingleton<Lazy<FuncTemplateConstraintEvaluator>>(services =>
+            new(services.GetRequiredService<FuncTemplateConstraintEvaluator>));
         builder.Services.AddSingleton<ITemplaterFactory, TemplaterFactory>();
 
         return builder;

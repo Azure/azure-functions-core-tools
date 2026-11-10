@@ -19,7 +19,9 @@ public sealed class TemplateCatalogProjectorTests
     [InlineData("Item")]
     public void GetTemplateType_ItemType_ReturnsItem(string type)
     {
-        TemplateType? templateType = TemplateCatalogProjector.GetTemplateType(Template(type: type));
+        ITemplateMetadata template = Template(type: type);
+
+        TemplateType? templateType = TemplateCatalogProjector.GetTemplateType(template);
 
         templateType.Should().Be(TemplateType.Item);
     }
@@ -29,7 +31,9 @@ public sealed class TemplateCatalogProjectorTests
     [InlineData("PROJECT")]
     public void GetTemplateType_ProjectType_ReturnsProject(string type)
     {
-        TemplateType? templateType = TemplateCatalogProjector.GetTemplateType(Template(type: type));
+        ITemplateMetadata template = Template(type: type);
+
+        TemplateType? templateType = TemplateCatalogProjector.GetTemplateType(template);
 
         templateType.Should().Be(TemplateType.Project);
     }
@@ -40,7 +44,9 @@ public sealed class TemplateCatalogProjectorTests
     [InlineData(null)]
     public void GetTemplateType_OtherOrMissingType_ReturnsNull(string? type)
     {
-        TemplateType? templateType = TemplateCatalogProjector.GetTemplateType(Template(type: type));
+        ITemplateMetadata template = Template(type: type);
+
+        TemplateType? templateType = TemplateCatalogProjector.GetTemplateType(template);
 
         templateType.Should().BeNull();
     }
@@ -59,6 +65,19 @@ public sealed class TemplateCatalogProjectorTests
         IReadOnlyList<TemplateCatalogEntry> entries = TemplateCatalogProjector.Project(templates, [], TemplateType.Item);
 
         entries.Select(entry => entry.Identity).Should().Equal("Func.Tests.Second", "Func.Tests.First");
+    }
+
+    [Fact]
+    public void Project_TemplatesReturnsAnImmutableSnapshot()
+    {
+        List<ITemplateInfo> templates = [Template("Func.Tests.Template")];
+        IReadOnlyList<TemplateCatalogEntry> entries = TemplateCatalogProjector.Project(templates, [], TemplateType.Item);
+
+        templates.Clear();
+
+        entries.Should().ContainSingle().Which.Identity.Should().Be("Func.Tests.Template");
+        Action mutateEntries = () => ((IList<TemplateCatalogEntry>)entries).Clear();
+        mutateEntries.Should().Throw<NotSupportedException>();
     }
 
     [Fact]
@@ -130,18 +149,61 @@ public sealed class TemplateCatalogProjectorTests
         TemplateCatalogEntry entry = TemplateCatalogProjector.Project(template, Package("Contoso.Functions.Templates", "1.2.3"));
 
         entry.Should().BeEquivalentTo(new TemplateCatalogEntry(
-            Identity: "Func.Tests.Template",
-            Name: "Func Tests Template",
-            Description: "Creates a project",
-            Type: TemplateType.Project,
-            ShortNames: ["func-tests-template", "ftt"],
-            GroupIdentity: "Func.Tests.Group",
-            Language: "Python",
-            Precedence: 100,
-            Package: new TemplatePackageInfo("Contoso.Functions.Templates", "1.2.3"),
-            IsHidden: false,
-            Parameters: [],
-            MetadataDiagnostic: null));
+            identity: "Func.Tests.Template",
+            name: "Func Tests Template",
+            description: "Creates a project",
+            type: TemplateType.Project,
+            shortNames: ["func-tests-template", "ftt"],
+            groupIdentity: "Func.Tests.Group",
+            language: "Python",
+            precedence: 100,
+            package: new TemplatePackageInfo("Contoso.Functions.Templates", "1.2.3"),
+            isHidden: false,
+            parameters: [],
+            metadataDiagnostic: null));
+    }
+
+    [Fact]
+    public void TemplateCatalogEntry_CopiesAndExposesNestedCollectionsAsReadOnly()
+    {
+        List<string> shortNames = ["template"];
+        List<TemplateParameterChoice> choices = [new("one", "One", null)];
+        List<TemplateParameterDefinition> parameters =
+        [
+            new("choice", "choice", null, null, "choice", choices, null, false, false, false),
+        ];
+
+        TemplateCatalogEntry entry = new(
+            identity: "Func.Tests.Template",
+            name: "Template",
+            description: null,
+            type: TemplateType.Item,
+            shortNames: shortNames,
+            groupIdentity: null,
+            language: null,
+            precedence: 0,
+            package: null,
+            isHidden: false,
+            parameters: parameters,
+            metadataDiagnostic: null);
+        TemplateCatalogEntry copy = entry with { };
+
+        shortNames.Add("later");
+        choices.Add(new("two", "Two", null));
+        parameters.Clear();
+
+        entry.ShortNames.Should().Equal("template");
+        entry.Parameters.Should().ContainSingle();
+        entry.Parameters[0].Choices.Should().ContainSingle().Which.Value.Should().Be("one");
+        copy.ShortNames.Should().Equal("template");
+        copy.Parameters[0].Choices.Should().ContainSingle();
+        Action addShortName = () => ((IList<string>)entry.ShortNames).Add("mutable");
+        Action clearParameters = () => ((IList<TemplateParameterDefinition>)entry.Parameters).Clear();
+        Action clearChoices = () => ((IList<TemplateParameterChoice>)entry.Parameters[0].Choices).Clear();
+
+        addShortName.Should().Throw<NotSupportedException>();
+        clearParameters.Should().Throw<NotSupportedException>();
+        clearChoices.Should().Throw<NotSupportedException>();
     }
 
     [Fact]
@@ -186,6 +248,7 @@ public sealed class TemplateCatalogProjectorTests
         TemplateCatalogEntry entry = TemplateCatalogProjector.Project(template, package: null);
 
         entry.MetadataDiagnostic.Should().StartWith("func.host.json");
+        entry.MetadataDiagnosticCause.Should().BeOfType<InvalidTemplateMetadataException>();
         entry.Parameters.Should().BeEmpty();
         entry.IsHidden.Should().BeFalse();
     }
