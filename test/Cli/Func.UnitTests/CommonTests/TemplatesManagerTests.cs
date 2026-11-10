@@ -3,6 +3,7 @@
 
 using AwesomeAssertions;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
 using NSubstitute;
@@ -30,10 +31,11 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             _previousOfflineEnv = Environment.GetEnvironmentVariable(Constants.FunctionsCoreToolsOffline);
             _previousBundlePathEnv = Environment.GetEnvironmentVariable(Constants.ExtensionBundleDownloadPath);
 
-            // Create an isolated working directory (no host.json by default)
+            // A missing host.json can enable default bundles; explicitly configure the no-bundle test host.
             _testWorkingDir = Path.Combine(
                 Path.GetTempPath(), "TemplatesManagerTest", Guid.NewGuid().ToString());
             Directory.CreateDirectory(_testWorkingDir);
+            File.WriteAllText(Path.Combine(_testWorkingDir, Constants.HostJsonFileName), "{\"version\":\"2.0\"}");
             Directory.SetCurrentDirectory(_testWorkingDir);
 
             // Ensure the lock file directory exists (CI agents may not have it)
@@ -164,6 +166,13 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             // Assert
             manager.Should().NotBeNull();
             manager.Should().BeAssignableTo<ITemplatesManager>();
+        }
+
+        [Fact]
+        public void TestHost_HasExplicitConfigurationWithoutExtensionBundle()
+        {
+            Assert.True(File.Exists(Path.Combine(_testWorkingDir, Constants.HostJsonFileName)));
+            Assert.Null(ExtensionBundleHelper.GetExtensionBundleOptions().Id);
         }
 
         public static IEnumerable<object[]> NodeConnectorTemplates()
