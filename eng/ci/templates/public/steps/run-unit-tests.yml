@@ -14,3 +14,14 @@ steps:
     failTaskOnFailedTests: true
     searchFolder: $(Agent.TempDirectory)
   condition: succeededOrFailed()
+
+- task: NodeTool@0
+  displayName: 'Install Node 24 for connector template checks'
+  inputs:
+    versionSpec: '24.x'
+
+- pwsh: |
+    $testFile = Join-Path $PWD 'test' 'Cli' 'Func.UnitTests' 'node-connector-templates.test.mjs'
+    node --test $testFile
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  displayName: 'Validate built-in JavaScript and TypeScript connector templates'

@@ -157,6 +157,9 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)node-v4-templates.json">
       <LogicalName>$(AssemblyName).node-v4-templates.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)connector-trigger-README.md">
+      <LogicalName>$(AssemblyName).connector-trigger-README.md</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Python-HttpTrigger-help.txt">
       <LogicalName>$(AssemblyName).python-HttpTrigger-help.txt</LogicalName>
     </EmbeddedResource>
