@@ -22,7 +22,7 @@ internal sealed record TemplateResolutionDiagnostic(
 
 internal sealed class TemplateResolutionResult
 {
-    public TemplateResolutionResult(
+    private TemplateResolutionResult(
         TemplateResolutionStatus status,
         ResolvedTemplate? selectedTemplate,
         IEnumerable<TemplateCatalogEntry> candidates,
@@ -54,6 +54,27 @@ internal sealed class TemplateResolutionResult
         Candidates = Array.AsReadOnly(candidateArray);
         Diagnostics = Array.AsReadOnly(diagnosticArray);
     }
+
+    public static TemplateResolutionResult Selected(
+        ResolvedTemplate selectedTemplate,
+        IEnumerable<TemplateResolutionDiagnostic>? diagnostics = null)
+    {
+        ArgumentNullException.ThrowIfNull(selectedTemplate);
+        return new(TemplateResolutionStatus.Selected, selectedTemplate, [], diagnostics ?? []);
+    }
+
+    public static TemplateResolutionResult NotFound(IEnumerable<TemplateResolutionDiagnostic>? diagnostics = null)
+        => new(TemplateResolutionStatus.NotFound, null, [], diagnostics ?? []);
+
+    public static TemplateResolutionResult Ambiguous(
+        IEnumerable<TemplateCatalogEntry> candidates,
+        IEnumerable<TemplateResolutionDiagnostic> diagnostics)
+        => new(TemplateResolutionStatus.Ambiguous, null, candidates, diagnostics);
+
+    public static TemplateResolutionResult Failed(
+        IEnumerable<TemplateResolutionDiagnostic> diagnostics,
+        IEnumerable<TemplateCatalogEntry>? candidates = null)
+        => new(TemplateResolutionStatus.Failed, null, candidates ?? [], diagnostics);
 
     public TemplateResolutionStatus Status { get; }
 

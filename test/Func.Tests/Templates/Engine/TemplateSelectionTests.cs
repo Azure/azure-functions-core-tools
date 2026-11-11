@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Reflection;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
@@ -49,6 +50,45 @@ public sealed class TemplateSelectionTests : IDisposable
         result.Status.Should().Be(TemplateResolutionStatus.Selected);
         result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Shared");
         result.Candidates.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AliasFiltersByRequestedTemplateKind()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackageForType(
+            _root,
+            "project",
+            ("project", "Func.Tests.Project", "shared", null, null, null, null));
+        TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("item", "Func.Tests.Item", "shared", null, null, null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using SelectionHarness selection = await CreateSelectionAsync();
+
+        TemplateResolutionResult result = await selection.ResolveAsync("shared", TemplateType.Item);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Selected);
+        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Item");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_WrongKindExactIdentityDoesNotFallThroughToAlias()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackageForType(
+            _root,
+            "project",
+            ("project", "Func.Tests.Requested", "project-alias", null, null, null, null));
+        TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("item", "Func.Tests.Other", "Func.Tests.Requested", null, null, null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using SelectionHarness selection = await CreateSelectionAsync();
+
+        TemplateResolutionResult result = await selection.ResolveAsync("Func.Tests.Requested", TemplateType.Item);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.SelectedTemplate.Should().BeNull();
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("wrong-kind");
     }
 
     [Fact]
@@ -188,6 +228,97 @@ public sealed class TemplateSelectionTests : IDisposable
     }
 
     [Fact]
+    public async Task ResolveAsync_MalformedRawConstraintRetainsMetadataCause()
+    {
+        const string identity = "Func.Tests.MalformedRawConstraint";
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("constrained", identity, "malformed-raw", null, null, "host", new { hostname = "func" }));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using SelectionHarness selection = await CreateSelectionAsync();
+        File.WriteAllText(
+            Path.Combine(packageDirectory, "constrained", ".template.config", "template.json"),
+            "{ not json");
+
+        TemplateResolutionResult result = await selection.ResolveAsync("malformed-raw", TemplateType.Item);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Code.Should().Be("invalid-constraints");
+        diagnostic.Cause.Should().BeOfType<InvalidTemplateMetadataException>()
+            .Which.InnerException.Should().BeAssignableTo<System.Text.Json.JsonException>();
+    }
+
+    [Fact]
+    public async Task ResolveAsync_SourceReadFailureRetainsCause()
+    {
+        const string identity = "Func.Tests.SourceReadFailure";
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("constrained", identity, "source-read-failure", null, null, "host", new { hostname = "func" }));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using SelectionHarness selection = await CreateSelectionAsync();
+        string configurationPath = Path.Combine(packageDirectory, "constrained", ".template.config", "template.json");
+        using FileStream exclusiveHandle = new(configurationPath, FileMode.Open, FileAccess.Read, FileShare.None);
+
+        TemplateResolutionResult result = await selection.ResolveAsync("source-read-failure", TemplateType.Item);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Code.Should().Be("constraint-source-unavailable");
+        diagnostic.Cause.Should().BeOfType<IOException>();
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ConstraintMetadataTypeMismatchFailsClosed()
+    {
+        const string identity = "Func.Tests.ConstraintMetadataTypeMismatch";
+        using var args = System.Text.Json.JsonDocument.Parse("""[{"hostname":"func"}]""");
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("constrained", identity, "type-mismatch", null, null, "host", args.RootElement.Clone()));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using TemplateEngineSession session = new(
+            new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)),
+            _hive);
+        (IReadOnlyList<ITemplatePackage> packages, IReadOnlyList<ITemplateInfo> engineTemplates) =
+            await session.GetInventoryAsync(CancellationToken.None);
+        ITemplateInfo engineCandidate = engineTemplates.Single(template => template.Identity == identity);
+        ITemplateInfo candidate = Substitute.For<ITemplateInfo>();
+        candidate.Identity.Returns(engineCandidate.Identity);
+        candidate.TagsCollection.Returns(engineCandidate.TagsCollection);
+        candidate.ShortNameList.Returns(engineCandidate.ShortNameList);
+        candidate.MountPointUri.Returns(engineCandidate.MountPointUri);
+        candidate.ConfigPlace.Returns(engineCandidate.ConfigPlace);
+        candidate.Constraints.Returns([new("different-type", args.RootElement.GetRawText())]);
+        TemplateCatalogEntry entry = TemplateCatalogProjector.Project(
+            engineCandidate,
+            packages.Single(package => package.MountPointUri == engineCandidate.MountPointUri));
+        Dictionary<ITemplateInfo, TemplateCatalogEntry> entries = new(ReferenceEqualityComparer.Instance)
+        {
+            [candidate] = entry,
+        };
+        Dictionary<TemplateCatalogEntry, ITemplateInfo> issuedEntries = new(ReferenceEqualityComparer.Instance)
+        {
+            [entry] = candidate,
+        };
+        TemplateSelection selection = new(
+            session,
+            new TemplateEligibilityEvaluator(session, new(() => new(new TemplateConstraintRequirementMatcher()))));
+
+        TemplateResolutionResult result = await selection.ResolveAsync(
+            [candidate],
+            entries,
+            issuedEntries,
+            identity,
+            TemplateType.Item,
+            CancellationToken.None);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-metadata-mismatch");
+    }
+
+    [Fact]
     public async Task ResolveAsync_NoRawOrEngineConstraints_RemainsEligible()
     {
         const string identity = "Func.Tests.NoConstraints";
@@ -201,10 +332,12 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("unconstrained", TemplateType.Item);
 
+        selection.HasConstraintManager.Should().BeFalse();
         result.Status.Should().Be(TemplateResolutionStatus.Selected);
         result.SelectedTemplate!.Descriptor.Identity.Should().Be(identity);
         result.Diagnostics.Should().BeEmpty();
         unrelatedFactory.CreateCount.Should().Be(0);
+        selection.HasConstraintManager.Should().BeFalse();
     }
 
     [Fact]
@@ -239,6 +372,63 @@ public sealed class TemplateSelectionTests : IDisposable
 
         result.Status.Should().Be(TemplateResolutionStatus.Selected);
         result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Bundle");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_RestrictedBundleConstraintRejectsCandidate()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("bundle", "Func.Tests.RestrictedBundle", "restricted-bundle", null, null, "func-bundle", new { id = "test.bundle", version = "[4.20.0,5.0.0)" }));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using SelectionHarness selection = await CreateSelectionAsync(
+            new(
+                WorkingDirectory.FromExplicit(_root),
+                bundle: new TemplateEngineBundleContext("test.bundle", "3.0.0")));
+
+        TemplateResolutionResult result = await selection.ResolveAsync("restricted-bundle", TemplateType.Item);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-restricted");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_EngineRestrictedResultRejectsCandidate()
+    {
+        const string constraintType = "func-tests-restricted";
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("constrained", "Func.Tests.EngineRestricted", "engine-restricted", null, null, constraintType, new { }));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using SelectionHarness selection = await CreateSelectionAsync(
+            additionalFactories: [new RestrictedConstraintFactory(constraintType)]);
+
+        TemplateResolutionResult result = await selection.ResolveAsync("engine-restricted", TemplateType.Item);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-restricted");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CancellationAfterConstraintEvaluationStartsPropagates()
+    {
+        const string constraintType = "func-tests-blocking";
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("constrained", "Func.Tests.BlockingConstraint", "blocking", null, null, constraintType, new { }));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        BlockingConstraintFactory factory = new(constraintType);
+        using SelectionHarness selection = await CreateSelectionAsync(additionalFactories: [factory]);
+        using CancellationTokenSource cancellation = new();
+
+        Task<TemplateResolutionResult> resolution = selection.ResolveAsync(
+            "blocking",
+            TemplateType.Item,
+            cancellation.Token);
+        await factory.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cancellation.CancelAsync();
+
+        await FluentActions.Awaiting(() => resolution).Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -339,6 +529,11 @@ public sealed class TemplateSelectionTests : IDisposable
     {
         public void Dispose() => session.Dispose();
 
+        public bool HasConstraintManager
+            => typeof(TemplateEngineSession)
+                .GetField("_constraintManager", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(session) is not null;
+
         public int GetConstraintFactoryCount(string type)
             => session.Settings.Components.OfType<ITemplateConstraintFactory>().Count(factory => factory.Type == type);
 
@@ -373,5 +568,45 @@ public sealed class TemplateSelectionTests : IDisposable
         public string DisplayName => "Duplicate factory test constraint";
 
         public TemplateConstraintResult Evaluate(string? args) => TemplateConstraintResult.CreateAllowed(this);
+    }
+
+    private sealed class BlockingConstraintFactory(string type) : ITemplateConstraintFactory
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+
+        public string Type { get; } = type;
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<ITemplateConstraint> CreateTemplateConstraintAsync(
+            IEngineEnvironmentSettings environmentSettings,
+            CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return new DuplicateFactoryConstraint(Type);
+        }
+    }
+
+    private sealed class RestrictedConstraintFactory(string type) : ITemplateConstraintFactory
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+
+        public string Type { get; } = type;
+
+        public Task<ITemplateConstraint> CreateTemplateConstraintAsync(
+            IEngineEnvironmentSettings environmentSettings,
+            CancellationToken cancellationToken)
+            => Task.FromResult<ITemplateConstraint>(new RestrictedConstraint(Type));
+    }
+
+    private sealed class RestrictedConstraint(string type) : ITemplateConstraint
+    {
+        public string Type { get; } = type;
+
+        public string DisplayName => "Restricted test constraint";
+
+        public TemplateConstraintResult Evaluate(string? args)
+            => TemplateConstraintResult.CreateRestricted(this, "The test constraint is restricted.", "Update the test environment.");
     }
 }

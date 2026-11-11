@@ -175,6 +175,12 @@ internal static class TemplateFixtures
     public static string WriteSelectionPackage(
         string parentDirectory,
         params (string DirectoryName, string Identity, string ShortName, string? GroupIdentity, string? Language, string? ConstraintType, object? ConstraintArgs)[] templates)
+        => WriteSelectionPackageForType(parentDirectory, "item", templates);
+
+    public static string WriteSelectionPackageForType(
+        string parentDirectory,
+        string templateType,
+        params (string DirectoryName, string Identity, string ShortName, string? GroupIdentity, string? Language, string? ConstraintType, object? ConstraintArgs)[] templates)
     {
         string packageDirectory = Path.Combine(parentDirectory, "selection-templates");
         foreach (var template in templates)
@@ -204,7 +210,7 @@ internal static class TemplateFixtures
                   "identity": {{System.Text.Json.JsonSerializer.Serialize(template.Identity)}},
                   "name": {{System.Text.Json.JsonSerializer.Serialize(template.DirectoryName)}},
                   "shortName": {{System.Text.Json.JsonSerializer.Serialize(template.ShortName)}},
-                  "tags": { "type": "item"{{language}} }{{groupIdentity}}{{constraint}}
+                  "tags": { "type": {{System.Text.Json.JsonSerializer.Serialize(templateType)}}{{language}} }{{groupIdentity}}{{constraint}}
                 }
                 """,
                 ($"{template.DirectoryName}.txt", $"content from {template.Identity}"));

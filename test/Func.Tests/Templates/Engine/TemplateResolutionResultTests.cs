@@ -25,17 +25,17 @@ public sealed class TemplateResolutionResultTests : IDisposable
     }
 
     [Fact]
-    public async Task Constructor_AcceptsEachValidStatusPayload()
+    public async Task Factories_AcceptEachValidStatusPayload()
     {
         (TemplateEngineSession session, ResolvedTemplate selection, TemplateCatalogEntry[] entries) = await CreateInputsAsync();
         using (session)
         {
-            TemplateResolutionDiagnostic diagnostic = new("warning", "Candidate was rejected.", entries[0].Identity, "package", new InvalidOperationException());
+            var diagnostic = new TemplateResolutionDiagnostic("warning", "Candidate was rejected.", entries[0].Identity, "package", new InvalidOperationException());
 
-            TemplateResolutionResult selected = new(TemplateResolutionStatus.Selected, selection, [], [diagnostic]);
-            TemplateResolutionResult notFound = new(TemplateResolutionStatus.NotFound, null, [], []);
-            TemplateResolutionResult ambiguous = new(TemplateResolutionStatus.Ambiguous, null, entries, [diagnostic]);
-            TemplateResolutionResult failed = new(TemplateResolutionStatus.Failed, null, [entries[0]], [diagnostic]);
+            var selected = TemplateResolutionResult.Selected(selection, [diagnostic]);
+            var notFound = TemplateResolutionResult.NotFound();
+            var ambiguous = TemplateResolutionResult.Ambiguous(entries, [diagnostic]);
+            var failed = TemplateResolutionResult.Failed([diagnostic], [entries[0]]);
 
             selected.SelectedTemplate.Should().BeSameAs(selection);
             selected.Candidates.Should().BeEmpty();
@@ -49,34 +49,28 @@ public sealed class TemplateResolutionResultTests : IDisposable
     }
 
     [Fact]
-    public async Task Constructor_RejectsInvalidStatusPayloads()
+    public async Task Factories_RejectInvalidStatusPayloads()
     {
         (TemplateEngineSession session, ResolvedTemplate selection, TemplateCatalogEntry[] entries) = await CreateInputsAsync();
         using (session)
         {
-            TemplateResolutionDiagnostic diagnostic = new("failed", "Resolution failed.");
+            var diagnostic = new TemplateResolutionDiagnostic("failed", "Resolution failed.");
 
-            Assert.Throws<ArgumentException>(() => new TemplateResolutionResult(TemplateResolutionStatus.Selected, null, [], []));
-            Assert.Throws<ArgumentException>(() => new TemplateResolutionResult(TemplateResolutionStatus.Selected, selection, [entries[0]], []));
-            Assert.Throws<ArgumentException>(() => new TemplateResolutionResult(TemplateResolutionStatus.NotFound, selection, [], []));
-            Assert.Throws<ArgumentException>(() => new TemplateResolutionResult(TemplateResolutionStatus.NotFound, null, [entries[0]], []));
-            Assert.Throws<ArgumentException>(() => new TemplateResolutionResult(TemplateResolutionStatus.Ambiguous, selection, entries, [diagnostic]));
-            Assert.Throws<ArgumentException>(() => new TemplateResolutionResult(TemplateResolutionStatus.Ambiguous, null, [entries[0]], [diagnostic]));
-            Assert.Throws<ArgumentException>(() => new TemplateResolutionResult(TemplateResolutionStatus.Failed, selection, [], [diagnostic]));
-            Assert.Throws<ArgumentException>(() => new TemplateResolutionResult(TemplateResolutionStatus.Failed, null, [], []));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new TemplateResolutionResult((TemplateResolutionStatus)int.MaxValue, null, [], []));
+            Assert.Throws<ArgumentNullException>(() => TemplateResolutionResult.Selected(null!));
+            Assert.Throws<ArgumentException>(() => TemplateResolutionResult.Ambiguous([entries[0]], []));
+            Assert.Throws<ArgumentException>(() => TemplateResolutionResult.Failed([]));
         }
     }
 
     [Fact]
-    public async Task Constructor_DefensivelyCopiesAndExposesReadOnlyCollections()
+    public async Task Factories_DefensivelyCopyAndExposeReadOnlyCollections()
     {
         (TemplateEngineSession session, _, TemplateCatalogEntry[] entries) = await CreateInputsAsync();
         using (session)
         {
             List<TemplateCatalogEntry> candidates = [.. entries];
             List<TemplateResolutionDiagnostic> diagnostics = [new("ambiguous", "Choose a candidate.")];
-            TemplateResolutionResult result = new(TemplateResolutionStatus.Ambiguous, null, candidates, diagnostics);
+            var result = TemplateResolutionResult.Ambiguous(candidates, diagnostics);
             candidates.Clear();
             diagnostics.Clear();
 
@@ -91,13 +85,15 @@ public sealed class TemplateResolutionResultTests : IDisposable
     }
 
     [Fact]
-    public void Constructor_RejectsNullCollections()
+    public void Factories_RejectNullCollections()
     {
-        Action nullCandidates = () => new TemplateResolutionResult(TemplateResolutionStatus.NotFound, null, null!, []);
-        Action nullDiagnostics = () => new TemplateResolutionResult(TemplateResolutionStatus.NotFound, null, [], null!);
+        Action nullAmbiguousCandidates = () => TemplateResolutionResult.Ambiguous(null!, []);
+        Action nullAmbiguousDiagnostics = () => TemplateResolutionResult.Ambiguous([], null!);
+        Action nullFailedDiagnostics = () => TemplateResolutionResult.Failed(null!);
 
-        nullCandidates.Should().Throw<ArgumentNullException>().WithParameterName("candidates");
-        nullDiagnostics.Should().Throw<ArgumentNullException>().WithParameterName("diagnostics");
+        nullAmbiguousCandidates.Should().Throw<ArgumentNullException>().WithParameterName("candidates");
+        nullAmbiguousDiagnostics.Should().Throw<ArgumentNullException>().WithParameterName("diagnostics");
+        nullFailedDiagnostics.Should().Throw<ArgumentNullException>().WithParameterName("diagnostics");
     }
 
     private async Task<(TemplateEngineSession Session, ResolvedTemplate Selection, TemplateCatalogEntry[] Entries)> CreateInputsAsync()

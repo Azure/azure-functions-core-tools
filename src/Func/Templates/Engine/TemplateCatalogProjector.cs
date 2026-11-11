@@ -34,33 +34,6 @@ internal static class TemplateCatalogProjector
     }
 
     /// <summary>
-    /// Projects the templates of <paramref name="type"/> into catalog entries, keeping their order.
-    /// </summary>
-    /// <param name="templates">Installed templates.</param>
-    /// <param name="packages">Installed template packages.</param>
-    /// <param name="type">Template type to list.</param>
-    public static IReadOnlyList<TemplateCatalogEntry> Project(
-        IEnumerable<ITemplateInfo> templates,
-        IEnumerable<ITemplatePackage> packages,
-        TemplateType type)
-    {
-        ArgumentNullException.ThrowIfNull(templates);
-        ArgumentNullException.ThrowIfNull(packages);
-
-        // Take the first package per mount point, as the engine's template cache does, so duplicate registrations can't fail the listing.
-        Dictionary<string, ITemplatePackage> packagesByMountPoint = new(StringComparer.Ordinal);
-        foreach (ITemplatePackage package in packages)
-        {
-            packagesByMountPoint.TryAdd(package.MountPointUri, package);
-        }
-
-        TemplateCatalogEntry[] entries = [.. templates
-            .Where(template => GetTemplateType(template) == type)
-            .Select(template => Project(template, packagesByMountPoint.GetValueOrDefault(template.MountPointUri)))];
-        return Array.AsReadOnly(entries);
-    }
-
-    /// <summary>
     /// Projects <paramref name="template"/> into a catalog entry, reporting unusable Functions or required template metadata.
     /// </summary>
     /// <param name="template">Installed template with an item or project type.</param>

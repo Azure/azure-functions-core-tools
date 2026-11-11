@@ -27,7 +27,7 @@ These are responsibilities, not a required class-per-row design. Reuse existing 
 
 Workload installation registers immutable, versioned content before commands discover it. The command-scoped `TemplatePackageManager` inventory is the discovery source. There is one inventory per command session; `Templater` does not rescan after selection or refresh aliases. Content servicing and cache re-registration happen outside the command session.
 
-`TemplateEngineSession` owns `EngineEnvironmentSettings`, `TemplatePackageManager`, and one cached runtime-read-only package/template snapshot. The snapshot copies only the collection containers, preserving the original package and `ITemplateInfo` references. `Templater` owns that session, projects the returned candidates to `TemplateCatalogEntry`, and retains the original candidate references and their lifetime. `TemplateSelection` consumes that inventory and projection without source I/O, creating another inventory, or refreshing it. A selection must resolve to the exact candidate issued by the same live session; it is not reconstructed from catalog fields or looked up again by alias.
+`TemplateEngineSession` owns `EngineEnvironmentSettings`, `TemplatePackageManager`, a lazily created `TemplateConstraintManager`, and one cached runtime-read-only package/template snapshot. The snapshot copies only the collection containers, preserving the original package and `ITemplateInfo` references. `Templater` owns that session, projects the returned candidates to `TemplateCatalogEntry`, and retains the original candidate references and their lifetime. `TemplateSelection` consumes that inventory and projection without source I/O, creating another inventory, or refreshing it. A selection must resolve to the exact candidate issued by the same live session; it is not reconstructed from catalog fields or looked up again by alias.
 
 Workload installation owns package acquisition and Hive registration. Discovery never downloads or installs content. The Template Engine remains in Core Tools for this milestone; physical extraction under issue #5330 is separate work.
 
@@ -46,13 +46,13 @@ Listing includes hidden templates and templates whose Functions-specific or requ
 
 `groupIdentity` describes related variants; it does not determine an alias result or select a variant. A template with no group is not an implicit family. The shared `shortName` alias of two variants may therefore be ambiguous. Project and item templates remain distinct through `tags.type`. Templates require at least one non-empty `shortName`: the engine may omit a template with no value, while projection filters empty aliases and marks an exposed candidate with no usable alias as invalid.
 
-A future authorized command may request candidate metadata, own the prompt, and then resolve the exact chosen entry. No no-reference prompting API is added here because no production command consumes it yet.
+A command may request candidate metadata, own the prompt, and then resolve the exact chosen entry. PR #5872 does not add a no-reference prompting API; command prompting remains with the consuming command, including the downstream PR #5878 integration.
 
 ## Eligibility and constraints
 
 `TemplateEligibilityEvaluator` uses `TemplateConstraintManager` for engine constraints. It validates raw declarations before normalization can hide malformed or duplicate constraints, reads the candidate configuration through the existing session, and verifies that the engine exposes exactly one matching factory. Unavailable, restricted, unknown, or unevaluated required constraints reject only the affected candidate with a structured diagnostic. Cancellation propagates.
 
-The narrow `func-bundle` constraint is evaluated against bundle context already attached to the session, using the lazy `FuncTemplateConstraintEvaluator`. A `func-workload` constraint fails closed until an authorized workload inventory is available. PR #5872 does not perform project Stack or language compatibility: no production command consumes `ITemplaterFactory` in this change, and project interpretation and compatibility are owned by the Stack and later command integration (PR #5878). The engine session may carry project context, but selection does not use it to filter candidates.
+The session lazily creates one `TemplateConstraintManager` when engine constraints need evaluation. The narrow `func-bundle` constraint is evaluated against bundle context already attached to the session, using the lazy `FuncTemplateConstraintEvaluator`. A `func-workload` constraint fails closed until an authorized workload inventory is available. PR #5872 does not perform project Stack or language compatibility. The downstream PR #5878 command consumes `ITemplaterFactory`; project interpretation and compatibility remain owned by the Stack. The engine session may carry project context, but selection does not use it to filter candidates.
 
 For constraints whose source configuration cannot be read or verified, resolution fails for that candidate. Additional configuration files are rejected when merged constraints cannot be proven. Listing propagates a surfaced inventory exception unchanged; resolution returns surfaced inventory failures as diagnostic causes.
 
@@ -64,7 +64,7 @@ PR #5872 does not activate `func init` or `func new`, replace existing Stack ini
 
 This discovery/selection change defines no generation or file-writing mechanics. Those contracts require separate accepted architecture and authorization.
 
-Node.js is the first executable Host E2E journey. .NET is the second representative architecture and behavior check. Use both to simplify the accepted responsibilities, not to create a generalized all-Stack framework. Workload registration, project compatibility, real `func init` and `func new` consumers, host discovery, and supported-platform qualification remain later integration gates.
+End-to-end qualification must cover workload registration, project compatibility, real `func init` and `func new` journeys, host discovery, and supported platforms. These are separate integration gates; this discovery-and-selection design does not generalize them into a single framework.
 
 ## References
 

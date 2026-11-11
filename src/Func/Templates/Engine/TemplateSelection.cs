@@ -62,7 +62,8 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
             template.ShortNameList.Contains(reference, StringComparer.OrdinalIgnoreCase))];
         if (aliasMatches.Length == 0)
         {
-            return Failure(TemplateResolutionStatus.NotFound, new("not-found", $"No installed template matches '{reference}'."));
+            return TemplateResolutionResult.NotFound(
+                [new("not-found", $"No installed template matches '{reference}'.")]);
         }
 
         TemplateCatalogEntry[] kindMatches = [.. aliasMatches
@@ -100,14 +101,12 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
         cancellationToken.ThrowIfCancellationRequested();
         if (eligible.Count == 0)
         {
-            return new(TemplateResolutionStatus.Failed, null, kindMatches, diagnostics);
+            return TemplateResolutionResult.Failed(diagnostics, kindMatches);
         }
 
         if (eligible.Count > 1)
         {
-            return new(
-                TemplateResolutionStatus.Ambiguous,
-                null,
+            return TemplateResolutionResult.Ambiguous(
                 eligible,
                 [new("ambiguous", $"Template alias '{reference}' matches multiple eligible templates."), .. diagnostics]);
         }
@@ -210,14 +209,14 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
         cancellationToken.ThrowIfCancellationRequested();
         return result.IsEligible
             ? Selected(template, entry)
-            : new(TemplateResolutionStatus.Failed, null, [entry], result.Diagnostics);
+            : TemplateResolutionResult.Failed(result.Diagnostics, [entry]);
     }
 
     private TemplateResolutionResult Selected(
         ITemplateInfo template,
         TemplateCatalogEntry entry,
         IReadOnlyList<TemplateResolutionDiagnostic>? diagnostics = null)
-        => new(TemplateResolutionStatus.Selected, new ResolvedTemplate(_session, entry, template), [], diagnostics ?? []);
+        => TemplateResolutionResult.Selected(new ResolvedTemplate(_session, entry, template), diagnostics);
 
     private static TemplateResolutionDiagnostic Diagnostic(
         TemplateCatalogEntry entry,
@@ -230,5 +229,7 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
         TemplateResolutionStatus status,
         TemplateResolutionDiagnostic diagnostic,
         IEnumerable<TemplateCatalogEntry>? candidates = null)
-        => new(status, null, candidates ?? [], [diagnostic]);
+        => status == TemplateResolutionStatus.Failed
+            ? TemplateResolutionResult.Failed([diagnostic], candidates)
+            : throw new ArgumentOutOfRangeException(nameof(status), status, "Only failed results use this helper.");
 }

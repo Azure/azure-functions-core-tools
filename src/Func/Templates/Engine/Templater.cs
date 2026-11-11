@@ -40,13 +40,10 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
-        try
+        TemplateResolutionResult? inventoryFailure = await GetInventoryFailureAsync(cancellationToken);
+        if (inventoryFailure is not null)
         {
-            await EnsureInventoryAsync(cancellationToken);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
-        {
-            return InventoryUnavailable(exception);
+            return inventoryFailure;
         }
 
         return await _selection.ResolveAsync(
@@ -69,7 +66,12 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
         ArgumentNullException.ThrowIfNull(selectedEntry);
         _session.ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
-        await EnsureInventoryAsync(cancellationToken);
+        TemplateResolutionResult? inventoryFailure = await GetInventoryFailureAsync(cancellationToken);
+        if (inventoryFailure is not null)
+        {
+            return inventoryFailure;
+        }
+
         return await _selection.ResolveAsync(
             _templates!,
             _entries,
@@ -131,6 +133,19 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
         _catalog = catalog.AsReadOnly();
     }
 
+    private async Task<TemplateResolutionResult?> GetInventoryFailureAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await EnsureInventoryAsync(cancellationToken);
+            return null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            return InventoryUnavailable(exception);
+        }
+    }
+
     private static IReadOnlyList<ITemplateInfo> DistinctCandidates(
         IEnumerable<ITemplateInfo> candidates,
         CancellationToken cancellationToken)
@@ -151,12 +166,6 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
     }
 
     private static TemplateResolutionResult InventoryUnavailable(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        return new(
-            TemplateResolutionStatus.Failed,
-            null,
-            [],
+        => TemplateResolutionResult.Failed(
             [new("inventory-unavailable", $"Installed template inventory could not be inspected: {exception.Message}", Cause: exception)]);
-    }
 }

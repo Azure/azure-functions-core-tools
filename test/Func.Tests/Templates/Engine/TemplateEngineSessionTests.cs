@@ -5,6 +5,9 @@ using System.Reflection;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Constraints;
+using Microsoft.TemplateEngine.Edge;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -97,6 +100,62 @@ public sealed class TemplateEngineSessionTests : IDisposable
         Action act = session.Dispose;
 
         act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void ConstraintManager_IsCreatedOnceAndDisposedBeforeSettings()
+    {
+        TemplateEngineSession session = new(CommandContext("command"), Hive);
+        TemplateConstraintManager manager = session.ConstraintManager;
+
+        session.ConstraintManager.Should().BeSameAs(manager);
+        session.Dispose();
+
+        Action accessAfterDispose = () => _ = session.ConstraintManager;
+        accessAfterDispose.Should().Throw<ObjectDisposedException>();
+        FieldInfo managerField = typeof(TemplateEngineSession)
+            .GetField("_constraintManager", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        managerField.GetValue(session).Should().BeNull();
+    }
+
+    [Fact]
+    public void Dispose_WithoutEvaluatingConstraints_DoesNotCreateConstraintManager()
+    {
+        TemplateEngineSession session = new(CommandContext("command"), Hive);
+        FieldInfo managerField = typeof(TemplateEngineSession)
+            .GetField("_constraintManager", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        managerField.GetValue(session).Should().BeNull();
+        session.Dispose();
+        managerField.GetValue(session).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task EligibilityEvaluator_AfterSessionDisposal_PropagatesObjectDisposedException()
+    {
+        TemplateEngineSession session = new(CommandContext("command"), Hive);
+        ITemplateInfo candidate = Substitute.For<ITemplateInfo>();
+        candidate.Identity.Returns("Func.Tests.Template");
+        TemplateCatalogEntry entry = new(
+            "Func.Tests.Template",
+            "Template",
+            null,
+            TemplateType.Item,
+            ["template"],
+            null,
+            null,
+            0,
+            null,
+            false,
+            [],
+            null);
+        TemplateEligibilityEvaluator evaluator = new(
+            session,
+            new(() => new(new TemplateConstraintRequirementMatcher())));
+        session.Dispose();
+
+        await FluentActions.Awaiting(() => evaluator.EvaluateAsync(candidate, entry, CancellationToken.None))
+            .Should().ThrowAsync<ObjectDisposedException>();
     }
 
     [Fact]

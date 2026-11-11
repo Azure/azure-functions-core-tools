@@ -85,7 +85,7 @@ The identities uniquely identify two variants in one descriptive family. `groupI
 
 The narrow Functions `func-bundle` constraint uses the bundle context already attached to the command-scoped engine session; it does not interpret a project or Stack. The lazy `FuncTemplateConstraintEvaluator` is used only for that declared constraint. A `func-workload` constraint cannot be evaluated until a workload inventory exists, so it fails closed.
 
-PR #5872 does not perform project Stack or language compatibility checks. No production command currently consumes `ITemplaterFactory` in this change, and project interpretation and compatibility belong to the owning Stack and later command integration (PR #5878), not to template matching. The project context may be carried by the session, but this selection foundation does not use it to filter or reject candidates.
+PR #5872 does not perform project Stack or language compatibility checks. The downstream PR #5878 command consumes `ITemplaterFactory`; project interpretation and compatibility belong to the owning Stack, not to template matching. The project context may be carried by the session, but this selection foundation does not use it to filter or reject candidates.
 
 Diagnostics retain their code, template identity, package identity, and original exception when those values are available. Listing propagates an engine inventory exception unchanged; resolution returns it as the diagnostic cause. No custom listing exception or message parsing is introduced.
 
@@ -95,7 +95,7 @@ The Template Engine inventory may not expose every conflicting registration as a
 
 Creation and writing files are later integration work. This discovery/selection change defines no generation or publication mechanics; those contracts require separate accepted architecture and authorization.
 
-Workload registration alone does not enable template-backed commands. Later enablement requires content delivery and readiness, project and Stack compatibility, command integration, supported parameters and defaults, Template Engine creation, approved workload tasks, generated-project validation, and supported-platform qualification. Node.js is the first executable Host E2E journey; .NET is the second representative architecture and behavior check. These are later gates, not PR #5872 results.
+Workload registration alone does not qualify template-backed commands. Qualification requires content delivery and readiness, project and Stack compatibility, command integration, supported parameters and defaults, Template Engine creation, approved workload tasks, generated-project validation, and supported-platform coverage. These are separate end-to-end gates, not PR #5872 results.
 
 ## References
 

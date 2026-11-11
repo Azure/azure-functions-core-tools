@@ -16,7 +16,12 @@ public sealed class TemplaterTests : IDisposable
     public async Task ResolveAsync_UsesOneSessionInventoryAndRetainsItsExactCandidate()
     {
         Directory.CreateDirectory(Hive);
-        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), Hive);
+        string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);
+        string additionalPackageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("additional", "Func.Tests.Additional", "additional", null, null, null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, Hive);
+        await TemplateFixtures.InstallAsync(additionalPackageDirectory, Hive);
         TemplateEngineSession session = new(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), Hive);
         (IReadOnlyList<Microsoft.TemplateEngine.Abstractions.TemplatePackage.ITemplatePackage> packages,
             IReadOnlyList<ITemplateInfo> templates) = await session.GetInventoryAsync(CancellationToken.None);
@@ -28,7 +33,9 @@ public sealed class TemplaterTests : IDisposable
 
         IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item);
         TemplateResolutionResult byAlias = await templater.ResolveAsync(TemplateFixtures.ItemTemplateShortName, TemplateType.Item);
-        TemplateResolutionResult byEntry = await templater.ResolveAsync(entries.Single(), TemplateType.Item);
+        TemplateResolutionResult byEntry = await templater.ResolveAsync(
+            entries.Single(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity),
+            TemplateType.Item);
         (IReadOnlyList<Microsoft.TemplateEngine.Abstractions.TemplatePackage.ITemplatePackage> cachedPackages,
             IReadOnlyList<ITemplateInfo> cachedTemplates) = await session.GetInventoryAsync(CancellationToken.None);
 
@@ -38,7 +45,11 @@ public sealed class TemplaterTests : IDisposable
         Action mutateTemplates = () => ((IList<ITemplateInfo>)templates).Clear();
         mutatePackages.Should().Throw<NotSupportedException>();
         mutateTemplates.Should().Throw<NotSupportedException>();
-        entries.Should().ContainSingle();
+        entries.Should().HaveCount(2);
+        entries.Single(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity)
+            .Package.Should().Be(new TemplatePackageInfo(packageDirectory, null));
+        entries.Single(entry => entry.Identity == "Func.Tests.Additional")
+            .Package.Should().Be(new TemplatePackageInfo(additionalPackageDirectory, null));
         byAlias.Status.Should().Be(TemplateResolutionStatus.Selected);
         byEntry.Status.Should().Be(TemplateResolutionStatus.Selected);
         byAlias.SelectedTemplate!.Template.Should().BeSameAs(engineCandidate);
@@ -52,7 +63,9 @@ public sealed class TemplaterTests : IDisposable
         accessDisposedCandidate.Should().Throw<ObjectDisposedException>();
         Func<Task> listDisposedSession = () => templater.ListAsync(TemplateType.Item);
         await listDisposedSession.Should().ThrowAsync<ObjectDisposedException>();
-        Func<Task> resolveDisposedEntry = () => templater.ResolveAsync(entries.Single(), TemplateType.Item);
+        Func<Task> resolveDisposedEntry = () => templater.ResolveAsync(
+            entries.Single(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity),
+            TemplateType.Item);
         await resolveDisposedEntry.Should().ThrowAsync<ObjectDisposedException>();
     }
 

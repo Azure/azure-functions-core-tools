@@ -20,7 +20,6 @@ internal sealed class TemplateEligibilityEvaluator(
     private readonly TemplateEngineSession _session = session ?? throw new ArgumentNullException(nameof(session));
     private readonly Lazy<FuncTemplateConstraintEvaluator> _funcConstraintEvaluator =
         funcConstraintEvaluator ?? throw new ArgumentNullException(nameof(funcConstraintEvaluator));
-    private TemplateConstraintManager? _constraintManager;
 
     public async Task<TemplateEligibilityResult> EvaluateAsync(
         ITemplateInfo candidate,
@@ -162,16 +161,16 @@ internal sealed class TemplateEligibilityEvaluator(
                         $"Template '{entry.Identity}' uses unsupported constraint '{constraintInfo.Type}'.");
                 }
 
+                TemplateConstraintManager constraintManager = _session.ConstraintManager;
                 TemplateConstraintResult result;
                 try
                 {
-                    _constraintManager ??= new(_session.Settings);
-                    result = await _constraintManager.EvaluateConstraintAsync(
+                    result = await constraintManager.EvaluateConstraintAsync(
                         constraintInfo.Type,
                         declaration.Arguments?.GetRawText(),
                         cancellationToken);
                 }
-                catch (InvalidOperationException exception)
+                catch (InvalidOperationException exception) when (exception is not ObjectDisposedException)
                 {
                     return Rejected(
                         entry,

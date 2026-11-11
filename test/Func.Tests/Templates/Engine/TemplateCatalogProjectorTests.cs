@@ -52,92 +52,6 @@ public sealed class TemplateCatalogProjectorTests
     }
 
     [Fact]
-    public void Project_Templates_ReturnsTemplatesOfRequestedTypeInOrder()
-    {
-        ITemplateInfo[] templates =
-        [
-            Template("Func.Tests.Second"),
-            Template("Func.Tests.Project", type: "project"),
-            Template("Func.Tests.Untyped", type: null),
-            Template("Func.Tests.First"),
-        ];
-
-        IReadOnlyList<TemplateCatalogEntry> entries = TemplateCatalogProjector.Project(templates, [], TemplateType.Item);
-
-        entries.Select(entry => entry.Identity).Should().Equal("Func.Tests.Second", "Func.Tests.First");
-    }
-
-    [Fact]
-    public void Project_TemplatesReturnsAnImmutableSnapshot()
-    {
-        List<ITemplateInfo> templates = [Template("Func.Tests.Template")];
-        IReadOnlyList<TemplateCatalogEntry> entries = TemplateCatalogProjector.Project(templates, [], TemplateType.Item);
-
-        templates.Clear();
-
-        entries.Should().ContainSingle().Which.Identity.Should().Be("Func.Tests.Template");
-        Action mutateEntries = () => ((IList<TemplateCatalogEntry>)entries).Clear();
-        mutateEntries.Should().Throw<NotSupportedException>();
-    }
-
-    [Fact]
-    public void Project_Templates_FindEachPackageByMountPoint()
-    {
-        ITemplateInfo[] templates =
-        [
-            Template("Func.Tests.Contoso", mountPoint: "/packages/contoso.nupkg"),
-            Template("Func.Tests.Folder", mountPoint: "/templates/folder"),
-        ];
-        ITemplatePackage[] packages =
-        [
-            Package("/templates/folder", version: null, mountPoint: "/templates/folder"),
-            Package("Contoso.Functions.Templates", "1.2.3", mountPoint: "/packages/contoso.nupkg"),
-        ];
-
-        IReadOnlyList<TemplateCatalogEntry> entries = TemplateCatalogProjector.Project(templates, packages, TemplateType.Item);
-
-        entries.Select(entry => entry.Package).Should().Equal(
-            new TemplatePackageInfo("Contoso.Functions.Templates", "1.2.3"),
-            new TemplatePackageInfo("/templates/folder", Version: null));
-    }
-
-    [Fact]
-    public void Project_TemplateWithoutPackage_ReportsNoPackage()
-    {
-        IReadOnlyList<TemplateCatalogEntry> entries = TemplateCatalogProjector.Project(
-            [Template(mountPoint: "/templates/removed")],
-            [Package("Contoso.Functions.Templates", "1.2.3", mountPoint: "/packages/contoso.nupkg")],
-            TemplateType.Item);
-
-        entries.Should().ContainSingle().Which.Package.Should().BeNull();
-    }
-
-    [Fact]
-    public void Project_TemplateFromUnmanagedPackage_ReportsNoPackage()
-    {
-        ITemplatePackage package = Substitute.For<ITemplatePackage>();
-        package.MountPointUri.Returns("/templates/unmanaged");
-
-        IReadOnlyList<TemplateCatalogEntry> entries = TemplateCatalogProjector.Project(
-            [Template(mountPoint: "/templates/unmanaged")],
-            [package],
-            TemplateType.Item);
-
-        entries.Should().ContainSingle().Which.Package.Should().BeNull();
-    }
-
-    [Fact]
-    public void Project_PackagesSharingMountPoint_UsesFirstPackage()
-    {
-        IReadOnlyList<TemplateCatalogEntry> entries = TemplateCatalogProjector.Project(
-            [Template(mountPoint: "/packages/contoso.nupkg")],
-            [Package("Contoso.First", "1.0.0", "/packages/contoso.nupkg"), Package("Contoso.Second", "2.0.0", "/packages/contoso.nupkg")],
-            TemplateType.Item);
-
-        entries.Should().ContainSingle().Which.Package.Should().Be(new TemplatePackageInfo("Contoso.First", "1.0.0"));
-    }
-
-    [Fact]
     public void Project_Template_CopiesTemplateDetails()
     {
         ITemplateInfo template = Template(
@@ -287,22 +201,6 @@ public sealed class TemplateCatalogProjectorTests
         Action act = () => TemplateCatalogProjector.Project(null!, package: null);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("template");
-    }
-
-    [Fact]
-    public void Project_NullTemplates_Throws()
-    {
-        Action act = () => TemplateCatalogProjector.Project(null!, [], TemplateType.Item);
-
-        act.Should().Throw<ArgumentNullException>().WithParameterName("templates");
-    }
-
-    [Fact]
-    public void Project_NullPackages_Throws()
-    {
-        Action act = () => TemplateCatalogProjector.Project([], null!, TemplateType.Item);
-
-        act.Should().Throw<ArgumentNullException>().WithParameterName("packages");
     }
 
     private static ITemplateInfo Template(

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
@@ -9,7 +10,7 @@ using Microsoft.TemplateEngine.Edge.Settings;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Owns the template engine host, environment and package manager for one command.
+/// Owns the template engine host, environment, package manager and lazy constraint manager for one command.
 /// </summary>
 /// <remarks>
 /// Engine components capture the environment when they are created, so every phase of a command shares this
@@ -20,6 +21,7 @@ internal sealed class TemplateEngineSession : IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
     private readonly TemplatePackageManager _packageManager;
+    private TemplateConstraintManager? _constraintManager;
     private (IReadOnlyList<ITemplatePackage> Packages, IReadOnlyList<ITemplateInfo> Templates)? _inventory;
     private bool _disposed;
 
@@ -55,6 +57,15 @@ internal sealed class TemplateEngineSession : IDisposable
         }
     }
 
+    internal TemplateConstraintManager ConstraintManager
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _constraintManager ??= new(_settings);
+        }
+    }
+
     public async Task<(IReadOnlyList<ITemplatePackage> Packages, IReadOnlyList<ITemplateInfo> Templates)> GetInventoryAsync(
         CancellationToken cancellationToken)
     {
@@ -83,7 +94,22 @@ internal sealed class TemplateEngineSession : IDisposable
 
         _disposed = true;
         _inventory = null;
-        _packageManager.Dispose();
-        _settings.Dispose();
+        TemplateConstraintManager? constraintManager = _constraintManager;
+        _constraintManager = null;
+        try
+        {
+            constraintManager?.Dispose();
+        }
+        finally
+        {
+            try
+            {
+                _packageManager.Dispose();
+            }
+            finally
+            {
+                _settings.Dispose();
+            }
+        }
     }
 }
