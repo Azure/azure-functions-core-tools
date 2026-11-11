@@ -7,7 +7,7 @@
 
 # Azure Functions CLI
 
-The Azure Functions CLI provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.
+The Azure Functions CLI provides a local development experience for creating, developing, testing, running, and debugging Azure Functions.
 
 ## Installation
 
