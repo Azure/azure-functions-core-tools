@@ -356,11 +356,16 @@ namespace Azure.Functions.Cli.Common
                 }
 
                 var added = new List<string>();
+                var settingsWriter = new AppSettingsFile(localSettingsPath)
+                {
+                    IsEncrypted = localSettings.Value<bool?>("IsEncrypted") ?? true
+                };
                 foreach (var setting in settings)
                 {
                     if (values[setting.Key] == null)
                     {
-                        values[setting.Key] = setting.Value;
+                        settingsWriter.SetSecret(setting.Key, setting.Value);
+                        values[setting.Key] = settingsWriter.Values[setting.Key];
                         added.Add(setting.Key);
                     }
                 }
