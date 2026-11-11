@@ -14,26 +14,19 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
 {
     private readonly TemplateEngineSession _session = session ?? throw new ArgumentNullException(nameof(session));
     private readonly TemplateSelection _selection = selection ?? throw new ArgumentNullException(nameof(selection));
-    private Dictionary<TemplateCatalogEntry, ITemplateInfo> _issuedEntries = new(ReferenceEqualityComparer.Instance);
-    private Dictionary<ITemplateInfo, TemplateCatalogEntry> _entries = new(ReferenceEqualityComparer.Instance);
     private IReadOnlyList<ITemplateInfo>? _templates;
     private IReadOnlyList<TemplateCatalogEntry>? _catalog;
 
     public TemplateEngineContext Context => _session.Context;
 
-    /// <summary>
-    /// Lists installed templates of the requested type, including hidden templates and templates with unusable
-    /// Functions host metadata.
-    /// </summary>
-    public async Task<IReadOnlyList<TemplateCatalogEntry>> ListAsync(TemplateType type, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TemplateCatalogEntry>> ListAsync(
+        TemplateType type,
+        CancellationToken cancellationToken = default)
     {
         await EnsureInventoryAsync(cancellationToken);
         return _catalog!.Where(entry => entry.Type == type).ToArray();
     }
 
-    /// <summary>
-    /// Delegates installed identity or short-name matching to the selection policy.
-    /// </summary>
     public async Task<TemplateResolutionResult> ResolveAsync(
         string reference,
         TemplateType type,
@@ -46,18 +39,9 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
             return inventoryFailure;
         }
 
-        return await _selection.ResolveAsync(
-            _templates!,
-            _entries,
-            _issuedEntries,
-            reference,
-            type,
-            cancellationToken);
+        return await _selection.ResolveAsync(_templates!, _catalog!, reference, type, cancellationToken);
     }
 
-    /// <summary>
-    /// Delegates an exact catalog entry issued by this templater to the selection policy.
-    /// </summary>
     public async Task<TemplateResolutionResult> ResolveAsync(
         TemplateCatalogEntry selectedEntry,
         TemplateType type,
@@ -72,19 +56,23 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
             return inventoryFailure;
         }
 
-        return await _selection.ResolveAsync(
-            _templates!,
-            _entries,
-            _issuedEntries,
-            selectedEntry,
-            type,
-            cancellationToken);
+        return await _selection.ResolveAsync(_templates!, _catalog!, selectedEntry, type, cancellationToken);
+    }
+
+    internal ITemplateInfo GetEngineTemplate(TemplateCatalogEntry selectedEntry)
+    {
+        ArgumentNullException.ThrowIfNull(selectedEntry);
+        _session.ThrowIfDisposed();
+        if (!_session.TryGetTemplateInfo(selectedEntry, out ITemplateInfo? template))
+        {
+            throw new InvalidOperationException("The catalog entry is not owned by this live templater session.");
+        }
+
+        return template;
     }
 
     public void Dispose()
     {
-        _issuedEntries = new(ReferenceEqualityComparer.Instance);
-        _entries = new(ReferenceEqualityComparer.Instance);
         _catalog = null;
         _templates = null;
         _session.Dispose();
@@ -106,8 +94,6 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
             packagesByMountPoint.TryAdd(package.MountPointUri, package);
         }
 
-        Dictionary<ITemplateInfo, TemplateCatalogEntry> entries = new(ReferenceEqualityComparer.Instance);
-        Dictionary<TemplateCatalogEntry, ITemplateInfo> issuedEntries = new(ReferenceEqualityComparer.Instance);
         List<TemplateCatalogEntry> catalog = [];
         foreach (ITemplateInfo template in engineTemplates)
         {
@@ -117,17 +103,13 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
                 continue;
             }
 
-            TemplateCatalogEntry entry = TemplateCatalogProjector.Project(
+            catalog.Add(TemplateCatalogProjector.Project(
                 template,
-                packagesByMountPoint.GetValueOrDefault(template.MountPointUri));
-            entries.Add(template, entry);
-            issuedEntries.Add(entry, template);
-            catalog.Add(entry);
+                packagesByMountPoint.GetValueOrDefault(template.MountPointUri),
+                _session.OwnershipToken));
         }
 
         _templates = engineTemplates;
-        _entries = entries;
-        _issuedEntries = issuedEntries;
         _catalog = catalog;
     }
 
@@ -140,11 +122,10 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            return InventoryUnavailable(exception);
+            return new([], [new(
+                "inventory-unavailable",
+                $"Installed template inventory could not be inspected: {exception.Message}",
+                Cause: exception)]);
         }
     }
-
-    private static TemplateResolutionResult InventoryUnavailable(Exception exception)
-        => TemplateResolutionResult.Failed(
-            [new("inventory-unavailable", $"Installed template inventory could not be inspected: {exception.Message}", Cause: exception)]);
 }

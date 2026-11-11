@@ -4,9 +4,9 @@ PR #5872 implements the discovery and selection foundation described by the [com
 
 ## Composition and ownership
 
-`ITemplaterFactory` creates one `TemplateEngineSession`, one internal `TemplateSelection`, and the command-scoped `Templater` from the existing `TemplateEngineContext`. The session owns the Microsoft.TemplateEngine environment, one `TemplatePackageManager`, the cached command inventory, and a lazy `TemplateConstraintManager`. `Templater` owns the session, minimal CLI projection, exact candidate mapping, and candidate lifetime; it delegates matching to `TemplateSelection`, which delegates candidate eligibility to `TemplateEligibilityEvaluator`.
+`ITemplaterFactory` creates one `TemplateEngineSession`, one internal `TemplateSelection`, and the command-scoped `Templater` from the existing `TemplateEngineContext`. The session owns the Microsoft.TemplateEngine environment, one `TemplatePackageManager`, the cached command inventory, and a lazy `TemplateConstraintManager`. Each `TemplateCatalogEntry` retains the exact engine candidate and a non-owning session token; `Templater` delegates matching to `TemplateSelection`, which delegates candidate eligibility to `TemplateEligibilityEvaluator`.
 
-The session loads the installed package and template inventory once, then captures read-only collection snapshots while preserving exact engine object references. `TemplateSelection` consumes that candidate list and projection; it never reads candidate source files, creates another inventory, or refreshes aliases. `TemplateEligibilityEvaluator` performs candidate source reads and constraint evaluation through the same session. Selection accepts only an entry issued by that same live `Templater`; it does not substitute changed content. Installed registered content is immutable during the command session.
+The session loads the installed package and template inventory once. `TemplateSelection` consumes that inventory and the candidate-bearing projection; it never reads candidate source files, creates another inventory, or refreshes aliases. `TemplateEligibilityEvaluator` performs candidate source reads and constraint evaluation through the same session. An entry can be used only by its live owning session, and its exact engine candidate must still belong to that session's cached inventory. An immutable same-session copy remains valid when it preserves the owner token and candidate. Installed registered content is immutable during the command session.
 
 `TemplateCatalogProjector` maps engine metadata to minimum CLI fields and reads Functions host metadata. Unusable Functions metadata remains visible in listing with its diagnostic and original cause; it cannot be selected. Project and item classification uses the common `ITemplateMetadata` contract and `tags.type`. The projection filters empty aliases and marks a candidate without any non-empty `shortName` with a metadata diagnostic so it cannot be selected.
 
@@ -17,11 +17,11 @@ The session loads the installed package and template inventory once, then captur
 `Templater` lists all projected entries of the requested `TemplateType`, including hidden entries. `TemplateSelection` applies resolution policy as follows:
 
 - Full identity matches precede aliases. If multiple entries with one identity are exposed in the inventory, resolution fails; wrong-kind and ineligible exact identities fail without sibling substitution.
-- Alias matches are checked for kind and candidate eligibility. No eligible candidates yield `Failed` with diagnostics; multiple eligible matches yield `Ambiguous`; one eligible match yields `Selected`.
-- `Selected` retains the exact engine candidate in `ResolvedTemplate`, has no ambiguity candidates, and preserves non-fatal candidate diagnostics.
-- A copied entry, an entry from another session, or a selection after session disposal is not a valid engine selection.
+- Alias matches are checked for kind and candidate eligibility. All failures have zero candidates; multiple eligible matches retain two or more candidates; one eligible match retains exactly one candidate.
+- Candidate count is the complete outcome contract: zero means unsuccessful, one means selected, and two or more means ambiguous. The selected entry is `Candidates[0]` and carries the exact engine candidate.
+- Foreign, unbound, forged, or disposed-session entries are rejected. A same-session immutable copy is accepted when it preserves its owner token and exact candidate.
 
-`TemplateResolutionResult` validates status/payload relationships, copies candidate and diagnostic inputs, and exposes runtime read-only collections. `TemplateCatalogEntry` also snapshots aliases, parameters, and nested choices. `NotFound` means no match appeared in the available inventory; it is not proof that every provider was enumerated successfully.
+`TemplateResolutionResult` contains only `Candidates` and `Diagnostics`; it has no separate status or selected-template property. Internally created candidate and diagnostic arrays are transferred to the result without another wrapper or copy. `TemplateCatalogEntry` snapshots caller-owned aliases, parameters, and nested choices. A zero-candidate result may include a `not-found` diagnostic, but it does not prove that every provider was enumerated successfully. Failure context formerly carried by candidates is retained in structured diagnostic fields such as identity, package, name, kind, source, and cause.
 
 ## Constraints and diagnostics
 
@@ -35,13 +35,13 @@ When an inventory exception is surfaced, listing propagates it and resolution re
 
 Focused unit coverage is in:
 
-- `test/Func.Tests/Templates/Engine/TemplaterTests.cs` — one inventory, minimal projection, exact candidate retention, session ownership, and disposal.
-- `test/Func.Tests/Templates/Engine/TemplateSelectionTests.cs` — identity/alias outcomes, ambiguity, the deferred Stack/language boundary, candidate-result invariants, and engine/Functions constraints.
+- `test/Func.Tests/Templates/Engine/TemplaterTests.cs` — one inventory, exact candidate retention, session ownership, and disposal.
+- `test/Func.Tests/Templates/Engine/TemplateSelectionTests.cs` — identity/alias outcomes, ambiguity, the deferred Stack/language boundary, and engine/Functions constraints.
 - `test/Func.Tests/Templates/Engine/TemplateResolutionIntegrationTests.cs` — selection behavior through the command-facing facade.
 - `test/Func.Tests/Templates/Engine/TemplaterFactoryTests.cs` — factory composition and lazy Functions constraint evaluation.
 - `test/Func.Tests/Templates/Engine/TemplateCatalogProjectorTests.cs` — metadata projection, Functions metadata diagnostics, and immutable catalog snapshots.
 - `test/Func.Tests/Templates/Engine/TemplateConstraintDeclarationReaderTests.cs` — declaration validation, including additional configuration files.
-- `test/Func.Tests/Templates/Engine/TemplateResolutionResultTests.cs` — status invariants and immutable collection behavior.
+- `test/Func.Tests/Templates/Engine/TemplateResolutionResultTests.cs` — the zero/one/multiple candidate-count contract.
 
 Validation results apply to a specific candidate revision and belong with its review evidence, not in this stable implementation description. Unit tests do not establish workload registration, generated-file safety, Functions Host discovery, or supported-platform qualification.
 

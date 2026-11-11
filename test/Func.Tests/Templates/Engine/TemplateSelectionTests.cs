@@ -47,9 +47,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("func.tests.shared", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Shared");
-        result.Candidates.Should().BeEmpty();
+        result.Candidates.Should().ContainSingle().Which.Identity.Should().Be("Func.Tests.Shared");
     }
 
     [Fact]
@@ -67,8 +65,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("shared", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Item");
+        result.Candidates.Should().ContainSingle().Which.Identity.Should().Be("Func.Tests.Item");
     }
 
     [Fact]
@@ -86,8 +83,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("Func.Tests.Requested", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
-        result.SelectedTemplate.Should().BeNull();
+        result.Candidates.Should().BeEmpty();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("wrong-kind");
         result.Diagnostics.Single().Message.Should().Be(
             "Template 'Func.Tests.Requested' is not an item template.");
@@ -105,7 +101,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("project-alias", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Candidates.Should().BeEmpty();
         result.Diagnostics.Should().ContainSingle().Which.Message.Should().Be(
             "Template alias 'project-alias' does not identify an item template.");
     }
@@ -123,7 +119,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("shared", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Ambiguous);
+        result.Candidates.Should().HaveCountGreaterThan(1);
         result.Candidates.Select(candidate => candidate.Identity)
             .Should().BeEquivalentTo(["Func.Tests.JavaScript", "Func.Tests.JavaScript2", "Func.Tests.Python"]);
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("ambiguous");
@@ -141,8 +137,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("shared", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Healthy");
+        result.Candidates.Should().ContainSingle().Which.Identity.Should().Be("Func.Tests.Healthy");
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-not-evaluated");
     }
 
@@ -170,13 +165,13 @@ public sealed class TemplateSelectionTests : IDisposable
 
         foreach (TemplateResolutionResult result in new[] { firstResult, reverseResult })
         {
-            result.Status.Should().Be(TemplateResolutionStatus.Failed);
-            result.SelectedTemplate.Should().BeNull();
-            result.Candidates.Should().ContainSingle().Which.Identity.Should().Be(identity);
+            result.Candidates.Should().BeEmpty();
             TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
             diagnostic.Code.Should().Be("constraint-not-evaluated");
             diagnostic.TemplateIdentity.Should().Be(identity);
             diagnostic.PackageIdentity.Should().Be(packageDirectory);
+            diagnostic.TemplateName.Should().NotBeNullOrWhiteSpace();
+            diagnostic.TemplateKind.Should().Be(TemplateType.Item);
             diagnostic.Message.Should().Contain(constraintType);
         }
 
@@ -217,29 +212,13 @@ public sealed class TemplateSelectionTests : IDisposable
         TemplateCatalogEntry entry = TemplateCatalogProjector.Project(
             engineCandidate,
             packages.Single(package => package.MountPointUri == engineCandidate.MountPointUri));
-        Dictionary<ITemplateInfo, TemplateCatalogEntry> entries = new(ReferenceEqualityComparer.Instance)
-        {
-            [candidate] = entry,
-        };
-        Dictionary<TemplateCatalogEntry, ITemplateInfo> issuedEntries = new(ReferenceEqualityComparer.Instance)
-        {
-            [entry] = candidate,
-        };
-        TemplateSelection selection = new(
+        TemplateEligibilityEvaluator evaluator = new(
             session,
-            new TemplateEligibilityEvaluator(session, new(new TemplateConstraintRequirementMatcher())));
+            new(new TemplateConstraintRequirementMatcher()));
 
-        TemplateResolutionResult result = await selection.ResolveAsync(
-            [candidate],
-            entries,
-            issuedEntries,
-            identity,
-            TemplateType.Item,
-            CancellationToken.None);
+        TemplateEligibilityResult result = await evaluator.EvaluateAsync(candidate, entry, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
-        result.SelectedTemplate.Should().BeNull();
-        result.Candidates.Should().ContainSingle().Which.Identity.Should().Be(identity);
+        result.IsEligible.Should().BeFalse();
         TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
         diagnostic.Code.Should().Be("constraint-metadata-mismatch");
         diagnostic.TemplateIdentity.Should().Be(identity);
@@ -261,7 +240,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("malformed-raw", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Candidates.Should().BeEmpty();
         TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
         diagnostic.Code.Should().Be("invalid-constraints");
         diagnostic.Cause.Should().BeOfType<InvalidTemplateMetadataException>()
@@ -282,7 +261,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("source-read-failure", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Candidates.Should().BeEmpty();
         TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
         diagnostic.Code.Should().Be("constraint-source-unavailable");
         diagnostic.Cause.Should().BeOfType<IOException>();
@@ -313,27 +292,13 @@ public sealed class TemplateSelectionTests : IDisposable
         TemplateCatalogEntry entry = TemplateCatalogProjector.Project(
             engineCandidate,
             packages.Single(package => package.MountPointUri == engineCandidate.MountPointUri));
-        Dictionary<ITemplateInfo, TemplateCatalogEntry> entries = new(ReferenceEqualityComparer.Instance)
-        {
-            [candidate] = entry,
-        };
-        Dictionary<TemplateCatalogEntry, ITemplateInfo> issuedEntries = new(ReferenceEqualityComparer.Instance)
-        {
-            [entry] = candidate,
-        };
-        TemplateSelection selection = new(
+        TemplateEligibilityEvaluator evaluator = new(
             session,
-            new TemplateEligibilityEvaluator(session, new(new TemplateConstraintRequirementMatcher())));
+            new(new TemplateConstraintRequirementMatcher()));
 
-        TemplateResolutionResult result = await selection.ResolveAsync(
-            [candidate],
-            entries,
-            issuedEntries,
-            identity,
-            TemplateType.Item,
-            CancellationToken.None);
+        TemplateEligibilityResult result = await evaluator.EvaluateAsync(candidate, entry, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.IsEligible.Should().BeFalse();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-metadata-mismatch");
     }
 
@@ -352,8 +317,7 @@ public sealed class TemplateSelectionTests : IDisposable
         TemplateResolutionResult result = await selection.ResolveAsync("unconstrained", TemplateType.Item);
 
         selection.HasConstraintManager.Should().BeFalse();
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be(identity);
+        result.Candidates.Should().ContainSingle().Which.Identity.Should().Be(identity);
         result.Diagnostics.Should().BeEmpty();
         unrelatedFactory.CreateCount.Should().Be(0);
         selection.HasConstraintManager.Should().BeFalse();
@@ -371,8 +335,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("host", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Host");
+        result.Candidates.Should().ContainSingle().Which.Identity.Should().Be("Func.Tests.Host");
     }
 
     [Fact]
@@ -389,8 +352,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("bundle", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Bundle");
+        result.Candidates.Should().ContainSingle().Which.Identity.Should().Be("Func.Tests.Bundle");
     }
 
     [Fact]
@@ -407,7 +369,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("restricted-bundle", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Candidates.Should().BeEmpty();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-restricted");
     }
 
@@ -424,7 +386,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
         TemplateResolutionResult result = await selection.ResolveAsync("engine-restricted", TemplateType.Item);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Candidates.Should().BeEmpty();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-restricted");
     }
 
@@ -504,8 +466,7 @@ public sealed class TemplateSelectionTests : IDisposable
                 packagesByMountPoint.TryAdd(package.MountPointUri, package);
             }
 
-            Dictionary<ITemplateInfo, TemplateCatalogEntry> entries = new(ReferenceEqualityComparer.Instance);
-            Dictionary<TemplateCatalogEntry, ITemplateInfo> issuedEntries = new(ReferenceEqualityComparer.Instance);
+            List<TemplateCatalogEntry> entries = [];
             foreach (ITemplateInfo template in templates)
             {
                 if (TemplateCatalogProjector.GetTemplateType(template) is null)
@@ -515,15 +476,15 @@ public sealed class TemplateSelectionTests : IDisposable
 
                 TemplateCatalogEntry entry = TemplateCatalogProjector.Project(
                     template,
-                    packagesByMountPoint.GetValueOrDefault(template.MountPointUri));
-                entries.Add(template, entry);
-                issuedEntries.Add(entry, template);
+                    packagesByMountPoint.GetValueOrDefault(template.MountPointUri),
+                    session.OwnershipToken);
+                entries.Add(entry);
             }
 
             TemplateSelection selector = new(
                 session,
                 new TemplateEligibilityEvaluator(session, new(new TemplateConstraintRequirementMatcher())));
-            return new(session, selector, templates, entries, issuedEntries);
+            return new(session, selector, templates, entries);
         }
         catch
         {
@@ -541,8 +502,7 @@ public sealed class TemplateSelectionTests : IDisposable
         TemplateEngineSession session,
         TemplateSelection selection,
         IReadOnlyList<ITemplateInfo> templates,
-        IReadOnlyDictionary<ITemplateInfo, TemplateCatalogEntry> entries,
-        IReadOnlyDictionary<TemplateCatalogEntry, ITemplateInfo> issuedEntries) : IDisposable
+        IReadOnlyList<TemplateCatalogEntry> entries) : IDisposable
     {
         public void Dispose() => session.Dispose();
 
@@ -558,7 +518,7 @@ public sealed class TemplateSelectionTests : IDisposable
             string reference,
             TemplateType type,
             CancellationToken cancellationToken = default)
-            => selection.ResolveAsync(templates, entries, issuedEntries, reference, type, cancellationToken);
+            => selection.ResolveAsync(templates, entries, reference, type, cancellationToken);
     }
 
     private sealed class DuplicateConstraintFactory(Guid id, string type) : ITemplateConstraintFactory

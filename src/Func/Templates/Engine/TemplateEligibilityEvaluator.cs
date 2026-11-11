@@ -200,7 +200,14 @@ internal sealed class TemplateEligibilityEvaluator(
         Exception? cause = null)
         => TemplateEligibilityResult.Rejected(
             entry,
-            new(code, message, entry.Identity, entry.Package?.Identifier, cause));
+            new(
+                code,
+                message,
+                entry.Identity,
+                entry.Package?.Identifier,
+                cause,
+                entry.Name,
+                entry.Type));
 }
 
 /// <summary>

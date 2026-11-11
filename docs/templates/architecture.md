@@ -39,10 +39,10 @@ Listing includes hidden templates and templates whose Functions-specific or requ
 
 1. Match a full identity before aliases. If the returned inventory contains multiple entries with one identity, resolution fails.
 2. Reject a full identity that is the wrong template kind or ineligible; never substitute a related template.
-3. Match aliases only against templates that declare them. Return `Ambiguous` when multiple eligible candidates match; do not choose the first candidate or expand to siblings.
-4. Return a `Selected` result with the exact engine candidate, an empty candidate collection, and any non-fatal diagnostics.
+3. Match aliases only against templates that declare them. Two or more eligible candidates remain ambiguous; do not choose the first candidate or expand to siblings.
+4. Return exactly one candidate when selection succeeds. Every unsuccessful outcome has zero candidates.
 
-`TemplateResolutionResult` enforces status/payload consistency and exposes defensive read-only collections. `TemplateCatalogEntry` snapshots aliases, parameters, and nested parameter choices behind runtime read-only wrappers. An entry from another session, a copied entry, or a disposed session cannot be used to resolve the candidate.
+`TemplateResolutionResult` contains only `Candidates` and `Diagnostics`: zero candidates means unsuccessful, one means selected, and two or more means ambiguous. `TemplateCatalogEntry` retains the exact engine candidate and a non-owning owner token while snapshotting caller-owned aliases, parameters, and nested parameter choices. A live owning session accepts an immutable same-session copy that preserves its token and candidate; foreign, unbound, forged, or disposed-session entries are rejected. Failure details such as template identity, package, name, kind, source, and cause are structured diagnostics rather than unsuccessful result candidates.
 
 `groupIdentity` describes related variants; it does not determine an alias result or select a variant. A template with no group is not an implicit family. The shared `shortName` alias of two variants may therefore be ambiguous. Project and item templates remain distinct through `tags.type`. Templates require at least one non-empty `shortName`: the engine may omit a template with no value, while projection filters empty aliases and marks an exposed candidate with no usable alias as invalid.
 
@@ -56,7 +56,7 @@ The session lazily creates one `TemplateConstraintManager` when engine constrain
 
 For constraints whose source configuration cannot be read or verified, resolution fails for that candidate. Additional configuration files are rejected when merged constraints cannot be proven. Listing propagates a surfaced inventory exception unchanged; resolution returns surfaced inventory failures as diagnostic causes.
 
-The inventory may not expose every conflicting registration as a distinct candidate. This layer does not scan mounts again to detect duplicate registrations; immutable, versioned workload content must avoid identity conflicts. Some Template Engine providers may log or suppress enumeration errors and return a partial inventory. There is no typed completeness result available to this layer. It does not parse logs or introduce a second scanner, so `NotFound` does not prove that the inventory was complete.
+The inventory may not expose every conflicting registration as a distinct candidate. This layer does not scan mounts again to detect duplicate registrations; immutable, versioned workload content must avoid identity conflicts. Some Template Engine providers may log or suppress enumeration errors and return a partial inventory. There is no typed completeness result available to this layer. It does not parse logs or introduce a second scanner, so a zero-candidate result with a `not-found` diagnostic does not prove that the inventory was complete.
 
 ## Later command integration
 

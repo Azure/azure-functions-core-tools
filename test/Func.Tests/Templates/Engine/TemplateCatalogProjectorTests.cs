@@ -74,7 +74,10 @@ public sealed class TemplateCatalogProjectorTests
             package: new TemplatePackageInfo("Contoso.Functions.Templates", "1.2.3"),
             isHidden: false,
             parameters: [],
-            metadataDiagnostic: null));
+            metadataDiagnostic: null)
+        {
+            EngineTemplate = template,
+        });
     }
 
     [Fact]

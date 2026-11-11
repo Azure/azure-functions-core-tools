@@ -149,18 +149,23 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateCatalogEntry entry = (await templater.ListAsync(TemplateType.Item, CancellationToken.None)).Single();
         TemplateResolutionResult byAlias = await templater.ResolveAsync(TemplateFixtures.ItemTemplateShortName, TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult byIdentity = await templater.ResolveAsync(TemplateFixtures.ItemTemplateIdentity, TemplateType.Item, CancellationToken.None);
         TemplateResolutionResult byEntry = await templater.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
         (IReadOnlyList<ITemplatePackage> cachedPackages, IReadOnlyList<ITemplateInfo> cachedTemplates) =
             await session.GetInventoryAsync(CancellationToken.None);
 
         cachedPackages.Should().BeSameAs(packages);
         cachedTemplates.Should().BeSameAs(templates);
-        byAlias.Status.Should().Be(TemplateResolutionStatus.Selected);
-        byEntry.Status.Should().Be(TemplateResolutionStatus.Selected);
-        byAlias.SelectedTemplate!.Template.Should().BeSameAs(engineCandidate);
-        byEntry.SelectedTemplate!.Template.Should().BeSameAs(engineCandidate);
-        byAlias.Candidates.Should().BeEmpty();
-        byEntry.Candidates.Should().BeEmpty();
+        byAlias.Candidates.Should().ContainSingle();
+        byIdentity.Candidates.Should().ContainSingle();
+        byEntry.Candidates.Should().ContainSingle();
+        byAlias.Candidates.Single().EngineTemplate.Should().BeSameAs(engineCandidate);
+        byIdentity.Candidates.Single().EngineTemplate.Should().BeSameAs(engineCandidate);
+        byEntry.Candidates.Single().EngineTemplate.Should().BeSameAs(engineCandidate);
+        templater.GetEngineTemplate(byAlias.Candidates.Single()).Should().BeSameAs(engineCandidate);
+        templater.GetEngineTemplate(byIdentity.Candidates.Single()).Should().BeSameAs(engineCandidate);
+        templater.GetEngineTemplate(byEntry.Candidates.Single()).Should().BeSameAs(engineCandidate);
+        byAlias.Candidates.Single().Parameters.Should().Equal(entry.Parameters);
     }
 
     [Fact]
@@ -211,18 +216,16 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         TemplateResolutionResult exact = await templater.ResolveAsync("func.tests.http.javascript", TemplateType.Item, CancellationToken.None);
         TemplateResolutionResult alias = await templater.ResolveAsync("http", TemplateType.Item, CancellationToken.None);
 
-        exact.Status.Should().Be(TemplateResolutionStatus.Selected);
-        exact.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Http.JavaScript");
-        exact.Candidates.Should().BeEmpty();
-        alias.Status.Should().Be(TemplateResolutionStatus.Ambiguous);
-        alias.SelectedTemplate.Should().BeNull();
+        exact.Candidates.Should().ContainSingle();
+        exact.Candidates.Single().Identity.Should().Be("Func.Tests.Http.JavaScript");
+        alias.Candidates.Should().HaveCountGreaterThan(1);
         alias.Candidates.Select(candidate => candidate.Identity)
             .Should().BeEquivalentTo(["Func.Tests.Http.JavaScript", "Func.Tests.Http.Python"]);
 
         TemplateCatalogEntry chosen = alias.Candidates.Single(candidate => candidate.Identity == "Func.Tests.Http.JavaScript");
         TemplateResolutionResult chosenResult = await templater.ResolveAsync(chosen, TemplateType.Item, CancellationToken.None);
-        chosenResult.Status.Should().Be(TemplateResolutionStatus.Selected);
-        chosenResult.SelectedTemplate!.Descriptor.Identity.Should().Be(chosen.Identity);
+        chosenResult.Candidates.Should().ContainSingle();
+        chosenResult.Candidates.Single().Identity.Should().Be(chosen.Identity);
     }
 
     [Fact]
@@ -237,8 +240,8 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("func.tests.shared", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Shared");
+        result.Candidates.Should().ContainSingle();
+        result.Candidates.Single().Identity.Should().Be("Func.Tests.Shared");
     }
 
     [Fact]
@@ -272,12 +275,12 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         exactCandidate.Identity.Should().Be(exactIdentity);
         aliasCandidate.ShortNameList.Should().Contain(exactIdentity);
         aliasEligibility.IsEligible.Should().BeTrue();
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
-        result.SelectedTemplate.Should().BeNull();
-        result.Candidates.Should().ContainSingle().Which.Identity.Should().Be(exactIdentity);
+        result.Candidates.Should().BeEmpty();
         TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
         diagnostic.Code.Should().Be("constraint-not-evaluated");
         diagnostic.TemplateIdentity.Should().Be(exactIdentity);
+        diagnostic.TemplateName.Should().Be("exact");
+        diagnostic.TemplateKind.Should().Be(TemplateType.Item);
         diagnostic.TemplateIdentity.Should().NotBe(aliasIdentity);
         cachedPackages.Should().BeSameAs(packages);
         cachedTemplates.Should().BeSameAs(templates);
@@ -297,9 +300,8 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("first", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.Candidates.Should().BeEmpty();
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.First");
+        result.Candidates.Should().ContainSingle();
+        result.Candidates.Single().Identity.Should().Be("Func.Tests.First");
     }
 
     [Fact]
@@ -314,8 +316,7 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("shared", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Ambiguous);
-        result.SelectedTemplate.Should().BeNull();
+        result.Candidates.Should().HaveCountGreaterThan(1);
         result.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == "ambiguous" && diagnostic.Message.Contains("multiple eligible templates"));
         result.Candidates.Select(candidate => candidate.Identity).Should().BeEquivalentTo(["Func.Tests.First", "Func.Tests.Second"]);
     }
@@ -329,14 +330,33 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         TemplateResolutionResult missing = await templater.ResolveAsync("not-installed", TemplateType.Item, CancellationToken.None);
         TemplateResolutionResult wrongKind = await templater.ResolveAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Item, CancellationToken.None);
 
-        missing.Status.Should().Be(TemplateResolutionStatus.NotFound);
-        wrongKind.Status.Should().Be(TemplateResolutionStatus.Failed);
         missing.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("not-found");
         wrongKind.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("wrong-kind");
+        wrongKind.Diagnostics.Single().TemplateName.Should().Be("Func Tests Project");
+        wrongKind.Diagnostics.Single().TemplateKind.Should().Be(TemplateType.Project);
         wrongKind.Diagnostics.Single().Message.Should().Be(
             $"Template '{TemplateFixtures.ProjectTemplateIdentity}' is not an item template.");
-        missing.SelectedTemplate.Should().BeNull();
-        wrongKind.SelectedTemplate.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AllIneligibleAliasCandidates_ReturnsOnlyStructuredDiagnostics()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackage(
+            _root,
+            ("unknown", "Func.Tests.Unknown", "shared", null, null, "future-constraint", new { }),
+            ("workload", "Func.Tests.Workload", "shared", null, null, "func-workload", "node"));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using Templater templater = CreateTemplater();
+
+        TemplateResolutionResult result = await templater.ResolveAsync("shared", TemplateType.Item, CancellationToken.None);
+
+        result.Candidates.Should().BeEmpty();
+        result.Diagnostics.Select(diagnostic => diagnostic.TemplateIdentity).Should().BeEquivalentTo(
+            ["Func.Tests.Unknown", "Func.Tests.Workload"]);
+        result.Diagnostics.Should().OnlyContain(diagnostic =>
+            diagnostic.TemplateName != null
+            && diagnostic.TemplateKind == TemplateType.Item
+            && diagnostic.PackageIdentity == packageDirectory);
     }
 
     [Fact]
@@ -362,10 +382,10 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         cachedPackages.Should().BeSameAs(packages);
         cachedTemplates.Should().BeSameAs(templates);
-        byIdentity.Status.Should().Be(TemplateResolutionStatus.Selected);
-        byEntry.Status.Should().Be(TemplateResolutionStatus.Selected);
-        byIdentity.SelectedTemplate!.Descriptor.Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
-        byEntry.SelectedTemplate!.Descriptor.Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
+        byIdentity.Candidates.Should().ContainSingle();
+        byEntry.Candidates.Should().ContainSingle();
+        byIdentity.Candidates.Single().Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
+        byEntry.Candidates.Single().Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
     }
 
     [Fact]
@@ -383,12 +403,13 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("FUNC.TESTS.DUPLICATE", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
-        result.SelectedTemplate.Should().BeNull();
-        TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
-        diagnostic.Code.Should().Be("duplicate-identity");
-        diagnostic.TemplateIdentity.Should().Be("FUNC.TESTS.DUPLICATE");
-        diagnostic.Message.Should().Contain("first").And.Contain("second");
+        result.Candidates.Should().BeEmpty();
+        result.Diagnostics.Should().HaveCount(2).And.OnlyContain(diagnostic =>
+            diagnostic.Code == "duplicate-identity" && diagnostic.TemplateIdentity == "FUNC.TESTS.DUPLICATE");
+        result.Diagnostics.Select(item => item.TemplateSource).Should().Contain(
+            $"{first}::/one/.template.config/template.json");
+        result.Diagnostics.Select(item => item.TemplateSource).Should().Contain(
+            $"{second}::/two/.template.config/template.json");
     }
 
     [Fact]
@@ -406,12 +427,9 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("shared", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
-        result.SelectedTemplate.Should().BeNull();
-        TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
-        diagnostic.Code.Should().Be("duplicate-identity");
-        diagnostic.TemplateIdentity.Should().Be("Func.Tests.Duplicate");
-        result.Status.Should().NotBe(TemplateResolutionStatus.NotFound);
+        result.Candidates.Should().BeEmpty();
+        result.Diagnostics.Should().HaveCount(2).And.OnlyContain(diagnostic =>
+            diagnostic.Code == "duplicate-identity" && diagnostic.TemplateIdentity == "Func.Tests.Duplicate");
     }
 
     [Fact]
@@ -426,11 +444,11 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("Func.Tests.Duplicate", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
-        result.SelectedTemplate.Should().BeNull();
-        TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
-        diagnostic.Code.Should().Be("duplicate-identity");
-        diagnostic.TemplateIdentity.Should().Be("Func.Tests.Duplicate");
+        result.Candidates.Should().BeEmpty();
+        result.Diagnostics.Should().HaveCount(2).And.OnlyContain(diagnostic =>
+            diagnostic.Code == "duplicate-identity"
+            && diagnostic.TemplateIdentity == "Func.Tests.Duplicate"
+            && diagnostic.TemplateSource!.Contains(packageDirectory));
     }
 
     [Fact]
@@ -445,7 +463,7 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("shared", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Ambiguous);
+        result.Candidates.Should().HaveCountGreaterThan(1);
         result.Candidates.Select(candidate => candidate.Identity)
             .Should().BeEquivalentTo(["Func.Tests.Python", "Func.Tests.JavaScript"]);
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("ambiguous");
@@ -460,9 +478,9 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         TemplateResolutionResult hidden = await templater.ResolveAsync(TemplateFixtures.HiddenTemplateIdentity, TemplateType.Item, CancellationToken.None);
         TemplateResolutionResult invalid = await templater.ResolveAsync(TemplateFixtures.InvalidHostTemplateIdentity, TemplateType.Item, CancellationToken.None);
 
-        hidden.Status.Should().Be(TemplateResolutionStatus.Failed);
+        hidden.Candidates.Should().BeEmpty();
         hidden.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("hidden");
-        invalid.Status.Should().Be(TemplateResolutionStatus.Failed);
+        invalid.Candidates.Should().BeEmpty();
         invalid.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("invalid-metadata");
     }
 
@@ -479,9 +497,9 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         TemplateResolutionResult unknown = await templater.ResolveAsync("unknown", TemplateType.Item, CancellationToken.None);
         TemplateResolutionResult workload = await templater.ResolveAsync("workload", TemplateType.Item, CancellationToken.None);
 
-        unknown.Status.Should().Be(TemplateResolutionStatus.Failed);
+        unknown.Candidates.Should().BeEmpty();
         unknown.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-not-evaluated");
-        workload.Status.Should().Be(TemplateResolutionStatus.Failed);
+        workload.Candidates.Should().BeEmpty();
         workload.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-not-evaluated");
     }
 
@@ -502,8 +520,8 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("shared", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Healthy");
+        result.Candidates.Should().ContainSingle();
+        result.Candidates.Single().Identity.Should().Be("Func.Tests.Healthy");
         TemplateResolutionDiagnostic diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
         diagnostic.Code.Should().Be("constraint-not-evaluated");
         diagnostic.TemplateIdentity.Should().Be(constrainedIdentity);
@@ -529,10 +547,10 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         TemplateResolutionResult wrongBundle = await restricted.ResolveAsync("bundle", TemplateType.Item, CancellationToken.None);
         TemplateResolutionResult noBundle = await missing.ResolveAsync("bundle", TemplateType.Item, CancellationToken.None);
 
-        allowed.Status.Should().Be(TemplateResolutionStatus.Selected);
-        wrongBundle.Status.Should().Be(TemplateResolutionStatus.Failed);
+        allowed.Candidates.Should().ContainSingle();
+        wrongBundle.Candidates.Should().BeEmpty();
         wrongBundle.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-restricted");
-        noBundle.Status.Should().Be(TemplateResolutionStatus.Failed);
+        noBundle.Candidates.Should().BeEmpty();
         noBundle.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("constraint-restricted");
     }
 
@@ -548,8 +566,8 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("host", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        result.SelectedTemplate!.Descriptor.Identity.Should().Be("Func.Tests.Host");
+        result.Candidates.Should().ContainSingle();
+        result.Candidates.Single().Identity.Should().Be("Func.Tests.Host");
     }
 
     [Fact]
@@ -571,7 +589,7 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
 
         TemplateResolutionResult result = await templater.ResolveAsync("merged", TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Candidates.Should().BeEmpty();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("additional-configuration-not-evaluated");
     }
 
@@ -586,26 +604,32 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         TemplateResolutionResult resolved = await owner.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
         TemplateResolutionResult copied = await owner.ResolveAsync(entry with { }, TemplateType.Item, CancellationToken.None);
         TemplateResolutionResult foreignEntry = await foreign.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
-        TemplateResolutionResult foreignResolvedEntry = await foreign.ResolveAsync(resolved.SelectedTemplate!.Descriptor, TemplateType.Item, CancellationToken.None);
+        TemplateResolutionResult foreignResolvedEntry = await foreign.ResolveAsync(
+            resolved.Candidates.Single(),
+            TemplateType.Item,
+            CancellationToken.None);
+        TemplateResolutionResult forged = await owner.ResolveAsync(
+            entry with { EngineTemplate = null, OwnerToken = null },
+            TemplateType.Item,
+            CancellationToken.None);
 
-        resolved.Status.Should().Be(TemplateResolutionStatus.Selected);
-        ResolvedTemplate selection = resolved.SelectedTemplate!;
-        selection.Template.Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
-        copied.Status.Should().Be(TemplateResolutionStatus.Failed);
-        copied.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("invalid-selection");
-        foreignEntry.Status.Should().Be(TemplateResolutionStatus.Failed);
+        resolved.Candidates.Should().ContainSingle();
+        ITemplateInfo engineCandidate = entry.EngineTemplate!;
+        owner.GetEngineTemplate(resolved.Candidates.Single()).Should().BeSameAs(engineCandidate);
+        copied.Candidates.Should().ContainSingle();
+        owner.GetEngineTemplate(copied.Candidates.Single()).Should().BeSameAs(engineCandidate);
+        foreignEntry.Candidates.Should().BeEmpty();
         foreignEntry.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("invalid-selection");
-        foreignResolvedEntry.Status.Should().Be(TemplateResolutionStatus.Failed);
+        foreignResolvedEntry.Candidates.Should().BeEmpty();
         foreignResolvedEntry.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("invalid-selection");
+        forged.Candidates.Should().BeEmpty();
+        forged.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("invalid-selection");
 
         owner.Dispose();
-        selection.Descriptor.Identity.Should().Be(TemplateFixtures.ItemTemplateIdentity);
-        Action accessDisposedCandidate = () => _ = selection.Template;
+        Action accessDisposedCandidate = () => _ = owner.GetEngineTemplate(entry);
         Func<Task> resolveDisposed = () => owner.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
-        Func<Task> resolveSelectionDisposed = () => owner.ResolveAsync(selection.Descriptor, TemplateType.Item, CancellationToken.None);
         accessDisposedCandidate.Should().Throw<ObjectDisposedException>();
         await resolveDisposed.Should().ThrowAsync<ObjectDisposedException>();
-        await resolveSelectionDisposed.Should().ThrowAsync<ObjectDisposedException>();
     }
 
     [Fact]
@@ -620,8 +644,8 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         TemplateResolutionResult unknown = await templater.ResolveAsync("not-installed", TemplateType.Item, CancellationToken.None);
         TemplateResolutionResult healthy = await templater.ResolveAsync(TemplateFixtures.ProjectTemplateIdentity, TemplateType.Project, CancellationToken.None);
 
-        unknown.Status.Should().Be(TemplateResolutionStatus.NotFound);
-        healthy.Status.Should().Be(TemplateResolutionStatus.Selected);
+        unknown.Candidates.Should().BeEmpty();
+        healthy.Candidates.Should().ContainSingle();
     }
 
     [Fact]
@@ -640,7 +664,7 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         File.Delete(configPath);
         TemplateResolutionResult result = await templater.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
 
-        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Candidates.Should().BeEmpty();
         result.Diagnostics.Should().ContainSingle()
             .Which.Code.Should().Be("constraint-source-unavailable");
     }
@@ -675,13 +699,13 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         if (shortName is null)
         {
             entries.Should().NotContain(entry => entry.Identity == "Func.Tests.MissingShortName");
-            result.Status.Should().Be(TemplateResolutionStatus.NotFound);
+            result.Candidates.Should().BeEmpty();
         }
         else
         {
             entries.Should().ContainSingle(entry => entry.Identity == "Func.Tests.MissingShortName")
                 .Which.MetadataDiagnostic.Should().Contain("non-empty shortName");
-            result.Status.Should().Be(TemplateResolutionStatus.Failed);
+            result.Candidates.Should().BeEmpty();
             result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("invalid-metadata");
         }
     }

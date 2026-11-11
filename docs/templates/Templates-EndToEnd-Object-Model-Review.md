@@ -38,20 +38,21 @@ Workload or package owners supply curated template content. Workload installatio
 
 `TemplateCatalogEntry` is a minimal CLI description of a project or item template. It retains identity, display metadata, non-empty aliases, group identity, language, package information, and diagnostics for unusable Functions host or required template metadata. It is not a replacement for the engine candidate.
 
-Resolution preserves the exact engine-owned `ITemplateInfo` through `ResolvedTemplate`. An issued catalog entry can be resolved only by the live `Templater` session that issued it. A copied entry, an entry from another session, or access to the selected engine candidate after disposal is rejected. Registered content is treated as immutable during the command; servicing or re-registration occurs outside that session.
+Each `TemplateCatalogEntry` retains the exact engine-owned `ITemplateInfo` internally; it is not reconstructed from projected metadata or exposed as command-facing public API. The owning live `Templater` validates a non-owning session token and exact inventory membership before resolving or retrieving that candidate. An immutable copy remains valid when it preserves the same token and candidate. Foreign, unbound, forged, and disposed-session entries are rejected. Registered content is treated as immutable during the command; servicing or re-registration occurs outside that session.
 
-The four outcomes are:
+The result has only `Candidates` and `Diagnostics`, with one strict count contract:
 
-| Status | Payload and caller responsibility |
+| Candidate count | Meaning and caller responsibility |
 | --- | --- |
-| `Selected` | One `SelectedTemplate`; no ambiguity candidates. It carries the exact selected engine candidate. |
-| `NotFound` | No selection or eligible candidates; applicable diagnostics are retained. It does not prove provider enumeration was complete. |
-| `Ambiguous` | At least two eligible candidates and no selection. The caller must choose explicitly. |
-| `Failed` | No selection; structured failure diagnostics, and candidate context when useful. |
+| `0` | Unsuccessful; inspect structured diagnostics. A `not-found` diagnostic does not prove provider enumeration was complete. |
+| `1` | Selected; use `Candidates[0]` and its projected parameters. |
+| `2` or more | Ambiguous; the caller must choose explicitly. |
 
-Result construction enforces these relationships. Candidate and diagnostic collections are copied and exposed read-only. Catalog entries also defensively snapshot aliases, parameters, and nested parameter choices so a caller cannot mutate the issued selection metadata through a retained list or a collection cast.
+Failures never return candidates. Their identity, package, name, kind, source, and rejection cause are retained in structured diagnostics as applicable. `TemplateResolutionResult` takes internally owned arrays without adding defensive wrappers. Catalog entries continue to snapshot caller-owned aliases, parameters, and nested parameter choices.
 
-An exact identity takes precedence over aliases. If the returned inventory contains multiple entries with one identity, resolution fails rather than choosing one. An alias resolves only its matching templates; it does not widen to sibling variants. Multiple eligible matches return `Ambiguous`, whether or not they share a family. The engine does not choose a family member automatically.
+The downstream command pattern is to resolve once, inspect `Candidates.Count`, display diagnostics when the count is not one, then use `Candidates[0]`. Read selected parameters from that entry and pass the same entry back through the same live `Templater` for exact engine use. There is no separate `TemplateResolutionStatus`, `SelectedTemplate`, or `ResolvedTemplate`.
+
+An exact identity takes precedence over aliases. If the returned inventory contains multiple entries with one identity, resolution fails rather than choosing one. An alias resolves only its matching templates; it does not widen to sibling variants. Two or more eligible matches remain in the result and are ambiguous, whether or not they share a family. The engine does not choose a family member automatically.
 
 ### Template metadata
 
@@ -89,7 +90,7 @@ PR #5872 does not perform project Stack or language compatibility checks. The do
 
 Diagnostics retain their code, template identity, package identity, and original exception when those values are available. Listing propagates an engine inventory exception unchanged; resolution returns it as the diagnostic cause. No custom listing exception or message parsing is introduced.
 
-The Template Engine inventory may not expose every conflicting registration as a distinct candidate. This layer does not enumerate mounts again to detect duplicate registrations; immutable, versioned workload content must avoid identity conflicts. Some Template Engine providers may also log or suppress enumeration errors and return a partial inventory. The CLI does not parse logs to infer completeness. In that case, `NotFound` may reflect an incomplete inventory; these limitations remain explicit.
+The Template Engine inventory may not expose every conflicting registration as a distinct candidate. This layer does not enumerate mounts again to detect duplicate registrations; immutable, versioned workload content must avoid identity conflicts. Some Template Engine providers may also log or suppress enumeration errors and return a partial inventory. The CLI does not parse logs to infer completeness. In that case, a zero-candidate result with a `not-found` diagnostic may reflect an incomplete inventory; these limitations remain explicit.
 
 ## Later integration
 

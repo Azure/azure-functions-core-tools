@@ -46,16 +46,14 @@ public sealed class TemplaterTests : IDisposable
             .Package.Should().Be(new TemplatePackageInfo(packageDirectory, null));
         entries.Single(entry => entry.Identity == "Func.Tests.Additional")
             .Package.Should().Be(new TemplatePackageInfo(additionalPackageDirectory, null));
-        byAlias.Status.Should().Be(TemplateResolutionStatus.Selected);
-        byEntry.Status.Should().Be(TemplateResolutionStatus.Selected);
-        byAlias.SelectedTemplate!.Template.Should().BeSameAs(engineCandidate);
-        byEntry.SelectedTemplate!.Template.Should().BeSameAs(engineCandidate);
-        byAlias.Candidates.Should().BeEmpty();
-        byEntry.Candidates.Should().BeEmpty();
+        byAlias.Candidates.Should().ContainSingle().Which.EngineTemplate.Should().BeSameAs(engineCandidate);
+        byEntry.Candidates.Should().ContainSingle().Which.EngineTemplate.Should().BeSameAs(engineCandidate);
+        templater.GetEngineTemplate(byAlias.Candidates.Single()).Should().BeSameAs(engineCandidate);
+        templater.GetEngineTemplate(byEntry.Candidates.Single()).Should().BeSameAs(engineCandidate);
 
         templater.Dispose();
 
-        Action accessDisposedCandidate = () => _ = byAlias.SelectedTemplate!.Template;
+        Action accessDisposedCandidate = () => _ = templater.GetEngineTemplate(byAlias.Candidates.Single());
         accessDisposedCandidate.Should().Throw<ObjectDisposedException>();
         Func<Task> listDisposedSession = () => templater.ListAsync(TemplateType.Item);
         await listDisposedSession.Should().ThrowAsync<ObjectDisposedException>();

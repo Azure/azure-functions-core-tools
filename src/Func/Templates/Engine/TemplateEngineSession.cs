@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Constraints;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
@@ -21,6 +22,7 @@ internal sealed class TemplateEngineSession : IDisposable
 {
     private readonly EngineEnvironmentSettings _settings;
     private readonly TemplatePackageManager _packageManager;
+    private readonly object _ownershipToken = new();
     private TemplateConstraintManager? _constraintManager;
     private (IReadOnlyList<ITemplatePackage> Packages, IReadOnlyList<ITemplateInfo> Templates)? _inventory;
     private bool _disposed;
@@ -36,6 +38,28 @@ internal sealed class TemplateEngineSession : IDisposable
     }
 
     public TemplateEngineContext Context { get; }
+
+    internal object OwnershipToken => _ownershipToken;
+
+    internal bool TryGetTemplateInfo(TemplateCatalogEntry entry, [NotNullWhen(true)] out ITemplateInfo? template)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(entry);
+
+        ITemplateInfo? candidate = entry.EngineTemplate;
+        if (!ReferenceEquals(entry.OwnerToken, _ownershipToken)
+            || candidate is null
+            || !string.Equals(candidate.Identity, entry.Identity, StringComparison.Ordinal)
+            || _inventory is not { } inventory
+            || !inventory.Templates.Any(item => ReferenceEquals(item, candidate)))
+        {
+            template = null;
+            return false;
+        }
+
+        template = candidate;
+        return true;
+    }
 
     internal void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 

@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Microsoft.TemplateEngine.Abstractions;
+
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
@@ -82,6 +84,10 @@ internal sealed record TemplateCatalogEntry
     public string? MetadataDiagnostic { get; }
 
     public Exception? MetadataDiagnosticCause { get; }
+
+    internal ITemplateInfo? EngineTemplate { get; init; }
+
+    internal object? OwnerToken { get; init; }
 
     private static IReadOnlyList<string> CaptureShortNames(IReadOnlyList<string> shortNames)
     {

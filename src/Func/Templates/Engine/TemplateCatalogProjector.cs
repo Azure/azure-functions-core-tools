@@ -42,6 +42,9 @@ internal static class TemplateCatalogProjector
     /// </param>
     /// <exception cref="ArgumentException"><paramref name="template"/> isn't an item or project template.</exception>
     public static TemplateCatalogEntry Project(ITemplateInfo template, ITemplatePackage? package)
+        => Project(template, package, ownerToken: null);
+
+    internal static TemplateCatalogEntry Project(ITemplateInfo template, ITemplatePackage? package, object? ownerToken)
     {
         TemplateType type = GetTemplateType(template)
             ?? throw new ArgumentException($"Template '{template.Identity}' isn't an item or project template.", nameof(template));
@@ -73,7 +76,7 @@ internal static class TemplateCatalogProjector
                 : $"{metadataDiagnostic} {shortNameDiagnostic}";
         }
 
-        return new(
+        return new TemplateCatalogEntry(
             template.Identity,
             template.Name,
             NullIfEmpty(template.Description),
@@ -86,7 +89,11 @@ internal static class TemplateCatalogProjector
             metadata.IsHidden,
             parameters,
             metadataDiagnostic,
-            metadataDiagnosticCause);
+            metadataDiagnosticCause)
+        {
+            EngineTemplate = template,
+            OwnerToken = ownerToken,
+        };
     }
 
     private static string? GetTag(ITemplateMetadata template, string name)
