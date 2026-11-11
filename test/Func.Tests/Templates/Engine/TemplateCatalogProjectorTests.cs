@@ -78,7 +78,7 @@ public sealed class TemplateCatalogProjectorTests
     }
 
     [Fact]
-    public void TemplateCatalogEntry_CopiesAndExposesNestedCollectionsAsReadOnly()
+    public void TemplateCatalogEntry_SnapshotsCallerOwnedCollections()
     {
         List<string> shortNames = ["template"];
         List<TemplateParameterChoice> choices = [new("one", "One", null)];
@@ -100,8 +100,6 @@ public sealed class TemplateCatalogProjectorTests
             isHidden: false,
             parameters: parameters,
             metadataDiagnostic: null);
-        TemplateCatalogEntry copy = entry with { };
-
         shortNames.Add("later");
         choices.Add(new("two", "Two", null));
         parameters.Clear();
@@ -109,15 +107,6 @@ public sealed class TemplateCatalogProjectorTests
         entry.ShortNames.Should().Equal("template");
         entry.Parameters.Should().ContainSingle();
         entry.Parameters[0].Choices.Should().ContainSingle().Which.Value.Should().Be("one");
-        copy.ShortNames.Should().Equal("template");
-        copy.Parameters[0].Choices.Should().ContainSingle();
-        Action addShortName = () => ((IList<string>)entry.ShortNames).Add("mutable");
-        Action clearParameters = () => ((IList<TemplateParameterDefinition>)entry.Parameters).Clear();
-        Action clearChoices = () => ((IList<TemplateParameterChoice>)entry.Parameters[0].Choices).Clear();
-
-        addShortName.Should().Throw<NotSupportedException>();
-        clearParameters.Should().Throw<NotSupportedException>();
-        clearChoices.Should().Throw<NotSupportedException>();
     }
 
     [Fact]

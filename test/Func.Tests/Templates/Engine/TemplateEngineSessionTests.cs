@@ -151,7 +151,7 @@ public sealed class TemplateEngineSessionTests : IDisposable
             null);
         TemplateEligibilityEvaluator evaluator = new(
             session,
-            new(() => new(new TemplateConstraintRequirementMatcher())));
+            new(new TemplateConstraintRequirementMatcher()));
         session.Dispose();
 
         await FluentActions.Awaiting(() => evaluator.EvaluateAsync(candidate, entry, CancellationToken.None))

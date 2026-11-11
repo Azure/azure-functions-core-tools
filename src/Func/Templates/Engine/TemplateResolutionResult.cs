@@ -51,8 +51,8 @@ internal sealed class TemplateResolutionResult
 
         Status = status;
         SelectedTemplate = selectedTemplate;
-        Candidates = Array.AsReadOnly(candidateArray);
-        Diagnostics = Array.AsReadOnly(diagnosticArray);
+        Candidates = candidateArray;
+        Diagnostics = diagnosticArray;
     }
 
     public static TemplateResolutionResult Selected(

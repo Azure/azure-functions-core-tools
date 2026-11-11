@@ -15,10 +15,10 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </summary>
 internal sealed class TemplateEligibilityEvaluator(
     TemplateEngineSession session,
-    Lazy<FuncTemplateConstraintEvaluator> funcConstraintEvaluator)
+    FuncTemplateConstraintEvaluator funcConstraintEvaluator)
 {
     private readonly TemplateEngineSession _session = session ?? throw new ArgumentNullException(nameof(session));
-    private readonly Lazy<FuncTemplateConstraintEvaluator> _funcConstraintEvaluator =
+    private readonly FuncTemplateConstraintEvaluator _funcConstraintEvaluator =
         funcConstraintEvaluator ?? throw new ArgumentNullException(nameof(funcConstraintEvaluator));
 
     public async Task<TemplateEligibilityResult> EvaluateAsync(
@@ -133,7 +133,7 @@ internal sealed class TemplateEligibilityEvaluator(
                     NuGetVersion? bundleVersion = NuGetVersion.TryParse(_session.Context.Bundle?.Version, out NuGetVersion? parsedBundleVersion)
                         ? parsedBundleVersion
                         : null;
-                    FuncTemplateConstraintOutcome outcome = _funcConstraintEvaluator.Value.Evaluate(
+                    FuncTemplateConstraintOutcome outcome = _funcConstraintEvaluator.Evaluate(
                         declaration,
                         [],
                         _session.Context.Bundle?.Id,
@@ -208,17 +208,16 @@ internal sealed class TemplateEligibilityEvaluator(
 /// </summary>
 internal sealed class TemplateEligibilityResult
 {
-    private TemplateEligibilityResult(bool isEligible, IEnumerable<TemplateResolutionDiagnostic> diagnostics)
+    private TemplateEligibilityResult(bool isEligible, IReadOnlyList<TemplateResolutionDiagnostic> diagnostics)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
-        TemplateResolutionDiagnostic[] snapshot = [.. diagnostics];
-        if ((isEligible && snapshot.Length != 0) || (!isEligible && snapshot.Length != 1))
+        if ((isEligible && diagnostics.Count != 0) || (!isEligible && diagnostics.Count != 1))
         {
             throw new ArgumentException("Eligibility requires no diagnostics and rejection requires exactly one.", nameof(diagnostics));
         }
 
         IsEligible = isEligible;
-        Diagnostics = Array.AsReadOnly(snapshot);
+        Diagnostics = diagnostics;
     }
 
     public static TemplateEligibilityResult Eligible { get; } = new(true, []);

@@ -63,26 +63,6 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Fact]
-    public async Task Create_DoesNotConstructFunctionsEvaluatorWithoutFunctionsConstraints()
-    {
-        await InstallFixturesUnderHomeAsync();
-        bool evaluatorCreated = false;
-        Lazy<FuncTemplateConstraintEvaluator> evaluator = new(() =>
-        {
-            evaluatorCreated = true;
-            return new(new TemplateConstraintRequirementMatcher());
-        });
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), evaluator);
-
-        using Templater templater = factory.Create(Context("command"));
-        TemplateCatalogEntry entry = (await templater.ListAsync(TemplateType.Item, CancellationToken.None)).Single();
-        TemplateResolutionResult result = await templater.ResolveAsync(entry, TemplateType.Item, CancellationToken.None);
-
-        result.Status.Should().Be(TemplateResolutionStatus.Selected);
-        evaluatorCreated.Should().BeFalse();
-    }
-
-    [Fact]
     public void Create_NullContext_Throws()
     {
         TemplaterFactory factory = CreateFactory();
@@ -120,6 +100,6 @@ public sealed class TemplaterFactoryTests : IDisposable
     private TemplateEngineContext Context(string directory)
         => new(WorkingDirectory.FromExplicit(Path.Combine(_root, directory)));
 
-    private static Lazy<FuncTemplateConstraintEvaluator> FuncConstraintEvaluator()
-        => new(() => new(new TemplateConstraintRequirementMatcher()));
+    private static FuncTemplateConstraintEvaluator FuncConstraintEvaluator()
+        => new(new TemplateConstraintRequirementMatcher());
 }

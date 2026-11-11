@@ -9,7 +9,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 internal sealed record TemplateCatalogEntry
 {
     /// <summary>
-    /// Creates a catalog entry with defensive snapshots of its aliases, parameters, and parameter choices.
+    /// Creates a catalog entry with snapshots of its aliases, parameters, and parameter choices.
     /// </summary>
     /// <param name="identity">Unique template identity.</param>
     /// <param name="name">Display name.</param>
@@ -86,7 +86,7 @@ internal sealed record TemplateCatalogEntry
     private static IReadOnlyList<string> CaptureShortNames(IReadOnlyList<string> shortNames)
     {
         ArgumentNullException.ThrowIfNull(shortNames);
-        return Array.AsReadOnly(shortNames.ToArray());
+        return shortNames.ToArray();
     }
 
     private static IReadOnlyList<TemplateParameterDefinition> CaptureParameters(
@@ -102,10 +102,10 @@ internal sealed record TemplateCatalogEntry
             }
 
             ArgumentNullException.ThrowIfNull(parameter.Choices);
-            snapshot.Add(parameter with { Choices = Array.AsReadOnly(parameter.Choices.ToArray()) });
+            snapshot.Add(parameter with { Choices = parameter.Choices.ToArray() });
         }
 
-        return Array.AsReadOnly(snapshot.ToArray());
+        return snapshot.ToArray();
     }
 }
 

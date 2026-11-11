@@ -7,7 +7,7 @@ namespace Azure.Functions.Cli.Templates.Engine;
 
 internal sealed class TemplaterFactory(
     CliConfigurationPathsOptions configurationPaths,
-    Lazy<FuncTemplateConstraintEvaluator> funcConstraintEvaluator) : ITemplaterFactory
+    FuncTemplateConstraintEvaluator funcConstraintEvaluator) : ITemplaterFactory
 {
     /// <summary>
     /// Sub-directory (under the func home) that holds the engine's settings,
@@ -15,7 +15,7 @@ internal sealed class TemplaterFactory(
     /// </summary>
     private const string SettingsDirectoryName = "templates";
     private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
-    private readonly Lazy<FuncTemplateConstraintEvaluator> _funcConstraintEvaluator =
+    private readonly FuncTemplateConstraintEvaluator _funcConstraintEvaluator =
         funcConstraintEvaluator ?? throw new ArgumentNullException(nameof(funcConstraintEvaluator));
 
     public Templater Create(TemplateEngineContext context)

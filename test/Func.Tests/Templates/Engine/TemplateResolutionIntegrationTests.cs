@@ -333,6 +333,8 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
         wrongKind.Status.Should().Be(TemplateResolutionStatus.Failed);
         missing.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("not-found");
         wrongKind.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("wrong-kind");
+        wrongKind.Diagnostics.Single().Message.Should().Be(
+            $"Template '{TemplateFixtures.ProjectTemplateIdentity}' is not an item template.");
         missing.SelectedTemplate.Should().BeNull();
         wrongKind.SelectedTemplate.Should().BeNull();
     }
@@ -755,8 +757,8 @@ public sealed class TemplateResolutionIntegrationTests : IDisposable
                 session,
                 new TemplateEligibilityEvaluator(session, FuncConstraintEvaluator())));
 
-    private static Lazy<FuncTemplateConstraintEvaluator> FuncConstraintEvaluator()
-        => new(() => new(new TemplateConstraintRequirementMatcher()));
+    private static FuncTemplateConstraintEvaluator FuncConstraintEvaluator()
+        => new(new TemplateConstraintRequirementMatcher());
 
     private TemplateEngineContext ProjectContext(string? stack, string? language)
         => new(

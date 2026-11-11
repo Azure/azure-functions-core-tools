@@ -28,7 +28,7 @@ public sealed class TemplaterTests : IDisposable
         ITemplateInfo engineCandidate = templates.Single(template => template.Identity == TemplateFixtures.ItemTemplateIdentity);
         TemplateSelection selection = new(
             session,
-            new TemplateEligibilityEvaluator(session, new(() => new(new TemplateConstraintRequirementMatcher()))));
+            new TemplateEligibilityEvaluator(session, new(new TemplateConstraintRequirementMatcher())));
         using Templater templater = new(session, selection);
 
         IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item);
@@ -41,10 +41,6 @@ public sealed class TemplaterTests : IDisposable
 
         cachedPackages.Should().BeSameAs(packages);
         cachedTemplates.Should().BeSameAs(templates);
-        Action mutatePackages = () => ((IList<Microsoft.TemplateEngine.Abstractions.TemplatePackage.ITemplatePackage>)packages).Clear();
-        Action mutateTemplates = () => ((IList<ITemplateInfo>)templates).Clear();
-        mutatePackages.Should().Throw<NotSupportedException>();
-        mutateTemplates.Should().Throw<NotSupportedException>();
         entries.Should().HaveCount(2);
         entries.Single(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity)
             .Package.Should().Be(new TemplatePackageInfo(packageDirectory, null));

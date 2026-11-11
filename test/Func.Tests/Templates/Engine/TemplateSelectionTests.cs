@@ -89,6 +89,25 @@ public sealed class TemplateSelectionTests : IDisposable
         result.Status.Should().Be(TemplateResolutionStatus.Failed);
         result.SelectedTemplate.Should().BeNull();
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be("wrong-kind");
+        result.Diagnostics.Single().Message.Should().Be(
+            "Template 'Func.Tests.Requested' is not an item template.");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_WrongKindAlias_UsesCorrectArticle()
+    {
+        string packageDirectory = TemplateFixtures.WriteSelectionPackageForType(
+            _root,
+            "project",
+            ("project", "Func.Tests.Project", "project-alias", null, null, null, null));
+        await TemplateFixtures.InstallAsync(packageDirectory, _hive);
+        using SelectionHarness selection = await CreateSelectionAsync();
+
+        TemplateResolutionResult result = await selection.ResolveAsync("project-alias", TemplateType.Item);
+
+        result.Status.Should().Be(TemplateResolutionStatus.Failed);
+        result.Diagnostics.Should().ContainSingle().Which.Message.Should().Be(
+            "Template alias 'project-alias' does not identify an item template.");
     }
 
     [Fact]
@@ -208,7 +227,7 @@ public sealed class TemplateSelectionTests : IDisposable
         };
         TemplateSelection selection = new(
             session,
-            new TemplateEligibilityEvaluator(session, new(() => new(new TemplateConstraintRequirementMatcher()))));
+            new TemplateEligibilityEvaluator(session, new(new TemplateConstraintRequirementMatcher())));
 
         TemplateResolutionResult result = await selection.ResolveAsync(
             [candidate],
@@ -304,7 +323,7 @@ public sealed class TemplateSelectionTests : IDisposable
         };
         TemplateSelection selection = new(
             session,
-            new TemplateEligibilityEvaluator(session, new(() => new(new TemplateConstraintRequirementMatcher()))));
+            new TemplateEligibilityEvaluator(session, new(new TemplateConstraintRequirementMatcher())));
 
         TemplateResolutionResult result = await selection.ResolveAsync(
             [candidate],
@@ -456,8 +475,6 @@ public sealed class TemplateSelectionTests : IDisposable
         accepted.Diagnostics.Should().BeEmpty();
         rejected.IsEligible.Should().BeFalse();
         rejected.Diagnostics.Should().ContainSingle().Which.Should().BeSameAs(diagnostic);
-        Action mutateDiagnostics = () => ((IList<TemplateResolutionDiagnostic>)rejected.Diagnostics).Clear();
-        mutateDiagnostics.Should().Throw<NotSupportedException>();
         Action unrelatedDiagnostic = () => TemplateEligibilityResult.Rejected(
             candidate,
             new("hidden", "The diagnostic belongs to another candidate.", "Func.Tests.Other"));
@@ -505,7 +522,7 @@ public sealed class TemplateSelectionTests : IDisposable
 
             TemplateSelection selector = new(
                 session,
-                new TemplateEligibilityEvaluator(session, new(() => new(new TemplateConstraintRequirementMatcher()))));
+                new TemplateEligibilityEvaluator(session, new(new TemplateConstraintRequirementMatcher())));
             return new(session, selector, templates, entries, issuedEntries);
         }
         catch

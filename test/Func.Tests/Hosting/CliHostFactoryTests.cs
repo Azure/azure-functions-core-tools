@@ -55,17 +55,35 @@ public sealed class CliHostFactoryTests : IDisposable
     }
 
     [Fact]
-    public void CreateBuilder_RegistersTemplaterFactory()
+    public void CreateBuilder_RegistersInstalledProjectStackCatalog()
     {
         var interaction = new TestInteractionService();
         HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
         using ServiceProvider provider = builder.Services.BuildServiceProvider();
 
+        var catalog = provider.GetRequiredService<InstalledProjectStackCatalog>();
+
+        catalog.Stacks.Should().BeEmpty();
+        provider.GetRequiredService<InstalledProjectStackCatalog>().Should().BeSameAs(catalog);
+    }
+
+    [Fact]
+    public void CreateBuilder_RegistersTemplaterFactory()
+    {
+        var interaction = new TestInteractionService();
+        HostApplicationBuilder builder = CliHostFactory.CreateBuilder(interaction);
+        builder.Services.Should().ContainSingle(descriptor => descriptor.ServiceType == typeof(FuncTemplateConstraintEvaluator))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Singleton);
+        builder.Services.Should().ContainSingle(descriptor => descriptor.ServiceType == typeof(ITemplaterFactory))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Singleton);
+        using ServiceProvider provider = builder.Services.BuildServiceProvider();
+
+        provider.GetRequiredService<FuncTemplateConstraintEvaluator>().Should().NotBeNull();
         provider.GetRequiredService<ITemplaterFactory>().Should().BeOfType<TemplaterFactory>();
     }
 
     [Fact]
-    public void CreateBuilder_RegistersInstalledProjectStackCatalogAsSingleton()
+    public void CreateBuilder_RegistersInstalledProjectStackCatalogOnceAsSingleton()
     {
         HostApplicationBuilder builder = CliHostFactory.CreateBuilder(new TestInteractionService());
         ServiceDescriptor registration = builder.Services.Should()

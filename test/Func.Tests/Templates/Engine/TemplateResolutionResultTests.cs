@@ -63,7 +63,7 @@ public sealed class TemplateResolutionResultTests : IDisposable
     }
 
     [Fact]
-    public async Task Factories_DefensivelyCopyAndExposeReadOnlyCollections()
+    public async Task Factories_SnapshotCallerOwnedCollections()
     {
         (TemplateEngineSession session, _, TemplateCatalogEntry[] entries) = await CreateInputsAsync();
         using (session)
@@ -76,11 +76,6 @@ public sealed class TemplateResolutionResultTests : IDisposable
 
             result.Candidates.Should().Equal(entries);
             result.Diagnostics.Should().ContainSingle();
-            Action addCandidate = () => ((IList<TemplateCatalogEntry>)result.Candidates).Add(entries[0]);
-            Action clearDiagnostics = () => ((IList<TemplateResolutionDiagnostic>)result.Diagnostics).Clear();
-
-            addCandidate.Should().Throw<NotSupportedException>();
-            clearDiagnostics.Should().Throw<NotSupportedException>();
         }
     }
 

@@ -96,7 +96,7 @@ internal static class TemplateConstraintDeclarationReader
             declarations.Add(ReadDeclaration(property, shared, project));
         }
 
-        return declarations.AsReadOnly();
+        return declarations;
     }
 
     private static TemplateConstraintDeclaration ReadDeclaration(JsonProperty property, bool shared, bool project)
@@ -149,7 +149,7 @@ internal static class TemplateConstraintDeclarationReader
             throw Invalid($"{source} requires at least one alternative.");
         }
 
-        return alternatives.AsReadOnly();
+        return alternatives;
     }
 
     private static TemplateConstraintAlternative ReadAlternative(JsonElement argument, bool workload, string source)

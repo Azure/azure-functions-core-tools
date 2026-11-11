@@ -28,7 +28,7 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
     public async Task<IReadOnlyList<TemplateCatalogEntry>> ListAsync(TemplateType type, CancellationToken cancellationToken = default)
     {
         await EnsureInventoryAsync(cancellationToken);
-        return Array.AsReadOnly(_catalog!.Where(entry => entry.Type == type).ToArray());
+        return _catalog!.Where(entry => entry.Type == type).ToArray();
     }
 
     /// <summary>
@@ -100,8 +100,6 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
 
         (IReadOnlyList<ITemplatePackage> packages, IReadOnlyList<ITemplateInfo> engineTemplates) =
             await _session.GetInventoryAsync(cancellationToken);
-        IReadOnlyList<ITemplateInfo> templates = DistinctCandidates(engineTemplates, cancellationToken);
-
         Dictionary<string, ITemplatePackage> packagesByMountPoint = new(StringComparer.Ordinal);
         foreach (ITemplatePackage package in packages)
         {
@@ -111,7 +109,7 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
         Dictionary<ITemplateInfo, TemplateCatalogEntry> entries = new(ReferenceEqualityComparer.Instance);
         Dictionary<TemplateCatalogEntry, ITemplateInfo> issuedEntries = new(ReferenceEqualityComparer.Instance);
         List<TemplateCatalogEntry> catalog = [];
-        foreach (ITemplateInfo template in templates)
+        foreach (ITemplateInfo template in engineTemplates)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (TemplateCatalogProjector.GetTemplateType(template) is not { } type)
@@ -127,7 +125,7 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
             catalog.Add(entry);
         }
 
-        _templates = templates;
+        _templates = engineTemplates;
         _entries = entries;
         _issuedEntries = issuedEntries;
         _catalog = catalog;
@@ -144,25 +142,6 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
         {
             return InventoryUnavailable(exception);
         }
-    }
-
-    private static IReadOnlyList<ITemplateInfo> DistinctCandidates(
-        IEnumerable<ITemplateInfo> candidates,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(candidates);
-        HashSet<(string Mount, string Configuration, Guid Generator, string Identity)> sources = [];
-        List<ITemplateInfo> distinct = [];
-        foreach (ITemplateInfo candidate in candidates)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (sources.Add((candidate.MountPointUri, candidate.ConfigPlace, candidate.GeneratorId, candidate.Identity)))
-            {
-                distinct.Add(candidate);
-            }
-        }
-
-        return distinct;
     }
 
     private static TemplateResolutionResult InventoryUnavailable(Exception exception)

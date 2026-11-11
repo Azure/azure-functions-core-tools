@@ -79,8 +79,6 @@ internal sealed class TemplateEngineSession : IDisposable
         IReadOnlyList<ITemplatePackage> packages = await _packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
         IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        packages = Array.AsReadOnly(packages.ToArray());
-        templates = Array.AsReadOnly(templates.ToArray());
         _inventory = (packages, templates);
         return _inventory.Value;
     }

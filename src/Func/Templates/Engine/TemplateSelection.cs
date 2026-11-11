@@ -42,11 +42,12 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
             entries.TryGetValue(exactMatch, out TemplateCatalogEntry? entry);
             if (entry is null || TemplateCatalogProjector.GetTemplateType(exactMatch) != type)
             {
-                string message = $"Template '{reference}' is not a {type.ToString().ToLowerInvariant()} template.";
+                string article = type == TemplateType.Item ? "an" : "a";
+                string message = $"Template '{reference}' is not {article} {type.ToString().ToLowerInvariant()} template.";
                 TemplateResolutionDiagnostic diagnostic = entry is null
                     ? new("wrong-kind", message, reference)
                     : Diagnostic(entry, "wrong-kind", message);
-                return Failure(TemplateResolutionStatus.Failed, diagnostic, entry is null ? null : [entry]);
+                return FailedResult(diagnostic, entry is null ? null : [entry]);
             }
 
             return await ResolveExactAsync(exactMatch, entry, cancellationToken);
@@ -73,9 +74,9 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
             .Select(entry => entry!)];
         if (kindMatches.Length == 0)
         {
-            return Failure(
-                TemplateResolutionStatus.Failed,
-                new("wrong-kind", $"Template alias '{reference}' does not identify a {type.ToString().ToLowerInvariant()} template."),
+            string article = type == TemplateType.Item ? "an" : "a";
+            return FailedResult(
+                new("wrong-kind", $"Template alias '{reference}' does not identify {article} {type.ToString().ToLowerInvariant()} template."),
                 [.. aliasMatches.Where(entries.ContainsKey).Select(template => entries[template])]);
         }
 
@@ -133,7 +134,7 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
 
         if (!issuedEntries.TryGetValue(selectedEntry, out ITemplateInfo? template))
         {
-            return Failure(TemplateResolutionStatus.Failed, new(
+            return FailedResult(new(
                 "invalid-selection",
                 "The catalog entry was not issued by this templater session.",
                 selectedEntry.Identity,
@@ -149,15 +150,16 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
 
         if (selectedEntry.Type != type)
         {
-            return Failure(TemplateResolutionStatus.Failed, Diagnostic(
+            string article = type == TemplateType.Item ? "an" : "a";
+            return FailedResult(Diagnostic(
                 selectedEntry,
                 "wrong-kind",
-                $"Template '{selectedEntry.Identity}' is not a {type.ToString().ToLowerInvariant()} template."));
+                $"Template '{selectedEntry.Identity}' is not {article} {type.ToString().ToLowerInvariant()} template."));
         }
 
         if (!entries.TryGetValue(template, out TemplateCatalogEntry? issuedEntry) || !ReferenceEquals(issuedEntry, selectedEntry))
         {
-            return Failure(TemplateResolutionStatus.Failed, new(
+            return FailedResult(new(
                 "invalid-selection",
                 "The catalog entry is not part of this templater session's installed inventory.",
                 selectedEntry.Identity,
@@ -195,8 +197,7 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)];
         string sourceDetail = sources.Length == 0 ? string.Empty : $" Sources: {string.Join(", ", sources)}.";
-        return Failure(
-            TemplateResolutionStatus.Failed,
+        return FailedResult(
             new("duplicate-identity", $"Installed templates contain duplicate identity '{identity}'.{sourceDetail}", identity));
     }
 
@@ -225,11 +226,8 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
         Exception? cause = null)
         => new(code, message, entry.Identity, entry.Package?.Identifier, cause);
 
-    private static TemplateResolutionResult Failure(
-        TemplateResolutionStatus status,
+    private static TemplateResolutionResult FailedResult(
         TemplateResolutionDiagnostic diagnostic,
         IEnumerable<TemplateCatalogEntry>? candidates = null)
-        => status == TemplateResolutionStatus.Failed
-            ? TemplateResolutionResult.Failed([diagnostic], candidates)
-            : throw new ArgumentOutOfRangeException(nameof(status), status, "Only failed results use this helper.");
+        => TemplateResolutionResult.Failed([diagnostic], candidates);
 }
