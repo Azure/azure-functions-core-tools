@@ -611,8 +611,11 @@ namespace Azure.Functions.Cli.Helpers
         }
 
         // Build environment images for building native dependencies for python function apps
-        private static async Task<(string Image, bool IsLocal)> GetBuildNativeDepsEnvironmentImage(WorkerLanguageVersionInfo info)
+        internal static async Task<(string Image, bool IsLocal)> GetBuildNativeDepsEnvironmentImage(WorkerLanguageVersionInfo info)
         {
+            // Validate before selecting an image so unsupported versions cannot use the fallback image.
+            AssertPythonVersion(info, errorIfNotSupported: true);
+
             if (info?.Major == 3)
             {
                 switch (info?.Minor)

@@ -93,6 +93,70 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
+        [InlineData("2.7.10")]
+        [InlineData("3.8.0")]
+        [InlineData("3.9.0")]
+        [InlineData("3.15.0")]
+        public async Task NativeBuildImageShouldRejectUnsupportedPythonVersion(string pythonVersion)
+        {
+            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Python, pythonVersion, "python");
+
+            var exception = await Assert.ThrowsAsync<CliException>(() => PythonHelpers.GetBuildNativeDepsEnvironmentImage(worker));
+
+            Assert.Contains("is required", exception.Message);
+        }
+
+        [Fact]
+        public async Task NativeBuildImageShouldRejectMissingPythonVersion()
+        {
+            await Assert.ThrowsAsync<CliException>(() => PythonHelpers.GetBuildNativeDepsEnvironmentImage(null));
+            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Python, null, null);
+            await Assert.ThrowsAsync<CliException>(() => PythonHelpers.GetBuildNativeDepsEnvironmentImage(worker));
+        }
+
+        [Theory]
+        [InlineData("3.10.0", "mcr.microsoft.com/azure-functions/python:4-python3.10-buildenv")]
+        [InlineData("3.11.0", "mcr.microsoft.com/azure-functions/python:4-python3.11-buildenv")]
+        [InlineData("3.12.0", "mcr.microsoft.com/azure-functions/python:4-python3.12-buildenv")]
+        public async Task NativeBuildImageShouldUseMatchingPublishedImage(string pythonVersion, string expectedImage)
+        {
+            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Python, pythonVersion, "python");
+
+            var (image, isLocal) = await PythonHelpers.GetBuildNativeDepsEnvironmentImage(worker);
+
+            Assert.Equal(expectedImage, image);
+            Assert.False(isLocal);
+        }
+
+        [Theory]
+        [InlineData("3.13.0", "3.13")]
+        [InlineData("3.14.0", "3.14")]
+        public async Task NativeBuildImageShouldUseMatchingDockerfile(string pythonVersion, string expectedVersion)
+        {
+            var worker = new WorkerLanguageVersionInfo(WorkerRuntime.Python, pythonVersion, "python");
+
+            var (image, isLocal) = await PythonHelpers.GetBuildNativeDepsEnvironmentImage(worker);
+
+            Assert.Contains($"FROM mcr.microsoft.com/oryx/python:{expectedVersion}-", image);
+            Assert.True(isLocal);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("2.7.10")]
+        [InlineData("3.9.0")]
+        [InlineData("3.15.0")]
+        public async Task DockerInitShouldFallBackToPython310(string pythonVersion)
+        {
+            var worker = pythonVersion == null ? null : new WorkerLanguageVersionInfo(WorkerRuntime.Python, pythonVersion, "python");
+
+            string dockerfile = await PythonHelpers.GetDockerInitFileContent(worker);
+
+            Assert.Contains("FROM mcr.microsoft.com/azure-functions/python:4-python3.10", dockerfile);
+            Assert.DoesNotContain("python3.9", dockerfile);
+        }
+
+        [Theory]
         [InlineData(3, 10)]
         [InlineData(3, 11)]
         [InlineData(3, 12)]
