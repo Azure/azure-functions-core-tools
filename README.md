@@ -5,9 +5,9 @@
 |main|[![Build Status](https://dev.azure.com/azfunc/public/_apis/build/status%2Fazure%2Fazure-functions-core-tools%2Fcoretools.public?repoName=Azure%2Fazure-functions-core-tools&branchName=main)](https://dev.azure.com/azfunc/public/_build/latest?definitionId=579&repoName=Azure%2Fazure-functions-core-tools&branchName=main) |
 |vnext|[![Build Status](https://dev.azure.com/azfunc/public/_apis/build/status%2Fazure%2Fazure-functions-core-tools%2Fcoretools.public?repoName=Azure%2Fazure-functions-core-tools&branchName=vnext)](https://dev.azure.com/azfunc/public/_build/latest?definitionId=579&repoName=Azure%2Fazure-functions-core-tools&branchName=vnext)|
 
-# Azure Functions Core Tools
+# Azure Functions CLI
 
-The Azure Functions Core Tools provide a local development experience for creating, developing, testing, running, and debugging Azure Functions.
+The Azure Functions CLI provides a local development experience for creating, developing, testing, running, and debugging Azure Functions.
 
 ## Installation
 
@@ -247,7 +247,7 @@ Files under `proposed/` capture design intent while a design is being shaped and
 
 ## Telemetry
 
-The Azure Functions Core Tools collect usage data in order to help us improve your experience.
+The Azure Functions CLI collects usage data in order to help us improve your experience.
 The data is anonymous and doesn't include any user specific or personal information. The data is collected by Microsoft.
 
 You can opt-out of telemetry by setting the `FUNC_CLI_TELEMETRY_OPTOUT` environment variable to any value other than `no`, `n`, `0`, `false`, or `off`. The legacy `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` variable from Core Tools v4 is still honored.
