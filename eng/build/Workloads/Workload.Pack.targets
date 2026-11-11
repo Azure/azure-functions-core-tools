@@ -21,7 +21,7 @@
     <!-- Ensure the workload packages are created for each runtime identifier (if there are any to create). -->
     <GenerateNuspecDependsOn>$(GenerateNuspecDependsOn);_ValidateWorkload;SetWorkloadPackageType;_CreateRIDSpecificWorkloadPackages</GenerateNuspecDependsOn>
     <TargetsForTfmSpecificContentInPackage Condition="!$(CreateRidSpecificWorkloadPackages) OR '$(RuntimeIdentifier)' != ''">$(TargetsForTfmSpecificContentInPackage);PackWorkload</TargetsForTfmSpecificContentInPackage>
-    <PackWorkloadDependsOn>_IncludeWorkloadCopyLocal;$(PackWorkloadDependsOn)</PackWorkloadDependsOn>
+    <PackWorkloadDependsOn>_IncludeWorkloadCopyLocal;_IncludeWorkloadTemplatePackageContent;$(PackWorkloadDependsOn)</PackWorkloadDependsOn>
     <PackWorkloadDependsOn Condition="'$(NoBuild)' == 'true'">_PreventProjectReferencesFromBuilding;$(PackWorkloadDependsOn)</PackWorkloadDependsOn>
   </PropertyGroup>
 
@@ -94,6 +94,13 @@
     <ItemGroup>
       <TfmSpecificPackageFile Include="$(TargetPath)" PackagePath="$(_WorkloadPackageContentRoot)" />
       <TfmSpecificPackageFile Include="@(_WorkloadCopyLocal)" PackagePath="$(_WorkloadPackageContentRoot)%(_WorkloadCopyLocal.TargetPath)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="_IncludeWorkloadTemplatePackageContent" DependsOnTargets="_SetWorkloadProperties" Condition="'@(WorkloadTemplatePackageContent)' != ''">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(WorkloadTemplatePackageContent)"
+                              PackagePath="$(_WorkloadPackageContentRoot)%(WorkloadTemplatePackageContent.Identity)" />
     </ItemGroup>
   </Target>
 

@@ -63,4 +63,10 @@ public abstract class FunctionsCliBuilder
     /// <typeparam name="TFactory">A concrete <see cref="IFunctionsProjectFactory"/>.</typeparam>
     public abstract void AddProjectFactory<TFactory>()
         where TFactory : class, IFunctionsProjectFactory;
+
+    /// <summary>
+    /// Adds a physical Microsoft.TemplateEngine package owned by the calling workload.
+    /// </summary>
+    /// <param name="relativePath">Path to the template package relative to the workload content root.</param>
+    public abstract void AddTemplatePackage(string relativePath);
 }

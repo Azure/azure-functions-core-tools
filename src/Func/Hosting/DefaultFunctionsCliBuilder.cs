@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -84,6 +85,27 @@ internal sealed class DefaultFunctionsCliBuilder(IServiceCollection services, Ru
             TFactory factory = ActivatorUtilities.GetServiceOrCreateInstance<TFactory>(sp);
             return new WorkloadProjectFactoryRegistration(workload, factory);
         });
+    }
+
+    public override void AddTemplatePackage(string relativePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+
+        RuntimeWorkloadInfo workload = RequireWorkload();
+        if (Path.IsPathRooted(relativePath))
+        {
+            throw new ArgumentException("The template package path must be relative to the workload content root.", nameof(relativePath));
+        }
+
+        string contentRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(workload.ContentRoot));
+        string packagePath = Path.GetFullPath(Path.Combine(contentRoot, relativePath));
+        string contentRootPrefix = contentRoot + Path.DirectorySeparatorChar;
+        if (!packagePath.StartsWith(contentRootPrefix, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The template package path must remain inside the workload content root.", nameof(relativePath));
+        }
+
+        Services.AddSingleton(new WorkloadTemplatePackageSource(workload.PackageId, packagePath));
     }
 
     private void RegisterCommandFactory(Func<IServiceProvider, FuncCommand> factory)

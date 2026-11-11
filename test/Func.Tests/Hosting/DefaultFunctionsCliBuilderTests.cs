@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -203,6 +204,67 @@ public class DefaultFunctionsCliBuilderTests
 
         var ex = FluentActions.Invoking(() => builder.AddProjectFactory(factory)).Should().ThrowExactly<InvalidOperationException>().Which;
         ex.Message.Should().Contain("workload-scoped builder");
+    }
+
+    [Fact]
+    public void AddTemplatePackage_RelativePath_RegistersPhysicalPackage()
+    {
+        string contentRoot = Path.Combine(Path.GetTempPath(), "func-builder-tests", Guid.NewGuid().ToString("N"));
+        var services = new ServiceCollection();
+        var workload = CreateWorkload(contentRoot);
+        var builder = new DefaultFunctionsCliBuilder(services, workload);
+
+        builder.AddTemplatePackage("templates");
+
+        WorkloadTemplatePackageSource source = services.BuildServiceProvider()
+            .GetServices<WorkloadTemplatePackageSource>()
+            .Should().ContainSingle().Subject;
+        source.WorkloadPackageId.Should().Be(workload.PackageId);
+        source.PackagePath.Should().Be(Path.Combine(contentRoot, "templates"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void AddTemplatePackage_EmptyPath_Throws(string path)
+    {
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
+
+        FluentActions.Invoking(() => builder.AddTemplatePackage(path)).Should().ThrowExactly<ArgumentException>();
+    }
+
+    [Fact]
+    public void AddTemplatePackage_RootedPath_Throws()
+    {
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), TestWorkloads.CreateInfo());
+
+        FluentActions.Invoking(() => builder.AddTemplatePackage(Path.GetFullPath("templates")))
+            .Should().ThrowExactly<ArgumentException>();
+    }
+
+    [Fact]
+    public void AddTemplatePackage_PathOutsideContentRoot_Throws()
+    {
+        string contentRoot = Path.Combine(Path.GetTempPath(), "func-builder-tests", Guid.NewGuid().ToString("N"));
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection(), CreateWorkload(contentRoot));
+
+        FluentActions.Invoking(() => builder.AddTemplatePackage(Path.Combine("..", "templates")))
+            .Should().ThrowExactly<ArgumentException>();
+    }
+
+    [Fact]
+    public void AddTemplatePackage_WithoutWorkloadContext_Throws()
+    {
+        var builder = new DefaultFunctionsCliBuilder(new ServiceCollection());
+
+        FluentActions.Invoking(() => builder.AddTemplatePackage("templates"))
+            .Should().ThrowExactly<InvalidOperationException>();
+    }
+
+    private static RuntimeWorkloadInfo CreateWorkload(string contentRoot)
+    {
+        RuntimeWorkloadInfo workload = TestWorkloads.CreateInfo();
+        return workload with { ContentRoot = contentRoot };
     }
 
     private sealed class GenericTestPayload(string value)

@@ -37,7 +37,11 @@ internal sealed record TemplateEngineContext
 /// </summary>
 internal sealed record TemplateEngineProjectContext
 {
-    public TemplateEngineProjectContext(WorkingDirectory rootDirectory, string? stack, string? language = null)
+    public TemplateEngineProjectContext(
+        WorkingDirectory rootDirectory,
+        string? stack,
+        string? language = null,
+        IReadOnlyDictionary<string, string>? hostParameters = null)
     {
         ArgumentNullException.ThrowIfNull(rootDirectory);
         if (stack is not null)
@@ -53,6 +57,9 @@ internal sealed record TemplateEngineProjectContext
         RootDirectory = rootDirectory;
         Stack = stack;
         Language = language;
+        HostParameters = hostParameters is null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : new Dictionary<string, string>(hostParameters, StringComparer.Ordinal);
     }
 
     public WorkingDirectory RootDirectory { get; }
@@ -66,6 +73,8 @@ internal sealed record TemplateEngineProjectContext
     /// Project language, or <c>null</c> when the command did not resolve one.
     /// </summary>
     public string? Language { get; }
+
+    public IReadOnlyDictionary<string, string> HostParameters { get; }
 }
 
 /// <summary>

@@ -21,6 +21,8 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// </param>
 /// <param name="Parameters">Parameters users can set, or empty when <paramref name="MetadataDiagnostic"/> is set.</param>
 /// <param name="MetadataDiagnostic">Why the template's func host metadata can't be used, or <c>null</c> when it's valid.</param>
+/// <param name="Stack">Stack selector declared by an artifact template, or <c>null</c>.</param>
+/// <param name="Capability">Capability selector declared by an artifact template, or <c>null</c>.</param>
 internal sealed record TemplateCatalogEntry(
     string Identity,
     string Name,
@@ -33,7 +35,9 @@ internal sealed record TemplateCatalogEntry(
     TemplatePackageInfo? Package,
     bool IsHidden,
     IReadOnlyList<TemplateParameterDefinition> Parameters,
-    string? MetadataDiagnostic);
+    string? MetadataDiagnostic,
+    string? Stack = null,
+    string? Capability = null);
 
 /// <summary>
 /// Installed template package that provides a template.

@@ -35,6 +35,16 @@ public sealed class TemplateCatalogProjectorTests
     }
 
     [Theory]
+    [InlineData("artifact")]
+    [InlineData("ARTIFACT")]
+    public void GetTemplateType_ArtifactType_ReturnsArtifact(string type)
+    {
+        TemplateType? templateType = TemplateCatalogProjector.GetTemplateType(Template(type: type));
+
+        templateType.Should().Be(TemplateType.Artifact);
+    }
+
+    [Theory]
     [InlineData("solution")]
     [InlineData("")]
     [InlineData(null)]
@@ -145,6 +155,23 @@ public sealed class TemplateCatalogProjectorTests
     }
 
     [Fact]
+    public void Project_ArtifactTemplate_CopiesSelectors()
+    {
+        ITemplateInfo template = Template(
+            type: "artifact",
+            additionalTags: new Dictionary<string, string>
+            {
+                ["func-stack"] = "dotnet",
+                ["func-capability"] = "container",
+            });
+
+        TemplateCatalogEntry entry = TemplateCatalogProjector.Project(template, package: null);
+
+        entry.Stack.Should().Be("dotnet");
+        entry.Capability.Should().Be("container");
+    }
+
+    [Fact]
     public void Project_EmptyOptionalDetails_AreNull()
     {
         ITemplateInfo template = Template(language: string.Empty, description: string.Empty, groupIdentity: string.Empty);
@@ -249,7 +276,8 @@ public sealed class TemplateCatalogProjectorTests
         string? description = null,
         string? groupIdentity = null,
         string? hostData = null,
-        string mountPoint = "/packages/templates")
+        string mountPoint = "/packages/templates",
+        IReadOnlyDictionary<string, string>? additionalTags = null)
     {
         Dictionary<string, string> tags = [];
         if (type is not null)
@@ -260,6 +288,14 @@ public sealed class TemplateCatalogProjectorTests
         if (language is not null)
         {
             tags["language"] = language;
+        }
+
+        if (additionalTags is not null)
+        {
+            foreach ((string name, string value) in additionalTags)
+            {
+                tags[name] = value;
+            }
         }
 
         ITemplateInfo template = Substitute.For<ITemplateInfo, ITemplateInfoHostJsonCache>();

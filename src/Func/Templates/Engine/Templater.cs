@@ -4,6 +4,7 @@
 using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
 using Microsoft.TemplateEngine.Edge.Settings;
+using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
@@ -27,6 +28,37 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
         IReadOnlyList<ITemplateInfo> templates = await packageManager.GetTemplatesAsync(cancellationToken);
         IReadOnlyList<ITemplatePackage> packages = await packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
         return TemplateCatalogProjector.Project(templates, packages, type);
+    }
+
+    public async Task<IReadOnlyList<ResolvedTemplate>> ResolveArtifactTemplatesAsync(
+        string capability,
+        string stack,
+        string? language,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(capability);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stack);
+
+        TemplatePackageManager packageManager = _session.PackageManager;
+        IReadOnlyList<ITemplateInfo> templates = await packageManager.GetTemplatesAsync(cancellationToken);
+        IReadOnlyList<ITemplatePackage> packages = await packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
+        var packagesByMountPoint = packages
+            .GroupBy(package => package.MountPointUri, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        TemplateCreator creator = new(_session.Settings);
+
+        return [.. templates
+            .Where(template => TemplateCatalogProjector.GetTemplateType(template) == TemplateType.Artifact)
+            .Select(template => (Template: template, Entry: TemplateCatalogProjector.Project(
+                template,
+                packagesByMountPoint.GetValueOrDefault(template.MountPointUri))))
+            .Where(item => item.Entry.MetadataDiagnostic is null
+                && string.Equals(item.Entry.Capability, capability, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.Entry.Stack, stack, StringComparison.OrdinalIgnoreCase)
+                && (item.Entry.Language is null
+                    || string.Equals(item.Entry.Language, language, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(item => item.Entry.Identity, StringComparer.Ordinal)
+            .Select(item => new ResolvedTemplate(item.Entry, item.Template, creator))];
     }
 
     public void Dispose() => _session.Dispose();

@@ -5,7 +5,9 @@ using Azure.Functions.Cli.Configuration;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
-internal sealed class TemplaterFactory(CliConfigurationPathsOptions configurationPaths) : ITemplaterFactory
+internal sealed class TemplaterFactory(
+    CliConfigurationPathsOptions configurationPaths,
+    IEnumerable<WorkloadTemplatePackageSource> templatePackages) : ITemplaterFactory
 {
     /// <summary>
     /// Sub-directory (under the func home) that holds the engine's settings,
@@ -14,12 +16,14 @@ internal sealed class TemplaterFactory(CliConfigurationPathsOptions configuratio
     private const string SettingsDirectoryName = "templates";
 
     private readonly CliConfigurationPathsOptions _configurationPaths = configurationPaths ?? throw new ArgumentNullException(nameof(configurationPaths));
+    private readonly IReadOnlyList<WorkloadTemplatePackageSource> _templatePackages =
+        (templatePackages ?? throw new ArgumentNullException(nameof(templatePackages))).ToList();
 
     public Templater Create(TemplateEngineContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new Templater(new TemplateEngineSession(context, settingsLocation));
+        return new Templater(new TemplateEngineSession(context, settingsLocation, _templatePackages));
     }
 }

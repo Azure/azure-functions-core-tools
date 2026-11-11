@@ -28,7 +28,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Create_BindsTheSuppliedContext()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), []);
         TemplateEngineContext context = Context("command");
 
         using Templater templater = factory.Create(context);
@@ -40,7 +40,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     public async Task Create_ReadsTemplatesFromTemplatesDirectoryUnderFuncHome()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), []);
 
         using Templater templater = factory.Create(Context("command"));
         IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
@@ -49,10 +49,28 @@ public sealed class TemplaterFactoryTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_ReadsPhysicalWorkloadTemplatePackages()
+    {
+        string packageDirectory = TemplateFixtures.WriteArtifactPackage(_root);
+        TemplaterFactory factory = new(
+            new CliConfigurationPathsOptions(Home),
+            [new WorkloadTemplatePackageSource("Test.Workload", packageDirectory)]);
+
+        using Templater templater = factory.Create(Context("command"));
+        IReadOnlyList<ResolvedTemplate> templates = await templater.ResolveArtifactTemplatesAsync(
+            "container",
+            "dotnet",
+            "C#",
+            CancellationToken.None);
+
+        templates.Should().ContainSingle().Which.Entry.Identity.Should().Be(TemplateFixtures.ArtifactTemplateIdentity);
+    }
+
+    [Fact]
     public async Task Create_EachCallReturnsAnIndependentTemplater()
     {
         await InstallFixturesUnderHomeAsync();
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), []);
         Templater first = factory.Create(Context("first"));
         using Templater second = factory.Create(Context("second"));
 
@@ -65,7 +83,7 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Create_NullContext_Throws()
     {
-        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home));
+        TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home), []);
 
         Action act = () => factory.Create(null!);
 
@@ -75,9 +93,17 @@ public sealed class TemplaterFactoryTests : IDisposable
     [Fact]
     public void Constructor_NullConfigurationPaths_Throws()
     {
-        Action act = () => _ = new TemplaterFactory(null!);
+        Action act = () => _ = new TemplaterFactory(null!, []);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("configurationPaths");
+    }
+
+    [Fact]
+    public void Constructor_NullTemplatePackages_Throws()
+    {
+        Action act = () => _ = new TemplaterFactory(new CliConfigurationPathsOptions(Home), null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("templatePackages");
     }
 
     private async Task InstallFixturesUnderHomeAsync()
