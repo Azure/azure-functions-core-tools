@@ -459,7 +459,6 @@ public sealed class TemplateSelectionTests : IDisposable
 
             (IReadOnlyList<ITemplatePackage> packages, IReadOnlyList<ITemplateInfo> engineTemplates) =
                 await session.GetInventoryAsync(CancellationToken.None);
-            var templates = engineTemplates;
             Dictionary<string, ITemplatePackage> packagesByMountPoint = new(StringComparer.Ordinal);
             foreach (ITemplatePackage package in packages)
             {
@@ -467,7 +466,7 @@ public sealed class TemplateSelectionTests : IDisposable
             }
 
             List<TemplateCatalogEntry> entries = [];
-            foreach (ITemplateInfo template in templates)
+            foreach (ITemplateInfo template in engineTemplates)
             {
                 if (TemplateCatalogProjector.GetTemplateType(template) is null)
                 {
@@ -484,7 +483,7 @@ public sealed class TemplateSelectionTests : IDisposable
             TemplateSelection selector = new(
                 session,
                 new TemplateEligibilityEvaluator(session, new(new TemplateConstraintRequirementMatcher())));
-            return new(session, selector, templates, entries);
+            return new(session, selector, entries);
         }
         catch
         {
@@ -501,7 +500,6 @@ public sealed class TemplateSelectionTests : IDisposable
     private sealed class SelectionHarness(
         TemplateEngineSession session,
         TemplateSelection selection,
-        IReadOnlyList<ITemplateInfo> templates,
         IReadOnlyList<TemplateCatalogEntry> entries) : IDisposable
     {
         public void Dispose() => session.Dispose();
@@ -518,7 +516,7 @@ public sealed class TemplateSelectionTests : IDisposable
             string reference,
             TemplateType type,
             CancellationToken cancellationToken = default)
-            => selection.ResolveAsync(templates, entries, reference, type, cancellationToken);
+            => selection.ResolveAsync(entries, reference, type, cancellationToken);
     }
 
     private sealed class DuplicateConstraintFactory(Guid id, string type) : ITemplateConstraintFactory

@@ -6,7 +6,7 @@ using Microsoft.TemplateEngine.Abstractions;
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Applies identity, alias, kind, and ambiguity policy to one command's installed-template inventory.
+/// Applies identity, alias, kind, and ambiguity policy to one command's candidate-bearing catalog.
 /// </summary>
 internal sealed class TemplateSelection(TemplateEngineSession session, TemplateEligibilityEvaluator eligibilityEvaluator)
 {
@@ -15,38 +15,33 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
         eligibilityEvaluator ?? throw new ArgumentNullException(nameof(eligibilityEvaluator));
 
     public async Task<TemplateResolutionResult> ResolveAsync(
-        IReadOnlyList<ITemplateInfo> templates,
         IReadOnlyList<TemplateCatalogEntry> catalog,
         string reference,
         TemplateType type,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(templates);
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
         _session.ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
 
-        ITemplateInfo[] exactMatches = [.. templates.Where(template =>
-            string.Equals(template.Identity, reference, StringComparison.OrdinalIgnoreCase))];
+        TemplateCatalogEntry[] exactMatches = [.. catalog.Where(entry =>
+            string.Equals(entry.Identity, reference, StringComparison.OrdinalIgnoreCase))];
         if (exactMatches.Length > 1)
         {
-            return DuplicateIdentityFailure(reference, exactMatches, catalog);
+            return DuplicateIdentityFailure(reference, exactMatches);
         }
 
         if (exactMatches.Length == 1)
         {
-            ITemplateInfo exactMatch = exactMatches[0];
-            TemplateCatalogEntry? entry = FindEntry(catalog, exactMatch);
-            if (entry is null || TemplateCatalogProjector.GetTemplateType(exactMatch) != type)
+            TemplateCatalogEntry entry = exactMatches[0];
+            if (entry.Type != type)
             {
                 string article = type == TemplateType.Item ? "an" : "a";
-                return Failure(new(
+                return Failure(Diagnostic(
+                    entry,
                     "wrong-kind",
-                    $"Template '{reference}' is not {article} {type.ToString().ToLowerInvariant()} template.",
-                    exactMatch.Identity,
-                    TemplateName: exactMatch.Name,
-                    TemplateKind: TemplateCatalogProjector.GetTemplateType(exactMatch)));
+                    $"Template '{reference}' is not {article} {type.ToString().ToLowerInvariant()} template."));
             }
 
             if (!_session.TryGetTemplateInfo(entry, out ITemplateInfo? candidate))
@@ -57,55 +52,28 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
             return await ResolveExactAsync(candidate, entry, cancellationToken);
         }
 
-        ITemplateInfo[] duplicateAlias = [.. FindDuplicateAliasIdentities(templates, reference, type)];
+        TemplateCatalogEntry[] duplicateAlias = FindDuplicateAliasIdentities(catalog, reference, type);
         if (duplicateAlias.Length > 0)
         {
-            return DuplicateIdentityFailure(duplicateAlias[0].Identity, duplicateAlias, catalog);
+            return DuplicateIdentityFailure(duplicateAlias[0].Identity, duplicateAlias);
         }
 
-        ITemplateInfo[] aliasMatches = [.. templates.Where(template =>
-            template.ShortNameList.Contains(reference, StringComparer.OrdinalIgnoreCase))];
+        TemplateCatalogEntry[] aliasMatches = [.. catalog.Where(entry =>
+            entry.ShortNames.Contains(reference, StringComparer.OrdinalIgnoreCase))];
         if (aliasMatches.Length == 0)
         {
             return new([], [new("not-found", $"No installed template matches '{reference}'.")]);
         }
 
-        List<TemplateCatalogEntry> kindMatches = [];
-        foreach (ITemplateInfo template in aliasMatches.Where(candidate =>
-            TemplateCatalogProjector.GetTemplateType(candidate) == type))
-        {
-            TemplateCatalogEntry? entry = FindEntry(catalog, template);
-            if (entry is null || !_session.TryGetTemplateInfo(entry, out _))
-            {
-                return Failure(new(
-                    "invalid-selection",
-                    "An installed template entry is missing its valid session ownership or engine candidate.",
-                    template.Identity,
-                    TemplateName: template.Name,
-                    TemplateKind: TemplateCatalogProjector.GetTemplateType(template)));
-            }
-
-            kindMatches.Add(entry);
-        }
-
-        if (kindMatches.Count == 0)
+        TemplateCatalogEntry[] kindMatches = [.. aliasMatches.Where(entry => entry.Type == type)];
+        if (kindMatches.Length == 0)
         {
             string article = type == TemplateType.Item ? "an" : "a";
-            TemplateResolutionDiagnostic[] diagnostics = [.. aliasMatches.Select(template =>
-            {
-                TemplateCatalogEntry? entry = FindEntry(catalog, template);
-                return entry is null
-                    ? new(
-                        "wrong-kind",
-                        $"Template alias '{reference}' does not identify {article} {type.ToString().ToLowerInvariant()} template.",
-                        template.Identity,
-                        TemplateName: template.Name,
-                        TemplateKind: TemplateCatalogProjector.GetTemplateType(template))
-                    : Diagnostic(
-                        entry,
-                        "wrong-kind",
-                        $"Template alias '{reference}' does not identify {article} {type.ToString().ToLowerInvariant()} template.");
-            })];
+            TemplateResolutionDiagnostic[] diagnostics = [.. aliasMatches.Select(entry =>
+                Diagnostic(
+                    entry,
+                    "wrong-kind",
+                    $"Template alias '{reference}' does not identify {article} {type.ToString().ToLowerInvariant()} template."))];
             return new([], diagnostics);
         }
 
@@ -147,13 +115,11 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
     }
 
     public async Task<TemplateResolutionResult> ResolveAsync(
-        IReadOnlyList<ITemplateInfo> templates,
         IReadOnlyList<TemplateCatalogEntry> catalog,
         TemplateCatalogEntry selectedEntry,
         TemplateType type,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(templates);
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(selectedEntry);
         _session.ThrowIfDisposed();
@@ -164,11 +130,11 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
             return InvalidEntry(selectedEntry);
         }
 
-        ITemplateInfo[] duplicates = [.. templates.Where(candidate =>
-            string.Equals(candidate.Identity, selectedEntry.Identity, StringComparison.OrdinalIgnoreCase))];
+        TemplateCatalogEntry[] duplicates = [.. catalog.Where(entry =>
+            string.Equals(entry.Identity, selectedEntry.Identity, StringComparison.OrdinalIgnoreCase))];
         if (duplicates.Length > 1)
         {
-            return DuplicateIdentityFailure(selectedEntry.Identity, duplicates, catalog);
+            return DuplicateIdentityFailure(selectedEntry.Identity, duplicates);
         }
 
         if (selectedEntry.Type != type)
@@ -183,50 +149,49 @@ internal sealed class TemplateSelection(TemplateEngineSession session, TemplateE
         return await ResolveExactAsync(template, selectedEntry, cancellationToken);
     }
 
-    private static TemplateCatalogEntry? FindEntry(
+    private static TemplateCatalogEntry[] FindDuplicateAliasIdentities(
         IReadOnlyList<TemplateCatalogEntry> catalog,
-        ITemplateInfo template)
-        => catalog.FirstOrDefault(entry => ReferenceEquals(entry.EngineTemplate, template));
-
-    private static IEnumerable<ITemplateInfo> FindDuplicateAliasIdentities(
-        IReadOnlyList<ITemplateInfo> templates,
         string reference,
         TemplateType type)
     {
-        foreach (IGrouping<string, ITemplateInfo> group in templates
-            .GroupBy(template => template.Identity, StringComparer.OrdinalIgnoreCase)
+        foreach (IGrouping<string, TemplateCatalogEntry> group in catalog
+            .GroupBy(entry => entry.Identity, StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Count() > 1
-                && group.Any(template => TemplateCatalogProjector.GetTemplateType(template) == type
-                    && template.ShortNameList.Contains(reference, StringComparer.OrdinalIgnoreCase)))
+                && group.Any(entry => entry.Type == type
+                    && entry.ShortNames.Contains(reference, StringComparer.OrdinalIgnoreCase)))
             .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
-            foreach (ITemplateInfo template in group)
-            {
-                yield return template;
-            }
-
-            yield break;
+            return [.. group];
         }
+
+        return [];
     }
 
-    private static TemplateResolutionResult DuplicateIdentityFailure(
+    private TemplateResolutionResult DuplicateIdentityFailure(
         string identity,
-        IReadOnlyList<ITemplateInfo> templates,
-        IReadOnlyList<TemplateCatalogEntry> catalog)
+        IReadOnlyList<TemplateCatalogEntry> entries)
     {
-        TemplateResolutionDiagnostic[] diagnostics = [.. templates
-            .OrderBy(template => $"{template.MountPointUri}::{template.ConfigPlace}", StringComparer.Ordinal)
-            .Select(template =>
+        TemplateResolutionDiagnostic[] diagnostics = [.. entries
+            .Select(entry =>
+            {
+                string? source = _session.TryGetTemplateInfo(entry, out ITemplateInfo? candidate)
+                    ? $"{candidate.MountPointUri}::{candidate.ConfigPlace}"
+                    : null;
+                return (Entry: entry, Source: source);
+            })
+            .OrderBy(item => item.Source, StringComparer.Ordinal)
+            .ThenBy(item => item.Entry.Name, StringComparer.Ordinal)
+            .Select(item =>
         {
-            TemplateCatalogEntry? entry = FindEntry(catalog, template);
+            TemplateCatalogEntry entry = item.Entry;
             return new TemplateResolutionDiagnostic(
                 "duplicate-identity",
                 $"Installed templates contain duplicate identity '{identity}'.",
                 identity,
-                entry?.Package?.Identifier,
-                TemplateName: entry?.Name ?? template.Name,
-                TemplateKind: entry?.Type ?? TemplateCatalogProjector.GetTemplateType(template),
-                TemplateSource: $"{template.MountPointUri}::{template.ConfigPlace}");
+                entry.Package?.Identifier,
+                TemplateName: entry.Name,
+                TemplateKind: entry.Type,
+                TemplateSource: item.Source);
         })];
         return new([], diagnostics);
     }

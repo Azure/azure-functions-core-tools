@@ -19,7 +19,7 @@ The CLI uses one Template Engine for project and item templates:
 | Generate Files Privately | Later integration responsibility; not implemented by PR #5872 |
 | Write Files to Project | Later integration responsibility; not implemented by PR #5872 |
 
-These are responsibilities, not a required class-per-row design. Reuse existing types and utilities. Keep `Templater` thin: own one session, obtain one inventory, project minimal CLI metadata, retain exact candidates, and delegate resolution policy. Do not introduce a second engine, generalized task framework, global compatibility framework, or conversion-only adapter.
+These are responsibilities, not a required class-per-row design. Reuse existing types and utilities. Keep `Templater` thin: own one session, obtain its inventory once, project usable templates into one candidate-bearing catalog, cache only that catalog, and delegate resolution policy. Do not introduce a second engine, generalized task framework, global compatibility framework, or conversion-only adapter.
 
 `TemplateSelection` is one internal operation, not a new public API or framework. It owns identity and alias matching, kind filtering, ambiguity, and result policy. Candidate eligibility is a separate concrete `TemplateEligibilityEvaluator` because source-backed validation and engine constraint evaluation do not belong in matching. The evaluator returns a candidate-scoped result: eligible with no diagnostics, or rejected with exactly one diagnostic for that candidate. `TemplateSelection` immediately consumes that result; `Templater` directly consumes the selection operation. The factory composes both with one session. No interface or second inventory is introduced.
 
@@ -27,7 +27,7 @@ These are responsibilities, not a required class-per-row design. Reuse existing 
 
 Workload installation registers immutable, versioned content before commands discover it. The command-scoped `TemplatePackageManager` inventory is the discovery source. There is one inventory per command session; `Templater` does not rescan after selection or refresh aliases. Content servicing and cache re-registration happen outside the command session.
 
-`TemplateEngineSession` owns `EngineEnvironmentSettings`, `TemplatePackageManager`, a lazily created `TemplateConstraintManager`, and one cached runtime-read-only package/template snapshot. The snapshot copies only the collection containers, preserving the original package and `ITemplateInfo` references. `Templater` owns that session, projects the returned candidates to `TemplateCatalogEntry`, and retains the original candidate references and their lifetime. `TemplateSelection` consumes that inventory and projection without source I/O, creating another inventory, or refreshing it. A selection must resolve to the exact candidate issued by the same live session; it is not reconstructed from catalog fields or looked up again by alias.
+`TemplateEngineSession` owns `EngineEnvironmentSettings`, `TemplatePackageManager`, a lazily created `TemplateConstraintManager`, and one cached runtime-read-only package/template snapshot. The snapshot copies only the collection containers, preserving the original package and `ITemplateInfo` references. `Templater` owns that session, projects usable engine templates once into `TemplateCatalogEntry` objects, and caches only the resulting catalog. Each entry retains its original candidate; `TemplateSelection` consumes the catalog directly without source I/O, a parallel raw-template input, another inventory, or alias-based candidate lookup. A selected entry must still resolve to the exact candidate issued by the same live session.
 
 Workload installation owns package acquisition and Hive registration. Discovery never downloads or installs content. The Template Engine remains in Core Tools for this milestone; physical extraction under issue #5330 is separate work.
 
@@ -35,11 +35,11 @@ Workload installation owns package acquisition and Hive registration. Discovery 
 
 Listing includes hidden templates and templates whose Functions-specific or required template metadata is unusable, with diagnostics retained on the projected entry. Resolution rejects hidden or invalid candidates. Listing is not a guarantee that every provider was fully enumerated.
 
-`TemplateSelection` applies this policy to the inventory supplied by `Templater`:
+`TemplateSelection` applies this policy directly to the candidate-bearing catalog supplied by `Templater`:
 
 1. Match a full identity before aliases. If the returned inventory contains multiple entries with one identity, resolution fails.
 2. Reject a full identity that is the wrong template kind or ineligible; never substitute a related template.
-3. Match aliases only against templates that declare them. Two or more eligible candidates remain ambiguous; do not choose the first candidate or expand to siblings.
+3. Match aliases only against catalog entries that declare them. Two or more eligible candidates remain ambiguous; do not choose the first candidate or expand to siblings.
 4. Return exactly one candidate when selection succeeds. Every unsuccessful outcome has zero candidates.
 
 `TemplateResolutionResult` contains only `Candidates` and `Diagnostics`: zero candidates means unsuccessful, one means selected, and two or more means ambiguous. `TemplateCatalogEntry` retains the exact engine candidate and a non-owning owner token while snapshotting caller-owned aliases, parameters, and nested parameter choices. A live owning session accepts an immutable same-session copy that preserves its token and candidate; foreign, unbound, forged, or disposed-session entries are rejected. Failure details such as template identity, package, name, kind, source, and cause are structured diagnostics rather than unsuccessful result candidates.

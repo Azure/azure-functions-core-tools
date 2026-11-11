@@ -14,7 +14,6 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
 {
     private readonly TemplateEngineSession _session = session ?? throw new ArgumentNullException(nameof(session));
     private readonly TemplateSelection _selection = selection ?? throw new ArgumentNullException(nameof(selection));
-    private IReadOnlyList<ITemplateInfo>? _templates;
     private IReadOnlyList<TemplateCatalogEntry>? _catalog;
 
     public TemplateEngineContext Context => _session.Context;
@@ -39,7 +38,7 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
             return inventoryFailure;
         }
 
-        return await _selection.ResolveAsync(_templates!, _catalog!, reference, type, cancellationToken);
+        return await _selection.ResolveAsync(_catalog!, reference, type, cancellationToken);
     }
 
     public async Task<TemplateResolutionResult> ResolveAsync(
@@ -56,7 +55,7 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
             return inventoryFailure;
         }
 
-        return await _selection.ResolveAsync(_templates!, _catalog!, selectedEntry, type, cancellationToken);
+        return await _selection.ResolveAsync(_catalog!, selectedEntry, type, cancellationToken);
     }
 
     internal ITemplateInfo GetEngineTemplate(TemplateCatalogEntry selectedEntry)
@@ -74,7 +73,6 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
     public void Dispose()
     {
         _catalog = null;
-        _templates = null;
         _session.Dispose();
     }
 
@@ -109,7 +107,6 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
                 _session.OwnershipToken));
         }
 
-        _templates = engineTemplates;
         _catalog = catalog;
     }
 
