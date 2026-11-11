@@ -130,7 +130,7 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
         _templates = templates;
         _entries = entries;
         _issuedEntries = issuedEntries;
-        _catalog = catalog.AsReadOnly();
+        _catalog = catalog;
     }
 
     private async Task<TemplateResolutionResult?> GetInventoryFailureAsync(CancellationToken cancellationToken)
@@ -162,7 +162,7 @@ internal sealed class Templater(TemplateEngineSession session, TemplateSelection
             }
         }
 
-        return Array.AsReadOnly(distinct.ToArray());
+        return distinct;
     }
 
     private static TemplateResolutionResult InventoryUnavailable(Exception exception)

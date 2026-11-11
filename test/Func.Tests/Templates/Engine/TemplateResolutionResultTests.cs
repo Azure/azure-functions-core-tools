@@ -42,8 +42,8 @@ public sealed class TemplateResolutionResultTests : IDisposable
             selected.Diagnostics.Should().ContainSingle().Which.Should().BeSameAs(diagnostic);
             notFound.SelectedTemplate.Should().BeNull();
             notFound.Candidates.Should().BeEmpty();
-            ambiguous.Candidates.Should().HaveCount(2);
-            failed.Candidates.Should().ContainSingle().Which.Should().Be(entries[0]);
+            ambiguous.Candidates.Should().Equal(entries);
+            failed.Candidates.Should().ContainSingle().Which.Should().BeSameAs(entries[0]);
             failed.Diagnostics.Single().Cause.Should().BeSameAs(diagnostic.Cause);
         }
     }
@@ -74,7 +74,7 @@ public sealed class TemplateResolutionResultTests : IDisposable
             candidates.Clear();
             diagnostics.Clear();
 
-            result.Candidates.Should().HaveCount(2);
+            result.Candidates.Should().Equal(entries);
             result.Diagnostics.Should().ContainSingle();
             Action addCandidate = () => ((IList<TemplateCatalogEntry>)result.Candidates).Add(entries[0]);
             Action clearDiagnostics = () => ((IList<TemplateResolutionDiagnostic>)result.Diagnostics).Clear();
