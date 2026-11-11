@@ -13,7 +13,7 @@ namespace Azure.Functions.Cli.Bundles;
 internal sealed class InstalledBundleScanner(IInstalledBundleWorkloads installed)
 {
     // Fixed subpath inside the workload install dir that carries the bundle zip layout.
-    // Matches the pack location in src/Workloads/Tools/ExtensionBundles/DownloadDefaultBundle.targets.
+    // Matches the pack location in src/Workloads/ExtensionBundles/DownloadDefaultBundle.targets.
     private static readonly string _bundlePayloadSubpath = Path.Combine("tools", "any");
 
     private readonly IInstalledBundleWorkloads _installed = installed ?? throw new ArgumentNullException(nameof(installed));
