@@ -30,6 +30,8 @@ namespace Azure.Functions.Cli
 
         public static Task<string> DockerfileDotnet10Isolated => GetValue("Dockerfile.dotnet10Isolated");
 
+        public static Task<string> DockerfileDotnet11IsolatedChiseled => GetValue("Dockerfile.dotnet11IsolatedChiseled");
+
         public static Task<string> DockerfileJava8 => GetValue("Dockerfile.java8");
 
         public static Task<string> DockerfileJava11 => GetValue("Dockerfile.java11");
@@ -47,6 +49,10 @@ namespace Azure.Functions.Cli
         public static Task<string> DockerfilePython314 => GetValue("Dockerfile.python3.14");
 
         public static Task<string> DockerfilePython314BuildEnv => GetValue("Dockerfile.python3.14-buildenv");
+
+        public static Task<string> DockerfilePython315 => GetValue("Dockerfile.python3.15");
+
+        public static Task<string> DockerfilePython315BuildEnv => GetValue("Dockerfile.python3.15-buildenv");
 
         public static Task<string> DockerfilePowershell7 => GetValue("Dockerfile.powershell7");
 

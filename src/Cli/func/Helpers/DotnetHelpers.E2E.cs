@@ -12,6 +12,7 @@ namespace Azure.Functions.Cli.Helpers
         internal const string CustomHiveFlag = "FUNC_E2E_USE_CUSTOM_HIVE";
         internal const string CustomHiveRoot = "FUNC_E2E_HIVE_ROOT";
         internal const string CustomHiveKey = "FUNC_E2E_HIVE_KEY";
+        internal const string CustomHiveReadyFileName = ".templates-installed";
 
         private static bool UseCustomTemplateHive() => string.Equals(Environment.GetEnvironmentVariable(CustomHiveFlag), "1", StringComparison.Ordinal);
 
@@ -52,5 +53,10 @@ namespace Azure.Functions.Cli.Helpers
             customHiveArg = $" --debug:custom-hive \"{hive}\"";
             return true;
         }
+
+        internal static string GetTemplateCreationOptions(WorkerRuntime workerRuntime)
+            => TryGetCustomHiveArg(workerRuntime, out string customHive)
+                ? $"{customHive} --no-update-check"
+                : string.Empty;
     }
 }

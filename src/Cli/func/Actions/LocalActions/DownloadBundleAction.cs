@@ -52,7 +52,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
                 if (Force)
                 {
-                    ClearExistingBundles(bundleBasePath);
+                    if (!ClearExistingBundles(bundleBasePath))
+                    {
+                        return;
+                    }
                 }
 
                 // Set the download path so the SDK downloads to the correct location
@@ -108,22 +111,38 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             return false;
         }
 
-        private static void ClearExistingBundles(string bundleBasePath)
+        private static bool ClearExistingBundles(string bundleBasePath)
         {
             if (!Directory.Exists(bundleBasePath))
             {
-                return;
+                return true;
             }
 
-            ColoredConsole.WriteLine($"Clearing existing bundles from {bundleBasePath}...");
+            var fullBundleBasePath = Path.GetFullPath(bundleBasePath);
+            ColoredConsole.WriteLine(WarningColor("--force will recursively delete the extension bundle directory and all of its contents:"));
+            ColoredConsole.WriteLine(WarningColor(fullBundleBasePath));
+            ColoredConsole.Write(QuestionColor("Continue? [y/N] "));
+
+            var response = Console.ReadLine();
+            if (!string.Equals(response, "y", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(response, "yes", StringComparison.OrdinalIgnoreCase))
+            {
+                ColoredConsole.WriteLine("Extension bundle download canceled. No files were deleted.");
+                return false;
+            }
+
+            ColoredConsole.WriteLine($"Clearing existing bundles from {fullBundleBasePath}...");
 
             try
             {
-                Directory.Delete(bundleBasePath, recursive: true);
+                Directory.Delete(fullBundleBasePath, recursive: true);
+                return true;
             }
             catch (Exception ex)
             {
-                ColoredConsole.WriteLine(WarningColor($"Warning: Could not clear existing bundles: {ex.Message}"));
+                throw new CliException(
+                    $"Could not clear existing bundles from '{fullBundleBasePath}': {ex.Message}",
+                    ex);
             }
         }
     }

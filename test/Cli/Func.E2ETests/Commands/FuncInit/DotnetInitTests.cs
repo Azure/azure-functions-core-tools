@@ -64,10 +64,11 @@ namespace Azure.Functions.Cli.E2ETests.Commands.FuncInit
             funcInitResult.Should().FilesExistsWithExpectContent(filesToValidate);
         }
 
-        [Fact]
-        public void Init_WithUnsupportedTargetFramework_FailsWithError()
+        [Theory]
+        [InlineData("net7.0")]
+        [InlineData("net11.0")]
+        public void Init_WithUnsupportedTargetFramework_FailsWithError(string unsupportedTargetFramework)
         {
-            string unsupportedTargetFramework = "net7.0";
             var workingDir = WorkingDirectory;
             var testName = nameof(Init_WithUnsupportedTargetFramework_FailsWithError);
             var funcInitCommand = new FuncInitCommand(FuncPath, testName, Log ?? throw new ArgumentNullException(nameof(Log)));

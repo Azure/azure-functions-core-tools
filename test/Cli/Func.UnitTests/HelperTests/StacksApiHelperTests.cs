@@ -13,6 +13,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("net8.0", 8)]
         [InlineData("net9.0", 9)]
         [InlineData("net10.0", 10)]
+        [InlineData("net11.0", 11)]
         [InlineData("net48", 48)]
         public void GetMajorDotnetVersionFromDotnetVersionInProject_ReturnsMajorVersion(string input, int expected)
         {

@@ -1,13 +1,59 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Helpers;
 using Xunit;
 
 namespace Azure.Functions.Cli.UnitTests.HelperTests
 {
-    public class DotnetHelpersTests
+    public class DotnetHelpersTests : IDisposable
     {
+        private readonly string _originalHiveFlag = Environment.GetEnvironmentVariable(DotnetHelpers.CustomHiveFlag);
+        private readonly string _originalHiveRoot = Environment.GetEnvironmentVariable(DotnetHelpers.CustomHiveRoot);
+        private readonly string _originalHiveKey = Environment.GetEnvironmentVariable(DotnetHelpers.CustomHiveKey);
+        private readonly Func<string, Task<int>> _originalRunDotnetNew = DotnetHelpers.RunDotnetNewFunc;
+        private readonly string _hiveRoot = Path.Combine(Path.GetTempPath(), $"func-hive-tests-{Guid.NewGuid():N}");
+
+        public DotnetHelpersTests()
+        {
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveFlag, null);
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveRoot, null);
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveKey, null);
+        }
+
+        public void Dispose()
+        {
+            DotnetHelpers.RunDotnetNewFunc = _originalRunDotnetNew;
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveFlag, _originalHiveFlag);
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveRoot, _originalHiveRoot);
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveKey, _originalHiveKey);
+            if (Directory.Exists(_hiveRoot))
+            {
+                Directory.Delete(_hiveRoot, recursive: true);
+            }
+        }
+
+        [Theory]
+        [InlineData("net10.0")]
+        [InlineData("net11.0")]
+        [InlineData("net11.0-windows")]
+        public void TargetFrameworkRegex_RecognizesModernFrameworks(string targetFramework)
+        {
+            var output = $"{{\"Properties\":{{\"TargetFrameworks\":\"\",\"TargetFramework\":\"{targetFramework}\"}}}}";
+            var matches = TargetFrameworkHelper.TfmRegex.Matches(output);
+
+            Assert.Single(matches);
+            Assert.Equal(targetFramework, matches[0].Value);
+        }
+
+        [Fact]
+        public void SupportedFrameworks_Net11IsIsolatedOnly()
+        {
+            Assert.Contains("net11.0", TargetFrameworkHelper.GetSupportedTargetFrameworks());
+            Assert.Equal(new[] { "net8.0", "net6.0" }, TargetFrameworkHelper.GetSupportedInProcTargetFrameworks());
+        }
+
         [Fact]
         public void EnsureDotnet_DoesNotThrow_WhenDotnetExists()
         {
@@ -20,6 +66,9 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("BlobTrigger", "blob")]
         [InlineData("HttpTrigger", "http")]
         [InlineData("TimerTrigger", "timer")]
+        [InlineData("DaprPublishOutputBinding", null)]
+        [InlineData("DaprServiceInvocationTrigger", null)]
+        [InlineData("DaprTopicTrigger", null)]
         [InlineData("UnknownTrigger", null)]
         public void GetTemplateShortName_ReturnsExpectedShortName(string input, string expected)
         {
@@ -35,12 +84,29 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
-        [InlineData(WorkerRuntime.Dotnet, 20)]
-        [InlineData(WorkerRuntime.DotnetIsolated, 19)]
+        [InlineData("ConnectorTriggerOffice365OnNewEmailV3", "connector-office365-onnewemailv3")]
+        [InlineData("ConnectorTriggerSharePointGetOnNewFileItems", "connector-sharepoint-getonnewfileitems")]
+        [InlineData("ConnectorTriggerTeamsOnNewChannelMessage", "connector-teams-onnewchannelmessage")]
+        [InlineData("ConnectorTriggerOneDriveOnNewFilesV2", "connector-onedrive-onnewfilesv2")]
+        [InlineData("ConnectorTriggerDataverseSubscribeOnNewItems", "connector-dataverse-subscribeonnewitems")]
+        public void ConnectorTemplates_MapNames_AndAreCSharpIsolatedOnly(string displayName, string shortName)
+        {
+            Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(displayName));
+            Assert.Contains(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated, "C#"));
+            Assert.DoesNotContain(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated, "F#"));
+            Assert.DoesNotContain(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.Dotnet));
+        }
+
+        [Theory]
+        [InlineData(WorkerRuntime.Dotnet, 17)]
+        [InlineData(WorkerRuntime.DotnetIsolated, 21)]
         public void GetTemplates_ReturnsExpectedTemplates(WorkerRuntime runtime, int expectedCount)
         {
             var templates = DotnetHelpers.GetTemplates(runtime);
             Assert.Equal(expectedCount, templates.Count());
+            Assert.DoesNotContain(templates, template =>
+                template.Contains("Dapr", StringComparison.OrdinalIgnoreCase) ||
+                template.Contains("OpenAI", StringComparison.OrdinalIgnoreCase));
         }
 
         [Theory]
@@ -93,6 +159,169 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
             {
                 DotnetHelpers.RunDotnetNewFunc = original;
             }
+        }
+
+        [Theory]
+        [InlineData(WorkerRuntime.Dotnet)]
+        [InlineData(WorkerRuntime.DotnetIsolated)]
+        public void GetTemplateCreationOptions_DisablesUpdatesOnlyForCustomHives(WorkerRuntime workerRuntime)
+        {
+            Assert.Empty(DotnetHelpers.GetTemplateCreationOptions(workerRuntime));
+
+            string hive = EnableCustomHive(workerRuntime);
+            string options = DotnetHelpers.GetTemplateCreationOptions(workerRuntime);
+
+            Assert.Equal($" --debug:custom-hive \"{hive}\" --no-update-check", options);
+            Assert.DoesNotContain("--no-restore", options);
+        }
+
+        [Theory]
+        [InlineData(WorkerRuntime.Dotnet)]
+        [InlineData(WorkerRuntime.DotnetIsolated)]
+        public async Task TemplateOperationAsync_CustomHive_DoesNotTrustPartialPackages(WorkerRuntime workerRuntime)
+        {
+            string hive = EnableCustomHive(workerRuntime);
+            CreateHivePackage(hive);
+            var calls = new List<string>();
+            DotnetHelpers.RunDotnetNewFunc = args =>
+            {
+                calls.Add(args);
+                Assert.False(File.Exists(Path.Combine(hive, DotnetHelpers.CustomHiveReadyFileName)));
+                return Task.FromResult(0);
+            };
+
+            int actions = 0;
+            Task Action()
+            {
+                Assert.True(File.Exists(Path.Combine(hive, DotnetHelpers.CustomHiveReadyFileName)));
+                actions++;
+                return Task.CompletedTask;
+            }
+
+            await DotnetHelpers.TemplateOperationAsync(Action, workerRuntime);
+            int installCount = calls.Count;
+            await DotnetHelpers.TemplateOperationAsync(Action, workerRuntime);
+
+            Assert.True(installCount >= 2);
+            Assert.Equal(installCount, calls.Count);
+            Assert.Equal(2, actions);
+            Assert.All(calls, args =>
+            {
+                Assert.Contains("new install", args);
+                Assert.Contains("--force", args);
+                Assert.DoesNotContain("--no-update-check", args);
+            });
+        }
+
+        [Fact]
+        public async Task TemplateOperationAsync_CustomHive_WaitsForConcurrentInstallation()
+        {
+            string hive = EnableCustomHive(WorkerRuntime.DotnetIsolated);
+            var installationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var finishInstallation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            int installs = 0;
+            int actions = 0;
+            DotnetHelpers.RunDotnetNewFunc = async _ =>
+            {
+                if (Interlocked.Increment(ref installs) == 1)
+                {
+                    CreateHivePackage(hive);
+                    installationStarted.SetResult();
+                    await finishInstallation.Task;
+                }
+
+                return 0;
+            };
+            Task Action()
+            {
+                Assert.True(File.Exists(Path.Combine(hive, DotnetHelpers.CustomHiveReadyFileName)));
+                Interlocked.Increment(ref actions);
+                return Task.CompletedTask;
+            }
+
+            Task first = DotnetHelpers.TemplateOperationAsync(Action, WorkerRuntime.DotnetIsolated);
+            await installationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Task second = DotnetHelpers.TemplateOperationAsync(Action, WorkerRuntime.DotnetIsolated);
+            try
+            {
+                Assert.False(second.IsCompleted);
+                Assert.Equal(0, actions);
+                Assert.Equal(1, installs);
+            }
+            finally
+            {
+                finishInstallation.TrySetResult();
+                await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+            }
+
+            Assert.Equal(2, actions);
+            Assert.True(installs >= 2);
+        }
+
+        [Theory]
+        [InlineData(1)]
+        [InlineData(2)]
+        public async Task TemplateOperationAsync_CustomHive_FailedInstallDoesNotPublishReadiness(int failingInstall)
+        {
+            string hive = EnableCustomHive(WorkerRuntime.DotnetIsolated);
+            int installs = 0;
+            bool actionCalled = false;
+            DotnetHelpers.RunDotnetNewFunc = _ =>
+            {
+                CreateHivePackage(hive);
+                return Task.FromResult(++installs == failingInstall ? 17 : 0);
+            };
+            Task Action()
+            {
+                actionCalled = true;
+                return Task.CompletedTask;
+            }
+
+            var exception = await Assert.ThrowsAsync<CliException>(() =>
+                DotnetHelpers.TemplateOperationAsync(Action, WorkerRuntime.DotnetIsolated));
+
+            Assert.Contains("exited with code 17", exception.Message);
+            Assert.False(actionCalled);
+            Assert.False(File.Exists(Path.Combine(hive, DotnetHelpers.CustomHiveReadyFileName)));
+
+            await DotnetHelpers.TemplateOperationAsync(Action, WorkerRuntime.DotnetIsolated);
+
+            Assert.True(actionCalled);
+            Assert.True(File.Exists(Path.Combine(hive, DotnetHelpers.CustomHiveReadyFileName)));
+            Assert.True(installs >= failingInstall + 2);
+        }
+
+        [Fact]
+        public async Task TemplateOperationAsync_CustomHive_MissingPackagesInvalidatesReadiness()
+        {
+            string hive = EnableCustomHive(WorkerRuntime.DotnetIsolated);
+            Directory.CreateDirectory(hive);
+            string readyFile = Path.Combine(hive, DotnetHelpers.CustomHiveReadyFileName);
+            File.WriteAllText(readyFile, string.Empty);
+            DotnetHelpers.RunDotnetNewFunc = _ =>
+            {
+                CreateHivePackage(hive);
+                return Task.FromResult(17);
+            };
+
+            await Assert.ThrowsAsync<CliException>(() =>
+                DotnetHelpers.TemplateOperationAsync(() => Task.CompletedTask, WorkerRuntime.DotnetIsolated));
+
+            Assert.False(File.Exists(readyFile));
+        }
+
+        private string EnableCustomHive(WorkerRuntime workerRuntime)
+        {
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveFlag, "1");
+            Environment.SetEnvironmentVariable(DotnetHelpers.CustomHiveRoot, _hiveRoot);
+            return Path.Combine(_hiveRoot, $"{workerRuntime.ToString().ToLowerInvariant()}-hive");
+        }
+
+        private static void CreateHivePackage(string hive)
+        {
+            string packages = Path.Combine(hive, "packages");
+            Directory.CreateDirectory(packages);
+            File.WriteAllText(Path.Combine(packages, "partial.nupkg"), string.Empty);
         }
     }
 }

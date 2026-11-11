@@ -116,8 +116,8 @@ namespace Azure.Functions.Cli.Helpers
                         : $"--language \"{language}\"";
 
                     var connectionString = $"--StorageConnectionStringValue \"{Constants.StorageEmulatorConnectionString}\"";
-                    TryGetCustomHiveArg(workerRuntime, out string customHive);
-                    var exe = new Executable("dotnet", $"new func {frameworkString} {languageString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}{customHive}");
+                    var templateOptions = GetTemplateCreationOptions(workerRuntime);
+                    var exe = new Executable("dotnet", $"new func {frameworkString} {languageString} --AzureFunctionsVersion v4 --name {name} {connectionString} {(force ? "--force" : string.Empty)}{templateOptions}");
                     var exitCode = await exe.RunAsync(o => { }, e => ColoredConsole.Error.WriteLine(ErrorColor(e)));
                     if (exitCode != 0)
                     {
@@ -152,8 +152,7 @@ namespace Azure.Functions.Cli.Helpers
                         }
                     }
 
-                    TryGetCustomHiveArg(workerRuntime, out string customHive);
-                    var exe = new Executable("dotnet", exeCommandArguments + customHive);
+                    var exe = new Executable("dotnet", exeCommandArguments + GetTemplateCreationOptions(workerRuntime));
                     string dotnetNewErrorMessage = string.Empty;
                     var exitCode = await exe.RunAsync(o => { }, e =>
                     {
@@ -179,6 +178,11 @@ namespace Azure.Functions.Cli.Helpers
             "blobtrigger" => "blob",
             "eventgridblobtrigger" => "eventgridblob",
             "cosmosdbtrigger" => "cosmos",
+            "connectortriggeroffice365onnewemailv3" => "connector-office365-onnewemailv3",
+            "connectortriggersharepointgetonnewfileitems" => "connector-sharepoint-getonnewfileitems",
+            "connectortriggerteamsonnewchannelmessage" => "connector-teams-onnewchannelmessage",
+            "connectortriggeronedriveonnewfilesv2" => "connector-onedrive-onnewfilesv2",
+            "connectortriggerdataversesubscribeonnewitems" => "connector-dataverse-subscribeonnewitems",
             "durablefunctionsorchestration" => "durable",
             "eventgridtrigger" => "eventgrid",
             "eventgridcloudeventtrigger" => "eventgridcloudevent",
@@ -195,9 +199,6 @@ namespace Azure.Functions.Cli.Helpers
             "servicebusqueuetrigger" => "squeue",
             "servicebustopictrigger" => "stopic",
             "timertrigger" => "timer",
-            "daprpublishoutputbinding" => "daprPublishOutputBinding",
-            "daprserviceinvocationtrigger" => "daprServiceInvocationTrigger",
-            "daprtopictrigger" => "daprTopicTrigger",
             _ => throw new ArgumentException($"Unknown template '{templateName}'", nameof(templateName))
         };
 
@@ -234,12 +235,14 @@ namespace Azure.Functions.Cli.Helpers
                     "ServiceBusTopicTrigger",
                     "EventGridTrigger",
                     "CosmosDBTrigger",
-                    "DaprPublishOutputBinding",
-                    "DaprServiceInvocationTrigger",
-                    "DaprTopicTrigger",
                     "DurableFunctionsOrchestration",
                     "DurableFunctionsEntityClass",
-                    "DurableFunctionsEntityFunction"
+                    "DurableFunctionsEntityFunction",
+                    "ConnectorTriggerOffice365OnNewEmailV3",
+                    "ConnectorTriggerSharePointGetOnNewFileItems",
+                    "ConnectorTriggerTeamsOnNewChannelMessage",
+                    "ConnectorTriggerOneDriveOnNewFilesV2",
+                    "ConnectorTriggerDataverseSubscribeOnNewItems"
                 ];
             }
 
@@ -262,9 +265,6 @@ namespace Azure.Functions.Cli.Helpers
                 "EventGridCloudEventTrigger",
                 "CosmosDBTrigger",
                 "IotHubTrigger",
-                "DaprPublishOutputBinding",
-                "DaprServiceInvocationTrigger",
-                "DaprTopicTrigger",
             ];
         }
 
@@ -370,20 +370,31 @@ namespace Azure.Functions.Cli.Helpers
 
         private static async Task EnsureTemplatesInCustomHiveAsync(Func<Task> action, WorkerRuntime workerRuntime)
         {
-            // If the custom hive already has templates installed, just run the action and skip installation
-            string hivePackagesDir = Path.Combine(GetHivePath(workerRuntime), "packages");
-            if (FileSystemHelpers.EnsureDirectoryNotEmpty(hivePackagesDir))
-            {
-                await action();
-                return;
-            }
+            string hive = Path.GetFullPath(GetHivePath(workerRuntime));
+            FileSystemHelpers.EnsureDirectory(hive);
+            string readyFile = Path.Combine(hive, CustomHiveReadyFileName);
 
-            // Install only, no need to uninstall as we are using a custom hive
-            Func<Task> installTemplates = workerRuntime == WorkerRuntime.DotnetIsolated
-                ? InstallIsolatedTemplates
-                : InstallInProcTemplates;
+            // Separate func processes share this hive. A populated packages directory can still
+            // belong to an installation in progress, so readiness is published under the same lock.
+            await FileLockHelper.WithFileLockAsync(
+                Path.Combine(hive, ".install.lock"),
+                async () =>
+                {
+                    if (File.Exists(readyFile) && FileSystemHelpers.EnsureDirectoryNotEmpty(Path.Combine(hive, "packages")))
+                    {
+                        return;
+                    }
 
-            await installTemplates();
+                    File.Delete(readyFile);
+                    Func<Task> installTemplates = workerRuntime == WorkerRuntime.DotnetIsolated
+                        ? InstallIsolatedTemplates
+                        : InstallInProcTemplates;
+
+                    await installTemplates();
+                    await File.WriteAllTextAsync(readyFile, string.Empty);
+                },
+                maxAttempts: 300);
+
             await action();
         }
 
@@ -456,11 +467,23 @@ namespace Azure.Functions.Cli.Helpers
                 list = nugetPackageList ?? Array.Empty<string>();
             }
 
+            bool customHiveEnabled = TryGetCustomHiveArg(workerRuntime, out string customHive);
+            bool customHiveInstall = customHiveEnabled && action == "install";
+            if (customHiveInstall && list.Length == 0)
+            {
+                throw new CliException($"No template packages found in '{templateDirectory}' to install in the custom hive.");
+            }
+
             foreach (var nupkg in list)
             {
-                TryGetCustomHiveArg(workerRuntime, out string customHive);
-                var args = $"new {action} \"{nupkg}\" {customHive}";
-                await RunDotnetNewAsync(args);
+                // A failed previous attempt may already have installed one of the packages.
+                string force = customHiveInstall ? " --force" : string.Empty;
+                var args = $"new {action} \"{nupkg}\"{force} {customHive}";
+                int exitCode = await RunDotnetNewAsync(args);
+                if (customHiveInstall && exitCode != 0)
+                {
+                    throw new CliException($"Failed to install template package '{nupkg}' in the custom hive (dotnet new exited with code {exitCode}).");
+                }
             }
         }
     }

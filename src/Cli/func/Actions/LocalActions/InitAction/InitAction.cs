@@ -22,6 +22,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
         // Default to .NET 10 if the target framework is not specified
         private const string DefaultTargetFramework = Common.TargetFramework.Net10;
         private const string DefaultInProcTargetFramework = Common.TargetFramework.Net8;
+
         private readonly ITemplatesManager _templatesManager;
         private readonly ISecretsManager _secretsManager;
         private readonly IEnumerable<IConfigurationProfile> _configurationProfiles;
@@ -449,6 +450,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             {
                 throw new CliArgumentsException("The --target-framework option is supported only when --worker-runtime is set to dotnet-isolated or dotnet");
             }
+
+            if (TargetFramework.Equals(Common.TargetFramework.Net11, StringComparison.OrdinalIgnoreCase)
+                && ResolvedLanguage == Constants.Languages.FSharp)
+            {
+                throw new CliArgumentsException(".NET 11 isolated project initialization is not yet supported for F#. Use C# or target .NET 10 instead.");
+            }
         }
 
         private static async Task WriteLocalSettingsJson(WorkerRuntime workerRuntime, ProgrammingModel programmingModel)
@@ -463,7 +470,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 : WorkerRuntimeLanguageHelper.GetRuntimeMoniker(workerRuntime);
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.FunctionsWorkerRuntime}}}", workerRuntimeSetting);
 
-            // For Go (preview) we leave AzureWebJobsStorage empty rather than seeding the storage
+            // For Go we leave AzureWebJobsStorage empty rather than seeding the storage
             // emulator connection string. This avoids 'func azure functionapp publish -i -y' silently
             // overwriting a production app's AzureWebJobsStorage with 'UseDevelopmentStorage=true'.
             string azureWebJobsStorageValue = workerRuntime == Helpers.WorkerRuntime.Go
@@ -471,7 +478,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 : Constants.StorageEmulatorConnectionString;
             localSettingsJsonContent = localSettingsJsonContent.Replace($"{{{Constants.AzureWebJobsStorage}}}", azureWebJobsStorageValue);
 
-            // Add the explicit Go preview opt-in so the CLI doesn't have to fall back to scanning
+            // Add the explicit Go opt-in so the CLI doesn't have to fall back to scanning
             // for go.mod on every command. See WorkerRuntimeLanguageHelper.GetCurrentWorkerRuntimeLanguage.
             if (workerRuntime == Helpers.WorkerRuntime.Go)
             {
@@ -514,7 +521,14 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.DotnetIsolated)
             {
-                if (targetFramework == Common.TargetFramework.Net7)
+                // Checked first, and case-insensitively, so that a target framework differing only in
+                // casing cannot fall through to the generic Dockerfile, which is still based on .NET 6.
+                // .NET 11 is only published as a chiseled Azure Functions base image.
+                if (Common.TargetFramework.Net11.Equals(targetFramework, StringComparison.OrdinalIgnoreCase))
+                {
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet11IsolatedChiseled);
+                }
+                else if (targetFramework == Common.TargetFramework.Net7)
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet7Isolated);
                 }

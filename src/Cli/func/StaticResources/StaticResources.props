@@ -34,6 +34,9 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.dotnet10Isolated">
       <LogicalName>$(AssemblyName).Dockerfile.dotnet10Isolated</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.dotnet11IsolatedChiseled">
+      <LogicalName>$(AssemblyName).Dockerfile.dotnet11IsolatedChiseled</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)ExtensionsProj.csproj.template">
       <LogicalName>$(AssemblyName).ExtensionsProj.csproj</LogicalName>
     </EmbeddedResource>
@@ -87,6 +90,12 @@
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.14-buildenv">
       <LogicalName>$(AssemblyName).Dockerfile.python3.14-buildenv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.15">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.15</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.python3.15-buildenv">
+      <LogicalName>$(AssemblyName).Dockerfile.python3.15-buildenv</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)Dockerfile.javascript">
       <LogicalName>$(AssemblyName).Dockerfile.javascript</LogicalName>

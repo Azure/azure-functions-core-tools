@@ -24,6 +24,7 @@ using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -243,6 +244,7 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .UseUrls(listenAddress.ToString())
                 .ConfigureAppConfiguration(configBuilder =>
                 {
+                    AddGoWorkerConfigurationDefaults(configBuilder);
                     configBuilder.AddEnvironmentVariables();
                 })
                 .ConfigureLogging(loggingBuilder =>
@@ -292,6 +294,21 @@ namespace Azure.Functions.Cli.Actions.HostActions
                 .Build();
         }
 #pragma warning restore ASPDEPR008
+
+        internal static void AddGoWorkerConfigurationDefaults(IConfigurationBuilder configBuilder)
+        {
+            if (OperatingSystem.IsWindows() && GlobalCoreToolsSettings.CurrentWorkerRuntimeOrNone == WorkerRuntime.Go)
+            {
+                // Keep explicit settings above this default, regardless of when their source is added.
+                configBuilder.Sources.Insert(0, new MemoryConfigurationSource
+                {
+                    InitialData = new Dictionary<string, string>
+                    {
+                        ["languageWorkers:native:defaultExecutablePath"] = GoHelpers.LocalBinaryPath
+                    }
+                });
+            }
+        }
 
         internal async Task<IDictionary<string, string>> GetConfigurationSettings(string scriptPath, Uri uri)
         {

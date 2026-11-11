@@ -1,16 +1,16 @@
-# Azure Functions CLI 4.14.0
+# Azure Functions CLI 4.16.0
 
 #### Host Version
 
-- Host Runtime Version: 4.1052.200
+- Host Runtime Version: 4.1054.250
 - In-Proc CLI:
-  - CLI Version: 4.7.0
-  - Host Runtime Version: 4.51.100 (includes 4.851.100, 4.651.100)
+  - CLI Version: 4.9.0
+  - Host Runtime Version: 4.52.200 (includes 4.852.200, 4.652.200)
 
 #### Breaking Changes
 
 - **Python 3.9 is no longer supported.** This version has reached end-of-life. Please upgrade to Python 3.10 or later to continue using Azure Functions Core Tools.
 
 #### Changes
-- Fixed Python native dependency builds to inherit authenticated pip indexes in Docker containers (#5574)
-- Make host.json optional across func publish, and pack (#5488)
+
+- Add C# .NET isolated connector polling templates for Office365, SharePoint, Teams, OneDrive, and Dataverse to `func new`.
