@@ -84,8 +84,22 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
+        [InlineData("ConnectorTriggerOffice365OnNewEmailV3", "connector-office365-onnewemailv3")]
+        [InlineData("ConnectorTriggerSharePointGetOnNewFileItems", "connector-sharepoint-getonnewfileitems")]
+        [InlineData("ConnectorTriggerTeamsOnNewChannelMessage", "connector-teams-onnewchannelmessage")]
+        [InlineData("ConnectorTriggerOneDriveOnNewFilesV2", "connector-onedrive-onnewfilesv2")]
+        [InlineData("ConnectorTriggerDataverseSubscribeOnNewItems", "connector-dataverse-subscribeonnewitems")]
+        public void ConnectorTemplates_MapNames_AndAreCSharpIsolatedOnly(string displayName, string shortName)
+        {
+            Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(displayName));
+            Assert.Contains(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated, "C#"));
+            Assert.DoesNotContain(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.DotnetIsolated, "F#"));
+            Assert.DoesNotContain(displayName, DotnetHelpers.GetTemplates(WorkerRuntime.Dotnet));
+        }
+
+        [Theory]
         [InlineData(WorkerRuntime.Dotnet, 17)]
-        [InlineData(WorkerRuntime.DotnetIsolated, 16)]
+        [InlineData(WorkerRuntime.DotnetIsolated, 21)]
         public void GetTemplates_ReturnsExpectedTemplates(WorkerRuntime runtime, int expectedCount)
         {
             var templates = DotnetHelpers.GetTemplates(runtime);
