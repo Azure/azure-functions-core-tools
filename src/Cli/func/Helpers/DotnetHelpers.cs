@@ -182,7 +182,7 @@ namespace Azure.Functions.Cli.Helpers
             "connectortriggersharepointgetonnewfileitems" => "connector-sharepoint-getonnewfileitems",
             "connectortriggerteamsonnewchannelmessage" => "connector-teams-onnewchannelmessage",
             "connectortriggeronedriveonnewfilesv2" => "connector-onedrive-onnewfilesv2",
-            "connectortriggerdataversegetonnewitemsv2" => "connector-dataverse-getonnewitems-v2",
+            "connectortriggerdataversesubscribeonnewitems" => "connector-dataverse-subscribeonnewitems",
             "durablefunctionsorchestration" => "durable",
             "eventgridtrigger" => "eventgrid",
             "eventgridcloudeventtrigger" => "eventgridcloudevent",
@@ -242,7 +242,7 @@ namespace Azure.Functions.Cli.Helpers
                     "ConnectorTriggerSharePointGetOnNewFileItems",
                     "ConnectorTriggerTeamsOnNewChannelMessage",
                     "ConnectorTriggerOneDriveOnNewFilesV2",
-                    "ConnectorTriggerDataverseGetOnNewItemsV2"
+                    "ConnectorTriggerDataverseSubscribeOnNewItems"
                 ];
             }
 

@@ -88,7 +88,7 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         [InlineData("ConnectorTriggerSharePointGetOnNewFileItems", "connector-sharepoint-getonnewfileitems")]
         [InlineData("ConnectorTriggerTeamsOnNewChannelMessage", "connector-teams-onnewchannelmessage")]
         [InlineData("ConnectorTriggerOneDriveOnNewFilesV2", "connector-onedrive-onnewfilesv2")]
-        [InlineData("ConnectorTriggerDataverseGetOnNewItemsV2", "connector-dataverse-getonnewitems-v2")]
+        [InlineData("ConnectorTriggerDataverseSubscribeOnNewItems", "connector-dataverse-subscribeonnewitems")]
         public void ConnectorTemplates_MapNames_AndAreCSharpIsolatedOnly(string displayName, string shortName)
         {
             Assert.Equal(shortName, DotnetHelpers.GetTemplateShortName(displayName));
