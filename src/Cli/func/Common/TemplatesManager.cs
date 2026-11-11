@@ -362,7 +362,7 @@ namespace Azure.Functions.Cli.Common
                 };
                 foreach (var setting in settings)
                 {
-                    if (values[setting.Key] == null)
+                    if (!values.TryGetValue(setting.Key, StringComparison.OrdinalIgnoreCase, out _))
                     {
                         settingsWriter.SetSecret(setting.Key, setting.Value);
                         values[setting.Key] = settingsWriter.Values[setting.Key];

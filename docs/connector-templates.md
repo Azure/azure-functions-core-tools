@@ -53,7 +53,7 @@ tarballs of these exact releases rather than substituting older packages.
 
 Core Tools prompts for the function name and writes the module. Connection settings and trigger config names are not additional CLI prompts. Instead, `func new` also:
 
-- adds any missing required settings (`ConnectorNamespace__pollingEndpoint` and the template's trigger config name setting, for example `OnNewEmailTriggerConfigName`) to `local.settings.json` with placeholder values, without overwriting existing values;
+- adds any missing required settings (`ConnectorNamespace__pollingEndpoint` and the template's trigger config name setting, for example `OnNewEmailTriggerConfigName`) to `local.settings.json` with placeholder values, matching existing names case-insensitively and preserving their names and values;
 - writes `<functionName>.README.md` to the project root (skipped if it already exists) with local testing and deployment instructions.
 
 Each generated module includes the comment `// Visit aka.ms/connectortrigger to local testing and deployment instructions.` immediately before the trigger registration. VS Code's Node v4 template list is bundled separately by the VS Code extension; publishing Core Tools does not update that list.

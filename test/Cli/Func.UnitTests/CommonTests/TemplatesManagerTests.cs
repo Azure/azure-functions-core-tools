@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.ExtensionBundle;
 using Azure.Functions.Cli.Helpers;
 using Azure.Functions.Cli.Interfaces;
+using Newtonsoft.Json.Linq;
 using NSubstitute;
 using Xunit;
 
@@ -303,6 +304,49 @@ namespace Azure.Functions.Cli.UnitTests.CommonTests
             foreach (var key in TemplatesManager.GetConnectorTriggerSettings(template).Keys)
             {
                 Assert.NotNull(values[key]);
+            }
+        }
+
+        [Theory]
+        [InlineData(false, "connectornamespace__pollingendpoint", "https://existing.example")]
+        [InlineData(true, "connectornamespace__pollingendpoint", "https://existing.example")]
+        [InlineData(false, "ONNEWEMAILTRIGGERCONFIGNAME", "existing-config")]
+        [InlineData(true, "ONNEWEMAILTRIGGERCONFIGNAME", "existing-config")]
+        [InlineData(false, "connectornamespace__pollingendpoint", "")]
+        [InlineData(true, "connectornamespace__pollingendpoint", "")]
+        public async Task Deploy_EmbeddedNodeConnector_PreservesDifferentlyCasedSettings(
+            bool isEncrypted, string existingName, string existingValue)
+        {
+            Directory.CreateDirectory(Path.Combine(_testWorkingDir, "src", "functions"));
+            var localSettingsPath = Path.Combine(_testWorkingDir, Constants.LocalSettingsJsonFileName);
+            var localSettings = new AppSettingsFile(localSettingsPath) { IsEncrypted = isEncrypted };
+            localSettings.SetSecret("FUNCTIONS_WORKER_RUNTIME", "node");
+            localSettings.SetSecret(existingName, existingValue);
+            localSettings.Commit();
+            var before = JObject.Parse(await File.ReadAllTextAsync(localSettingsPath));
+
+            var manager = new TemplatesManager(Substitute.For<ISecretsManager>());
+            var template = Assert.Single(await manager.Templates, template => template.Id == "OutlookTrigger-TypeScript-4.x");
+
+            await manager.Deploy("preserveExistingSettings", null, template);
+
+            var after = JObject.Parse(await File.ReadAllTextAsync(localSettingsPath));
+            Assert.Equal(isEncrypted, after.Value<bool>("IsEncrypted"));
+            var values = (JObject)after["Values"];
+            var existing = Assert.Single(values.Properties(), property => property.Name.Equals(existingName, StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(existingName, existing.Name);
+            Assert.True(JToken.DeepEquals(before["Values"][existingName], existing.Value));
+            Assert.Equal(3, values.Count);
+
+            var decryptedValues = new AppSettingsFile(localSettingsPath).GetValues();
+            Assert.Equal("node", decryptedValues["FUNCTIONS_WORKER_RUNTIME"]);
+            Assert.Equal(existingValue, decryptedValues[existingName]);
+            foreach (var setting in TemplatesManager.GetConnectorTriggerSettings(template))
+            {
+                if (!setting.Key.Equals(existingName, StringComparison.OrdinalIgnoreCase))
+                {
+                    Assert.Equal(setting.Value, decryptedValues[setting.Key]);
+                }
             }
         }
     }
