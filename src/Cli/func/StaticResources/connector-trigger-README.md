@@ -37,6 +37,13 @@ npm install "@azure/functions@^4.17.1" "@azure/functions-extensions-connectors@0
 
 ## 3. Run locally
 
+Before starting the host, configure a preview extension bundle in `host.json`
+that includes Connector Poll support. Installing the npm packages does not
+install the host listener; projects initialized with `--no-bundle` also need
+this configuration. Follow the
+[host extension configuration guide](https://github.com/Azure/azure-functions-connector-extension/blob/main/docs/connector-trigger-configuration.md#non-net-workers)
+and verify that the selected published bundle contains Poll support.
+
 ```bash
 func start
 ```
