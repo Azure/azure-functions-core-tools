@@ -45,8 +45,14 @@ internal static class FuncTemplateComponents
 
             services.AddSingleton<ITemplateComponent, Component<TInterface>>(sp =>
             {
-                TImplementation implementation = ActivatorUtilities.GetServiceOrCreateInstance<TImplementation>(sp);
-                return new Component<TInterface>(implementation);
+                if (sp.GetService<TImplementation>() is { } implementation)
+                {
+                    return new Component<TInterface>(implementation, dispose: false);
+                }
+
+                return new Component<TInterface>(
+                    ActivatorUtilities.CreateInstance<TImplementation>(sp),
+                    dispose: true);
             });
             return services;
         }
@@ -72,7 +78,7 @@ internal static class FuncTemplateComponents
         }
     }
 
-    private sealed class Component<TInterface>(IIdentifiedComponent implementation)
+    private sealed class Component<TInterface>(IIdentifiedComponent implementation, bool dispose)
         : ITemplateComponent, IAsyncDisposable
     {
         public Type InterfaceType => typeof(TInterface);
@@ -81,6 +87,11 @@ internal static class FuncTemplateComponents
 
         public ValueTask DisposeAsync()
         {
+            if (!dispose)
+            {
+                return ValueTask.CompletedTask;
+            }
+
             if (Instance is IAsyncDisposable asyncDisposable)
             {
                 return asyncDisposable.DisposeAsync();
