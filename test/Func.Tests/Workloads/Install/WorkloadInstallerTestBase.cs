@@ -74,10 +74,11 @@ public abstract class WorkloadInstallerTestBase : IDisposable
 
     private protected IWorkloadPaths Paths => _paths;
 
-    private protected static WorkloadEntry ExistingEntry(string id, string version) => new()
+    private protected WorkloadEntry ExistingEntry(string id, string version) => new()
     {
         PackageId = id,
         PackageVersion = version,
+        PackageRoot = _paths.GetInstallDirectory(id, version),
         Aliases = [],
         Kind = WorkloadKind.Workload,
         EntryPoint = new EntryPointSpec { AssemblyPath = "Test.dll", Type = "Test.Type" },

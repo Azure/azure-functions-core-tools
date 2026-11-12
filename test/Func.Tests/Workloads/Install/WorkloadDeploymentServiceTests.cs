@@ -35,8 +35,9 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task TryReuseExplicitAsync_InstalledPayload_ReturnsExistingEntry()
     {
         WorkloadEntry entry = Entry("example.workload", "1.0.0", explicitlyInstalled: true);
+        entry.PackageRoot = Path.Combine(_root, "reused-payload");
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
-        Directory.CreateDirectory(_paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion));
+        Directory.CreateDirectory(entry.PackageRoot);
 
         WorkloadInstallResult? result = await _deploymentService.TryReuseExplicitAsync(entry.PackageId, entry.PackageVersion);
 
@@ -47,6 +48,17 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task TryReuseExplicitAsync_MissingPackageRoot_Throws()
+    {
+        WorkloadEntry entry = Entry("example.workload", "1.0.0", explicitlyInstalled: true);
+        entry.PackageRoot = string.Empty;
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
+
+        await FluentActions.Awaiting(() => _deploymentService.TryReuseExplicitAsync(entry.PackageId, entry.PackageVersion))
+            .Should().ThrowExactlyAsync<ArgumentException>();
+    }
+
+    [Fact]
     public async Task TryReuseImplementationForUpdateAsync_MovesOwnershipAndDeletesOrphanedPayload()
     {
         LogicalPackage oldLogical = Logical("example.pointer", "1.0.0");
@@ -54,8 +66,10 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         WorkloadEntry current = Entry("example.workload.win-x64", "1.0.0", logicalPackage: oldLogical);
         WorkloadEntry reusable = Entry("example.workload.win-x64", "2.0.0", runtimeIdentifier: "win-x64");
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([current, reusable]);
-        string currentPath = _paths.GetInstallDirectory(current.PackageId, current.PackageVersion);
-        string reusablePath = _paths.GetInstallDirectory(reusable.PackageId, reusable.PackageVersion);
+        current.PackageRoot = Path.Combine(_root, "old-payload");
+        reusable.PackageRoot = Path.Combine(_root, "reusable-payload");
+        string currentPath = current.PackageRoot;
+        string reusablePath = reusable.PackageRoot;
         Directory.CreateDirectory(currentPath);
         Directory.CreateDirectory(reusablePath);
         _metadataReader.Read(reusablePath).Returns(Metadata("win-x64"));
@@ -79,7 +93,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         LogicalPackage logicalPackage = Logical("example.pointer", "1.0.0");
         WorkloadEntry existing = CompleteEntry();
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([existing]);
-        string installPath = _paths.GetInstallDirectory(existing.PackageId, existing.PackageVersion);
+        string installPath = existing.PackageRoot;
         Directory.CreateDirectory(installPath);
         _metadataReader.Read(installPath).Returns(Metadata(existing.RuntimeIdentifier!));
         _store.AddOwnershipAsync(Arg.Any<WorkloadEntry>(), WorkloadOwnershipKind.Logical, Arg.Any<CancellationToken>())
@@ -146,7 +160,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     {
         WorkloadEntry reusable = Entry("example.workload.win-x64", "1.0.0", runtimeIdentifier: "win-x64");
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([reusable]);
-        string installPath = _paths.GetInstallDirectory(reusable.PackageId, reusable.PackageVersion);
+        string installPath = reusable.PackageRoot;
         Directory.CreateDirectory(installPath);
         _metadataReader.Read(installPath).Throws(new InvalidWorkloadException("invalid manifest"));
 
@@ -387,11 +401,12 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     public async Task UninstallAsync_FinalOwnershipRemoved_DeletesPayload()
     {
         WorkloadEntry entry = Entry("example.workload", "1.0.0", explicitlyInstalled: true);
-        string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        entry.PackageRoot = Path.Combine(_root, "removed-payload");
+        string installPath = entry.PackageRoot;
         Directory.CreateDirectory(installPath);
         _store.RemoveOwnershipAsync(
                 entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
-            .Returns(new WorkloadOwnershipRemovalResult(OwnershipRemoved: true, EntryRemoved: true, Entry: null));
+            .Returns(new WorkloadOwnershipRemovalResult(OwnershipRemoved: true, EntryRemoved: true, Entry: entry));
 
         bool removed = await _deploymentService.UninstallAsync(entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit);
 
@@ -399,24 +414,47 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         Directory.Exists(installPath).Should().BeFalse();
     }
 
-    private static WorkloadEntry Entry(string packageId, string version, bool explicitlyInstalled = false,
+    [Fact]
+    public async Task UninstallAsync_RemovedEntryMissing_Throws()
+    {
+        _store.RemoveOwnershipAsync("pkg", "1.0.0", WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
+            .Returns(new WorkloadOwnershipRemovalResult(true, true, null));
+
+        await FluentActions.Awaiting(() => _deploymentService.UninstallAsync("pkg", "1.0.0", WorkloadOwnershipKind.Explicit))
+            .Should().ThrowExactlyAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task UninstallAsync_RemovedEntryHasNoPackageRoot_Throws()
+    {
+        WorkloadEntry entry = Entry("pkg", "1.0.0", explicitlyInstalled: true);
+        entry.PackageRoot = string.Empty;
+        _store.RemoveOwnershipAsync(entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit, Arg.Any<CancellationToken>())
+            .Returns(new WorkloadOwnershipRemovalResult(true, true, entry));
+
+        await FluentActions.Awaiting(() => _deploymentService.UninstallAsync(entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit))
+            .Should().ThrowExactlyAsync<ArgumentException>();
+    }
+
+    private WorkloadEntry Entry(string packageId, string version, bool explicitlyInstalled = false,
         string? runtimeIdentifier = null, LogicalPackage? logicalPackage = null)
         => new()
         {
             PackageId = packageId,
             PackageVersion = version,
+            PackageRoot = _paths.GetInstallDirectory(packageId, version),
             IsImplicitlyInstalled = !explicitlyInstalled,
             InstallRefCount = 1,
             RuntimeIdentifier = runtimeIdentifier,
             LogicalPackage = logicalPackage,
         };
 
-    private static WorkloadEntry CompleteEntry(LogicalPackage? logicalPackage = null)
+    private WorkloadEntry CompleteEntry(LogicalPackage? logicalPackage = null)
         => new()
         {
             PackageId = "example.workload.win-x64",
             PackageVersion = "1.0.0",
-            PackageRoot = "existing-package-root",
+            PackageRoot = Path.Combine(_root, "existing-package-root"),
             Kind = WorkloadKind.Workload,
             Aliases = ["example", "sample"],
             DisplayName = "Existing display name",

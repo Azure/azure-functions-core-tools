@@ -99,6 +99,12 @@ public sealed class CliHostFactoryTests : IDisposable
         provider.GetContentWorkloads().Count.Should().Be(2);
         provider.GetWorkloads().Count.Should().Be(3);
         provider.GetContentWorkloads().Should().AllSatisfy(w => w.DisplayName.Should().Be(w.PackageId));
+        provider.GetContentWorkloads().Should().AllSatisfy(w =>
+        {
+            string packageRoot = Path.Combine(_home, "workloads", w.PackageId, w.PackageVersion);
+            w.InstallDirectory.Should().Be(packageRoot);
+            w.ContentRoot.Should().Be(Path.Combine(packageRoot, "tools", "any"));
+        });
     }
 
     [Fact]

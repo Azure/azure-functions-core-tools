@@ -16,14 +16,12 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 /// </summary>
 internal sealed class InstallHostWorkloadInitializationStep(
     IWorkloadInstaller installer,
-    IWorkloadPaths workloadPaths,
     string? packageId,
     string hostVersion) : FuncStartInitializationStep
 {
     public const string StepId = "install_host_workload";
 
     private readonly IWorkloadInstaller _installer = installer ?? throw new ArgumentNullException(nameof(installer));
-    private readonly IWorkloadPaths _workloadPaths = workloadPaths ?? throw new ArgumentNullException(nameof(workloadPaths));
     private readonly string _packageId = string.IsNullOrWhiteSpace(packageId) ? HostWorkloadPackage.PackageId : packageId;
 
     private readonly NuGetVersion _hostVersion = NuGetVersion.TryParse(hostVersion, out NuGetVersion? parsedHostVersion)
@@ -97,9 +95,9 @@ internal sealed class InstallHostWorkloadInitializationStep(
     private static GracefulException CreateUserError(Exception exception)
         => new(exception.Message, isUserError: true, verboseMessage: exception.ToString());
 
-    private ContentWorkloadInfo CreateContentWorkloadInfo(WorkloadEntry entry)
+    private static ContentWorkloadInfo CreateContentWorkloadInfo(WorkloadEntry entry)
     {
-        string installDirectory = _workloadPaths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        string installDirectory = entry.PackageRoot;
         return new ContentWorkloadInfo(
             entry.PackageId,
             entry.PackageVersion,

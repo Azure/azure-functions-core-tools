@@ -101,6 +101,19 @@ public class WorkloadStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task RemoveOwnershipAsync_FinalOwner_ReturnsRemovedEntryWithPackageRoot()
+    {
+        await _store.SaveWorkloadAsync(NewEntry("pkg", "1.0.0"));
+
+        WorkloadOwnershipRemovalResult result = await _store.RemoveOwnershipAsync("pkg", "1.0.0", WorkloadOwnershipKind.Explicit);
+
+        result.EntryRemoved.Should().BeTrue();
+        result.Entry.Should().NotBeNull();
+        result.Entry!.PackageRoot.Should().Be(_paths.GetInstallDirectory("pkg", "1.0.0"));
+        (await _store.GetWorkloadsAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SaveWorkloadAsync_KeepsBothVersions_WhenSamePackageIdDifferentVersion()
     {
         await _store.SaveWorkloadAsync(NewEntry("Azure.Functions.Cli.Workloads.Dotnet", "1.0.0"));

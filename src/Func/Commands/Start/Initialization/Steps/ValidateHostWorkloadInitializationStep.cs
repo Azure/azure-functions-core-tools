@@ -5,7 +5,6 @@ using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Install;
-using Azure.Functions.Cli.Workloads.Storage;
 
 namespace Azure.Functions.Cli.Commands.Start.Initialization;
 
@@ -15,7 +14,6 @@ namespace Azure.Functions.Cli.Commands.Start.Initialization;
 internal sealed class ValidateHostWorkloadInitializationStep(
     IHostWorkloadResolver resolver,
     IWorkloadInstaller installer,
-    IWorkloadPaths workloadPaths,
     IProcessEnvironment processEnvironment)
     : FuncStartInitializationStep
 {
@@ -28,7 +26,6 @@ internal sealed class ValidateHostWorkloadInitializationStep(
 
     private readonly IHostWorkloadResolver _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
     private readonly IWorkloadInstaller _installer = installer ?? throw new ArgumentNullException(nameof(installer));
-    private readonly IWorkloadPaths _workloadPaths = workloadPaths ?? throw new ArgumentNullException(nameof(workloadPaths));
     private readonly IProcessEnvironment _processEnvironment = processEnvironment ?? throw new ArgumentNullException(nameof(processEnvironment));
 
     public override string Id => StepId;
@@ -81,7 +78,7 @@ internal sealed class ValidateHostWorkloadInitializationStep(
                     throw new GracefulException(message, isUserError: true);
                 }
 
-                var installStep = new InstallHostWorkloadInitializationStep(_installer, _workloadPaths, installRequired.PackageId, installRequired.HostVersion);
+                var installStep = new InstallHostWorkloadInitializationStep(_installer, installRequired.PackageId, installRequired.HostVersion);
                 context.AddNext(installStep);
 
                 return StartInitializationStepResult.Completed(installRequired.Message);
