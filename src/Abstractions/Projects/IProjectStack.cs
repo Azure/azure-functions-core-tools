@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using Azure.Functions.Cli.Common;
+
 namespace Azure.Functions.Cli.Projects;
 
 /// <summary>
@@ -33,4 +35,16 @@ public interface IProjectStack
     /// Gets accepted aliases keyed by canonical language name, matched case-insensitively.
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; }
+
+    /// <summary>
+    /// Runs a template post action for a generated project.
+    /// </summary>
+    /// <exception cref="NotSupportedException">The stack does not support the requested post action.</exception>
+    public Task RunTemplatePostActionAsync(string actionId, WorkingDirectory projectDirectory, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
+        ArgumentNullException.ThrowIfNull(projectDirectory);
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new NotSupportedException($"The '{Stack}' stack does not support template post-action '{actionId}'.");
+    }
 }

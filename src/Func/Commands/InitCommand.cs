@@ -10,7 +10,10 @@ using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workloads;
+using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Commands;
 
@@ -60,6 +63,9 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
     private readonly IHostJsonBundleSectionReader _bundleSectionReader;
     private readonly InstalledBundleScanner _bundleScanner;
     private readonly IReadOnlyList<IProjectInitializer> _initializers;
+    private readonly InstalledProjectStackCatalog _stackCatalog;
+    private readonly ITemplaterFactory _templaterFactory;
+    private readonly Option<string>? _dotNetTargetFrameworkOption;
 
     public InitCommand(
         IInteractionService interaction,
@@ -68,6 +74,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         IFunctionsProjectResolver projectResolver,
         IHostJsonBundleSectionReader bundleSectionReader,
         InstalledBundleScanner bundleScanner,
+        InstalledProjectStackCatalog stackCatalog,
+        ITemplaterFactory templaterFactory,
         IEnumerable<IProjectInitializer> initializers)
         : base("init", "Initialize a new Azure Functions project.")
     {
@@ -77,6 +85,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         ArgumentNullException.ThrowIfNull(projectResolver);
         ArgumentNullException.ThrowIfNull(bundleSectionReader);
         ArgumentNullException.ThrowIfNull(bundleScanner);
+        ArgumentNullException.ThrowIfNull(stackCatalog);
+        ArgumentNullException.ThrowIfNull(templaterFactory);
         ArgumentNullException.ThrowIfNull(initializers);
 
         _interaction = interaction;
@@ -85,6 +95,8 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         _projectResolver = projectResolver;
         _bundleSectionReader = bundleSectionReader;
         _bundleScanner = bundleScanner;
+        _stackCatalog = stackCatalog;
+        _templaterFactory = templaterFactory;
         _initializers = initializers.ToList();
 
         StackOption.Description = BuildStackOptionDescription(_initializers);
@@ -107,7 +119,12 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         foreach (IProjectInitializer initializer in _initializers)
         {
             registry.SetActiveStack(initializer.Stack);
-            initializer.GetInitOptions(registry);
+            IReadOnlyList<Option> options = initializer.GetInitOptions(registry);
+            if (string.Equals(initializer.Stack, "dotnet", StringComparison.OrdinalIgnoreCase))
+            {
+                _dotNetTargetFrameworkOption = options.OfType<Option<string>>()
+                    .SingleOrDefault(option => string.Equals(option.Name, "--target-framework", StringComparison.Ordinal));
+            }
         }
     }
 
@@ -281,6 +298,11 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             }
 
             language = resolved;
+        }
+
+        if (ShouldUseDotNetTemplateFlow(initializer, language, parseResult))
+        {
+            return await InitializeDotNetTemplateAsync(workingDirectory, initializer, language, parseResult, force, cancellationToken);
         }
 
         if (force)
@@ -573,7 +595,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         return displayToInitializer.TryGetValue(picked, out IProjectInitializer? chosen) ? chosen : null;
     }
 
-    private void WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
+    private bool WriteCliConfigurationFile(DirectoryInfo workingDirectory, string? stack, string? language, bool force)
     {
         string folder = CliConfigurationPathsOptions.GetProjectConfigFolderPath(workingDirectory);
         string path = CliConfigurationPathsOptions.GetProjectConfigPath(workingDirectory);
@@ -581,7 +603,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         // Treat an existing file as user-owned unless --force was passed.
         if (File.Exists(path) && !force)
         {
-            return;
+            return true;
         }
 
         try
@@ -615,6 +637,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 .Muted("· Wrote ")
                 .Code(CliConfigurationPathsOptions.ProjectConfigDisplayPath)
                 .Muted("."));
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -625,7 +648,133 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
                 .Muted($"Could not write {CliConfigurationPathsOptions.ProjectConfigDisplayPath} (")
                 .Code(ex.Message)
                 .Muted(")."));
+            return false;
         }
+    }
+
+    private bool ShouldUseDotNetTemplateFlow(IProjectInitializer initializer, string? language, ParseResult parseResult)
+        => _dotNetTargetFrameworkOption is not null
+            && string.Equals(initializer.Stack, "dotnet", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(language, "c#", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(parseResult.GetValue(_dotNetTargetFrameworkOption), "net10.0", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<int> InitializeDotNetTemplateAsync(
+        WorkingDirectory workingDirectory,
+        IProjectInitializer initializer,
+        string? language,
+        ParseResult parseResult,
+        bool force,
+        CancellationToken cancellationToken)
+    {
+        IProjectStack? stack = _stackCatalog.FindStack(initializer.Stack);
+        if (stack is null)
+        {
+            _interaction.WriteError($"The '{initializer.Stack}' Stack is not installed. Run `func setup --features {initializer.Stack}` and try again.");
+            return 1;
+        }
+
+        using Templater templater = _templaterFactory.Create(new TemplateEngineContext(workingDirectory));
+        IReadOnlyList<ITemplateInfo> inventory = await templater.ListAsync(cancellationToken);
+        ITemplateInfo[] candidates = [.. inventory.Where(template =>
+            TemplateCatalogProjector.GetTemplateType(template) == TemplateType.Project
+            && template.TagsCollection.TryGetValue("language", out string? templateLanguage)
+            && string.Equals(templateLanguage, "C#", StringComparison.OrdinalIgnoreCase)
+            && template.ShortNameList.Contains("func", StringComparer.OrdinalIgnoreCase))];
+
+        if (candidates.Length != 1)
+        {
+            string message = candidates.Length == 0
+                ? "No installed .NET C# project template with the 'func' short name was found."
+                : $"More than one .NET C# project template matches 'func': {string.Join(", ", candidates.Select(template => template.Identity))}.";
+            _interaction.WriteError(message);
+            return 1;
+        }
+
+        ITemplateInfo selectedTemplate = candidates[0];
+        string projectName = parseResult.GetValue(NameOption) ?? workingDirectory.Info.Name;
+        string framework = parseResult.GetValue(_dotNetTargetFrameworkOption!)!;
+        Dictionary<string, string?> inputParameters = new(StringComparer.Ordinal);
+        ITemplateParameter? frameworkParameter = selectedTemplate.ParameterDefinitions
+            .SingleOrDefault(parameter => string.Equals(parameter.Name, "Framework", StringComparison.Ordinal));
+        if (frameworkParameter is not null && !string.Equals(frameworkParameter.DefaultValue, framework, StringComparison.OrdinalIgnoreCase))
+        {
+            inputParameters["Framework"] = framework;
+        }
+
+        if (force)
+        {
+            if (!await ConfirmClearDirectoryAsync(workingDirectory.Info, cancellationToken))
+            {
+                _interaction.WriteHint("Init cancelled. The directory was not modified.");
+                return 1;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            ClearDirectory(workingDirectory.Info);
+        }
+
+        ITemplateCreationResult creation = await templater.CreateAsync(
+            selectedTemplate,
+            parseResult.GetValue(NameOption),
+            projectName,
+            workingDirectory.Info.FullName,
+            inputParameters,
+            cancellationToken);
+        if (creation.Status != CreationResultStatus.Success || creation.CreationResult is null)
+        {
+            _interaction.WriteError(
+                $"Failed to create the .NET project from template '{selectedTemplate.Identity}': "
+                + $"{creation.ErrorMessage ?? creation.Status.ToString()}. Template files may have been written.");
+            return 1;
+        }
+
+        foreach (IPostAction postAction in creation.CreationResult.PostActions)
+        {
+            try
+            {
+                await stack.RunTemplatePostActionAsync(postAction.ActionId.ToString(), workingDirectory, cancellationToken);
+            }
+            catch (NotSupportedException ex)
+            {
+                _interaction.WriteError($"The project files were created, but template post-action '{postAction.ActionId}' is unsupported: {ex.Message}");
+                return 1;
+            }
+            catch (InvalidOperationException ex)
+            {
+                _interaction.WriteError($"The project files were created, but template post-action '{postAction.ActionId}' failed: {ex.Message}");
+                return 1;
+            }
+        }
+
+        ProjectResolutionResult resolution = await _projectResolver.ResolveProjectAsync(
+            new ProjectResolutionContext(workingDirectory),
+            cancellationToken);
+        if (resolution is not ProjectResolutionResult.Resolved resolved
+            || !string.Equals(resolved.Project.StackName, initializer.Stack, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(resolved.Project.Language, language, StringComparison.OrdinalIgnoreCase))
+        {
+            _interaction.WriteError(
+                $"The .NET project template completed, but the generated project could not be verified. "
+                + "Template files may remain; run `func init` again after addressing the project files.");
+            return 1;
+        }
+
+        string? persistedLanguage = initializer.SupportedLanguages.Count == 1 ? null : language;
+        if (!WriteCliConfigurationFile(workingDirectory.Info, initializer.Stack, persistedLanguage, force))
+        {
+            _interaction.WriteError(
+                $"The .NET project files were created, but required CLI configuration '{CliConfigurationPathsOptions.ProjectConfigDisplayPath}' could not be written.");
+            return 1;
+        }
+
+        _interaction.WriteBlankLine();
+        _interaction.WriteLine(l => l
+            .Success("✓ ")
+            .Muted("Project initialized for ")
+            .Code(initializer.Stack)
+            .Muted("."));
+        await WarnIfBundleChannelNotInstalledAsync(workingDirectory.Info, cancellationToken);
+        return 0;
     }
 
     // Patches stack.language into an existing .func/config.json without

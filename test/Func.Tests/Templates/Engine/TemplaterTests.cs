@@ -3,6 +3,7 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.TemplateEngine.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -31,44 +32,30 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
-    public async Task ListAsync_Item_ReturnsItemTemplateEntries()
+    public async Task ListAsync_ReturnsInstalledItemTemplate()
     {
         string packageDirectory = TemplateFixtures.WriteBasicPackage(_root);
         await TemplateFixtures.InstallAsync(packageDirectory, _hive);
         using Templater templater = CreateTemplater();
 
-        IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+        IReadOnlyList<ITemplateInfo> entries = await templater.ListAsync();
 
-        entries.Should().ContainSingle().Which.Should().BeEquivalentTo(new TemplateCatalogEntry(
-            Identity: TemplateFixtures.ItemTemplateIdentity,
-            Name: "Func Tests Item",
-            Description: null,
-            Type: TemplateType.Item,
-            ShortNames: [TemplateFixtures.ItemTemplateShortName],
-            GroupIdentity: null,
-            Language: null,
-            Precedence: 0,
-            Package: new TemplatePackageInfo(packageDirectory, Version: null),
-            IsHidden: false,
-            Parameters: [],
-            MetadataDiagnostic: null));
+        entries.Should().Contain(template => template.Identity == TemplateFixtures.ItemTemplateIdentity);
     }
 
     [Fact]
-    public async Task ListAsync_Project_ReturnsProjectTemplateEntries()
+    public async Task ListAsync_ReturnsInstalledProjectTemplate()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
         using Templater templater = CreateTemplater();
 
-        IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Project, CancellationToken.None);
+        IReadOnlyList<ITemplateInfo> entries = await templater.ListAsync();
 
-        TemplateCatalogEntry entry = entries.Should().ContainSingle().Subject;
-        entry.Identity.Should().Be(TemplateFixtures.ProjectTemplateIdentity);
-        entry.Type.Should().Be(TemplateType.Project);
+        entries.Should().Contain(template => template.Identity == TemplateFixtures.ProjectTemplateIdentity);
     }
 
     [Fact]
-    public async Task ListAsync_TemplatesWithoutItemOrProjectType_AreNotListed()
+    public async Task ListAsync_ReturnsTemplatesWithoutFuncTypeMetadata()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
 
@@ -77,53 +64,24 @@ public sealed class TemplaterTests : IDisposable
         await TemplateFixtures.GetInstalledTemplateAsync(_hive, TemplateFixtures.UntypedTemplateIdentity);
         using Templater templater = CreateTemplater();
 
-        IReadOnlyList<TemplateCatalogEntry> items = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
-        IReadOnlyList<TemplateCatalogEntry> projects = await templater.ListAsync(TemplateType.Project, CancellationToken.None);
+        IReadOnlyList<ITemplateInfo> templates = await templater.ListAsync();
 
-        items.Concat(projects).Select(entry => entry.Identity).Should().BeEquivalentTo(
-            [TemplateFixtures.ItemTemplateIdentity, TemplateFixtures.ProjectTemplateIdentity]);
+        templates.Select(template => template.Identity).Should().BeEquivalentTo(
+            [
+                TemplateFixtures.ItemTemplateIdentity,
+                TemplateFixtures.ProjectTemplateIdentity,
+                TemplateFixtures.OtherTypeTemplateIdentity,
+                TemplateFixtures.UntypedTemplateIdentity,
+            ]);
     }
 
     [Fact]
-    public async Task ListAsync_FuncHostMetadata_AppliesParameterAliases()
-    {
-        IReadOnlyList<TemplateCatalogEntry> entries = await ListMetadataTemplatesAsync();
-
-        TemplateCatalogEntry entry = Entry(entries, TemplateFixtures.MetadataTemplateIdentity);
-        entry.Language.Should().Be("TypeScript");
-        entry.MetadataDiagnostic.Should().BeNull();
-        entry.Parameters.Select(parameter => (parameter.CanonicalName, parameter.LongName, parameter.ShortName)).Should().Equal(
-            ("Level", "log-level", "l"),
-            ("Namespace", "Namespace", null));
-    }
-
-    [Fact]
-    public async Task ListAsync_HiddenTemplate_IsListedAsHidden()
-    {
-        IReadOnlyList<TemplateCatalogEntry> entries = await ListMetadataTemplatesAsync();
-
-        Entry(entries, TemplateFixtures.HiddenTemplateIdentity).IsHidden.Should().BeTrue();
-        Entry(entries, TemplateFixtures.DotnetHostOnlyTemplateIdentity).IsHidden
-            .Should().BeFalse("dotnetcli.host.json only applies to dotnet new");
-    }
-
-    [Fact]
-    public async Task ListAsync_InvalidFuncHostMetadata_ReportsDiagnosticOnEntry()
-    {
-        IReadOnlyList<TemplateCatalogEntry> entries = await ListMetadataTemplatesAsync();
-
-        TemplateCatalogEntry entry = Entry(entries, TemplateFixtures.InvalidHostTemplateIdentity);
-        entry.MetadataDiagnostic.Should().Contain("func.host.json");
-        entry.Parameters.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task ListAsync_FromEngineCache_ReturnsSameEntriesAsFromScan()
+    public async Task ListAsync_FromEngineCache_ReturnsSameInventoryAsFromScan()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteMetadataPackage(_root), _hive);
-        IReadOnlyList<TemplateCatalogEntry> scanned = await ListWithNewTemplaterAsync(TemplateType.Item);
+        IReadOnlyList<ITemplateInfo> scanned = await ListWithNewTemplaterAsync();
 
-        IReadOnlyList<TemplateCatalogEntry> cached = await ListWithNewTemplaterAsync(TemplateType.Item);
+        IReadOnlyList<ITemplateInfo> cached = await ListWithNewTemplaterAsync();
 
         scanned.Select(entry => entry.Identity).Should().BeEquivalentTo(
         [
@@ -132,7 +90,7 @@ public sealed class TemplaterTests : IDisposable
             TemplateFixtures.DotnetHostOnlyTemplateIdentity,
             TemplateFixtures.HiddenTemplateIdentity,
         ]);
-        cached.Should().BeEquivalentTo(scanned);
+        cached.Select(entry => entry.Identity).Should().BeEquivalentTo(scanned.Select(entry => entry.Identity));
     }
 
     [Fact]
@@ -142,7 +100,7 @@ public sealed class TemplaterTests : IDisposable
         using CancellationTokenSource cancellation = new();
         await cancellation.CancelAsync();
 
-        Func<Task> act = () => templater.ListAsync(TemplateType.Item, cancellation.Token);
+        Func<Task> act = () => templater.ListAsync(cancellation.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
@@ -153,7 +111,7 @@ public sealed class TemplaterTests : IDisposable
         Templater templater = CreateTemplater();
         templater.Dispose();
 
-        Func<Task> act = () => templater.ListAsync(TemplateType.Item, CancellationToken.None);
+        Func<Task> act = () => templater.ListAsync();
 
         await act.Should().ThrowAsync<ObjectDisposedException>();
     }
@@ -166,20 +124,11 @@ public sealed class TemplaterTests : IDisposable
         act.Should().Throw<ArgumentNullException>().WithParameterName("session");
     }
 
-    private async Task<IReadOnlyList<TemplateCatalogEntry>> ListMetadataTemplatesAsync()
-    {
-        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteMetadataPackage(_root), _hive);
-        return await ListWithNewTemplaterAsync(TemplateType.Item);
-    }
-
-    private async Task<IReadOnlyList<TemplateCatalogEntry>> ListWithNewTemplaterAsync(TemplateType type)
+    private async Task<IReadOnlyList<ITemplateInfo>> ListWithNewTemplaterAsync()
     {
         using Templater templater = CreateTemplater();
-        return await templater.ListAsync(type, CancellationToken.None);
+        return await templater.ListAsync();
     }
-
-    private static TemplateCatalogEntry Entry(IReadOnlyList<TemplateCatalogEntry> entries, string identity)
-        => entries.Should().ContainSingle(candidate => candidate.Identity == identity).Subject;
 
     private Templater CreateTemplater()
         => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive));

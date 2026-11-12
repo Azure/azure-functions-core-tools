@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
 using NSubstitute;
@@ -22,6 +23,8 @@ public class InitCommandTests
     private readonly IFunctionsProjectResolver _projectResolver;
     private readonly IHostJsonBundleSectionReader _bundleReader;
     private readonly IInstalledBundleWorkloads _installedBundles;
+    private readonly InstalledProjectStackCatalog _stackCatalog = new([]);
+    private readonly ITemplaterFactory _templaterFactory = Substitute.For<ITemplaterFactory>();
 
     public InitCommandTests()
     {
@@ -44,7 +47,8 @@ public class InitCommandTests
     }
 
     private InitCommand CreateCommand(IEnumerable<IProjectInitializer> initializers) =>
-        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), initializers);
+        new(_interaction, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles),
+            _stackCatalog, _templaterFactory, initializers);
 
     [Fact]
     public void InitCommand_HasExpectedOptions()
@@ -127,6 +131,61 @@ public class InitCommandTests
             if (Directory.Exists(newDir))
             {
                 Directory.Delete(newDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_DotNet10WithoutProjectTemplate_FailsWithoutWritingCliConfiguration()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-dotnet-template-{Guid.NewGuid():N}");
+        string projectPath = Path.Combine(root, "project");
+        string home = Path.Combine(root, "home");
+        var frameworkOption = new Option<string>("--target-framework");
+        var initializer = new FakeProjectInitializer(
+            "dotnet",
+            ["C#"],
+            optionFactory: registry => [registry.GetOrAdd(frameworkOption)]);
+        IProjectStack stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns("dotnet");
+        stack.DisplayName.Returns(".NET");
+        stack.WorkerRuntimeAliases.Returns(["dotnet-isolated"]);
+        stack.SupportedLanguages.Returns(["C#"]);
+        stack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["C#"] = ["csharp"],
+        });
+        var stackCatalog = new InstalledProjectStackCatalog([stack]);
+        var templaterFactory = new TemplaterFactory(new CliConfigurationPathsOptions(home));
+        var command = new InitCommand(
+            _interaction,
+            _hintRenderer,
+            _localSettings,
+            _projectResolver,
+            _bundleReader,
+            new InstalledBundleScanner(_installedBundles),
+            stackCatalog,
+            templaterFactory,
+            [initializer]);
+
+        try
+        {
+            int exitCode = await command.Parse([
+                projectPath,
+                "--stack", "dotnet",
+                "--language", "C#",
+                "--target-framework", "net10.0",
+            ]).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+            exitCode.Should().Be(1);
+            _interaction.AllOutput.Should().Contain("No installed .NET C# project template");
+            File.Exists(CliConfigurationPathsOptions.GetProjectConfigPath(new DirectoryInfo(projectPath))).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
             }
         }
     }
@@ -655,7 +714,8 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var dotnet = new FakeProjectInitializer("dotnet", workerRuntimeAliases: ["dotnet-isolated"]);
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [dotnet]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+                new InstalledBundleScanner(_installedBundles), _stackCatalog, _templaterFactory, [dotnet]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir, "--stack", "dotnet-isolated"]).InvokeAsync();
@@ -819,7 +879,8 @@ public class InitCommandTests
 
             var interactive = new InteractiveTestInteractionService();
             var python = new FakeProjectInitializer("python");
-            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader, new InstalledBundleScanner(_installedBundles), [python]);
+            var command = new InitCommand(interactive, _hintRenderer, _localSettings, _projectResolver, _bundleReader,
+                new InstalledBundleScanner(_installedBundles), _stackCatalog, _templaterFactory, [python]);
             var root = new RootCommand { command };
 
             int exitCode = await root.Parse(["init", newDir]).InvokeAsync();

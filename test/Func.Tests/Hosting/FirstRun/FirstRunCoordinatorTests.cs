@@ -8,6 +8,8 @@ using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.FirstRun;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Telemetry;
 using NSubstitute;
 using Spectre.Console.Rendering;
@@ -103,7 +105,8 @@ public sealed class FirstRunCoordinatorTests
         _setupRunner.RunAsync(Arg.Any<SetupCommandOptions>(), Arg.Any<CancellationToken>())
             .Returns(new SetupRunResult(0));
         var root = new FuncRootCommand();
-        root.Subcommands.Add(new NewCommand(_interaction));
+        root.Subcommands.Add(new NewCommand(_interaction, Substitute.For<IFunctionsProjectResolver>(),
+            new InstalledProjectStackCatalog([]), Substitute.For<ITemplaterFactory>()));
         ParseResult parseResult = root.Parse(invocation);
         parseResult.Errors.Should().BeEmpty();
         string commandName = CommandNameResolver.ResolveCommandName(parseResult, root);
@@ -116,7 +119,8 @@ public sealed class FirstRunCoordinatorTests
         exitCode.Should().Be(1);
         _interaction.Lines.Should().Contain(line =>
             line.StartsWith("ERROR:", StringComparison.Ordinal)
-            && line.Contains("temporarily unavailable"));
+            &&             line.Contains("No initialized Functions project was found")
+            || line.Contains("not supported"));
         _interaction.Lines.Should().NotContain(line => line.Contains("`func setup`"));
         _interaction.ConfirmCalls.Should().Be(0);
         await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);

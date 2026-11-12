@@ -30,7 +30,7 @@ public class DotNetProjectInitializerTests : IDisposable
         }
     }
 
-    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli, _hivePathProvider, new DotNetProjectStack());
+    private DotNetProjectInitializer CreateInitializer() => new(_dotnetCli, _hivePathProvider, new DotNetProjectStack(_dotnetCli));
 
     [Fact]
     public void Stack_IsDotNet()
@@ -76,6 +76,37 @@ public class DotNetProjectInitializerTests : IDisposable
     public void SupportedFrameworks_ContainsNet10AndNet11()
     {
         DotNetProjectInitializer.SupportedFrameworks.Should().Equal("net10.0", "net11.0");
+    }
+
+    [Fact]
+    public async Task DotNetProjectStack_RestorePostAction_RunsDotnetRestoreInProjectDirectory()
+    {
+        string projectPath = Path.Combine(_hivePath, "project");
+        var projectDirectory = WorkingDirectory.FromExplicit(projectPath);
+
+        await new DotNetProjectStack(_dotnetCli).RunTemplatePostActionAsync(
+            "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+            projectDirectory,
+            CancellationToken.None);
+
+        await _dotnetCli.Received(1).RunAsync(
+            Arg.Is<IReadOnlyList<string>>(arguments => arguments.SequenceEqual(new[] { "restore" })),
+            projectPath,
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DotNetProjectStack_UnknownPostAction_ThrowsWithoutRunningDotnet()
+    {
+        var projectDirectory = WorkingDirectory.FromExplicit(_hivePath);
+
+        Func<Task> act = () => new DotNetProjectStack(_dotnetCli).RunTemplatePostActionAsync(
+            "unknown-action",
+            projectDirectory,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<NotSupportedException>();
+        await _dotnetCli.DidNotReceiveWithAnyArgs().RunAsync(default!, default, default);
     }
 
     [Theory]
@@ -194,14 +225,14 @@ public class DotNetProjectInitializerTests : IDisposable
     [Fact]
     public void Constructor_ThrowsOnNullRunner()
     {
-        FluentActions.Invoking(() => new DotNetProjectInitializer(null!, _hivePathProvider, new DotNetProjectStack()))
+        FluentActions.Invoking(() => new DotNetProjectInitializer(null!, _hivePathProvider, new DotNetProjectStack(_dotnetCli)))
             .Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullHivePathProvider()
     {
-        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, null!, new DotNetProjectStack()))
+        FluentActions.Invoking(() => new DotNetProjectInitializer(_dotnetCli, null!, new DotNetProjectStack(_dotnetCli)))
             .Should().ThrowExactly<ArgumentNullException>();
     }
 

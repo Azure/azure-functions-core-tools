@@ -19,7 +19,7 @@ public sealed class NewCommandProgramTests(ITestOutputHelper output)
     [InlineData(false, true, true)]
     [InlineData(true, false, true)]
     [InlineData(true, true, true)]
-    public async Task Program_New_Unavailable_LeavesTargetUnchanged(bool exists, bool force, bool list)
+    public async Task Program_New_RequiresInitializedProjectAndLeavesTargetUnchanged(bool exists, bool force, bool list)
     {
         string directory = Path.Combine(Path.GetTempPath(), $"func-new-process-{Guid.NewGuid():N}");
         string project = Path.Combine(directory, "project");
@@ -66,7 +66,7 @@ public sealed class NewCommandProgramTests(ITestOutputHelper output)
                 directory, paths.Home, workloads.Home, directory, args, cancellation.Token);
 
             result.ExitCode.Should().Be(1, "stdout: {0}; stderr: {1}", result.StandardOutput, result.StandardError);
-            result.StandardError.Should().Contain("temporarily unavailable").And.Contain("new templating engine");
+            result.StandardError.Should().Contain("No initialized Functions project was found");
             Directory.Exists(project).Should().Be(exists);
             if (exists)
             {

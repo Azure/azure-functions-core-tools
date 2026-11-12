@@ -3,23 +3,33 @@
 
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Commands;
+using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Templates.Engine;
+using NSubstitute;
 
 namespace Azure.Functions.Cli.Tests.Commands;
 
 public class NewCommandTests
 {
     private readonly TestInteractionService _interaction;
+    private readonly IFunctionsProjectResolver _projectResolver = Substitute.For<IFunctionsProjectResolver>();
+    private readonly InstalledProjectStackCatalog _stackCatalog = new([]);
+    private readonly ITemplaterFactory _templaterFactory = Substitute.For<ITemplaterFactory>();
 
     public NewCommandTests()
     {
         _interaction = new TestInteractionService();
     }
 
+    private NewCommand CreateCommand() => new(_interaction, _projectResolver, _stackCatalog, _templaterFactory);
+
     [Fact]
     public void NewCommand_HasExpectedOptions()
     {
-        var cmd = new NewCommand(_interaction);
+        var cmd = CreateCommand();
         var optionNames = cmd.Options.Select(o => o.Name).ToList();
 
         optionNames.Should().Contain("--name");
@@ -34,15 +44,15 @@ public class NewCommandTests
     [Theory]
     [InlineData("plain")]
     [InlineData("json")]
-    public async Task NewCommand_List_FailsWithMigrationDiagnostic(string format)
+    public async Task NewCommand_List_RequiresInitializedProject(string format)
     {
-        var command = new NewCommand(_interaction);
+        var command = CreateCommand();
         ParseResult result = command.Parse(["--list", "--format", format]);
 
         int exitCode = await result.InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
         exitCode.Should().Be(1);
-        _interaction.AllOutput.Should().Contain("temporarily unavailable");
+        _interaction.AllOutput.Should().Contain("No initialized Functions project was found");
     }
 
     [Theory]
@@ -51,7 +61,7 @@ public class NewCommandTests
     [InlineData("--output:json")]
     public void NewCommand_RemovedOutputOption_ReportsUnrecognizedOption(params string[] args)
     {
-        var command = new NewCommand(_interaction);
+        var command = CreateCommand();
         ParseResult result = command.Parse(["--list", .. args]);
 
         result.Errors.Should().Contain(error =>
@@ -65,7 +75,7 @@ public class NewCommandTests
     [InlineData("--output:json")]
     public void NewCommand_RemovedOutputOptionWithExplicitPath_ReportsUnrecognizedOption(params string[] args)
     {
-        var command = new NewCommand(_interaction);
+        var command = CreateCommand();
         ParseResult result = command.Parse([".", "--list", .. args]);
 
         result.Errors.Should().Contain(error =>
@@ -85,7 +95,7 @@ public class NewCommandTests
     [Fact]
     public void NewCommand_HasPathArgument()
     {
-        var cmd = new NewCommand(_interaction);
+        var cmd = CreateCommand();
         cmd.Arguments.Should().ContainSingle();
         cmd.Arguments[0].Name.Should().Be("path");
     }
@@ -124,7 +134,7 @@ public class NewCommandTests
 
         try
         {
-            var command = new NewCommand(_interaction);
+            var command = CreateCommand();
             string[] args = [directory, "--template", "HttpTrigger", "--name", "Example", "--non-interactive"];
             if (force)
             {
@@ -134,7 +144,7 @@ public class NewCommandTests
             int exitCode = await command.Parse(args).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
             exitCode.Should().Be(1);
-            _interaction.AllOutput.Should().Contain("temporarily unavailable");
+            _interaction.AllOutput.Should().Contain("No initialized Functions project was found");
             Directory.Exists(directory).Should().Be(exists);
             if (exists)
             {
@@ -154,9 +164,50 @@ public class NewCommandTests
     }
 
     [Fact]
+    public async Task NewCommand_Force_RefusesOverwriteForInitializedDotNetProject()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"func-new-force-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, ".func"));
+        await File.WriteAllTextAsync(CliConfigurationPathsOptions.GetProjectConfigPath(new DirectoryInfo(directory)), "{}");
+        try
+        {
+            FunctionsProject project = Substitute.For<FunctionsProject>();
+            project.WorkingDirectory.Returns(WorkingDirectory.FromExplicit(directory));
+            project.StackName.Returns("dotnet");
+            project.Language.Returns("C#");
+            _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+                .Returns(ProjectResolutionResults.Resolved(project, "test project"));
+
+            IProjectStack stack = Substitute.For<IProjectStack>();
+            stack.Stack.Returns("dotnet");
+            stack.DisplayName.Returns(".NET");
+            stack.WorkerRuntimeAliases.Returns(["dotnet-isolated"]);
+            stack.SupportedLanguages.Returns(["C#"]);
+            stack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["C#"] = ["csharp"],
+            });
+            InstalledProjectStackCatalog catalog = new([stack]);
+            var command = new NewCommand(_interaction, _projectResolver, catalog, _templaterFactory);
+
+            int exitCode = await command.Parse([directory, "--force"])
+                .InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+            exitCode.Should().Be(1);
+            _interaction.AllOutput.Should().Contain("overwrite behavior for item templates has not been approved");
+            _templaterFactory.DidNotReceiveWithAnyArgs().Create(default!);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void NewCommand_NullInteraction_Throws()
     {
-        Action act = () => _ = new NewCommand(null!);
+        Action act = () => _ = new NewCommand(null!, Substitute.For<IFunctionsProjectResolver>(),
+            _stackCatalog, _templaterFactory);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("interaction");
     }

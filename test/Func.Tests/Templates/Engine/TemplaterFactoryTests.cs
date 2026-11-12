@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Templates.Engine;
+using Microsoft.TemplateEngine.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -43,7 +44,7 @@ public sealed class TemplaterFactoryTests : IDisposable
         TemplaterFactory factory = new(new CliConfigurationPathsOptions(Home));
 
         using Templater templater = factory.Create(Context("command"));
-        IReadOnlyList<TemplateCatalogEntry> entries = await templater.ListAsync(TemplateType.Item, CancellationToken.None);
+        IReadOnlyList<ITemplateInfo> entries = await templater.ListAsync();
 
         entries.Should().Contain(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity);
     }
@@ -57,7 +58,7 @@ public sealed class TemplaterFactoryTests : IDisposable
         using Templater second = factory.Create(Context("second"));
 
         first.Dispose();
-        IReadOnlyList<TemplateCatalogEntry> entries = await second.ListAsync(TemplateType.Item, CancellationToken.None);
+        IReadOnlyList<ITemplateInfo> entries = await second.ListAsync();
 
         entries.Should().Contain(entry => entry.Identity == TemplateFixtures.ItemTemplateIdentity);
     }
