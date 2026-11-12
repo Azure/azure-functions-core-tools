@@ -35,7 +35,7 @@ public class FuncTemplateEngineHostTests
     [Fact]
     public void TryGetHostParamDefault_WorkingDirectory_ReturnsCommandDirectory()
     {
-        using FuncTemplateEngineHost host = new(new TemplateEngineContext(_commandDirectory));
+        using FuncTemplateEngineHost host = new(new TemplateEngineContext(_commandDirectory), []);
 
         bool found = host.TryGetHostParamDefault("WorkingDirectory", out string? value);
 
@@ -51,7 +51,7 @@ public class FuncTemplateEngineHostTests
         TemplateEngineContext context = new(
             WorkingDirectory.FromExplicit(commandPath + Path.DirectorySeparatorChar),
             new TemplateEngineProjectContext(WorkingDirectory.FromExplicit(projectPath + Path.DirectorySeparatorChar), "node"));
-        using FuncTemplateEngineHost host = new(context);
+        using FuncTemplateEngineHost host = new(context, []);
 
         host.TryGetHostParamDefault("WorkingDirectory", out string? workingDirectory).Should().BeTrue();
         host.TryGetHostParamDefault(FuncTemplateEngineHostParameters.ProjectRoot, out string? projectRoot).Should().BeTrue();
@@ -68,7 +68,7 @@ public class FuncTemplateEngineHostTests
             _commandDirectory,
             new TemplateEngineProjectContext(_projectRoot, "node", "TypeScript"),
             new TemplateEngineBundleContext(BundleId, "4.35.0"));
-        using FuncTemplateEngineHost host = new(context);
+        using FuncTemplateEngineHost host = new(context, []);
 
         bool found = host.TryGetHostParamDefault(parameter, out string? value);
 
@@ -80,7 +80,7 @@ public class FuncTemplateEngineHostTests
     [MemberData(nameof(FuncParameters))]
     public void TryGetHostParamDefault_UnresolvedContext_ReportsParameterUnavailable(string parameter)
     {
-        using FuncTemplateEngineHost host = new(new TemplateEngineContext(_commandDirectory));
+        using FuncTemplateEngineHost host = new(new TemplateEngineContext(_commandDirectory), []);
 
         bool found = host.TryGetHostParamDefault(parameter, out string? value);
 
@@ -92,7 +92,7 @@ public class FuncTemplateEngineHostTests
     public void TryGetHostParamDefault_ProjectWithoutLanguage_ReportsLanguageUnavailable()
     {
         TemplateEngineContext context = new(_commandDirectory, new TemplateEngineProjectContext(_projectRoot, "python"));
-        using FuncTemplateEngineHost host = new(context);
+        using FuncTemplateEngineHost host = new(context, []);
 
         bool found = host.TryGetHostParamDefault(FuncTemplateEngineHostParameters.Language, out string? value);
 
@@ -104,7 +104,7 @@ public class FuncTemplateEngineHostTests
     public void TryGetHostParamDefault_ProjectWithoutStack_ReportsOnlyStackUnavailable()
     {
         TemplateEngineContext context = new(_commandDirectory, new TemplateEngineProjectContext(_projectRoot, stack: null, "TypeScript"));
-        using FuncTemplateEngineHost host = new(context);
+        using FuncTemplateEngineHost host = new(context, []);
 
         bool found = host.TryGetHostParamDefault(FuncTemplateEngineHostParameters.Stack, out string? value);
 
@@ -118,8 +118,14 @@ public class FuncTemplateEngineHostTests
     [Fact]
     public void Constructor_NullContext_Throws()
     {
-        Action act = () => _ = new FuncTemplateEngineHost(null!);
-
+        Action act = () => _ = new FuncTemplateEngineHost(null!, []);
         act.Should().Throw<ArgumentNullException>().WithParameterName("context");
+    }
+
+    [Fact]
+    public void Constructor_NullComponents_Throws()
+    {
+        Action act = () => _ = new FuncTemplateEngineHost(new TemplateEngineContext(_commandDirectory), null!);
+        act.Should().Throw<ArgumentNullException>().WithParameterName("components");
     }
 }

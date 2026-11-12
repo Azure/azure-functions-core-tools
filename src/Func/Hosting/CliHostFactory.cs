@@ -130,7 +130,7 @@ internal static class CliHostFactory
         builder.Services.AddWorkloadInstaller();
         builder.Services.AddQuickstartManifest();
         builder.Services.AddManagedAzurite();
-        builder.Services.AddSingleton<ITemplaterFactory, TemplaterFactory>();
+        builder.Services.AddTemplating();
 
         return builder;
     }
