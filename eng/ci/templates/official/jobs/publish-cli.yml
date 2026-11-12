@@ -16,7 +16,7 @@ jobs:
     # Temporarily pin MSI-producing jobs while investigating ICE failures.
     ${{ if startsWith(parameters.runtime, 'win-x') }}:
       demands:
-      - ImageVersionOverride -equals 517.0.0
+      - ImageVersionOverride -equals 493.0.0
 
   variables:
   - template: /eng/ci/templates/official/variables/authenticode-binaries-tosign.yml@self
