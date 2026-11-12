@@ -55,7 +55,7 @@ extends:
           projects: |
             src/Func/Func.csproj
             test/Func.Tests/Func.Tests.csproj
-          build_args: -p:IsReleaseCI=true
+          build_args: -p:IsReleaseCI=true -p:TelemetryInstrumentationKey="$(TELEMETRY_INSTRUMENTATION_KEY)"
 
     - stage: Release
       dependsOn: ['Build', 'SDLSources']
