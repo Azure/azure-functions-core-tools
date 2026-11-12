@@ -1,7 +1,8 @@
 # Measuring CLI startup
 
-The local harness measures `func --help` and `func version` from process launch
-through exit. It records observations, **not an approved baseline or CI budget**.
+The local harness uses **BenchmarkDotNet 0.15.8** to measure `func --help` and
+`func version` from a prepared process launch through exit. It records
+observations, **not an approved baseline or CI budget**.
 CI collects these observations without enforcing a latency threshold.
 
 Use PowerShell 7.4 or newer and a native, single-file published v5 executable.
@@ -10,6 +11,8 @@ Build outside the measurement:
 ```powershell
 dotnet restore src\Func\Func.csproj -r win-x64
 dotnet publish src\Func\Func.csproj -c Release -r win-x64 --no-restore -p:CI=true -o out\startup-cli
+dotnet restore eng\Performance\Startup\Performance.Startup.csproj
+dotnet build eng\Performance\Startup\Performance.Startup.csproj -c Release --no-restore -p:CI=true
 .\eng\scripts\measure-cli-startup.ps1 -ExecutablePath .\out\startup-cli\func.exe -OutputPath .\out\startup-results.json
 ```
 
@@ -18,14 +21,19 @@ and use your shell's path separators. The self-contained executable carries its
 runtime; the build SDK does not select a different runtime when measuring it.
 Keep the published artifact and its build provenance. The report records its
 SHA-256, product metadata (when available), CLI version, host OS/architecture,
-PowerShell version, protocol and raw samples.
+PowerShell version, protocol and raw samples. The repository-selected .NET SDK
+is also required to build and run the BenchmarkDotNet host; it does not replace
+the self-contained target CLI's runtime.
 
 Defaults are three series of five launches per command. Override `-Series`,
 `-SamplesPerSeries` or `-TimeoutSeconds` for experiments. These are exploratory
 counts, not statistically qualified policy. Every launch is a fresh process.
 Within each command/series, the first is labeled `first-in-series`; the remainder
-are `subsequent`. Each series starts with separate, known state. Command order
-alternates between series. An untimed version preflight occurs first and is
+are `subsequent`. Each command/series starts with separate, known state and a
+fresh BenchmarkDotNet host. The **Monitoring** strategy uses one invocation per
+iteration, five iterations by default, one host launch per command/series, and
+no warmup iterations. BenchmarkDotNet orders its parameter cases; command order
+no longer alternates between series. An untimed version preflight occurs first and is
 recorded; it can warm OS caches. Neither category guarantees cold machine caches,
 which are not cleared.
 
@@ -49,7 +57,10 @@ always `not-evaluated`; successful measurement does not mean a performance pass.
 Run the focused harness checks, including actual CLI measurements:
 
 ```powershell
-.\test\Performance\MeasureCliStartup.Tests.ps1 -ExecutablePath .\out\startup-cli\func.exe
+dotnet restore test\Performance\Fixtures\Performance.Startup.Fixture.csproj
+dotnet publish test\Performance\Fixtures\Performance.Startup.Fixture.csproj -c Release --no-restore -p:CI=true -o out\startup-fixture
+.\test\Performance\MeasureCliStartup.Tests.ps1 -ExecutablePath .\out\startup-cli\func.exe `
+    -FixtureExecutablePath .\out\startup-fixture\Azure.Functions.Cli.Performance.Startup.Fixture.exe
 ```
 
 The tests use real child processes and synthetic summary inputs; they do not
@@ -59,6 +70,11 @@ wrong-directory negative control, rather than comparing platform-dependent path
 spellings. Environment fields are checked separately for useful diagnostics.
 Windows validation does not
 qualify Linux, macOS or ARM64.
+The synthetic CLI fixture intentionally passes version preflight, then forces
+nonzero exit, unexpected stderr, wrong output and timeout inside generated
+BenchmarkDotNet hosts. Tests require failed reports, retained diagnostics and
+removed owned state; framework failure cannot be accepted as a performance pass.
+On Unix, omit `.exe` from the fixture executable name.
 
 ## Reporting-only CI
 
@@ -76,6 +92,30 @@ then collects the default 30 samples. Test execution warms the machine further;
 the categories describe state within each series, not first launch on a clean
 runner. Builds, tests and measurements run sequentially within each job.
 
+The benchmark host prepares the process in `IterationSetup`, measures
+`StartupProcess.StartAndWait`, then captures/qualifies output and disposes the
+process in `IterationCleanup`. Setup, validation, fixture deletion, framework
+host startup and generated-project builds are not part of the measured workload.
+The workload includes small method/guard/Stopwatch overhead around process
+start-to-exit. `elapsedMs` comes from BenchmarkDotNet's actual workload iteration;
+`innerElapsedMs` records the nested process timer for boundary diagnostics.
+Each framework iteration must match exactly one qualified child observation and
+one operation, with the expected command/series/index. Missing, duplicate,
+invalid or incomplete framework results fail the run.
+
+The JSON report's schema and first/subsequent summary remain compatible. Adjacent
+`<OutputPath>.benchmarkdotnet/` artifacts retain the request, child observations,
+framework logs, JSON/CSV/HTML/Markdown exports and actual iteration mapping.
+Existing report files and artifact directories are never overwritten. The
+framework's default pooled mean table is supplementary: the Actions summary
+continues to use category medians, not pooled means.
+
+This changes measurement orchestration, caller-runtime conditions and ordering
+from the earlier custom-script protocol. Historical custom-script CI baselines
+remain evidence for that protocol, not automatically qualified BenchmarkDotNet
+baselines. Collect and review native BenchmarkDotNet observations before
+rebaselining or deciding any warning/failure threshold.
+
 The workflow rejects architecture emulation within the PowerShell process. It
 does not promise all six shipped RIDs: hosted runner architecture can differ by
 repository/runner availability. The actual RID, runner label/image, selected SDK,
@@ -92,6 +132,11 @@ No download is needed for this overview. Failed reports are labeled as partial;
 missing reports show an explicit no-results message. Harness test outcomes remain
 in the **Validate startup harness** step logs. Raw data and executable identity
 remain in the artifacts.
+
+BenchmarkDotNet is configured not to change the machine's power plan. Its
+normal benchmark-host preparation still differs from the earlier PowerShell
+measurement loop. Neither framework statistics nor additional instrumentation
+eliminates shared-runner load or OS-cache variability.
 
 Summary generation and upload are attempted even after failure or cancellation;
 early setup failures may leave no files, and hosted job termination can prevent

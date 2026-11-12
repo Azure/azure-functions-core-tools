@@ -7,6 +7,7 @@ on:
     paths:
       - src/**
       - eng/build/**
+      - eng/Performance/**
       - eng/res/**
       - eng/scripts/measure-cli-startup.ps1
       - test/Performance/**
@@ -23,6 +24,7 @@ on:
     paths:
       - src/**
       - eng/build/**
+      - eng/Performance/**
       - eng/res/**
       - eng/scripts/measure-cli-startup.ps1
       - test/Performance/**
@@ -110,6 +112,8 @@ jobs:
               configuration = 'Release'
               telemetry = 'opted-out'
               budgetStatus = 'not-evaluated'
+              measurementFramework = 'BenchmarkDotNet 0.15.8'
+              runStrategy = 'Monitoring'
           } | ConvertTo-Json | Set-Content (Join-Path $env:RESULTS_DIRECTORY 'provenance.json') -Encoding utf8
 
       - name: Restore native CLI
@@ -128,11 +132,28 @@ jobs:
               Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'publish.log')
           if ($LASTEXITCODE -ne 0) { throw 'CLI publish failed.' }
 
+      - name: Build BenchmarkDotNet harness
+        run: |
+          dotnet restore eng/Performance/Startup/Performance.Startup.csproj 2>&1 |
+              Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'benchmark-restore.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Benchmark restore failed.' }
+          dotnet build eng/Performance/Startup/Performance.Startup.csproj -c Release --no-restore -p:CI=true 2>&1 |
+              Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'benchmark-build.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Benchmark build failed.' }
+          dotnet restore test/Performance/Fixtures/Performance.Startup.Fixture.csproj 2>&1 |
+              Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'fixture-restore.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture restore failed.' }
+          dotnet publish test/Performance/Fixtures/Performance.Startup.Fixture.csproj -c Release --no-restore -p:CI=true -o out/startup-fixture 2>&1 |
+              Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'fixture-publish.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture publish failed.' }
+
       - name: Validate startup harness
         env:
           CLI_EXECUTABLE: ${{ steps.target.outputs.executable }}
         run: |
-          & ./test/Performance/MeasureCliStartup.Tests.ps1 -ExecutablePath $env:CLI_EXECUTABLE *>&1 |
+          $fixtureName = if ($IsWindows) { 'Azure.Functions.Cli.Performance.Startup.Fixture.exe' } else { 'Azure.Functions.Cli.Performance.Startup.Fixture' }
+          & ./test/Performance/MeasureCliStartup.Tests.ps1 -ExecutablePath $env:CLI_EXECUTABLE `
+              -FixtureExecutablePath (Join-Path $env:GITHUB_WORKSPACE "out/startup-fixture/$fixtureName") *>&1 |
               Tee-Object (Join-Path $env:RESULTS_DIRECTORY 'harness-tests.log')
 
       - name: Collect startup observations (no performance gate)
@@ -160,6 +181,7 @@ jobs:
           $lines.Add("## CLI startup observations: $(ConvertTo-SummaryText $env:RUNNER_LABEL)")
           $lines.Add('')
           $lines.Add('**Reporting only: no performance budget is enforced.** Times cover fresh process start through exit, not guaranteed cold OS caches.')
+          $lines.Add('BenchmarkDotNet 0.15.8, Monitoring strategy; one fresh CLI process per iteration, no warmup iterations.')
           $lines.Add('')
           $provenancePath = Join-Path $env:RESULTS_DIRECTORY 'provenance.json'
           if (Test-Path -LiteralPath $provenancePath) {
