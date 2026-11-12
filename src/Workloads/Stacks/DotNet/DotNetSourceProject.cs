@@ -12,15 +12,42 @@ namespace Azure.Functions.Cli.Workloads.DotNet;
 /// A .NET Functions project detected from source (has a .csproj/.fsproj).
 /// Requires building before host startup.
 /// </summary>
-internal sealed class DotNetSourceProject(WorkingDirectory workingDirectory, string projectFilePath, IDotnetCliRunner dotnetCli) : DotNetProject(workingDirectory)
+internal sealed class DotNetSourceProject(
+    WorkingDirectory workingDirectory,
+    string projectFilePath,
+    IDotnetCliRunner dotnetCli,
+    IDotNetProjectMetadataReader projectMetadataReader) : DotNetProject(workingDirectory)
 {
     private readonly IDotnetCliRunner _dotnetCli = dotnetCli ?? throw new ArgumentNullException(nameof(dotnetCli));
+    private readonly IDotNetProjectMetadataReader _projectMetadataReader =
+        projectMetadataReader ?? throw new ArgumentNullException(nameof(projectMetadataReader));
 
     public string ProjectFilePath { get; } = projectFilePath ?? throw new ArgumentNullException(nameof(projectFilePath));
 
     public override string? Language => Path.GetExtension(ProjectFilePath).Equals(".fsproj", StringComparison.OrdinalIgnoreCase)
         ? "F#"
         : "C#";
+
+    public override IReadOnlyDictionary<string, string> TemplateHostParameters
+    {
+        get
+        {
+            try
+            {
+                return new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["func:dotnet-project-file"] = Path.GetFileName(ProjectFilePath),
+                    ["func:dotnet-assembly-name"] = _projectMetadataReader.ReadAssemblyName(ProjectFilePath),
+                };
+            }
+            catch (Exception ex) when (ex is IOException or System.Xml.XmlException)
+            {
+                throw new InvalidOperationException(
+                    $"Unable to read .NET project file '{Path.GetFileName(ProjectFilePath)}'.",
+                    ex);
+            }
+        }
+    }
 
     public override async Task PrepareForHostRunAsync(FunctionsProjectHostRunContext context, CancellationToken cancellationToken)
     {

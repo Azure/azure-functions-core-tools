@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "identity": "Azure.Functions.Cli.Java.FlexByoc",
+  "name": "Java Flex BYOC container artifacts",
+  "shortName": "flex-byoc",
+  "precedence": 100,
+  "tags": {
+    "type": "artifact",
+    "func-capability": "flex-byoc",
+    "func-stack": "java"
+  },
+  "symbols": {
+    "RuntimeVersion": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "25",
+      "replaces": "{{RUNTIME_VERSION}}",
+      "choices": [
+        { "choice": "21" },
+        { "choice": "25" }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "rename": {
+            "Dockerfile.template": "Dockerfile",
+            "dockerignore.template": ".dockerignore"
+          }
+        }
+      ]
+    }
+  ]
+}

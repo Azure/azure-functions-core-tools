@@ -7,6 +7,7 @@ using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Hosting.FirstRun;
@@ -92,6 +93,8 @@ internal static class CliHostFactory
 
         builder.Services.AddSingleton<IProcessEnvironment, ProcessEnvironment>();
         builder.Services.AddSingleton<IFileSystem, PhysicalFileSystem>();
+        builder.Services.AddSingleton<ContainerArtifactOrchestrator>();
+        builder.Services.AddSingleton<TemplateArgumentParser>();
         builder.Services.AddSingleton<IInstallationMetadataReader, InstallationMetadataReader>();
         builder.Services.AddSingleton<FuncAliasNudge>();
         builder.Services.AddSingleton<IWorkerConfigFileSystem, WorkerConfigFileSystem>();

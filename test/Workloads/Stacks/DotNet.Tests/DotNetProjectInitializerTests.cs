@@ -4,6 +4,7 @@
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Projects;
 using NSubstitute;
 

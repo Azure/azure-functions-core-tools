@@ -28,5 +28,6 @@ public sealed class NodeWorkload : Workload
         builder.Services.AddSingleton<IProjectInitializer, NodeProjectInitializer>();
         builder.Services.AddSingleton<IQuickstartProvider, NodeQuickstartProvider>();
         builder.AddProjectFactory(new NodeProjectFactory());
+        builder.AddTemplatePackage("Templates/FlexByoc");
     }
 }

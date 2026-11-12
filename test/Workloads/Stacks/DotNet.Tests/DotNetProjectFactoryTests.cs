@@ -34,7 +34,7 @@ public class DotNetProjectFactoryTests : IDisposable
     [Fact]
     public async Task Empty_directory_does_not_match()
     {
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>()
             .Which.Reason.Should().Be("no .NET project file or build output found");
@@ -47,7 +47,7 @@ public class DotNetProjectFactoryTests : IDisposable
     {
         WriteFile(fileName, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
 
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(CreateContext(), default);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         DotNetSourceProject sourceProject = created.Project.Should().BeOfType<DotNetSourceProject>().Subject;
@@ -65,7 +65,7 @@ public class DotNetProjectFactoryTests : IDisposable
     {
         WriteFile(fileName, "<Project></Project>");
 
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.Created>().Which.Reason.Should().Be($"found {fileName}");
     }
@@ -76,7 +76,7 @@ public class DotNetProjectFactoryTests : IDisposable
         WriteFile("App1.csproj", "<Project></Project>");
         WriteFile("App2.csproj", "<Project></Project>");
 
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>()
             .Which.Reason.Should().Be("multiple .NET project files found; cannot determine which to use");
@@ -88,7 +88,7 @@ public class DotNetProjectFactoryTests : IDisposable
         var nonexistent = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "func-dotnet-missing-" + Guid.NewGuid().ToString("N")));
         var context = new ProjectCreationContext(WorkingDirectory.FromExplicit(nonexistent.FullName));
 
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(context, default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(context, default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>()
             .Which.Reason.Should().Be("directory does not exist");
@@ -97,7 +97,7 @@ public class DotNetProjectFactoryTests : IDisposable
     [Fact]
     public async Task NullContext_throws()
     {
-        await FluentActions.Awaiting(() => new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
+        await FluentActions.Awaiting(() => CreateFactory().TryCreateProjectAsync(null!, default)).Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class DotNetProjectFactoryTests : IDisposable
         // .vbproj should not be matched as source or output
         WriteFile("MyApp.vbproj", "<Project></Project>");
 
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -118,7 +118,7 @@ public class DotNetProjectFactoryTests : IDisposable
         WriteFile("worker.config.json", "{}");
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, ".azurefunctions"));
 
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(CreateContext(), default);
 
         ProjectCreationResult.Created created = result.Should().BeOfType<ProjectCreationResult.Created>().Subject;
         created.Project.Should().BeOfType<DotNetOutputProject>();
@@ -131,7 +131,7 @@ public class DotNetProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         WriteFile("worker.config.json", "{}");
 
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -142,7 +142,7 @@ public class DotNetProjectFactoryTests : IDisposable
         WriteFile("host.json", "{}");
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, ".azurefunctions"));
 
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.NotCreated>();
     }
@@ -156,7 +156,7 @@ public class DotNetProjectFactoryTests : IDisposable
         WriteFile("worker.config.json", "{}");
         Directory.CreateDirectory(Path.Combine(_projectDir.FullName, ".azurefunctions"));
 
-        ProjectCreationResult result = await new DotNetProjectFactory(_dotnetCli).TryCreateProjectAsync(CreateContext(), default);
+        ProjectCreationResult result = await CreateFactory().TryCreateProjectAsync(CreateContext(), default);
 
         result.Should().BeOfType<ProjectCreationResult.Created>()
             .Which.Project.Should().BeOfType<DotNetSourceProject>();
@@ -167,4 +167,7 @@ public class DotNetProjectFactoryTests : IDisposable
 
     private ProjectCreationContext CreateContext()
         => new(WorkingDirectory.FromExplicit(_projectDir.FullName));
+
+    private DotNetProjectFactory CreateFactory() =>
+        new(_dotnetCli, Substitute.For<IDotNetProjectMetadataReader>());
 }

@@ -3,8 +3,9 @@
 
 using System.CommandLine;
 using Azure.Functions.Cli.Commands;
-using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Common;
+using Azure.Functions.Cli.Containers;
+using Azure.Functions.Cli.Projects;
 
 namespace Azure.Functions.Cli.Workloads.DotNet;
 
@@ -70,10 +71,15 @@ internal sealed class DotNetProjectInitializer(
         string projectName = context.ProjectName ?? Path.GetFileName(projectPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(projectName, nameof(context.ProjectName));
 
-        string framework = parseResult.GetValue(FrameworkOption) ?? DefaultFramework;
-        if (!SupportedFrameworks.Contains(framework, StringComparer.OrdinalIgnoreCase))
+        string framework = ResolveFramework(context, parseResult);
+        IReadOnlyList<string> supportedFrameworks = context.RequestedContainerArtifactCapability == ContainerArtifactCapability.FlexByoc
+            ? [framework]
+            : SupportedFrameworks;
+        if (!supportedFrameworks.Contains(framework, StringComparer.OrdinalIgnoreCase))
         {
-            throw new ArgumentException($"Framework '{framework}' is not supported. Supported frameworks: {string.Join(", ", SupportedFrameworks)}.", nameof(framework));
+            throw new ArgumentException(
+                $"Framework '{framework}' is not supported. Supported frameworks: {string.Join(", ", supportedFrameworks)}.",
+                nameof(framework));
         }
 
         if (framework.Equals("net11.0", StringComparison.OrdinalIgnoreCase) && language == "F#")
@@ -121,6 +127,29 @@ internal sealed class DotNetProjectInitializer(
                 $"Failed to scaffold project: {ex.Message}",
                 isUserError: true);
         }
+    }
+
+    private string ResolveFramework(InitContext context, ParseResult parseResult)
+    {
+        string framework = parseResult.GetValue(FrameworkOption) ?? DefaultFramework;
+        if (context.RequestedContainerArtifactCapability != ContainerArtifactCapability.FlexByoc)
+        {
+            return framework;
+        }
+
+        string runtimeVersion = context.ContainerArtifactParameters.GetValueOrDefault("RuntimeVersion")
+            ?? throw new InvalidOperationException("The selected Flex BYOC template did not provide its RuntimeVersion value.");
+
+        string expectedFramework = $"net{runtimeVersion}.0";
+        bool frameworkSpecified = parseResult.GetResult(FrameworkOption) is { Tokens.Count: > 0 };
+        if (frameworkSpecified && !framework.Equals(expectedFramework, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GracefulException(
+                $"The Flex BYOC runtime version '{runtimeVersion}' does not match target framework '{framework}'.",
+                isUserError: true);
+        }
+
+        return frameworkSpecified ? framework : expectedFramework;
     }
 
     internal async Task EnsureTemplatesInstalledAsync(CancellationToken cancellationToken)

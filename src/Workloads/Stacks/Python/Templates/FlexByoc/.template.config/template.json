@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "identity": "Azure.Functions.Cli.Python.FlexByoc",
+  "name": "Python Flex BYOC container artifacts",
+  "shortName": "flex-byoc",
+  "precedence": 100,
+  "tags": {
+    "type": "artifact",
+    "func-capability": "flex-byoc",
+    "func-stack": "python"
+  },
+  "symbols": {
+    "RuntimeVersion": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "3.14",
+      "replaces": "{{RUNTIME_VERSION}}",
+      "choices": [
+        { "choice": "3.11" },
+        { "choice": "3.12" },
+        { "choice": "3.13" },
+        { "choice": "3.14" }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "rename": {
+            "Dockerfile.template": "Dockerfile",
+            "dockerignore.template": ".dockerignore"
+          }
+        }
+      ]
+    }
+  ]
+}

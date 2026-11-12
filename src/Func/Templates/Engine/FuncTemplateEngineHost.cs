@@ -12,8 +12,8 @@ namespace Azure.Functions.Cli.Templates.Engine;
 /// <summary>
 /// Template engine host that exposes one command's <see cref="TemplateEngineContext"/> as host parameters.
 /// </summary>
-internal class FuncTemplateEngineHost(TemplateEngineContext context)
-    : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), _builtIns)
+internal class FuncTemplateEngineHost(TemplateEngineContext context, IReadOnlyList<WorkloadTemplatePackageSource>? templatePackages = null)
+    : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), CreateBuiltIns(templatePackages))
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
@@ -24,13 +24,6 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
     internal const string Identifier = "func";
 
     private const string WorkingDirectoryParameter = "WorkingDirectory";
-
-    private static readonly IReadOnlyList<(Type, IIdentifiedComponent)> _builtIns =
-    [
-        ..Components.AllComponents,
-        ..OrchestratorComponents.AllComponents,
-        ..FuncTemplateComponents.AllComponents,
-    ];
 
     private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));
 
@@ -62,6 +55,11 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
             {
                 defaults[FuncTemplateEngineHostParameters.Language] = project.Language;
             }
+
+            foreach ((string name, string value) in project.HostParameters)
+            {
+                defaults[name] = value;
+            }
         }
 
         if (context.Bundle is { } bundle)
@@ -75,4 +73,23 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
 
     // Trim so the value doesn't depend on whether the user typed a trailing separator.
     private static string DirectoryValue(WorkingDirectory directory) => Path.TrimEndingDirectorySeparator(directory.Info.FullName);
+
+    private static IReadOnlyList<(Type, IIdentifiedComponent)> CreateBuiltIns(
+        IReadOnlyList<WorkloadTemplatePackageSource>? templatePackages)
+    {
+        List<(Type, IIdentifiedComponent)> components =
+        [
+            ..Components.AllComponents,
+            ..OrchestratorComponents.AllComponents,
+            ..FuncTemplateComponents.AllComponents,
+        ];
+
+        if (templatePackages is { Count: > 0 })
+        {
+            WorkloadTemplatePackageProviderFactory factory = new(templatePackages);
+            components.Add((typeof(Microsoft.TemplateEngine.Abstractions.TemplatePackage.ITemplatePackageProviderFactory), factory));
+        }
+
+        return components;
+    }
 }

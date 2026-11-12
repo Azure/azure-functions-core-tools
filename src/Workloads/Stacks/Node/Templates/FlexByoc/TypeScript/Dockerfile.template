@@ -1,0 +1,40 @@
+# === BYOC: WORKER SOURCE ===
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS worker-source
+RUN dotnet new classlib --name WorkerRestore --output /tmp/worker-restore --no-restore \
+    && NUGET_PACKAGES=/worker-packages dotnet add /tmp/worker-restore/WorkerRestore.csproj package Microsoft.Azure.Functions.NodeJsWorker \
+        --version 3.16.0 \
+        --source https://azfunc.pkgs.visualstudio.com/e6a70c92-4128-439f-8012-382fe78d6396/_packaging/AzureFunctionsRelease/nuget/v3/index.json
+
+# === BYOC: BUILD STAGE ===
+FROM node:{{RUNTIME_VERSION}}-bookworm-slim AS build
+WORKDIR /src
+
+# === BYOC: BUILD PACKAGES - customer customization ===
+# Add build-only tools here.
+
+# === BYOC: BUILD PROJECT ===
+COPY package*.json ./
+RUN npm install
+COPY . ./
+RUN npm run build \
+    && npm prune --omit=dev
+
+# === BYOC: RUNTIME STAGE ===
+FROM node:{{RUNTIME_VERSION}}-bookworm-slim AS runtime
+WORKDIR /home/site/wwwroot
+
+# === BYOC: RUNTIME PACKAGES - customer customization ===
+# Add native runtime dependencies here.
+
+# === BYOC: COPY APPLICATION ===
+COPY --from=build /src/ ./
+COPY --from=worker-source /worker-packages/microsoft.azure.functions.nodejsworker/3.16.0/contentFiles/any/any/workers/node/ /azure-functions-worker/
+
+# === BYOC: PERMISSIONS - customer customization ===
+RUN chown -R node:node /home/site/wwwroot
+
+# === BYOC: STARTUP SCRIPT ===
+COPY entrypoint.sh /usr/local/bin/byoc-entrypoint
+RUN chmod 755 /usr/local/bin/byoc-entrypoint
+USER node
+ENTRYPOINT ["/usr/local/bin/byoc-entrypoint"]

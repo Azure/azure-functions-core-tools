@@ -23,6 +23,7 @@ public class PowerShellWorkloadTests
         initializer.Should().BeOfType<PowerShellProjectInitializer>();
         initializer.Stack.Should().Be("powershell");
         initializer.SupportedLanguages.Should().ContainSingle().Subject.Should().Be("PowerShell");
+        builder.Received(1).AddTemplatePackage("Templates/FlexByoc");
 
         IProjectStack stack = provider.GetRequiredService<IProjectStack>();
         stack.Should().BeOfType<PowerShellProjectStack>();

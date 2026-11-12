@@ -24,6 +24,7 @@ public sealed class DotNetWorkload : Workload
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IDotnetPathResolver, DotnetPathResolver>();
         builder.Services.AddSingleton<IDotnetCliRunner, DotnetCliRunner>();
+        builder.Services.AddSingleton<IDotNetProjectMetadataReader, DotNetProjectMetadataReader>();
         builder.Services.AddSingleton<ITemplateHivePathProvider, TemplateHivePathProvider>();
         builder.Services.AddSingleton<DotNetProjectStack>();
         builder.Services.AddSingleton<IProjectStack>(sp => sp.GetRequiredService<DotNetProjectStack>());
@@ -31,5 +32,6 @@ public sealed class DotNetWorkload : Workload
         builder.Services.AddSingleton<IStartHostOptionContributor, DotNetStartOptionContributor>();
         builder.Services.AddSingleton<IQuickstartProvider, DotNetQuickstartProvider>();
         builder.AddProjectFactory<DotNetProjectFactory>();
+        builder.AddTemplatePackage("Templates/FlexByoc");
     }
 }

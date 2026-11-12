@@ -4,10 +4,13 @@
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Setup;
 using Azure.Functions.Cli.Commands.Start.Initialization;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Containers;
 using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Quickstart;
+using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Update;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Loading;
@@ -66,6 +69,10 @@ internal static class TestParser
         var services = new ServiceCollection();
         services.AddSingleton(interaction);
         services.AddSingleton(Substitute.For<IPlatform>());
+        services.AddSingleton(Substitute.For<IFileSystem>());
+        services.AddSingleton(Substitute.For<ITemplaterFactory>());
+        services.AddSingleton<TemplateArgumentParser>();
+        services.AddSingleton<ContainerArtifactOrchestrator>();
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddOptions<StackOptions>();
         services.AddOptions<HostStartupOptions>();

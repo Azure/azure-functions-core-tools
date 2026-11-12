@@ -17,4 +17,12 @@
     <ProjectReference Include="$(SrcRoot)Abstractions/Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Templates/**" Exclude="Templates/FlexByoc/**" />
+    <Content Include="Templates/FlexByoc/**/*.*"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <WorkloadTemplatePackageContent Include="Templates/FlexByoc/**/*.*" />
+  </ItemGroup>
+
 </Project>

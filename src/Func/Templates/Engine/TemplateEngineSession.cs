@@ -21,13 +21,16 @@ internal sealed class TemplateEngineSession : IDisposable
     private readonly TemplatePackageManager _packageManager;
     private bool _disposed;
 
-    public TemplateEngineSession(TemplateEngineContext context, string settingsLocation)
+    public TemplateEngineSession(
+        TemplateEngineContext context,
+        string settingsLocation,
+        IReadOnlyList<WorkloadTemplatePackageSource>? templatePackages = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
 
         Context = context;
-        _settings = new(new FuncTemplateEngineHost(context), settingsLocation: settingsLocation);
+        _settings = new(new FuncTemplateEngineHost(context, templatePackages), settingsLocation: settingsLocation);
         _packageManager = new(_settings);
     }
 
