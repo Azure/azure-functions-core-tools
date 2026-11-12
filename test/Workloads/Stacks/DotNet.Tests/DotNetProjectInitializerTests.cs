@@ -86,6 +86,7 @@ public class DotNetProjectInitializerTests : IDisposable
 
         await new DotNetProjectStack(_dotnetCli).RunTemplatePostActionAsync(
             "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+            new Dictionary<string, string>(),
             projectDirectory,
             CancellationToken.None);
 
@@ -157,6 +158,7 @@ public class DotNetProjectInitializerTests : IDisposable
 
         Func<Task> act = () => new DotNetProjectStack(_dotnetCli).RunTemplatePostActionAsync(
             "unknown-action",
+            new Dictionary<string, string>(),
             projectDirectory,
             CancellationToken.None);
 

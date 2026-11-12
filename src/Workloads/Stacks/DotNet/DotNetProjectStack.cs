@@ -28,9 +28,6 @@ internal sealed class DotNetProjectStack(IDotnetCliRunner dotnetCli) : IProjectS
         { "F#", ["fsharp"] }
     };
 
-    public Task RunTemplatePostActionAsync(string actionId, WorkingDirectory projectDirectory, CancellationToken cancellationToken)
-        => RunTemplatePostActionAsync(actionId, new Dictionary<string, string>(), projectDirectory, cancellationToken);
-
     public async Task RunTemplatePostActionAsync(
         string actionId,
         IReadOnlyDictionary<string, string> arguments,

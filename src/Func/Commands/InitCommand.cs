@@ -746,12 +746,18 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             catch (NotSupportedException ex)
             {
                 _interaction.WriteError($"The project files were created, but template post-action '{postAction.ActionId}' is unsupported: {ex.Message}");
-                return 1;
+                if (!postAction.ContinueOnError)
+                {
+                    return 1;
+                }
             }
             catch (InvalidOperationException ex)
             {
                 _interaction.WriteError($"The project files were created, but template post-action '{postAction.ActionId}' failed: {ex.Message}");
-                return 1;
+                if (!postAction.ContinueOnError)
+                {
+                    return 1;
+                }
             }
         }
 

@@ -176,11 +176,21 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand
             }
             catch (NotSupportedException ex)
             {
-                return Fail($"Function files were created, but template post-action '{postAction.ActionId}' is unsupported: {ex.Message}");
+                string message = $"Function files were created, but template post-action '{postAction.ActionId}' is unsupported: {ex.Message}";
+                _interaction.WriteError(message);
+                if (!postAction.ContinueOnError)
+                {
+                    return 1;
+                }
             }
             catch (InvalidOperationException ex)
             {
-                return Fail($"Function files were created, but template post-action '{postAction.ActionId}' failed: {ex.Message}");
+                string message = $"Function files were created, but template post-action '{postAction.ActionId}' failed: {ex.Message}";
+                _interaction.WriteError(message);
+                if (!postAction.ContinueOnError)
+                {
+                    return 1;
+                }
             }
         }
 

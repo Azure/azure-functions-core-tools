@@ -299,7 +299,7 @@ public class NewCommandTests
     }
 
     [Fact]
-    public async Task NewCommand_PostActionFailureReportsPartialCreation()
+    public async Task NewCommand_ContinueOnErrorPostActionFailureContinuesAndSucceeds()
     {
         string root = Path.Combine(Path.GetTempPath(), $"func-new-post-action-{Guid.NewGuid():N}");
         string projectDirectory = Path.Combine(root, "project");
@@ -314,7 +314,12 @@ public class NewCommandTests
                 Arg.Any<IReadOnlyDictionary<string, string>>(),
                 Arg.Any<WorkingDirectory>(),
                 Arg.Any<CancellationToken>())
-            .Returns(_ => Task.FromException(new InvalidOperationException("package add failed")));
+            .Returns(call => string.Equals(
+                call.ArgAt<string>(0),
+                TemplateFixtures.AddPackageActionId,
+                StringComparison.OrdinalIgnoreCase)
+                    ? Task.FromException(new InvalidOperationException("package add failed"))
+                    : Task.CompletedTask);
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteHttpItemPackage(root), Path.Combine(home, "templates"));
         NewCommand command = new(_interaction, _projectResolver, new InstalledProjectStackCatalog([stack]), new TemplaterFactory(new CliConfigurationPathsOptions(home)));
 
@@ -326,10 +331,21 @@ public class NewCommandTests
                 "--non-interactive",
             ]).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
 
-            exitCode.Should().Be(1);
+            exitCode.Should().Be(0);
             _interaction.AllOutput.Should().Contain("Function files were created, but template post-action");
             _interaction.AllOutput.Should().Contain("package add failed");
+            _interaction.AllOutput.Should().Contain("Created function from template");
             Directory.GetFiles(projectDirectory, "*.cs", SearchOption.AllDirectories).Should().ContainSingle();
+            await stack.Received(1).RunTemplatePostActionAsync(
+                TemplateFixtures.AddPackageActionId.ToLowerInvariant(),
+                Arg.Any<IReadOnlyDictionary<string, string>>(),
+                project.WorkingDirectory,
+                Arg.Any<CancellationToken>());
+            await stack.Received(1).RunTemplatePostActionAsync(
+                TemplateFixtures.OpenEditorActionId.ToLowerInvariant(),
+                Arg.Any<IReadOnlyDictionary<string, string>>(),
+                project.WorkingDirectory,
+                Arg.Any<CancellationToken>());
         }
         finally
         {

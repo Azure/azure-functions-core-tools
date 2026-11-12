@@ -37,18 +37,6 @@ public interface IProjectStack
     public IReadOnlyDictionary<string, IReadOnlyList<string>> SupportedLanguageAliases { get; }
 
     /// <summary>
-    /// Runs a template post action for a generated project.
-    /// </summary>
-    /// <exception cref="NotSupportedException">The stack does not support the requested post action.</exception>
-    public Task RunTemplatePostActionAsync(string actionId, WorkingDirectory projectDirectory, CancellationToken cancellationToken)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
-        ArgumentNullException.ThrowIfNull(projectDirectory);
-        cancellationToken.ThrowIfCancellationRequested();
-        throw new NotSupportedException($"The '{Stack}' stack does not support template post-action '{actionId}'.");
-    }
-
-    /// <summary>
     /// Runs a template post action with its declared arguments for a generated project.
     /// </summary>
     public Task RunTemplatePostActionAsync(
@@ -57,7 +45,10 @@ public interface IProjectStack
         WorkingDirectory projectDirectory,
         CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
         ArgumentNullException.ThrowIfNull(arguments);
-        return RunTemplatePostActionAsync(actionId, projectDirectory, cancellationToken);
+        ArgumentNullException.ThrowIfNull(projectDirectory);
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new NotSupportedException($"The '{Stack}' stack does not support template post-action '{actionId}'.");
     }
 }
