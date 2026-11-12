@@ -10,6 +10,27 @@ namespace Azure.Functions.Cli.Tests.Templates.Engine;
 public sealed class FuncTemplateComponentsTests
 {
     [Fact]
+    public void AddTemplating_RegistersTemplatingServices()
+    {
+        ServiceCollection services = new();
+
+        services.AddTemplating();
+
+        services.Should().ContainSingle(descriptor =>
+            descriptor.ServiceType == typeof(ITemplaterFactory)
+            && descriptor.ImplementationType == typeof(TemplaterFactory)
+            && descriptor.Lifetime == ServiceLifetime.Singleton);
+        services.Should().ContainSingle(descriptor =>
+            descriptor.ServiceType == typeof(IWorkloadTemplateSource)
+            && descriptor.ImplementationType == typeof(WorkloadTemplateSource)
+            && descriptor.Lifetime == ServiceLifetime.Singleton);
+        services.Should().ContainSingle(descriptor =>
+            descriptor.ServiceType == typeof(ITemplateComponent)
+            && descriptor.ImplementationFactory != null
+            && descriptor.Lifetime == ServiceLifetime.Singleton);
+    }
+
+    [Fact]
     public void Get_NoCustomComponents_IncludesEdgeComponents()
     {
         IReadOnlyList<(Type Type, IIdentifiedComponent Instance)> components = FuncTemplateComponents.Get([]);
