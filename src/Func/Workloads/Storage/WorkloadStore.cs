@@ -193,7 +193,7 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
         if (remainingReferences <= 0)
         {
             registry.Workloads.RemoveAt(index);
-            return new WorkloadOwnershipRemovalResult(true, true, null);
+            return new WorkloadOwnershipRemovalResult(true, true, current);
         }
 
         WorkloadEntry updated = CopyWithOwnership(

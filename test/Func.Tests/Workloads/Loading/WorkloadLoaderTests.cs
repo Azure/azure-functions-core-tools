@@ -23,7 +23,7 @@ public class WorkloadLoaderTests
     [Fact]
     public void Load_ReturnsEmpty_WhenNoEntries()
     {
-        var loader = new WorkloadLoader(StubPaths());
+        var loader = new WorkloadLoader();
 
         var loaded = loader.Load([]);
 
@@ -33,19 +33,20 @@ public class WorkloadLoaderTests
     [Fact]
     public void Load_HydratesEntry_FromAssemblyOnDisk()
     {
-        var loader = new WorkloadLoader(StubPaths());
+        var loader = new WorkloadLoader();
 
         var loaded = loader.Load([FixtureEntry(FixturePackageId)]);
 
         var item = loaded.Should().ContainSingle().Subject;
         item.Instance.GetType().FullName.Should().Be(FixtureTypeName);
         item.PackageId.Should().Be(FixturePackageId);
+        item.InstallDirectory.Should().Be(AppContext.BaseDirectory);
     }
 
     [Fact]
     public void Load_Throws_WhenAssemblyFileMissing()
     {
-        var loader = new WorkloadLoader(StubPaths());
+        var loader = new WorkloadLoader();
         var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: "DoesNotExist.dll");
 
         var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
@@ -56,11 +57,23 @@ public class WorkloadLoaderTests
     }
 
     [Fact]
+    public void Load_Throws_WhenPackageRootIsMissing()
+    {
+        var loader = new WorkloadLoader();
+        WorkloadEntry entry = FixtureEntry(FixturePackageId);
+        entry.PackageRoot = string.Empty;
+
+        var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().Contain("package root is missing");
+    }
+
+    [Fact]
     public void Load_InvalidWorkloadForDifferentRid_IncludesUpdateGuidance()
     {
         var runtimeIdentifierProvider = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
         runtimeIdentifierProvider.Current.Returns("linux-x64");
-        var loader = new WorkloadLoader(StubPaths(), runtimeIdentifierProvider);
+        var loader = new WorkloadLoader(runtimeIdentifierProvider);
         WorkloadEntry entry = FixtureEntry(
             FixturePackageId,
             assemblyFileOverride: "DoesNotExist.dll",
@@ -85,7 +98,7 @@ public class WorkloadLoaderTests
     {
         var runtimeIdentifierProvider = Substitute.For<IWorkloadRuntimeIdentifierProvider>();
         runtimeIdentifierProvider.Current.Returns("win-x64");
-        var loader = new WorkloadLoader(StubPaths(), runtimeIdentifierProvider);
+        var loader = new WorkloadLoader(runtimeIdentifierProvider);
         WorkloadEntry entry = FixtureEntry(
             FixturePackageId,
             assemblyFileOverride: "DoesNotExist.dll",
@@ -101,7 +114,7 @@ public class WorkloadLoaderTests
     [Fact]
     public void Load_Throws_WhenTypeNotFoundInAssembly()
     {
-        var loader = new WorkloadLoader(StubPaths());
+        var loader = new WorkloadLoader();
         var entry = FixtureEntry(FixturePackageId, typeNameOverride: "Some.Missing.Type");
 
         var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
@@ -114,7 +127,7 @@ public class WorkloadLoaderTests
     [Fact]
     public void Load_Throws_WhenTypeDoesNotDeriveFromWorkload()
     {
-        var loader = new WorkloadLoader(StubPaths());
+        var loader = new WorkloadLoader();
         var entry = FixtureEntry(
             FixturePackageId,
             typeNameOverride: "Azure.Functions.Cli.Workloads.Tests.Fixtures.Default.NotAWorkload");
@@ -130,7 +143,7 @@ public class WorkloadLoaderTests
     [Fact]
     public void Load_LoadsEachWorkloadInOwnAssemblyLoadContext()
     {
-        var loader = new WorkloadLoader(StubPaths());
+        var loader = new WorkloadLoader();
         var entries = new[]
         {
             FixtureEntry("fixture-a"),
@@ -151,7 +164,7 @@ public class WorkloadLoaderTests
     [Fact]
     public void Load_LoadContextIsCollectible()
     {
-        var loader = new WorkloadLoader(StubPaths());
+        var loader = new WorkloadLoader();
 
         var loaded = loader.Load([FixtureEntry("collectible-fixture")]);
 
@@ -163,7 +176,7 @@ public class WorkloadLoaderTests
     [Fact]
     public void Load_DelegatesAbstractionsAssemblyToDefaultContext()
     {
-        var loader = new WorkloadLoader(StubPaths());
+        var loader = new WorkloadLoader();
 
         var loaded = loader.Load([FixtureEntry("identity-fixture")]);
 
@@ -190,7 +203,7 @@ public class WorkloadLoaderTests
         // assemblies and the default context resolves them, distinct from the
         // defensive intercept path exercised by the sibling test using the
         // mis-packaged Workloads.Tests.Fixtures.Default fixture.
-        var loader = new WorkloadLoader(StubPaths());
+        var loader = new WorkloadLoader();
 
         var loaded = loader.Load([SdkFixtureEntry(SdkFixturePackageId)]);
 
@@ -226,7 +239,7 @@ public class WorkloadLoaderTests
     }
 
     [Fact]
-    public void Ctor_NullPaths_Throws()
+    public void Ctor_NullRuntimeIdentifierProvider_Throws()
     {
         FluentActions.Invoking(() => new WorkloadLoader(null!)).Should().ThrowExactly<ArgumentNullException>();
     }
@@ -242,12 +255,9 @@ public class WorkloadLoaderTests
             Directory.CreateDirectory(tempDir);
             CopyFixtureToDirectory(FixtureAssemblyFile, tempDir);
 
-            var paths = Substitute.For<IWorkloadPaths>();
-            paths.WorkloadsRoot.Returns(tempDir);
-            paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns(tempDir);
-
-            var loader = new WorkloadLoader(paths);
+            var loader = new WorkloadLoader();
             var entry = FixtureEntry(FixturePackageId);
+            entry.PackageRoot = tempDir;
 
             var loaded = loader.Load([entry]);
 
@@ -274,12 +284,9 @@ public class WorkloadLoaderTests
             Directory.CreateDirectory(subDir);
             CopyFixtureToDirectory(FixtureAssemblyFile, subDir);
 
-            var paths = Substitute.For<IWorkloadPaths>();
-            paths.WorkloadsRoot.Returns(tempDir);
-            paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns(tempDir);
-
-            var loader = new WorkloadLoader(paths);
+            var loader = new WorkloadLoader();
             var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: $"lib/{FixtureAssemblyFile}");
+            entry.PackageRoot = tempDir;
 
             var loaded = loader.Load([entry]);
 
@@ -307,12 +314,9 @@ public class WorkloadLoaderTests
             CopyFixtureToDirectory(FixtureAssemblyFile, tempDir);
             CopyFixtureToDirectory(FixtureAssemblyFile, toolsAny);
 
-            var paths = Substitute.For<IWorkloadPaths>();
-            paths.WorkloadsRoot.Returns(tempDir);
-            paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns(tempDir);
-
-            var loader = new WorkloadLoader(paths);
+            var loader = new WorkloadLoader();
             var entry = FixtureEntry(FixturePackageId);
+            entry.PackageRoot = tempDir;
 
             var loaded = loader.Load([entry]);
 
@@ -342,12 +346,9 @@ public class WorkloadLoaderTests
             // Place the DLL one level above the "install directory" to simulate escape.
             CopyFixtureToDirectory(FixtureAssemblyFile, tempDir);
 
-            var paths = Substitute.For<IWorkloadPaths>();
-            paths.WorkloadsRoot.Returns(nested);
-            paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns(nested);
-
-            var loader = new WorkloadLoader(paths);
+            var loader = new WorkloadLoader();
             var entry = FixtureEntry(FixturePackageId, assemblyFileOverride: $"../{FixtureAssemblyFile}");
+            entry.PackageRoot = nested;
 
             var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
@@ -360,20 +361,6 @@ public class WorkloadLoaderTests
         }
     }
 
-    private static IWorkloadPaths StubPaths()
-    {
-        // Loader resolves assemblies via paths.GetInstallDirectory + tools/any.
-        // Fixture dlls land at <BaseDirectory>/tools/any/<file> via test
-        // project copies, so returning BaseDirectory as the install directory
-        // lines up with a registry entry of AssemblyPath = "<file>" without
-        // having to materialize a <package_id>/<version>/tools/any tree.
-        var paths = Substitute.For<IWorkloadPaths>();
-        paths.WorkloadsRoot.Returns(AppContext.BaseDirectory);
-        paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
-            .Returns(AppContext.BaseDirectory);
-        return paths;
-    }
-
     private static WorkloadEntry FixtureEntry(
         string packageId,
         string? assemblyFileOverride = null,
@@ -383,6 +370,7 @@ public class WorkloadLoaderTests
         {
             PackageId = packageId,
             PackageVersion = "1.0.0",
+            PackageRoot = AppContext.BaseDirectory,
             RuntimeIdentifier = runtimeIdentifier,
             LogicalPackage = logicalPackage,
             EntryPoint = new EntryPointSpec
@@ -396,6 +384,7 @@ public class WorkloadLoaderTests
     {
         PackageId = packageId,
         PackageVersion = "1.0.0",
+        PackageRoot = AppContext.BaseDirectory,
         EntryPoint = new EntryPointSpec
         {
             AssemblyPath = SdkFixtureAssemblyFile,

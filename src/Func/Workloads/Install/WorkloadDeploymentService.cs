@@ -57,9 +57,13 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         WorkloadEntry? existing = installed.FirstOrDefault(entry =>
             string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(entry.PackageVersion, version, StringComparison.Ordinal));
-        if (existing is null
-            || existing.IsImplicitlyInstalled
-            || !Directory.Exists(_paths.GetInstallDirectory(existing.PackageId, existing.PackageVersion)))
+        if (existing is null || existing.IsImplicitlyInstalled)
+        {
+            return null;
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(existing.PackageRoot);
+        if (!Directory.Exists(existing.PackageRoot))
         {
             return null;
         }
@@ -133,7 +137,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                     await _store.MoveLogicalOwnershipAsync(currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, entry, cancellationToken);
                 if (moved.PreviousEntryRemoved)
                 {
-                    TryDeleteDirectory(_paths.GetInstallDirectory(currentLogicalOwner.PackageId, currentLogicalOwner.PackageVersion));
+                    TryDeleteDirectory(currentLogicalOwner.PackageRoot);
                 }
 
                 return new WorkloadInstallResult(moved.Entry, false);
@@ -192,7 +196,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
             if (moved.PreviousEntryRemoved)
             {
-                string oldPath = _paths.GetInstallDirectory(currentEntry.PackageId, currentEntry.PackageVersion);
+                string oldPath = currentEntry.PackageRoot;
                 if (!string.Equals(oldPath, finalPath, StringComparison.Ordinal))
                 {
                     TryDeleteDirectory(oldPath);
@@ -246,7 +250,9 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
         if (result.EntryRemoved)
         {
-            TryDeleteDirectory(_paths.GetInstallDirectory(physicalPackageId, physicalVersion));
+            WorkloadEntry removedEntry = result.Entry
+                ?? throw new InvalidOperationException("The workload store did not return the removed entry.");
+            TryDeleteDirectory(removedEntry.PackageRoot);
         }
 
         return true;
@@ -281,7 +287,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                 await _store.MoveLogicalOwnershipAsync(currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, incoming, cancellationToken);
             if (moved.PreviousEntryRemoved)
             {
-                TryDeleteDirectory(_paths.GetInstallDirectory(currentLogicalOwner.PackageId, currentLogicalOwner.PackageVersion));
+                TryDeleteDirectory(currentLogicalOwner.PackageRoot);
             }
 
             return new WorkloadInstallResult(moved.Entry, false);
@@ -336,7 +342,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             return null;
         }
 
-        string installPath = _paths.GetInstallDirectory(existing.PackageId, existing.PackageVersion);
+        string installPath = existing.PackageRoot;
+        ArgumentException.ThrowIfNullOrWhiteSpace(installPath);
         if (!Directory.Exists(installPath))
         {
             return null;
@@ -418,7 +425,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
     private bool IsExistingInstallationValid(WorkloadEntry entry, WorkloadMetadata expectedMetadata)
     {
-        string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        string installPath = entry.PackageRoot;
+        ArgumentException.ThrowIfNullOrWhiteSpace(installPath);
         if (!Directory.Exists(installPath))
         {
             return false;
@@ -607,6 +615,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
     private static void TryDeleteDirectory(string path)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
         try
         {
             if (Directory.Exists(path))

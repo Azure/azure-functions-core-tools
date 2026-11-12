@@ -7,13 +7,11 @@ using Azure.Functions.Cli.Workloads.Storage;
 namespace Azure.Functions.Cli.Bundles;
 
 /// <summary>
-/// Adapter over <see cref="IWorkloadStore"/> + <see cref="IWorkloadPaths"/> that
-/// surfaces only the installed bundle workload rows.
+/// Adapter over <see cref="IWorkloadStore"/> that surfaces only the installed bundle workload rows.
 /// </summary>
-internal sealed class InstalledBundleWorkloads(IWorkloadStore store, IWorkloadPaths paths) : IInstalledBundleWorkloads
+internal sealed class InstalledBundleWorkloads(IWorkloadStore store) : IInstalledBundleWorkloads
 {
     private readonly IWorkloadStore _store = store ?? throw new ArgumentNullException(nameof(store));
-    private readonly IWorkloadPaths _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
     public async Task<IReadOnlyList<InstalledBundleWorkload>> ListInstalledAsync(CancellationToken cancellationToken = default)
     {
@@ -32,8 +30,7 @@ internal sealed class InstalledBundleWorkloads(IWorkloadStore store, IWorkloadPa
                 continue;
             }
 
-            string installDir = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
-            result.Add(new InstalledBundleWorkload(entry.PackageVersion, installDir));
+            result.Add(new InstalledBundleWorkload(entry.PackageVersion, entry.PackageRoot));
         }
 
         return result;

@@ -58,7 +58,8 @@ internal interface IWorkloadStore
 
     /// <summary>
     /// Atomically removes only the requested ownership and deletes the physical
-    /// row when its final owner is removed.
+    /// row when its final owner is removed. The result includes the removed
+    /// entry when the row is deleted, or the remaining entry otherwise.
     /// </summary>
     public Task<WorkloadOwnershipRemovalResult> RemoveOwnershipAsync(string packageId, string version,
         WorkloadOwnershipKind ownership, CancellationToken cancellationToken = default);
