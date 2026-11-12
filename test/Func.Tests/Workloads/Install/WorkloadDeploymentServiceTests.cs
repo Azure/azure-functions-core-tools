@@ -416,6 +416,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         {
             PackageId = "example.workload.win-x64",
             PackageVersion = "1.0.0",
+            PackageRoot = "existing-package-root",
             Kind = WorkloadKind.Workload,
             Aliases = ["example", "sample"],
             DisplayName = "Existing display name",
