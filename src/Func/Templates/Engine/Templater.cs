@@ -26,7 +26,7 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
     /// <summary>
     /// Instantiates the exact selected template using Microsoft.TemplateEngine's defaults for unspecified parameters.
     /// </summary>
-    public Task<ITemplateCreationResult> CreateAsync(
+    public async Task<ITemplateCreationResult> CreateAsync(
         ITemplateInfo template,
         string? name,
         string? fallbackName,
@@ -38,7 +38,23 @@ internal sealed class Templater(TemplateEngineSession session) : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
         ArgumentNullException.ThrowIfNull(inputParameters);
 
-        return new TemplateCreator(_session.Settings).InstantiateAsync(
+        TemplateCreator creator = new(_session.Settings);
+        ITemplateCreationResult preview = await creator.InstantiateAsync(
+            template,
+            name,
+            fallbackName,
+            outputPath,
+            inputParameters,
+            forceCreation: false,
+            baselineName: null,
+            dryRun: true,
+            cancellationToken);
+        if (preview.CreationEffects?.FileChanges.Any(change => change.ChangeKind == ChangeKind.Overwrite) == true)
+        {
+            throw new InvalidOperationException("The template would overwrite existing files.");
+        }
+
+        return await creator.InstantiateAsync(
             template,
             name,
             fallbackName,

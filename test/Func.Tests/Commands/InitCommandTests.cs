@@ -8,6 +8,7 @@ using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Projects;
+using Azure.Functions.Cli.Tests.Templates;
 using Azure.Functions.Cli.Templates.Engine;
 using Azure.Functions.Cli.Workers;
 using Azure.Functions.Cli.Workloads;
@@ -188,6 +189,140 @@ public class InitCommandTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task InitCommand_CreatesInstalledDotNet10ProjectAndRunsRestorePostAction()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-template-{Guid.NewGuid():N}");
+        string projectPath = Path.Combine(root, "project");
+        string home = Path.Combine(root, "home");
+        Option<string> frameworkOption = new("--target-framework");
+        FakeProjectInitializer initializer = new(
+            "dotnet",
+            ["C#"],
+            optionFactory: registry => [registry.GetOrAdd(frameworkOption)]);
+        IProjectStack stack = CreateDotNetStack();
+        stack.RunTemplatePostActionAsync(
+                Arg.Any<string>(),
+                Arg.Any<IReadOnlyDictionary<string, string>>(),
+                Arg.Any<WorkingDirectory>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        FunctionsProject project = Substitute.For<FunctionsProject>();
+        project.StackName.Returns("dotnet");
+        project.Language.Returns("C#");
+        project.WorkingDirectory.Returns(WorkingDirectory.FromExplicit(projectPath));
+        _projectResolver.ResolveProjectAsync(Arg.Any<ProjectResolutionContext>(), Arg.Any<CancellationToken>())
+            .Returns(ProjectResolutionResults.Resolved(project, "test project"));
+        string settingsPath = Path.Combine(home, "templates");
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteDotNetProjectPackage(root), settingsPath);
+        InitCommand command = new(
+            _interaction,
+            _hintRenderer,
+            _localSettings,
+            _projectResolver,
+            _bundleReader,
+            new InstalledBundleScanner(_installedBundles),
+            new InstalledProjectStackCatalog([stack]),
+            new TemplaterFactory(new CliConfigurationPathsOptions(home)),
+            [initializer]);
+
+        try
+        {
+            int exitCode = await command.Parse([
+                projectPath,
+                "--stack", "dotnet",
+                "--language", "C#",
+                "--name", "SampleApp",
+                "--target-framework", "net10.0",
+            ]).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+            exitCode.Should().Be(0);
+            string projectFile = Directory.GetFiles(projectPath, "*.csproj", SearchOption.AllDirectories)
+                .Should().ContainSingle().Subject;
+            (await File.ReadAllTextAsync(projectFile)).Should().Contain("net10.0");
+            File.Exists(Path.Combine(projectPath, "host.json")).Should().BeTrue();
+            File.Exists(CliConfigurationPathsOptions.GetProjectConfigPath(new DirectoryInfo(projectPath))).Should().BeTrue();
+            await stack.Received(1).RunTemplatePostActionAsync(
+                TemplateFixtures.ProjectRestoreActionId.ToLowerInvariant(),
+                Arg.Any<IReadOnlyDictionary<string, string>>(),
+                Arg.Is<WorkingDirectory>(directory => directory.Info.FullName == projectPath),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InitCommand_AmbiguousDotNetProjectTemplates_FailsBeforeCreatingProjectFiles()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"func-init-ambiguous-{Guid.NewGuid():N}");
+        string projectPath = Path.Combine(root, "project");
+        string home = Path.Combine(root, "home");
+        Option<string> frameworkOption = new("--target-framework");
+        FakeProjectInitializer initializer = new(
+            "dotnet",
+            ["C#"],
+            optionFactory: registry => [registry.GetOrAdd(frameworkOption)]);
+        IProjectStack stack = CreateDotNetStack();
+        string settingsPath = Path.Combine(home, "templates");
+        await TemplateFixtures.InstallAsync(
+            TemplateFixtures.WriteDotNetProjectPackage(root, includeAmbiguousCandidate: true),
+            settingsPath);
+        InitCommand command = new(
+            _interaction,
+            _hintRenderer,
+            _localSettings,
+            _projectResolver,
+            _bundleReader,
+            new InstalledBundleScanner(_installedBundles),
+            new InstalledProjectStackCatalog([stack]),
+            new TemplaterFactory(new CliConfigurationPathsOptions(home)),
+            [initializer]);
+
+        try
+        {
+            int exitCode = await command.Parse([
+                projectPath,
+                "--stack", "dotnet",
+                "--language", "C#",
+                "--target-framework", "net10.0",
+            ]).InvokeAsync(new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+            exitCode.Should().Be(1);
+            _interaction.AllOutput.Should().Contain(TemplateFixtures.DotNetProjectTemplateIdentity);
+            _interaction.AllOutput.Should().Contain(TemplateFixtures.SecondDotNetProjectTemplateIdentity);
+            File.Exists(CliConfigurationPathsOptions.GetProjectConfigPath(new DirectoryInfo(projectPath))).Should().BeFalse();
+            Directory.Exists(projectPath).Should().BeTrue();
+            Directory.GetFileSystemEntries(projectPath).Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    private static IProjectStack CreateDotNetStack()
+    {
+        IProjectStack stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns("dotnet");
+        stack.DisplayName.Returns(".NET");
+        stack.WorkerRuntimeAliases.Returns(["dotnet-isolated"]);
+        stack.SupportedLanguages.Returns(["C#"]);
+        stack.SupportedLanguageAliases.Returns(new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["C#"] = ["csharp"],
+        });
+        return stack;
     }
 
     [Fact]

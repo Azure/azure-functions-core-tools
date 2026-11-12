@@ -119,8 +119,8 @@ public sealed class FirstRunCoordinatorTests
         exitCode.Should().Be(1);
         _interaction.Lines.Should().Contain(line =>
             line.StartsWith("ERROR:", StringComparison.Ordinal)
-            &&             line.Contains("No initialized Functions project was found")
-            || line.Contains("not supported"));
+            && (line.Contains("No initialized Functions project was found")
+                || line.Contains("not supported")));
         _interaction.Lines.Should().NotContain(line => line.Contains("`func setup`"));
         _interaction.ConfirmCalls.Should().Be(0);
         await _setupRunner.DidNotReceiveWithAnyArgs().RunAsync(default!, default);

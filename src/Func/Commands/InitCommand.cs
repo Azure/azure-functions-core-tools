@@ -713,13 +713,22 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
             ClearDirectory(workingDirectory.Info);
         }
 
-        ITemplateCreationResult creation = await templater.CreateAsync(
-            selectedTemplate,
-            parseResult.GetValue(NameOption),
-            projectName,
-            workingDirectory.Info.FullName,
-            inputParameters,
-            cancellationToken);
+        ITemplateCreationResult creation;
+        try
+        {
+            creation = await templater.CreateAsync(
+                selectedTemplate,
+                parseResult.GetValue(NameOption),
+                projectName,
+                workingDirectory.Info.FullName,
+                inputParameters,
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _interaction.WriteError($"Failed to create the .NET project from template '{selectedTemplate.Identity}': {ex.Message}");
+            return 1;
+        }
         if (creation.Status != CreationResultStatus.Success || creation.CreationResult is null)
         {
             _interaction.WriteError(
@@ -732,7 +741,7 @@ internal class InitCommand : FuncCliCommand, IBuiltInCommand
         {
             try
             {
-                await stack.RunTemplatePostActionAsync(postAction.ActionId.ToString(), workingDirectory, cancellationToken);
+                await stack.RunTemplatePostActionAsync(postAction.ActionId.ToString(), postAction.Args, workingDirectory, cancellationToken);
             }
             catch (NotSupportedException ex)
             {

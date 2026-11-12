@@ -47,4 +47,17 @@ public interface IProjectStack
         cancellationToken.ThrowIfCancellationRequested();
         throw new NotSupportedException($"The '{Stack}' stack does not support template post-action '{actionId}'.");
     }
+
+    /// <summary>
+    /// Runs a template post action with its declared arguments for a generated project.
+    /// </summary>
+    public Task RunTemplatePostActionAsync(
+        string actionId,
+        IReadOnlyDictionary<string, string> arguments,
+        WorkingDirectory projectDirectory,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        return RunTemplatePostActionAsync(actionId, projectDirectory, cancellationToken);
+    }
 }

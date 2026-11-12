@@ -18,7 +18,7 @@ namespace Azure.Functions.Cli.Commands;
 /// </summary>
 internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand
 {
-    private const string HttpTemplateShortName = "HttpTrigger";
+    private const string HttpTemplateShortName = "http";
 
     public Option<string?> NameOption { get; } = new("--name", "-n")
     {
@@ -146,13 +146,21 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand
 
         ITemplateInfo selectedTemplate = candidates[0];
         string? name = parseResult.GetValue(NameOption);
-        ITemplateCreationResult creation = await templater.CreateAsync(
-            selectedTemplate,
-            name,
-            null,
-            project.WorkingDirectory.Info.FullName,
-            new Dictionary<string, string?>(StringComparer.Ordinal),
-            cancellationToken);
+        ITemplateCreationResult creation;
+        try
+        {
+            creation = await templater.CreateAsync(
+                selectedTemplate,
+                name,
+                null,
+                project.WorkingDirectory.Info.FullName,
+                new Dictionary<string, string?>(StringComparer.Ordinal),
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Fail($"Failed to create function from template '{selectedTemplate.Identity}': {ex.Message}");
+        }
         if (creation.Status != CreationResultStatus.Success || creation.CreationResult is null)
         {
             return Fail(
@@ -164,7 +172,7 @@ internal sealed class NewCommand : FuncCliCommand, IBuiltInCommand
         {
             try
             {
-                await stack.RunTemplatePostActionAsync(postAction.ActionId.ToString(), project.WorkingDirectory, cancellationToken);
+                await stack.RunTemplatePostActionAsync(postAction.ActionId.ToString(), postAction.Args, project.WorkingDirectory, cancellationToken);
             }
             catch (NotSupportedException ex)
             {

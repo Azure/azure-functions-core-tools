@@ -96,6 +96,61 @@ public class DotNetProjectInitializerTests : IDisposable
     }
 
     [Fact]
+    public async Task DotNetProjectStack_AddPackageReferencePostAction_UsesTemplatePackageMetadata()
+    {
+        var projectDirectory = WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project"));
+        IReadOnlyDictionary<string, string> arguments = new Dictionary<string, string>
+        {
+            ["referenceType"] = "package",
+            ["reference"] = "Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore",
+            ["version"] = "2.1.1",
+            ["projectFileExtensions"] = ".csproj",
+        };
+
+        await new DotNetProjectStack(_dotnetCli).RunTemplatePostActionAsync(
+            "B17581D1-C5C9-4489-8F0A-004BE667B814",
+            arguments,
+            projectDirectory,
+            CancellationToken.None);
+
+        await _dotnetCli.Received(1).RunAsync(
+            Arg.Is<IReadOnlyList<string>>(values => values.SequenceEqual(
+                new[] { "add", "package", "Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore", "--version", "2.1.1" })),
+            projectDirectory.Info.FullName,
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DotNetProjectStack_OpenEditorPostAction_IsIgnoredInCli()
+    {
+        var projectDirectory = WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project"));
+
+        await new DotNetProjectStack(_dotnetCli).RunTemplatePostActionAsync(
+            "84C0DA21-51C8-4541-9940-6CA19AF04EE6",
+            new Dictionary<string, string> { ["files"] = "0" },
+            projectDirectory,
+            CancellationToken.None);
+
+        await _dotnetCli.DidNotReceiveWithAnyArgs().RunAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task DotNetProjectStack_AddPackageReferencePostAction_RejectsMissingPackageMetadata()
+    {
+        var projectDirectory = WorkingDirectory.FromExplicit(Path.Combine(_hivePath, "project"));
+
+        Func<Task> act = () => new DotNetProjectStack(_dotnetCli).RunTemplatePostActionAsync(
+            "B17581D1-C5C9-4489-8F0A-004BE667B814",
+            new Dictionary<string, string>(),
+            projectDirectory,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("The .NET template package-reference post action is missing package metadata.");
+        await _dotnetCli.DidNotReceiveWithAnyArgs().RunAsync(default!, default, default);
+    }
+
+    [Fact]
     public async Task DotNetProjectStack_UnknownPostAction_ThrowsWithoutRunningDotnet()
     {
         var projectDirectory = WorkingDirectory.FromExplicit(_hivePath);

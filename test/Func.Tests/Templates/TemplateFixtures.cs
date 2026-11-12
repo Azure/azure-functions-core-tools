@@ -25,6 +25,156 @@ internal static class TemplateFixtures
     public const string InvalidHostTemplateIdentity = "Func.Tests.InvalidHost";
     public const string DotnetHostOnlyTemplateIdentity = "Func.Tests.DotnetHostOnly";
     public const string HiddenTemplateIdentity = "Func.Tests.Hidden";
+    public const string DotNetProjectTemplateIdentity = "Func.Tests.DotNetProject";
+    public const string SecondDotNetProjectTemplateIdentity = "Func.Tests.DotNetProject.Second";
+    public const string HttpItemTemplateIdentity = "Azure.Function.CSharp.Isolated.HttpTrigger.3.x";
+    public const string SecondHttpItemTemplateIdentity = "Func.Tests.Http.Second";
+    public const string IncompleteHttpTemplateIdentity = "Func.Tests.Http.Incomplete";
+    public const string ProjectRestoreActionId = "210D431B-A78B-4D2F-B762-4ED3E3EA9025";
+    public const string AddPackageActionId = "B17581D1-C5C9-4489-8F0A-004BE667B814";
+    public const string OpenEditorActionId = "84C0DA21-51C8-4541-9940-6CA19AF04EE6";
+
+    public static string WriteDotNetProjectPackage(string parentDirectory, bool includeAmbiguousCandidate = false)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "dotnet-project-templates");
+        WriteDotNetProjectTemplate(Path.Combine(packageDirectory, "project"), DotNetProjectTemplateIdentity);
+        if (includeAmbiguousCandidate)
+        {
+            WriteDotNetProjectTemplate(Path.Combine(packageDirectory, "project-second"), SecondDotNetProjectTemplateIdentity);
+        }
+
+        return packageDirectory;
+    }
+
+    public static string WriteHttpItemPackage(
+        string parentDirectory,
+        bool includeAmbiguousCandidate = false,
+        bool includeIncompleteCandidate = false)
+    {
+        string packageDirectory = Path.Combine(parentDirectory, "http-item-templates");
+        WriteHttpItemTemplate(Path.Combine(packageDirectory, "http"), HttpItemTemplateIdentity, includePostActions: true);
+        if (includeAmbiguousCandidate)
+        {
+            WriteHttpItemTemplate(Path.Combine(packageDirectory, "http-second"), SecondHttpItemTemplateIdentity, includePostActions: true);
+        }
+
+        if (includeIncompleteCandidate)
+        {
+            WriteTemplate(
+                Path.Combine(packageDirectory, "http-incomplete"),
+                $$"""
+                {
+                  "identity": "{{IncompleteHttpTemplateIdentity}}",
+                  "name": "Incomplete HTTP template",
+                  "shortName": "http",
+                  "tags": { "type": "item" }
+                }
+                """,
+                ("IncompleteHttp.txt", "Should not be selected"));
+        }
+
+        return packageDirectory;
+    }
+
+    private static void WriteDotNetProjectTemplate(string templateDirectory, string identity)
+    {
+        WriteTemplate(
+            templateDirectory,
+            $$"""
+            {
+              "identity": "{{identity}}",
+              "name": "Functions C# Project",
+              "shortName": "func",
+              "sourceName": "Company.FunctionApp",
+              "defaultName": "Company.FunctionApp",
+              "tags": { "type": "project", "language": "C#" },
+              "symbols": {
+                "Framework": {
+                  "type": "parameter",
+                  "datatype": "string",
+                  "defaultValue": "net10.0",
+                  "replaces": "TargetFrameworkValue"
+                }
+              },
+              "postActions": [
+                {
+                  "description": "Restore NuGet packages required by this project.",
+                  "manualInstructions": [],
+                  "actionId": "{{ProjectRestoreActionId}}",
+                  "continueOnError": true
+                }
+              ]
+            }
+            """,
+            ("Company.FunctionApp.csproj", "<Project><PropertyGroup><TargetFramework>TargetFrameworkValue</TargetFramework></PropertyGroup></Project>"));
+        File.WriteAllText(Path.Combine(templateDirectory, "host.json"), """{ "version": "2.0" }""");
+    }
+
+    private static void WriteHttpItemTemplate(string templateDirectory, string identity, bool includePostActions)
+    {
+        string postActions = includePostActions
+            ? $$"""
+                "postActions": [
+                  {
+                    "description": "Adding Reference to Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore Nuget package",
+                    "actionId": "{{AddPackageActionId}}",
+                    "continueOnError": true,
+                    "manualInstructions": [],
+                    "args": {
+                      "referenceType": "package",
+                      "reference": "Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore",
+                      "version": "2.1.1",
+                      "projectFileExtensions": ".csproj"
+                    }
+                  },
+                  {
+                    "description": "Opens the function class file in the editor",
+                    "actionId": "{{OpenEditorActionId}}",
+                    "continueOnError": true,
+                    "manualInstructions": [],
+                    "args": { "files": "0" }
+                  }
+                ],
+                """
+            : string.Empty;
+
+        WriteTemplate(
+            templateDirectory,
+            $$"""
+            {
+              "identity": "{{identity}}",
+              "name": "HttpTrigger",
+              "shortName": "http",
+              "sourceName": "HttpTriggerCSharp",
+              "defaultName": "HttpTriggerCSharp",
+              "tags": { "type": "item", "language": "C#" },
+              "symbols": {
+                "name": {
+                  "type": "parameter",
+                  "datatype": "string",
+                  "defaultValue": "HttpTriggerCSharp",
+                  "replaces": "HttpTriggerCSharp"
+                },
+                "AccessRights": {
+                  "type": "parameter",
+                  "datatype": "choice",
+                  "defaultValue": "Function",
+                  "choices": [ { "choice": "Function" }, { "choice": "Anonymous" }, { "choice": "Admin" } ],
+                  "replaces": "AuthLevelValue"
+                },
+                "Namespace": {
+                  "type": "parameter",
+                  "datatype": "string",
+                  "defaultValue": "Company.Function",
+                  "replaces": "Company.Function"
+                }
+              },
+              {{postActions}}
+              "primaryOutputs": [ { "path": "HttpTriggerCSharp.cs" } ]
+            }
+            """,
+            ("HttpTriggerCSharp.cs", "public class HttpTriggerCSharp { public const string Auth = \"AuthLevelValue\"; public const string Namespace = \"Company.Function\"; }"));
+    }
 
     /// <summary>
     /// Writes a folder package with one item template, one basic project template, and two templates without an item

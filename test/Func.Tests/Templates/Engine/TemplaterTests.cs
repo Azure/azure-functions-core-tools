@@ -4,6 +4,7 @@
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
 using Microsoft.TemplateEngine.Abstractions;
+using Microsoft.TemplateEngine.Edge.Template;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -55,6 +56,54 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateAsync_UsesExactInstalledTemplateAndEngineDefaultsWithoutForce()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteHttpItemPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+        IReadOnlyList<ITemplateInfo> inventory = await templater.ListAsync();
+        ITemplateInfo selected = inventory.Should()
+            .ContainSingle(template => template.Identity == TemplateFixtures.HttpItemTemplateIdentity).Subject;
+        string outputPath = Path.Combine(_root, "generated");
+        IReadOnlyDictionary<string, string?> inputs = new Dictionary<string, string?>
+        {
+            ["AccessRights"] = "Anonymous",
+        };
+
+        ITemplateCreationResult created = await templater.CreateAsync(
+            selected,
+            "SampleHttp",
+            null,
+            outputPath,
+            inputs,
+            CancellationToken.None);
+
+        created.Status.Should().Be(CreationResultStatus.Success);
+        created.CreationResult.Should().NotBeNull();
+        string generatedFile = Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories)
+            .Should().ContainSingle().Subject;
+        string content = await File.ReadAllTextAsync(generatedFile);
+        content.Should().Contain("HttpTriggerCSharp");
+        content.Should().Contain("Anonymous");
+        content.Should().Contain("Company.Function", "unspecified parameters retain the Template Engine template default");
+
+        string conflictPath = Path.Combine(_root, "conflict");
+        string conflictingFile = Path.Combine(conflictPath, Path.GetRelativePath(outputPath, generatedFile));
+        Directory.CreateDirectory(Path.GetDirectoryName(conflictingFile)!);
+        await File.WriteAllTextAsync(conflictingFile, "preserve existing file");
+        Func<Task> createCollision = () => templater.CreateAsync(
+            selected,
+            "SampleHttp",
+            null,
+            conflictPath,
+            inputs,
+            CancellationToken.None);
+
+        await createCollision.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("The template would overwrite existing files.");
+        (await File.ReadAllTextAsync(conflictingFile)).Should().Be("preserve existing file", "creation is performed with force disabled");
+    }
+
+    [Fact]
     public async Task ListAsync_ReturnsTemplatesWithoutFuncTypeMetadata()
     {
         await TemplateFixtures.InstallAsync(TemplateFixtures.WriteBasicPackage(_root), _hive);
@@ -103,6 +152,28 @@ public sealed class TemplaterTests : IDisposable
         Func<Task> act = () => templater.ListAsync(cancellation.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task CreateAsync_CanceledTokenDoesNotCreateFiles()
+    {
+        await TemplateFixtures.InstallAsync(TemplateFixtures.WriteHttpItemPackage(_root), _hive);
+        using Templater templater = CreateTemplater();
+        ITemplateInfo selected = (await templater.ListAsync())
+            .Should().ContainSingle(template => template.Identity == TemplateFixtures.HttpItemTemplateIdentity).Subject;
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        Func<Task> act = () => templater.CreateAsync(
+            selected,
+            "SampleHttp",
+            null,
+            Path.Combine(_root, "generated"),
+            new Dictionary<string, string?>(),
+            cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        Directory.Exists(Path.Combine(_root, "generated")).Should().BeFalse();
     }
 
     [Fact]
