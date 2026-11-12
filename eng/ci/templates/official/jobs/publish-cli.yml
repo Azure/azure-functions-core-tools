@@ -13,6 +13,10 @@ jobs:
     name: 1es-pool-azfunc-public
     image: 1es-windows-2022
     os: windows
+    # Temporarily pin MSI-producing jobs while investigating ICE failures.
+    ${{ if startsWith(parameters.runtime, 'win-x') }}:
+      demands:
+      - ImageVersionOverride -equals 517.0.0
 
   variables:
   - template: /eng/ci/templates/official/variables/authenticode-binaries-tosign.yml@self
