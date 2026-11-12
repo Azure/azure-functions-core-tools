@@ -10,15 +10,19 @@
 
 Keep the CLI and workloads independently versioned. Each workload package
 declares what it requires from the CLI and what optional behavior it provides.
-During install and prune, the CLI warns when a workload references a different
-Abstractions version; the warning does not block installation or remove the
-workload. Runtime diagnostics explain recognized failures during workload
-loading or activation. No compatibility scan runs on every CLI invocation.
-This design is not related to or controlled by profile behavior and is considered a separate feature.
+For workloads loaded into the CLI process, the SDK generates a minimum CLI
+version from the resolved Abstractions package version used to build the
+workload. The CLI enforces that requirement; assembly-version differences are
+only diagnostic warnings. Default install, update, and setup select the newest
+compatible package version; an explicit version remains an exact request.
+During prune, Abstractions warnings do not remove workloads. Runtime
+diagnostics explain recognized failures during workload loading or activation.
+No compatibility scan runs on every CLI invocation. This design is not related
+to or controlled by profile behavior and is considered a separate feature.
 
 | Question | Source of Truth |
 | --- | --- |
-| Can this CLI consume the workload? | Manifest schema, structural validation, a minimum CLI version when needed, and diagnostic warnings about the Abstractions version referenced by a CLI-loaded workload |
+| Can this CLI consume the workload? | Manifest schema, structural validation, the required minimum CLI version for CLI-loaded workloads, and supplemental Abstractions-version warnings |
 | Can this workload perform a requested operation? | Capabilities declared by the selected workload implementation |
 | What exact versions were tested or requested? | Release evidence and explicit version/profile pins |
 
@@ -27,9 +31,9 @@ a runtime negotiation service. A capability check applies to the operation that
 needs it; an absent optional capability does not make the entire workload
 unusable.
 
-The initial acquisition behavior remains deliberately simple: validate the
-version selected by the existing resolver, but do not search older versions
-automatically.
+For implicit install, update, and setup selections, consider available package
+versions from newest to oldest and choose the first compatible version. An
+explicit version pin is exact and is never replaced with another version.
 
 ## Current state and motivation
 
@@ -47,7 +51,7 @@ re-reading the manifest.
 **Goals**
 
 - Warn during install or update when the workload references a different
-  Abstractions version; do not block installation.
+  Abstractions version; the warning alone does not block installation.
 - Warn during prune about all installed workloads with a different
   Abstractions reference; do not remove them for that reason.
 - Let workloads advertise optional behavior; when a command needs a capability,
@@ -55,12 +59,12 @@ re-reading the manifest.
 - Explain recognized assembly/type-loading failures during workload loading or
   activation; leave errors during workload command execution unchanged.
 - Explain incompatibilities and keep workload inventory and repair available.
-- Respect the selected version rather than silently choosing another one.
+- Respect explicit version pins; for implicit selections, choose the newest
+  compatible version and report incompatible newer candidates that were skipped.
 
 **Non-goals**
 
-- Automatically searching for another compatible version, updating workloads
-  in the background, or downgrading the CLI.
+- Updating workloads in the background or downgrading the CLI.
 - Treating a metadata declaration as proof that the workload behaves correctly.
 
 ## Compatibility requirements
@@ -69,12 +73,19 @@ re-reading the manifest.
 
 Some workloads load into the CLI process and use its shared
 `Azure.Functions.Cli.Abstractions` assembly. A version difference can be a
-useful warning, but does not by itself prove the workload is incompatible.
-Once a downloaded, local, or reused package is available during install/update,
-inspect the workload DLL's assembly reference and report it alongside the CLI's
-Abstractions version when they differ. Warnings do not block installation.
-Prune inspects every installed workload and does not remove a workload for
-this reason.
+useful diagnostic, but assembly versions do not reliably prove compatibility:
+prerelease details may be omitted, so multiple previews can have the same
+assembly version despite different APIs. For every workload loaded into the CLI
+process, the SDK generates `minCliVersion` from the full, resolved version of
+the Abstractions package used to build it. The CLI rejects the workload if its
+version is below that minimum. A missing or malformed minimum is not evidence
+of compatibility and is rejected for a v2 CLI-loaded workload.
+
+At install/update, inspect the workload DLL's assembly reference and report it
+alongside the CLI's Abstractions version when they differ. This remains a
+supplemental warning and does not replace the minimum-version check. Prune
+inspects every installed workload and does not remove a workload for an
+Abstractions-version warning.
 
 Do not scan workloads on unrelated CLI invocations. When a command actually
 loads a workload, make known assembly/type-loading failures actionable: name
@@ -83,14 +94,12 @@ for verbose diagnostics, and suggest updating the CLI or workload. Scope this
 handling to workload loading and activation. Errors raised later while running
 the workload's command code retain their existing behavior.
 
-Different versions don't necessarily mean the workload will fail. Assembly
-versions may also leave out prerelease details, so the warning should show the
-versions it found without claiming the workload is incompatible.
-
-A workload can also declare `minCliVersion` when it needs CLI behavior that
-the Abstractions version does not describe, such as a CLI bug fix. This is a
-CLI version, not an Abstractions version, and the workload author declares it.
-NuGet prerelease ordering applies: `5.2.0-preview.1` is older than `5.2.0`.
+Different assembly versions don't necessarily mean the workload will fail.
+Warnings should show the versions found without claiming incompatibility.
+`minCliVersion` is a CLI version, not an assembly version; NuGet prerelease
+ordering applies, so `5.2.0-preview.1` is older than `5.2.0`. A workload that
+needs additional CLI behavior beyond its Abstractions dependency may raise the
+SDK-generated minimum.
 
 ### Package shape
 
@@ -137,10 +146,13 @@ omits the other manifest fields:
 The schema URL, version numbers, and capability name are proposed examples,
 not metadata already present in published packages.
 
-For v2, `minCliVersion` is an optional top-level property. Reject a malformed
-value when it is present. The manifest does not declare an Abstractions
-version; the CLI reads the assembly reference to produce install and prune
-warnings.
+For v2, `minCliVersion` is a top-level property required for workloads loaded
+into the CLI process. The SDK generates it from the resolved Abstractions
+package version used to build the workload; authors may raise it for additional
+CLI behavior requirements but must not lower it. Reject a missing or malformed
+value for these workloads. The manifest does not declare an Abstractions
+version; the CLI reads the assembly reference to produce supplemental install
+and prune warnings.
 
 Not every new manifest property requires a schema-version bump. An optional
 field can be added compatibly when older CLIs may safely ignore it and the
@@ -149,8 +161,12 @@ understand a field to behave safely, or when the package structure or meaning
 changes incompatibly.
 
 `workload.json` is authoritative. NuGet tags may be discovery hints but do not
-authorize installation. Do not use NuGet dependencies to install a second copy
-of an assembly the CLI already supplies, such as Abstractions.
+authorize installation. A package-level `minCliVersion` may be published as a
+search prefilter so the CLI can skip downloading candidates that require a
+newer CLI. The SDK must generate it from the same value as the manifest; the
+manifest remains authoritative and every selected package is validated against
+it. Do not use NuGet dependencies to install a second copy of an assembly the
+CLI already supplies, such as Abstractions.
 
 ### Provided capabilities
 
@@ -222,11 +238,43 @@ builds instead of inferring support from the executable path or version.
 
 ## Enforcement and selection
 
-1. The existing resolver selects a workload using its normal source and version
-   rules. Compatibility checks do not change that selection.
+### Default version resolution
+
+For install, update, or setup without an explicit version, enumerate available
+versions from the configured package sources in descending NuGet version order,
+across major versions. Validate candidates until the newest compatible version
+is found. Compatibility includes valid manifest schema, package structure, and
+the CLI's satisfaction of `minCliVersion`; capabilities are checked later by
+the operation that needs them, and Abstractions-version warnings alone do not
+make a candidate incompatible. Report incompatible newer candidates and why
+they were skipped.
+
+A package-level `minCliVersion` may prefilter candidates that require a newer
+CLI. If the hint is absent, download and inspect the candidate manifest. Always
+validate the selected package's manifest and structure; do not treat the
+package-level hint as proof of compatibility.
+
+If no candidate is compatible, fail with an actionable explanation, including
+the newest candidate and its required CLI version when available. For update,
+never downgrade an installed workload: update only to a compatible version
+that is not lower than the installed version. If no such version exists, leave
+the installation unchanged and report why.
+
+An explicit version pin selects only that version. Reject it if incompatible;
+do not fall back to another version. An update pin below the installed version
+is rejected rather than downgrading. If the installed version is already the
+newest compatible version, report that it is up to date. `--force` does not
+bypass compatibility checks.
+
+### Compatibility enforcement
+
+1. During install/update and before loading a CLI-loaded workload, enforce its
+   SDK-generated `minCliVersion`. Reject a missing or malformed minimum, or a
+   CLI version below it.
 2. During download/install or update, inspect the selected workload DLL's
-   Abstractions reference. If it differs from the CLI's, warn and continue.
-   Apply the same behavior to local and reused packages.
+   Abstractions reference. If it differs from the CLI's, warn and continue;
+   this warning is supplemental to `minCliVersion`. Apply the same behavior to
+   local and reused packages.
 3. During prune, inspect every installed workload and warn about differing
    Abstractions references. Do not remove or change workloads because of these
    warnings.
@@ -245,10 +293,6 @@ available even if a workload cannot be loaded.
 Do not run a full compatibility scan at CLI startup or for unrelated commands.
 Prune checks all installed workloads from metadata without loading their code.
 A capability-gated command checks only the workload whose capability it needs.
-
-An explicit version pin or `--force` does not bypass compatibility checks.
-Do not silently change a selection or search for an older version; the user can
-update the CLI or explicitly choose a compatible workload instead.
 
 ## Migration and release coordination
 
@@ -282,19 +326,25 @@ workload release notes.
 
 1. Agree on the v2 schema, Abstractions versioning policy, and the preview
    reset/reinstall guidance for existing workloads.
-2. Add non-blocking Abstractions mismatch warnings during install/update and
+2. Resolve implicit install/update/setup requests to the newest compatible
+   version, while keeping explicit pins exact and updates non-downgrading.
+3. Add non-blocking Abstractions mismatch warnings during install/update and
    prune. Keep prune from removing workloads for these warnings.
-3. Add actionable diagnostics for recognized load/activation errors, without
+4. Add actionable diagnostics for recognized load/activation errors, without
    changing errors raised during command execution.
-4. Update the SDK to write `minCliVersion` and capabilities to the manifest.
-5. Add the host capability check for `--port 0`, then verify stable CLI schema
+5. Update the SDK to generate `minCliVersion` from the resolved Abstractions
+   package version and write capabilities to the manifest.
+6. Add the host capability check for `--port 0`, then verify stable CLI schema
    support before publishing stable v2 workloads.
 
 ## Acceptance criteria
 
 | Scenario | Expected outcome |
 | --- | --- |
-| A downloaded, local, or reused workload references a different Abstractions version | Warn during install/update and continue |
+| A downloaded, local, or reused workload references a different Abstractions version | Warn during install/update; independently enforce `minCliVersion` |
+| A CLI-loaded v2 workload is built against a newer Abstractions package | The SDK records its full resolved version in `minCliVersion`; reject it when the CLI is older |
+| A CLI-loaded v2 workload has no generated minimum or has a malformed one | Reject it rather than assuming it is compatible |
+| Two CLI previews have the same Abstractions assembly version but different package versions | Use the generated full-SemVer `minCliVersion` check to reject the older CLI |
 | Prune is called | Warn for every installed workload with a different Abstractions reference; do not remove it for that reason |
 | A command needs a capability | Check that capability on only the individual workload the command will use |
 | An unrelated command is called | Do not scan installed workloads for compatibility or load their code for that purpose |
@@ -307,8 +357,12 @@ workload release notes.
 | A prerelease CLI does not satisfy a stable minimum | Reject the package with guidance to upgrade |
 | A package advertises an unknown capability | Ignore it; it does not satisfy a capability the CLI needs |
 | A pinned or forced install violates a declared minimum CLI requirement | Reject it without changing the selection or existing installation |
-| The selected version is incompatible but an older one exists | Report the incompatibility; do not automatically select the older version |
-| A package is local, reused, or a meta-package member | Apply the same relevant checks without changing unrelated ownership |
+| A newer candidate is incompatible but an older candidate is compatible | Select the newest compatible version and report incompatible newer candidates |
+| The only compatible candidate is in an older major version | Select it when resolving an implicit version |
+| No available candidate is compatible | Fail with the newest candidate's incompatibility reason when available |
+| An update's newest compatible candidate is older than the installed version | Do not downgrade; leave the installation unchanged and explain why |
+| An update is explicitly pinned below the installed version | Reject the downgrade |
+| A local, reused, or meta-package member is selected | Apply the same version and compatibility rules to each package without changing unrelated ownership |
 | A host lacks bound-address reporting | Allow fixed-port runs; reject `--port 0` before launch with guidance |
 | A host advertises bound-address reporting | Report a valid nonzero address and fail if the event is missing or invalid |
 | A local host or v1 manifest has no capability metadata | Do not assume it provides the capability |
