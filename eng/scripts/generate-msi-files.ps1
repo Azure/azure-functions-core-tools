@@ -116,7 +116,9 @@ function New-PlatformMSI {
         & { candle -arch $Platform -dPlatform="$Platform" -dSource='.' -dProductVersion="$CliVersion" $masterWxsPath $fragmentPath }
 
         # Link to create MSI
-        & { light -ext "WixUIExtension" -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
+        # TEMPORARY: -sval skips ICE validation because the current 1es-windows-2022 image (518.0.0)
+        # cannot access the Windows Installer service. Remove once the image is fixed.
+        & { light -ext "WixUIExtension" -sval -out $msiPath -sice:"ICE61" "$masterWxsName.wixobj" "$fragmentName.wixobj" }
 
         # Verify MSI was created
         if (-not (Test-Path -Path $msiPath)) {
