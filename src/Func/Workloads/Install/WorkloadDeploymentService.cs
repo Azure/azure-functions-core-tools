@@ -379,6 +379,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         {
             PackageId = entry.PackageId,
             PackageVersion = entry.PackageVersion,
+            PackageRoot = entry.PackageRoot,
             Aliases = entry.Aliases,
             DisplayName = entry.DisplayName,
             Description = entry.Description,
@@ -400,6 +401,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         {
             PackageId = incoming.PackageId,
             PackageVersion = incoming.PackageVersion,
+            PackageRoot = incoming.PackageRoot,
             Aliases = incoming.Aliases,
             DisplayName = incoming.DisplayName,
             Description = incoming.Description,

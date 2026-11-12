@@ -194,6 +194,8 @@ This is lexical containment, not symbolic-link resolution or a guarantee that
 directory names are valid on every filesystem. Authors must choose names supported
 on their target platforms.
 
+The registry stores package identity, not an absolute installation path. When reading entries, the workload store hydrates the non-serialized `PackageRoot` from the configured workload home, package id, and version. Entries saved or returned by ownership changes are bound to that same store's paths.
+
 Add a `README.md` next to the csproj. `Release.props` auto-wires it as `<PackageReadmeFile>` (and the Functions icon as `<PackageIcon>`), so both surface on NuGet feeds without extra packing config. Use it to describe the workload's purpose, the language(s) it supports, and any prerequisites.
 
 ## Step 2: Subclass `Workload`
