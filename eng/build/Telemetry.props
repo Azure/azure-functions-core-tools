@@ -11,4 +11,15 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <Target Name="ValidateReleaseTelemetryInstrumentationKey"
+          BeforeTargets="GetAssemblyAttributes"
+          Condition="'$(IsReleaseCI)' == 'true'">
+    <Error Condition="'$(TelemetryInstrumentationKey)' == ''"
+           Text="A telemetry instrumentation key is required for release builds." />
+    <Error Condition="'$(TelemetryInstrumentationKey)' == '00000000-0000-0000-0000-000000000000'"
+           Text="The telemetry instrumentation key cannot use the development sentinel for release builds." />
+    <Error Condition="'$(TelemetryInstrumentationKey)' != '' AND '$(TelemetryInstrumentationKey)' != '00000000-0000-0000-0000-000000000000' AND !$([System.Text.RegularExpressions.Regex]::IsMatch('$(TelemetryInstrumentationKey)', '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'))"
+           Text="The telemetry instrumentation key must be a valid GUID for release builds." />
+  </Target>
+
 </Project>
