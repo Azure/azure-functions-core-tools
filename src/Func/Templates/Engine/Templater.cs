@@ -2,32 +2,61 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Microsoft.TemplateEngine.Abstractions;
-using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
+using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
-/// Command-scoped entry point to the template engine. Create it through <see cref="ITemplaterFactory"/> and dispose
-/// it when the command is finished with templates.
+/// Command-scoped entry point for discovering templates installed in the func template engine.
 /// </summary>
-internal sealed class Templater(TemplateEngineSession session) : IDisposable
+internal sealed class Templater : IDisposable
 {
-    private readonly TemplateEngineSession _session = session ?? throw new ArgumentNullException(nameof(session));
+    private readonly EngineEnvironmentSettings _settings;
+    private readonly TemplatePackageManager _packageManager;
+    private bool _disposed;
 
-    public TemplateEngineContext Context => _session.Context;
-
-    /// <summary>
-    /// Lists the installed templates of <paramref name="type"/>, including hidden templates and templates whose func
-    /// host metadata can't be used.
-    /// </summary>
-    public async Task<IReadOnlyList<TemplateCatalogEntry>> ListAsync(TemplateType type, CancellationToken cancellationToken = default)
+    public Templater(TemplateEngineContext context, string settingsLocation)
     {
-        TemplatePackageManager packageManager = _session.PackageManager;
-        IReadOnlyList<ITemplateInfo> templates = await packageManager.GetTemplatesAsync(cancellationToken);
-        IReadOnlyList<ITemplatePackage> packages = await packageManager.GetTemplatePackagesAsync(force: false, cancellationToken);
-        return TemplateCatalogProjector.Project(templates, packages, type);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
+
+        Context = context;
+        _settings = new(new FuncTemplateEngineHost(context), settingsLocation: settingsLocation);
+        _packageManager = new(_settings);
     }
 
-    public void Dispose() => _session.Dispose();
+    public TemplateEngineContext Context { get; }
+
+    internal IEngineEnvironmentSettings Settings
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _settings;
+        }
+    }
+
+    /// <summary>
+    /// Lists the templates installed in the func template engine.
+    /// </summary>
+    public async Task<TemplateResolutionResult> ListAsync(CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        IReadOnlyList<ITemplateInfo> templates = await _packageManager.GetTemplatesAsync(cancellationToken);
+        return new([.. templates.Select(template => new FuncTemplateInfo(template))]);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _packageManager.Dispose();
+        _settings.Dispose();
+    }
 }

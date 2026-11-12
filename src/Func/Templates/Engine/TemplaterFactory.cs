@@ -20,6 +20,6 @@ internal sealed class TemplaterFactory(CliConfigurationPathsOptions configuratio
         ArgumentNullException.ThrowIfNull(context);
 
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new Templater(new TemplateEngineSession(context, settingsLocation));
+        return new Templater(context, settingsLocation);
     }
 }

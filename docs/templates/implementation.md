@@ -6,11 +6,11 @@ This document describes the existing CLI v5 infrastructure, what remains to be i
 
 ## What exists today
 
-The repository baseline described by the current design includes:
+The current CLI includes:
 
-- `TemplaterFactory`, `TemplateEngineContext`, `TemplateEngineSession`, and `Templater`: creation/disposal, a dedicated CLI template hive, installed-template listing, and metadata projection. The new command-facing resolution and invocation behavior is not complete.
-- `TemplateCatalogEntry` and parameter projection: template identity and display metadata. Projection alone does not evaluate conditional requirements or defaults.
-- Template constraint readers and evaluators: reusable helpers that are not yet wired into the complete command path.
+- `TemplaterFactory`, `TemplateEngineContext`, `FuncTemplateEngineHost`, and `Templater`: a command-scoped engine environment, an isolated CLI template hive, and installed-template discovery through `TemplatePackageManager.GetTemplatesAsync`.
+- `FuncTemplateInfo` and `TemplateResolutionResult`: discovery returns wrappers that forward `ITemplateInfo` metadata and retain the original engine template. `HostConfigPlace` is available, but its file is not read yet.
+- Selection, parameter evaluation, rendering, and writing generated files are not implemented. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
 - `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
 
 - `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
@@ -26,13 +26,13 @@ These behaviors belong to the existing implementation. The proposed template-bas
 
 Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Commands/InitCommand.cs`, `src/Func/Commands/NewCommand.cs`, `src/Abstractions/Projects/`, and `src/Workloads/Stacks/`. Recheck the exact implementation branch before treating any type as available: the legacy cleanup and ongoing feature work may have changed the baseline.
 
-## Initial implementation
+## Next implementation steps
 
-Build the smallest working command-facing model first, then fill in behavior incrementally.
+The first increment, installed-template discovery, is now in place. Add the remaining behavior in small steps.
 
-1. **Establish the API surface.** Create a `Templater` from the factory and command context. Support listing or resolving installed templates and invoking an exact selected template. Keep the engine session internal. Use the proposed group/catalog/resolved-template concepts where they make the API clearer; do not create wrappers without a consumer.
+1. **Build on the discovery API.** The factory creates a `Templater` with command context. It lists installed templates as `FuncTemplateInfo` values in a `TemplateResolutionResult`. Add selection and invocation APIs when a command needs them. Keep the original engine template available for later use, and do not add group or catalog types before they have a consumer.
 
-2. **Qualify the engine seam.** With representative project and parameterized function templates installed in an isolated hive, prove metadata discovery, Stack filtering, exact selection, parameter evaluation, and invocation against selected content. Use multiple metadata variants to expose filtering and ambiguity behavior.
+2. **Qualify the engine seam.** With representative project and parameterized function templates installed in an isolated hive, prove Stack filtering, exact selection, parameter evaluation, and invocation against selected content. If a command needs func-specific metadata, read it through `HostConfigPlace`. Use multiple metadata variants to expose filtering and ambiguity behavior.
 
 3. **Integrate the CLI commands.** Preserve `func init` adoption/repair and current Stack behavior. Add one template-based project route and one `func new` item route for the same Stack. Keep unmigrated initializers working.
 

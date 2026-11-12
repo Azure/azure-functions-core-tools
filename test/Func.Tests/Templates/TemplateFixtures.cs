@@ -3,9 +3,9 @@
 
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
-using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Abstractions.Installer;
 using Microsoft.TemplateEngine.Abstractions.TemplatePackage;
+using Microsoft.TemplateEngine.Edge;
 using Microsoft.TemplateEngine.Edge.Settings;
 
 namespace Azure.Functions.Cli.Tests.Templates;
@@ -21,10 +21,6 @@ internal static class TemplateFixtures
     public const string ProjectTemplateShortName = "func-tests-project";
     public const string OtherTypeTemplateIdentity = "Func.Tests.OtherType";
     public const string UntypedTemplateIdentity = "Func.Tests.Untyped";
-    public const string MetadataTemplateIdentity = "Func.Tests.Metadata";
-    public const string InvalidHostTemplateIdentity = "Func.Tests.InvalidHost";
-    public const string DotnetHostOnlyTemplateIdentity = "Func.Tests.DotnetHostOnly";
-    public const string HiddenTemplateIdentity = "Func.Tests.Hidden";
 
     /// <summary>
     /// Writes a folder package with one item template, one basic project template, and two templates without an item
@@ -93,113 +89,19 @@ internal static class TemplateFixtures
     }
 
     /// <summary>
-    /// Writes a folder package whose templates exercise func host metadata, and returns its path.
-    /// </summary>
-    /// <remarks>
-    /// The metadata template also declares <c>name</c>, tags, a bind symbol and a parameter without a datatype.
-    /// </remarks>
-    public static string WriteMetadataPackage(string parentDirectory)
-    {
-        string packageDirectory = Path.Combine(parentDirectory, "metadata-templates");
-
-        WriteTemplate(
-            Path.Combine(packageDirectory, "metadata"),
-            $$"""
-            {
-              "$schema": "http://json.schemastore.org/template",
-              "author": "func-tests",
-              "identity": "{{MetadataTemplateIdentity}}",
-              "name": "Func Tests Metadata",
-              "shortName": "func-tests-metadata",
-              "tags": { "type": "item", "language": "TypeScript" },
-              "sourceName": "MetadataFunction",
-              "symbols": {
-                "name": { "type": "parameter", "datatype": "string", "isRequired": true },
-                "Level": {
-                  "type": "parameter",
-                  "datatype": "choice",
-                  "defaultValue": "Low",
-                  "choices": [ { "choice": "Low", "description": "Low level" }, { "choice": "High" } ]
-                },
-                "Namespace": { "type": "parameter", "defaultValue": "Company.Function" },
-                "FuncStack": { "type": "bind", "binding": "host:func:stack" }
-              }
-            }
-            """,
-            ("MetadataFunction.txt", "MetadataFunction content"),
-            ("func.host.json", """{ "symbolInfo": { "Level": { "longName": "log-level", "shortName": "l" } } }"""),
-            ("dotnetcli.host.json", """{ "symbolInfo": { "Level": { "longName": "dotnet-level" } } }"""));
-
-        WriteTemplate(
-            Path.Combine(packageDirectory, "invalid-host"),
-            $$"""
-            {
-              "identity": "{{InvalidHostTemplateIdentity}}",
-              "name": "Func Tests Invalid Host",
-              "shortName": "func-tests-invalid-host",
-              "tags": { "type": "item" }
-            }
-            """,
-            ("InvalidHost.txt", "InvalidHost content"),
-            ("func.host.json", "{ not json"));
-
-        WriteTemplate(
-            Path.Combine(packageDirectory, "dotnet-host-only"),
-            $$"""
-            {
-              "identity": "{{DotnetHostOnlyTemplateIdentity}}",
-              "name": "Func Tests Dotnet Host Only",
-              "shortName": "func-tests-dotnet-host-only",
-              "tags": { "type": "item" }
-            }
-            """,
-            ("DotnetHostOnly.txt", "DotnetHostOnly content"),
-            ("dotnetcli.host.json", """{ "isHidden": true }"""));
-
-        WriteTemplate(
-            Path.Combine(packageDirectory, "hidden"),
-            $$"""
-            {
-              "identity": "{{HiddenTemplateIdentity}}",
-              "name": "Func Tests Hidden",
-              "shortName": "func-tests-hidden",
-              "tags": { "type": "item" }
-            }
-            """,
-            ("Hidden.txt", "Hidden content"),
-            ("func.host.json", """{ "isHidden": true }"""));
-
-        return packageDirectory;
-    }
-
-    /// <summary>
     /// Installs a folder package into the template engine settings at <paramref name="settingsLocation"/>.
     /// </summary>
     public static async Task InstallAsync(string packageDirectory, string settingsLocation)
     {
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(packageDirectory));
-        using TemplateEngineSession session = new(context, settingsLocation);
+        using EngineEnvironmentSettings settings = new(new FuncTemplateEngineHost(context), settingsLocation: settingsLocation);
+        using TemplatePackageManager packageManager = new(settings);
 
-        IManagedTemplatePackageProvider provider = session.PackageManager.GetBuiltInManagedProvider(InstallationScope.Global);
+        IManagedTemplatePackageProvider provider = packageManager.GetBuiltInManagedProvider(InstallationScope.Global);
         IReadOnlyList<InstallResult> results = await provider.InstallAsync([new InstallRequest(packageDirectory)], CancellationToken.None);
 
         InstallResult result = results.Should().ContainSingle().Subject;
         result.Success.Should().BeTrue(result.ErrorMessage ?? string.Empty);
-    }
-
-    /// <summary>
-    /// Loads the installed template with <paramref name="identity"/> through a new session on <paramref name="settingsLocation"/>.
-    /// </summary>
-    /// <remarks>
-    /// The first load after an install comes from a fresh scan and later loads come from the engine's saved cache.
-    /// </remarks>
-    public static async Task<ITemplateInfo> GetInstalledTemplateAsync(string settingsLocation, string identity)
-    {
-        TemplateEngineContext context = new(WorkingDirectory.FromExplicit(settingsLocation));
-        using TemplateEngineSession session = new(context, settingsLocation);
-
-        IReadOnlyList<ITemplateInfo> templates = await session.PackageManager.GetTemplatesAsync(CancellationToken.None);
-        return templates.Should().ContainSingle(template => template.Identity == identity).Subject;
     }
 
     private static void WriteTemplate(

@@ -29,7 +29,6 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
     [
         ..Components.AllComponents,
         ..OrchestratorComponents.AllComponents,
-        ..FuncTemplateComponents.AllComponents,
     ];
 
     private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));

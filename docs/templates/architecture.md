@@ -4,9 +4,15 @@
 
 ## Overview
 
-The Template Engine enables `func init` to create a Functions project and `func new` to add a function using installed templates. It discovers templates, uses their metadata to find suitable choices, evaluates template parameters, and invokes the selected template.
+The proposed Template Engine is intended to let `func init` create a Functions project and `func new` add a function using installed templates. When complete, it will discover templates, use their metadata to find suitable choices, evaluate template parameters, and invoke the selected template.
 
 The initial goal is a working local journey: `func init` creates a valid project; `func new` adds a parameterized function; the Functions Host discovers that function. A small set of representative templates can establish this integration before the complete template catalog is migrated. This is not, by itself, release qualification.
+
+## Current foundation
+
+The current code creates a command-scoped `Templater` with an isolated settings hive. `Templater.ListAsync` returns installed templates in a `TemplateResolutionResult`. Each `FuncTemplateInfo` forwards the engine metadata and keeps the original `ITemplateInfo`, including its `HostConfigPlace`, for later use.
+
+The current code does not read host-specific configuration, select templates, evaluate parameters, render output, or write files. The rest of this document describes proposed work beyond discovery.
 
 <a id="end-to-end-proof"></a>
 
@@ -32,17 +38,17 @@ The command-facing flow is:
 | `Templater` | Expose installed template metadata and the operations needed to list, resolve, and invoke templates. |
 | Template catalog entry | Describe an available template, including identity, metadata, and parameters; it is not itself permission to invoke a template. |
 | Template group | Present related template variants together when useful for selection. |
-| Resolved template | Represent the exact selected template that can be invoked within its valid session. |
-| Template Engine internals | Use Microsoft.TemplateEngine facilities for metadata, authored parameter semantics, and rendering. Manage engine sessions and temporary rendering resources internally. |
+| Resolved template | Represent the exact selected template that can be invoked within its command scope. |
+| Template Engine internals | Use Microsoft.TemplateEngine facilities for metadata, authored parameter semantics, and rendering. Keep engine resources within the command-scoped templater. |
 | Content producers and workload installation | Build, package, distribute, and register templates in the CLI hive. |
 
-The CLI captures the command, project, and bundle context once. The Template Engine uses one command-scoped session for discovery, parameter evaluation, and invocation.
+The CLI captures the command, project, and bundle context once. The current `Templater` uses that context to create the func host and discover installed templates. Parameter evaluation and invocation are not implemented yet.
 
-The Templater keeps engine objects private. Catalog and group collections are immutable views, and parameter metadata has one canonical representation.
+`FuncTemplateInfo` keeps the original engine template available as `Template` and forwards its metadata, including `HostConfigPlace`. `TemplateResolutionResult` currently holds the discovered candidates; it does not group or select them. Catalogs, groups, and resolved templates remain design concepts for later work, not current types.
 
-Only an exact selection issued by the Templater can be invoked. Selections from another session, or selections that are stale or disposed, must fail.
+For later selection, the proposed design calls for immutable catalog and group views and one canonical representation of parameter metadata. Only an exact selection issued by the `Templater` should be invoked. Selections from another command scope, or selections that are stale or disposed, must fail.
 
-The existing session owns temporary rendering resources. No additional lifecycle owner is needed.
+Template invocation and its temporary rendering resources are not implemented. Define their ownership when invocation is added.
 
 These are responsibilities and useful object-model concepts, not a requirement to introduce a public class or interface for each row. Reuse existing types where they fit. The proposed group, resolution, request, and result shapes inform the command-facing API; their exact signatures still need agreement against concrete command calls.
 
