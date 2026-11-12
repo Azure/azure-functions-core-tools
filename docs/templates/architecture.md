@@ -26,7 +26,7 @@ The command-facing flow is:
 
 1. The CLI parses the command and identifies the project or requested language stack.
 2. The template factory creates a `Templater` with the relevant context.
-3. The `Templater` lists or resolves templates installed in the CLI's template hive.
+3. The `Templater` starts the engine, which loads its template cache from the workload template folders registered in the CLI hive, then lists or resolves templates.
 4. The CLI presents choices when necessary and supplies template-specific arguments.
 5. The Template Engine resolves one exact template, evaluates its parameters, and renders it.
 6. The CLI validates and publishes the resulting files and reports the outcome.
@@ -40,7 +40,7 @@ The command-facing flow is:
 | Template group | Present related template variants together when useful for selection. |
 | Resolved template | Represent the exact selected template that can be invoked within its command scope. |
 | Template Engine internals | Use Microsoft.TemplateEngine facilities for metadata, authored parameter semantics, and rendering. Keep engine resources within the command-scoped templater. |
-| Content producers and workload installation | Build, package, distribute, and register templates in the CLI hive. |
+| Content producers and workload installation | Build and package templates. Workload installation registers each workload's template folders in the CLI hive; uninstall removes them. |
 
 The CLI captures the command, project, and bundle context once. The current `Templater` uses that context to create the func host and discover installed templates. Parameter evaluation and invocation are not implemented yet.
 
@@ -56,11 +56,11 @@ These are responsibilities and useful object-model concepts, not a requirement t
 
 ## Installed templates and discovery
 
-The Template Engine consumes templates already installed in a dedicated CLI hive. The `Templater` provides access to the metadata available in that scope. Discovery does not download packages or install templates as a side effect.
+The Template Engine uses templates whose folders are already registered in a dedicated CLI hive. When `func init` or `func new` creates a `Templater`, the engine reads those registrations and builds or refreshes its template cache. The `Templater` provides access to the metadata available in that scope. Discovery does not download packages or register templates as a side effect.
 
 A command supplies the relevant project or Stack context. The command-facing API should return usable template choices and meaningful reasons when candidates are unavailable. Prefer a straightforward call that accepts context and returns the relevant collection; do not require the CLI to orchestrate multiple discovery passes merely to obtain that list. Whether filtering happens internally during discovery or in a subsequent resolution operation is an API detail for the CLI team to settle.
 
-Template producers can develop project and item content independently. Representative local templates with different Stack metadata should exercise discovery, filtering, and selection. Production workload registration is a separate integration task: test-only registration in an isolated hive does not prove that installed workloads populate the CLI hive.
+Template producers can develop project and item content independently. Representative local templates with different Stack metadata should exercise discovery, filtering, and selection. Production workload registration is a separate integration task: test-only registration in an isolated hive does not prove that workload installation registers its template folders in the CLI hive.
 
 Ordinary listing excludes hidden items while retaining diagnostics for unavailable candidates. Listing does not impose creation-only bundle gates. Resolve the explicit project target without introducing upward search, and keep selection within the chosen source/channel scope.
 
@@ -174,11 +174,17 @@ Do not report planned output as completed changes.
 
 ## Content and workload ownership
 
-Templates are expected to be packaged and distributed through workloads, including NuGet-hosted template packages. Workload installation owns acquisition and registration; the Template Engine consumes installed metadata and content from the CLI hive. The exact production registration location, timing, retry behavior, version coordination, and integrity policy need agreement between the CLI team, template content owners and workload owners.
+Templates are packaged and distributed through workloads. Each workload ships its templates in a folder and declares where that folder is. Leverage Microsoft.TemplateEngine for registration, mounting, scanning, and caching instead of building func-specific versions of those features.
+
+Registration happens when a workload is installed. The installer registers the workload's template folders with Microsoft.TemplateEngine in the CLI hive, using the engine's own package registration, before reporting the templates ready. Uninstalling a workload removes its registrations. Updating a workload replaces the old folders with the new ones. Registering the same workload version again has no extra effect, so a failed install can be retried safely.
+
+`func init` and `func new` do not register content. When they create a `Templater`, the engine reads the registered folders and builds its template cache. Later commands reuse that cache, and the engine rescans only folders that changed. Do not force a full cache rebuild on every command; keep that for repair or troubleshooting.
+
+Give each installed workload version its own folder, so a new version is always seen as a change. When the engine starts, cheaply check that each registered folder still exists. If a registered folder is missing or cannot be read, report that the templates are unavailable and explain how to repair the workload; do not show an empty list as success. If a registration fails, keep the previous working registration where possible. Discovery never scans arbitrary folders or downloads content.
 
 The existing .NET project-template workflow uses its own template hive. That is not evidence that production workload content is already registered in the new CLI hive. Keep current Stack initialization working while package producers migrate content to the format expected by the new engine.
 
-Installation/setup registers a validated local package from an installed, versioned workload into the existing CLI hive before reporting template content ready. Registration and retry are idempotent for that workload identity/version. Missing content, unsupported metadata or registration failure reports incomplete availability, retains prior usable registration where possible, and provides an explicit repair path. Package-relative location, version/channel policy and replacement coordination remain owner decisions; discovery never scans arbitrary directories or acquires content.
+The folder layout inside a workload, version and channel rules, and integrity checks still need agreement between the CLI team, template content owners, and workload owners.
 
 <a id="normative-authority"></a>
 
@@ -201,7 +207,7 @@ The historical research reports `docs/research/historical-design-reconciliation.
 ## Decisions to finish with the team
 
 - **CLI team:** the smallest command-facing API and object shapes; template group/variant selection and alias policy; supported parameter semantics and token handoff.
-- **Template content owners and workload owners:** representative project/item packages, production package location, workload-to-hive registration, versioning, and content integrity.
+- **Template content owners and workload owners:** representative project/item packages, the template folder layout inside a workload, registration during workload install/update/uninstall, versioning, and content integrity.
 - **CLI team and release owners:** initial supported Stack scope, public activation, force-policy changes, and release qualification.
 
 The CLI team and release owners must settle explicit hidden-ID access, profile/no-bundle policy and supported item-Stack scope, including Go, Java and PowerShell. Until approved, these decisions do not change current public behavior or activate unavailable generation.

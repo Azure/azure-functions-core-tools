@@ -16,7 +16,7 @@ The current CLI includes:
 - `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
 - `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
 - `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
-- Test-only local template registration in isolated hives. Workload deployment does not yet establish the required production registration into the CLI template hive.
+- Test-only local template registration in isolated hives. Workload installation does not yet register its template folders in the CLI template hive.
 
 ### Existing initialization limitations
 
@@ -38,7 +38,7 @@ The first increment, installed-template discovery, is now in place. Add the rema
 
 4. **Add guarded publication.** Render privately, validate target effects, preserve non-force behavior, protect Git metadata, persist required configuration correctly, and report failures and partial effects.
 
-5. **Connect production content.** Once template content owners and workload owners confirm package ownership and layout, register installed workload templates into the CLI hive. Do not make discovery install packages.
+5. **Connect production content.** Once template content owners and workload owners confirm the template folder layout, make workload install register its template folders with Microsoft.TemplateEngine in the CLI hive, and make uninstall and update remove or replace them. `func init` and `func new` only load the engine cache from those registrations. Do not make discovery install packages or force a full cache rebuild on every command.
 
 6. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
 
@@ -70,7 +70,7 @@ Keep the distinction between the language Stack and the Azure Functions Runtime.
 | Command-facing API, group/variant and alias behavior | Freezing signatures and public selection behavior |
 | Microsoft.TemplateEngine parameter and selected-content APIs | Claiming supported evaluation and exact invocation |
 | Representative real project and item content | Completing the first useful end-to-end proof |
-| Workload package layout and production registration | Making templates available through installed workloads |
+| Workload template folder layout and install-time registration | Making templates available through installed workloads |
 | Supported Stack scope, platform policy, and force behavior | Public activation and release acceptance |
 
 Engine work with isolated representative content does not need to wait for the entire production catalog. A public template-backed journey does need approved content and production registration.
@@ -97,7 +97,7 @@ A `host.json` file, successful listing, or basic text-file fixture alone does no
 - **`func init`:** all existing Stack options, adoption/repair, safe occupied non-project directories, write-if-missing behavior, complete-project refusal, force confirmation, `.git` protection, and required configuration failures.
 - **`func new`:** project resolution, existing command grammar, template listing versus invocation, item collisions, guarded modifications, and no unrelated initialization configuration writes. Verify that invoking `func new` outside an initialized Functions project fails with actionable guidance to run `func init`, without initializing a project or modifying the destination.
 - **Publication:** path/ancestor/case checks, guarded no-replace or replacement on supported operating systems, cancellation, cleanup, and truthful partial-effect reporting.
-- **Packaging:** isolated test registration versus real workload registration; missing or incompatible installed content; retry and version coordination.
+- **Packaging:** isolated test registration versus real workload registration; registration on install, removal on uninstall, and replacement on update; repeated registration of the same version; missing or unreadable registered folders; cache refresh after a folder changes.
 
 ## Qualification and limitations
 
