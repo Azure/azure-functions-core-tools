@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Install;
@@ -103,6 +104,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             Kind = WorkloadKind.Workload,
             EntryPoint = entryPoint,
             RuntimeIdentifier = "win-x64",
+            TemplateRoot = "templates/new",
             DisplayName = "New display name",
             Description = "New description.",
         };
@@ -128,6 +130,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             Description = metadata.Description,
             Source = source,
             RuntimeIdentifier = metadata.RuntimeIdentifier,
+            TemplateRoot = metadata.TemplateRoot,
             IsImplicitlyInstalled = false,
             LogicalPackage = logicalPackage,
             InstallRefCount = existing.InstallRefCount + 1,
@@ -150,6 +153,110 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             reusable.PackageId, reusable.PackageVersion, "win-x64", Logical("example.pointer", "1.0.0"));
 
         result.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false, "templates/initial", "templates/updated")]
+    [InlineData(true, "templates/initial", "templates/reinstalled")]
+    [InlineData(false, "templates/initial", null)]
+    [InlineData(true, "templates/initial", null)]
+    [InlineData(false, null, "templates/updated")]
+    [InlineData(true, null, "templates/reinstalled")]
+    public async Task Deployment_PersistsTemplateRootOnInstallAndReplacement(bool reinstall, string? initialRoot, string? newRoot)
+    {
+        WorkloadStore store = new(_paths);
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        WorkloadMetadata initialMetadata = TemplateMetadata(initialRoot);
+        InspectedWorkloadPackage initial = Package("1.0.0", initialMetadata);
+        WorkloadInstallResult installed = await deployment.InstallAsync(
+            initial, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+        (await store.GetWorkloadsAsync()).Should().ContainSingle().Which.TemplateRoot.Should().Be(initialRoot);
+        WorkloadMetadata newMetadata = TemplateMetadata(newRoot);
+        InspectedWorkloadPackage replacement = Package(reinstall ? "1.0.0" : "2.0.0", newMetadata);
+
+        if (reinstall)
+        {
+            await deployment.InstallAsync(replacement, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: true);
+        }
+        else
+        {
+            await deployment.UpdateAsync(installed.Entry, replacement, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null);
+        }
+
+        WorkloadEntry persisted = (await store.GetWorkloadsAsync()).Should().ContainSingle().Subject;
+        persisted.TemplateRoot.Should().Be(newRoot);
+        persisted.PackageVersion.Should().Be(replacement.Identity.Version);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Deployment_InvalidTemplateRoot_DoesNotMutateRegistry(bool update)
+    {
+        WorkloadStore store = new(_paths);
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        InspectedWorkloadPackage initial = Package("1.0.0", TemplateMetadata("templates"));
+        WorkloadInstallResult installed = await deployment.InstallAsync(
+            initial, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+        byte[] before = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath);
+        InspectedWorkloadPackage invalid = Package("2.0.0", TemplateMetadata("../templates"));
+
+        Func<Task> action = update
+            ? () => deployment.UpdateAsync(installed.Entry, invalid, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null)
+            : () => deployment.InstallAsync(invalid, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+
+        await action.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*templateRoot*");
+        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath)).Should().Equal(before);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Deployment_ChangedTemplateRootSinceInspection_DoesNotMutateRegistry(bool update)
+    {
+        WorkloadStore store = new(_paths);
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        WorkloadInstallResult installed = await deployment.InstallAsync(
+            Package("1.0.0", TemplateMetadata("templates/original")),
+            _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+        byte[] before = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath);
+        InspectedWorkloadPackage package = Package("2.0.0", TemplateMetadata("templates/actual"));
+        InspectedWorkloadPackage changed = package with { Metadata = TemplateMetadata("templates/inspected") };
+        Func<Task> action = update
+            ? () => deployment.UpdateAsync(installed.Entry, changed, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null)
+            : () => deployment.InstallAsync(changed, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+
+        await action.Should().ThrowExactlyAsync<InvalidWorkloadException>().WithMessage("*changed*");
+
+        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath)).Should().Equal(before);
+        Directory.Exists(_paths.GetInstallDirectory(package.Identity.PackageId, package.Identity.Version)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("templates/stale")]
+    public async Task InstallAsync_DifferentRegistryTemplateRoot_ReusesInstalledPayload(string? registeredRoot)
+    {
+        WorkloadStore store = new(_paths);
+        WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
+        InspectedWorkloadPackage package = Package("1.0.0", TemplateMetadata("templates/current"));
+        await deployment.InstallAsync(package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+        await store.SaveWorkloadAsync(new WorkloadEntry
+        {
+            PackageId = package.Identity.PackageId,
+            PackageVersion = package.Identity.Version,
+            TemplateRoot = registeredRoot,
+        });
+        byte[] before = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath);
+        string payloadPath = Path.Combine(_paths.GetInstallDirectory(package.Identity.PackageId, package.Identity.Version), "existing-payload.txt");
+        File.WriteAllText(payloadPath, "preserve");
+
+        WorkloadInstallResult result = await deployment.InstallAsync(
+            package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
+
+        result.AlreadyInstalled.Should().BeTrue();
+        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath)).Should().Equal(before);
+        File.ReadAllText(payloadPath).Should().Be("preserve");
     }
 
     [Fact]
@@ -204,6 +311,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             Description = "Existing description.",
             Source = "https://old.example.test/v3/index.json",
             RuntimeIdentifier = "win-x64",
+            TemplateRoot = "templates/existing",
             IsImplicitlyInstalled = true,
             LogicalPackage = logicalPackage,
             InstallRefCount = 2,
@@ -221,10 +329,25 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             Source = "https://pointer.example.test/v3/index.json",
         };
 
-    private string BuildPackage(string packageId, string version)
+    private static WorkloadMetadata TemplateMetadata(string? templateRoot)
+        => new()
+        {
+            Schema = WorkloadManifestSchema.PackageManifestV1Schema,
+            EntryPoint = new EntryPointSpec { AssemblyPath = "Example.dll", Type = "Example.Workload" },
+            TemplateRoot = templateRoot,
+        };
+
+    private InspectedWorkloadPackage Package(string version, WorkloadMetadata metadata)
+        => new(
+            BuildPackage("example.workload", version, metadata),
+            new WorkloadPackageIdentity("example.workload", version, [WorkloadPackageTypes.Workload], [], [], null, null),
+            metadata,
+            WorkloadPackageRole.Ordinary);
+
+    private string BuildPackage(string packageId, string version, WorkloadMetadata? metadata = null)
     {
         string manifestPath = Path.Combine(_root, $"workload-{Guid.NewGuid():N}.json");
-        File.WriteAllText(manifestPath, "{}");
+        File.WriteAllText(manifestPath, metadata is null ? "{}" : JsonSerializer.Serialize(metadata, WorkloadJsonContext.Default.WorkloadMetadata));
         var builder = new PackageBuilder
         {
             Id = packageId,
