@@ -368,6 +368,11 @@ internal class WorkloadStore(IWorkloadPaths paths) : IWorkloadStore
     {
         foreach (WorkloadEntry entry in registry.Workloads)
         {
+            if (entry.PackageId is null || entry.PackageVersion is null)
+            {
+                continue;
+            }
+
             entry.PackageRoot = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
         }
     }
