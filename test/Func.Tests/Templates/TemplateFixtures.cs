@@ -94,7 +94,7 @@ internal static class TemplateFixtures
     public static async Task InstallAsync(string packageDirectory, string settingsLocation)
     {
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(packageDirectory));
-        using EngineEnvironmentSettings settings = new(new FuncTemplateEngineHost(context), settingsLocation: settingsLocation);
+        using EngineEnvironmentSettings settings = new(new FuncTemplateEngineHost(context, []), settingsLocation: settingsLocation);
         using TemplatePackageManager packageManager = new(settings);
 
         IManagedTemplatePackageProvider provider = packageManager.GetBuiltInManagedProvider(InstallationScope.Global);

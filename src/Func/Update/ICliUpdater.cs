@@ -10,8 +10,8 @@ namespace Azure.Functions.Cli.Update;
 internal interface ICliUpdater
 {
     /// <summary>
-    /// Downloads the release artifact from CDN, extracts it, swaps the current
-    /// binary with backup/rollback, and verifies via spawning <c>func --version</c>.
+    /// Preloads process-launch dependencies, downloads and checks the release artifact,
+    /// then installs it with backup/rollback and verifies the installed executable with <c>--version</c>.
     /// </summary>
     /// <param name="release">The release to install.</param>
     /// <param name="progress">

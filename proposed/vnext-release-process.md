@@ -88,7 +88,7 @@ the channel is just a label and a CDN bundle id, not compiled output. So
 for bundles, **the tag is the version**, including the channel.
 
 `vnext` keeps `BundleChannel` at its default in
-`src/Workloads/Tools/ExtensionBundles/Directory.Version.props`. The release
+`src/Workloads/ExtensionBundles/Directory.Version.props`. The release
 pipeline inspects the tag it was queued against and overrides the channel
 at pack time:
 

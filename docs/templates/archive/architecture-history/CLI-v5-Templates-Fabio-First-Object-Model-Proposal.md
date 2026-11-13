@@ -2,8 +2,8 @@
 
 **PROPOSED — NOT APPROVED FOR IMPLEMENTATION**
 
-**Date:** October 31, 2026  
-**Candidate:** `feature/templates-engine-redesign` at `c8559f8e1f0ba0bd3e1fed39e68934c836f5b32b` (tree `3243a0529b2505f39e76ba2b0543545ff77b905c`).  
+**Date:** October 31, 2026<br>
+**Candidate:** `feature/templates-engine-redesign` at `c8559f8e1f0ba0bd3e1fed39e68934c836f5b32b` (tree `3243a0529b2505f39e76ba2b0543545ff77b905c`).<br>
 **Scope:** Design only. No product implementation, runtime validation, or GA acceptance is claimed.
 
 ## 1. Executive summary

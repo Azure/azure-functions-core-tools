@@ -25,7 +25,7 @@ The Template Engine is part of CLI v5. Moving it into a separate assembly is out
 The command-facing flow is:
 
 1. The CLI parses the command and identifies the project or requested language stack.
-2. The template factory creates a `Templater` with the relevant context.
+2. The template factory creates a `Templater` with the relevant context and DI-registered engine components.
 3. The `Templater` starts the engine, which loads its template cache from the workload template folders registered in the CLI hive, then lists or resolves templates.
 4. The CLI presents choices when necessary and supplies template-specific arguments.
 5. The Template Engine resolves one exact template, evaluates its parameters, and renders it.
@@ -34,7 +34,7 @@ The command-facing flow is:
 | Component | Responsibility |
 | --- | --- |
 | CLI commands | Parse public options, identify project and language stack, prompt for input, authorize filesystem changes, persist project configuration, and report results. |
-| Template factory and context | Create the command-facing `Templater` with the installed-template scope and required command context. |
+| Template factory and context | Create the command-facing `Templater` with the installed-template scope, required command context, and DI-registered engine components. |
 | `Templater` | Expose installed template metadata and the operations needed to list, resolve, and invoke templates. |
 | Template catalog entry | Describe an available template, including identity, metadata, and parameters; it is not itself permission to invoke a template. |
 | Template group | Present related template variants together when useful for selection. |
@@ -42,7 +42,7 @@ The command-facing flow is:
 | Template Engine internals | Use Microsoft.TemplateEngine facilities for metadata, authored parameter semantics, and rendering. Keep engine resources within the command-scoped templater. |
 | Content producers and workload installation | Build and package templates. Workload installation registers each workload's template folders in the CLI hive; uninstall removes them. |
 
-The CLI captures the command, project, and bundle context once. The current `Templater` uses that context to create the func host and discover installed templates. Parameter evaluation and invocation are not implemented yet.
+The CLI captures the command, project, and bundle context once. The current `Templater` passes that context and DI-registered engine components to the func host, then discovers installed templates. Parameter evaluation and invocation are not implemented yet.
 
 `FuncTemplateInfo` keeps the original engine template available as `Template` and forwards its metadata, including `HostConfigPlace`. `TemplateResolutionResult` currently holds the discovered candidates; it does not group or select them. Catalogs, groups, and resolved templates remain design concepts for later work, not current types.
 
@@ -75,7 +75,7 @@ A template can be selected by an explicit identifier or through an interactive c
 - A full template ID identifies one specific candidate. If that candidate is unavailable or incompatible, report the problem; never substitute a related variant.
 - Short names and aliases may identify groups of related templates. Ambiguity must be resolved explicitly, not by an arbitrary first match.
 - Project, Stack, language, template kind, and declared constraints determine eligibility. Invalid or unreadable declarations must not silently become successful selections.
-- A catalog entry describes a candidate. Only the exact resolved candidate within its valid session may be invoked.
+- A catalog entry describes a candidate. Only the exact resolved candidate within its valid command scope may be invoked.
 
 Group variants only by explicit GroupIdentity; an ungrouped template is an identity-keyed singleton. Within the selected source scope, match full identity before aliases or eligibility filtering. Duplicate applicable full IDs are an error. An alias matching one variant does not widen to its siblings, and matching display names do not establish a family. Preserve established supported IDs and known aliases; changes to alias, case or precedence policy require agreement. A concrete catalog selection stays pinned to its issued candidate; family selection is explicit.
 
@@ -91,7 +91,7 @@ The existing CLI grammar remains unchanged. Unsupported `--path`, `--output`, `-
 
 After selection, Microsoft.TemplateEngine evaluates authored parameter semantics, including conditional requirements, enabled or disabled parameters, and dependent defaults. The CLI owns input provenance and prompting, not a second expression evaluator. Preserve the distinction between omitted, explicitly empty, repeated, and explicitly supplied default-equal values. Reject conflicting explicit assignments. Prompt only for active required inputs that remain unresolved; noninteractive calls fail with actionable missing-input diagnostics.
 
-Bind CLI-owned values, including name, and project-derived values to canonical parameter names without allowing template aliases to shadow built-ins. Preserve each value's origin. Invalid explicit input, including a value supplied to a disabled parameter, fails rather than being replaced by a default. After prompting, re-evaluate in the same session and pass the engine-evaluated canonical inputs to invocation, not values reconstructed from projected metadata.
+Bind CLI-owned values, including name, and project-derived values to canonical parameter names without allowing template aliases to shadow built-ins. Preserve each value's origin. Invalid explicit input, including a value supplied to a disabled parameter, fails rather than being replaced by a default. After prompting, re-evaluate in the same command-scoped engine and pass the engine-evaluated canonical inputs to invocation, not values reconstructed from projected metadata.
 
 If the installed engine cannot evaluate a required template feature, reject that candidate before changing the destination. The supported parameter-feature subset and exact API need focused qualification.
 
@@ -109,9 +109,9 @@ Mutable content must be copied and verified at selection time. Rendering must us
 
 Before rendering, verify that the selected source still matches the recorded content. Missing, changed, unreadable, or unsafe content invalidates the selection. Do not rediscover or substitute another template.
 
-The exact Microsoft.TemplateEngine mount and invocation API is still to be qualified. Use the existing engine and session facilities rather than introducing a second engine or a separate lifecycle framework.
+The exact Microsoft.TemplateEngine mount and invocation API is still to be qualified. Use the existing engine APIs through the command-scoped `Templater` rather than introducing a second engine or a separate lifecycle framework.
 
-Render into session-owned private temporary output within defined asset and expansion limits. Return bounded planned file bytes, explicit directories and diagnostics; these are not completed destination effects. Preserve the supported func host bindings, but do not execute authored post-actions or unapproved custom bind sources. Reject unsupported effects before touching the destination. Rendering failures must not become empty success, and unexpected internal errors remain distinct from invalid user input.
+Render into command-scoped private temporary output within defined asset and expansion limits. Return bounded planned file bytes, explicit directories and diagnostics; these are not completed destination effects. Preserve the supported func host bindings, but do not execute authored post-actions or unapproved custom bind sources. Reject unsupported effects before touching the destination. Rendering failures must not become empty success, and unexpected internal errors remain distinct from invalid user input.
 
 <a id="non-force-init"></a>
 
@@ -151,7 +151,7 @@ The proposed path is:
 4. Check candidate eligibility and parse template-specific arguments for each eligible variant before final selection.
 5. Select one exact template, bind its content, and evaluate parameters using the Template Engine.
 6. Render privately, validate destination effects, and publish the generated function.
-7. Report the actual outcome and release session resources.
+7. Report the actual outcome and dispose the `Templater` to release engine resources.
 
 Listing is not proof that generation works. An exact-ID failure cannot fall back to a sibling. Without force, creating an item fails on a destination collision; any approved modification to existing files requires its own guard. `func new` does not write `func init` configuration or acquire packages during discovery.
 

@@ -30,6 +30,7 @@ public class PromptCapabilityConsumerTests
         var service = new SpectreInteractionService(new DefaultTheme(), stdout, stderr);
         var initializer = Substitute.For<IProjectInitializer>();
         initializer.Stack.Returns("node");
+        initializer.DisplayName.Returns("Node.js");
         initializer.SupportedLanguages.Returns(["javascript", "typescript"]);
         initializer.GetInitOptions(Arg.Any<IInitOptionRegistry>()).Returns([]);
         var localSettings = Substitute.For<ILocalSettingsProvider>();

@@ -57,6 +57,31 @@ public class StartCommandTests : IDisposable
             startOptionContributors: [new FakeStartHostOptionContributor()]);
 
         cmd.Options.Select(o => o.Name).Should().Contain("--fake-stack-option");
+        cmd.GetOptionHelpHeading(cmd.Options.Single(o => o.Name == "--fake-stack-option"))
+            .Should().Be("fake");
+    }
+
+    [Theory]
+    [InlineData("fake", "Friendly stack")]
+    [InlineData("FAKE", "Friendly stack")]
+    [InlineData("other", "fake")]
+    public void StartCommand_ResolvesHelpHeadingFromMatchingProjectStack(string stackId, string expectedHeading)
+    {
+        var stack = Substitute.For<IProjectStack>();
+        stack.Stack.Returns(stackId);
+        stack.DisplayName.Returns("Friendly stack");
+        var contributor = new FakeStartHostOptionContributor();
+
+        var cmd = new StartCommand(
+            _interaction, _palette, _cliVersionProvider,
+            _initializationRunner,
+            Substitute.For<IOptionsMonitor<HostStartupOptions>>(),
+            _shortcutLabels,
+            _platform,
+            startOptionContributors: [contributor],
+            projectStacks: [stack]);
+
+        cmd.GetOptionHelpHeading(contributor.Option).Should().Be(expectedHeading);
     }
 
     [Fact]

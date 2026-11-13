@@ -42,9 +42,12 @@ internal sealed class LocalSettingsProvider : ILocalSettingsProvider
                 return LocalSettingsSnapshot.Empty;
             }
 
+            bool isEncrypted = ReadNullableBoolean(document.RootElement, "IsEncrypted") == true;
+
             return new LocalSettingsSnapshot
             {
-                Values = ReadValues(document.RootElement),
+                IsEncrypted = isEncrypted,
+                Values = isEncrypted ? LocalSettingsSnapshot.Empty.Values : ReadValues(document.RootElement),
                 Host = ReadHost(document.RootElement),
             };
         }

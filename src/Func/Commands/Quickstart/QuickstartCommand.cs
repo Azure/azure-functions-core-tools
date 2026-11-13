@@ -182,10 +182,10 @@ internal sealed class QuickstartCommand : FuncCliCommand, IBuiltInCommand
         await _interaction.StatusAsync(
             $"Scaffolding '{entry!.DisplayName}'...",
             ct => _scaffolder.ScaffoldAsync(entry, workingDirectory.Info.FullName, fetchMode, ct),
-            cancellationToken);
+            cancellationToken,
+            writeCompletion: false);
 
         // 7. Next steps
-        _interaction.WriteBlankLine();
         _interaction.WriteLine(l => l
             .Success(QuickstartMessages.SuccessIcon)
             .Muted("Scaffolded ")

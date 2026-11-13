@@ -16,7 +16,9 @@ Creating .NET 11 projects requires a .NET 11 SDK and a version of
 `Microsoft.Azure.Functions.Worker.ProjectTemplates` that supports `net11.0`.
 The workload installs that template package into its private hive. Existing
 projects are built with the installed `dotnet` SDK when running `func start`
-or `func run`; `--no-build` uses the existing build output. The CLI and workload
+or `func run`; `--no-build` uses the existing build output. It runs MSBuild's
+`GetTargetPath` target to locate that output without compiling. Successful lookups
+are silent; failed lookups include the captured diagnostics. The CLI and workload
 binaries continue to target .NET 10.
 
 ## 1.0.0-preview.1

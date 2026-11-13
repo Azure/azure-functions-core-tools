@@ -16,13 +16,14 @@ internal sealed class Templater : IDisposable
     private readonly TemplatePackageManager _packageManager;
     private bool _disposed;
 
-    public Templater(TemplateEngineContext context, string settingsLocation)
+    public Templater(TemplateEngineContext context, string settingsLocation, IEnumerable<ITemplateComponent> components)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(settingsLocation);
+        ArgumentNullException.ThrowIfNull(components);
 
         Context = context;
-        _settings = new(new FuncTemplateEngineHost(context), settingsLocation: settingsLocation);
+        _settings = new(new FuncTemplateEngineHost(context, components), settingsLocation: settingsLocation);
         _packageManager = new(_settings);
     }
 

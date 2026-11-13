@@ -83,7 +83,7 @@ internal sealed record SetupDependency(
             versionRange,
             SetupRuntimes.RangeText(versionRange),
             ResolvedPackageId: null,
-            Optional: true);
+            Optional: SupportsStack(runtime));
 
     public static SetupDependency Bundle(string bundleId, VersionRange? versionRange, string? rangeText, BundleChannel channel)
         => new(

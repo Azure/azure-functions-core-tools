@@ -76,7 +76,7 @@ public sealed class TemplaterTests : IDisposable
     [Fact]
     public void Constructor_NullContext_Throws()
     {
-        Action act = () => _ = new Templater(null!, _hive);
+        Action act = () => _ = new Templater(null!, _hive, []);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("context");
     }
@@ -86,9 +86,17 @@ public sealed class TemplaterTests : IDisposable
     [InlineData("  ")]
     public void Constructor_BlankSettingsLocation_Throws(string settingsLocation)
     {
-        Action act = () => _ = new Templater(Context(), settingsLocation);
+        Action act = () => _ = new Templater(Context(), settingsLocation, []);
 
         act.Should().Throw<ArgumentException>().WithParameterName("settingsLocation");
+    }
+
+    [Fact]
+    public void Constructor_NullComponents_Throws()
+    {
+        Action act = () => _ = new Templater(Context(), _hive, null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("components");
     }
 
     [Fact]
@@ -108,6 +116,15 @@ public sealed class TemplaterTests : IDisposable
     }
 
     [Fact]
+    public void Constructor_RegistersSuppliedComponents()
+    {
+        TestComponent component = new();
+        using Templater templater = new(Context(), _hive, [new TestTemplateComponent(component)]);
+
+        templater.Settings.Components.OfType<ITestComponent>().Should().ContainSingle().Which.Should().BeSameAs(component);
+    }
+
+    [Fact]
     public void Dispose_CalledTwice_DoesNotThrow()
     {
         Templater templater = CreateTemplater();
@@ -120,5 +137,21 @@ public sealed class TemplaterTests : IDisposable
 
     private TemplateEngineContext Context() => new(WorkingDirectory.FromExplicit(_root));
 
-    private Templater CreateTemplater() => new(Context(), _hive);
+    private Templater CreateTemplater() => new(Context(), _hive, []);
+
+    private interface ITestComponent : IIdentifiedComponent
+    {
+    }
+
+    private sealed class TestComponent : ITestComponent, IIdentifiedComponent
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+    }
+
+    private sealed class TestTemplateComponent(IIdentifiedComponent instance) : ITemplateComponent
+    {
+        public Type InterfaceType => typeof(ITestComponent);
+
+        public IIdentifiedComponent Instance { get; } = instance;
+    }
 }

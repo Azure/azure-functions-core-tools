@@ -33,14 +33,14 @@ public sealed class CliUpdaterTests
     };
 
     [Fact]
-    public async Task UpdateAsync_HappyPath_DownloadsExtractsSwapsAndVerifies()
+    public async Task UpdateAsync_HappyPath_PreloadsProcessRunnerBeforeUpdateAndVerifiesAfterSwap()
     {
         // Arrange
         (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
-            .Returns(OkOutcome("5.1.0\n"));
+            .Returns(OkOutcome("5.0.0\n"), OkOutcome("5.1.0\n"));
 
         fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
         fileSystem.FileExists(_fakeProcessPath).Returns(true);
@@ -52,8 +52,21 @@ public sealed class CliUpdaterTests
         fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
         fileSystem.Received(1).CopyFile(_fakeExtractedBinary, _fakeProcessPath);
 
-        // Verify was run
-        await processRunner.Received(1).RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>());
+        await processRunner.Received(2).RunAsync(
+            Arg.Is<ProcessRunRequest>(request => request.FileName == _fakeProcessPath
+                && request.WorkingDirectory == _fakeInstallDir
+                && request.Arguments.SequenceEqual(new[] { "--version" })
+                && request.Timeout == TimeSpan.FromSeconds(30)),
+            CancellationToken.None);
+        Received.InOrder(() =>
+        {
+            _ = processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), CancellationToken.None);
+            _ = fileSystem.SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), CancellationToken.None);
+            fileSystem.MoveFile(_fakeProcessPath, _fakeBackupPath, true);
+            fileSystem.CopyFile(_fakeExtractedBinary, _fakeProcessPath);
+            _ = processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), CancellationToken.None);
+        });
+        await fileSystem.Received(1).ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
     }
 
     [Fact]
@@ -239,7 +252,7 @@ public sealed class CliUpdaterTests
     }
 
     [Fact]
-    public async Task UpdateAsync_VerificationOutputMismatch_RollsBackAllFilesAndThrowsGraceful()
+    public async Task UpdateAsync_VerificationOutputMismatch_RollsBackInstallation()
     {
         // Arrange
         (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
@@ -258,7 +271,8 @@ public sealed class CliUpdaterTests
 
         Assert.Contains("Verification failed", ex.Message, StringComparison.OrdinalIgnoreCase);
 
-        // Rollback: new binary removed, backup restored
+        fileSystem.Received(1).MoveFile(_fakeProcessPath, _fakeBackupPath, true);
+        fileSystem.Received(1).CopyFile(_fakeExtractedBinary, _fakeProcessPath);
         fileSystem.Received(1).DeleteFile(_fakeProcessPath);
         fileSystem.Received(1).MoveFile(_fakeBackupPath, _fakeProcessPath);
     }
@@ -327,10 +341,11 @@ public sealed class CliUpdaterTests
         // Act
         await updater.UpdateAsync(_stableRelease, progress: null, CancellationToken.None);
 
-        await fileSystem.Received(1).ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
+        string archivePath = Path.Combine(_fakeTempWorkDir, $"func-update.{Release.ArchiveExtension}");
+        await fileSystem.Received(1).ComputeSha256Async(archivePath, CancellationToken.None);
         Received.InOrder(() =>
         {
-            _ = fileSystem.ComputeSha256Async(Arg.Any<string>(), CancellationToken.None);
+            _ = fileSystem.ComputeSha256Async(archivePath, CancellationToken.None);
             if (Release.ArchiveExtension == "zip")
             {
                 fileSystem.ExtractZip(Arg.Any<string>(), _fakeExtractDir);
@@ -343,7 +358,7 @@ public sealed class CliUpdaterTests
     }
 
     [Fact]
-    public async Task UpdateAsync_MultipleFiles_SwapsAllAndRollsBackOnFailure()
+    public async Task UpdateAsync_VerificationFailure_RollsBackAllFiles()
     {
         // Arrange — archive contains two files (e.g. func + a native dependency)
         string fakeLib = Path.Combine(_fakeExtractDir, "libgrpc.so");
@@ -354,7 +369,7 @@ public sealed class CliUpdaterTests
             httpHandler: SuccessDownloadHandler());
 
         processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
-            .Returns(OkOutcome("4.0.0\n")); // wrong version — triggers rollback
+            .Returns(OkOutcome("4.0.0\n"));
 
         fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary, fakeLib]);
         fileSystem.FileExists(_fakeProcessPath).Returns(true);
@@ -377,6 +392,7 @@ public sealed class CliUpdaterTests
         fileSystem.Received(1).MoveFile(_fakeBackupPath, _fakeProcessPath);
         fileSystem.Received(1).DeleteFile(targetLib);
         fileSystem.Received(1).MoveFile(backupLib, targetLib);
+        await processRunner.Received(2).RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -429,7 +445,7 @@ public sealed class CliUpdaterTests
         // Arrange — simulate an extracted file that escapes the extract directory
         string maliciousPath = Path.GetFullPath(Path.Combine(_fakeExtractDir, "..", "etc", "crontab"));
 
-        (CliUpdater updater, IFileSystem fileSystem, _, _) = CreateUpdater(
+        (CliUpdater updater, IFileSystem fileSystem, IProcessRunner processRunner, _) = CreateUpdater(
             httpHandler: SuccessDownloadHandler());
 
         fileSystem.GetFiles(_fakeExtractDir).Returns([maliciousPath]);
@@ -443,6 +459,135 @@ public sealed class CliUpdaterTests
         // No file operations should have been attempted
         fileSystem.DidNotReceive().MoveFile(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
         fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
+        await processRunner.Received(1).RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(1, false, false)]
+    [InlineData(null, true, false)]
+    [InlineData(null, false, true)]
+    public async Task UpdateAsync_PreflightProcessFailure_DoesNotStageOrSwap(int? exitCode, bool timedOut, bool executableNotFound)
+    {
+        var (updater, fileSystem, processRunner, _) = CreateUpdater(SuccessDownloadHandler());
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new ProcessOutcome(exitCode, "5.1.0", "failed", timedOut, executableNotFound));
+
+        var exception = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, null, CancellationToken.None));
+
+        Assert.Contains("before updating", exception.Message, StringComparison.Ordinal);
+        fileSystem.DidNotReceive().CreateTempDirectory(Arg.Any<string>());
+        await fileSystem.DidNotReceive().SaveStreamToFileAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>());
+        fileSystem.DidNotReceive().MoveFile(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
+        fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Theory]
+    [InlineData(1, false, false)]
+    [InlineData(null, true, false)]
+    [InlineData(null, false, true)]
+    public async Task UpdateAsync_VerificationProcessFailure_RollsBack(int? exitCode, bool timedOut, bool executableNotFound)
+    {
+        var (updater, fileSystem, processRunner, _) = CreateUpdater(SuccessDownloadHandler());
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
+        fileSystem.FileExists(_fakeBackupPath).Returns(true);
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>())
+            .Returns(OkOutcome("5.0.0\n"), new ProcessOutcome(exitCode, "5.1.0", "failed", timedOut, executableNotFound));
+
+        var exception = await Assert.ThrowsAsync<GracefulException>(
+            () => updater.UpdateAsync(_stableRelease, null, CancellationToken.None));
+
+        Assert.Contains("after installing", exception.Message, StringComparison.Ordinal);
+        fileSystem.Received(1).CopyFile(_fakeExtractedBinary, _fakeProcessPath);
+        fileSystem.Received(1).MoveFile(_fakeBackupPath, _fakeProcessPath);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PreflightCancelled_DoesNotStageOrSwapAndReleasesLock()
+    {
+        var lockProvider = Substitute.For<IUpdateLockProvider>();
+        var updateLock = Substitute.For<IDisposable>();
+        lockProvider.Acquire(_fakeInstallDir).Returns(updateLock);
+        var (updater, fileSystem, processRunner, _) = CreateUpdater(SuccessDownloadHandler(), lockProvider);
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        using var cancellation = new CancellationTokenSource();
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), cancellation.Token).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return Task.FromCanceled<ProcessOutcome>(cancellation.Token);
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => updater.UpdateAsync(_stableRelease, null, cancellation.Token));
+
+        fileSystem.DidNotReceive().CreateTempDirectory(Arg.Any<string>());
+        fileSystem.DidNotReceive().MoveFile(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
+        fileSystem.DidNotReceive().CopyFile(Arg.Any<string>(), Arg.Any<string>());
+        updateLock.Received(1).Dispose();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UpdateAsync_VerificationProcessThrows_RollsBackAndReleasesLock(bool cancelled)
+    {
+        var lockProvider = Substitute.For<IUpdateLockProvider>();
+        var updateLock = Substitute.For<IDisposable>();
+        lockProvider.Acquire(_fakeInstallDir).Returns(updateLock);
+        var (updater, fileSystem, processRunner, _) = CreateUpdater(SuccessDownloadHandler(), lockProvider);
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
+        fileSystem.FileExists(_fakeBackupPath).Returns(true);
+        using var cancellation = new CancellationTokenSource();
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), cancellation.Token).Returns(
+            _ => Task.FromResult(OkOutcome("5.0.0\n")),
+            _ =>
+            {
+                if (!cancelled) throw new IOException("process failed");
+                cancellation.Cancel();
+                return Task.FromCanceled<ProcessOutcome>(cancellation.Token);
+            });
+
+        if (cancelled)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => updater.UpdateAsync(_stableRelease, null, cancellation.Token));
+        }
+        else
+        {
+            await Assert.ThrowsAsync<IOException>(() => updater.UpdateAsync(_stableRelease, null, cancellation.Token));
+        }
+
+        fileSystem.Received(1).MoveFile(_fakeBackupPath, _fakeProcessPath);
+        updateLock.Received(1).Dispose();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_CancelledBetweenCopies_RollsBackChangedFilesOnly()
+    {
+        var (updater, fileSystem, _, _) = CreateUpdater(SuccessDownloadHandler());
+        string secondFile = Path.Combine(_fakeExtractDir, "second-file");
+        fileSystem.GetFiles(_fakeExtractDir).Returns([_fakeExtractedBinary, secondFile]);
+        fileSystem.FileExists(_fakeProcessPath).Returns(true);
+        fileSystem.FileExists(_fakeBackupPath).Returns(true);
+        using var cancellation = new CancellationTokenSource();
+        fileSystem.When(fs => fs.CopyFile(_fakeExtractedBinary, _fakeProcessPath)).Do(_ => cancellation.Cancel());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => updater.UpdateAsync(_stableRelease, null, cancellation.Token));
+
+        fileSystem.Received(1).MoveFile(_fakeBackupPath, _fakeProcessPath);
+        fileSystem.DidNotReceive().CopyFile(secondFile, Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NullRelease_ThrowsBeforeAcquiringLock()
+    {
+        var lockProvider = Substitute.For<IUpdateLockProvider>();
+        var (updater, _, _, _) = CreateUpdater(SuccessDownloadHandler(), lockProvider);
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => updater.UpdateAsync(null!, null, CancellationToken.None));
+
+        lockProvider.DidNotReceive().Acquire(Arg.Any<string>());
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -453,6 +598,7 @@ public sealed class CliUpdaterTests
         IFileSystem fileSystem = Substitute.For<IFileSystem>();
         var environment = new CliEnvironmentOptions { ProcessPath = _fakeProcessPath };
         IProcessRunner processRunner = Substitute.For<IProcessRunner>();
+        processRunner.RunAsync(Arg.Any<ProcessRunRequest>(), Arg.Any<CancellationToken>()).Returns(OkOutcome("5.1.0\n"));
         fileSystem.ComputeSha256Async(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(_stableRelease.Sha256Checksum);
         if (updateLockProvider is null)

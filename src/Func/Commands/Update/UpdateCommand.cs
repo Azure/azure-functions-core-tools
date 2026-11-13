@@ -127,7 +127,8 @@ internal sealed class UpdateCommand : FuncCliCommand, IBuiltInCommand
                 await _updater.UpdateAsync(target, reporter, ct);
                 return true;
             },
-            cancellationToken);
+            cancellationToken,
+            writeCompletion: false);
 
         _interaction.WriteSuccess($"Azure Functions CLI updated to {target.Version}.");
         return 0;

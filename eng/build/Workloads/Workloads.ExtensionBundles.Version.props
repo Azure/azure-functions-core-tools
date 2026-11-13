@@ -20,9 +20,9 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(BundleVersion)' == ''">
-    <BundleVersion Condition="'$(BundleChannel)' == 'stable'">4.35.0</BundleVersion>
-    <BundleVersion Condition="'$(BundleChannel)' == 'preview'">4.42.0</BundleVersion>
-    <BundleVersion Condition="'$(BundleChannel)' == 'experimental'">4.6.0</BundleVersion>
+    <BundleVersion Condition="'$(BundleChannel)' == 'stable'">4.39.1</BundleVersion>
+    <BundleVersion Condition="'$(BundleChannel)' == 'preview'">4.50.0</BundleVersion>
+    <BundleVersion Condition="'$(BundleChannel)' == 'experimental'">4.8.0</BundleVersion>
   </PropertyGroup>
 
 </Project>
