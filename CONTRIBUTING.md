@@ -113,21 +113,20 @@ Tests can be run using:
 dotnet test test/Func.Tests/Func.Tests.csproj
 ```
 
-#### Log history, clipboard, and terminal checks
+#### Dashboard and terminal checks
 
-The log history, viewport, terminal model, clipboard, and interaction tests do
-not require a live terminal:
+The dashboard model and interaction tests do not require a live terminal:
 
 ```powershell
-dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests|FullyQualifiedName~ProcessRunnerTests"
+dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~Hosting.Dashboard|FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~ConsoleInterruptCoordinatorTests"
 ```
 
-The log-history model retains at most 10,000 entries within a 16 MiB canonical-text
-budget and truncates oversized display entries on text-element boundaries.
-`LogViewport` materializes only visible rows. Its unit tests cover sustained-input
-retention, Unicode wrapping, anchored scrolling, logical selections and expiry,
-and release of cached projections after eviction. These are model contracts,
-not qualification of a live dashboard.
+With the normal host/project workloads installed, use `func run --demo` from
+an initialized project in a real terminal to qualify mouse scrolling, selection,
+resize, and restoration. The demo replaces the event source, not startup
+prerequisites. Verify Ctrl+C copies selected text without terminating
+the host, then verify Ctrl+C stops it after selection is cleared. Check plain
+and JSON output independently, including redirection.
 
 String-writer tests cannot establish real terminal geometry or native mode
 restoration. Native terminal checks must run on the operating system being
@@ -176,6 +175,12 @@ The same probe participates in the opt-in native test suite on Unix:
 ```sh
 FUNC_TERMINAL_NATIVE_TESTS=1 dotnet test test/Func.Tests/Func.Tests.csproj --filter "FullyQualifiedName~UnixPtySmokeTests"
 ```
+
+In addition, manually qualify the actual terminal emulator: select wrapped
+and Unicode log text, copy and paste it into an editor, resize during streaming,
+and verify the host remains running after copying. On macOS, check Terminal.app
+and iTerm2 when available. Automated PTY results do not prove desktop clipboard
+permissions or emulator rendering.
 
 Clipboard unit tests use substitutes. Do not write to a developer's real
 clipboard in unattended tests; use an isolated desktop or explicitly initiated

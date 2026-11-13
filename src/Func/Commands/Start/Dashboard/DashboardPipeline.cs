@@ -1,107 +1,166 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Runtime.ExceptionServices;
+using Azure.Functions.Cli.Console;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
 
 namespace Azure.Functions.Cli.Hosting.Dashboard;
 
 /// <summary>
-/// Drives the event-source → state → renderer loop. Owns the high-level
-/// lifecycle (start banner, event fan-out, summary on exit) and is the only
-/// place that touches the renderer surface.
+/// Owns event fan-out and renderer/host cleanup, including failures before the first frame.
 /// </summary>
 internal sealed class DashboardPipeline(
-    DashboardState state,
-    IHostEventStream source,
-    IDashboardRenderer renderer,
-    IDashboardEventSink? eventSink = null)
+    DashboardState state, IHostEventStream source, IDashboardRenderer renderer,
+    IDashboardEventSink? eventSink = null, IInteractionService? interaction = null)
 {
     private readonly DashboardState _state = state ?? throw new ArgumentNullException(nameof(state));
     private readonly IHostEventStream _source = source ?? throw new ArgumentNullException(nameof(source));
     private readonly IDashboardRenderer _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
     private readonly IDashboardEventSink? _eventSink = eventSink;
+    private readonly IInteractionService? _interaction = interaction;
 
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
         string exitReason = "sigint";
         int exitCode = 0;
+        int? hostExitCode = null;
+        ExceptionDispatchInfo? failure = null;
+        List<Exception> cleanupFailures = [];
         using var pipelineCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        Action? shutdownHandler = null;
-
-        if (_renderer is IDashboardShutdownRequester shutdownRequester)
+        var requester = _renderer as IDashboardShutdownRequester;
+        var lifetime = _renderer as IDashboardRendererLifetime;
+        Action shutdown = pipelineCts.Cancel;
+        Task? consumption = null;
+        if (requester is not null)
         {
-            shutdownHandler = pipelineCts.Cancel;
-            shutdownRequester.ShutdownRequested += shutdownHandler;
+            requester.ShutdownRequested += shutdown;
         }
-
-        await _renderer.OnStartAsync(_state, pipelineCts.Token);
 
         try
         {
-            await foreach (HostLogEntry entry in _source.ReadAsync(pipelineCts.Token))
+            await _renderer.OnStartAsync(_state, pipelineCts.Token);
+            consumption = ConsumeAsync(pipelineCts.Token);
+            if (lifetime is not null)
             {
-                IReadOnlyList<DashboardEvent> events = _state.Observe(entry);
-                if (_eventSink is not null)
+                Task completed = await Task.WhenAny(consumption, lifetime.Completion);
+                if (completed != consumption)
                 {
-                    await _eventSink.OnEventAsync(entry, events, pipelineCts.Token);
+                    await completed;
+                    throw new EndOfStreamException("The dashboard closed before the host stopped.");
                 }
-
-                await _renderer.OnEventAsync(entry, events, pipelineCts.Token);
             }
 
+            await consumption;
             exitReason = "source_completed";
-            if (_source is IHostEventStreamLifecycle lifecycle)
+            if (_source is IHostEventStreamLifecycle host)
             {
-                exitCode = await lifecycle.WaitForExitAsync(CancellationToken.None);
+                hostExitCode = await host.WaitForExitAsync(pipelineCts.Token);
+                exitCode = hostExitCode.Value;
             }
         }
         catch (OperationCanceledException) when (pipelineCts.IsCancellationRequested)
         {
             exitReason = "sigint";
         }
+        catch (Exception exception)
+        {
+            // This lifetime boundary preserves the original failure while every owner is cleaned up.
+            exitReason = "host_failed";
+            failure = ExceptionDispatchInfo.Capture(exception);
+        }
         finally
         {
-            // Signal shutdown on every exit path; StartCommand's await using disposes the stream as a fallback.
-            if (_source is IHostEventStreamLifecycle lifecycle)
+            await AttemptCleanupAsync(() =>
+            {
+                pipelineCts.Cancel();
+                return Task.CompletedTask;
+            }, cleanupFailures);
+            await AttemptCleanupAsync(() =>
+            {
+                lifetime?.BeginShutdown(hostExitCode);
+                return Task.CompletedTask;
+            }, cleanupFailures);
+            if (consumption is { IsCompleted: false })
             {
                 try
                 {
-                    await lifecycle.RequestShutdownAsync(CancellationToken.None);
+                    await consumption;
                 }
-                catch
+                catch (OperationCanceledException) when (pipelineCts.IsCancellationRequested)
                 {
-                    // Best effort.
+                    // Cancellation stops the event consumer before the renderer is disposed.
+                }
+                catch (Exception exception)
+                {
+                    failure ??= ExceptionDispatchInfo.Capture(exception);
                 }
             }
 
-            if (_renderer is IDashboardShutdownRequester requester && shutdownHandler is not null)
+            if (_source is IHostEventStreamLifecycle host)
             {
-                requester.ShutdownRequested -= shutdownHandler;
+                using CancellationTokenSource cleanup = new(TimeSpan.FromSeconds(10));
+                await AttemptCleanupAsync(() => host.RequestShutdownAsync(cleanup.Token), cleanupFailures);
+            }
+
+            if (requester is not null)
+            {
+                requester.ShutdownRequested -= shutdown;
             }
 
             SummaryEvent summary = _state.BuildSummary(exitReason, DateTimeOffset.UtcNow);
-
-            // OnSummaryAsync must run even when the pipeline is cancelled so
-            // the JSON renderer can emit its terminal `summary` record and
-            // the compact renderer can restore the cursor.
-            using var summaryCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            try
-            {
-                await _renderer.OnSummaryAsync(summary, summaryCts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                // Best effort.
-            }
-
-            await _renderer.DisposeAsync();
+            using CancellationTokenSource summaryCts = new(TimeSpan.FromSeconds(5));
+            await AttemptCleanupAsync(() => _renderer.OnSummaryAsync(summary, summaryCts.Token), cleanupFailures);
+            await AttemptCleanupAsync(() => _renderer.DisposeAsync().AsTask(), cleanupFailures);
             if (_eventSink is not null)
             {
-                await _eventSink.DisposeAsync();
+                await AttemptCleanupAsync(() => _eventSink.DisposeAsync().AsTask(), cleanupFailures);
             }
         }
 
+        if (failure is not null)
+        {
+            foreach (Exception cleanupFailure in cleanupFailures.Where(exception => !ReferenceEquals(exception, failure.SourceException)))
+            {
+                _interaction?.WriteWarning($"Run cleanup failed: {cleanupFailure.Message}");
+            }
+
+            failure.Throw();
+        }
+
+        if (cleanupFailures.Count > 0)
+        {
+            ExceptionDispatchInfo.Capture(cleanupFailures[0]).Throw();
+        }
+
         return exitCode;
+    }
+
+    private async Task ConsumeAsync(CancellationToken cancellationToken)
+    {
+        await foreach (HostLogEntry entry in _source.ReadAsync(cancellationToken))
+        {
+            IReadOnlyList<DashboardEvent> events = _state.Observe(entry);
+            if (_eventSink is not null)
+            {
+                await _eventSink.OnEventAsync(entry, events, cancellationToken);
+            }
+
+            await _renderer.OnEventAsync(entry, events, cancellationToken);
+        }
+    }
+
+    private static async Task AttemptCleanupAsync(Func<Task> cleanup, List<Exception> failures)
+    {
+        try
+        {
+            await cleanup();
+        }
+        catch (Exception exception)
+        {
+            // Defer reporting until the remaining owners, particularly the terminal, are restored.
+            failures.Add(exception);
+        }
     }
 }

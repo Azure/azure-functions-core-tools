@@ -10,6 +10,7 @@
 
 #### Changes
 
+- Make `func run` full-screen in supported interactive terminals, with mouse scrolling, bounded log history, and log selection/copy. Ctrl+C copies selected text and otherwise stops the host; plain and JSON output remain available. (#5885)
 - Fix in-place Azure Functions CLI updates failing during post-install verification on Windows by preloading process-launch dependencies before replacing the running single-file executable. Unexpected errors now fall back to the exception type when the message is empty and include full details with `--verbose`. (#5818)
 - Verify publisher trust and signed content before extracting newly acquired workload archives, including RID pointers and implementations. Explicit `workload install` / `update --allow-untrusted` supports unsigned development packages without bypassing workload format checks. Existing installed-content reuse and `FUNC_HOST_CONTENT_ROOT` remain unchanged. (#5759)
 - Include Java and PowerShell stacks in `func setup`, and correctly infer Go setup requirements from the `native` worker runtime. (#5801)
