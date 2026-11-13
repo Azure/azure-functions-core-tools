@@ -1,0 +1,638 @@
+#!/usr/bin/env pwsh
+#Requires -Version 7.4
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)] [string] $ExecutablePath,
+    [Parameter(Mandatory)] [string] $FixtureExecutablePath
+)
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$harness = Join-Path $repoRoot 'eng/scripts/measure-cli-startup.ps1'
+$executable = (Resolve-Path -LiteralPath $ExecutablePath).Path
+$fixtureExecutable = (Resolve-Path -LiteralPath $FixtureExecutablePath).Path
+$root = Join-Path ([System.IO.Path]::GetTempPath()) "func-startup-tests-$([Guid]::NewGuid().ToString('N'))"
+[void][System.IO.Directory]::CreateDirectory($root)
+$fixtureDirectory = Join-Path $root 'fixture'
+[void][IO.Directory]::CreateDirectory($fixtureDirectory)
+Get-ChildItem -LiteralPath ([IO.Path]::GetDirectoryName($fixtureExecutable)) -File |
+    Copy-Item -Destination $fixtureDirectory
+$fixtureExecutable = Join-Path $fixtureDirectory ([IO.Path]::GetFileName($fixtureExecutable))
+Add-Type -Path @(
+    (Join-Path $repoRoot 'eng/Performance/Startup/StartupProcess.cs'),
+    (Join-Path $repoRoot 'eng/Performance/Startup/NativeStartupProcess.cs'),
+    (Join-Path $PSScriptRoot 'StartupGroupCompletionChecks.cs')
+)
+. $harness -ExecutablePath $executable -OutputPath (Join-Path $root 'unused.json')
+$pwsh = (Get-Process -Id $PID).Path
+$testCount = 0
+
+function Assert-True {
+    param([bool] $Condition, [string] $Message)
+    if (-not $Condition) { throw $Message }
+}
+
+function Assert-Fails {
+    param([scriptblock] $Action, [string] $ExpectedMessage)
+    $failure = $null
+    try { & $Action | Out-Null } catch { $failure = $_ }
+    Assert-True ($null -ne $failure) "Expected failure containing '$ExpectedMessage'."
+    Assert-True ($failure.Exception.Message.Contains($ExpectedMessage)) "Unexpected failure: $failure"
+}
+
+function Test-Case {
+    param([string] $Name, [scriptblock] $Action)
+    & $Action
+    $script:testCount++
+    Write-Host "PASS $Name"
+}
+
+try {
+    foreach ($scenario in @('delayed-exit', 'timeout', 'inspection-error', 'native-inspection')) {
+        $name = "Process_GroupCompletion_$($scenario.Replace('-', '_'))"
+        if ($IsWindows) {
+            Write-Host "SKIP $name (Unix process-group lifecycle)"
+        }
+        else {
+            Test-Case $name { [StartupGroupCompletionChecks]::new().Run($scenario) }
+        }
+    }
+    Test-Case 'Summary_SeparatesCommandsAndState_ComputesEvenAndOddMedians' {
+        $inputSamples = @(
+            foreach ($value in @(8, 2, 4, 6)) {
+                [pscustomobject]@{ command = '--help'; kind = 'subsequent'; elapsedMs = $value; status = 'valid' }
+            }
+            foreach ($value in @(9, 1, 5)) {
+                [pscustomobject]@{ command = 'version'; kind = 'first-in-series'; elapsedMs = $value; status = 'valid' }
+            }
+            [pscustomobject]@{ command = '--help'; kind = 'subsequent'; elapsedMs = 1000; status = 'invalid' }
+        )
+        $summary = @(Get-StartupSummary -Samples $inputSamples)
+        Assert-True ($summary.Count -eq 2) 'Expected exactly two command/state groups.'
+        $help = $summary | Where-Object command -eq '--help'
+        $version = $summary | Where-Object command -eq 'version'
+        Assert-True ($help.count -eq 4 -and $help.medianMs -eq 5 -and $help.meanMs -eq 5 -and
+            $help.minMs -eq 2 -and $help.maxMs -eq 8) 'Even median, ordering or invalid-sample filtering is incorrect.'
+        Assert-True ($version.count -eq 3 -and $version.medianMs -eq 5 -and $version.meanMs -eq 5 -and
+            $version.minMs -eq 1 -and $version.maxMs -eq 9) 'Odd median or version grouping is incorrect.'
+        Assert-True (@(Get-StartupSummary -Samples @()).Count -eq 0) 'Empty input must not produce a success-shaped summary.'
+    }
+
+    Test-Case 'Process_LargeUnicodeStreamsAndClosedInput_CapturesBothWithoutDeadlock' {
+        $code = @'
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+if ([Console]::ReadLine() -ne $null) { exit 7 }
+[Console]::Out.Write(('x' * 100000) + [char]0x2192)
+[Console]::Error.Write(('y' * 100000) + [char]0x2713)
+'@
+        $observed = Invoke-StartupProcess -Executable $pwsh -Arguments @('-NoProfile', '-NonInteractive', '-Command', $code) `
+            -Directory $root -EnvironmentVariables @{} -TimeoutMilliseconds 30000
+        Assert-True ($observed.status -eq 'exited' -and $observed.exitCode -eq 0) 'Child did not exit successfully with EOF on stdin.'
+        Assert-True ($observed.stdout -ceq (('x' * 100000) + [char]0x2192)) 'stdout bytes/Unicode were lost.'
+        Assert-True ($observed.stderr -ceq (('y' * 100000) + [char]0x2713)) 'stderr bytes/Unicode were lost.'
+        Assert-True ($observed.elapsedMs -gt 0) 'No elapsed time recorded.'
+    }
+
+    Test-Case 'Process_ExplicitEnvironmentAndDirectory_DoesNotInheritCliState' {
+        $directory = Join-Path $root 'isolation'
+        [void][IO.Directory]::CreateDirectory($directory)
+        $markerName = "marker-$([Guid]::NewGuid().ToString('N')).txt"
+        $markerValue = [Guid]::NewGuid().ToString('N')
+        [IO.File]::WriteAllText((Join-Path $directory $markerName), $markerValue)
+        $linkedDirectory = Join-Path $root 'isolation-link'
+        if ($IsWindows) {
+            [void](New-Item -ItemType Junction -Path $linkedDirectory -Target $directory)
+        }
+        else {
+            [void][IO.Directory]::CreateSymbolicLink($linkedDirectory, $directory)
+        }
+        $code = @'
+$marker = [IO.Path]::Combine([Environment]::CurrentDirectory, $env:STARTUP_TEST_MARKER)
+[ordered]@{
+    home = $env:FUNC_CLI_HOME
+    workloads = $env:FUNC_CLI_WORKLOADS_HOME
+    sentinel = $env:FUNC_CLI_BENCHMARK_SENTINEL
+    directory = [Environment]::CurrentDirectory
+    marker = if ([IO.File]::Exists($marker)) { [IO.File]::ReadAllText($marker) } else { $null }
+} | ConvertTo-Json -Compress
+'@
+        $old = [Environment]::GetEnvironmentVariable('FUNC_CLI_BENCHMARK_SENTINEL')
+        try {
+            [Environment]::SetEnvironmentVariable('FUNC_CLI_BENCHMARK_SENTINEL', 'must-not-leak')
+            foreach ($workingDirectory in @($directory, $linkedDirectory, $root)) {
+                $observed = Invoke-StartupProcess -Executable $pwsh -Arguments @('-NoProfile', '-NonInteractive', '-Command', $code) `
+                    -Directory $workingDirectory -EnvironmentVariables @{
+                        FUNC_CLI_HOME = 'owned'
+                        FUNC_CLI_WORKLOADS_HOME = 'workloads'
+                        STARTUP_TEST_MARKER = $markerName
+                    } -TimeoutMilliseconds 30000
+                Assert-True ($observed.status -eq 'exited' -and $observed.exitCode -eq 0) `
+                    "Isolation child failed for '$workingDirectory': $($observed | ConvertTo-Json -Compress)"
+                Assert-True ($observed.stderr -ceq '') "Unexpected isolation stderr: $($observed.stderr)"
+                $fields = $observed.stdout | ConvertFrom-Json
+                Assert-True ($fields.home -ceq 'owned') "Expected home 'owned'; actual: '$($fields.home)'."
+                Assert-True ($fields.workloads -ceq 'workloads') "Expected workloads 'workloads'; actual: '$($fields.workloads)'."
+                Assert-True ([string]::IsNullOrEmpty($fields.sentinel)) "Inherited sentinel leaked: '$($fields.sentinel)'."
+                if ($workingDirectory -eq $root) {
+                    Assert-True ($null -eq $fields.marker) "Wrong directory unexpectedly found the marker: '$($fields.directory)'."
+                }
+                else {
+                    # The child may report a physical path rather than the supplied symlink spelling.
+                    Assert-True ($fields.marker -ceq $markerValue) `
+                        "Expected marker '$markerValue' via '$workingDirectory'; actual '$($fields.marker)' in '$($fields.directory)'."
+                }
+            }
+        }
+        finally {
+            [Environment]::SetEnvironmentVariable('FUNC_CLI_BENCHMARK_SENTINEL', $old)
+            [IO.Directory]::Delete($linkedDirectory)
+        }
+    }
+
+    Test-Case 'Process_NonzeroExit_PreservesStatusAndDiagnostics' {
+        $observed = Invoke-StartupProcess -Executable $pwsh `
+            -Arguments @('-NoProfile', '-NonInteractive', '-Command', '[Console]::Error.Write("expected"); exit 23') `
+            -Directory $root -EnvironmentVariables @{} -TimeoutMilliseconds 30000
+        Assert-True ($observed.status -eq 'exited' -and $observed.exitCode -eq 23 -and $observed.stderr -eq 'expected') 'Nonzero exit was hidden.'
+    }
+
+    Test-Case 'Process_ExitedLeader_RepeatedDisposalReapsOwnedProcess' {
+        if (-not $IsWindows) {
+            Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public class StartupTestUnixProcesses {
+    [DllImport("libc", SetLastError = true)]
+    private static extern int kill(int pid, int signal);
+    [DllImport("libc", SetLastError = true)]
+    private static extern int waitid(int type, int pid, IntPtr information, int options);
+    public static int ProbeGroup(int pid) {
+        return kill(-pid, 0) == 0 ? 0 : Marshal.GetLastPInvokeError();
+    }
+    public static int ProbeChild(int pid) {
+        IntPtr information = Marshal.AllocHGlobal(128);
+        try {
+            return waitid(1, pid, information, 4 | 1 | (OperatingSystem.IsMacOS() ? 0x20 : 0x1000000)) == 0
+                ? 0 : Marshal.GetLastPInvokeError();
+        }
+        finally { Marshal.FreeHGlobal(information); }
+    }
+}
+'@
+        }
+        $environment = [Collections.Generic.Dictionary[string, string]]::new()
+        $process = [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new(
+            $pwsh, @('-NoProfile', '-NonInteractive', '-Command', '[Console]::Write("exited:$PID"); exit 23'),
+            $root, $environment, 30000)
+        try {
+            $process.StartAndWait()
+            $observation = $process.Capture()
+            Assert-True ($process.ExitedWithinTimeout -and $observation.ExitCode -eq 23 -and
+                $observation.Stdout -ceq "exited:$($observation.ProcessId)" -and $observation.Stderr.Length -eq 0) `
+                'Exited-leader fixture failed before disposal.'
+            if (-not $IsWindows) {
+                Assert-True ([StartupTestUnixProcesses]::ProbeChild($observation.ProcessId) -eq 0) `
+                    'Exited group leader was not retained before disposal.'
+                $expectedGroupError = if ($IsMacOS) { 1 } else { 0 }
+                Assert-True ([StartupTestUnixProcesses]::ProbeGroup($observation.ProcessId) -eq $expectedGroupError) `
+                    'Zombie-only group did not exercise the expected native signalling boundary.'
+            }
+            $process.Dispose()
+            $process.Dispose()
+            if (-not $IsWindows) {
+                Assert-True ([StartupTestUnixProcesses]::ProbeChild($observation.ProcessId) -eq 10) `
+                    'Disposed target was not reaped (expected ECHILD).'
+            }
+            Assert-Fails { $process.Capture() } 'disposed'
+        }
+        finally { $process.Dispose() }
+    }
+
+    Test-Case 'Process_ArgumentBoundaries_PreservesEmptyQuotesUnicodeAndBackslashes' {
+        $script = Join-Path $root 'argument fixture.ps1'
+        [IO.File]::WriteAllText($script, '[Console]::OutputEncoding = [Text.Encoding]::UTF8; ConvertTo-Json -InputObject @($args) -Compress')
+        $values = @('', 'with spaces', 'embedded"quote', 'trailing\', 'quote\"and\\', "unicode-$([char]0x2192)")
+        $observed = Invoke-StartupProcess -Executable $pwsh -Arguments (@('-NoProfile', '-NonInteractive', '-File', $script) + $values) `
+            -Directory $root -EnvironmentVariables @{} -TimeoutMilliseconds 30000
+        Assert-True ($observed.status -eq 'exited' -and $observed.exitCode -eq 0 -and $observed.stderr.Length -eq 0) `
+            'Argument fixture failed before reporting its received values.'
+        $received = @($observed.stdout | ConvertFrom-Json)
+        Assert-True ($received.Count -eq $values.Count) 'Native argument count changed.'
+        for ($index = 0; $index -lt $values.Count; $index++) {
+            Assert-True ($received[$index] -ceq $values[$index]) "Native argument boundary changed at index $index."
+        }
+    }
+
+    Test-Case 'Process_MissingExecutable_PreservesLaunchErrorAndDisposesSafely' {
+        Assert-Fails {
+            Invoke-StartupProcess -Executable (Join-Path $root 'missing-child') -Arguments @() `
+                -Directory $root -EnvironmentVariables @{} -TimeoutMilliseconds 30000
+        } 'error occurred trying to start process'
+    }
+
+    Test-Case 'Process_InvalidLaunchInputs_PreservesNativeErrorsAndDisposesSafely' {
+        $inert = Join-Path $root 'not-executable.txt'
+        [IO.File]::WriteAllText($inert, 'not an executable')
+        $cases = @(
+            @{ executable = $pwsh; directory = (Join-Path $root 'missing-directory'); codes = $(if ($IsWindows) { @(3, 267) } else { @(2) }) },
+            @{ executable = $inert; directory = $root; codes = $(if ($IsWindows) { @(193) } else { @(13) }) }
+        )
+        foreach ($case in $cases) {
+            $environment = [Collections.Generic.Dictionary[string, string]]::new()
+            $process = [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new(
+                $case.executable, @(), $case.directory, $environment, 30000)
+            try {
+                $failure = $null
+                try { $process.StartAndWait() } catch { $failure = $_.Exception.GetBaseException() }
+                Assert-True ($failure -is [ComponentModel.Win32Exception] -and $case.codes -contains $failure.NativeErrorCode -and
+                    $failure.Message.Contains($case.executable) -and -not $process.HasStarted) `
+                    'Native launch failure lost its error code, executable identity or not-started status.'
+                $process.Dispose()
+                $process.Dispose()
+            }
+            finally { $process.Dispose() }
+        }
+    }
+
+    Test-Case 'Process_ValidationAndFixtureOwnership_RejectsInvalidInputsWithoutMutatingExistingState' {
+        $environment = [Collections.Generic.Dictionary[string, string]]::new()
+        Assert-Fails {
+            [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new($pwsh, @(), $root, $environment, 0)
+        } 'timeoutMilliseconds'
+        Assert-Fails {
+            [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new('', @(), $root, $environment, 1000)
+        } 'executable'
+        Assert-Fails {
+            [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new($pwsh, @("nul$([char]0)argument"), $root, $environment, 1000)
+        } 'NUL'
+        $environment['INVALID=KEY'] = 'value'
+        Assert-Fails {
+            [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new($pwsh, @(), $root, $environment, 1000)
+        } 'Environment keys'
+        $environment.Clear()
+        $environment['VALID_KEY'] = "nul$([char]0)value"
+        Assert-Fails {
+            [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new($pwsh, @(), $root, $environment, 1000)
+        } 'NUL'
+        $directory = Join-Path $root 'existing-fixture'
+        [void][IO.Directory]::CreateDirectory($directory)
+        $marker = Join-Path $directory 'preserve.txt'
+        [IO.File]::WriteAllText($marker, 'user-owned')
+        Assert-Fails { [Azure.Functions.Cli.Performance.Startup.StartupFixture]::new($directory) } 'already exists'
+        Assert-True ([IO.File]::ReadAllText($marker) -ceq 'user-owned' -and
+            @(Get-ChildItem -LiteralPath $directory).Count -eq 1) 'Existing fixture state was overwritten.'
+    }
+
+    Test-Case 'Framework_MatchingQualifiedIterations_UsesOuterTimings' {
+        $childSamples = @(
+            foreach ($command in @('--help', 'version')) {
+                foreach ($index in 1..2) {
+                    [pscustomobject]@{
+                        command = $command; series = 1; index = $index; status = 'valid'; elapsedMs = 999
+                    }
+                }
+            }
+        )
+        $framework = [pscustomobject]@{
+            completed = $true; strategy = 'Monitoring'; measurements = @(
+                foreach ($command in @('--help', 'version')) {
+                    foreach ($index in 1..2) {
+                        [pscustomobject]@{ command = $command; series = 1; index = $index; operations = 1; elapsedMs = 10 * $index }
+                    }
+                }
+            )
+        }
+        $merged = @(Merge-StartupMeasurements -Samples $childSamples -Framework $framework -Series 1 -SamplesPerSeries 2)
+        Assert-True (($merged.elapsedMs -join ',') -ceq '10,20,10,20') 'Framework timings were replaced with inner or pooled values.'
+        foreach ($scenario in @('incomplete', 'missing', 'duplicate', 'extra-operation', 'invalid-time', 'unqualified-child')) {
+            $copy = $framework | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+            $children = @($childSamples | ConvertTo-Json -Depth 8 | ConvertFrom-Json)
+            switch ($scenario) {
+                'incomplete' { $copy.completed = $false }
+                'missing' { $copy.measurements = @($copy.measurements | Select-Object -Skip 1) }
+                'duplicate' { $copy.measurements[1].index = 1 }
+                'extra-operation' { $copy.measurements[0].operations = 2 }
+                'invalid-time' { $copy.measurements[0].elapsedMs = -1 }
+                'unqualified-child' { $children[0].status = 'invalid' }
+            }
+            Assert-Fails { Merge-StartupMeasurements -Samples $children -Framework $copy -Series 1 -SamplesPerSeries 2 } 'BenchmarkDotNet'
+        }
+    }
+
+    Test-Case 'Process_Timeout_TerminatesOwnedChildAndPreservesOutput' {
+        $code = '[Console]::Write("started:$PID"); [Console]::Out.Flush(); Start-Sleep -Seconds 120'
+        $observed = Invoke-StartupProcess -Executable $pwsh -Arguments @('-NoProfile', '-NonInteractive', '-Command', $code) `
+            -Directory $root -EnvironmentVariables @{} -TimeoutMilliseconds 5000
+        Assert-True ($observed.status -eq 'timeout' -and $null -eq $observed.exitCode) 'Timeout became an ordinary successful exit.'
+        Assert-True ($observed.stdout -match '^started:(\d+)$') 'Child did not reach its explicit startup handshake.'
+        $childId = [int]$Matches[1]
+        Assert-True ($null -eq (Get-Process -Id $childId -ErrorAction SilentlyContinue)) 'Timed-out child was left running.'
+    }
+
+    Test-Case 'Process_Timeout_TerminatesOwnedDescendantAfterHandshake' {
+        $code = @'
+$ready = Join-Path ([Environment]::CurrentDirectory) 'descendant-ready'
+$start = [Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
+$start.UseShellExecute = $false
+foreach ($arg in @('-NoProfile', '-NonInteractive', '-Command',
+    '[IO.File]::WriteAllText($env:READY_PATH, "$PID"); Start-Sleep -Seconds 120')) {
+    $start.ArgumentList.Add($arg)
+}
+$start.Environment['READY_PATH'] = $ready
+$child = [Diagnostics.Process]::Start($start)
+while (-not [IO.File]::Exists($ready)) { Start-Sleep -Milliseconds 10 }
+[Console]::Write("ready:$PID,$($child.Id)")
+[Console]::Out.Flush()
+Start-Sleep -Seconds 120
+'@
+        $observed = Invoke-StartupProcess -Executable $pwsh -Arguments @('-NoProfile', '-NonInteractive', '-Command', $code) `
+            -Directory $root -EnvironmentVariables @{} -TimeoutMilliseconds 10000
+        Assert-True ($observed.status -eq 'timeout' -and $observed.stdout -match '^ready:(\d+),(\d+)$') `
+            'Parent and descendant did not reach explicit readiness.'
+        $ownedIds = @([int]$Matches[1], [int]$Matches[2])
+        Assert-True ([IO.File]::ReadAllText((Join-Path $root 'descendant-ready')) -eq "$($ownedIds[1])") `
+            'Descendant readiness was not independently observed.'
+        foreach ($ownedId in $ownedIds) {
+            Assert-True ($null -eq (Get-Process -Id $ownedId -ErrorAction SilentlyContinue)) 'Owned process tree survived timeout.'
+        }
+    }
+
+    foreach ($scenario in @('capture-failure', 'successful-capture', 'dispose-without-capture')) {
+        Test-Case "Process_ExitedParent_$($scenario.Replace('-', '_'))_TerminatesOwnedDescendant" {
+            $directory = Join-Path $root "exited-parent-$scenario"
+            [void][IO.Directory]::CreateDirectory($directory)
+            $code = @'
+$directory = [Environment]::CurrentDirectory
+$ready = Join-Path $directory 'ready'
+$start = [Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
+$start.UseShellExecute = $false
+if ($env:STARTUP_DESCENDANT_SCENARIO -eq 'successful-capture') {
+    if ($IsWindows) {
+        Add-Type 'using System; using System.Runtime.InteropServices; public class StartupTestHandles {
+            [DllImport("kernel32.dll", SetLastError=true)] public static extern IntPtr GetStdHandle(int id);
+            [DllImport("kernel32.dll", SetLastError=true)] public static extern bool SetHandleInformation(IntPtr handle, uint mask, uint flags);
+        }'
+        foreach ($handleId in @(-11, -12)) {
+            if (-not [StartupTestHandles]::SetHandleInformation([StartupTestHandles]::GetStdHandle($handleId), 1, 0)) {
+                throw 'Could not prevent unrelated output handles from reaching the independent-stream descendant.'
+            }
+        }
+    }
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+}
+foreach ($arg in @('-NoProfile', '-NonInteractive', '-Command',
+    '[Console]::Write("inherited-stream"); [Console]::Out.Flush(); [IO.File]::WriteAllText($env:READY_PATH, "$PID"); Start-Sleep -Seconds 120')) {
+    $start.ArgumentList.Add($arg)
+}
+$start.Environment['READY_PATH'] = $ready
+$child = [Diagnostics.Process]::Start($start)
+try {
+    [IO.File]::WriteAllText((Join-Path $directory 'child-id'), "$($child.Id)")
+    $guard = [Diagnostics.Stopwatch]::StartNew()
+    while (-not [IO.File]::Exists($ready)) {
+        if ($guard.Elapsed.TotalSeconds -gt 20) { throw 'Descendant readiness timed out.' }
+        Start-Sleep -Milliseconds 10
+    }
+    if ($child.HasExited) { throw 'Descendant exited before parent readiness.' }
+    [IO.File]::WriteAllText((Join-Path $directory 'parent-id'), "$PID")
+}
+finally {
+    $child.Dispose()
+}
+exit 0
+'@
+            $environment = [Collections.Generic.Dictionary[string, string]]::new()
+            $environment['STARTUP_DESCENDANT_SCENARIO'] = $scenario
+            $process = [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new(
+                $pwsh, @('-NoProfile', '-NonInteractive', '-Command', $code), $directory, $environment, 30000)
+            $descendant = $null
+            try {
+                $process.StartAndWait()
+                $childIdPath = Join-Path $directory 'child-id'
+                Assert-True ([IO.File]::Exists($childIdPath)) 'Parent did not record its owned descendant.'
+                $descendant = [Diagnostics.Process]::GetProcessById([int][IO.File]::ReadAllText($childIdPath))
+                $parentId = [int][IO.File]::ReadAllText((Join-Path $directory 'parent-id'))
+                Assert-True ($process.ExitedWithinTimeout -and $parentId -gt 0 -and
+                    -not $descendant.HasExited -and
+                    [IO.File]::ReadAllText((Join-Path $directory 'ready')) -eq "$($descendant.Id)") `
+                    'Parent-first exit and live inherited-stream descendant were not established.'
+                switch ($scenario) {
+                    'capture-failure' { Assert-Fails { $process.Capture() } 'timed out' }
+                    'successful-capture' {
+                        $observation = $process.Capture()
+                        Assert-True ($observation.Status -eq 'exited' -and $observation.ExitCode -eq 0 -and
+                            $observation.Stdout.Length -eq 0 -and $observation.Stderr.Length -eq 0 -and
+                            -not $descendant.HasExited) 'Healthy capture did not retain the independently running descendant.'
+                    }
+                }
+                $process.Dispose()
+                $descendant.Refresh()
+                Assert-True ($descendant.HasExited) 'Owned descendant was still live when disposal returned.'
+                $process.Dispose()
+            }
+            finally {
+                try { $process.Dispose() }
+                finally {
+                    if ($null -eq $descendant -and [IO.File]::Exists((Join-Path $directory 'child-id'))) {
+                        $childId = [int][IO.File]::ReadAllText((Join-Path $directory 'child-id'))
+                        $descendant = Get-Process -Id $childId -ErrorAction SilentlyContinue
+                    }
+                    if ($null -ne $descendant) {
+                        try {
+                            if (-not $descendant.HasExited) {
+                                $descendant.Kill($true)
+                                Assert-True ($descendant.WaitForExit(10000)) 'Test cleanup could not terminate its owned descendant.'
+                            }
+                        }
+                        finally { $descendant.Dispose() }
+                    }
+                }
+            }
+        }
+    }
+
+    Test-Case 'Harness_MissingExecutable_FailsBeforeCreatingReport' {
+        $output = Join-Path $root 'missing.json'
+        Assert-Fails { & $harness -ExecutablePath (Join-Path $root 'missing-executable') -OutputPath $output } 'does not exist'
+        Assert-True (-not (Test-Path -LiteralPath $output)) 'Missing executable created a successful-looking report.'
+    }
+
+    Test-Case 'Harness_InvalidCli_PersistsFailedPreflight' {
+        $output = Join-Path $root 'invalid.json'
+        Assert-Fails { & $harness -ExecutablePath $pwsh -OutputPath $output -Series 1 -SamplesPerSeries 2 } 'Version preflight failed'
+        $report = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+        Assert-True ($report.status -eq 'failed' -and $report.budgetStatus -eq 'not-evaluated') 'Failure not recorded.'
+        Assert-True ($report.samples.Count -eq 0 -and $report.summary.Count -eq 0) 'Invalid CLI produced accepted measurements.'
+        Assert-True (-not [string]::IsNullOrWhiteSpace($report.error)) 'Missing failure diagnostic.'
+        Assert-True ($null -ne $report.preflight) 'Failed preflight output was lost.'
+        Assert-True ($report.cleanupStatus -eq 'removed' -and -not (Test-Path -LiteralPath $report.temporaryStatePath)) `
+            'Failed preflight left owned temporary state.'
+    }
+
+    Test-Case 'Harness_ExistingReport_IsNeverOverwritten' {
+        $output = Join-Path $root 'existing.json'
+        [IO.File]::WriteAllText($output, 'preserve-me')
+        Assert-Fails { & $harness -ExecutablePath $executable -OutputPath $output } 'already exists'
+        Assert-True ([IO.File]::ReadAllText($output) -ceq 'preserve-me') 'Existing report was changed.'
+    }
+
+    Test-Case 'Harness_MultifileArtifact_IsRejectedWithFailedReport' {
+        $directory = Join-Path $root 'multifile'
+        [void][IO.Directory]::CreateDirectory($directory)
+        $binary = Join-Path $directory ([IO.Path]::GetFileName($executable))
+        Copy-Item -LiteralPath $executable -Destination $binary
+        [IO.File]::WriteAllText((Join-Path $directory 'func.dll'), 'not-a-single-file-payload')
+        $output = Join-Path $root 'multifile.json'
+        Assert-Fails { & $harness -ExecutablePath $binary -OutputPath $output } 'single-file published CLI'
+        $report = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+        Assert-True ($report.status -eq 'failed' -and $report.samples.Count -eq 0 -and $report.summary.Count -eq 0) `
+            'Multi-file output was accepted as an identified single-file artifact.'
+    }
+
+    Test-Case 'Harness_ChangedArtifact_InvalidatesSamplesAndCleansState' {
+        $directory = Join-Path $root 'changed-artifact'
+        [void][IO.Directory]::CreateDirectory($directory)
+        $binary = Join-Path $directory ([IO.Path]::GetFileName($executable))
+        Copy-Item -LiteralPath $executable -Destination $binary
+        $originalHash = (Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash
+        $output = Join-Path $root 'changed-artifact.json'
+        $hashCheck = [pscustomobject]@{ count = 0 }
+        # Change only the owned copy at final verification, after the real benchmark has returned.
+        function Get-FileHash {
+            param([string] $LiteralPath, [string] $Algorithm)
+            Assert-True ($LiteralPath -eq $binary) 'Hash interception targeted an unowned executable.'
+            $hashCheck.count++
+            if ($hashCheck.count -eq 2) {
+                $stream = [IO.File]::Open($binary, [IO.FileMode]::Append, [IO.FileAccess]::Write)
+                try { $stream.WriteByte(0) } finally { $stream.Dispose() }
+            }
+            Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $LiteralPath -Algorithm $Algorithm
+        }
+        Assert-Fails {
+            & $harness -ExecutablePath $binary -OutputPath $output -Series 1 -SamplesPerSeries 2
+        } 'Executable changed during measurement'
+        $report = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+        $framework = Get-Content -LiteralPath (Join-Path $report.benchmarkArtifactsPath 'framework-measurements.json') -Raw |
+            ConvertFrom-Json
+        Assert-True ($hashCheck.count -eq 2 -and $report.artifact.sha256 -eq $originalHash -and
+            (Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash -ne $originalHash) `
+            'Owned executable did not change at final artifact verification.'
+        Assert-True ($framework.completed -and $framework.measurements.Count -eq 4 -and
+            $report.preflight.exitCode -eq 0 -and $report.preflight.stdout.Trim() -eq $report.artifact.cliVersion -and
+            $report.samples.Count -eq 4) 'Hash failure did not follow healthy preflight and complete framework observations.'
+        Assert-True ($report.status -eq 'failed' -and $report.error.Contains('Executable changed during measurement') -and
+            $report.summary.Count -eq 0) 'Artifact identity failure retained accepted summaries or lost diagnostics.'
+        foreach ($sample in $report.samples) {
+            Assert-True ($sample.status -eq 'invalid' -and $sample.processStatus -eq 'exited' -and $sample.exitCode -eq 0 -and
+                $sample.stderr.Length -eq 0 -and $sample.elapsedMs -gt 0 -and
+                $sample.stdout.Contains($report.artifact.cliVersion)) 'Artifact failure did not invalidate healthy observations.'
+        }
+        Assert-True ($report.cleanupStatus -eq 'removed' -and -not (Test-Path -LiteralPath $report.temporaryStatePath)) `
+            'Artifact identity failure left owned temporary state.'
+        Assert-True ((Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash -eq $originalHash) `
+            'Artifact mutation changed the original published CLI.'
+    }
+
+    Test-Case 'Harness_PublishedV5_MeasuresBothCommandsWithQualifiedSamples' {
+        $output = Join-Path $root 'actual.json'
+        Push-Location $root
+        try {
+            & $harness -ExecutablePath $executable -OutputPath 'actual.json' -Series 2 -SamplesPerSeries 3 | Out-Null
+        }
+        finally {
+            Pop-Location
+        }
+        Assert-True ([IO.File]::Exists($output)) 'Relative output path did not use the PowerShell working directory.'
+        $report = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+        Assert-True ($report.schemaVersion -eq 1 -and $report.status -eq 'completed' -and
+            $report.budgetStatus -eq 'not-evaluated') 'Unexpected report contract/status.'
+        Assert-True ($report.artifact.cliVersion.StartsWith('5.') -and
+            $report.artifact.sha256 -eq (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash) 'Artifact identity mismatch.'
+        Assert-True ($report.samples.Count -eq 12 -and $report.summary.Count -eq 4) 'Both commands/state categories were not measured.'
+        Assert-True ($report.protocol.measurementFramework -eq 'BenchmarkDotNet 0.15.8' -and
+            $report.protocol.runStrategy -eq 'Monitoring' -and $report.protocol.invocationsPerIteration -eq 1 -and
+            $report.protocol.warmupIterations -eq 0) 'BenchmarkDotNet configuration was not activated.'
+        $actual = Get-Content -LiteralPath (Join-Path $report.benchmarkArtifactsPath 'framework-measurements.json') -Raw | ConvertFrom-Json
+        Assert-True ($actual.completed -and $actual.measurements.Count -eq 12) 'Missing actual framework iterations.'
+        Assert-True (@($report.samples.processId | Sort-Object -Unique).Count -eq 12) 'Target launches did not use distinct processes.'
+        Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $report.benchmarkArtifactsPath 'framework/results') -Filter '*-report-full.json').Count -eq 1) `
+            'Full framework export was not retained.'
+        Assert-True ($report.cleanupStatus -eq 'removed' -and -not (Test-Path -LiteralPath $report.temporaryStatePath)) `
+            'Successful measurement left owned temporary state.'
+        foreach ($command in @('--help', 'version')) {
+            $rows = @($report.samples | Where-Object command -eq $command)
+            Assert-True ($rows.Count -eq 6) "Incorrect sample count for $command."
+            foreach ($row in $rows) {
+                Assert-True ($row.status -eq 'valid' -and $row.processStatus -eq 'exited' -and $row.exitCode -eq 0 -and
+                    $row.stderr.Length -eq 0 -and $row.elapsedMs -gt 0) "Invalid accepted sample for $command."
+                Assert-True ($row.stdout.Contains($report.artifact.cliVersion)) 'Command output did not identify expected version.'
+                $measurement = @($actual.measurements | Where-Object {
+                    $_.command -eq $row.command -and $_.series -eq $row.series -and $_.index -eq $row.index
+                })
+                Assert-True ($measurement.Count -eq 1 -and $measurement[0].operations -eq 1 -and
+                    $row.elapsedMs -eq $measurement[0].elapsedMs -and $row.innerElapsedMs -gt 0) `
+                    'Sample did not retain its actual framework timing and qualified process timer.'
+                if ($command -eq '--help') { Assert-True ($row.stdout.Contains('Usage')) 'Help path did not render help.' }
+            }
+            Assert-True (@($rows | Where-Object kind -eq 'first-in-series').Count -eq 2) 'First launches not classified separately.'
+            Assert-True (@($rows | Where-Object kind -eq 'subsequent').Count -eq 4) 'Subsequent launches not classified separately.'
+        }
+    }
+    foreach ($scenario in @('nonzero', 'stderr', 'wrong-output', 'timeout')) {
+        Test-Case "Harness_GeneratedHost_$($scenario.Replace('-', '_'))_RejectsMeasurementsAndCleansState" {
+            [IO.File]::WriteAllText((Join-Path ([IO.Path]::GetDirectoryName($fixtureExecutable)) 'scenario.txt'), $scenario)
+            $output = Join-Path $root "$scenario.json"
+            $timeout = if ($scenario -eq 'timeout') { 5 } else { 30 }
+            Assert-Fails {
+                & $harness -ExecutablePath $fixtureExecutable -OutputPath $output -Series 1 -SamplesPerSeries 2 -TimeoutSeconds $timeout
+            } 'BenchmarkDotNet execution failed'
+            $report = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+            Assert-True ($report.status -eq 'failed' -and $report.summary.Count -eq 0 -and
+                $report.cleanupStatus -eq 'removed' -and -not (Test-Path -LiteralPath $report.temporaryStatePath)) `
+                'Generated-host failure became successful measurement or leaked owned state.'
+            Assert-True ($report.preflight.stdout.Trim() -eq '5.0.0' -and $report.samples.Count -gt 0) `
+                'Failure did not occur after successful preflight in the real generated host.'
+            foreach ($sample in $report.samples) {
+                Assert-True ($sample.status -eq 'invalid') 'Failed benchmark retained a success-shaped sample.'
+                switch ($scenario) {
+                    'nonzero' {
+                        Assert-True ($sample.exitCode -eq 23 -and $sample.stderr -eq 'expected-nonzero') 'Nonzero failure diagnostics lost.'
+                    }
+                    'stderr' { Assert-True ($sample.exitCode -eq 0 -and $sample.stderr -eq 'unexpected-stderr') 'stderr failure was hidden.' }
+                    'wrong-output' { Assert-True ($sample.stdout.Trim() -eq 'not-the-requested-command-output') 'Invalid output diagnostic lost.' }
+                    'timeout' {
+                        Assert-True ($sample.processStatus -eq 'timeout' -and $null -eq $sample.exitCode -and
+                            $sample.stdout -match '^ready:(\d+)$') 'Timeout was not forced after readiness.'
+                        Assert-True ($null -eq (Get-Process -Id ([int]$Matches[1]) -ErrorAction SilentlyContinue)) `
+                            'Generated-host timeout left the owned target running.'
+                    }
+                }
+            }
+        }
+    }
+    Test-Case 'Harness_GeneratedHost_LaunchFailure_PreservesErrorWithoutAcceptedSamples' {
+        [IO.File]::WriteAllText((Join-Path $fixtureDirectory 'scenario.txt'), 'missing-after-preflight')
+        $output = Join-Path $root 'launch-failure.json'
+        Assert-Fails {
+            & $harness -ExecutablePath $fixtureExecutable -OutputPath $output -Series 1 -SamplesPerSeries 2
+        } 'BenchmarkDotNet execution failed'
+        $report = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+        Assert-True ($report.preflight.stdout.Trim() -eq '5.0.0' -and
+            [IO.File]::Exists("$fixtureExecutable.moved") -and -not [IO.File]::Exists($fixtureExecutable)) `
+            'Fixture did not force missing target after successful preflight.'
+        Assert-True ($report.status -eq 'failed' -and $report.samples.Count -eq 0 -and $report.summary.Count -eq 0 -and
+            $report.cleanupStatus -eq 'removed' -and -not (Test-Path -LiteralPath $report.temporaryStatePath)) `
+            'Failed launch accepted samples or left owned fixture state.'
+        $log = Get-Content -LiteralPath (Join-Path $report.benchmarkArtifactsPath 'benchmark.log') -Raw
+        Assert-True ($log.Contains('error occurred trying to start process')) 'Original process launch exception was lost.'
+    }
+    Write-Host "Passed $testCount harness tests."
+}
+finally {
+    [System.IO.Directory]::Delete($root, $true)
+}
+
+# Expected failing native benchmarks must not leak their exit status into the CI shell wrapper.
+$global:LASTEXITCODE = 0
