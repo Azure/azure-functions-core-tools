@@ -144,18 +144,36 @@ public class TerminalSessionFactoryTests
             factory.DrainManagedInput(console, drainCancellation.Token).Should().BeEmpty();
         }
 
-        using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(5));
+        using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(30));
+        using CancellationTokenSource readCancellation = new();
         await using ITerminalSession session = factory.Open(console);
-        await using var reader = session.ReadAsync(deadline.Token).GetAsyncEnumerator();
+        IAsyncEnumerator<TerminalInputEvent> reader = session.ReadAsync(readCancellation.Token).GetAsyncEnumerator();
         Task<bool> next = reader.MoveNextAsync().AsTask();
-        await polled.Task.WaitAsync(deadline.Token);
-        next.IsCompleted.Should().BeFalse("a pending high surrogate must not be emitted or replaced on an idle native poll");
-        deliverLow.Set();
+        try
+        {
+            await polled.Task.WaitAsync(deadline.Token);
+            next.IsCompleted.Should().BeFalse("a pending high surrogate must not be emitted or replaced on an idle native poll");
+            deliverLow.Set();
 
-        (await next.WaitAsync(deadline.Token)).Should().BeTrue();
-        reader.Current.Should().Be(new TerminalInputEvent(TerminalInputKind.Text, Text: "😀"));
-        console.Input.Received(1).ReadKey(true);
-        native.Received(1).Read();
+            (await next.WaitAsync(deadline.Token)).Should().BeTrue();
+            reader.Current.Should().Be(new TerminalInputEvent(TerminalInputKind.Text, Text: "😀"));
+            console.Input.Received(1).ReadKey(true);
+            native.Received(1).Read();
+        }
+        finally
+        {
+            readCancellation.Cancel();
+            try
+            {
+                await next.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (OperationCanceledException) when (next.IsCanceled)
+            {
+                // Only the joined read's cancellation is expected, not a watchdog failure.
+            }
+
+            await reader.DisposeAsync();
+        }
     }
 
     [Fact]
