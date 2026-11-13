@@ -185,7 +185,6 @@ public class HostWorkloadResolverTests
         var step = new ValidateHostWorkloadInitializationStep(
             resolver,
             Substitute.For<IWorkloadInstaller>(),
-            CreateWorkloadPaths(),
             Substitute.For<IProcessEnvironment>());
         StartInitializationStepContext context = NewStepContext(step, offline: true);
 
@@ -208,7 +207,6 @@ public class HostWorkloadResolverTests
         var step = new ValidateHostWorkloadInitializationStep(
             resolver,
             Substitute.For<IWorkloadInstaller>(),
-            CreateWorkloadPaths(),
             Substitute.For<IProcessEnvironment>());
         StartInitializationStepContext context = NewStepContext(step, offline: false);
 
@@ -233,7 +231,7 @@ public class HostWorkloadResolverTests
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 cancellationToken: Arg.Any<CancellationToken>())
             .Returns(installResult);
-        var step = new InstallHostWorkloadInitializationStep(installer, CreateWorkloadPaths(), _hostPackageId, "4.1000.0");
+        var step = new InstallHostWorkloadInitializationStep(installer, _hostPackageId, "4.1000.0");
         StartInitializationStepContext context = NewStepContext(step, offline: false);
 
         StartInitializationStepResult result = await step.ExecuteAsync(context, CancellationToken.None);
@@ -242,6 +240,8 @@ public class HostWorkloadResolverTests
         context.State.HostVersion.Should().Be("4.1000.0");
         context.State.HostWorkload.Should().NotBeNull();
         context.State.HostWorkload.PackageId.Should().Be(_hostPackageId);
+        context.State.HostWorkload.InstallDirectory.Should().Be(installResult.Entry.PackageRoot);
+        context.State.HostWorkload.ContentRoot.Should().Be(Path.Combine(installResult.Entry.PackageRoot, "tools", "any"));
         await installer.Received(1).InstallFromCatalogAsync(
             packageId: _hostPackageId,
             version: Arg.Is<NuGetVersion?>(version => version != null && version.ToNormalizedString() == "4.1000.0"),
@@ -267,7 +267,7 @@ public class HostWorkloadResolverTests
                 Arg.Any<IProgress<WorkloadInstallProgress>?>(),
                 cancellationToken: Arg.Any<CancellationToken>())
             .Returns(Task.FromException<WorkloadInstallResult>(new WorkloadPackageNotFoundException("missing host")));
-        var step = new InstallHostWorkloadInitializationStep(installer, CreateWorkloadPaths(), _hostPackageId, "4.1000.0");
+        var step = new InstallHostWorkloadInitializationStep(installer, _hostPackageId, "4.1000.0");
         StartInitializationStepContext context = NewStepContext(step, offline: false);
 
         GracefulException ex = (await FluentActions.Awaiting(() => step.ExecuteAsync(context, CancellationToken.None)).Should().ThrowAsync<GracefulException>()).Which;
@@ -304,6 +304,7 @@ public class HostWorkloadResolverTests
         {
             PackageId = _hostPackageId,
             PackageVersion = packageVersion,
+            PackageRoot = Path.Combine(Path.GetTempPath(), "host-install-root", packageVersion),
             Kind = WorkloadKind.Content,
             Aliases = ["host"],
             DisplayName = "Azure Functions host",
@@ -342,11 +343,4 @@ public class HostWorkloadResolverTests
             TimeProvider.System);
     }
 
-    private static IWorkloadPaths CreateWorkloadPaths()
-    {
-        IWorkloadPaths workloadPaths = Substitute.For<IWorkloadPaths>();
-        workloadPaths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>())
-            .Returns(callInfo => Path.Combine(Path.GetTempPath(), "workloads", (string)callInfo[0], (string)callInfo[1]));
-        return workloadPaths;
-    }
 }

@@ -16,12 +16,10 @@ namespace Azure.Functions.Cli.Workers;
 internal sealed class DefaultFunctionsWorkerInstaller(
     IWorkloadCatalog workloadCatalog,
     IWorkloadInstaller workloadInstaller,
-    IWorkloadPaths workloadPaths,
     IFunctionsWorkerContentResolver workerContentResolver) : IFunctionsWorkerInstaller
 {
     private readonly IWorkloadCatalog _workloadCatalog = workloadCatalog ?? throw new ArgumentNullException(nameof(workloadCatalog));
     private readonly IWorkloadInstaller _workloadInstaller = workloadInstaller ?? throw new ArgumentNullException(nameof(workloadInstaller));
-    private readonly IWorkloadPaths _workloadPaths = workloadPaths ?? throw new ArgumentNullException(nameof(workloadPaths));
     private readonly IFunctionsWorkerContentResolver _workerContentResolver = workerContentResolver
         ?? throw new ArgumentNullException(nameof(workerContentResolver));
 
@@ -105,16 +103,14 @@ internal sealed class DefaultFunctionsWorkerInstaller(
             : throw CreateInvalidInstalledWorkerException((FunctionsWorkerResolutionResult.NotResolved)resolution);
     }
 
-    private ContentWorkloadInfo CreateContentWorkloadInfo(WorkloadEntry entry)
+    private static ContentWorkloadInfo CreateContentWorkloadInfo(WorkloadEntry entry)
     {
-        string installDirectory = _workloadPaths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
-        string contentRoot = WorkloadPackageLayout.GetContentRoot(installDirectory, entry.RuntimeIdentifier);
-
+        string contentRoot = WorkloadPackageLayout.GetContentRoot(entry.PackageRoot, entry.RuntimeIdentifier);
         return new ContentWorkloadInfo(
             entry.PackageId,
             entry.PackageVersion,
             entry.Aliases,
-            installDirectory,
+            entry.PackageRoot,
             contentRoot,
             entry.DisplayName,
             entry.Description);

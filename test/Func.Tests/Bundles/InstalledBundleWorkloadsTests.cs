@@ -13,7 +13,6 @@ public class InstalledBundleWorkloadsTests
     public async Task FiltersToBundleWorkloadPackageId_CaseInsensitive()
     {
         IWorkloadStore store = Substitute.For<IWorkloadStore>();
-        IWorkloadPaths paths = Substitute.For<IWorkloadPaths>();
 
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns<IReadOnlyList<WorkloadEntry>>(
         [
@@ -21,9 +20,7 @@ public class InstalledBundleWorkloadsTests
             new WorkloadEntry { PackageId = "azure.functions.cli.workloads.extensionbundles", PackageVersion = "4.35.0", Kind = WorkloadKind.Content },
             new WorkloadEntry { PackageId = "Azure.Functions.Cli.Workloads.ExtensionBundles", PackageVersion = "4.36.0", Kind = WorkloadKind.Content },
         ]);
-        paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns(ci => $"/install/{ci[0]}/{ci[1]}");
-
-        IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store, paths).ListInstalledAsync();
+        IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store).ListInstalledAsync();
 
         result.Count.Should().Be(2);
         result.Should().Contain(r => r.PackageVersion == "4.35.0");
@@ -34,7 +31,6 @@ public class InstalledBundleWorkloadsTests
     public async Task SkipsWorkloadKindEntries()
     {
         IWorkloadStore store = Substitute.For<IWorkloadStore>();
-        IWorkloadPaths paths = Substitute.For<IWorkloadPaths>();
 
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns<IReadOnlyList<WorkloadEntry>>(
         [
@@ -45,16 +41,13 @@ public class InstalledBundleWorkloadsTests
                 Kind = WorkloadKind.Workload,
             },
         ]);
-        paths.GetInstallDirectory(Arg.Any<string>(), Arg.Any<string>()).Returns("/x");
-
-        (await new InstalledBundleWorkloads(store, paths).ListInstalledAsync()).Should().BeEmpty();
+        (await new InstalledBundleWorkloads(store).ListInstalledAsync()).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task ReturnsInstallDirectoryFromPaths()
+    public async Task ReturnsInstallDirectoryFromEntry()
     {
         IWorkloadStore store = Substitute.For<IWorkloadStore>();
-        IWorkloadPaths paths = Substitute.For<IWorkloadPaths>();
 
         store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns<IReadOnlyList<WorkloadEntry>>(
         [
@@ -62,12 +55,11 @@ public class InstalledBundleWorkloadsTests
             {
                 PackageId = IInstalledBundleWorkloads.BundleWorkloadPackageId,
                 PackageVersion = "4.35.0",
+                PackageRoot = "/home/.func/workloads/bundles/4.35.0",
                 Kind = WorkloadKind.Content,
             },
         ]);
-        paths.GetInstallDirectory(IInstalledBundleWorkloads.BundleWorkloadPackageId, "4.35.0").Returns("/home/.func/workloads/bundles/4.35.0");
-
-        IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store, paths).ListInstalledAsync();
+        IReadOnlyList<InstalledBundleWorkload> result = await new InstalledBundleWorkloads(store).ListInstalledAsync();
 
         result.Should().ContainSingle().Which.InstallDirectory.Should().Be("/home/.func/workloads/bundles/4.35.0");
     }

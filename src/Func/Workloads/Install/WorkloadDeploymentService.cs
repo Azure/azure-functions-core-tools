@@ -57,9 +57,13 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         WorkloadEntry? existing = installed.FirstOrDefault(entry =>
             string.Equals(entry.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(entry.PackageVersion, version, StringComparison.Ordinal));
-        if (existing is null
-            || existing.IsImplicitlyInstalled
-            || !Directory.Exists(_paths.GetInstallDirectory(existing.PackageId, existing.PackageVersion)))
+        if (existing is null || existing.IsImplicitlyInstalled)
+        {
+            return null;
+        }
+
+        string packageRoot = GetPackageRoot(existing);
+        if (!Directory.Exists(packageRoot))
         {
             return null;
         }
@@ -133,7 +137,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                     await _store.MoveLogicalOwnershipAsync(currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, entry, cancellationToken);
                 if (moved.PreviousEntryRemoved)
                 {
-                    TryDeleteDirectory(_paths.GetInstallDirectory(currentLogicalOwner.PackageId, currentLogicalOwner.PackageVersion));
+                    TryDeleteDirectory(GetPackageRoot(currentLogicalOwner));
                 }
 
                 return new WorkloadInstallResult(moved.Entry, false);
@@ -192,7 +196,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
             if (moved.PreviousEntryRemoved)
             {
-                string oldPath = _paths.GetInstallDirectory(currentEntry.PackageId, currentEntry.PackageVersion);
+                string oldPath = GetPackageRoot(currentEntry);
                 if (!string.Equals(oldPath, finalPath, StringComparison.Ordinal))
                 {
                     TryDeleteDirectory(oldPath);
@@ -246,7 +250,9 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
         if (result.EntryRemoved)
         {
-            TryDeleteDirectory(_paths.GetInstallDirectory(physicalPackageId, physicalVersion));
+            WorkloadEntry removedEntry = result.Entry
+                ?? throw new InvalidOperationException("The workload store did not return the removed entry.");
+            TryDeleteDirectory(GetPackageRoot(removedEntry));
         }
 
         return true;
@@ -281,7 +287,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                 await _store.MoveLogicalOwnershipAsync(currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, incoming, cancellationToken);
             if (moved.PreviousEntryRemoved)
             {
-                TryDeleteDirectory(_paths.GetInstallDirectory(currentLogicalOwner.PackageId, currentLogicalOwner.PackageVersion));
+                TryDeleteDirectory(GetPackageRoot(currentLogicalOwner));
             }
 
             return new WorkloadInstallResult(moved.Entry, false);
@@ -336,7 +342,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             return null;
         }
 
-        string installPath = _paths.GetInstallDirectory(existing.PackageId, existing.PackageVersion);
+        string installPath = GetPackageRoot(existing);
         if (!Directory.Exists(installPath))
         {
             return null;
@@ -379,6 +385,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         {
             PackageId = entry.PackageId,
             PackageVersion = entry.PackageVersion,
+            PackageRoot = entry.PackageRoot,
             Aliases = entry.Aliases,
             DisplayName = entry.DisplayName,
             Description = entry.Description,
@@ -400,6 +407,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         {
             PackageId = incoming.PackageId,
             PackageVersion = incoming.PackageVersion,
+            PackageRoot = incoming.PackageRoot,
             Aliases = incoming.Aliases,
             DisplayName = incoming.DisplayName,
             Description = incoming.Description,
@@ -416,7 +424,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
     private bool IsExistingInstallationValid(WorkloadEntry entry, WorkloadMetadata expectedMetadata)
     {
-        string installPath = _paths.GetInstallDirectory(entry.PackageId, entry.PackageVersion);
+        string installPath = GetPackageRoot(entry);
         if (!Directory.Exists(installPath))
         {
             return false;
@@ -603,8 +611,21 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             ? metadata.Description
             : string.IsNullOrWhiteSpace(nuspecDescription) ? string.Empty : nuspecDescription;
 
+    private static string GetPackageRoot(WorkloadEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.PackageRoot))
+        {
+            return entry.PackageRoot;
+        }
+
+        throw new InvalidOperationException(
+            $"Workload '{entry.PackageId}' version '{entry.PackageVersion}' has no package root.");
+    }
+
     private static void TryDeleteDirectory(string path)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
         try
         {
             if (Directory.Exists(path))

@@ -99,6 +99,12 @@ public sealed class CliHostFactoryTests : IDisposable
         provider.GetContentWorkloads().Count.Should().Be(2);
         provider.GetWorkloads().Count.Should().Be(3);
         provider.GetContentWorkloads().Should().AllSatisfy(w => w.DisplayName.Should().Be(w.PackageId));
+        provider.GetContentWorkloads().Should().AllSatisfy(w =>
+        {
+            string packageRoot = Path.Combine(_home, "workloads", w.PackageId, w.PackageVersion);
+            w.InstallDirectory.Should().Be(packageRoot);
+            w.ContentRoot.Should().Be(Path.Combine(packageRoot, "tools", "any"));
+        });
     }
 
     [Fact]
@@ -119,6 +125,39 @@ public sealed class CliHostFactoryTests : IDisposable
         rootCommand.Subcommands.Should().NotContain(c => string.Equals(c.Name, "hello-from-workload", StringComparison.Ordinal));
         interaction.Lines.Should().Contain(line => line.StartsWith("WARNING:", StringComparison.Ordinal)
             && line.Contains("func workload update", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("packageId")]
+    [InlineData("packageVersion")]
+    public async Task CreateHostAsync_IncompatibleRidWorkloadWithNullIdentityField_IsSkippedWithWarning(string nullField)
+    {
+        string packageId = nullField == "packageId" ? "null" : "\"incompatible.fixture\"";
+        string packageVersion = nullField == "packageVersion" ? "null" : "\"1.0.0\"";
+        Directory.CreateDirectory(_home);
+        File.WriteAllText(
+            Path.Combine(_home, WorkloadPathsOptions.WorkloadRegistryFileName),
+            $$"""
+            {
+              "$schema": "{{WorkloadManifestSchema.RegistryV1Schema}}",
+              "workloads": [
+                {
+                  "packageId": {{packageId}},
+                  "packageVersion": {{packageVersion}},
+                  "runtimeIdentifier": "incompatible-{{Guid.NewGuid():N}}"
+                }
+              ]
+            }
+            """);
+
+        var interaction = new TestInteractionService();
+
+        using IHost host = await StartHostAsync(interaction);
+        var rootCommand = Parser.CreateCommand(host.Services);
+
+        rootCommand.Subcommands.Should().Contain(c => string.Equals(c.Name, "version", StringComparison.OrdinalIgnoreCase));
+        interaction.Lines.Should().Contain(line => line.StartsWith("WARNING:", StringComparison.Ordinal)
+            && line.Contains("targets runtime identifier", StringComparison.Ordinal));
     }
 
     [Fact]

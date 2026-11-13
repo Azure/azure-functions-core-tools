@@ -49,6 +49,13 @@ internal sealed class WorkloadEntry
     public required string PackageVersion { get; init; }
 
     /// <summary>
+    /// Installed physical package root, populated by the workload store and never persisted.
+    /// Empty until the entry is bound to a store.
+    /// </summary>
+    [JsonIgnore]
+    public string PackageRoot { get; internal set; } = string.Empty;
+
+    /// <summary>
     /// Package shape stamped at install time. The loader only activates
     /// <see cref="WorkloadKind.Workload"/>; <see cref="WorkloadKind.Content"/>
     /// ships files only. Meta packages live in <see cref="WorkloadRegistry.Metas"/>.
