@@ -34,7 +34,10 @@ Set-StrictMode -Version Latest
 
 $benchmarkProject = Join-Path $PSScriptRoot '../Performance/Startup/Performance.Startup.csproj'
 if (-not ('Azure.Functions.Cli.Performance.Startup.StartupProcess' -as [type])) {
-    Add-Type -Path (Join-Path $PSScriptRoot '../Performance/Startup/StartupProcess.cs')
+    Add-Type -Path @(
+        (Join-Path $PSScriptRoot '../Performance/Startup/StartupProcess.cs'),
+        (Join-Path $PSScriptRoot '../Performance/Startup/NativeStartupProcess.cs')
+    )
 }
 
 function Invoke-StartupProcess {
@@ -156,13 +159,14 @@ $report = [ordered]@{
         series = $Series
         samplesPerSeries = $SamplesPerSeries
         timeoutSeconds = $TimeoutSeconds
-        timingBoundary = 'BenchmarkDotNet workload: prepared process start-to-exit; output validation and disposal outside timing'
+        timingBoundary = 'BenchmarkDotNet workload: prepared native-contained launch-to-exit; output validation and disposal outside timing'
         commandOrder = 'BenchmarkDotNet parameter order; no alternating command order'
         osCaches = 'not-cleared'
         fixture = 'no-installed-workloads; cached-update-version=0.0.0'
         telemetry = 'opted-out'
         network = 'update-cache-seeded; no packet-level verification'
         streams = 'UTF-8; redirected; stdin closed; NO_COLOR=1'
+        processContainment = 'native job-at-create on Windows; spawn-time process group on Unix; cleanup after parent exit'
         preflight = 'untimed version invocation before measurement; may warm OS caches'
     }
     preflight = $null

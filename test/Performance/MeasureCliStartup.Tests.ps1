@@ -143,11 +143,50 @@ $marker = [IO.Path]::Combine([Environment]::CurrentDirectory, $env:STARTUP_TEST_
         Assert-True ($observed.status -eq 'exited' -and $observed.exitCode -eq 23 -and $observed.stderr -eq 'expected') 'Nonzero exit was hidden.'
     }
 
+    Test-Case 'Process_ArgumentBoundaries_PreservesEmptyQuotesUnicodeAndBackslashes' {
+        $script = Join-Path $root 'argument fixture.ps1'
+        [IO.File]::WriteAllText($script, '[Console]::OutputEncoding = [Text.Encoding]::UTF8; ConvertTo-Json -InputObject @($args) -Compress')
+        $values = @('', 'with spaces', 'embedded"quote', 'trailing\', 'quote\"and\\', "unicode-$([char]0x2192)")
+        $observed = Invoke-StartupProcess -Executable $pwsh -Arguments (@('-NoProfile', '-NonInteractive', '-File', $script) + $values) `
+            -Directory $root -EnvironmentVariables @{} -TimeoutMilliseconds 30000
+        Assert-True ($observed.status -eq 'exited' -and $observed.exitCode -eq 0 -and $observed.stderr.Length -eq 0) `
+            'Argument fixture failed before reporting its received values.'
+        $received = @($observed.stdout | ConvertFrom-Json)
+        Assert-True ($received.Count -eq $values.Count) 'Native argument count changed.'
+        for ($index = 0; $index -lt $values.Count; $index++) {
+            Assert-True ($received[$index] -ceq $values[$index]) "Native argument boundary changed at index $index."
+        }
+    }
+
     Test-Case 'Process_MissingExecutable_PreservesLaunchErrorAndDisposesSafely' {
         Assert-Fails {
             Invoke-StartupProcess -Executable (Join-Path $root 'missing-child') -Arguments @() `
                 -Directory $root -EnvironmentVariables @{} -TimeoutMilliseconds 30000
         } 'error occurred trying to start process'
+    }
+
+    Test-Case 'Process_InvalidLaunchInputs_PreservesNativeErrorsAndDisposesSafely' {
+        $inert = Join-Path $root 'not-executable.txt'
+        [IO.File]::WriteAllText($inert, 'not an executable')
+        $cases = @(
+            @{ executable = $pwsh; directory = (Join-Path $root 'missing-directory'); codes = $(if ($IsWindows) { @(3, 267) } else { @(2) }) },
+            @{ executable = $inert; directory = $root; codes = $(if ($IsWindows) { @(193) } else { @(13) }) }
+        )
+        foreach ($case in $cases) {
+            $environment = [Collections.Generic.Dictionary[string, string]]::new()
+            $process = [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new(
+                $case.executable, @(), $case.directory, $environment, 30000)
+            try {
+                $failure = $null
+                try { $process.StartAndWait() } catch { $failure = $_.Exception.GetBaseException() }
+                Assert-True ($failure -is [ComponentModel.Win32Exception] -and $case.codes -contains $failure.NativeErrorCode -and
+                    $failure.Message.Contains($case.executable) -and -not $process.HasStarted) `
+                    'Native launch failure lost its error code, executable identity or not-started status.'
+                $process.Dispose()
+                $process.Dispose()
+            }
+            finally { $process.Dispose() }
+        }
     }
 
     Test-Case 'Process_ValidationAndFixtureOwnership_RejectsInvalidInputsWithoutMutatingExistingState' {
@@ -158,6 +197,18 @@ $marker = [IO.Path]::Combine([Environment]::CurrentDirectory, $env:STARTUP_TEST_
         Assert-Fails {
             [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new('', @(), $root, $environment, 1000)
         } 'executable'
+        Assert-Fails {
+            [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new($pwsh, @("nul$([char]0)argument"), $root, $environment, 1000)
+        } 'NUL'
+        $environment['INVALID=KEY'] = 'value'
+        Assert-Fails {
+            [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new($pwsh, @(), $root, $environment, 1000)
+        } 'Environment keys'
+        $environment.Clear()
+        $environment['VALID_KEY'] = "nul$([char]0)value"
+        Assert-Fails {
+            [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new($pwsh, @(), $root, $environment, 1000)
+        } 'NUL'
         $directory = Join-Path $root 'existing-fixture'
         [void][IO.Directory]::CreateDirectory($directory)
         $marker = Join-Path $directory 'preserve.txt'
@@ -238,6 +289,100 @@ Start-Sleep -Seconds 120
             'Descendant readiness was not independently observed.'
         foreach ($ownedId in $ownedIds) {
             Assert-True ($null -eq (Get-Process -Id $ownedId -ErrorAction SilentlyContinue)) 'Owned process tree survived timeout.'
+        }
+    }
+
+    foreach ($scenario in @('capture-failure', 'successful-capture', 'dispose-without-capture')) {
+        Test-Case "Process_ExitedParent_$($scenario.Replace('-', '_'))_TerminatesOwnedDescendant" {
+            $directory = Join-Path $root "exited-parent-$scenario"
+            [void][IO.Directory]::CreateDirectory($directory)
+            $code = @'
+$directory = [Environment]::CurrentDirectory
+$ready = Join-Path $directory 'ready'
+$start = [Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
+$start.UseShellExecute = $false
+if ($env:STARTUP_DESCENDANT_SCENARIO -eq 'successful-capture') {
+    if ($IsWindows) {
+        Add-Type 'using System; using System.Runtime.InteropServices; public class StartupTestHandles {
+            [DllImport("kernel32.dll", SetLastError=true)] public static extern IntPtr GetStdHandle(int id);
+            [DllImport("kernel32.dll", SetLastError=true)] public static extern bool SetHandleInformation(IntPtr handle, uint mask, uint flags);
+        }'
+        foreach ($handleId in @(-11, -12)) {
+            if (-not [StartupTestHandles]::SetHandleInformation([StartupTestHandles]::GetStdHandle($handleId), 1, 0)) {
+                throw 'Could not prevent unrelated output handles from reaching the independent-stream descendant.'
+            }
+        }
+    }
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+}
+foreach ($arg in @('-NoProfile', '-NonInteractive', '-Command',
+    '[Console]::Write("inherited-stream"); [Console]::Out.Flush(); [IO.File]::WriteAllText($env:READY_PATH, "$PID"); Start-Sleep -Seconds 120')) {
+    $start.ArgumentList.Add($arg)
+}
+$start.Environment['READY_PATH'] = $ready
+$child = [Diagnostics.Process]::Start($start)
+try {
+    [IO.File]::WriteAllText((Join-Path $directory 'child-id'), "$($child.Id)")
+    $guard = [Diagnostics.Stopwatch]::StartNew()
+    while (-not [IO.File]::Exists($ready)) {
+        if ($guard.Elapsed.TotalSeconds -gt 20) { throw 'Descendant readiness timed out.' }
+        Start-Sleep -Milliseconds 10
+    }
+    if ($child.HasExited) { throw 'Descendant exited before parent readiness.' }
+    [IO.File]::WriteAllText((Join-Path $directory 'parent-id'), "$PID")
+}
+finally {
+    $child.Dispose()
+}
+exit 0
+'@
+            $environment = [Collections.Generic.Dictionary[string, string]]::new()
+            $environment['STARTUP_DESCENDANT_SCENARIO'] = $scenario
+            $process = [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new(
+                $pwsh, @('-NoProfile', '-NonInteractive', '-Command', $code), $directory, $environment, 30000)
+            $descendant = $null
+            try {
+                $process.StartAndWait()
+                $childIdPath = Join-Path $directory 'child-id'
+                Assert-True ([IO.File]::Exists($childIdPath)) 'Parent did not record its owned descendant.'
+                $descendant = [Diagnostics.Process]::GetProcessById([int][IO.File]::ReadAllText($childIdPath))
+                $parentId = [int][IO.File]::ReadAllText((Join-Path $directory 'parent-id'))
+                Assert-True ($process.ExitedWithinTimeout -and $parentId -gt 0 -and
+                    -not $descendant.HasExited -and
+                    [IO.File]::ReadAllText((Join-Path $directory 'ready')) -eq "$($descendant.Id)") `
+                    'Parent-first exit and live inherited-stream descendant were not established.'
+                switch ($scenario) {
+                    'capture-failure' { Assert-Fails { $process.Capture() } 'timed out' }
+                    'successful-capture' {
+                        $observation = $process.Capture()
+                        Assert-True ($observation.Status -eq 'exited' -and $observation.ExitCode -eq 0 -and
+                            $observation.Stdout.Length -eq 0 -and $observation.Stderr.Length -eq 0 -and
+                            -not $descendant.HasExited) 'Healthy capture did not retain the independently running descendant.'
+                    }
+                }
+                $process.Dispose()
+                $process.Dispose()
+                Assert-True ($descendant.WaitForExit(10000)) 'Owned descendant survived capture failure and repeated disposal.'
+            }
+            finally {
+                try { $process.Dispose() }
+                finally {
+                    if ($null -eq $descendant -and [IO.File]::Exists((Join-Path $directory 'child-id'))) {
+                        $childId = [int][IO.File]::ReadAllText((Join-Path $directory 'child-id'))
+                        $descendant = Get-Process -Id $childId -ErrorAction SilentlyContinue
+                    }
+                    if ($null -ne $descendant) {
+                        try {
+                            if (-not $descendant.HasExited) {
+                                $descendant.Kill($true)
+                                Assert-True ($descendant.WaitForExit(10000)) 'Test cleanup could not terminate its owned descendant.'
+                            }
+                        }
+                        finally { $descendant.Dispose() }
+                    }
+                }
+            }
         }
     }
 

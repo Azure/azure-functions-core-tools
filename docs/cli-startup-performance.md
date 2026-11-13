@@ -49,7 +49,15 @@ separate work.
 Output is UTF-8, redirected, and color disabled; stdin is closed. This measures a
 noninteractive launch, not terminal rendering. The harness drains both output
 streams concurrently, enforces a liveness timeout, and cleans up owned processes
-and directories. A nonzero exit, timeout, unexpected output, or stderr invalidates
+and directories. A mandatory Windows Job Object is assigned by the native
+process-creation call before the target executes. Linux (glibc) and macOS use
+`posix_spawn` with a new process group. Unix retains the exited group leader
+until cleanup to prevent its group identifier from being recycled. Disposal
+terminates the job/group even after the direct target exits, including when
+an inherited output pipe prevents capture from completing. Unix descendants
+that deliberately leave the process group are outside this cleanup boundary;
+this is process-lifetime management, not a sandbox.
+A nonzero exit, timeout, unexpected output, or stderr invalidates
 the run and produces a terminating error. A final executable-hash mismatch
 invalidates every sample and leaves summaries empty, even if all measured
 commands succeeded. JSON retains earlier samples and diagnostics. An existing
@@ -80,6 +88,10 @@ The changed-artifact regression runs healthy measurements using an owned CLI
 copy, then changes that copy at final hash verification through a test-scoped
 hash-command override. It requires invalid samples, empty summaries, retained
 diagnostics and removed temporary state without changing the original CLI.
+Parent-first lifecycle cases use an explicit descendant-readiness handshake,
+then verify descendant termination after failed capture, successful capture
+with independently redirected descendant streams, and disposal without capture.
+Each case also checks repeated disposal and includes exact-process test cleanup.
 On Unix, omit `.exe` from the fixture executable name.
 
 ## Reporting-only CI
@@ -102,6 +114,13 @@ The benchmark host prepares the process in `IterationSetup`, measures
 `StartupProcess.StartAndWait`, then captures/qualifies output and disposes the
 process in `IterationCleanup`. Setup, validation, fixture deletion, framework
 host startup and generated-project builds are not part of the measured workload.
+Native job/pipe/spawn-attribute preparation occurs in iteration setup. The timed
+workload includes native process creation with containment, stream-read/wait
+registration and direct-target exit. Unix exit observation uses a blocking
+native waiter; scheduling that waiter is included. Cleanup and descendant
+termination remain outside the timed workload. This replaces the earlier
+`System.Diagnostics.Process.Start` launch path, so prior observations are not
+automatically comparable; review new native observations before rebaselining.
 The workload includes small method/guard/Stopwatch overhead around process
 start-to-exit. `elapsedMs` comes from BenchmarkDotNet's actual workload iteration;
 `innerElapsedMs` records the nested process timer for boundary diagnostics.

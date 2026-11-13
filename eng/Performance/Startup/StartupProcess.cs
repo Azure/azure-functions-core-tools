@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Azure.Functions.Cli.Performance.Startup;
@@ -27,7 +26,7 @@ public sealed class StartupObservation(double elapsedMs, string status, int? exi
 
 public sealed class StartupProcess : IDisposable
 {
-    private readonly Process _process;
+    private readonly NativeStartupProcess _process;
     private readonly int _timeoutMilliseconds;
     private readonly Stopwatch _timer = new();
     private Task<string>? _stdout;
@@ -38,6 +37,8 @@ public sealed class StartupProcess : IDisposable
 
     public bool HasStarted => _started;
 
+    public bool ExitedWithinTimeout => _exited;
+
     public StartupProcess(string executable, string[] arguments, string directory, IDictionary<string, string> environmentVariables, int timeoutMilliseconds)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(executable);
@@ -45,39 +46,42 @@ public sealed class StartupProcess : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentNullException.ThrowIfNull(environmentVariables);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(timeoutMilliseconds);
-        _timeoutMilliseconds = timeoutMilliseconds;
-        var start = new ProcessStartInfo(executable)
-        {
-            WorkingDirectory = directory,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-        };
+        ValidateNativeString(executable, nameof(executable));
+        ValidateNativeString(directory, nameof(directory));
         foreach (string argument in arguments)
         {
-            start.ArgumentList.Add(argument);
+            ArgumentNullException.ThrowIfNull(argument);
+            ValidateNativeString(argument, nameof(arguments));
         }
-
-        start.Environment.Clear();
+        _timeoutMilliseconds = timeoutMilliseconds;
+        var environment = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         foreach (string? key in new[] { "PATH", "SystemRoot", "WINDIR", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432",
             "DOTNET_ROOT", "DOTNET_ROOT_X64", "DOTNET_ROOT_ARM64", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH" })
         {
             if (Environment.GetEnvironmentVariable(key) is { } value)
             {
-                start.Environment[key] = value;
+                environment[key] = value;
             }
         }
 
         foreach (KeyValuePair<string, string> entry in environmentVariables)
         {
-            start.Environment[entry.Key] = entry.Value;
+            ArgumentException.ThrowIfNullOrEmpty(entry.Key);
+            ArgumentNullException.ThrowIfNull(entry.Value);
+            ValidateNativeString(entry.Key, nameof(environmentVariables));
+            ValidateNativeString(entry.Value, nameof(environmentVariables));
+            if (entry.Key.Contains('='))
+            {
+                throw new ArgumentException("Environment keys must not contain '='.", nameof(environmentVariables));
+            }
+            environment[entry.Key] = entry.Value;
         }
 
-        _process = new Process { StartInfo = start };
+        _process = OperatingSystem.IsWindows()
+            ? new WindowsStartupProcess(executable, arguments, directory, environment)
+            : OperatingSystem.IsLinux() || OperatingSystem.IsMacOS()
+                ? new UnixStartupProcess(executable, arguments, directory, environment)
+                : throw new PlatformNotSupportedException("Startup containment requires Windows, Linux or macOS.");
     }
 
     public void StartAndWait()
@@ -89,15 +93,10 @@ public sealed class StartupProcess : IDisposable
         }
 
         _timer.Start();
-        _started = _process.Start();
-        if (!_started)
-        {
-            throw new InvalidOperationException("Process launch failed.");
-        }
-
-        _process.StandardInput.Close();
-        _stdout = _process.StandardOutput.ReadToEndAsync();
-        _stderr = _process.StandardError.ReadToEndAsync();
+        _process.Start();
+        _started = true;
+        _stdout = _process.Output.ReadToEndAsync();
+        _stderr = _process.Error.ReadToEndAsync();
         _exited = _process.WaitForExit(_timeoutMilliseconds);
         _timer.Stop();
     }
@@ -112,7 +111,7 @@ public sealed class StartupProcess : IDisposable
 
         if (!_exited)
         {
-            Terminate();
+            _process.Terminate();
         }
 
         Task.WhenAll(_stdout, _stderr).WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
@@ -129,28 +128,27 @@ public sealed class StartupProcess : IDisposable
 
         try
         {
-            if (_started && !_process.HasExited)
+            if (_started)
             {
-                Terminate();
+                _process.Terminate();
+                if (_stdout is not null && _stderr is not null)
+                {
+                    Task.WhenAll(_stdout, _stderr).WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+                }
             }
         }
         finally
         {
-            _process.Dispose();
-            _disposed = true;
+            try { _process.Dispose(); }
+            finally { _disposed = true; }
         }
     }
 
-    private void Terminate()
+    private static void ValidateNativeString(string value, string parameter)
     {
-        if (!_process.HasExited)
+        if (value.Contains('\0'))
         {
-            _process.Kill(entireProcessTree: true);
-        }
-
-        if (!_process.WaitForExit(10000))
-        {
-            throw new TimeoutException("Owned process cleanup exceeded 10 seconds.");
+            throw new ArgumentException("Native process inputs must not contain NUL characters.", parameter);
         }
     }
 }
