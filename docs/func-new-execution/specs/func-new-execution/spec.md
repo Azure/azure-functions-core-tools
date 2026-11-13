@@ -4,6 +4,21 @@ Defines how `func new` resolves an existing Functions project, selects and confi
 
 ## ADDED Requirements
 
+### Requirement: Item ordinary-action execution
+The initial new item execution path SHALL reject ordinary action declarations before file creation until the separate real-caller, containing-project target, and authorization/compatibility gates in `template-engine-post-actions` are qualified. It SHALL NOT silently ignore those declarations or infer a wider mutation boundary from project discovery. Existing supported legacy journeys requiring actions SHALL remain behind their migration qualification. Dry-run SHALL never execute actions, and item templates SHALL NOT finalize Functions project configuration.
+
+#### Scenario: Nested item requests ancestor restore
+- **WHEN** an item's output is nested below the discovered project root and its restore input is at that ancestor root
+- **THEN** the unsupported target fails preflight without creating files or dispatching restore
+
+#### Scenario: Item has ordinary actions before qualification
+- **WHEN** a selected new-path item declares ordinary actions and its execution contract is not qualified
+- **THEN** preflight rejects it before creating files rather than silently drop actions
+
+#### Scenario: Item preview has ordinary actions
+- **WHEN** dry-run projects ordinary item actions
+- **THEN** the command launches no processor and performs no action writes
+
 ### Requirement: Item template command grammar
 `func new` SHALL accept a template reference as its primary positional argument and SHALL NOT interpret that argument as a filesystem path. The command SHALL accept `--path` as the directory in which the item template runs and SHALL accept `--template` / `-t` as an alternative explicit template selector. Supplying both selectors SHALL be an error.
 
