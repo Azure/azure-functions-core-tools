@@ -353,7 +353,7 @@ public class WorkloadLoaderTests
             var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
 
             ex.Message.Should().StartWith($"[{FixturePackageId}]");
-            ex.Message.Should().Contain("outside the install directory");
+            ex.Message.Should().Contain("escapes its base directory");
         }
         finally
         {
@@ -361,16 +361,52 @@ public class WorkloadLoaderTests
         }
     }
 
+    [Fact]
+    public void Load_ResolvesTemplateRoot_RelativeToPackageRoot()
+    {
+        var loader = new WorkloadLoader();
+
+        var loaded = loader.Load([FixtureEntry(FixturePackageId, templateRoot: "templates/missing")]);
+
+        loaded.Should().ContainSingle().Which.TemplateRoot.Should().Be(Path.Combine(AppContext.BaseDirectory, "templates", "missing"));
+    }
+
+    [Fact]
+    public void Load_LeavesTemplateRootNull_WhenNotDeclared()
+    {
+        var loader = new WorkloadLoader();
+
+        var loaded = loader.Load([FixtureEntry(FixturePackageId)]);
+
+        loaded.Should().ContainSingle().Which.TemplateRoot.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("../templates")]
+    [InlineData(".")]
+    public void Load_Throws_WhenTemplateRootIsNotInsidePackageRoot(string templateRoot)
+    {
+        var loader = new WorkloadLoader();
+        WorkloadEntry entry = FixtureEntry(FixturePackageId, templateRoot: templateRoot);
+
+        var ex = FluentActions.Invoking(() => loader.Load([entry])).Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        ex.Message.Should().StartWith($"[{FixturePackageId}]");
+        ex.Message.Should().Contain($"template root '{templateRoot}'");
+    }
+
     private static WorkloadEntry FixtureEntry(
         string packageId,
         string? assemblyFileOverride = null,
         string? typeNameOverride = null,
         string? runtimeIdentifier = null,
-        LogicalPackage? logicalPackage = null) => new()
+        LogicalPackage? logicalPackage = null,
+        string? templateRoot = null) => new()
         {
             PackageId = packageId,
             PackageVersion = "1.0.0",
             PackageRoot = AppContext.BaseDirectory,
+            TemplateRoot = templateRoot,
             RuntimeIdentifier = runtimeIdentifier,
             LogicalPackage = logicalPackage,
             EntryPoint = new EntryPointSpec
