@@ -516,21 +516,31 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
     }
 
-    private static Task ExtractPackageAsync(PackageArchiveReader reader, string destination, CancellationToken cancellationToken)
-        => ExtractPackageFilesAsync(reader, destination, IsInstallablePackageFile, cancellationToken);
-
-    private static async Task ExtractPackageFilesAsync(PackageArchiveReader reader, string destination, Func<string, bool> include,
-        CancellationToken cancellationToken)
+    private static async Task ExtractPackageAsync(PackageArchiveReader reader, string destination, CancellationToken cancellationToken)
     {
+        string destinationPrefix = Path.GetFullPath(destination) + Path.DirectorySeparatorChar;
+        StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         foreach (string packageFile in await reader.GetFilesAsync(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!include(packageFile))
+            string relativePath = packageFile.Replace('\\', '/');
+            string targetPath = Path.GetFullPath(Path.Combine(destination, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            if (!targetPath.StartsWith(destinationPrefix, comparison))
+            {
+                throw new InvalidWorkloadException($"Package entry '{packageFile}' resolves outside the workload install directory.");
+            }
+
+            string normalizedPath = Path.GetRelativePath(destination, targetPath).Replace('\\', '/');
+            if (IgnorePackageFile(normalizedPath))
             {
                 continue;
             }
 
-            string targetPath = Path.Combine(destination, packageFile.Replace('/', Path.DirectorySeparatorChar));
+            if (relativePath.EndsWith('/'))
+            {
+                continue;
+            }
+
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
             using Stream entryStream = await reader.GetStreamAsync(packageFile, cancellationToken);
             using FileStream output = File.Create(targetPath);
@@ -538,14 +548,31 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         }
     }
 
-    private static bool IsMetadataFile(string packageFile)
-        => string.Equals(packageFile, WorkloadMetadataReader.MetadataFileName, StringComparison.OrdinalIgnoreCase);
+    private static bool IgnorePackageFile(string packageFile)
+    {
+        // Verify trust against the original archive; these root files are not runtime payload.
+        if (string.Equals(packageFile, "[Content_Types].xml", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(packageFile, ".signature.p7s", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
 
-    private static bool IsInstallablePackageFile(string packageFile)
-        => IsMetadataFile(packageFile) || IsPayloadFile(packageFile);
+        // Exclude the entire package relationship subtree, not similarly named payload directories.
+        if (string.Equals(packageFile, "_rels", StringComparison.OrdinalIgnoreCase)
+            || packageFile.StartsWith("_rels/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
 
-    private static bool IsPayloadFile(string packageFile)
-        => packageFile.StartsWith("tools/", StringComparison.OrdinalIgnoreCase);
+        // Preserve other payload files in this directory; only NuGet core-property documents are bookkeeping.
+        if (packageFile.StartsWith("package/services/metadata/core-properties/", StringComparison.OrdinalIgnoreCase)
+            && packageFile.EndsWith(".psmdcp", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
 
     private static void EnsureHostExecutableBit(string installPath, string packageId, string? runtimeIdentifier)
     {
