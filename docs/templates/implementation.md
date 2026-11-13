@@ -2,7 +2,7 @@
 
 **Status:** Proposed implementation plan
 
-This document describes the existing CLI v5 infrastructure, what remains to be implemented, and how to validate the first `func init` and `func new` integration. The [architecture](architecture.md) defines the required behavior and safety boundaries.
+This document describes the existing CLI v5 infrastructure, what remains to be implemented, and how to validate the first `func init` and `func new` integration. The [architecture](architecture.md) describes the proposed behavior and safety boundaries.
 
 ## What exists today
 
@@ -10,13 +10,13 @@ The current CLI includes:
 
 - `TemplaterFactory`, `TemplateEngineContext`, `FuncTemplateEngineHost`, and `Templater`: a command-scoped engine environment, an isolated CLI template hive, and installed-template discovery through `TemplatePackageManager.GetTemplatesAsync`. The factory passes DI-registered `ITemplateComponent` instances directly to the host; no separate engine-session abstraction is used.
 - `FuncTemplateInfo` and `TemplateResolutionResult`: discovery returns wrappers that forward `ITemplateInfo` metadata and retain the original engine template. `HostConfigPlace` is available, but its file is not read yet.
-- Selection, parameter evaluation, rendering, and writing generated files are not implemented. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
 - `InitCommand`, `IProjectInitializer`, and Stack metadata: six existing project initializers, Stack-specific options, adoption, and configuration repair. They remain operative until replacements are qualified.
-
 - `NewCommand` retains the current public argument surface. Its migration handler reports scaffolding and template listing unavailable and returns exit code 1 before modifying the target. The first-run coordinator skips `func new`, so the unavailable-command handler returns its error without running setup.
 - `FirstRunCoordinator`: for eligible commands, setup can complete before the handler and ask the user to rerun. `func new` skips first-run setup.
 - `QuickstartCommand`: a separate existing manifest/provider/scaffolding route, not the new Template Engine implementation.
 - Test-only local template registration in isolated hives. Workload installation does not yet register its template folders in the CLI template hive.
+
+The discovery foundation is not yet integrated with `func init` or `func new`. It does not read host-specific configuration, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The previous session, catalog projection, and custom constraint helpers are not part of the current foundation.
 
 ### Existing initialization limitations
 
@@ -28,7 +28,7 @@ Useful source entry points include `src/Func/Templates/Engine/`, `src/Func/Comma
 
 ## Next implementation steps
 
-The first increment, installed-template discovery, is now in place. Add the remaining behavior in small steps.
+The first increment provides an internal installed-template discovery API, but it is not exposed through CLI commands. Add the remaining behavior in small steps.
 
 1. **Build on the discovery API.** The factory creates a `Templater` with command context and DI-registered engine components. It lists installed templates as `FuncTemplateInfo` values in a `TemplateResolutionResult`. Add selection and invocation APIs when a command needs them. Keep the original engine template available for later use, and do not add group or catalog types before they have a consumer.
 
@@ -38,7 +38,7 @@ The first increment, installed-template discovery, is now in place. Add the rema
 
 4. **Add guarded publication.** Render privately, validate target effects, preserve non-force behavior, protect Git metadata, persist required configuration correctly, and report failures and partial effects.
 
-5. **Connect production content.** Once template content owners and workload owners confirm the template folder layout, make workload install register its template folders with Microsoft.TemplateEngine in the CLI hive, and make uninstall and update remove or replace them. `func init` and `func new` only load the engine cache from those registrations. Do not make discovery install packages or force a full cache rebuild on every command.
+5. **Connect production content.** Once template content owners and workload owners confirm the template folder layout, make workload install register its template folders with Microsoft.TemplateEngine in the CLI hive, and make uninstall and update remove or replace them. After integration, `func init` and `func new` use those registrations and the engine's cache without registering content themselves. Verify cache invalidation, and do not make discovery install packages or force a full cache rebuild on every command.
 
 6. **Qualify the release surface.** Run command regressions, actual Functions Host discovery, installed-platform tests, and the approved supported-Stack inventory before enabling public paths.
 
@@ -76,6 +76,8 @@ Keep the distinction between the language Stack and the Azure Functions Runtime.
 Engine work with isolated representative content does not need to wait for the entire production catalog. A public template-backed journey does need approved content and production registration.
 
 ## Tests and acceptance
+
+These are acceptance criteria for future integration, not a claim that the end-to-end journey or release qualification has completed.
 
 ### First working journey
 

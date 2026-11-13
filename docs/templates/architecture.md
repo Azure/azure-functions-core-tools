@@ -10,9 +10,9 @@ The initial goal is a working local journey: `func init` creates a valid project
 
 ## Current foundation
 
-The current code creates a command-scoped `Templater` with an isolated settings hive. `Templater.ListAsync` returns installed templates in a `TemplateResolutionResult`. Each `FuncTemplateInfo` forwards the engine metadata and keeps the original `ITemplateInfo`, including its `HostConfigPlace`, for later use.
+The current code provides a command-scoped `Templater` with an isolated settings hive. `Templater.ListAsync` returns installed templates in a `TemplateResolutionResult`. Each `FuncTemplateInfo` forwards the engine metadata and keeps the original `ITemplateInfo`, including its `HostConfigPlace`, for later use.
 
-The current code does not read host-specific configuration, select templates, evaluate parameters, render output, or write files. The rest of this document describes proposed work beyond discovery.
+Neither `func init` nor `func new` uses this discovery API yet, and workload installation does not register templates in the CLI hive. The current foundation does not read host-specific configuration, filter or select templates, evaluate constraints or parameters, render output, or write generated files. The rest of this document describes proposed work beyond discovery.
 
 <a id="end-to-end-proof"></a>
 
@@ -20,13 +20,13 @@ The first working journey defines the representative project, item and Functions
 
 The Template Engine is part of CLI v5. Moving it into a separate assembly is outside the initial scope.
 
-## Initial Design
+## Proposed design
 
-The command-facing flow is:
+The proposed command-facing flow is:
 
 1. The CLI parses the command and identifies the project or requested language stack.
 2. The template factory creates a `Templater` with the relevant context and DI-registered engine components.
-3. The `Templater` starts the engine, which loads its template cache from the workload template folders registered in the CLI hive, then lists or resolves templates.
+3. The `Templater` uses Microsoft.TemplateEngine to discover templates from workload folders registered in the CLI hive; the engine manages its cache.
 4. The CLI presents choices when necessary and supplies template-specific arguments.
 5. The Template Engine resolves one exact template, evaluates its parameters, and renders it.
 6. The CLI validates and publishes the resulting files and reports the outcome.
@@ -40,9 +40,9 @@ The command-facing flow is:
 | Template group | Present related template variants together when useful for selection. |
 | Resolved template | Represent the exact selected template that can be invoked within its command scope. |
 | Template Engine internals | Use Microsoft.TemplateEngine facilities for metadata, authored parameter semantics, and rendering. Keep engine resources within the command-scoped templater. |
-| Content producers and workload installation | Build and package templates. Workload installation registers each workload's template folders in the CLI hive; uninstall removes them. |
+| Content producers and workload installation | Build and package templates. Installation registers the template folders of workloads that provide them in the CLI hive; uninstall removes those registrations. |
 
-The CLI captures the command, project, and bundle context once. The current `Templater` passes that context and DI-registered engine components to the func host, then discovers installed templates. Parameter evaluation and invocation are not implemented yet.
+The proposed CLI flow captures the command, project, and bundle context once. The current `Templater` accepts a context and passes it and the DI-registered engine components to the func host. Its `ListAsync` method lists installed templates. Parameter evaluation and invocation are not implemented yet.
 
 `FuncTemplateInfo` keeps the original engine template available as `Template` and forwards its metadata, including `HostConfigPlace`. `TemplateResolutionResult` currently holds the discovered candidates; it does not group or select them. Catalogs, groups, and resolved templates remain design concepts for later work, not current types.
 
@@ -56,13 +56,15 @@ These are responsibilities and useful object-model concepts, not a requirement t
 
 ## Installed templates and discovery
 
-The Template Engine uses templates whose folders are already registered in a dedicated CLI hive. When `func init` or `func new` creates a `Templater`, the engine reads those registrations and builds or refreshes its template cache. The `Templater` provides access to the metadata available in that scope. Discovery does not download packages or register templates as a side effect.
+`Templater.ListAsync` currently lists templates already installed in the configured CLI hive. The API does not provide template registration or installation, and no CLI command uses it yet.
 
-A command supplies the relevant project or Stack context. The command-facing API should return usable template choices and meaningful reasons when candidates are unavailable. Prefer a straightforward call that accepts context and returns the relevant collection; do not require the CLI to orchestrate multiple discovery passes merely to obtain that list. Whether filtering happens internally during discovery or in a subsequent resolution operation is an API detail for the CLI team to settle.
+In the proposed flow, `func init` and `func new` create a `Templater` and use the registered workload templates. Microsoft.TemplateEngine manages the cache; its creation, reuse, and invalidation behavior still need to be verified.
+
+The planned command integration supplies the relevant project or Stack context. The command-facing API should return usable template choices and meaningful reasons when candidates are unavailable. Prefer a straightforward call that accepts context and returns the relevant collection; do not require the CLI to orchestrate multiple discovery passes merely to obtain that list. Whether filtering happens internally during discovery or in a subsequent resolution operation is an API detail for the CLI team to settle.
 
 Template producers can develop project and item content independently. Representative local templates with different Stack metadata should exercise discovery, filtering, and selection. Production workload registration is a separate integration task: test-only registration in an isolated hive does not prove that workload installation registers its template folders in the CLI hive.
 
-Ordinary listing excludes hidden items while retaining diagnostics for unavailable candidates. Listing does not impose creation-only bundle gates. Resolve the explicit project target without introducing upward search, and keep selection within the chosen source/channel scope.
+Ordinary listing should exclude hidden items while retaining diagnostics for unavailable candidates, without imposing creation-only bundle gates. Resolve the explicit project target without introducing upward search, and keep selection within the chosen source/channel scope.
 
 <a id="parameter-evaluation"></a>
 <a id="token-capture"></a>
@@ -70,7 +72,7 @@ Ordinary listing excludes hidden items while retaining diagnostics for unavailab
 
 ## Selection and parameters
 
-A template can be selected by an explicit identifier or through an interactive choice. Selection must preserve the user's choice:
+Selection and parameter evaluation are not implemented. The proposed design allows a template to be selected by an explicit identifier or through an interactive choice. Selection must preserve the user's choice:
 
 - A full template ID identifies one specific candidate. If that candidate is unavailable or incompatible, report the problem; never substitute a related variant.
 - Short names and aliases may identify groups of related templates. Ambiguity must be resolved explicitly, not by an arbitrary first match.
@@ -99,7 +101,7 @@ If the installed engine cannot evaluate a required template feature, reject that
 
 ## Selected content and rendering
 
-Invoking a template must use the exact content selected, not a later lookup by name or a different variant.
+Rendering and selected-content validation are not implemented. The proposed design requires invocation to use the exact content selected, not a later lookup by name or a different variant.
 
 Before a template can be invoked or its parameters prompted for, validate its configuration, metadata, and assets. Reject unsafe paths, unreadable or unsupported content, and assets that exceed the configured size or expansion limits.
 
@@ -117,9 +119,9 @@ Render into command-scoped private temporary output within defined asset and exp
 
 ## `func init`
 
-`func init` creates a Functions project for a selected Stack and language. Existing initializers continue to serve unmigrated Stacks until template-based replacements pass qualification.
+`func init` currently uses the existing Stack initializers, not this Template Engine. Existing initializers continue to serve unmigrated Stacks until template-based replacements pass qualification.
 
-The proposed template-based path is:
+The proposed template-based path for creating a project for a selected Stack and language is:
 
 1. Parse the existing `func init` options and inspect the destination.
 2. Preserve existing project adoption and configuration-repair behavior without running a project template.
@@ -137,9 +139,9 @@ Diagnose readable malformed CLI configuration without force. Explicit force may 
 
 ## `func new`
 
-`func new` adds a function to an existing, initialized Functions project.
+`func new` currently skips first-run setup. Its handler reports that template generation and listing are temporarily unavailable; it does not check whether the target is an initialized Functions project or modify it.
 
-In CLI v5, `func new` requires an initialized Functions project. If the project has not been initialized, the command fails with an actionable error directing the user to run `func init` first. It does not initialize the project automatically.
+The proposed `func new` path adds a function to an existing, initialized Functions project. If the project has not been initialized, the command should fail with an actionable error directing the user to run `func init` first. It should not initialize the project automatically.
 
 The initial public command surface retains `[path]`, `--template`, `--name`, `--force`, `--non-interactive`, `--list`, and `--format`. The redesign does not add a positional template selector or a new `--path` option.
 
@@ -155,9 +157,9 @@ The proposed path is:
 
 Listing is not proof that generation works. An exact-ID failure cannot fall back to a sibling. Without force, creating an item fails on a destination collision; any approved modification to existing files requires its own guard. `func new` does not write `func init` configuration or acquire packages during discovery.
 
-`func new` skips first-run setup. The current handler reports template generation and listing unavailable without modifying the destination. The current command implementation and the proposed generation path must be distinguished during integration and testing.
-
 ## Filesystem and failure behavior
+
+The following describes the proposed template-based flow, not guarantees of the current discovery foundation or existing initializers.
 
 The CLI owns destination safety. Before publishing, it validates relative paths, path aliases, ancestor links, collisions, originals, and the exact authorized force-deletion scope. A replace or append operation must check that its original has not changed, even when force was requested. File publication must be qualified on supported operating systems; an ordinary move operation is not automatically a safe guarded replacement.
 
@@ -174,13 +176,13 @@ Do not report planned output as completed changes.
 
 ## Content and workload ownership
 
-Templates are packaged and distributed through workloads. Each workload ships its templates in a folder and declares where that folder is. Leverage Microsoft.TemplateEngine for registration, mounting, scanning, and caching instead of building func-specific versions of those features.
+Workload installation does not yet register template folders in the CLI hive. The proposed design packages and distributes templates through workloads that provide them. Leverage Microsoft.TemplateEngine for registration, mounting, scanning, and caching instead of building func-specific versions of those features.
 
-Registration happens when a workload is installed. The installer registers the workload's template folders with Microsoft.TemplateEngine in the CLI hive, using the engine's own package registration, before reporting the templates ready. Uninstalling a workload removes its registrations. Updating a workload replaces the old folders with the new ones. Registering the same workload version again has no extra effect, so a failed install can be retried safely.
+During workload installation, the installer would register the workload's template folders with Microsoft.TemplateEngine in the CLI hive, using the engine's own package registration, before reporting the templates ready. Uninstall would remove the registrations, and update would replace the old folders with the new ones. Registering the same workload version again should have no extra effect, so a failed install can be retried safely.
 
-`func init` and `func new` do not register content. When they create a `Templater`, the engine reads the registered folders and builds its template cache. Later commands reuse that cache, and the engine rescans only folders that changed. Do not force a full cache rebuild on every command; keep that for repair or troubleshooting.
+In the proposed flow, `func init` and `func new` would create a `Templater` and use those registrations without registering content themselves. The engine would populate and use its cache from the registered folders. Verify cache refresh and invalidation behavior rather than assuming which folders are rescanned. Do not force a full cache rebuild on every command; keep that for repair or troubleshooting.
 
-Give each installed workload version its own folder, so a new version is always seen as a change. When the engine starts, cheaply check that each registered folder still exists. If a registered folder is missing or cannot be read, report that the templates are unavailable and explain how to repair the workload; do not show an empty list as success. If a registration fails, keep the previous working registration where possible. Discovery never scans arbitrary folders or downloads content.
+Using a separate folder for each installed workload version may help the engine detect updates; that behavior needs verification. If a registered folder is missing or cannot be read, the planned integration should report that the templates are unavailable and explain how to repair the workload; it should not show an empty list as success. If a registration fails, keep the previous working registration where possible. Discovery should not scan arbitrary folders or download content.
 
 The existing .NET project-template workflow uses its own template hive. That is not evidence that production workload content is already registered in the new CLI hive. Keep current Stack initialization working while package producers migrate content to the format expected by the new engine.
 
@@ -190,15 +192,15 @@ The folder layout inside a workload, version and channel rules, and integrity ch
 
 ## Scope and compatibility
 
-This document defines the proposed initial contract. Archived task lists are not implementation instructions; the dispositions below preserve their relevant requirements without making the historical specifications jointly authoritative.
+This document defines the proposed initial contract. Archived task lists are not implementation instructions; the dispositions below describe design targets, not a list of implemented features.
 
-| Historical area | Disposition for this increment |
+| Historical area | Proposed disposition |
 | --- | --- |
 | `func new` | Retain item-only scope, explicit `--template`, candidate-specific validation and noninteractive failure. Positional-template syntax, `--path`, `--output`, upward project search and bundle-gated listing are superseded. Public dry-run, lifecycle commands and fallback parameter aliases are deferred. |
 | `func init` | Retain existing Stack selection, adoption/repair and configuration behavior. Occupied non-project targets preserve safe files. Public template selection, new noninteractive/dry-run options, template-first UX, a general action framework and removal of working initializers are deferred. |
 | Engine integration | Retain host context, catalog metadata, explicit group identity, func-host aliases, fail-closed eligibility and exact invocation. Projection-driven conditional evaluation and full-ID widening are superseded. General selection frameworks and authored action plumbing are deferred. |
-| Constraints | Raw validation, fail-closed evaluation and selected-content checks apply now. Installer/update preflight and producer-specific rules are deferred with those workflows. |
-| Package lifecycle | Install/update/uninstall/search and feed UX are deferred. Package provenance and failure-safe replacement remain requirements to revisit when those workflows enter scope; local workload registration is separate. |
+| Constraints | Raw validation, fail-closed evaluation and selected-content checks are proposed for selection and invocation; they are not implemented in the discovery foundation. Installer/update preflight and producer-specific rules are deferred with those workflows. |
+| Package lifecycle | User-facing template package install/update/uninstall/search and feed UX are deferred. Package provenance and failure-safe replacement remain requirements to revisit when those workflows enter scope; workload template registration is a separate proposed integration. |
 | Quickstarts | Preserve the existing Quickstart route. Template-first, multi-project, topology/action and browse proposals are deferred. |
 | Umbrella and producer pipeline | Preserve program and producer history, not a requirement to complete all historical changes before the first engine proof. Producer automation remains deferred. |
 
