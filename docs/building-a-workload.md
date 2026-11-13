@@ -178,6 +178,19 @@ Add a `workload.json` that points at your entry-point type. `assemblyPath` is **
 }
 ```
 
+Runtime (`kind: workload`) manifests may also declare an optional single string
+`templateRoot`, such as `"content/templates"`, relative to the **physical package root**
+(not `tools/any/` or `tools/<rid>/`). Missing or null means no bundled templates.
+The CLI validates this declaration and persists it in the installed workload registry;
+the declaration alone does not install a TemplateEngine package or change extraction.
+Content, meta, and RID-pointer manifests cannot declare a non-null `templateRoot`.
+Paths must be portable and relative: no rooted paths, drive syntax, empty interior
+segments, control characters, `:*?"<>|`, or directory names ending in a dot or
+space. The CLI combines the declaration with the package directory and resolves
+the full path, rejecting paths that resolve outside or to the package root itself.
+`.` and `..` segments are resolved, backslashes normalize to `/`, and trailing
+separators are removed.
+
 Add a `README.md` next to the csproj. `Release.props` auto-wires it as `<PackageReadmeFile>` (and the Functions icon as `<PackageIcon>`), so both surface on NuGet feeds without extra packing config. Use it to describe the workload's purpose, the language(s) it supports, and any prerequisites.
 
 ## Step 2: Subclass `Workload`

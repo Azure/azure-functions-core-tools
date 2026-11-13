@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text.Json;
 using Azure.Functions.Cli.Workloads;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
@@ -49,6 +50,158 @@ public class WorkloadMetadataReaderTests : IDisposable
         metadata.Kind.Should().Be(WorkloadKind.Workload);
         metadata.EntryPoint!.AssemblyPath.Should().Be("Foo.dll");
         metadata.EntryPoint.Type.Should().Be("Foo.MyWorkload");
+    }
+
+    [Theory]
+    [InlineData("templates", "templates")]
+    [InlineData("content/templates/", "content/templates")]
+    [InlineData("content\\templates\\", "content/templates")]
+    [InlineData("tools/any/templates///", "tools/any/templates")]
+    [InlineData("templates/../other", "other")]
+    [InlineData("templates/./other", "templates/other")]
+    [InlineData("templates\\..\\other", "other")]
+    [InlineData("./templates", "templates")]
+    public void Read_NormalizesTemplateRoot(string path, string expected)
+    {
+        WriteTemplateMetadata("workload", JsonSerializer.Serialize(path));
+
+        WorkloadMetadata metadata = _reader.Read(_tempDir);
+
+        metadata.TemplateRoot.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("/")]
+    [InlineData("/templates")]
+    [InlineData("\\templates")]
+    [InlineData("\\\\server\\templates")]
+    [InlineData("C:/templates")]
+    [InlineData("C:templates")]
+    [InlineData(".")]
+    [InlineData("..")]
+    [InlineData("../other")]
+    [InlineData("..\\other")]
+    [InlineData("templates/../../other")]
+    [InlineData("templates/..")]
+    [InlineData("templates//other")]
+    [InlineData("templates\\\\other")]
+    [InlineData("templates/*")]
+    [InlineData("templates/?")]
+    [InlineData("templates/\"quoted\"")]
+    [InlineData("templates/<other>")]
+    [InlineData("templates/a|b")]
+    [InlineData("templates/a:b")]
+    [InlineData("templates/a\nb")]
+    [InlineData("templates/a\u0000b")]
+    [InlineData("templates/name.")]
+    [InlineData("templates/name /child")]
+    public void Read_RejectsInvalidTemplateRoot(string path)
+    {
+        WriteTemplateMetadata("workload", JsonSerializer.Serialize(path));
+
+        var exception = FluentActions.Invoking(() => _reader.Read(_tempDir))
+            .Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        exception.Message.Should().Contain(Path.Combine(_tempDir, "workload.json")).And.Contain("templateRoot");
+        exception.InnerException.Should().BeAssignableTo<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("[\"templates\"]")]
+    [InlineData("{}")]
+    [InlineData("42")]
+    [InlineData("true")]
+    public void Read_RejectsNonStringTemplateRoot(string json)
+    {
+        WriteTemplateMetadata("workload", json);
+
+        var exception = FluentActions.Invoking(() => _reader.Read(_tempDir))
+            .Should().ThrowExactly<InvalidWorkloadException>().Which;
+
+        exception.Message.Should().Contain("workload.json").And.Contain("templateRoot");
+        exception.InnerException.Should().BeOfType<JsonException>();
+    }
+
+    [Theory]
+    [InlineData("content")]
+    [InlineData("meta")]
+    [InlineData("rid-pointer")]
+    public void Read_RejectsTemplateRootOnNonRuntimeKinds(string kind)
+    {
+        WriteTemplateMetadata(kind, "\"templates\"");
+
+        FluentActions.Invoking(() => _reader.Read(_tempDir))
+            .Should().ThrowExactly<InvalidWorkloadException>()
+            .WithMessage("*workload.json*templateRoot*only supported for kind 'workload'*");
+    }
+
+    [Theory]
+    [InlineData("workload", null)]
+    [InlineData("workload", "null")]
+    [InlineData("content", null)]
+    [InlineData("content", "null")]
+    [InlineData("meta", null)]
+    [InlineData("meta", "null")]
+    [InlineData("rid-pointer", null)]
+    [InlineData("rid-pointer", "null")]
+    public void Read_AcceptsAbsentOrNullTemplateRoot(string kind, string? json)
+    {
+        WriteTemplateMetadata(kind, json);
+
+        _reader.Read(_tempDir).TemplateRoot.Should().BeNull();
+    }
+
+    [Fact]
+    public void Read_RejectsTemplateRootResolvingToSiblingWithSharedPrefix()
+    {
+        string path = $"../{Path.GetFileName(_tempDir)}-other/templates";
+        WriteTemplateMetadata("workload", JsonSerializer.Serialize(path));
+
+        FluentActions.Invoking(() => _reader.Read(_tempDir))
+            .Should().ThrowExactly<InvalidWorkloadException>()
+            .WithMessage("*templateRoot*inside the package root*");
+    }
+
+    [Fact]
+    public void NormalizePackagePath_RejectsPackageRootEvenWhenItIsAVolumeRoot()
+    {
+        string packageDirectory = Path.GetPathRoot(_tempDir)!;
+
+        FluentActions.Invoking(() => WorkloadMetadata.NormalizePackagePath(".", packageDirectory))
+            .Should().ThrowExactly<ArgumentException>()
+            .WithMessage("*inside the package root*");
+    }
+
+    [Fact]
+    public void NormalizePackagePath_RejectsNullPath()
+    {
+        FluentActions.Invoking(() => WorkloadMetadata.NormalizePackagePath(null!, _tempDir))
+            .Should().ThrowExactly<ArgumentNullException>();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void NormalizePackagePath_RejectsInvalidPackageDirectory(string? packageDirectory)
+    {
+        FluentActions.Invoking(() => WorkloadMetadata.NormalizePackagePath("templates", packageDirectory!))
+            .Should().Throw<ArgumentException>();
+    }
+
+    private void WriteTemplateMetadata(string kind, string? templateRootJson)
+    {
+        string fields = kind switch
+        {
+            "workload" => """, "entryPoint": { "assemblyPath": "Foo.dll", "type": "Foo.Workload" }""",
+            "rid-pointer" => """, "packages": { "win-x64": "Example.win-x64" }""",
+            _ => string.Empty,
+        };
+        string templateField = templateRootJson is null ? string.Empty : $", \"templateRoot\": {templateRootJson}";
+        WriteMetadata($$"""{ "$schema": "{{SchemaUrl}}", "kind": "{{kind}}"{{fields}}{{templateField}} }""");
     }
 
     [Fact]

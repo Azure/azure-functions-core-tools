@@ -84,6 +84,12 @@ internal sealed class WorkloadEntry
     public string? RuntimeIdentifier { get; init; }
 
     /// <summary>
+    /// Normalized template directory relative to the physical package root, captured at install time.
+    /// Null for packages without bundled templates and legacy entries.
+    /// </summary>
+    public string? TemplateRoot { get; init; }
+
+    /// <summary>
     /// Whether this physical package lacks an explicit install owner. Defaults
     /// to false so registry rows written by older CLIs retain their ownership.
     /// </summary>

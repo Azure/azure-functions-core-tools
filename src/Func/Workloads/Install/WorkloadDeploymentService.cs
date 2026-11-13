@@ -368,6 +368,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             Kind = package.Metadata.Kind,
             Source = source,
             RuntimeIdentifier = package.Metadata.RuntimeIdentifier,
+            TemplateRoot = package.Metadata.TemplateRoot,
             IsImplicitlyInstalled = ownership != WorkloadOwnershipKind.Explicit,
             LogicalPackage = logicalPackage,
             InstallRefCount = 1,
@@ -385,6 +386,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             Kind = entry.Kind,
             Source = entry.Source,
             RuntimeIdentifier = entry.RuntimeIdentifier,
+            TemplateRoot = entry.TemplateRoot,
             IsImplicitlyInstalled = ownership != WorkloadOwnershipKind.Explicit && entry.IsImplicitlyInstalled,
             LogicalPackage = entry.LogicalPackage ?? logicalPackage,
             InstallRefCount = entry.InstallRefCount,
@@ -405,6 +407,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             Kind = incoming.Kind,
             Source = incoming.Source,
             RuntimeIdentifier = incoming.RuntimeIdentifier,
+            TemplateRoot = incoming.TemplateRoot,
             IsImplicitlyInstalled = existing.IsImplicitlyInstalled && incoming.IsImplicitlyInstalled,
             LogicalPackage = existing.LogicalPackage ?? incoming.LogicalPackage,
             InstallRefCount = existing.InstallRefCount + (addExplicit ? 1 : 0) + (addLogical ? 1 : 0),
@@ -423,6 +426,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         {
             WorkloadMetadata actual = _metadataReader.Read(installPath);
             return actual.Kind == expectedMetadata.Kind
+                && string.Equals(entry.TemplateRoot, expectedMetadata.TemplateRoot, StringComparison.Ordinal)
+                && string.Equals(actual.TemplateRoot, expectedMetadata.TemplateRoot, StringComparison.Ordinal)
                 && string.Equals(actual.RuntimeIdentifier, expectedMetadata.RuntimeIdentifier, StringComparison.Ordinal);
         }
         catch (InvalidWorkloadException)
@@ -483,6 +488,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
     private static void EnsureMetadataMatchesInspection(WorkloadMetadata expected, WorkloadMetadata actual, string packageId)
     {
         if (expected.Kind != actual.Kind
+            || !string.Equals(expected.TemplateRoot, actual.TemplateRoot, StringComparison.Ordinal)
             || !string.Equals(expected.RuntimeIdentifier, actual.RuntimeIdentifier, StringComparison.Ordinal))
         {
             throw new InvalidWorkloadException(
