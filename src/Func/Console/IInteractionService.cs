@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Console.Theme;
+using Azure.Functions.Cli.Console.Terminal;
 using Spectre.Console.Rendering;
 
 namespace Azure.Functions.Cli.Console;
@@ -30,6 +31,17 @@ internal interface IInteractionService
     /// stdout rendering with stderr selection prompts. Individual prompts check their target console.
     /// </summary>
     public bool IsInteractive { get; }
+
+    /// <summary>
+    /// Checks full-screen capability without acquiring terminal ownership.
+    /// </summary>
+    public bool CanUseFullScreen(ITerminalSessionFactory factory) => false;
+
+    /// <summary>
+    /// Acquires exclusive full-screen input/output after startup prompts have finished.
+    /// </summary>
+    public ITerminalSession OpenFullScreen(ITerminalSessionFactory factory, CancellationToken cancellationToken = default)
+        => throw new PlatformNotSupportedException("Full-screen output is not available. Use --format=plain.");
 
     /// <summary>Writes a single line of unstyled text to stdout.</summary>
     public void WriteLine(string text);

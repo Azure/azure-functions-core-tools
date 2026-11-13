@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Console.Theme;
+using Azure.Functions.Cli.Console.Terminal;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
@@ -16,6 +17,7 @@ internal class SpectreInteractionService : IInteractionService
     private readonly IAnsiConsole _stdout;
     private readonly IAnsiConsole _stderr;
     private readonly ITheme _theme;
+    private IAnsiConsole? _managedInputConsole;
 
     public SpectreInteractionService(ITheme theme, IAnsiConsole? stdout = null, IAnsiConsole? stderr = null)
     {
@@ -36,6 +38,42 @@ internal class SpectreInteractionService : IInteractionService
         && CanSelect;
 
     private bool CanSelect => _stderr.Profile.Capabilities.Interactive && _stderr.Profile.Capabilities.Ansi;
+
+    public bool CanUseFullScreen(ITerminalSessionFactory factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        return IsInteractive
+            && (_managedInputConsole is null || factory is ITerminalInputHandoff { CanHandoffManagedInput: true })
+            && factory.IsSupported(_stdout);
+    }
+
+    public ITerminalSession OpenFullScreen(ITerminalSessionFactory factory, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        cancellationToken.ThrowIfCancellationRequested();
+        List<TerminalInputEvent> pending = [];
+        if (_managedInputConsole is { } inputConsole)
+        {
+            if (factory is not ITerminalInputHandoff { CanHandoffManagedInput: true } handoff)
+            {
+                throw new PlatformNotSupportedException("Buffered prompt input cannot be transferred safely. Use --format=plain.");
+            }
+
+            foreach (TerminalInputEvent input in handoff.DrainManagedInput(inputConsole, cancellationToken))
+            {
+                if (pending.Count == 4096)
+                {
+                    throw new IOException("Too much pending keyboard input to enter full-screen mode safely. Re-run with --format=plain.");
+                }
+
+                pending.Add(input);
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        ITerminalSession session = factory.Open(_stdout);
+        return pending.Count == 0 ? session : new PrefixedTerminalSession(session, pending);
+    }
 
     public void WriteLine(string text) => _stdout.WriteLine(text);
 
@@ -306,6 +344,7 @@ internal class SpectreInteractionService : IInteractionService
             return whenInputUnavailable;
         }
 
+        _managedInputConsole = _stdout;
         return await new ConfirmationPrompt(prompt) { DefaultValue = defaultValue }
             .ShowAsync(_stdout, cancellationToken);
     }
@@ -319,6 +358,7 @@ internal class SpectreInteractionService : IInteractionService
             return choiceList.FirstOrDefault() ?? string.Empty;
         }
 
+        _managedInputConsole = _stderr;
         return await new SelectionPrompt<string>()
             .Title(title)
             .EnableSearch()
@@ -340,6 +380,7 @@ internal class SpectreInteractionService : IInteractionService
 
         // The prompt requires at least one selection; users cancel with CTRL+C
         // (which surfaces as OperationCanceledException up the call stack).
+        _managedInputConsole = _stderr;
         List<MultiSelectionChoice> selected = await new MultiSelectionPrompt<MultiSelectionChoice>()
             .Title(title)
             .Required()
@@ -359,6 +400,7 @@ internal class SpectreInteractionService : IInteractionService
             return defaultValue ?? string.Empty;
         }
 
+        _managedInputConsole = _stderr;
         TextPrompt<string> textPrompt = new TextPrompt<string>(prompt).AllowEmpty();
         if (defaultValue is not null)
         {

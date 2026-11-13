@@ -55,3 +55,53 @@ extends:
           parameters:
             projects: Azure.Functions.Cli.slnx
             sign: false
+        - job: terminal_windows
+          displayName: Windows terminal qualification
+          pool:
+            name: 1es-pool-azfunc-public
+            image: 1es-windows-2022
+            os: windows
+          steps:
+          - template: /eng/ci/templates/steps/setup-dependencies.yml@self
+            parameters:
+              sign: false
+          - task: DotNetCoreCLI@2
+            displayName: Restore terminal tests
+            inputs:
+              command: custom
+              custom: restore
+              projects: test/Func.Tests/Func.Tests.csproj
+          - task: DotNetCoreCLI@2
+            displayName: Qualify native input, prompt handoff, and interruption
+            inputs:
+              command: test
+              projects: test/Func.Tests/Func.Tests.csproj
+              arguments: >-
+                -c Release --no-restore -p:CI=true
+                --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests"
+            env:
+              FUNC_TERMINAL_NATIVE_TESTS: '1'
+        - job: terminal_linux
+          displayName: Linux terminal qualification
+          steps:
+          - template: /eng/ci/templates/steps/setup-dependencies.yml@self
+            parameters:
+              sign: false
+          - bash: python3 --version
+            displayName: Verify Unix PTY harness prerequisite
+          - task: DotNetCoreCLI@2
+            displayName: Restore terminal tests
+            inputs:
+              command: custom
+              custom: restore
+              projects: test/Func.Tests/Func.Tests.csproj
+          - task: DotNetCoreCLI@2
+            displayName: Qualify native Unix input and job control
+            inputs:
+              command: test
+              projects: test/Func.Tests/Func.Tests.csproj
+              arguments: >-
+                -c Release --no-restore -p:CI=true
+                --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests"
+            env:
+              FUNC_TERMINAL_NATIVE_TESTS: '1'
