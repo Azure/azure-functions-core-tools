@@ -6,6 +6,11 @@ Azure-Samples quickstarts will be distributed as ordinary `FuncTemplate` package
 
 - Make interactive `func init` template-first by listing installed TemplateEngine templates with `tags.type = project` before resolving remaining template choices.
 - Run an installed template by exact identity or short name through `func init --template <template>`.
+- Replace the existing `func quickstart` workflow only after supported samples, independent subfolder choices, basic companion acquisition, guided CLI discovery/use, and regression coverage are ready.
+- Acquire basic project/item companions with stacks, but do not preinstall quickstarts or add a quickstart preinstallation option.
+- Preserve curated availability through a cached metadata catalog and an explicitly authorized acquire-and-create action, without making search or ordinary init implicitly install packages.
+- Use the existing reviewed manifest as the curated registration and initial discovery authority, extending it with approved publishing inputs and verified package references without a second manual YAML registry or a general feed scanner as a GA prerequisite.
+- Preserve legacy consumers and require exact actual-artifact approval, explicit script authorization, and complete supported-entry gap dispositions before legacy removal.
 - Require explicit template package installation; an unknown template reference provides browse and `func new install` guidance rather than installing implicitly.
 - Show a stable Functions-owned browse URL alongside the installed-template experience without defining the backing gallery or catalog in this change.
 - Keep workload-restricted installed templates visible as unavailable, show a concise restriction summary, and render actionable remediation supplied by the constraint system.
@@ -35,4 +40,8 @@ None.
 - Depends on `template-engine-post-actions` for the mandatory Functions project configuration action.
 - Depends on `template-package-install` for explicit package installation and on `azure-samples-template-pipeline` for packaged quickstart supply.
 - Requires corresponding package-authoring changes so synthesized and authored quickstarts declare workload requirements, project primary outputs, and configuration actions.
-- Does not define remote template search, a gallery implementation, implicit installation, package publication, workload acquisition, or multi-project adoption.
+- Requires publishing to preserve independently selectable source scopes and discovery to map sanctioned templates to package/version/source references and own guided acquisition.
+- Distinguishes reviewed registration/publishing policy, its cached public discovery view, and the installed TemplateEngine catalog; publication supplies evidence rather than inventing public curation.
+- Retains explicit installation of third-party template packages while deferring broader automated discovery/catalog work.
+- Leaves automatic updates and freshness policy separate from command migration, and does not claim installed packages track CDN manifest changes automatically.
+- Defines discovery/acquisition requirements and migration gates, but leaves remote search command grammar, trust transport, gallery implementation, and service details to their owners. It does not implement implicit installation, package publication, workload acquisition, or multi-project adoption.
