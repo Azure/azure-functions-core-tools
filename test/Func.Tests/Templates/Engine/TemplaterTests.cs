@@ -182,5 +182,5 @@ public sealed class TemplaterTests : IDisposable
         => entries.Should().ContainSingle(candidate => candidate.Identity == identity).Subject;
 
     private Templater CreateTemplater()
-        => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive));
+        => new(new TemplateEngineSession(new TemplateEngineContext(WorkingDirectory.FromExplicit(_root)), _hive, []));
 }

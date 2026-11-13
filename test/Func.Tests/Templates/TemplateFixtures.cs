@@ -178,7 +178,7 @@ internal static class TemplateFixtures
     public static async Task InstallAsync(string packageDirectory, string settingsLocation)
     {
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(packageDirectory));
-        using TemplateEngineSession session = new(context, settingsLocation);
+        using TemplateEngineSession session = new(context, settingsLocation, []);
 
         IManagedTemplatePackageProvider provider = session.PackageManager.GetBuiltInManagedProvider(InstallationScope.Global);
         IReadOnlyList<InstallResult> results = await provider.InstallAsync([new InstallRequest(packageDirectory)], CancellationToken.None);
@@ -196,7 +196,7 @@ internal static class TemplateFixtures
     public static async Task<ITemplateInfo> GetInstalledTemplateAsync(string settingsLocation, string identity)
     {
         TemplateEngineContext context = new(WorkingDirectory.FromExplicit(settingsLocation));
-        using TemplateEngineSession session = new(context, settingsLocation);
+        using TemplateEngineSession session = new(context, settingsLocation, []);
 
         IReadOnlyList<ITemplateInfo> templates = await session.PackageManager.GetTemplatesAsync(CancellationToken.None);
         return templates.Should().ContainSingle(template => template.Identity == identity).Subject;

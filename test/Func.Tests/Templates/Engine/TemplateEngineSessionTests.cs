@@ -1,10 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using System.Reflection;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Templates.Engine;
-using Microsoft.TemplateEngine.Abstractions;
 
 namespace Azure.Functions.Cli.Tests.Templates.Engine;
 
@@ -27,37 +25,9 @@ public sealed class TemplateEngineSessionTests : IDisposable
     }
 
     [Fact]
-    public void Constructor_RegistersRunnableProjectsAndFuncConstraintComponents()
-    {
-        using TemplateEngineSession session = new(CommandContext("command"), Hive);
-
-        // RunnableProjects generator components are registered, so the host can
-        // load and render standard template.json packages.
-        session.Settings.Components.OfType<IGenerator>().Should().NotBeEmpty();
-
-        // Every member of the func constraint factory component set is
-        // registered on the host under the engine interface it is resolved by
-        // (e.g. ITemplateConstraintFactory). The component manager caches by
-        // that exact interface, so it must be probed with the registered type,
-        // not the IIdentifiedComponent base (which is never a cache key).
-        MethodInfo tryGetComponent = typeof(IComponentManager)
-            .GetMethod(nameof(IComponentManager.TryGetComponent))!;
-
-        foreach ((Type Type, IIdentifiedComponent Instance) in FuncTemplateComponents.AllComponents)
-        {
-            object?[] args = [Instance.Id, null];
-            bool resolved = (bool)tryGetComponent
-                .MakeGenericMethod(Type)
-                .Invoke(session.Settings.Components, args)!;
-
-            resolved.Should().BeTrue($"{Instance.GetType().Name} should be resolvable as {Type.Name}");
-        }
-    }
-
-    [Fact]
     public void Settings_UseTheSuppliedSettingsLocation()
     {
-        using TemplateEngineSession session = new(CommandContext("command"), Hive);
+        using TemplateEngineSession session = new(CommandContext("command"), Hive, []);
 
         session.Settings.Paths.GlobalSettingsDir.Should().Be(Hive);
     }
@@ -65,8 +35,8 @@ public sealed class TemplateEngineSessionTests : IDisposable
     [Fact]
     public void Settings_SeparateSessionsOnSharedHive_KeepTheirOwnContext()
     {
-        using TemplateEngineSession node = new(ProjectContext("node-app", "node"), Hive);
-        using TemplateEngineSession python = new(ProjectContext("python-app", "python"), Hive);
+        using TemplateEngineSession node = new(ProjectContext("node-app", "node"), Hive, []);
+        using TemplateEngineSession python = new(ProjectContext("python-app", "python"), Hive, []);
 
         HostParameter(node, FuncTemplateEngineHostParameters.Stack).Should().Be("node");
         HostParameter(python, FuncTemplateEngineHostParameters.Stack).Should().Be("python");
@@ -78,7 +48,7 @@ public sealed class TemplateEngineSessionTests : IDisposable
     [Fact]
     public void Dispose_ThenUse_ThrowsObjectDisposedException()
     {
-        TemplateEngineSession session = new(CommandContext("command"), Hive);
+        TemplateEngineSession session = new(CommandContext("command"), Hive, []);
 
         session.Dispose();
 
@@ -91,7 +61,7 @@ public sealed class TemplateEngineSessionTests : IDisposable
     [Fact]
     public void Dispose_CalledTwice_DoesNotThrow()
     {
-        TemplateEngineSession session = new(CommandContext("command"), Hive);
+        TemplateEngineSession session = new(CommandContext("command"), Hive, []);
         session.Dispose();
 
         Action act = session.Dispose;
@@ -102,7 +72,7 @@ public sealed class TemplateEngineSessionTests : IDisposable
     [Fact]
     public void Constructor_NullContext_Throws()
     {
-        Action act = () => _ = new TemplateEngineSession(null!, Hive);
+        Action act = () => _ = new TemplateEngineSession(null!, Hive, []);
 
         act.Should().Throw<ArgumentNullException>().WithParameterName("context");
     }
@@ -112,9 +82,17 @@ public sealed class TemplateEngineSessionTests : IDisposable
     [InlineData("  ")]
     public void Constructor_BlankSettingsLocation_Throws(string settingsLocation)
     {
-        Action act = () => _ = new TemplateEngineSession(CommandContext("command"), settingsLocation);
+        Action act = () => _ = new TemplateEngineSession(CommandContext("command"), settingsLocation, []);
 
         act.Should().Throw<ArgumentException>().WithParameterName("settingsLocation");
+    }
+
+    [Fact]
+    public void Constructor_NullComponents_Throws()
+    {
+        Action act = () => _ = new TemplateEngineSession(CommandContext("command"), Hive, null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("components");
     }
 
     private static string? HostParameter(TemplateEngineSession session, string name)
