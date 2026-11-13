@@ -165,7 +165,7 @@ And a `release_notes.md`:
 - Initial scaffold of the Node.js workload (entry point + stub project initializer).
 ```
 
-Add a `workload.json` that points at your entry-point type. `assemblyPath` is **relative to `tools/any/`**, conventionally a bare filename (no leading `/`, no `..`); `type` is the FQN of your `Workload` subclass.
+Add a `workload.json` that points at your entry-point type. `assemblyPath` is **relative to the package root**, with a legacy `tools/any/` fallback (no leading `/`, no `..`); `type` is the FQN of your `Workload` subclass. Assemblies conventionally live under `tools/<rid>/` or `tools/any/`. For RID-specific assemblies, include `tools/<rid>/` in `assemblyPath`; the loader does not automatically search that directory.
 
 ```json
 {
@@ -180,9 +180,9 @@ Add a `workload.json` that points at your entry-point type. `assemblyPath` is **
 
 Runtime (`kind: workload`) manifests may also declare an optional single string
 `templateRoot`, such as `"content/templates"`, relative to the **physical package root**
-(not `tools/any/` or `tools/<rid>/`). Missing or null means no bundled templates.
-The CLI validates this declaration and persists it in the installed workload registry;
-the declaration alone does not install a TemplateEngine package or change extraction.
+(not `tools/any/` or `tools/<rid>/`). Missing or null means no declared template root.
+The CLI validates this declaration and persists it in the installed workload registry.
+The declaration alone does not install a TemplateEngine package.
 Content, meta, and RID-pointer manifests cannot declare a non-null `templateRoot`.
 Paths must be relative according to the current platform's `Path.IsPathRooted`
 rules. The CLI normalizes both slash styles, combines the declaration with the
