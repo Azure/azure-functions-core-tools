@@ -212,7 +212,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                     new WorkloadInstallProgressAdapter(ctx),
                     allowUntrusted,
                     ct),
-                cancellationToken);
+                cancellationToken,
+                writeCompletion: false);
 
             RenderSingle(result);
             return 0;
@@ -262,7 +263,8 @@ internal sealed class WorkloadUpdateCommand : FuncCliCommand
                         new WorkloadInstallProgressAdapter(ctx),
                         allowUntrusted,
                         ct),
-                    cancellationToken);
+                    cancellationToken,
+                    writeCompletion: false);
                 RenderSingle(result);
             }
             catch (Exception ex) when (

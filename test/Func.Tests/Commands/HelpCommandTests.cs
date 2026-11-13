@@ -63,6 +63,154 @@ public class HelpCommandTests
     }
 
     [Fact]
+    public void ShowCommandHelp_WithNullCommandPath_Throws()
+    {
+        var act = () => _helpCommand.ShowCommandHelp(null!);
+
+        act.Should().Throw<ArgumentNullException>().WithParameterName("commandPath");
+    }
+
+    [Fact]
+    public void ShowCommandHelp_WithEmptyCommandPath_ShowsGeneralHelp()
+    {
+        var exitCode = _helpCommand.ShowCommandHelp();
+
+        exitCode.Should().Be(0);
+        _interaction.AllOutput.Should().Contain("TITLE: Azure Functions CLI");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("help")]
+    public async Task Help_WithoutCommandPath_ShowsGeneralHelp(string commandLine)
+    {
+        var exitCode = await _rootCommand.Parse(commandLine).InvokeAsync();
+
+        exitCode.Should().Be(0);
+        _interaction.AllOutput.Should().Contain("TITLE: Azure Functions CLI").And.Contain("RULE: Commands");
+    }
+
+    [Theory]
+    [InlineData("version")]
+    [InlineData("workload")]
+    [InlineData("workload install")]
+    [InlineData("workload list")]
+    [InlineData("profile show")]
+    [InlineData("start")]
+    public async Task Help_WithCommandPath_MatchesHelpOption(string commandPath)
+    {
+        var expectedInteraction = new TestInteractionService();
+        var expectedRoot = TestParser.CreateRoot(expectedInteraction);
+        var expectedExitCode = await expectedRoot.Parse($"{commandPath} --help").InvokeAsync();
+
+        var exitCode = await _rootCommand.Parse($"help {commandPath}").InvokeAsync();
+
+        expectedExitCode.Should().Be(0);
+        exitCode.Should().Be(0);
+        _interaction.Lines.Should().Equal(expectedInteraction.Lines);
+    }
+
+    [Theory]
+    [InlineData("nonexistent")]
+    [InlineData("workload nonexistent")]
+    [InlineData("nonexistent install")]
+    [InlineData("version install")]
+    [InlineData("workload install nonexistent")]
+    public async Task Help_WithInvalidCommandPath_ReturnsErrorWithoutRenderingPartialHelp(string commandPath)
+    {
+        var exitCode = await _rootCommand.Parse($"help {commandPath}").InvokeAsync();
+
+        exitCode.Should().Be(1);
+        _interaction.Lines.Should().ContainSingle()
+            .Which.Should().Be($"ERROR: Unknown command: '{commandPath}'. Run 'func help' for available commands.");
+    }
+
+    [Theory]
+    [InlineData("workload", "--unknown")]
+    [InlineData("workload", "--unknown value")]
+    [InlineData("workload", "--unknown=value")]
+    [InlineData("workload", "-unknown")]
+    [InlineData("workload install", "--unknown")]
+    [InlineData("workload install", "--unknown value")]
+    [InlineData("workload install", "--unknown=value")]
+    [InlineData("workload install", "-unknown")]
+    public async Task Help_WithUnknownOption_ReportsParserErrorWithoutExecutingTarget(string commandPath, string option)
+    {
+        var targetExecuted = false;
+        var install = _rootCommand.Subcommands.Single(command => command.Name == "workload")
+            .Subcommands.Single(command => command.Name == "install");
+        install.SetAction(_ =>
+        {
+            targetExecuted = true;
+            return 0;
+        });
+        var result = _rootCommand.Parse($"help {commandPath} {option}",
+            new ParserConfiguration { EnablePosixBundling = false });
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        using var cancellation = new CancellationTokenSource();
+
+        var exitCode = await result.InvokeAsync(new InvocationConfiguration
+        {
+            EnableDefaultExceptionHandler = false,
+            Output = output,
+            Error = error,
+        }, cancellation.Token);
+
+        exitCode.Should().Be(1);
+        result.Errors.Should().Contain(parseError => parseError.Message.Contains("Unrecognized option", StringComparison.Ordinal));
+        error.ToString().Should().Contain($"Unrecognized option '{option.Split(' ')[0]}'").And.NotContain("Unknown command");
+        _interaction.AllOutput.Should().NotContain($"TITLE: func {commandPath}").And.NotContain("Unknown command");
+        targetExecuted.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("help --verbose workload install")]
+    [InlineData("help workload --verbose install")]
+    [InlineData("help workload install --verbose")]
+    public async Task Help_WithRegisteredGlobalOption_ShowsCommandHelp(string commandLine)
+    {
+        var result = _rootCommand.Parse(commandLine);
+
+        var exitCode = await result.InvokeAsync();
+
+        result.Errors.Should().BeEmpty();
+        result.GetValue(_rootCommand.VerboseOption).Should().BeTrue();
+        exitCode.Should().Be(0);
+        _interaction.AllOutput.Should().Contain("TITLE: func workload install");
+    }
+
+    [Theory]
+    [InlineData("cloud deployment create")]
+    [InlineData("CLOUD DEPLOYMENT CREATE")]
+    [InlineData("cloud deploy add")]
+    public async Task Help_WithDeepCommandPath_ResolvesCommandMetadataWithoutExecuting(string commandPath)
+    {
+        var executed = false;
+        var create = new Command("create", "Create a deployment.");
+        create.Aliases.Add("add");
+        create.Arguments.Add(new Argument<string>("name") { Description = "Deployment name." });
+        create.SetAction(_ =>
+        {
+            executed = true;
+            return 0;
+        });
+        var deployment = new Command("deployment", "Manage deployments.");
+        deployment.Aliases.Add("deploy");
+        deployment.Subcommands.Add(create);
+        var cloud = new Command("cloud", "Manage cloud resources.");
+        cloud.Subcommands.Add(deployment);
+        _rootCommand.Subcommands.Add(cloud);
+
+        var exitCode = await _rootCommand.Parse($"help {commandPath}").InvokeAsync();
+
+        exitCode.Should().Be(0);
+        executed.Should().BeFalse();
+        _interaction.AllOutput.Should().Contain("TITLE: func cloud deployment create")
+            .And.Contain("Create a deployment.").And.Contain("<name>");
+    }
+
+    [Fact]
     public void RenderCommandHelp_WithNestedSubcommand_UsesFullPath()
     {
         var workloadCommand = _rootCommand.Subcommands

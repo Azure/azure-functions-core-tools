@@ -19,7 +19,7 @@ namespace Azure.Functions.Cli.Console;
 internal interface IProgressContext
 {
     /// <summary>
-    /// Updates the visible description for the in-flight task. Pass a short
+    /// Updates the subordinate phase description beneath the stable task title. Pass a short
     /// present-tense phrase (e.g. <c>"Downloading workload..."</c>).
     /// </summary>
     public void SetDescription(string description);

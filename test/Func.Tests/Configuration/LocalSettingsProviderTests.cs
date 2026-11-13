@@ -7,6 +7,8 @@ namespace Azure.Functions.Cli.Tests.Configuration;
 
 public sealed class LocalSettingsProviderTests : IDisposable
 {
+    private const string EncryptedSecretSentinel = "S1_SYNTHETIC_CIPHERTEXT_SENTINEL";
+
     private readonly DirectoryInfo _dir = Directory.CreateTempSubdirectory("local-settings-provider-");
     private readonly LocalSettingsProvider _provider = new();
 
@@ -17,17 +19,21 @@ public sealed class LocalSettingsProviderTests : IDisposable
     {
         LocalSettingsSnapshot snapshot = _provider.Get(_dir);
 
+        snapshot.IsEncrypted.Should().BeFalse();
         snapshot.Values.Should().BeEmpty();
         snapshot.WorkerRuntime.Should().BeNull();
         snapshot.Host.Should().BeNull();
     }
 
-    [Fact]
-    public void Get_ValuesAndHostPresent_ReadsSnapshot()
+    [Theory]
+    [InlineData("")]
+    [InlineData("\"IsEncrypted\":false,")]
+    public void Get_ValuesAndHostPresent_ReadsSnapshot(string encryptionMarker)
     {
         WriteSettings(
-            """
+            $$"""
             {
+              {{encryptionMarker}}
               "Values": {
                 "FUNCTIONS_WORKER_RUNTIME": "python",
                 "AzureWebJobsStorage": "UseDevelopmentStorage=true",
@@ -43,6 +49,7 @@ public sealed class LocalSettingsProviderTests : IDisposable
 
         LocalSettingsSnapshot snapshot = _provider.Get(_dir);
 
+        snapshot.IsEncrypted.Should().BeFalse();
         snapshot.WorkerRuntime.Should().Be("python");
         snapshot.Values["AzureWebJobsStorage"].Should().Be("UseDevelopmentStorage=true");
         snapshot.Values.ContainsKey("IgnoredNumber").Should().BeFalse();
@@ -50,6 +57,72 @@ public sealed class LocalSettingsProviderTests : IDisposable
         snapshot.Host!.LocalHttpPort.Should().Be(7072);
         snapshot.Host.Cors.Should().Be("http://localhost,http://example");
         snapshot.Host.CorsCredentials.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("true")]
+    [InlineData("\"true\"")]
+    public void Get_ExplicitlyEncryptedValues_AreWithheldWithoutRewritingFile(string encryptionMarker)
+    {
+        WriteSettings(
+            $$"""
+            {
+              "IsEncrypted": {{encryptionMarker}},
+              "Values": {
+                "FUNCTIONS_WORKER_RUNTIME": "{{EncryptedSecretSentinel}}",
+                "PrivateSetting": "{{EncryptedSecretSentinel}}",
+                "IgnoredNumber": 42
+              },
+              "Host": {
+                "LocalHttpPort": 7072
+              }
+            }
+            """);
+        string path = Path.Combine(_dir.FullName, CliConfigurationNames.LocalSettingsFileName);
+        byte[] originalBytes = File.ReadAllBytes(path);
+        DateTime originalWriteTime = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(path, originalWriteTime);
+
+        LocalSettingsSnapshot snapshot = _provider.Get(_dir);
+
+        snapshot.IsEncrypted.Should().BeTrue();
+        snapshot.Values.Should().BeEmpty();
+        snapshot.WorkerRuntime.Should().BeNull();
+        snapshot.Host!.LocalHttpPort.Should().Be(7072);
+        File.ReadAllBytes(path).Should().Equal(originalBytes);
+        File.GetLastWriteTimeUtc(path).Should().Be(originalWriteTime);
+        Directory.Exists(Path.Combine(_dir.FullName, CliConfigurationNames.ProjectConfigFolderName)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("""{"IsEncrypted":true}""")]
+    [InlineData("""{"IsEncrypted":true,"Values":null}""")]
+    [InlineData("""{"IsEncrypted":true,"Values":[]}""")]
+    [InlineData("""{"IsEncrypted":true,"Values":{"IgnoredNumber":42}}""")]
+    public void Get_EncryptedMarkerWithoutStringValues_ReturnsEncryptedSnapshot(string settings)
+    {
+        WriteSettings(settings);
+
+        LocalSettingsSnapshot snapshot = _provider.Get(_dir);
+
+        snapshot.IsEncrypted.Should().BeTrue();
+        snapshot.Values.Should().BeEmpty();
+        snapshot.WorkerRuntime.Should().BeNull();
+    }
+
+    [Fact]
+    public void WorkerRuntime_ExplicitlyEncryptedSnapshot_DoesNotProvideFallback()
+    {
+        var snapshot = new LocalSettingsSnapshot
+        {
+            IsEncrypted = true,
+            Values = new Dictionary<string, string>
+            {
+                ["FUNCTIONS_WORKER_RUNTIME"] = EncryptedSecretSentinel,
+            },
+        };
+
+        snapshot.WorkerRuntime.Should().BeNull();
     }
 
     [Fact]

@@ -106,11 +106,14 @@ internal interface IInteractionService
     /// <summary>Displays a status spinner while executing an async operation.</summary>
     public Task<T> ShowStatusAsync<T>(string statusMessage, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default);
 
-    /// <summary>Displays a status spinner while executing an async operation (no return value).</summary>
-    public Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Displays a status spinner while executing an async operation (no return value).
+    /// Set <paramref name="writeCompletion"/> to false when the caller writes its own result.
+    /// </summary>
+    public Task StatusAsync(string statusMessage, Func<CancellationToken, Task> action, CancellationToken cancellationToken = default, bool writeCompletion = true);
 
     /// <summary>
-    /// Displays a progress indicator (a bar in interactive contexts, plain
+    /// Displays a task with a leading spinner in interactive contexts, plain
     /// log lines elsewhere) and passes a mutable <see cref="IProgressContext"/>
     /// to <paramref name="action"/> so the running operation can update its
     /// description and report completion.
@@ -119,12 +122,18 @@ internal interface IInteractionService
     /// Prefer this over <see cref="ShowStatusAsync{T}"/> when the operation
     /// has distinct phases the user benefits from seeing (e.g. resolve →
     /// download → extract). Phases with a known total surface as a real
-    /// percentage; phases without one render as indeterminate motion.
+    /// percentage; phases without one render without a progress bar. Description
+    /// changes appear beneath the stable task title. On success, the check replaces
+    /// the spinner on the same row and phase details collapse. Failed operations
+    /// retain their latest phase detail.
+    /// Set <paramref name="writeCompletion"/> to false when the caller writes its
+    /// own result, including warning/no-op outcomes, immediately after this call.
     /// </remarks>
     public Task<T> RunWithProgressAsync<T>(
         string initialDescription,
         Func<IProgressContext, CancellationToken, Task<T>> action,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool writeCompletion = true);
 
     /// <summary>
     /// Prompts on stdout for yes/no confirmation, without requiring ANSI. Returns

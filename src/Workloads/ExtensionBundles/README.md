@@ -12,12 +12,13 @@ separate workload code to version).
 
 | Channel       | Workload pkg version   | host.json `extensionBundle.id`                                      |
 |---------------|------------------------|---------------------------------------------------------------------|
-| stable        | `4.35.0`               | `Microsoft.Azure.Functions.ExtensionBundle`                         |
-| preview       | `4.35.0-preview`       | `Microsoft.Azure.Functions.ExtensionBundle.Preview`                 |
-| experimental  | `4.35.0-experimental`  | `Microsoft.Azure.Functions.ExtensionBundle.Experimental`            |
+| stable        | `4.39.1`               | `Microsoft.Azure.Functions.ExtensionBundle`                         |
+| preview       | `4.50.0-preview.1`      | `Microsoft.Azure.Functions.ExtensionBundle.Preview`                 |
+| experimental  | `4.8.0-experimental.1` | `Microsoft.Azure.Functions.ExtensionBundle.Experimental`            |
 
-The prerelease label, when present, names the channel. `func` always
-reports the 3-part bundle version (`4.35.0`) in user-facing logs.
+The prerelease label, when present, names the channel and includes a numeric
+package revision. `func` always reports the 3-part bundle version (`4.39.1`)
+in user-facing logs.
 
 ## Channel selection in `func setup` and `func init`
 
@@ -36,9 +37,9 @@ prints a hint to run `func workload search bundles --prerelease`.
 ## Install
 
 ```bash
-func workload install Azure.Functions.Cli.Workloads.ExtensionBundles@4.35.0
+func workload install Azure.Functions.Cli.Workloads.ExtensionBundles@4.39.1
 # or by alias
-func workload install bundles@4.35.0
+func workload install bundles@4.39.1
 ```
 
 Multiple bundle versions coexist via `--force`.

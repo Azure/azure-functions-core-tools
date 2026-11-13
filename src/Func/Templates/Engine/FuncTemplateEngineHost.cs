@@ -2,18 +2,21 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using Azure.Functions.Cli.Common;
-using Microsoft.TemplateEngine.Abstractions;
 using Microsoft.TemplateEngine.Edge;
-
-using OrchestratorComponents = Microsoft.TemplateEngine.Orchestrator.RunnableProjects.Components;
 
 namespace Azure.Functions.Cli.Templates.Engine;
 
 /// <summary>
 /// Template engine host that exposes one command's <see cref="TemplateEngineContext"/> as host parameters.
 /// </summary>
-internal class FuncTemplateEngineHost(TemplateEngineContext context)
-    : DefaultTemplateEngineHost(Identifier, AssemblyCliVersionProvider.Instance.Version, CreateDefaults(context), _builtIns)
+/// <param name="context">The template engine context for the current command.</param>
+/// <param name="components">The template components to expose to the engine.</param>
+internal class FuncTemplateEngineHost(TemplateEngineContext context, IEnumerable<ITemplateComponent> components)
+    : DefaultTemplateEngineHost(
+        Identifier,
+        AssemblyCliVersionProvider.Instance.Version,
+        CreateDefaults(context),
+        FuncTemplateComponents.Get(components))
 {
     /// <summary>
     /// Host identifier reported to <c>Microsoft.TemplateEngine</c>. Using a
@@ -25,15 +28,9 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
 
     private const string WorkingDirectoryParameter = "WorkingDirectory";
 
-    private static readonly IReadOnlyList<(Type, IIdentifiedComponent)> _builtIns =
-    [
-        ..Components.AllComponents,
-        ..OrchestratorComponents.AllComponents,
-        ..FuncTemplateComponents.AllComponents,
-    ];
-
     private readonly TemplateEngineContext _context = context ?? throw new ArgumentNullException(nameof(context));
 
+    /// <inheritdoc />
     public override bool TryGetHostParamDefault(string paramName, out string? value)
     {
         // The base host answers WorkingDirectory with the process current directory before it consults defaults.
@@ -48,7 +45,10 @@ internal class FuncTemplateEngineHost(TemplateEngineContext context)
 
     private static Dictionary<string, string> CreateDefaults(TemplateEngineContext context)
     {
+#pragma warning disable IDE0028 // '[with(args)]' is a preview feature in net10 SDK.
+        // TODO: revisit when updating to .net11 SDK.
         Dictionary<string, string> defaults = new(StringComparer.Ordinal);
+#pragma warning restore IDE0028
 
         if (context.Project is { } project)
         {
