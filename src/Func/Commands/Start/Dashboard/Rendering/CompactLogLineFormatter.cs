@@ -6,6 +6,7 @@ using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 
@@ -14,8 +15,6 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// </summary>
 internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette palette)
 {
-    private const int SourceColumnWidth = 18;
-
     private readonly ITheme _theme = theme ?? throw new ArgumentNullException(nameof(theme));
     private readonly FunctionPalette _palette = palette ?? throw new ArgumentNullException(nameof(palette));
 
@@ -57,7 +56,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
                 case HostStateChangedEvent hs:
                     return CreateSingleLine(
                         string.Create(CultureInfo.InvariantCulture,
-                            $" [{MutedTag}]{ts}[/]  [{MutedTag}][[host]][/]             {LogText.EscapeMarkup(DescribeHostState(hs))}"),
+                            $" [{MutedTag}]{ts}[/]  [{MutedTag}][[host]][/]  {LogText.EscapeMarkup(DescribeHostState(hs))}"),
                         functionName,
                         isError,
                         effectiveLogLevel);
@@ -68,7 +67,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
                     string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fd.Function, listenUri, _theme);
                     return CreateSingleLine(
                         string.Create(CultureInfo.InvariantCulture,
-                            $" [{MutedTag}]{ts}[/]  [{color}]{LogText.EscapeMarkup(fd.Function.Name),-18}[/]  loaded  [{MutedTag}]{LogText.EscapeMarkup(fd.Function.TriggerType)} {routeMarkup}[/]"),
+                            $" [{MutedTag}]{ts}[/]  [{color}]{LogText.EscapeMarkup(fd.Function.Name)}[/]  loaded  [{MutedTag}]{LogText.EscapeMarkup(fd.Function.TriggerType)} {routeMarkup}[/]"),
                         functionName,
                         isError,
                         effectiveLogLevel);
@@ -86,7 +85,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
 
                     return CreateSingleLine(
                         string.Create(CultureInfo.InvariantCulture,
-                            $" [{MutedTag}]{ts}[/]  [{color}]{LogText.EscapeMarkup(inv.Function),-18}[/]  [{SuccessTag}]→[/]  {LogText.EscapeMarkup(detail)}"),
+                            $" [{MutedTag}]{ts}[/]  [{color}]{LogText.EscapeMarkup(inv.Function)}[/]  [{SuccessTag}]→[/]  {LogText.EscapeMarkup(detail)}"),
                         functionName,
                         isError,
                         effectiveLogLevel);
@@ -103,7 +102,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
 
                     return CreateSingleLine(
                         string.Create(CultureInfo.InvariantCulture,
-                            $" [{MutedTag}]{ts}[/]  [{color}]{LogText.EscapeMarkup(inv.Function),-18}[/]  {arrow}  {suffix}"),
+                            $" [{MutedTag}]{ts}[/]  [{color}]{LogText.EscapeMarkup(inv.Function)}[/]  {arrow}  {suffix}"),
                         functionName,
                         isError,
                         effectiveLogLevel);
@@ -122,8 +121,8 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
         int prefixWidth;
         if (functionName is not null)
         {
-            int sourceWidth = Math.Max(SourceColumnWidth, functionName.Length);
-            string nameMarkup = $"[{_palette.GetColorFor(functionName)}]{LogText.EscapeMarkup(functionName),-SourceColumnWidth}[/]";
+            int sourceWidth = functionName.Length;
+            string nameMarkup = $"[{_palette.GetColorFor(functionName)}]{LogText.EscapeMarkup(functionName)}[/]";
             prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  ");
             prefixWidth = 1 + ts.Length + 2 + sourceWidth + 2 + 1 + 2;
         }
@@ -133,10 +132,10 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
             // marker and message stay aligned with function lines; logs replayed from the CLI's startup
             // initialization steps get an "Initialization" label so that phase reads as a coherent group.
             string sourceMarkup = IsInitializationStep(entry)
-                ? $"[{MutedTag}]{"Initialization",-SourceColumnWidth}[/]"
-                : new string(' ', SourceColumnWidth);
+                ? $"[{MutedTag}]Initialization[/]"
+                : string.Empty;
             prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {sourceMarkup}  {levelMarkup}  ");
-            prefixWidth = 1 + ts.Length + 2 + SourceColumnWidth + 2 + 1 + 2;
+            prefixWidth = 1 + ts.Length + 2 + (IsInitializationStep(entry) ? "Initialization".Length : 0) + 2 + 1 + 2;
         }
 
         return CreateWrappedLine(prefix, prefixWidth, FormatMessage(entry), functionName, isError, effectiveLogLevel);

@@ -35,3 +35,9 @@ internal interface IDashboardShutdownRequester
 {
     public event Action? ShutdownRequested;
 }
+
+internal interface IDashboardRendererLifetime
+{
+    public Task Completion { get; }
+    public void BeginShutdown(int? hostExitCode = null);
+}

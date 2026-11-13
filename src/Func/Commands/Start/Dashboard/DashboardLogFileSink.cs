@@ -14,6 +14,7 @@ namespace Azure.Functions.Cli.Hosting.Dashboard;
 internal sealed class DashboardLogFileSink(TextWriter writer) : IDashboardEventSink
 {
     private readonly TextWriter _writer = writer ?? throw new ArgumentNullException(nameof(writer));
+    private int _disposed;
 
     public static DashboardLogFileSink Create(string path)
     {
@@ -33,10 +34,10 @@ internal sealed class DashboardLogFileSink(TextWriter writer) : IDashboardEventS
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(events);
 
-        await _writer.WriteLineAsync(FormatEntry(entry));
+        await _writer.WriteLineAsync(FormatEntry(entry).AsMemory(), cancellationToken);
         foreach (DashboardEvent dashboardEvent in events)
         {
-            await _writer.WriteLineAsync(FormatEvent(dashboardEvent));
+            await _writer.WriteLineAsync(FormatEvent(dashboardEvent).AsMemory(), cancellationToken);
         }
 
         await _writer.FlushAsync(cancellationToken);
@@ -44,7 +45,10 @@ internal sealed class DashboardLogFileSink(TextWriter writer) : IDashboardEventS
 
     public async ValueTask DisposeAsync()
     {
-        await _writer.DisposeAsync();
+        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        {
+            await _writer.DisposeAsync();
+        }
     }
 
     private static string FormatEntry(HostLogEntry entry)

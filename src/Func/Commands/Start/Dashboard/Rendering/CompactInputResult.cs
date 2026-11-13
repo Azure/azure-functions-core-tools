@@ -6,4 +6,4 @@ namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 /// <summary>
 /// Describes the renderer side effects requested by compact input handling.
 /// </summary>
-internal readonly record struct CompactInputResult(bool Handled, bool ClearLogsRequested, bool ShutdownRequested);
+internal readonly record struct CompactInputResult(bool Handled, bool ClearLogsRequested, bool ShutdownRequested, string? Message = null);

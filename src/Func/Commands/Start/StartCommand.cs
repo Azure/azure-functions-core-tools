@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Globalization;
 using Azure.Functions.Cli.Commands.Start.Azurite;
 using Azure.Functions.Cli.Commands.Start.Azurite.Orchestration;
@@ -10,6 +11,8 @@ using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Clipboard;
+using Azure.Functions.Cli.Console.Terminal;
 using Azure.Functions.Cli.Hosting;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
@@ -73,7 +76,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
     public Option<string?> FormatOption { get; } = new("--format")
     {
-        Description = "Output mode: compact (interactive TUI), plain (CI / non-TTY), "
+        Description = "Output mode: compact (full-screen interactive TUI), plain (CI / non-TTY), "
             + "or json (NDJSON for AI agents). Defaults to auto-detect."
     };
 
@@ -120,10 +123,12 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
     private readonly ICliVersionProvider _versionProvider;
     private readonly IStartInitializationRunner _initializationRunner;
     private readonly CompactDashboardShortcutLabels _shortcutLabels;
-    private readonly IPlatform _platform;
     private readonly StartDashboardEventStreamFactory _eventStreamFactory;
     private readonly IOptionsMonitor<HostStartupOptions> _hostStartupOptions;
     private readonly IReadOnlyList<IStartHostOptionContributor> _startOptionContributors;
+    private readonly ITerminalSessionFactory? _terminalFactory;
+    private readonly IClipboardWriter? _clipboard;
+    private readonly ConsoleInterruptCoordinator? _interrupts;
 
     public StartCommand(
         IInteractionService interaction,
@@ -135,7 +140,10 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         IPlatform platform,
         IEnumerable<IStartHostOptionContributor>? startOptionContributors = null,
         StartDashboardEventStreamFactory? eventStreamFactory = null,
-        IEnumerable<IProjectStack>? projectStacks = null)
+        IEnumerable<IProjectStack>? projectStacks = null,
+        ITerminalSessionFactory? terminalFactory = null,
+        IClipboardWriter? clipboard = null,
+        ConsoleInterruptCoordinator? interrupts = null)
         : base("run", "Launch the Azure Functions host runtime.")
     {
         ArgumentNullException.ThrowIfNull(interaction);
@@ -157,10 +165,12 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         _versionProvider = versionProvider;
         _initializationRunner = initializationRunner;
         _shortcutLabels = shortcutLabels;
-        _platform = platform;
         _eventStreamFactory = eventStreamFactory ?? new StartDashboardEventStreamFactory();
         _hostStartupOptions = hostStartupOptions;
         _startOptionContributors = [.. startOptionContributors ?? []];
+        _terminalFactory = terminalFactory;
+        _clipboard = clipboard;
+        _interrupts = interrupts;
 
         AddPathArgument();
         Options.Add(PortOption);
@@ -205,7 +215,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         OutputMode mode = ResolveOutputMode(parseResult);
 
-        mode = OutputModeResolver.ApplyTerminalSafetyFallback(mode, _interaction, out bool downgraded);
+        mode = OutputModeResolver.ApplyTerminalSafetyFallback(mode, _interaction, out bool downgraded,
+            fullScreenAvailable: _terminalFactory is not null && _interaction.CanUseFullScreen(_terminalFactory));
         if (downgraded)
         {
             _interaction.WriteWarning("Interactive input or ANSI output is unavailable; falling back to --format=plain.");
@@ -213,7 +224,7 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         HostStartupOptions hostStartupOptions = GetHostStartupOptions(workingDirectory.Info);
         StartCommandOptions options = CreateStartOptions(parseResult, workingDirectory, mode, hostStartupOptions);
-        IDashboardEventSink? eventSink = CreateLogFileSink(options.LogFilePath);
+        await using IDashboardEventSink? eventSink = CreateLogFileSink(options.LogFilePath);
 
         var initializationContext = new StartInitializationContext(
             options,
@@ -238,34 +249,36 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
 
         // Take ownership of the host stream now so any failure before pipeline completion still tears the process down.
         await using IHostEventStream hostEventStream = initializationResult.EventStream;
+        await using ManagedAzuriteHandle? azurite = initializationResult.ManagedAzurite;
 
-        var state = new DashboardState();
-
-        IDashboardRenderer renderer = CreateRenderer(mode, initializationResult.RunInfo);
-
-        // When the CLI launched Azurite, watch host output for a 500 from the
-        // emulator and surface data-directory reset guidance (live and in the
-        // end-of-run summary). Inert for user-managed or disabled Azurite.
-        IHostEventStream hostStreamForDashboard = hostEventStream;
         AzuriteFailureDetectingHostEventStream? azuriteFailureDetector = null;
         string? azuriteResetGuidance = null;
-        if (initializationResult.AzuritePaths is { } azuritePaths)
-        {
-            azuriteResetGuidance = BuildAzuriteResetGuidance(azuritePaths);
-            azuriteFailureDetector = new AzuriteFailureDetectingHostEventStream(hostEventStream, azuriteResetGuidance);
-            hostStreamForDashboard = azuriteFailureDetector;
-        }
-
-        IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, hostStreamForDashboard);
-        var pipeline = new DashboardPipeline(state, dashboardEventStream, renderer, eventSink);
         FunctionsProjectHostRunOutcome? outcome = null;
-        // Stop any managed Azurite instance the orchestrator launched when
-        // the host run completes (success, failure, or Ctrl+C). Wrapping the
-        // host run in `await using` guarantees the process never outlives
-        // `func start`.
-        await using ManagedAzuriteHandle? azurite = initializationResult.ManagedAzurite;
         try
         {
+            if (mode == OutputMode.Compact && (_terminalFactory is null || !_interaction.CanUseFullScreen(_terminalFactory)))
+            {
+                mode = OutputMode.Plain;
+                _interaction.WriteWarning("Full-screen input is unavailable after initialization; continuing with --format=plain for this run.");
+                await using PlainStartInitializationRenderer replay = new(_interaction);
+                foreach (StartInitializationEvent initializationEvent in initializationEvents)
+                {
+                    await replay.OnEventAsync(initializationEvent, cancellationToken);
+                }
+            }
+
+            var state = new DashboardState();
+            IDashboardRenderer renderer = CreateRenderer(mode, initializationResult.RunInfo);
+            IHostEventStream hostStreamForDashboard = hostEventStream;
+            if (initializationResult.AzuritePaths is { } azuritePaths)
+            {
+                azuriteResetGuidance = BuildAzuriteResetGuidance(azuritePaths);
+                azuriteFailureDetector = new AzuriteFailureDetectingHostEventStream(hostEventStream, azuriteResetGuidance);
+                hostStreamForDashboard = azuriteFailureDetector;
+            }
+
+            IHostEventStream dashboardEventStream = _eventStreamFactory.Create(mode, initializationEvents, hostStreamForDashboard);
+            var pipeline = new DashboardPipeline(state, dashboardEventStream, renderer, eventSink, _interaction);
             int exitCode = await pipeline.RunAsync(cancellationToken);
             outcome = FunctionsProjectHostRunOutcomes.Completed(exitCode);
             return exitCode;
@@ -448,6 +461,11 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
         return Default;
     }
 
+    internal bool UsesFullScreen(ParseResult parseResult)
+        => parseResult.Action is AsynchronousCommandLineAction && parseResult.Errors.Count == 0
+            && ResolveOutputMode(parseResult) == OutputMode.Compact
+            && _terminalFactory is not null && _interaction.CanUseFullScreen(_terminalFactory);
+
     private OutputMode ResolveOutputMode(ParseResult parseResult)
     {
         string? raw = parseResult.GetValue(FormatOption);
@@ -470,7 +488,8 @@ internal sealed class StartCommand : FuncCliCommand, IBuiltInCommand
     {
         OutputMode.Json => new JsonRenderer(),
         OutputMode.Plain => new PlainRenderer(_interaction),
-        OutputMode.Compact => new CompactRenderer(_interaction, _palette, _shortcutLabels, _platform, runInfo: runInfo),
+        OutputMode.Compact => new CompactRenderer(_interaction, _palette, _shortcutLabels, runInfo: runInfo,
+            terminalFactory: _terminalFactory, clipboard: _clipboard, interrupts: _interrupts),
         _ => throw new InvalidOperationException($"Unsupported output mode: {mode}"),
     };
 

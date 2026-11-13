@@ -84,6 +84,13 @@ func <command> [path] [options]
 | `func version` | Display version information |
 | `func help [command]` | Display help for a command |
 
+`func run` uses a full-screen log dashboard in supported interactive terminals.
+Scroll with the mouse or keyboard, drag to select logs, and press Ctrl+C to copy
+a selection or stop the host when nothing is selected. Use `--no-tui` for
+streaming text or `--format=json` for NDJSON. See
+[output modes and controls](docs/func-start-output-modes.md) for history limits,
+clipboard behavior, and terminal compatibility.
+
 ## Architecture
 
 The function-template engine is implemented under `src/Func/Templates/Engine`
