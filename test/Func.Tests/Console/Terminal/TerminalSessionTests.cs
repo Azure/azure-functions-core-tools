@@ -181,6 +181,7 @@ public class TerminalSessionTests
     [InlineData(true)]
     public async Task DisposeDeadline_DoesNotAbandonCleanupWhenOutputLaterRecovers(bool signalCleanupFails)
     {
+        using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(30));
         using BlockingWriter writer = new() { BlockSequence = "\u001b[H" };
         IOException? signalFailure = signalCleanupFails ? new("signal cleanup failure") : null;
         FakeDriver driver = new() { SignalDisposeFailure = signalFailure };
@@ -189,9 +190,10 @@ public class TerminalSessionTests
         var render = Task.Run(() => session.Render(new Text("blocked frame")));
         try
         {
-            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await driver.ReadEntered.Task.WaitAsync(deadline.Token);
+            await writer.Entered.Task.WaitAsync(deadline.Token);
 
-            Func<Task> dispose = () => session.DisposeAsync().AsTask();
+            Func<Task> dispose = () => session.DisposeAsync().AsTask().WaitAsync(deadline.Token);
             if (signalFailure is null)
             {
                 await dispose.Should().ThrowAsync<TimeoutException>();
@@ -201,16 +203,21 @@ public class TerminalSessionTests
                 (await dispose.Should().ThrowAsync<IOException>()).Which.Should().BeSameAs(signalFailure);
             }
 
+            render.IsCompleted.Should().BeFalse("the test must own the output blockage until disposal has finished");
             driver.InputRestored.Should().BeTrue();
+            driver.ActiveReads.Should().Be(0);
+            driver.RestoreCount.Should().Be(0);
             driver.DisposeCount.Should().Be(0);
         }
         finally
         {
             writer.Release.Set();
+            // Disposal may already be faulted; its independently owned cleanup still needs to finish.
+            _ = session.DisposeAsync().AsTask();
+            await render.WaitAsync(TimeSpan.FromSeconds(5));
+            await driver.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         }
 
-        await render.WaitAsync(TimeSpan.FromSeconds(5));
-        await driver.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         driver.RestoreCount.Should().Be(1);
         driver.DisposeCount.Should().Be(1);
         writer.ToString().Split(TerminalSession.LeaveScreen, StringSplitOptions.None).Length.Should().Be(2);
@@ -287,20 +294,27 @@ public class TerminalSessionTests
         TerminalSession session = new(CreateConsole(writer), driver);
         session.Activate();
         var render = Task.Run(() => session.Render(new Text("blocked frame")));
-        await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var elapsed = Stopwatch.StartNew();
-        session.Restore();
+            var elapsed = Stopwatch.StartNew();
+            session.Restore();
 
-        elapsed.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
-        driver.InputRestored.Should().BeTrue();
-        render.IsCompleted.Should().BeFalse();
-        driver.RestoreCount.Should().Be(0, "native output modes must remain enabled until protocol cleanup can write");
-        Task disposal = session.DisposeAsync().AsTask();
-        disposal.IsCompleted.Should().BeFalse("the skipped protocol work must remain pending");
-        writer.Release.Set();
-        await render.WaitAsync(TimeSpan.FromSeconds(5));
-        await disposal.WaitAsync(TimeSpan.FromSeconds(5));
+            elapsed.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
+            driver.InputRestored.Should().BeTrue();
+            render.IsCompleted.Should().BeFalse();
+            driver.RestoreCount.Should().Be(0, "native output modes must remain enabled until protocol cleanup can write");
+            Task disposal = session.DisposeAsync().AsTask();
+            disposal.IsCompleted.Should().BeFalse("the skipped protocol work must remain pending");
+        }
+        finally
+        {
+            writer.Release.Set();
+            await render.WaitAsync(TimeSpan.FromSeconds(5));
+            await session.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
         writer.ToString().Split(TerminalSession.LeaveScreen, StringSplitOptions.None).Length.Should().Be(2);
         driver.RestoreCount.Should().Be(1);
         driver.ActiveReads.Should().Be(0);
@@ -314,14 +328,21 @@ public class TerminalSessionTests
         TerminalSession session = new(CreateConsole(writer), driver);
         session.Activate();
 
-        var elapsed = Stopwatch.StartNew();
-        session.Restore();
+        try
+        {
+            var elapsed = Stopwatch.StartNew();
+            session.Restore();
 
-        elapsed.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
-        driver.InputRestored.Should().BeTrue();
-        await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        writer.Release.Set();
-        await session.DisposeAsync();
+            elapsed.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
+            driver.InputRestored.Should().BeTrue();
+            await writer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            writer.Release.Set();
+            await session.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
         driver.RestoreCount.Should().Be(1);
         driver.ActiveReads.Should().Be(0);
     }
@@ -446,10 +467,8 @@ public class TerminalSessionTests
             if (value?.Contains(BlockSequence, StringComparison.Ordinal) == true)
             {
                 Entered.TrySetResult();
-                if (!Release.WaitHandle.WaitOne(TimeSpan.FromSeconds(5)))
-                {
-                    throw new TimeoutException("The test did not release its blocked terminal writer.");
-                }
+                // The owner releases output; a writer timeout would race the session's restoration deadline.
+                Release.WaitHandle.WaitOne();
             }
 
             base.Write(value);
