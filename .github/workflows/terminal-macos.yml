@@ -1,0 +1,98 @@
+name: Native macOS terminal tests
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/terminal-macos.yml
+      - .editorconfig
+      - Directory.Build.*
+      - eng/build/**
+      - global.json
+      - NuGet.Config
+      - src/Abstractions/**
+      - src/Func/**
+      - test/Directory.Build.*
+      - test/Fixtures/**
+      - test/Func.Tests/**
+  push:
+    paths:
+      - .github/workflows/terminal-macos.yml
+      - .editorconfig
+      - Directory.Build.*
+      - eng/build/**
+      - global.json
+      - NuGet.Config
+      - src/Abstractions/**
+      - src/Func/**
+      - test/Directory.Build.*
+      - test/Fixtures/**
+      - test/Func.Tests/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terminal-macos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-terminal:
+    name: Native terminal (${{ matrix.architecture }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            architecture: Arm64
+          - os: macos-15-intel
+            architecture: X64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      FUNC_TERMINAL_NATIVE_TESTS: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Record candidate and environment
+        run: |
+          mkdir -p out/test-results
+          git rev-parse HEAD > out/test-results/source-revision.txt
+          sw_vers
+          dotnet --info
+          python3 --version
+      - name: Build and qualify the native Unix adapter
+        run: python3 test/Func.Tests/Console/Terminal/Probe/run_unix_probe.py --build --report out/tui-native-results.json
+      - name: Require the intended process architecture
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          with open("out/tui-native-results.json", encoding="utf-8") as source:
+              report = json.load(source)
+          expected = os.environ["EXPECTED_ARCHITECTURE"]
+          if report["process_architecture"] != expected:
+              raise SystemExit(f"Expected {expected}, got {report['process_architecture']}")
+          PY
+      - name: Qualify terminal input, prompt handoff, and interruption
+        run: >-
+          dotnet test test/Func.Tests/Func.Tests.csproj -c Release -p:CI=true --verbosity quiet
+          --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests"
+          --logger "trx;LogFileName=terminal-tests.trx"
+          --results-directory out/test-results
+      - name: Preserve native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-macos-${{ matrix.architecture }}
+          path: |
+            out/tui-native-results.json
+            out/test-results/

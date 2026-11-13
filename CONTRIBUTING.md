@@ -113,6 +113,62 @@ Tests can be run using:
 dotnet test test/Func.Tests/Func.Tests.csproj
 ```
 
+#### Terminal checks
+
+The terminal model and interaction tests do not require a live terminal:
+
+```powershell
+dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests"
+```
+
+String-writer tests cannot establish real terminal geometry or native mode
+restoration. Native terminal checks must run on the operating system being
+qualified; cross-publishing an RID is not a native execution test. Include
+Windows Terminal/VS Code, macOS Terminal/iTerm2, Linux terminals, and SSH/tmux
+where support is claimed.
+
+On Windows, opt into the isolated ConPTY qualification (also enabled in the
+public build's Windows terminal job):
+
+```powershell
+$env:FUNC_TERMINAL_NATIVE_TESTS = '1'
+dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~ConPtySmokeTests"
+Remove-Item Env:\FUNC_TERMINAL_NATIVE_TESTS
+```
+
+The probe checks raw keyboard/mouse input, bracketed paste, Unicode, bottom-row
+painting, prompt handoff, and native mode restoration in a test-owned console.
+It does not operate on the developer's interactive terminal or clipboard.
+
+On Linux or macOS, use the pinned .NET SDK and Python 3 (standard library only):
+
+```sh
+python3 test/Func.Tests/Console/Terminal/Probe/run_unix_probe.py --build --report out/tui-native-results.json
+```
+
+The `Native macOS terminal tests` GitHub Actions workflow runs this command
+on both ARM64 and Intel hosted Macs, verifies the actual .NET process
+architecture, and preserves native JSON and test-result artifacts.
+
+This builds the candidate and runs it in a private PTY with a real foreground
+process group. It checks mouse input, Unicode, paste isolation, resize,
+suspend/resume, restored terminal attributes, and that Ctrl+C input does not
+signal either the probe or its child process. The JSON report identifies the
+OS, machine and .NET process architectures, runtime version, kernel, and probe
+binary hash. Check the process architecture when qualifying Apple Silicon;
+an x64 .NET SDK under Rosetta does not qualify the ARM64 adapter.
+Failure exits nonzero and
+retains diagnostic output. It never reads or overwrites the desktop clipboard.
+Darwin restoration checks exclude only `PENDIN`, the kernel's pending-input
+state set when canonical mode is restored; every configurable attribute is
+still compared, and pending input is never flushed to make the check pass.
+
+The same probe participates in the opt-in native test suite on Unix:
+
+```sh
+FUNC_TERMINAL_NATIVE_TESTS=1 dotnet test test/Func.Tests/Func.Tests.csproj --filter "FullyQualifiedName~UnixPtySmokeTests"
+```
+
 #### CLI Process Smoke Tests
 
 `WorkloadProgramSmokeTests` and `SetupProgramAdvisoryTests` run bounded CLI processes with isolated user, workload, cache, and temporary state.
