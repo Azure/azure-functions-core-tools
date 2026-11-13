@@ -199,13 +199,24 @@ internal sealed class SetupFeatureResolver(
         List<string> installedStacks = [];
         foreach (string stack in stacks.OrderBy(static stack => stack, StringComparer.OrdinalIgnoreCase))
         {
+            string displayName = stack switch
+            {
+                "dotnet" => ".NET",
+                "go" => "Go",
+                "java" => "Java",
+                "node" => "Node.js",
+                "powershell" => "PowerShell",
+                "python" => "Python",
+                _ => stack,
+            };
+
             if (installedStackPackageIds.Contains(SetupDependency.Stack(stack).PackageId))
             {
-                installedStacks.Add(stack);
+                installedStacks.Add(displayName);
             }
             else
             {
-                promptChoices.Add(new MultiSelectionChoice(stack, stack));
+                promptChoices.Add(new MultiSelectionChoice(stack, displayName));
             }
         }
 
