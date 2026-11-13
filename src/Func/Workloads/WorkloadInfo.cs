@@ -38,6 +38,7 @@ internal abstract record WorkloadInfo(
 /// <param name="DisplayName">Human-readable name for <c>func workload list</c>.</param>
 /// <param name="Description">One-line workload description.</param>
 /// <param name="LoadContext">The assembly load context used to load the workload.</param>
+/// <param name="TemplateRoot">Absolute template root inside the package, or <c>null</c> when none is declared.</param>
 /// <remarks>
 /// The <see cref="LoadContext"/> must be kept in memory as long as the workload is in use.
 /// </remarks>
@@ -50,7 +51,8 @@ internal sealed record RuntimeWorkloadInfo(
     string ContentRoot,
     string DisplayName,
     string Description,
-    WorkloadLoadContext LoadContext)
+    WorkloadLoadContext LoadContext,
+    string? TemplateRoot = null)
     : WorkloadInfo(WorkloadKind.Workload, PackageId, PackageVersion, Aliases, InstallDirectory, ContentRoot, DisplayName, Description);
 
 /// <summary>
