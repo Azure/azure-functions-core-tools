@@ -448,8 +448,71 @@ internal sealed class UnixStartupProcess : NativeStartupProcess
     internal override void Terminate()
     {
         if (_id <= 0) { return; }
-        if (Native.kill(-_id, 9) < 0 && Marshal.GetLastPInvokeError() != 3) { throw Failure("terminate target process group"); }
+        if (Native.kill(-_id, 9) < 0)
+        {
+            int error = Marshal.GetLastPInvokeError();
+            // Darwin reports EPERM for zombie-only groups, including the leader retained by WNOWAIT.
+            if (error != 3 && !(error == 1 && OperatingSystem.IsMacOS() &&
+                WaitForExit(10000) && DarwinGroupHasOnlyExitedMembers()))
+            {
+                throw new Win32Exception(error, $"Unable to terminate target process group: {new Win32Exception(error).Message}");
+            }
+        }
         if (!WaitForExit(10000)) { throw new TimeoutException("Owned process cleanup exceeded 10 seconds."); }
+    }
+
+    private bool DarwinGroupHasOnlyExitedMembers()
+    {
+        int[] members = ListDarwinGroupMembers();
+        var guard = Stopwatch.StartNew();
+        while (true)
+        {
+            foreach (int member in members)
+            {
+                int size = Native.proc_pidinfo(member, 13, 1, out Native.BsdShortInfo information, Marshal.SizeOf<Native.BsdShortInfo>());
+                if (size == 0 && Marshal.GetLastPInvokeError() == 3 && member != _id) { continue; }
+                if (size == 0) { throw Failure("inspect target process group member"); }
+                if (size != Marshal.SizeOf<Native.BsdShortInfo>())
+                {
+                    throw new InvalidOperationException("Native process inspection returned an incomplete process record.");
+                }
+                if (information.ProcessId != member)
+                {
+                    throw new InvalidOperationException("Native process inspection returned a mismatched process identity.");
+                }
+                if (member == _id && information.GroupId != _id) { return false; }
+                if (information.GroupId == _id && information.Status != 5) { return false; }
+            }
+            int[] current = ListDarwinGroupMembers();
+            // Recheck newly observed members: a parent may fork and exit during inspection.
+            if (current.All(member => members.Contains(member))) { return true; }
+            if (guard.ElapsedMilliseconds >= 10000) { throw new TimeoutException("Owned process group inspection exceeded 10 seconds."); }
+            members = current;
+        }
+    }
+
+    private int[] ListDarwinGroupMembers()
+    {
+        int size = Native.proc_listpids(2, (uint)_id, null, 0);
+        if (size <= 0) { throw Failure("size target process group inspection"); }
+        while (true)
+        {
+            int[] members = new int[checked(size / sizeof(int) + 1)];
+            int bytes = checked(members.Length * sizeof(int));
+            int returned = Native.proc_listpids(2, (uint)_id, members, bytes);
+            if (returned <= 0) { throw Failure("list target process group members"); }
+            if (returned > bytes || returned % sizeof(int) != 0)
+            {
+                throw new InvalidOperationException("Native process inspection returned an invalid process list.");
+            }
+            if (returned == bytes) { size = checked(bytes * 2); continue; }
+            int[] result = [.. members.Take(returned / sizeof(int))];
+            if (!result.Contains(_id))
+            {
+                throw new InvalidOperationException("The retained target process group leader was not found during cleanup.");
+            }
+            return result;
+        }
     }
 
     public override void Dispose()
@@ -541,6 +604,23 @@ internal sealed class UnixStartupProcess : NativeStartupProcess
 
     private sealed class Native
     {
+        [StructLayout(LayoutKind.Explicit, Size = 64)]
+        internal struct BsdShortInfo
+        {
+            [FieldOffset(0)]
+            internal int ProcessId;
+            [FieldOffset(8)]
+            internal int GroupId;
+            [FieldOffset(12)]
+            internal uint Status;
+        }
+
+        [DllImport("/usr/lib/libproc.dylib", SetLastError = true)]
+        internal static extern int proc_listpids(uint type, uint group, [Out] int[]? buffer, int size);
+
+        [DllImport("/usr/lib/libproc.dylib", SetLastError = true)]
+        internal static extern int proc_pidinfo(int pid, int flavor, ulong argument, out BsdShortInfo information, int size);
+
         [DllImport("libc", SetLastError = true)]
         internal static extern int pipe(out Pipe descriptors);
 

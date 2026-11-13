@@ -57,6 +57,10 @@ terminates the job/group even after the direct target exits, including when
 an inherited output pipe prevents capture from completing. Unix descendants
 that deliberately leave the process group are outside this cleanup boundary;
 this is process-lifetime management, not a sandbox.
+Darwin can report a permission error when signalling a group containing only
+exited processes. The harness accepts that result only after observing the
+leader's exit and inspecting the group to confirm that no live members remain;
+actual permission and inspection errors still fail cleanup.
 A nonzero exit, timeout, unexpected output, or stderr invalidates
 the run and produces a terminating error. A final executable-hash mismatch
 invalidates every sample and leaves summaries empty, even if all measured
@@ -92,6 +96,8 @@ Parent-first lifecycle cases use an explicit descendant-readiness handshake,
 then verify descendant termination after failed capture, successful capture
 with independently redirected descendant streams, and disposal without capture.
 Each case also checks repeated disposal and includes exact-process test cleanup.
+An exited-leader regression checks the native zombie-only signalling result
+and verifies that disposal reaps the retained Unix child.
 On Unix, omit `.exe` from the fixture executable name.
 
 ## Reporting-only CI

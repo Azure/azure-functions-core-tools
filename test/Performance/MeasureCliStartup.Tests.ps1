@@ -143,6 +143,58 @@ $marker = [IO.Path]::Combine([Environment]::CurrentDirectory, $env:STARTUP_TEST_
         Assert-True ($observed.status -eq 'exited' -and $observed.exitCode -eq 23 -and $observed.stderr -eq 'expected') 'Nonzero exit was hidden.'
     }
 
+    Test-Case 'Process_ExitedLeader_RepeatedDisposalReapsOwnedProcess' {
+        if (-not $IsWindows) {
+            Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public class StartupTestUnixProcesses {
+    [DllImport("libc", SetLastError = true)]
+    private static extern int kill(int pid, int signal);
+    [DllImport("libc", SetLastError = true)]
+    private static extern int waitid(int type, int pid, IntPtr information, int options);
+    public static int ProbeGroup(int pid) {
+        return kill(-pid, 0) == 0 ? 0 : Marshal.GetLastPInvokeError();
+    }
+    public static int ProbeChild(int pid) {
+        IntPtr information = Marshal.AllocHGlobal(128);
+        try {
+            return waitid(1, pid, information, 4 | 1 | (OperatingSystem.IsMacOS() ? 0x20 : 0x1000000)) == 0
+                ? 0 : Marshal.GetLastPInvokeError();
+        }
+        finally { Marshal.FreeHGlobal(information); }
+    }
+}
+'@
+        }
+        $environment = [Collections.Generic.Dictionary[string, string]]::new()
+        $process = [Azure.Functions.Cli.Performance.Startup.StartupProcess]::new(
+            $pwsh, @('-NoProfile', '-NonInteractive', '-Command', '[Console]::Write("exited:$PID"); exit 23'),
+            $root, $environment, 30000)
+        try {
+            $process.StartAndWait()
+            $observation = $process.Capture()
+            Assert-True ($process.ExitedWithinTimeout -and $observation.ExitCode -eq 23 -and
+                $observation.Stdout -ceq "exited:$($observation.ProcessId)" -and $observation.Stderr.Length -eq 0) `
+                'Exited-leader fixture failed before disposal.'
+            if (-not $IsWindows) {
+                Assert-True ([StartupTestUnixProcesses]::ProbeChild($observation.ProcessId) -eq 0) `
+                    'Exited group leader was not retained before disposal.'
+                $expectedGroupError = if ($IsMacOS) { 1 } else { 0 }
+                Assert-True ([StartupTestUnixProcesses]::ProbeGroup($observation.ProcessId) -eq $expectedGroupError) `
+                    'Zombie-only group did not exercise the expected native signalling boundary.'
+            }
+            $process.Dispose()
+            $process.Dispose()
+            if (-not $IsWindows) {
+                Assert-True ([StartupTestUnixProcesses]::ProbeChild($observation.ProcessId) -eq 10) `
+                    'Disposed target was not reaped (expected ECHILD).'
+            }
+            Assert-Fails { $process.Capture() } 'disposed'
+        }
+        finally { $process.Dispose() }
+    }
+
     Test-Case 'Process_ArgumentBoundaries_PreservesEmptyQuotesUnicodeAndBackslashes' {
         $script = Join-Path $root 'argument fixture.ps1'
         [IO.File]::WriteAllText($script, '[Console]::OutputEncoding = [Text.Encoding]::UTF8; ConvertTo-Json -InputObject @($args) -Compress')
