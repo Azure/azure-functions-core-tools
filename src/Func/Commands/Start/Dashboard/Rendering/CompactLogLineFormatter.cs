@@ -6,7 +6,6 @@ using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
-using Spectre.Console.Rendering;
 
 namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 
@@ -58,7 +57,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
                 case HostStateChangedEvent hs:
                     return CreateSingleLine(
                         string.Create(CultureInfo.InvariantCulture,
-                            $" [{MutedTag}]{ts}[/]  [{MutedTag}][[host]][/]             {Markup.Escape(DescribeHostState(hs))}"),
+                            $" [{MutedTag}]{ts}[/]  [{MutedTag}][[host]][/]             {LogText.EscapeMarkup(DescribeHostState(hs))}"),
                         functionName,
                         isError,
                         effectiveLogLevel);
@@ -69,7 +68,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
                     string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fd.Function, listenUri, _theme);
                     return CreateSingleLine(
                         string.Create(CultureInfo.InvariantCulture,
-                            $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(fd.Function.Name),-18}[/]  loaded  [{MutedTag}]{Markup.Escape(fd.Function.TriggerType)} {routeMarkup}[/]"),
+                            $" [{MutedTag}]{ts}[/]  [{color}]{LogText.EscapeMarkup(fd.Function.Name),-18}[/]  loaded  [{MutedTag}]{LogText.EscapeMarkup(fd.Function.TriggerType)} {routeMarkup}[/]"),
                         functionName,
                         isError,
                         effectiveLogLevel);
@@ -87,7 +86,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
 
                     return CreateSingleLine(
                         string.Create(CultureInfo.InvariantCulture,
-                            $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  [{SuccessTag}]→[/]  {Markup.Escape(detail)}"),
+                            $" [{MutedTag}]{ts}[/]  [{color}]{LogText.EscapeMarkup(inv.Function),-18}[/]  [{SuccessTag}]→[/]  {LogText.EscapeMarkup(detail)}"),
                         functionName,
                         isError,
                         effectiveLogLevel);
@@ -99,12 +98,12 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
                     bool failed = string.Equals(inv.Result, "failed", StringComparison.OrdinalIgnoreCase);
                     string arrow = failed ? $"[{ErrorTag}]✗[/]" : $"[{SuccessTag}]←[/]";
                     string suffix = failed
-                        ? $"[{ErrorTag}]{Markup.Escape(inv.ErrorSummary ?? string.Empty)}[/]"
+                        ? $"[{ErrorTag}]{LogText.EscapeMarkup(inv.ErrorSummary ?? string.Empty)}[/]"
                         : $"[{MutedTag}]{(inv.DurationMs.HasValue ? ((long)inv.DurationMs.Value).ToString(CultureInfo.InvariantCulture) + "ms" : string.Empty)}[/]";
 
                     return CreateSingleLine(
                         string.Create(CultureInfo.InvariantCulture,
-                            $" [{MutedTag}]{ts}[/]  [{color}]{Markup.Escape(inv.Function),-18}[/]  {arrow}  {suffix}"),
+                            $" [{MutedTag}]{ts}[/]  [{color}]{LogText.EscapeMarkup(inv.Function),-18}[/]  {arrow}  {suffix}"),
                         functionName,
                         isError,
                         effectiveLogLevel);
@@ -124,7 +123,7 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
         if (functionName is not null)
         {
             int sourceWidth = Math.Max(SourceColumnWidth, functionName.Length);
-            string nameMarkup = $"[{_palette.GetColorFor(functionName)}]{Markup.Escape(functionName),-SourceColumnWidth}[/]";
+            string nameMarkup = $"[{_palette.GetColorFor(functionName)}]{LogText.EscapeMarkup(functionName),-SourceColumnWidth}[/]";
             prefix = string.Create(CultureInfo.InvariantCulture, $" [{MutedTag}]{ts}[/]  {nameMarkup}  {levelMarkup}  ");
             prefixWidth = 1 + ts.Length + 2 + sourceWidth + 2 + 1 + 2;
         }
@@ -167,63 +166,9 @@ internal sealed class CompactLogLineFormatter(ITheme theme, FunctionPalette pale
         bool isError,
         LogLevel level)
     {
-        string continuationPrefix = new(' ', prefixWidth);
-        Markup first = new(prefixMarkup + Markup.Escape(message));
-        return new CompactLogLine(
-            first,
-            width => BuildWrappedRows(prefixMarkup, prefixWidth, continuationPrefix, message, width),
-            functionName,
-            isError,
-            level);
+        Markup first = new(prefixMarkup + LogText.EscapeMarkup(message));
+        return new CompactLogLine(first, functionName, isError, level, prefixWidth);
     }
-
-    private static IReadOnlyList<IRenderable> BuildWrappedRows(
-        string firstPrefixMarkup,
-        int prefixWidth,
-        string continuationPrefix,
-        string message,
-        int viewportWidth)
-    {
-        int messageWidth = Math.Max(1, viewportWidth - prefixWidth);
-        List<string> segments = WrapMessage(message, messageWidth);
-        if (segments.Count == 0)
-        {
-            segments.Add(string.Empty);
-        }
-
-        var rows = new List<IRenderable>(segments.Count);
-        for (int i = 0; i < segments.Count; i++)
-        {
-            string prefix = i == 0 ? firstPrefixMarkup : continuationPrefix;
-            rows.Add(new Markup(prefix + Markup.Escape(segments[i])));
-        }
-
-        return rows;
-    }
-
-    private static List<string> WrapMessage(string message, int width)
-    {
-        var rows = new List<string>();
-        foreach (string line in NormalizeLineEndings(message).Split('\n'))
-        {
-            if (line.Length == 0)
-            {
-                rows.Add(string.Empty);
-                continue;
-            }
-
-            for (int start = 0; start < line.Length; start += width)
-            {
-                int length = Math.Min(width, line.Length - start);
-                rows.Add(line.Substring(start, length));
-            }
-        }
-
-        return rows;
-    }
-
-    private static string NormalizeLineEndings(string value)
-        => value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
 
     private static bool ShouldSuppress(HostLogEntry entry, IReadOnlyList<DashboardEvent> events)
     {

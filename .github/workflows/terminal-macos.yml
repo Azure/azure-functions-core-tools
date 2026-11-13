@@ -82,10 +82,10 @@ jobs:
           if report["process_architecture"] != expected:
               raise SystemExit(f"Expected {expected}, got {report['process_architecture']}")
           PY
-      - name: Qualify terminal input, prompt handoff, and interruption
+      - name: Qualify terminal input, log viewport, prompt handoff, and interruption
         run: >-
           dotnet test test/Func.Tests/Func.Tests.csproj -c Release -p:CI=true --verbosity quiet
-          --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests"
+          --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests"
           --logger "trx;LogFileName=terminal-tests.trx"
           --results-directory out/test-results
       - name: Preserve native evidence

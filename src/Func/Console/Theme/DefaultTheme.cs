@@ -39,4 +39,6 @@ internal sealed class DefaultTheme : ITheme
     public Style Active { get; } = new(Color.Cyan1);
 
     public Style Hyperlink { get; } = new(Color.Blue, decoration: Decoration.Underline);
+
+    public Style Selection { get; } = new(decoration: Decoration.Invert);
 }
