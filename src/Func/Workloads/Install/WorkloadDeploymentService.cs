@@ -62,8 +62,8 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             return null;
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(existing.PackageRoot);
-        if (!Directory.Exists(existing.PackageRoot))
+        string packageRoot = GetPackageRoot(existing);
+        if (!Directory.Exists(packageRoot))
         {
             return null;
         }
@@ -137,7 +137,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                     await _store.MoveLogicalOwnershipAsync(currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, entry, cancellationToken);
                 if (moved.PreviousEntryRemoved)
                 {
-                    TryDeleteDirectory(currentLogicalOwner.PackageRoot);
+                    TryDeleteDirectory(GetPackageRoot(currentLogicalOwner));
                 }
 
                 return new WorkloadInstallResult(moved.Entry, false);
@@ -196,7 +196,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
             if (moved.PreviousEntryRemoved)
             {
-                string oldPath = currentEntry.PackageRoot;
+                string oldPath = GetPackageRoot(currentEntry);
                 if (!string.Equals(oldPath, finalPath, StringComparison.Ordinal))
                 {
                     TryDeleteDirectory(oldPath);
@@ -252,7 +252,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         {
             WorkloadEntry removedEntry = result.Entry
                 ?? throw new InvalidOperationException("The workload store did not return the removed entry.");
-            TryDeleteDirectory(removedEntry.PackageRoot);
+            TryDeleteDirectory(GetPackageRoot(removedEntry));
         }
 
         return true;
@@ -287,7 +287,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
                 await _store.MoveLogicalOwnershipAsync(currentLogicalOwner!.PackageId, currentLogicalOwner.PackageVersion, incoming, cancellationToken);
             if (moved.PreviousEntryRemoved)
             {
-                TryDeleteDirectory(currentLogicalOwner.PackageRoot);
+                TryDeleteDirectory(GetPackageRoot(currentLogicalOwner));
             }
 
             return new WorkloadInstallResult(moved.Entry, false);
@@ -342,8 +342,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
             return null;
         }
 
-        string installPath = existing.PackageRoot;
-        ArgumentException.ThrowIfNullOrWhiteSpace(installPath);
+        string installPath = GetPackageRoot(existing);
         if (!Directory.Exists(installPath))
         {
             return null;
@@ -425,8 +424,7 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
 
     private bool IsExistingInstallationValid(WorkloadEntry entry, WorkloadMetadata expectedMetadata)
     {
-        string installPath = entry.PackageRoot;
-        ArgumentException.ThrowIfNullOrWhiteSpace(installPath);
+        string installPath = GetPackageRoot(entry);
         if (!Directory.Exists(installPath))
         {
             return false;
@@ -612,6 +610,17 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         => !string.IsNullOrWhiteSpace(metadata.Description)
             ? metadata.Description
             : string.IsNullOrWhiteSpace(nuspecDescription) ? string.Empty : nuspecDescription;
+
+    private static string GetPackageRoot(WorkloadEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.PackageRoot))
+        {
+            return entry.PackageRoot;
+        }
+
+        throw new InvalidOperationException(
+            $"Workload '{entry.PackageId}' version '{entry.PackageVersion}' has no package root.");
+    }
 
     private static void TryDeleteDirectory(string path)
     {
