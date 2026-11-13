@@ -55,7 +55,8 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([entry]);
 
         await FluentActions.Awaiting(() => _deploymentService.TryReuseExplicitAsync(entry.PackageId, entry.PackageVersion))
-            .Should().ThrowExactlyAsync<ArgumentException>();
+            .Should().ThrowExactlyAsync<InvalidOperationException>()
+            .WithMessage($"Workload '{entry.PackageId}' version '{entry.PackageVersion}' has no package root.");
     }
 
     [Fact]
@@ -153,6 +154,26 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
         };
         result.Entry.Should().BeEquivalentTo(expected);
         await _store.Received(1).SaveWorkloadAsync(result.Entry, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InstallAsync_ExistingEntryMissingPackageRoot_Throws()
+    {
+        WorkloadEntry existing = CompleteEntry();
+        existing.PackageRoot = string.Empty;
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([existing]);
+        const string packageId = "example.workload.win-x64";
+        const string version = "1.0.0";
+        WorkloadMetadata metadata = Metadata("win-x64");
+        WorkloadPackageIdentity identity = new(
+            packageId, version, [WorkloadPackageTypes.RuntimeIdentifierPackage], ["example"], ["win-x64"], null, null);
+        InspectedWorkloadPackage package = new(
+            BuildPackage(packageId, version), identity, metadata, WorkloadPackageRole.RuntimeIdentifierImplementation);
+
+        await FluentActions.Awaiting(() => _deploymentService.InstallAsync(
+                package, "https://example.test/v3/index.json", WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false))
+            .Should().ThrowExactlyAsync<InvalidOperationException>()
+            .WithMessage($"Workload '{packageId}' version '{version}' has no package root.");
     }
 
     [Fact]
@@ -385,6 +406,19 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task TryReuseImplementationAsync_MissingPackageRoot_Throws()
+    {
+        WorkloadEntry reusable = Entry("example.workload.win-x64", "1.0.0", runtimeIdentifier: "win-x64");
+        reusable.PackageRoot = string.Empty;
+        _store.GetWorkloadsAsync(Arg.Any<CancellationToken>()).Returns([reusable]);
+
+        await FluentActions.Awaiting(() => _deploymentService.TryReuseImplementationAsync(
+                reusable.PackageId, reusable.PackageVersion, reusable.RuntimeIdentifier!, Logical("example.pointer", "1.0.0")))
+            .Should().ThrowExactlyAsync<InvalidOperationException>()
+            .WithMessage($"Workload '{reusable.PackageId}' version '{reusable.PackageVersion}' has no package root.");
+    }
+
+    [Fact]
     public async Task GetUpdateTargetAsync_LogicalOwnership_SelectsHighestLogicalVersion()
     {
         WorkloadEntry older = Entry("example.workload.win-x64", "7.0.0", logicalPackage: Logical("example.pointer", "1.0.0"));
@@ -433,7 +467,8 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             .Returns(new WorkloadOwnershipRemovalResult(true, true, entry));
 
         await FluentActions.Awaiting(() => _deploymentService.UninstallAsync(entry.PackageId, entry.PackageVersion, WorkloadOwnershipKind.Explicit))
-            .Should().ThrowExactlyAsync<ArgumentException>();
+            .Should().ThrowExactlyAsync<InvalidOperationException>()
+            .WithMessage($"Workload '{entry.PackageId}' version '{entry.PackageVersion}' has no package root.");
     }
 
     private WorkloadEntry Entry(string packageId, string version, bool explicitlyInstalled = false,

@@ -105,14 +105,12 @@ internal sealed class DefaultFunctionsWorkerInstaller(
 
     private static ContentWorkloadInfo CreateContentWorkloadInfo(WorkloadEntry entry)
     {
-        string installDirectory = entry.PackageRoot;
-        string contentRoot = WorkloadPackageLayout.GetContentRoot(installDirectory, entry.RuntimeIdentifier);
-
+        string contentRoot = WorkloadPackageLayout.GetContentRoot(entry.PackageRoot, entry.RuntimeIdentifier);
         return new ContentWorkloadInfo(
             entry.PackageId,
             entry.PackageVersion,
             entry.Aliases,
-            installDirectory,
+            entry.PackageRoot,
             contentRoot,
             entry.DisplayName,
             entry.Description);
