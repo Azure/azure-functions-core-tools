@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "identity": "Azure.Functions.Cli.DotNet.FlexByoc",
+  "name": ".NET isolated Flex BYOC container artifacts",
+  "shortName": "flex-byoc",
+  "precedence": 100,
+  "tags": {
+    "type": "artifact",
+    "func-capability": "flex-byoc",
+    "func-stack": "dotnet"
+  },
+  "symbols": {
+    "RuntimeVersion": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "11",
+      "replaces": "{{RUNTIME_VERSION}}",
+      "choices": [
+        { "choice": "8" },
+        { "choice": "9" },
+        { "choice": "10" },
+        { "choice": "11" }
+      ]
+    },
+    "ProjectFile": {
+      "type": "bind",
+      "binding": "host:func:dotnet-project-file",
+      "replaces": "{{PROJ_FILE}}"
+    },
+    "AssemblyName": {
+      "type": "bind",
+      "binding": "host:func:dotnet-assembly-name",
+      "replaces": "{{ASSEMBLY_NAME}}"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "rename": {
+            "Dockerfile.template": "Dockerfile",
+            "dockerignore.template": ".dockerignore"
+          }
+        }
+      ]
+    }
+  ]
+}
