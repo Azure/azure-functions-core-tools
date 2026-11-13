@@ -61,6 +61,11 @@ Darwin can report a permission error when signalling a group containing only
 exited processes. The harness accepts that result only after observing the
 leader's exit and inspecting the group to confirm that no live members remain;
 actual permission and inspection errors still fail cleanup.
+After signalling on either Unix platform, cleanup waits until group inspection
+finds no live members before reaping the retained leader. Linux reads process
+group and state from `/proc`; macOS uses `libproc`. Zombies count as exited.
+This bounded completion check prevents descendant shutdown from overlapping
+the next measurement, even when descendant streams are independently redirected.
 A nonzero exit, timeout, unexpected output, or stderr invalidates
 the run and produces a terminating error. A final executable-hash mismatch
 invalidates every sample and leaves summaries empty, even if all measured
@@ -98,6 +103,11 @@ with independently redirected descendant streams, and disposal without capture.
 Each case also checks repeated disposal and includes exact-process test cleanup.
 An exited-leader regression checks the native zombie-only signalling result
 and verifies that disposal reaps the retained Unix child.
+Controlled Unix checks distinguish signal delivery from group-exit completion,
+including delayed exit, cleanup timeout, inspection failure and native inspection.
+Linux also checks a process name containing spaces and parentheses. Parent-first
+cases require the descendant to be exited when disposal returns, not merely
+after a later test-side wait.
 On Unix, omit `.exe` from the fixture executable name.
 
 ## Reporting-only CI

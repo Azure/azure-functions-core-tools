@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -344,7 +345,7 @@ internal sealed class WindowsStartupProcess : NativeStartupProcess
     }
 }
 
-internal sealed class UnixStartupProcess : NativeStartupProcess
+internal class UnixStartupProcess : NativeStartupProcess
 {
     private readonly string _executable;
     private readonly IntPtr _arguments;
@@ -459,6 +460,66 @@ internal sealed class UnixStartupProcess : NativeStartupProcess
             }
         }
         if (!WaitForExit(10000)) { throw new TimeoutException("Owned process cleanup exceeded 10 seconds."); }
+        var guard = Stopwatch.StartNew();
+        while (!GroupHasOnlyExitedMembers())
+        {
+            if (guard.ElapsedMilliseconds >= CleanupTimeoutMilliseconds)
+            {
+                throw new TimeoutException("Owned process group cleanup exceeded its timeout.");
+            }
+            Thread.Sleep(1);
+        }
+    }
+
+    internal virtual bool GroupHasOnlyExitedMembers() => OperatingSystem.IsMacOS()
+        ? DarwinGroupHasOnlyExitedMembers()
+        : LinuxGroupHasOnlyExitedMembers();
+
+    internal virtual int CleanupTimeoutMilliseconds => 10000;
+
+    private bool LinuxGroupHasOnlyExitedMembers()
+    {
+        Dictionary<int, char> members = ReadLinuxGroupMembers();
+        var guard = Stopwatch.StartNew();
+        while (true)
+        {
+            if (members.Values.Any(state => state is not ('Z' or 'X'))) { return false; }
+            Dictionary<int, char> current = ReadLinuxGroupMembers();
+            if (current.Values.Any(state => state is not ('Z' or 'X'))) { return false; }
+            if (current.Keys.All(members.ContainsKey)) { return true; }
+            if (guard.ElapsedMilliseconds >= CleanupTimeoutMilliseconds)
+            {
+                throw new TimeoutException("Owned process group inspection exceeded its timeout.");
+            }
+            members = current;
+        }
+    }
+
+    private Dictionary<int, char> ReadLinuxGroupMembers()
+    {
+        var members = new Dictionary<int, char>();
+        foreach (string directory in Directory.EnumerateDirectories("/proc"))
+        {
+            if (!int.TryParse(Path.GetFileName(directory), NumberStyles.None, CultureInfo.InvariantCulture, out int id)) { continue; }
+            string record;
+            try { record = File.ReadAllText(Path.Combine(directory, "stat")); }
+            catch (FileNotFoundException) when (id != _id) { continue; }
+            catch (DirectoryNotFoundException) when (id != _id) { continue; }
+            // Linux comm is parenthesized and may itself contain spaces or parentheses.
+            int end = record.LastIndexOf(')');
+            string[] fields = end >= 0 ? record[(end + 1)..].Split(' ', StringSplitOptions.RemoveEmptyEntries) : [];
+            if (fields.Length < 3 || fields[0].Length != 1 ||
+                !int.TryParse(fields[2], NumberStyles.None, CultureInfo.InvariantCulture, out int group))
+            {
+                throw new InvalidOperationException($"Invalid native process record for PID {id}.");
+            }
+            if (group == _id) { members.Add(id, fields[0][0]); }
+        }
+        if (!members.ContainsKey(_id))
+        {
+            throw new InvalidOperationException("The retained target process group leader was not found during cleanup.");
+        }
+        return members;
     }
 
     private bool DarwinGroupHasOnlyExitedMembers()
@@ -518,15 +579,30 @@ internal sealed class UnixStartupProcess : NativeStartupProcess
     public override void Dispose()
     {
         if (_disposed) { return; }
+        Exception? terminationFailure = null;
         try
         {
-            Terminate();
-            if (_id > 0)
+            try { Terminate(); }
+            catch (Exception error) when (error is TimeoutException or IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception)
             {
-                int result;
-                do { result = Native.waitpid(_id, out _, 0); }
-                while (result < 0 && Marshal.GetLastPInvokeError() == 4);
-                if (result < 0) { throw Failure("reap target"); }
+                terminationFailure = error;
+                throw;
+            }
+            finally
+            {
+                // Inspection failure must not strand the already-exited child we own.
+                if (_exit?.IsCompletedSuccessfully == true)
+                {
+                    int result;
+                    do { result = Native.waitpid(_id, out _, 0); }
+                    while (result < 0 && Marshal.GetLastPInvokeError() == 4);
+                    if (result < 0)
+                    {
+                        Win32Exception reapFailure = Failure("reap target");
+                        if (terminationFailure is not null) { throw new AggregateException(terminationFailure, reapFailure); }
+                        throw reapFailure;
+                    }
+                }
             }
         }
         finally

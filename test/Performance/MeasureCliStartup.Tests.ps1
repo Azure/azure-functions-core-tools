@@ -19,6 +19,11 @@ $fixtureDirectory = Join-Path $root 'fixture'
 Get-ChildItem -LiteralPath ([IO.Path]::GetDirectoryName($fixtureExecutable)) -File |
     Copy-Item -Destination $fixtureDirectory
 $fixtureExecutable = Join-Path $fixtureDirectory ([IO.Path]::GetFileName($fixtureExecutable))
+Add-Type -Path @(
+    (Join-Path $repoRoot 'eng/Performance/Startup/StartupProcess.cs'),
+    (Join-Path $repoRoot 'eng/Performance/Startup/NativeStartupProcess.cs'),
+    (Join-Path $PSScriptRoot 'StartupGroupCompletionChecks.cs')
+)
 . $harness -ExecutablePath $executable -OutputPath (Join-Path $root 'unused.json')
 $pwsh = (Get-Process -Id $PID).Path
 $testCount = 0
@@ -44,6 +49,15 @@ function Test-Case {
 }
 
 try {
+    foreach ($scenario in @('delayed-exit', 'timeout', 'inspection-error', 'native-inspection')) {
+        $name = "Process_GroupCompletion_$($scenario.Replace('-', '_'))"
+        if ($IsWindows) {
+            Write-Host "SKIP $name (Unix process-group lifecycle)"
+        }
+        else {
+            Test-Case $name { [StartupGroupCompletionChecks]::new().Run($scenario) }
+        }
+    }
     Test-Case 'Summary_SeparatesCommandsAndState_ComputesEvenAndOddMedians' {
         $inputSamples = @(
             foreach ($value in @(8, 2, 4, 6)) {
@@ -414,8 +428,9 @@ exit 0
                     }
                 }
                 $process.Dispose()
+                $descendant.Refresh()
+                Assert-True ($descendant.HasExited) 'Owned descendant was still live when disposal returned.'
                 $process.Dispose()
-                Assert-True ($descendant.WaitForExit(10000)) 'Owned descendant survived capture failure and repeated disposal.'
             }
             finally {
                 try { $process.Dispose() }
