@@ -8,5 +8,3 @@
   - Host Runtime Version: 4.52.200 (includes 4.852.200, 4.652.200)
 
 #### Changes
-
-- Add C# .NET isolated connector polling templates for Office365, SharePoint, Teams, OneDrive, and Dataverse to `func new`.
