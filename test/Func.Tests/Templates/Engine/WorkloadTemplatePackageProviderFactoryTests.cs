@@ -35,7 +35,7 @@ public sealed class WorkloadTemplatePackageProviderFactoryTests
     [Fact]
     public async Task GetAllTemplatePackagesAsync_EmptySource_ReturnsNoPackages()
     {
-        WorkloadTemplatePackageProviderFactory factory = new(new WorkloadTemplateSource());
+        WorkloadTemplatePackageProviderFactory factory = new(Substitute.For<IWorkloadTemplateSource>());
         ITemplatePackageProvider provider = factory.CreateProvider(Substitute.For<IEngineEnvironmentSettings>());
 
         IReadOnlyList<ITemplatePackage> packages = await provider.GetAllTemplatePackagesAsync(CancellationToken.None);
@@ -85,7 +85,7 @@ public sealed class WorkloadTemplatePackageProviderFactoryTests
     [Fact]
     public void CreateProvider_NullSettings_Throws()
     {
-        WorkloadTemplatePackageProviderFactory factory = new(new WorkloadTemplateSource());
+        WorkloadTemplatePackageProviderFactory factory = new(Substitute.For<IWorkloadTemplateSource>());
 
         Action act = () => factory.CreateProvider(null!);
 

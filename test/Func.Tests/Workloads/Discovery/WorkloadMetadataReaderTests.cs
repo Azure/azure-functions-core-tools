@@ -108,7 +108,7 @@ public class WorkloadMetadataReaderTests : IDisposable
         {
             FluentActions.Invoking(() => _reader.Read(_tempDir))
                 .Should().ThrowExactly<InvalidWorkloadException>()
-                .WithMessage("*templateRoot*relative to the package root*");
+                .WithMessage("*templateRoot*relative to the base directory*");
         }
         else
         {
@@ -170,60 +170,7 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         FluentActions.Invoking(() => _reader.Read(_tempDir))
             .Should().ThrowExactly<InvalidWorkloadException>()
-            .WithMessage("*templateRoot*inside the package root*");
-    }
-
-    [Fact]
-    public void NormalizePackagePath_RejectsPackageRootEvenWhenItIsAVolumeRoot()
-    {
-        string packageDirectory = Path.GetPathRoot(_tempDir)!;
-
-        FluentActions.Invoking(() => WorkloadMetadata.NormalizePackagePath(".", packageDirectory))
-            .Should().ThrowExactly<ArgumentException>()
-            .WithMessage("*inside the package root*");
-    }
-
-    [Fact]
-    public void NormalizePackagePath_UsesPlatformCaseComparison()
-    {
-        string packageDirectory = Path.Combine(_tempDir, "package");
-        const string path = "../PACKAGE/templates";
-
-        if (OperatingSystem.IsWindows())
-        {
-            WorkloadMetadata.NormalizePackagePath(path, packageDirectory).Should().Be("templates");
-        }
-        else
-        {
-            FluentActions.Invoking(() => WorkloadMetadata.NormalizePackagePath(path, packageDirectory))
-                .Should().ThrowExactly<ArgumentException>()
-                .WithMessage("*inside the package root*");
-        }
-    }
-
-    [Fact]
-    public void NormalizePackagePath_NormalizesPackageDirectoryAndTrailingSeparators()
-    {
-        string packageDirectory = Path.Combine(_tempDir, "intermediate", "..") + Path.DirectorySeparatorChar;
-
-        WorkloadMetadata.NormalizePackagePath("templates///", packageDirectory).Should().Be("templates");
-    }
-
-    [Fact]
-    public void NormalizePackagePath_RejectsNullPath()
-    {
-        FluentActions.Invoking(() => WorkloadMetadata.NormalizePackagePath(null!, _tempDir))
-            .Should().ThrowExactly<ArgumentNullException>();
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData(" ")]
-    public void NormalizePackagePath_RejectsInvalidPackageDirectory(string? packageDirectory)
-    {
-        FluentActions.Invoking(() => WorkloadMetadata.NormalizePackagePath("templates", packageDirectory!))
-            .Should().Throw<ArgumentException>();
+            .WithMessage("*templateRoot*inside the base directory*");
     }
 
     private void WriteTemplateMetadata(string kind, string? templateRootJson)

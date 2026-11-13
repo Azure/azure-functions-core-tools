@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Reflection;
+using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Workloads.Discovery;
 using Azure.Functions.Cli.Workloads.Storage;
 
@@ -77,18 +78,7 @@ internal sealed class WorkloadLoader(IWorkloadRuntimeIdentifierProvider runtimeI
         string assemblyPath = ResolveAssemblyPath(installPath, entryPoint.AssemblyPath, entry.PackageId);
         string contentRoot = Path.GetDirectoryName(assemblyPath)!;
 
-        // Defense-in-depth: the metadata reader already rejects rooted paths
-        // and `..` segments, but the on-disk registry stores the same value
-        // and could be tampered with. Refuse anything resolving outside
-        // the install directory (where workload.json lives).
-        string installPathWithSeparator = installPath.EndsWith(Path.DirectorySeparatorChar)
-            ? installPath
-            : installPath + Path.DirectorySeparatorChar;
-        if (!assemblyPath.StartsWith(installPathWithSeparator, StringComparison.Ordinal))
-        {
-            throw new InvalidWorkloadException(
-                $"[{entry.PackageId}] Could not load workload: assembly path '{entryPoint.AssemblyPath}' resolves outside the install directory '{installPath}'.");
-        }
+        string? templateRoot = ResolveTemplateRoot(entry, installPath);
 
         if (!File.Exists(assemblyPath))
         {
@@ -118,7 +108,24 @@ internal sealed class WorkloadLoader(IWorkloadRuntimeIdentifierProvider runtimeI
             ContentRoot: contentRoot,
             DisplayName: instance.DisplayName,
             Description: instance.Description,
-            LoadContext: loadContext);
+            LoadContext: loadContext,
+            TemplateRoot: templateRoot);
+    }
+
+    /// <summary>
+    /// Resolves the registry's package-relative template root to an absolute path inside the install directory.
+    /// </summary>
+    /// <remarks>
+    /// Existence is not checked here; a missing template root must not prevent the workload from loading.
+    /// </remarks>
+    private static string? ResolveTemplateRoot(WorkloadEntry entry, string installPath)
+    {
+        if (entry.TemplateRoot is null)
+        {
+            return null;
+        }
+
+        return ResolvePackagePath(installPath, entry.TemplateRoot, entry.PackageId, "template root");
     }
 
     /// <summary>
@@ -128,14 +135,14 @@ internal sealed class WorkloadLoader(IWorkloadRuntimeIdentifierProvider runtimeI
     private static string ResolveAssemblyPath(string installPath, string relativeAssemblyPath, string packageId)
     {
         // Try resolving directly relative to the install root (workload.json location).
-        string candidate = Path.GetFullPath(Path.Combine(installPath, relativeAssemblyPath));
+        string candidate = ResolvePackagePath(installPath, relativeAssemblyPath, packageId, "assembly path");
         if (File.Exists(candidate))
         {
             return candidate;
         }
 
         // Fall back to legacy tools/any/ layout.
-        string legacyCandidate = Path.GetFullPath(Path.Combine(installPath, "tools", "any", relativeAssemblyPath));
+        string legacyCandidate = ResolvePackagePath(installPath, Path.Combine("tools", "any", relativeAssemblyPath), packageId, "assembly path");
         if (File.Exists(legacyCandidate))
         {
             return legacyCandidate;
@@ -143,5 +150,20 @@ internal sealed class WorkloadLoader(IWorkloadRuntimeIdentifierProvider runtimeI
 
         // Return the primary candidate so the caller produces a clear error message.
         return candidate;
+    }
+
+    private static string ResolvePackagePath(string installPath, string relativePath, string packageId, string pathDescription)
+    {
+        // The on-disk registry can be tampered with after install-time validation.
+        try
+        {
+            return Path.CombineNormalized(installPath, relativePath);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidWorkloadException(
+                $"[{packageId}] Could not load workload: {pathDescription} '{relativePath}' is invalid or escapes its base directory. {ex.Message}",
+                ex);
+        }
     }
 }

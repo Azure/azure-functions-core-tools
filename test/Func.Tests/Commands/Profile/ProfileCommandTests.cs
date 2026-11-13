@@ -421,6 +421,7 @@ public sealed class ProfileCommandTests : IDisposable
         public void CopyDirectory(string sourcePath, string destinationPath) => throw new NotImplementedException();
         public void DeleteDirectory(string path) => throw new NotImplementedException();
         public IReadOnlyList<string> GetFiles(string directoryPath) => throw new NotImplementedException();
+        public DateTime GetLastWriteTimeUtc(string path) => throw new NotImplementedException();
         public void ExtractZip(string zipPath, string destinationDirectory) => throw new NotImplementedException();
 
         public void ExtractTarGz(string tarGzPath, string destinationDirectory) => throw new NotImplementedException();
