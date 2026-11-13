@@ -50,8 +50,10 @@ Output is UTF-8, redirected, and color disabled; stdin is closed. This measures 
 noninteractive launch, not terminal rendering. The harness drains both output
 streams concurrently, enforces a liveness timeout, and cleans up owned processes
 and directories. A nonzero exit, timeout, unexpected output, or stderr invalidates
-the run and produces a terminating error. JSON retains earlier samples and
-diagnostics. An existing output file is never overwritten. `budgetStatus` is
+the run and produces a terminating error. A final executable-hash mismatch
+invalidates every sample and leaves summaries empty, even if all measured
+commands succeeded. JSON retains earlier samples and diagnostics. An existing
+output file is never overwritten. `budgetStatus` is
 always `not-evaluated`; successful measurement does not mean a performance pass.
 
 Run the focused harness checks, including actual CLI measurements:
@@ -74,6 +76,10 @@ The synthetic CLI fixture intentionally passes version preflight, then forces
 nonzero exit, unexpected stderr, wrong output and timeout inside generated
 BenchmarkDotNet hosts. Tests require failed reports, retained diagnostics and
 removed owned state; framework failure cannot be accepted as a performance pass.
+The changed-artifact regression runs healthy measurements using an owned CLI
+copy, then changes that copy at final hash verification through a test-scoped
+hash-command override. It requires invalid samples, empty summaries, retained
+diagnostics and removed temporary state without changing the original CLI.
 On Unix, omit `.exe` from the fixture executable name.
 
 ## Reporting-only CI

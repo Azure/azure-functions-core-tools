@@ -279,6 +279,50 @@ Start-Sleep -Seconds 120
             'Multi-file output was accepted as an identified single-file artifact.'
     }
 
+    Test-Case 'Harness_ChangedArtifact_InvalidatesSamplesAndCleansState' {
+        $directory = Join-Path $root 'changed-artifact'
+        [void][IO.Directory]::CreateDirectory($directory)
+        $binary = Join-Path $directory ([IO.Path]::GetFileName($executable))
+        Copy-Item -LiteralPath $executable -Destination $binary
+        $originalHash = (Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash
+        $output = Join-Path $root 'changed-artifact.json'
+        $hashCheck = [pscustomobject]@{ count = 0 }
+        # Change only the owned copy at final verification, after the real benchmark has returned.
+        function Get-FileHash {
+            param([string] $LiteralPath, [string] $Algorithm)
+            Assert-True ($LiteralPath -eq $binary) 'Hash interception targeted an unowned executable.'
+            $hashCheck.count++
+            if ($hashCheck.count -eq 2) {
+                $stream = [IO.File]::Open($binary, [IO.FileMode]::Append, [IO.FileAccess]::Write)
+                try { $stream.WriteByte(0) } finally { $stream.Dispose() }
+            }
+            Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $LiteralPath -Algorithm $Algorithm
+        }
+        Assert-Fails {
+            & $harness -ExecutablePath $binary -OutputPath $output -Series 1 -SamplesPerSeries 2
+        } 'Executable changed during measurement'
+        $report = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+        $framework = Get-Content -LiteralPath (Join-Path $report.benchmarkArtifactsPath 'framework-measurements.json') -Raw |
+            ConvertFrom-Json
+        Assert-True ($hashCheck.count -eq 2 -and $report.artifact.sha256 -eq $originalHash -and
+            (Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash -ne $originalHash) `
+            'Owned executable did not change at final artifact verification.'
+        Assert-True ($framework.completed -and $framework.measurements.Count -eq 4 -and
+            $report.preflight.exitCode -eq 0 -and $report.preflight.stdout.Trim() -eq $report.artifact.cliVersion -and
+            $report.samples.Count -eq 4) 'Hash failure did not follow healthy preflight and complete framework observations.'
+        Assert-True ($report.status -eq 'failed' -and $report.error.Contains('Executable changed during measurement') -and
+            $report.summary.Count -eq 0) 'Artifact identity failure retained accepted summaries or lost diagnostics.'
+        foreach ($sample in $report.samples) {
+            Assert-True ($sample.status -eq 'invalid' -and $sample.processStatus -eq 'exited' -and $sample.exitCode -eq 0 -and
+                $sample.stderr.Length -eq 0 -and $sample.elapsedMs -gt 0 -and
+                $sample.stdout.Contains($report.artifact.cliVersion)) 'Artifact failure did not invalidate healthy observations.'
+        }
+        Assert-True ($report.cleanupStatus -eq 'removed' -and -not (Test-Path -LiteralPath $report.temporaryStatePath)) `
+            'Artifact identity failure left owned temporary state.'
+        Assert-True ((Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash -eq $originalHash) `
+            'Artifact mutation changed the original published CLI.'
+    }
+
     Test-Case 'Harness_PublishedV5_MeasuresBothCommandsWithQualifiedSamples' {
         $output = Join-Path $root 'actual.json'
         Push-Location $root

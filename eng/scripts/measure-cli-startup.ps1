@@ -229,10 +229,10 @@ try {
     [void](Merge-StartupMeasurements -Samples $samples.ToArray() -Framework $framework -Series $Series -SamplesPerSeries $SamplesPerSeries)
     $report.host.benchmarkArchitecture = $framework.harnessArchitecture
     $report.host.benchmarkRuntimeVersion = $framework.runtimeVersion
-    $measurementsQualified = $true
     if ((Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash -ne $report.artifact.sha256) {
         throw 'Executable changed during measurement; results cannot qualify that artifact.'
     }
+    $measurementsQualified = $true
     $report.status = 'completed'
 }
 catch {
