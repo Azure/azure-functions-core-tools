@@ -61,6 +61,8 @@ public class WorkloadMetadataReaderTests : IDisposable
     [InlineData("templates/./other", "templates/other")]
     [InlineData("templates\\..\\other", "other")]
     [InlineData("./templates", "templates")]
+    [InlineData("templates//other", "templates/other")]
+    [InlineData("templates\\\\other", "templates/other")]
     public void Read_NormalizesTemplateRoot(string path, string expected)
     {
         WriteTemplateMetadata("workload", JsonSerializer.Serialize(path));
@@ -77,26 +79,13 @@ public class WorkloadMetadataReaderTests : IDisposable
     [InlineData("/templates")]
     [InlineData("\\templates")]
     [InlineData("\\\\server\\templates")]
-    [InlineData("C:/templates")]
-    [InlineData("C:templates")]
     [InlineData(".")]
     [InlineData("..")]
     [InlineData("../other")]
     [InlineData("..\\other")]
     [InlineData("templates/../../other")]
     [InlineData("templates/..")]
-    [InlineData("templates//other")]
-    [InlineData("templates\\\\other")]
-    [InlineData("templates/*")]
-    [InlineData("templates/?")]
-    [InlineData("templates/\"quoted\"")]
-    [InlineData("templates/<other>")]
-    [InlineData("templates/a|b")]
-    [InlineData("templates/a:b")]
-    [InlineData("templates/a\nb")]
     [InlineData("templates/a\u0000b")]
-    [InlineData("templates/name.")]
-    [InlineData("templates/name /child")]
     public void Read_RejectsInvalidTemplateRoot(string path)
     {
         WriteTemplateMetadata("workload", JsonSerializer.Serialize(path));
@@ -106,6 +95,25 @@ public class WorkloadMetadataReaderTests : IDisposable
 
         exception.Message.Should().Contain(Path.Combine(_tempDir, "workload.json")).And.Contain("templateRoot");
         exception.InnerException.Should().BeAssignableTo<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("C:/templates")]
+    [InlineData("C:templates")]
+    public void Read_UsesPlatformRootedPathRules(string path)
+    {
+        WriteTemplateMetadata("workload", JsonSerializer.Serialize(path));
+
+        if (OperatingSystem.IsWindows())
+        {
+            FluentActions.Invoking(() => _reader.Read(_tempDir))
+                .Should().ThrowExactly<InvalidWorkloadException>()
+                .WithMessage("*templateRoot*relative to the package root*");
+        }
+        else
+        {
+            _reader.Read(_tempDir).TemplateRoot.Should().Be(path);
+        }
     }
 
     [Theory]
@@ -173,6 +181,32 @@ public class WorkloadMetadataReaderTests : IDisposable
         FluentActions.Invoking(() => WorkloadMetadata.NormalizePackagePath(".", packageDirectory))
             .Should().ThrowExactly<ArgumentException>()
             .WithMessage("*inside the package root*");
+    }
+
+    [Fact]
+    public void NormalizePackagePath_UsesPlatformCaseComparison()
+    {
+        string packageDirectory = Path.Combine(_tempDir, "package");
+        const string path = "../PACKAGE/templates";
+
+        if (OperatingSystem.IsWindows())
+        {
+            WorkloadMetadata.NormalizePackagePath(path, packageDirectory).Should().Be("templates");
+        }
+        else
+        {
+            FluentActions.Invoking(() => WorkloadMetadata.NormalizePackagePath(path, packageDirectory))
+                .Should().ThrowExactly<ArgumentException>()
+                .WithMessage("*inside the package root*");
+        }
+    }
+
+    [Fact]
+    public void NormalizePackagePath_NormalizesPackageDirectoryAndTrailingSeparators()
+    {
+        string packageDirectory = Path.Combine(_tempDir, "intermediate", "..") + Path.DirectorySeparatorChar;
+
+        WorkloadMetadata.NormalizePackagePath("templates///", packageDirectory).Should().Be("templates");
     }
 
     [Fact]

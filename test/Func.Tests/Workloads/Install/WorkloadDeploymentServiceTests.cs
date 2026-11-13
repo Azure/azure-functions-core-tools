@@ -235,7 +235,7 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
     [Theory]
     [InlineData(null)]
     [InlineData("templates/stale")]
-    public async Task InstallAsync_StaleRegistryTemplateRoot_RefreshesMetadataWithoutForce(string? registeredRoot)
+    public async Task InstallAsync_DifferentRegistryTemplateRoot_ReusesInstalledPayload(string? registeredRoot)
     {
         WorkloadStore store = new(_paths);
         WorkloadDeploymentService deployment = new(_paths, store, new WorkloadMetadataReader());
@@ -247,12 +247,16 @@ public sealed class WorkloadDeploymentServiceTests : IDisposable
             PackageVersion = package.Identity.Version,
             TemplateRoot = registeredRoot,
         });
+        byte[] before = await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath);
+        string payloadPath = Path.Combine(_paths.GetInstallDirectory(package.Identity.PackageId, package.Identity.Version), "existing-payload.txt");
+        File.WriteAllText(payloadPath, "preserve");
 
         WorkloadInstallResult result = await deployment.InstallAsync(
             package, _root, WorkloadOwnershipKind.Explicit, logicalPackage: null, force: false);
 
-        result.AlreadyInstalled.Should().BeFalse();
-        (await store.GetWorkloadsAsync()).Should().ContainSingle().Which.TemplateRoot.Should().Be("templates/current");
+        result.AlreadyInstalled.Should().BeTrue();
+        (await File.ReadAllBytesAsync(_paths.WorkloadRegistryPath)).Should().Equal(before);
+        File.ReadAllText(payloadPath).Should().Be("preserve");
     }
 
     [Fact]

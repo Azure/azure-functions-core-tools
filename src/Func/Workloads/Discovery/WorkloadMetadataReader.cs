@@ -242,6 +242,7 @@ internal sealed class WorkloadMetadataReader : IWorkloadMetadataReader
                 $"'{metadataPath}' is missing entryPoint.type.");
         }
 
+        // TODO: Use WorkloadMetadata.NormalizePackagePath for EntryPointSpec.AssemblyPath validation after reviewing the no-'..' contract.
         // Reject anything that would let a package escape its content root:
         // absolute paths or `..` segments. Defense-in-depth — the loader
         // also checks.

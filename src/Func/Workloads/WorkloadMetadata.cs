@@ -42,7 +42,7 @@ internal sealed class WorkloadMetadata
     public string? RuntimeIdentifier { get; init; }
 
     /// <summary>
-    /// Optional portable template directory relative to the physical package root.
+    /// Optional template directory relative to the physical package root.
     /// Only runtime workloads may declare it.
     /// </summary>
     public string? TemplateRoot { get; set; }
@@ -58,36 +58,25 @@ internal sealed class WorkloadMetadata
     public string Description { get; init; } = string.Empty;
 
     /// <summary>
-    /// Normalizes a portable relative directory path and verifies it resolves inside the package root.
+    /// Normalizes a relative directory path and verifies it resolves inside the package root.
     /// </summary>
     public static string NormalizePackagePath(string path, string packageDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageDirectory);
 
-        string normalized = path.Replace('\\', '/').TrimEnd('/');
-        if (normalized.Length == 0 || normalized[0] == '/')
+        string relativePath = path.Replace('\\', '/');
+        if (Path.IsPathRooted(relativePath))
         {
             throw new ArgumentException("The path must be relative to the package root.", nameof(path));
         }
 
-        foreach (string segment in normalized.Split('/'))
-        {
-            if (segment.Length == 0
-                || (segment is not "." and not ".." && segment.EndsWith('.'))
-                || segment.EndsWith(' ')
-                || segment.Any(c => char.IsControl(c) || c is ':' or '*' or '?' or '"' or '<' or '>' or '|'))
-            {
-                throw new ArgumentException("The path must contain only portable directory names without empty segments.", nameof(path));
-            }
-        }
-
-        string packageRoot = Path.GetFullPath(packageDirectory);
-        string resolvedPath = Path.GetFullPath(Path.Combine(packageRoot, normalized));
+        string packageRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(packageDirectory));
+        string resolvedPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(packageRoot, relativePath)));
         string packageRootPrefix = Path.EndsInDirectorySeparator(packageRoot) ? packageRoot : packageRoot + Path.DirectorySeparatorChar;
         StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         if (!resolvedPath.StartsWith(packageRootPrefix, comparison)
-            || string.Equals(resolvedPath, Path.TrimEndingDirectorySeparator(packageRoot), comparison))
+            || string.Equals(resolvedPath, packageRoot, comparison))
         {
             throw new ArgumentException("The path must resolve to a directory inside the package root.", nameof(path));
         }

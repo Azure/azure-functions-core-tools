@@ -426,7 +426,6 @@ internal sealed class WorkloadDeploymentService(IWorkloadPaths paths, IWorkloadS
         {
             WorkloadMetadata actual = _metadataReader.Read(installPath);
             return actual.Kind == expectedMetadata.Kind
-                && string.Equals(entry.TemplateRoot, expectedMetadata.TemplateRoot, StringComparison.Ordinal)
                 && string.Equals(actual.TemplateRoot, expectedMetadata.TemplateRoot, StringComparison.Ordinal)
                 && string.Equals(actual.RuntimeIdentifier, expectedMetadata.RuntimeIdentifier, StringComparison.Ordinal);
         }
