@@ -28,6 +28,6 @@ internal sealed class TemplaterFactory(
     {
         ArgumentNullException.ThrowIfNull(context);
         string settingsLocation = Path.Combine(_configurationPaths.Home, SettingsDirectoryName);
-        return new Templater(new TemplateEngineSession(context, settingsLocation, _components));
+        return new Templater(context, settingsLocation, _components);
     }
 }

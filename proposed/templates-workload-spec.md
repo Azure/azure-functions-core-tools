@@ -1,42 +1,11 @@
 # Template Engine and Packages
 
-## Purpose
+Navigation gateway, not an approved package or integration specification. Start with [Templates Architecture](../docs/templates/README.md), then the [proposed behavior contract](../docs/templates/architecture.md) and [implementation baseline and authorization gates](../docs/templates/implementation.md).
 
-Azure Functions templates are discovered and invoked through the
-Microsoft.TemplateEngine integration in `src/Func/Templates/Engine`. Template
-packages and their registrations are managed by Template Engine in the shared
-func settings hive. They are separate from language worker workloads and
-extension bundles.
+## Current boundaries
 
-## Engine integration
+[TemplaterFactory](../src/Func/Templates/Engine/TemplaterFactory.cs) creates a synchronous command-scoped session in the existing CLI-home `templates` hive. [Templater](../src/Func/Templates/Engine/Templater.cs) lists installed entries; catalog/parameter projection and raw constraint reader/matcher/evaluator helpers exist. Constraint-aware command resolution and invocation are not wired; `FuncTemplateComponents.AllComponents` is empty. Project/item kinds use `tags.type`; engine types stay inside the integration.
 
-- `ITemplaterFactory` creates a command-scoped engine session for a resolved
-  `TemplateEngineContext`.
-- `Templater` currently lists installed templates by type.
-- `TemplateCatalogProjector` maps engine template and package metadata into
-  func-owned catalog entries, including `tags.type`, language, identity,
-  package information, func host metadata, and parameter definitions.
-- Func constraint declarations and their evaluation rules are implemented
-  under `src/Func/Templates/Engine` and documented in
-  `docs/template-engine-constraints`.
-- Raw Template Engine types remain internal to the engine integration.
+[TemplateFixtures](../test/Func.Tests/Templates/TemplateFixtures.cs) explicitly registers local content in isolated test hives. [WorkloadDeploymentService](../src/Func/Workloads/Install/WorkloadDeploymentService.cs) deploys workload payloads and store metadata, not production template registration. The working .NET initializer uses a separate `dotnet new` hive. Existing setup must not be described as making template content ready.
 
-## Template kinds and command use
-
-Templates use `tags.type` values `item` or `project`. The `func new` command
-is designed to consume item templates, while project-template execution belongs
-to the `func init` design. Missing or unrecognized type values do not identify
-a usable template kind.
-
-The current `func new` command is not yet connected to template selection and
-invocation. It reports scaffolding and listing as unavailable with a nonzero
-exit code before changing project files. Its planned command flow is described
-in `docs/func-new-execution`; package operations are described in
-`docs/template-package-install`.
-
-## Package and workload boundaries
-
-Template package discovery and registration use Microsoft.TemplateEngine.
-Language workers and extension bundles continue to use the Functions workload
-system. Setup does not resolve or install template packages. This keeps
-template availability and worker/runtime setup as independent concerns.
+Production workload-to-CLI-hive registration, approved package-relative location, version/channel/integrity, ownership and retry policy require Sarah/Fabio decisions. Workers and extension bundles retain their workload responsibilities. No discovery-time installation, new registry, package manager or `func new install/update/uninstall` is authorized by this gateway.
