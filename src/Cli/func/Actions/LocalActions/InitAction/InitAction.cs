@@ -46,6 +46,8 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         public bool InitDockerOnly { get; set; }
 
+        public bool StandardDockerfile { get; set; }
+
         public string WorkerRuntime { get; set; }
 
         public string FolderName { get; set; } = string.Empty;
@@ -107,6 +109,11 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                     InitDocker = f;
                     InitDockerOnly = f;
                 });
+
+            Parser
+                .Setup<bool>("standard")
+                .WithDescription("Use the standard non-chiseled Dockerfile when both standard and chiseled templates are available.")
+                .Callback(f => StandardDockerfile = f);
 
             Parser
                 .Setup<bool>("no-bundle")
@@ -203,7 +210,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
         private async Task InitDockerFileOnly()
         {
-            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Language, TargetFramework, Csx);
+            await WriteDockerfile(GlobalCoreToolsSettings.CurrentWorkerRuntime, Language, TargetFramework, Csx, StandardDockerfile);
         }
 
         private async Task InitFunctionAppProject()
@@ -279,7 +286,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
 
             if (InitDocker)
             {
-                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, TargetFramework, Csx);
+                await WriteDockerfile(ResolvedWorkerRuntime, ResolvedLanguage, TargetFramework, Csx, StandardDockerfile);
             }
 
             if (!SkipNpmInstall)
@@ -493,7 +500,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await FileSystemHelpers.WriteFileIfNotExists("local.settings.json", localSettingsJsonContent);
         }
 
-        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, string targetFramework, bool csx)
+        private static async Task WriteDockerfile(WorkerRuntime workerRuntime, string language, string targetFramework, bool csx, bool standardDockerfile)
         {
             if (WorkerRuntimeLanguageHelper.IsDotnet(workerRuntime) && string.IsNullOrEmpty(targetFramework) && !csx)
             {
@@ -540,9 +547,12 @@ namespace Azure.Functions.Cli.Actions.LocalActions
                 {
                     await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet9Isolated);
                 }
-                else if (targetFramework == Common.TargetFramework.Net10)
+                else if (Common.TargetFramework.Net10.Equals(targetFramework, StringComparison.OrdinalIgnoreCase))
                 {
-                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await StaticResources.DockerfileDotnet10Isolated);
+                    Task<string> dockerfile = standardDockerfile
+                        ? StaticResources.DockerfileDotnet10Isolated
+                        : StaticResources.DockerfileDotnet10IsolatedChiseled;
+                    await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await dockerfile);
                 }
                 else
                 {
@@ -562,7 +572,7 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             }
             else if (workerRuntime == Helpers.WorkerRuntime.Python)
             {
-                await WritePythonDockerFile();
+                await WritePythonDockerFile(standardDockerfile);
             }
             else if (workerRuntime == Helpers.WorkerRuntime.Powershell)
             {
@@ -585,10 +595,10 @@ namespace Azure.Functions.Cli.Actions.LocalActions
             await FileSystemHelpers.WriteFileIfNotExists(".dockerignore", await StaticResources.DockerIgnoreFile);
         }
 
-        private static async Task WritePythonDockerFile()
+        private static async Task WritePythonDockerFile(bool standardDockerfile)
         {
             WorkerLanguageVersionInfo worker = await PythonHelpers.GetEnvironmentPythonVersion();
-            await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await PythonHelpers.GetDockerInitFileContent(worker));
+            await FileSystemHelpers.WriteFileIfNotExists("Dockerfile", await PythonHelpers.GetDockerInitFileContent(worker, standardDockerfile));
         }
 
         private static async Task WriteExtensionsJson()

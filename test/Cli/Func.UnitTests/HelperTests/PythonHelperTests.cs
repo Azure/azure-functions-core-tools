@@ -113,6 +113,19 @@ namespace Azure.Functions.Cli.UnitTests.HelperTests
         }
 
         [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Python314DockerfileSelectionHonorsStandardFlag(bool standardDockerfile)
+        {
+            WorkerLanguageVersionInfo worker = new WorkerLanguageVersionInfo(WorkerRuntime.Python, "3.14.0", "python");
+
+            string dockerfile = await PythonHelpers.GetDockerInitFileContent(worker, standardDockerfile);
+
+            Assert.Contains("4-python3.14", dockerfile);
+            Assert.Equal(!standardDockerfile, dockerfile.Contains("4-python3.14-chiseled"));
+        }
+
+        [Theory]
         [InlineData(3, 10)]
         [InlineData(3, 11)]
         [InlineData(3, 12)]
