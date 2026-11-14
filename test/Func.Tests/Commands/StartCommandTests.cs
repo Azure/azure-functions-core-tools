@@ -8,6 +8,9 @@ using Azure.Functions.Cli.Commands.Start;
 using Azure.Functions.Cli.Commands.Start.Initialization.Rendering;
 using Azure.Functions.Cli.Common;
 using Azure.Functions.Cli.Configuration;
+using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Terminal;
+using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Dashboard;
 using Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 using Azure.Functions.Cli.Hosting.Events;
@@ -294,6 +297,38 @@ public class StartCommandTests : IDisposable
                 && context.Options.CorsCredentials),
             Arg.Any<IStartInitializationRenderer>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartCommand_WhenStartupInputPreventsHandoff_FallsBackWithoutOpeningATerminal()
+    {
+        var source = new InMemoryHostEventStream();
+        source.Complete();
+        IInteractionService interaction = Substitute.For<IInteractionService>();
+        ITerminalSessionFactory factory = Substitute.For<ITerminalSessionFactory>();
+        interaction.IsInteractive.Returns(true);
+        interaction.Theme.Returns(new DefaultTheme());
+        interaction.CanUseFullScreen(factory).Returns(true, false);
+        _initializationRunner.RunAsync(Arg.Any<StartInitializationContext>(), Arg.Any<IStartInitializationRenderer>(),
+            Arg.Any<CancellationToken>()).Returns(CreateInitializationResult(source));
+        IServiceProvider services = TestParser.BuildServiceProviderWith(interaction, collection =>
+        {
+            collection.AddSingleton(_cliVersionProvider);
+            collection.AddSingleton(_initializationRunner);
+            collection.AddSingleton(factory);
+        });
+        var root = Parser.CreateCommand(services);
+
+        int exitCode = await root.Parse($"run \"{_tempDir}\"").InvokeAsync(
+            new InvocationConfiguration { EnableDefaultExceptionHandler = false });
+
+        exitCode.Should().Be(0);
+        interaction.Received().WriteWarning(
+            "Full-screen input is unavailable after initialization; continuing with --format=plain for this run.");
+        interaction.DidNotReceive().OpenFullScreen(Arg.Any<ITerminalSessionFactory>(), Arg.Any<CancellationToken>());
+        await _initializationRunner.Received(1).RunAsync(
+            Arg.Is<StartInitializationContext>(context => context.Options.OutputMode == OutputMode.Compact),
+            Arg.Any<IStartInitializationRenderer>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

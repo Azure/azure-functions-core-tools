@@ -25,12 +25,12 @@ internal sealed class CompactFunctionSearchBuilder(ITheme theme, FunctionPalette
         ArgumentNullException.ThrowIfNull(matches);
 
         IRenderable results = matches.Length == 0
-            ? new Markup($"[{MutedTag}]  No functions match \"{Markup.Escape(query)}\"[/]")
+            ? new Markup($"[{MutedTag}]  No functions match \"{LogText.EscapeMarkup(query)}\"[/]")
             : BuildResults(matches, visibleRows, rowOffset, selectedIndex);
 
         string displayQuery = query.Length == 0 ? "type to search" : query;
         return new Panel(new Rows(
-            new Markup($"[{MutedTag}]Search:[/] [{EmphasisTag}]{Markup.Escape(displayQuery)}[/]"),
+            new Markup($"[{MutedTag}]Search:[/] [{EmphasisTag}]{LogText.EscapeMarkup(displayQuery)}[/]"),
             results,
             new Markup(string.Empty),
             new Markup($"[{MutedTag}]Type to filter · Up/Down select · Enter apply · Esc cancel[/]")))
@@ -91,8 +91,8 @@ internal sealed class CompactFunctionSearchBuilder(ITheme theme, FunctionPalette
 
             table.AddRow(
                 new Markup(marker),
-                new Markup($"[{color}]{Markup.Escape(function.Name)}[/]"),
-                new Markup($"[{MutedTag}]{Markup.Escape(route)}[/]"));
+                new Markup($"[{color}]{LogText.EscapeMarkup(function.Name)}[/]"),
+                new Markup($"[{MutedTag}]{LogText.EscapeMarkup(route)}[/]"));
         }
 
         return table;

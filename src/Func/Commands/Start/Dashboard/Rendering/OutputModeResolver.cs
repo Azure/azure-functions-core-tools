@@ -42,12 +42,13 @@ internal static class OutputModeResolver
     /// returns the safe fallback and indicates whether a downgrade was
     /// applied so the caller can surface a one-line stderr notice.
     /// </summary>
-    public static OutputMode ApplyTerminalSafetyFallback(OutputMode mode, IInteractionService interaction, out bool downgraded)
+    public static OutputMode ApplyTerminalSafetyFallback(OutputMode mode, IInteractionService interaction, out bool downgraded,
+        bool fullScreenAvailable = true)
     {
         ArgumentNullException.ThrowIfNull(interaction);
         downgraded = false;
 
-        if (mode == OutputMode.Compact && !interaction.IsInteractive)
+        if (mode == OutputMode.Compact && (!interaction.IsInteractive || !fullScreenAvailable))
         {
             downgraded = true;
             return OutputMode.Plain;

@@ -1,6 +1,6 @@
-# `func start` JSON output schema
+# `func run` JSON output schema
 
-`func start --format=json` (alias: `--format json`) emits one self-contained
+`func run --format=json` (`start` remains a command alias) emits one self-contained
 JSON object per line on stdout (newline-delimited JSON, NDJSON / JSON Lines).
 Records are not wrapped in an array; there are no commas between them.
 See [`func-start-output-modes.md`](func-start-output-modes.md) for how JSON
@@ -10,10 +10,9 @@ The schema is designed for programmatic consumers (CI logs, log shippers, AI
 agents) and is versioned via the `schema_version` field. v1 is the contract
 described in this document.
 
-> Status: **prototype**. The current implementation streams from a scripted
-> in-memory event source so the UX can be reviewed before host integration
-> lands. The shape of the stream is the contract we commit to. Field values
-> in this prototype come from a fake source; field semantics are stable.
+Full-screen dashboard interaction does not change this output contract.
+Programmatic consumers should explicitly select JSON rather than consume
+interactive dashboard output.
 
 ## Top-level invariants
 

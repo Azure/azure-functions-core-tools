@@ -2,7 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Globalization;
+using System.Threading.Channels;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Clipboard;
+using Azure.Functions.Cli.Console.Terminal;
 using Azure.Functions.Cli.Console.Theme;
 using Azure.Functions.Cli.Hosting.Events;
 using Microsoft.Extensions.Logging;
@@ -12,49 +15,79 @@ using Spectre.Console.Rendering;
 namespace Azure.Functions.Cli.Hosting.Dashboard.Rendering;
 
 /// <summary>
-/// Interactive TTY renderer. Combines a live-redrawn header (functions table + counters) with a streaming log tail in a single <c>Live</c>
-/// region — this keeps redraws and log appends consistent without cursor-juggling.
+/// Full-screen dashboard with an anchored log document and exclusive terminal ownership.
 /// </summary>
-/// <remarks>
-/// Prototype scope: the renderer demonstrates the live header / live log tail UX against the scripted event source.
-/// </remarks>
 internal sealed class CompactRenderer(
     IInteractionService interaction,
     FunctionPalette palette,
     CompactDashboardShortcutLabels shortcutLabels,
-    IPlatform platform,
     IAnsiConsole? console = null,
-    DashboardRunInfo? runInfo = null) : IDashboardRenderer, IDashboardShutdownRequester
+    DashboardRunInfo? runInfo = null,
+    ITerminalSessionFactory? terminalFactory = null,
+    IClipboardWriter? clipboard = null,
+    ConsoleInterruptCoordinator? interrupts = null,
+    ITerminalSession? terminal = null,
+    TimeProvider? timeProvider = null,
+    CompactLogBuffer? logBuffer = null) : IDashboardRenderer, IDashboardShutdownRequester, IDashboardRendererLifetime
 {
     private const int MaxLogTailLines = CompactLogBuffer.DefaultCapacity;
-    private const int HelpOverlayCommandRows = 15;
-    private const int HelpOverlayLines = HelpOverlayCommandRows + 3;
-    private const string EnterAlternateScreenSequence = "\u001b[?1049h\u001b[H";
-    private const string ExitAlternateScreenSequence = "\u001b[?1049l";
 
     private static readonly IComparer<string> _functionNameComparer = new FunctionNameComparer();
 
     private readonly IInteractionService _interaction = interaction ?? throw new ArgumentNullException(nameof(interaction));
     private readonly FunctionPalette _palette = palette ?? throw new ArgumentNullException(nameof(palette));
-    private readonly IPlatform _platform = platform ?? throw new ArgumentNullException(nameof(platform));
-    private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
+    private readonly IAnsiConsole? _console = console;
+    private readonly ITerminalSessionFactory? _terminalFactory = terminalFactory;
+    private readonly IClipboardWriter? _clipboard = clipboard;
+    private readonly ConsoleInterruptCoordinator? _interrupts = interrupts;
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private readonly CompactHeaderBuilder _headerBuilder = new(interaction.Theme, runInfo ?? new());
-    private readonly CompactFooterBuilder _footerBuilder = new(interaction.Theme, runInfo ?? new(), shortcutLabels);
-    private readonly CompactHelpOverlayBuilder _helpOverlayBuilder = new(interaction.Theme, shortcutLabels);
+    private readonly CompactFooterBuilder _footerBuilder = new(interaction.Theme, shortcutLabels);
+    private readonly CompactHelpOverlayBuilder _helpOverlayBuilder = new(interaction.Theme, shortcutLabels, runInfo ?? new());
     private readonly CompactFunctionSearchBuilder _functionSearchBuilder = new(interaction.Theme, palette);
     private readonly CompactFunctionBrowserBuilder _functionBrowserBuilder = new(interaction.Theme, palette);
     private readonly Lock _uiLock = new();
-    private readonly CompactLogBuffer _logBuffer = new(MaxLogTailLines);
+    private readonly CompactLogBuffer _logBuffer = logBuffer ?? new(MaxLogTailLines);
     private readonly CompactLogLineFormatter _logLineFormatter = new(interaction.Theme, palette);
+    private readonly LogViewport _viewport = new();
+    private readonly List<TerminalInputEvent> _deferredInput = [];
+    private ITerminalSession? _terminal = terminal;
+    private IDisposable? _interruptRegistration;
+    private CancellationTokenRegistration _cancellationRegistration;
+    private Task? _completion;
+    private Task? _copyTask;
+    private CancellationTokenSource? _copyCts;
+    private readonly Channel<bool> _redrawSignal = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
+    {
+        SingleReader = true,
+        FullMode = BoundedChannelFullMode.DropOldest,
+        AllowSynchronousContinuations = false,
+    });
+    private bool _disposed;
+    private bool _stopped;
+    private bool _stopping;
+    private bool _mouseCapture = true;
+    private bool _manualRedraw = true;
+    private bool _painting;
+    private TerminalSize? _frameSize;
+    private int _logTop;
+    private int _logHeight;
+    private int _dragX;
+    private int _dragY;
+    private string? _status;
+    private string? _statusCaption;
+    private int? _hostExitCode;
 
     private DashboardState _state = null!;
     private CancellationTokenSource? _liveCts;
-    private SemaphoreSlim? _redrawSignal;
     private Task? _liveTask;
     private Task? _inputTask;
     private int _lastKnownWidth;
     private int _lastKnownHeight;
     private bool _helpOpen;
+    private int _helpRowOffset;
+    private int _helpMaximumRowOffset;
+    private int _helpVisibleRows = 1;
     private bool _functionBrowserOpen;
     private bool _functionSearchOpen;
     private int _functionBrowserSelectedIndex;
@@ -69,32 +102,49 @@ internal sealed class CompactRenderer(
 
     private ITheme Theme => _interaction.Theme;
 
-    private string HeadingTag => field ??= Theme.Heading.ToMarkup();
     private string MutedTag => field ??= Theme.Muted.ToMarkup();
     private string EmphasisTag => field ??= Theme.Emphasis.ToMarkup();
     private string SuccessTag => field ??= Theme.Success.ToMarkup();
     private string ErrorTag => field ??= Theme.Error.ToMarkup();
-    private string WarningTag => field ??= Theme.Warning.ToMarkup();
     private string ActiveTag => field ??= Theme.Active.ToMarkup();
 
     private CompactInputController InputController => field ??= new(_functionSearchBuilder, _functionBrowserBuilder);
 
     public event Action? ShutdownRequested;
 
+    public Task Completion => _completion ?? Task.CompletedTask;
+
     public Task OnStartAsync(DashboardState state, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _state = state ?? throw new ArgumentNullException(nameof(state));
-        _redrawSignal = new SemaphoreSlim(initialCount: 1, maxCount: int.MaxValue);
-        _liveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _console.Cursor.Hide();
-        _liveTask = Task.Run(() => RunLiveLoopInTerminalModeAsync(_liveCts.Token));
+        _terminal ??= _interaction.OpenFullScreen(_terminalFactory
+            ?? throw new InvalidOperationException("A terminal session factory is required."), cancellationToken);
+        _interruptRegistration = _interrupts?.RegisterTerminal(_terminal.Restore);
+        SignalRedraw();
+        // Keep raw Ctrl+C available for escalation while the host drains and shuts down.
+        _liveCts = new CancellationTokenSource();
+        _cancellationRegistration = cancellationToken.Register(() => BeginShutdown());
+        _liveTask = Task.Run(() => RunLiveLoopAsync(_liveCts.Token));
+        _inputTask = Task.Run(() => RunInputLoopAsync(_liveCts.Token));
+        _completion = MonitorAsync(_liveTask, _inputTask, _liveCts.Token);
+        return Task.CompletedTask;
+    }
 
-        if (_interaction.IsInteractive && _console.Profile.Capabilities.Interactive)
+    public void BeginShutdown(int? hostExitCode = null)
+    {
+        lock (_uiLock)
         {
-            _inputTask = Task.Run(() => RunInputLoopAsync(_liveCts.Token), cancellationToken);
+            _stopping = true;
+            _hostExitCode = hostExitCode ?? _hostExitCode;
+            _manualRedraw = true;
+            _viewport.ClearSelection();
+            _copyCts?.Cancel();
+            SetStatus("Stopping host; Ctrl+C forces exit");
+            _interrupts?.MarkStopping();
         }
 
-        return Task.CompletedTask;
+        SignalRedraw();
     }
 
     public Task OnEventAsync(HostLogEntry entry, IReadOnlyList<DashboardEvent> events, CancellationToken cancellationToken)
@@ -105,23 +155,11 @@ internal sealed class CompactRenderer(
             return Task.CompletedTask;
         }
 
-        _logBuffer.Add(line);
-
         lock (_uiLock)
         {
-            if (_logScrollOffset > 0 && MatchesLogFilters(line, _activeFunctionFilter, _errorsOnly, _minimumLogLevel))
+            if (_logBuffer.Add(line) is { } oldestEntryId)
             {
-                int width = GetViewportWidth();
-                int addedRows = line.RenderRows(width).Count;
-
-                // Account for the blank separator row that BuildLogVisualRows inserts
-                // before a multi-line entry so a held scrollback position stays anchored.
-                if (SeparatorPrecedesNewEntry(line, width))
-                {
-                    addedRows++;
-                }
-
-                _logScrollOffset = Math.Min(MaxLogTailLines, _logScrollOffset + addedRows);
+                _viewport.Invalidate(oldestEntryId);
             }
         }
 
@@ -131,61 +169,106 @@ internal sealed class CompactRenderer(
 
     public async Task OnSummaryAsync(SummaryEvent summary, CancellationToken cancellationToken)
     {
-        if (_liveCts is { } cts)
-        {
-            cts.Cancel();
-        }
-
-        if (_liveTask is { } task)
-        {
-            try
-            {
-                await task;
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected on clean shutdown.
-            }
-        }
-
-        if (_inputTask is { } inputTask)
-        {
-            try
-            {
-                await inputTask;
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected on clean shutdown.
-            }
-        }
-
-        _console.Cursor.Show();
+        await StopAsync();
 
         var uptime = TimeSpan.FromSeconds(summary.UptimeSeconds);
         _interaction.WriteBlankLine();
         _interaction.WriteLine($"  Azure Functions host stopped after {uptime.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture)}");
         _interaction.WriteLine($"  {summary.FunctionCount} functions  ·  {summary.TotalInvocations} invocations  ·  {summary.ErrorCount} error{(summary.ErrorCount == 1 ? string.Empty : "s")}");
+        if (_hostExitCode is null or 0)
+        {
+            return;
+        }
+
+        _interaction.WriteError($"The host exited with code {_hostExitCode.Value}.");
+        CompactLogLine? failure = _logBuffer.Snapshot().LastOrDefault(line => line.IsError);
+        if (failure is not null)
+        {
+            _interaction.WriteLine("  Last logged error:");
+            using StringReader errorText = new(failure.Text);
+            for (int index = 0; index < 8 && errorText.ReadLine() is { } line; index++)
+            {
+                _interaction.WriteRawLine(line.Length <= 500 ? line
+                    : line[..LogText.BoundaryBefore(line, 500)] + " [display truncated]");
+            }
+        }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        _liveCts?.Dispose();
-        _redrawSignal?.Dispose();
-        return ValueTask.CompletedTask;
-    }
+        if (_disposed)
+        {
+            return;
+        }
 
-    private void SignalRedraw()
-    {
+        _disposed = true;
         try
         {
-            _redrawSignal?.Release();
+            await StopAsync();
         }
-        catch (ObjectDisposedException)
+        finally
         {
-            // Live loop already torn down.
+            _cancellationRegistration.Dispose();
+            _interruptRegistration?.Dispose();
+            _copyCts?.Dispose();
+            _liveCts?.Dispose();
+            _redrawSignal.Writer.TryComplete();
         }
     }
+
+    private async Task StopAsync()
+    {
+        if (_stopped)
+        {
+            return;
+        }
+
+        _liveCts?.Cancel();
+        var workers = Task.WhenAll(_liveTask ?? Task.CompletedTask, _inputTask ?? Task.CompletedTask,
+            _copyTask ?? Task.CompletedTask, _completion ?? Task.CompletedTask);
+        try
+        {
+            await workers.WaitAsync(TimeSpan.FromSeconds(2), _timeProvider, CancellationToken.None);
+        }
+        catch (OperationCanceledException) when (_liveCts?.IsCancellationRequested == true)
+        {
+            // The owned input and rendering tasks have joined.
+        }
+        catch (TimeoutException exception)
+        {
+            // Restore input even when a broken terminal transport has stalled a synchronous writer.
+            _terminal?.Restore();
+            _ = workers.ContinueWith(task => _ = task.Exception, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+            throw new IOException("Terminal I/O did not stop during shutdown. Terminal restoration was attempted.", exception);
+        }
+        finally
+        {
+            try
+            {
+                if (_terminal is not null)
+                {
+                    await _terminal.DisposeAsync();
+                }
+            }
+            finally
+            {
+                _stopped = true;
+            }
+        }
+    }
+
+    private static async Task MonitorAsync(Task rendering, Task input, CancellationToken cancellationToken)
+    {
+        Task completed = await Task.WhenAny(rendering, input);
+        await completed;
+        if (!cancellationToken.IsCancellationRequested)
+        {
+            throw new EndOfStreamException("The terminal session ended unexpectedly.");
+        }
+    }
+
+    private void SignalRedraw() => _redrawSignal.Writer.TryWrite(true);
 
     private string? GetListenUriForLogFormatting(IReadOnlyList<DashboardEvent> events)
         => events.Any(static ev => ev is FunctionDiscoveredEvent) && _state is not null
@@ -194,18 +277,206 @@ internal sealed class CompactRenderer(
 
     private async Task RunInputLoopAsync(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        await foreach (TerminalInputEvent input in _terminal!.ReadAsync(cancellationToken))
         {
-            ConsoleKeyInfo? key = await _console.Input.ReadKeyAsync(intercept: true, cancellationToken);
-            if (key is null)
+            lock (_uiLock)
             {
-                continue;
+                bool interrupt = input.Kind == TerminalInputKind.Key
+                    && TerminalKey.IsInterrupt(input.Key.KeyChar, input.Key.Key, input.Key.Modifiers);
+                bool quit = input.Kind == TerminalInputKind.Key && !_functionSearchOpen
+                    && input.Key.Key == ConsoleKey.Q && (input.Key.Modifiers & (ConsoleModifiers.Control | ConsoleModifiers.Alt)) == 0
+                    && !_deferredInput.Any(item => item.Kind is TerminalInputKind.Key or TerminalInputKind.Text or TerminalInputKind.Paste);
+                bool canStopImmediately = quit || (interrupt && (_stopping
+                    || (!_viewport.HasSelection && !_viewport.SelectionExpired
+                        && (!_mouseCapture || !_deferredInput.Any(item => item.Kind is TerminalInputKind.PointerDown or TerminalInputKind.PointerMove)))));
+                if (_painting && !canStopImmediately)
+                {
+                    if (input.Kind == TerminalInputKind.PointerMove && _deferredInput.Count > 0
+                        && _deferredInput[^1].Kind == TerminalInputKind.PointerMove)
+                    {
+                        _deferredInput[^1] = input;
+                    }
+                    else
+                    {
+                        if (_deferredInput.Count == 256)
+                        {
+                            throw new IOException("Terminal output is not keeping up with input. Use --format=plain.");
+                        }
+
+                        _deferredInput.Add(input);
+                    }
+                }
+                else
+                {
+                    HandleInput(input, cancellationToken);
+                }
+
+                _manualRedraw |= _mouseCapture || input.Kind is TerminalInputKind.Key or TerminalInputKind.Text
+                    or TerminalInputKind.Paste or TerminalInputKind.Resize;
             }
 
-            if (HandleKey(key.Value))
+            SignalRedraw();
+        }
+    }
+
+    private void HandleInput(TerminalInputEvent input, CancellationToken cancellationToken)
+    {
+        if (input.Kind == TerminalInputKind.Key
+            && TerminalKey.IsInterrupt(input.Key.KeyChar, input.Key.Key, input.Key.Modifiers))
+        {
+            RefreshViewport(_state.Snapshot());
+            if (!_stopping && (_viewport.HasSelection || _viewport.SelectionExpired))
             {
-                SignalRedraw();
+                if (_viewport.SelectionExpired)
+                {
+                    SetStatus("Selection expired; select again or Esc to clear");
+                }
+                else if (_copyTask is null || _copyTask.IsCompleted)
+                {
+                    LogCopySnapshot copy = _viewport.CaptureSelection();
+                    SetStatus("Copying selection...", "Copying");
+                    _copyCts?.Dispose();
+                    _copyCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    CancellationToken copyToken = _copyCts.Token;
+                    _copyTask = Task.Run(() => CopyAsync(copy, copyToken));
+                }
             }
+            else if (_interrupts is not null)
+            {
+                _interrupts.RequestStop();
+            }
+            else
+            {
+                ShutdownRequested?.Invoke();
+            }
+
+            return;
+        }
+
+        if (_stopping)
+        {
+            return;
+        }
+
+        if (input.Kind is TerminalInputKind.Text or TerminalInputKind.Paste)
+        {
+            if (_functionSearchOpen && input.Text is not null)
+            {
+                _functionSearchQuery = (_functionSearchQuery + LogText.Sanitize(input.Text).Replace('\n', ' '));
+                if (_functionSearchQuery.Length > 4096)
+                {
+                    _functionSearchQuery = _functionSearchQuery[..LogText.BoundaryBefore(_functionSearchQuery, 4096)];
+                    SetStatus("Search text limited to 4096 characters");
+                }
+            }
+
+            return;
+        }
+
+        if (input.Kind == TerminalInputKind.Key)
+        {
+            if (!_functionSearchOpen && input.Key.Key == ConsoleKey.M && input.Key.Modifiers == 0)
+            {
+                _mouseCapture = !_mouseCapture;
+                _viewport.ClearSelection();
+                _viewport.Pause();
+                SetStatus(null);
+            }
+            else if (!_functionSearchOpen && !_helpOpen && !_functionBrowserOpen
+                && input.Key.Key == ConsoleKey.Escape && (_viewport.HasSelection || _viewport.SelectionExpired))
+            {
+                _viewport.ClearSelection();
+                SetStatus(null);
+            }
+            else
+            {
+                HandleKey(input.Key);
+            }
+
+            return;
+        }
+
+        if (input.Kind is TerminalInputKind.FocusLost or TerminalInputKind.Resize)
+        {
+            _viewport.EndDrag();
+            return;
+        }
+
+        if (_frameSize is { } presentedSize && _terminal is not null && _terminal.Size != presentedSize)
+        {
+            _viewport.EndDrag();
+            return;
+        }
+
+        if (_mouseCapture && _helpOpen && input.Kind == TerminalInputKind.Wheel
+            && input.Y >= 0 && input.Y < _logTop - 1 && input.X >= 0 && input.X < GetViewportWidth())
+        {
+            _helpRowOffset = (int)Math.Clamp((long)_helpRowOffset - input.Delta, 0, _helpMaximumRowOffset);
+            return;
+        }
+
+        if (!_mouseCapture || _helpOpen || _functionBrowserOpen || _functionSearchOpen || _logHeight == 0)
+        {
+            return;
+        }
+
+        int y = input.Y - _logTop;
+        bool inside = y >= 0 && y < _logHeight && input.X >= 0 && input.X < GetViewportWidth();
+        switch (input.Kind)
+        {
+            case TerminalInputKind.Wheel when inside:
+                _viewport.Scroll(input.Delta);
+                break;
+            case TerminalInputKind.PointerDown when inside:
+                SetStatus(null);
+                _dragX = input.X;
+                _dragY = y;
+                _viewport.BeginDrag(input.X, y);
+                break;
+            case TerminalInputKind.PointerMove:
+                _dragX = input.X;
+                _dragY = y;
+                _viewport.Drag(input.X, y);
+                break;
+            case TerminalInputKind.PointerUp:
+                _viewport.EndDrag();
+                break;
+        }
+    }
+
+    private async Task CopyAsync(LogCopySnapshot copy, CancellationToken cancellationToken)
+    {
+        try
+        {
+            ClipboardCopyResult result = _clipboard is null
+                ? new ClipboardCopyResult(ClipboardCopyStatus.Failed, "Clipboard access is unavailable.")
+                : await _clipboard.CopyAsync(copy.Text, _terminal!, cancellationToken);
+            lock (_uiLock)
+            {
+                if (_stopping || !_mouseCapture || _viewport.SelectionVersion != copy.SelectionVersion)
+                {
+                    // A completed clipboard operation must not repaint an abandoned selection or terminal-selection mode.
+                    return;
+                }
+
+                _viewport.CompleteCopy(copy.SelectionVersion, result.Status == ClipboardCopyStatus.Confirmed);
+                string message = result.Status == ClipboardCopyStatus.Confirmed ? result.Message
+                    : result.Message + " Press m for advanced terminal selection, then use your terminal's Copy command."
+                        + " Ctrl+C sent to the CLI stops the host.";
+                SetStatus(message, result.Status switch
+                {
+                    ClipboardCopyStatus.Confirmed => "Copied",
+                    ClipboardCopyStatus.Sent => "Copy unconfirmed",
+                    _ => "Copy failed",
+                });
+                _manualRedraw = true;
+            }
+
+            SignalRedraw();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Closing the session cancels in-flight clipboard work.
         }
     }
 
@@ -216,19 +487,60 @@ internal sealed class CompactRenderer(
 
         lock (_uiLock)
         {
+            RefreshViewport(snapshot);
+            if (_helpOpen && TryScrollHelp(key))
+            {
+                return true;
+            }
+
+            bool overlays = _functionSearchOpen || _functionBrowserOpen || _helpOpen;
+            if (!overlays && key.Key == ConsoleKey.End)
+            {
+                _viewport.Follow();
+                SetStatus(null);
+                _logScrollOffset = 0;
+                return true;
+            }
+
             CompactInputState state = CaptureInputState();
+            bool choosingFilter = (state.FunctionSearchOpen || state.FunctionBrowserOpen) && key.Key == ConsoleKey.Enter;
+            int previousOffset = _viewport.ScrollOffset;
+            state.LogScrollOffset = previousOffset;
             CompactInputResult result = InputController.HandleKey(
                 key,
                 functions,
                 state,
                 GetViewportHeight(),
-                GetLogScrollStep(snapshot),
-                MaxLogTailLines);
+                Math.Max(1, _viewport.Height - 1),
+                _viewport.MaximumScroll);
 
             ApplyInputState(state);
+            if (!_helpOpen)
+            {
+                _helpRowOffset = 0;
+            }
+            if (choosingFilter && result.Handled && !state.FunctionSearchOpen && !state.FunctionBrowserOpen)
+            {
+                _viewport.Follow();
+            }
+            if (result.Message is not null)
+            {
+                SetStatus(result.Message);
+            }
+            if (!overlays && state.LogScrollOffset != previousOffset)
+            {
+                _viewport.Scroll(state.LogScrollOffset - previousOffset);
+            }
+
+            if (_helpOpen || _functionBrowserOpen || _functionSearchOpen)
+            {
+                _viewport.ClearSelection();
+            }
+
             if (result.ClearLogsRequested)
             {
                 _logBuffer.Clear();
+                _viewport.Clear();
             }
 
             if (result.ShutdownRequested)
@@ -238,12 +550,6 @@ internal sealed class CompactRenderer(
 
             return result.Handled;
         }
-    }
-
-    private int GetLogScrollStep(DashboardSnapshot snapshot)
-    {
-        int logBudget = ComputeLogBudgetCore(snapshot, _helpOpen, functionSearchOpen: false, functionBrowserOpen: false, searchQuery: string.Empty);
-        return Math.Max(1, logBudget - 1);
     }
 
     private CompactInputState CaptureInputState()
@@ -283,299 +589,152 @@ internal sealed class CompactRenderer(
 
     private async Task RunLiveLoopAsync(CancellationToken cancellationToken)
     {
-        // Outer loop: each iteration runs one LiveDisplay session. When a
-        // terminal resize is detected we exit the inner Live region so
-        // Spectre tears down its internal shape/cursor state, clear the
-        // screen + scrollback, then come around and start a brand-new Live
-        // region at the new dimensions. That's the only reliable way to
-        // avoid stale-shape artifacts: in particular, on shrinks the new
-        // content is taller than the viewport and Spectre's "move up N
-        // lines to clear previous frame" math diverges from the terminal's
-        // clamped cursor behavior, which leaves blank rows wedged between
-        // elements on subsequent refreshes.
+        using PeriodicTimer poll = new(TimeSpan.FromMilliseconds(100), _timeProvider);
+        Task<bool> tick = poll.WaitForNextTickAsync(cancellationToken).AsTask();
+        Task<bool> redraw = _redrawSignal.Reader.WaitToReadAsync(cancellationToken).AsTask();
+        bool appliedMouseCapture = true;
         while (!cancellationToken.IsCancellationRequested)
         {
-            _lastKnownWidth = _console.Profile.Width;
-            _lastKnownHeight = _console.Profile.Height;
-            bool resizeDetected = false;
-
-            try
+            await Task.WhenAny(redraw, tick);
+            cancellationToken.ThrowIfCancellationRequested();
+            bool changed = _redrawSignal.Reader.TryRead(out _);
+            if (redraw.IsCompleted)
             {
-                await _console.Live(BuildLayout())
-                    .AutoClear(false)
-                    .Overflow(VerticalOverflow.Ellipsis)
-                    // Cropping.Top is a safety net: BuildLayout already sizes
-                    // the log tail to the viewport, but if the header gets
-                    // taller than estimated (e.g. very long route strings
-                    // wrap) we want the newest log lines to remain visible —
-                    // losing the banner top is preferable to freezing the
-                    // bottom of the log stream.
-                    .Cropping(VerticalOverflowCropping.Top)
-                    .StartAsync(async ctx =>
+                if (!await redraw)
+                {
+                    return;
+                }
+                redraw = _redrawSignal.Reader.WaitToReadAsync(cancellationToken).AsTask();
+            }
+            if (tick.IsCompleted)
+            {
+                if (!await tick)
+                {
+                    return;
+                }
+                tick = poll.WaitForNextTickAsync(cancellationToken).AsTask();
+            }
+
+            IRenderable? frame = null;
+            Task? copy;
+            bool requestedMouseCapture;
+            TerminalSize size = _terminal!.Size;
+            lock (_uiLock)
+            {
+                copy = _copyTask;
+                requestedMouseCapture = _mouseCapture;
+                int width = size.Width;
+                int height = size.Height;
+                bool resized = width != _lastKnownWidth || height != _lastKnownHeight;
+                if (resized)
+                {
+                    _viewport.EndDrag();
+                }
+
+                bool autoScroll = _viewport.IsDragging && (_dragY < 0 || _dragY >= _logHeight);
+                if (autoScroll)
+                {
+                    _viewport.Scroll(_dragY < 0 ? 1 : -1);
+                    _viewport.Drag(_dragX, _dragY);
+                }
+
+                if ((_mouseCapture || _manualRedraw || resized) && (changed || resized || autoScroll))
+                {
+                    frame = BuildLayout();
+                    _painting = true;
+                    _manualRedraw = false;
+                    _lastKnownWidth = width;
+                    _lastKnownHeight = height;
+                }
+            }
+
+            if (copy?.IsFaulted == true)
+            {
+                await copy;
+            }
+
+            if (frame is not null)
+            {
+                try
+                {
+                    if (appliedMouseCapture != requestedMouseCapture)
                     {
-                        while (!cancellationToken.IsCancellationRequested)
+                        _terminal!.SetMouseCapture(requestedMouseCapture);
+                        appliedMouseCapture = requestedMouseCapture;
+                    }
+                    _terminal!.Render(frame);
+                }
+                finally
+                {
+                    frame = null;
+                    lock (_uiLock)
+                    {
+                        _painting = false;
+                        if (_deferredInput.Count > 0)
                         {
-                            int width = _console.Profile.Width;
-                            int height = _console.Profile.Height;
-                            if (width != _lastKnownWidth || height != _lastKnownHeight)
+                            foreach (TerminalInputEvent input in _deferredInput)
                             {
-                                resizeDetected = true;
-                                return;
+                                if (!cancellationToken.IsCancellationRequested)
+                                {
+                                    HandleInput(input, cancellationToken);
+                                }
                             }
 
-                            ctx.UpdateTarget(BuildLayout());
-
-                            try
-                            {
-                                await _redrawSignal!.WaitAsync(TimeSpan.FromMilliseconds(500), cancellationToken);
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                return;
-                            }
+                            _deferredInput.Clear();
+                            _manualRedraw = true;
+                            SignalRedraw();
                         }
-                    });
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
+                    }
+                }
 
-            if (!resizeDetected)
-            {
-                // Normal shutdown path: cancellation requested, loop exits
-                // without restarting. Spectre's AutoClear(false) preserves
-                // the final frame so the post-stream summary lands beneath.
-                return;
+                await Task.Delay(TimeSpan.FromMilliseconds(33), _timeProvider, cancellationToken);
             }
-
-            // Resize-restart path: tear-down complete. Wipe the viewport
-            // *and* scrollback (\x1b[3J) so no ghost rows from the old
-            // layout survive, then loop and reopen a fresh LiveDisplay at
-            // the new dimensions. Without the scrollback clear, previous
-            // frames pushed above the viewport during a shrink would still
-            // be visible if the user scrolled up.
-            _console.Clear(home: true);
-            _console.Write(new ControlCode("\u001b[3J"));
         }
     }
-
-    private async Task RunLiveLoopInTerminalModeAsync(CancellationToken cancellationToken)
-    {
-        if (!ShouldUseAlternateScreen())
-        {
-            await RunLiveLoopAsync(cancellationToken);
-            return;
-        }
-
-        _console.Write(new ControlCode(EnterAlternateScreenSequence));
-        _console.Cursor.Hide();
-
-        try
-        {
-            await RunLiveLoopAsync(cancellationToken);
-        }
-        finally
-        {
-            _console.Write(new ControlCode(ExitAlternateScreenSequence));
-        }
-    }
-
-    private bool ShouldUseAlternateScreen()
-        => _platform.IsMacOS && _console.Profile.Capabilities.Ansi && _console.Profile.Capabilities.AlternateBuffer;
 
     private IRenderable BuildLayout()
     {
         DashboardSnapshot snapshot = _state.Snapshot();
-        IRenderable header = BuildHeader(snapshot);
-
-        CompactLogLine[] tail = _logBuffer.Snapshot();
-
-        string? activeFunctionFilter;
-        bool errorsOnly;
-        LogLevel minimumLogLevel;
         lock (_uiLock)
         {
-            activeFunctionFilter = _activeFunctionFilter;
-            errorsOnly = _errorsOnly;
-            minimumLogLevel = _minimumLogLevel;
-        }
-
-        if (activeFunctionFilter is not null)
-        {
-            tail = [.. tail.Where(line =>
-                line.FunctionName is null
-                || string.Equals(line.FunctionName, activeFunctionFilter, StringComparison.Ordinal))];
-        }
-
-        if (errorsOnly)
-        {
-            tail = [.. tail.Where(line => line.IsError)];
-        }
-
-        tail = [.. tail.Where(line => line.Level >= minimumLogLevel)];
-
-        int logBudget = ComputeLogBudget(snapshot);
-        List<IRenderable> visualRows = BuildLogVisualRows(tail, activeFunctionFilter, GetViewportWidth());
-        int logScrollOffset;
-        lock (_uiLock)
-        {
-            _logScrollOffset = Math.Clamp(_logScrollOffset, 0, Math.Max(0, visualRows.Count - logBudget));
-            logScrollOffset = _logScrollOffset;
-        }
-
-        if (visualRows.Count > logBudget)
-        {
-            int start = Math.Max(0, visualRows.Count - logBudget - logScrollOffset);
-            visualRows = visualRows[start..Math.Min(visualRows.Count, start + logBudget)];
-        }
-
-        IRenderable logRows = BuildLogRows(visualRows, logBudget);
-        IRenderable footer = BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly, minimumLogLevel);
-
-        var rows = new Rows(
-            header,
-            new Rule("logs").LeftJustified().RuleStyle(Theme.Muted),
-            logRows,
-            footer);
-
-        return rows;
-    }
-
-    private List<IRenderable> BuildLogVisualRows(CompactLogLine[] tail, string? activeFunctionFilter, int viewportWidth)
-    {
-        if (tail.Length == 0)
-        {
-            return [new Markup($"[{MutedTag}]{Markup.Escape(GetEmptyLogMessage(activeFunctionFilter))}[/]")];
-        }
-
-        var rows = new List<IRenderable>();
-        bool previousWasMultiline = false;
-        for (int i = 0; i < tail.Length; i++)
-        {
-            IReadOnlyList<IRenderable> lineRows = tail[i].RenderRows(viewportWidth);
-            bool multiline = lineRows.Count > 1;
-
-            // Only separate multi-line entries (wrapped messages or exception
-            // summaries) so they read as a distinct block. Consecutive single-line
-            // entries stay dense to keep the live tail compact. A single space (not
-            // string.Empty) is required: Spectre's Rows collapses an empty Markup.
-            if (i > 0 && (previousWasMultiline || multiline))
+            _frameSize = _terminal?.Size ?? new TerminalSize(_console?.Profile.Width ?? 120, _console?.Profile.Height ?? 30);
+            if (_frameSize.Value.Width <= 0 || _frameSize.Value.Height <= 0)
             {
-                rows.Add(new Markup(" "));
+                throw new IOException("The terminal viewport is unavailable.");
             }
 
-            rows.AddRange(lineRows);
-            previousWasMultiline = multiline;
-        }
-
-        return rows;
-    }
-
-    private static bool IsMultiline(CompactLogLine line, int viewportWidth) => line.RenderRows(viewportWidth).Count > 1;
-
-    private bool SeparatorPrecedesNewEntry(CompactLogLine current, int viewportWidth)
-    {
-        CompactLogLine[] snapshot = _logBuffer.Snapshot();
-        CompactLogLine? previous = null;
-        for (int i = snapshot.Length - 2; i >= 0; i--)
-        {
-            if (MatchesLogFilters(snapshot[i], _activeFunctionFilter, _errorsOnly, _minimumLogLevel))
+            IRenderable header = GetViewportWidth() < 24 || GetViewportHeight() < 6
+                ? new Text("Resize terminal", Theme.Muted)
+                : BuildHeader(snapshot);
+            RefreshViewport(snapshot, header);
+            IReadOnlyList<IRenderable> rows = _viewport.RenderRows(Theme.Selection);
+            if (rows.Count == 0)
             {
-                previous = snapshot[i];
-                break;
+                rows = [new Text(LogText.Sanitize(GetEmptyLogMessage(_activeFunctionFilter)), Theme.Muted)];
             }
-        }
 
-        return previous is not null && (IsMultiline(previous, viewportWidth) || IsMultiline(current, viewportWidth));
+            return new DashboardFrame(GetViewportWidth(), GetViewportHeight(), header, _logTop - 1,
+                BuildLogDivider(), rows, BuildFooter());
+        }
     }
 
-    private static IRenderable BuildLogRows(List<IRenderable> visualRows, int logBudget)
+    private void RefreshViewport(DashboardSnapshot snapshot, IRenderable? header = null)
     {
-        if (logBudget <= 0)
+        header ??= BuildHeader(snapshot);
+        RenderOptions options = LogText.CreateRenderOptions(GetViewportWidth(), GetViewportHeight());
+        int headerHeight = Segment.SplitLines(header.Render(options, GetViewportWidth())).Count;
+        headerHeight = Math.Clamp(headerHeight, 0, Math.Max(0, GetViewportHeight() - 3));
+        if (GetViewportWidth() < 24 || GetViewportHeight() < 6)
         {
-            return new Rows([]);
+            headerHeight = Math.Min(1, Math.Max(0, GetViewportHeight() - 2));
         }
 
-        while (visualRows.Count < logBudget)
-        {
-            visualRows.Add(new Markup(string.Empty));
-        }
-
-        return new Rows(visualRows);
+        _logTop = headerHeight + 1;
+        _logHeight = Math.Max(0, GetViewportHeight() - headerHeight - 2);
+        _viewport.Refresh(_logBuffer.Capture(), GetViewportWidth(), Math.Max(1, _logHeight),
+            new LogFilter(_activeFunctionFilter, _errorsOnly, _minimumLogLevel));
+        _logScrollOffset = _viewport.ScrollOffset;
     }
-
-    private int ComputeLogBudget(DashboardSnapshot snapshot)
-    {
-        bool helpOpen;
-        bool browserOpen;
-        bool searchOpen;
-        string searchQuery;
-        lock (_uiLock)
-        {
-            helpOpen = _helpOpen;
-            browserOpen = _functionBrowserOpen;
-            searchOpen = _functionSearchOpen;
-            searchQuery = _functionSearchQuery;
-        }
-
-        return ComputeLogBudgetCore(snapshot, helpOpen, searchOpen, browserOpen, searchQuery);
-    }
-
-    private int ComputeLogBudgetCore(
-        DashboardSnapshot snapshot,
-        bool helpOpen,
-        bool functionSearchOpen,
-        bool functionBrowserOpen,
-        string searchQuery)
-    {
-        // Spectre reports sentinel values when stdout isn't a real terminal
-        // (e.g., redirected to a pipe). Clamp to a sensible default so the
-        // compact renderer still produces useful output if it's somehow
-        // reached without the terminal-safety fallback firing.
-        int viewportHeight = GetViewportHeight();
-
-        // Chrome lines breakdown (matches BuildLayout output):
-        //   bannerPanel (rounded box):              3 lines
-        //   functions block (count-dependent):      see switch
-        //   "logs" rule:                            1 line
-        //   footer line:                            1 line
-        //   safety pad (resize/wrap slack):         2 lines
-        int functionsLines = ComputeHeaderLineCount(snapshot, helpOpen, functionSearchOpen, functionBrowserOpen, searchQuery);
-        if (helpOpen || functionBrowserOpen || functionSearchOpen)
-        {
-            // Overlay panel + "logs" rule + footer. Do not reserve extra
-            // slack here: if the target exceeds the viewport, Spectre crops
-            // from the top and hides the overlay header.
-            int reservedForOverlay = functionsLines + 1 + 1;
-            return Math.Max(0, viewportHeight - reservedForOverlay);
-        }
-
-        // Always reserve at least 3 lines for logs so the dashboard remains
-        // useful even on very small terminals (the header simply overflows).
-        int reservedForHeader = 3 + functionsLines + 1 + 1 + 2;
-        return Math.Max(3, viewportHeight - reservedForHeader);
-    }
-
-    private int ComputeHeaderLineCount(
-        DashboardSnapshot snapshot,
-        bool helpOpen,
-        bool functionSearchOpen,
-        bool functionBrowserOpen,
-        string searchQuery)
-        => helpOpen
-            ? HelpOverlayLines
-            : functionSearchOpen
-            ? _functionSearchBuilder.GetVisibleRows(_functionSearchBuilder.GetMatches(GetSortedFunctions(snapshot), searchQuery).Length, GetViewportHeight()) + CompactFunctionSearchBuilder.ChromeLines
-            : functionBrowserOpen
-            // Panel border (2) + visible grid rows + spacer/footer (2).
-            ? _functionBrowserBuilder.GetVisibleRows(snapshot.Functions.Count, GetViewportHeight()) + CompactFunctionBrowserBuilder.ChromeLines
-            : snapshot.Functions.Count switch
-            {
-                0 => 1,
-                <= 8 => snapshot.Functions.Count + 1, // 1 column-header row + N data rows
-                _ => GetFunctionsBlockLineCount(snapshot.Functions.Count),
-            };
 
     private IRenderable BuildHeader(DashboardSnapshot snapshot)
     {
@@ -604,13 +763,14 @@ internal sealed class CompactRenderer(
             return BuildFunctionBrowser(snapshot);
         }
 
-        
-        IRenderable bannerPanel = _headerBuilder.BuildBanner(snapshot.HostVersion, snapshot.ListenUri);
+
+        IRenderable bannerPanel = _headerBuilder.BuildBanner(snapshot, GetViewportWidth());
 
         int truncatedRows = GetTruncatedFunctionVisibleRows(snapshot.Functions.Count);
         IRenderable functions = snapshot.Functions.Count switch
         {
             0 => new Markup($"[{MutedTag}]  No functions loaded yet…[/]"),
+            _ when GetViewportWidth() < 64 || GetViewportHeight() < 16 => BuildFunctionsStatusStrip(snapshot),
             <= 8 => BuildFunctionsTable(GetSortedFunctions(snapshot), snapshot.ListenUri),
             _ when truncatedRows > 0 => BuildTruncatedFunctionsTable(snapshot, truncatedRows),
             _ => BuildFunctionsStatusStrip(snapshot),
@@ -623,13 +783,17 @@ internal sealed class CompactRenderer(
 
     private Table BuildFunctionsTable(IReadOnlyList<FunctionInfo> functions, string? listenUri)
     {
+        int nameWidth = Math.Clamp(GetViewportWidth() / 4, 12, 30);
+        int statusWidth = Math.Clamp(GetViewportWidth() / 8, 7, 12);
+        const int TriggerWidth = 7;
+        int routeWidth = Math.Max(1, GetViewportWidth() - nameWidth - statusWidth - TriggerWidth - 10);
         Table table = new Table()
             .Border(TableBorder.None)
             .HideHeaders()
-            .AddColumn(new TableColumn(string.Empty).PadLeft(2).PadRight(2).NoWrap())
-            .AddColumn(new TableColumn(string.Empty).PadRight(2).NoWrap())
-            .AddColumn(new TableColumn(string.Empty).PadRight(2).NoWrap())
-            .AddColumn(new TableColumn(string.Empty).PadRight(2).NoWrap());
+            .AddColumn(new TableColumn(string.Empty) { Width = nameWidth }.PadLeft(2).PadRight(2).NoWrap())
+            .AddColumn(new TableColumn(string.Empty) { Width = TriggerWidth }.PadLeft(0).PadRight(2).NoWrap())
+            .AddColumn(new TableColumn(string.Empty) { Width = routeWidth }.PadLeft(0).PadRight(2).NoWrap())
+            .AddColumn(new TableColumn(string.Empty) { Width = statusWidth }.PadLeft(0).PadRight(0).NoWrap());
 
         table.AddRow(
             new Markup($"[{EmphasisTag}]Function[/]"),
@@ -640,13 +804,13 @@ internal sealed class CompactRenderer(
         foreach (FunctionInfo fn in functions)
         {
             string color = _palette.GetColorFor(fn.Name);
-            string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fn, listenUri, Theme);
+            string routeMarkup = HttpRouteFormatter.FormatRouteMarkup(fn, listenUri, Theme, routeWidth);
 
             table.AddRow(
-                new Markup($"[{color}]{Markup.Escape(fn.Name)}[/]"),
-                new Markup(Markup.Escape(FormatTrigger(fn.TriggerType))),
+                new Markup($"[{color}]{LogText.EscapeMarkup(LogText.Clip(fn.Name, nameWidth))}[/]"),
+                new Markup(LogText.EscapeMarkup(LogText.Clip(FormatTrigger(fn.TriggerType), TriggerWidth))),
                 new Markup($"[{MutedTag}]{routeMarkup}[/]"),
-                new Markup(FormatStatus(fn)));
+                new Markup(FormatStatus(fn)) { Overflow = Overflow.Ellipsis });
         }
 
         return table;
@@ -674,7 +838,39 @@ internal sealed class CompactRenderer(
     }
 
     private IRenderable BuildHelpOverlay()
-        => _helpOverlayBuilder.Build();
+    {
+        CompactHelpPage page = _helpOverlayBuilder.Build(GetViewportWidth(), Math.Max(3, GetViewportHeight() - 3), _helpRowOffset, _status);
+        _helpRowOffset = page.RowOffset;
+        _helpMaximumRowOffset = page.MaximumRowOffset;
+        _helpVisibleRows = page.VisibleRows;
+        return page.Content;
+    }
+
+    private bool TryScrollHelp(ConsoleKeyInfo key)
+    {
+        if ((key.Modifiers & (ConsoleModifiers.Control | ConsoleModifiers.Alt)) != 0)
+        {
+            return false;
+        }
+
+        int? row = key.Key switch
+        {
+            ConsoleKey.UpArrow => _helpRowOffset - 1,
+            ConsoleKey.DownArrow => _helpRowOffset + 1,
+            ConsoleKey.PageUp => _helpRowOffset - _helpVisibleRows,
+            ConsoleKey.PageDown => _helpRowOffset + _helpVisibleRows,
+            ConsoleKey.Home => 0,
+            ConsoleKey.End => _helpMaximumRowOffset,
+            _ => null,
+        };
+        if (row is null)
+        {
+            return false;
+        }
+
+        _helpRowOffset = Math.Clamp(row.Value, 0, _helpMaximumRowOffset);
+        return true;
+    }
 
     private IRenderable BuildFunctionSearch(DashboardSnapshot snapshot)
     {
@@ -768,33 +964,73 @@ internal sealed class CompactRenderer(
             $"  [{EmphasisTag}]{snapshot.Functions.Count}[/] functions  ·  [{SuccessTag}]● {ready} ready[/]  ·  [{ActiveTag}]◉ {active} active[/]  ·  [{ErrorTag}]✗ {errored} error{(errored == 1 ? string.Empty : "s")}[/]"));
     }
 
-    private IRenderable BuildFooter(DashboardSnapshot snapshot, string? activeFunctionFilter)
-        => BuildFooterCore(snapshot, activeFunctionFilter, errorsOnly: false, LogLevel.Information);
-
-    private IRenderable BuildFooterCore(DashboardSnapshot snapshot, string? activeFunctionFilter, bool errorsOnly, LogLevel minimumLogLevel)
+    private IRenderable BuildFooter()
     {
-        int logScrollOffset;
-        bool helpOpen;
-        bool functionSearchOpen;
-        bool functionBrowserOpen;
-
         lock (_uiLock)
         {
-            logScrollOffset = _logScrollOffset;
-            helpOpen = _helpOpen;
-            functionSearchOpen = _functionSearchOpen;
-            functionBrowserOpen = _functionBrowserOpen;
+            CompactFooterMode mode = _stopping ? CompactFooterMode.Stopping
+                : _functionSearchOpen ? CompactFooterMode.Search
+                : !_mouseCapture ? CompactFooterMode.MouseReleased
+                : _helpOpen ? CompactFooterMode.Help
+                : _functionBrowserOpen ? CompactFooterMode.Functions
+                : _viewport.SelectionExpired ? CompactFooterMode.ExpiredSelection
+                : _viewport.HasSelection ? CompactFooterMode.Selection
+                : CompactFooterMode.Logs;
+            return _footerBuilder.Build(GetViewportWidth(), mode, _viewport.Following, _activeFunctionFilter is not null,
+                helpScrollable: _helpMaximumRowOffset > 0);
+        }
+    }
+
+    private IRenderable BuildLogDivider()
+    {
+        if (!_stopping && !_mouseCapture)
+        {
+            return _headerBuilder.BuildLogDivider(GetViewportWidth(),
+                ["host running", "display paused", "use terminal Copy"], "Terminal selection");
         }
 
-        return _footerBuilder.Build(
-            snapshot,
-            activeFunctionFilter,
-            errorsOnly,
-            minimumLogLevel,
-            logScrollOffset,
-            helpOpen,
-            functionSearchOpen,
-            functionBrowserOpen);
+        List<string> state =
+        [
+            _stopping ? "Stopping"
+                : _viewport.SelectionExpired ? "Selection expired"
+                : _viewport.Following ? "Live" : "Paused",
+        ];
+        if (!_stopping && !_viewport.SelectionExpired && _status is not null)
+        {
+            state.Add(_statusCaption ?? _status);
+        }
+        if (_viewport.HasSelection)
+        {
+            state.Add("Text selected");
+        }
+        if (_viewport.UnreadEntries > 0)
+        {
+            state.Add(string.Create(CultureInfo.InvariantCulture, $"{_viewport.UnreadEntries} new"));
+        }
+        if (_errorsOnly)
+        {
+            state.Add("Errors only");
+        }
+        else if (_minimumLogLevel >= LogLevel.Warning)
+        {
+            state.Add(_minimumLogLevel >= LogLevel.Error ? "L:error" : "L:warn");
+        }
+        if (_viewport.Evicted > 0)
+        {
+            state.Add("History trimmed");
+        }
+        if (_activeFunctionFilter is not null)
+        {
+            state.Add("Filter " + _activeFunctionFilter);
+        }
+
+        return _headerBuilder.BuildLogDivider(GetViewportWidth(), state);
+    }
+
+    private void SetStatus(string? message, string? caption = null)
+    {
+        _status = message;
+        _statusCaption = caption;
     }
 
     private static string FormatTrigger(string trigger) => trigger switch
@@ -819,14 +1055,6 @@ internal sealed class CompactRenderer(
 
     private static FunctionInfo[] GetSortedFunctions(DashboardSnapshot snapshot)
         => [.. snapshot.Functions.OrderBy(f => f.Name, _functionNameComparer)];
-
-    private int GetFunctionsBlockLineCount(int functionCount)
-    {
-        int visibleRows = GetTruncatedFunctionVisibleRows(functionCount);
-        return visibleRows > 0
-            ? visibleRows + 1 + (functionCount > visibleRows ? 1 : 0)
-            : 1;
-    }
 
     private int GetTruncatedFunctionVisibleRows(int functionCount)
     {
@@ -857,7 +1085,18 @@ internal sealed class CompactRenderer(
 
     private int GetViewportHeight()
     {
-        int viewportHeight = _console.Profile.Height;
+        if (_frameSize is { } frame)
+        {
+            return frame.Height;
+        }
+
+        if (_terminal is not null)
+        {
+            int height = _terminal.Size.Height;
+            return height > 0 ? height : throw new IOException("The terminal viewport height is unavailable.");
+        }
+
+        int viewportHeight = _console?.Profile.Height ?? 30;
         if (viewportHeight <= 0 || viewportHeight > 1000)
         {
             viewportHeight = 30;
@@ -868,7 +1107,18 @@ internal sealed class CompactRenderer(
 
     private int GetViewportWidth()
     {
-        int viewportWidth = _console.Profile.Width;
+        if (_frameSize is { } frame)
+        {
+            return frame.Width;
+        }
+
+        if (_terminal is not null)
+        {
+            int width = _terminal.Size.Width;
+            return width > 0 ? width : throw new IOException("The terminal viewport width is unavailable.");
+        }
+
+        int viewportWidth = _console?.Profile.Width ?? 120;
         if (viewportWidth <= 0 || viewportWidth > 1000)
         {
             viewportWidth = 120;
@@ -881,23 +1131,6 @@ internal sealed class CompactRenderer(
         => activeFunctionFilter is null
             ? "Waiting for events…"
             : $"No logs for {activeFunctionFilter}…";
-
-    private static bool MatchesLogFilters(CompactLogLine line, string? activeFunctionFilter, bool errorsOnly, LogLevel minimumLogLevel)
-    {
-        if (activeFunctionFilter is not null
-            && line.FunctionName is not null
-            && !string.Equals(line.FunctionName, activeFunctionFilter, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (errorsOnly && !line.IsError)
-        {
-            return false;
-        }
-
-        return line.Level >= minimumLogLevel;
-    }
 
     private sealed class FunctionNameComparer : IComparer<string>
     {
