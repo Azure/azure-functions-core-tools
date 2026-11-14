@@ -27,7 +27,7 @@ internal static class HttpRouteFormatter
     /// Returns Spectre markup describing the function's route. The returned
     /// string is safe to embed directly into another markup template.
     /// </summary>
-    public static string FormatRouteMarkup(FunctionInfo function, string? listenUri, ITheme theme)
+    public static string FormatRouteMarkup(FunctionInfo function, string? listenUri, ITheme theme, int? maxWidth = null)
     {
         ArgumentNullException.ThrowIfNull(function);
 
@@ -39,16 +39,21 @@ internal static class HttpRouteFormatter
         if (!isHttp || string.IsNullOrEmpty(listenUri) || string.IsNullOrEmpty(function.Route))
         {
             string fallback = !string.IsNullOrEmpty(function.Route) ? function.Route : "—";
-            return Markup.Escape(methodsPrefix + fallback);
+            string value = methodsPrefix + fallback;
+            return LogText.EscapeMarkup(maxWidth is { } width ? LogText.Clip(value, width) : value);
         }
 
         string url = CombineUrl(listenUri, function.Route);
+        if (maxWidth is { } maximum)
+        {
+            return $"[{theme.Hyperlink.ToMarkup()} link={LogText.EscapeMarkup(url)}]{LogText.EscapeMarkup(LogText.Clip(methodsPrefix + url, maximum))}[/]";
+        }
 
         // [link=URL]DISPLAY[/] emits OSC 8 in supported terminals. We show
         // the full URL as the display text so it's obvious what gets opened
         // when clicked, and so the output remains useful when copy-pasted
         // into a terminal that doesn't honor the hyperlink sequence.
-        return $"{Markup.Escape(methodsPrefix)}[{theme.Hyperlink.ToMarkup()} link={Markup.Escape(url)}]{Markup.Escape(url)}[/]";
+        return $"{LogText.EscapeMarkup(methodsPrefix)}[{theme.Hyperlink.ToMarkup()} link={LogText.EscapeMarkup(url)}]{LogText.EscapeMarkup(url)}[/]";
     }
 
     private static string CombineUrl(string baseUrl, string route)

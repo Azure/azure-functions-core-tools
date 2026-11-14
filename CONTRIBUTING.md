@@ -113,13 +113,21 @@ Tests can be run using:
 dotnet test test/Func.Tests/Func.Tests.csproj
 ```
 
-#### Terminal checks
+#### Log history and terminal checks
 
-The terminal model and interaction tests do not require a live terminal:
+The log history, viewport, terminal model, and interaction tests do not require
+a live terminal:
 
 ```powershell
-dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests"
+dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests"
 ```
+
+The log-history model retains at most 10,000 entries within a 16 MiB canonical-text
+budget and truncates oversized display entries on text-element boundaries.
+`LogViewport` materializes only visible rows. Its unit tests cover sustained-input
+retention, Unicode wrapping, anchored scrolling, logical selections and expiry,
+and release of cached projections after eviction. These are model contracts,
+not qualification of a live dashboard.
 
 String-writer tests cannot establish real terminal geometry or native mode
 restoration. Native terminal checks must run on the operating system being
