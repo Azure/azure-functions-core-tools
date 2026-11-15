@@ -72,13 +72,13 @@ extends:
               custom: restore
               projects: test/Func.Tests/Func.Tests.csproj
           - task: DotNetCoreCLI@2
-            displayName: Qualify native input, log viewport, prompt handoff, and interruption
+            displayName: Qualify native input, log viewport, clipboard, prompt handoff, and interruption
             inputs:
               command: test
               projects: test/Func.Tests/Func.Tests.csproj
               arguments: >-
                 -c Release --no-restore -p:CI=true
-                --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests"
+                --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests|FullyQualifiedName~ProcessRunnerTests"
             env:
               FUNC_TERMINAL_NATIVE_TESTS: '1'
         - job: terminal_linux
@@ -96,12 +96,12 @@ extends:
               custom: restore
               projects: test/Func.Tests/Func.Tests.csproj
           - task: DotNetCoreCLI@2
-            displayName: Qualify native Unix input and job control
+            displayName: Qualify native Unix input, log viewport, clipboard, and job control
             inputs:
               command: test
               projects: test/Func.Tests/Func.Tests.csproj
               arguments: >-
                 -c Release --no-restore -p:CI=true
-                --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests"
+                --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests|FullyQualifiedName~ProcessRunnerTests"
             env:
               FUNC_TERMINAL_NATIVE_TESTS: '1'

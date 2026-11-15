@@ -113,13 +113,13 @@ Tests can be run using:
 dotnet test test/Func.Tests/Func.Tests.csproj
 ```
 
-#### Log history and terminal checks
+#### Log history, clipboard, and terminal checks
 
-The log history, viewport, terminal model, and interaction tests do not require
-a live terminal:
+The log history, viewport, terminal model, clipboard, and interaction tests do
+not require a live terminal:
 
 ```powershell
-dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests"
+dotnet test .\test\Func.Tests\Func.Tests.csproj --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests|FullyQualifiedName~ProcessRunnerTests"
 ```
 
 The log-history model retains at most 10,000 entries within a 16 MiB canonical-text
@@ -176,6 +176,16 @@ The same probe participates in the opt-in native test suite on Unix:
 ```sh
 FUNC_TERMINAL_NATIVE_TESTS=1 dotnet test test/Func.Tests/Func.Tests.csproj --filter "FullyQualifiedName~UnixPtySmokeTests"
 ```
+
+Clipboard unit tests use substitutes. Do not write to a developer's real
+clipboard in unattended tests; use an isolated desktop or explicitly initiated
+manual checks. A successful OSC 52 write means the request was sent, not that
+the terminal accepted it.
+
+The separate `FUNC_CLIPBOARD_NATIVE_TESTS=1` opt-in enables real `pbcopy`/`pbpaste`
+round-trip tests on disposable macOS desktops. The macOS CI workflow enables it
+only on its hosted VMs. Unlike `FUNC_TERMINAL_NATIVE_TESTS`, this replaces the
+desktop clipboard and must not be enabled in ordinary developer test runs.
 
 #### CLI Process Smoke Tests
 

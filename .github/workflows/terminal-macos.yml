@@ -52,6 +52,7 @@ jobs:
       CI: 'true'
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       FUNC_TERMINAL_NATIVE_TESTS: '1'
+      FUNC_CLIPBOARD_NATIVE_TESTS: '1'
 
     steps:
       - uses: actions/checkout@v4
@@ -82,10 +83,10 @@ jobs:
           if report["process_architecture"] != expected:
               raise SystemExit(f"Expected {expected}, got {report['process_architecture']}")
           PY
-      - name: Qualify terminal input, log viewport, prompt handoff, and interruption
+      - name: Qualify terminal input, log viewport, clipboard, prompt handoff, and interruption
         run: >-
           dotnet test test/Func.Tests/Func.Tests.csproj -c Release -p:CI=true --verbosity quiet
-          --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests"
+          --filter "FullyQualifiedName~Console.Terminal|FullyQualifiedName~Console.Clipboard|FullyQualifiedName~FullScreenInputHandoffTests|FullyQualifiedName~ConsoleInterruptCoordinatorTests|FullyQualifiedName~LogViewportTests|FullyQualifiedName~CompactLogComponentsTests|FullyQualifiedName~HttpRouteFormatterTests|FullyQualifiedName~ProcessRunnerTests"
           --logger "trx;LogFileName=terminal-tests.trx"
           --results-directory out/test-results
       - name: Preserve native evidence
