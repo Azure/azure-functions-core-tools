@@ -11,7 +11,7 @@ internal sealed record CommandCase(string Name, string[] Arguments, string Outpu
     internal static IReadOnlyList<CommandCase> All { get; } =
     [
         new("version", ["version"], @"\A\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?\s*\z"),
-        new("help", ["--help"], @"\A[\s\S]*\z"),
+        new("help", ["--help"], @"\A[\s\S]*\bUsage\b[\s\S]*\bCommands\b[\s\S]*\bGlobal\s+Options\b[\s\S]*\z"),
     ];
 
     internal string DisplayCommand => string.Join(" ", Arguments.Select(FormatArgument).Prepend("func"));
