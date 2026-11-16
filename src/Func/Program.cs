@@ -3,6 +3,7 @@
 
 using System.CommandLine;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Azure.Functions.Cli;
 using Azure.Functions.Cli.Commands;
 using Azure.Functions.Cli.Commands.Setup;
@@ -37,21 +38,13 @@ UnexpectedErrorReporter unexpectedErrors = new(interaction);
 // Wire cancellation to Ctrl+C / SIGTERM
 // First Ctrl+C: graceful shutdown. Second Ctrl+C: force exit.
 using var cts = new CancellationTokenSource();
-int ctrlCCount = 0;
+ConsoleInterruptCoordinator interrupts = new(cts.Cancel, Environment.Exit);
 Console.CancelKeyPress += (_, e) =>
 {
-    ctrlCCount++;
-    if (ctrlCCount == 1)
-    {
-        e.Cancel = true;
-        cts.Cancel();
-    }
-    else
-    {
-        // Second Ctrl+C — force exit immediately
-        Environment.Exit(130);
-    }
+    e.Cancel = true;
+    interrupts.RequestStop();
 };
+AppDomain.CurrentDomain.ProcessExit += (_, _) => interrupts.RestoreTerminal();
 
 // Leave advisories disabled until the parsed command establishes its output contract.
 Task<string?> versionCheckTask = Task.FromResult<string?>(null);
@@ -73,7 +66,7 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
     ParseResult? commandParseResult = null;
     try
     {
-        using IHost host = await CliHostFactory.CreateHostAsync(interaction, cts.Token);
+        using IHost host = await CliHostFactory.CreateHostAsync(interaction, cts.Token, interrupts);
         await host.StartAsync(cts.Token);
 
         // Capture nudge before host disposal so it can run after the
@@ -106,6 +99,20 @@ using (Activity? activity = CliTelemetry.Trace.StartCommandActivity())
         else
         {
             var config = new InvocationConfiguration { EnableDefaultExceptionHandler = false };
+            bool ownsTerminal = commandParseResult.CommandResult.Command is StartCommand startCommand
+                && startCommand.UsesFullScreen(commandParseResult);
+            if (ownsTerminal)
+            {
+                config.ProcessTerminationTimeout = null;
+            }
+
+            using PosixSignalRegistration? termination = ownsTerminal
+                ? PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+                {
+                    context.Cancel = true;
+                    interrupts.RequestStop(143);
+                })
+                : null;
             exitCode = await commandParseResult.InvokeAsync(config, cts.Token);
         }
     }

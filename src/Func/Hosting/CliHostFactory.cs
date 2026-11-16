@@ -8,6 +8,8 @@ using Azure.Functions.Cli.Commands.Start.Host;
 using Azure.Functions.Cli.Commands.Start.Initialization;
 using Azure.Functions.Cli.Configuration;
 using Azure.Functions.Cli.Console;
+using Azure.Functions.Cli.Console.Clipboard;
+using Azure.Functions.Cli.Console.Terminal;
 using Azure.Functions.Cli.Projects;
 using Azure.Functions.Cli.Hosting.FirstRun;
 using Azure.Functions.Cli.Http;
@@ -38,9 +40,10 @@ internal static class CliHostFactory
     /// Creates the builder, registers installed workloads, and builds the
     /// host. Caller is responsible for <see cref="IHost.StartAsync"/>.
     /// </summary>
-    public static async Task<IHost> CreateHostAsync(IInteractionService interaction, CancellationToken cancellationToken = default)
+    public static async Task<IHost> CreateHostAsync(IInteractionService interaction, CancellationToken cancellationToken = default,
+        ConsoleInterruptCoordinator? interrupts = null)
     {
-        HostApplicationBuilder builder = CreateBuilder(interaction);
+        HostApplicationBuilder builder = CreateBuilder(interaction, interrupts);
         await builder.RegisterWorkloadsAsync(cancellationToken);
         return builder.Build();
     }
@@ -51,7 +54,7 @@ internal static class CliHostFactory
     /// before workloads register; production code should use
     /// <see cref="CreateHostAsync"/>.
     /// </summary>
-    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction)
+    public static HostApplicationBuilder CreateBuilder(IInteractionService interaction, ConsoleInterruptCoordinator? interrupts = null)
     {
         ArgumentNullException.ThrowIfNull(interaction);
 
@@ -61,6 +64,12 @@ internal static class CliHostFactory
         HostApplicationBuilder builder = Host.CreateEmptyApplicationBuilder(null);
         builder.Services.AddSingleton(interaction);
         builder.Services.AddSingleton<IPlatform, Platform>();
+        builder.Services.AddSingleton<ITerminalSessionFactory, TerminalSessionFactory>();
+        builder.Services.AddSingleton<IClipboardWriter, ClipboardWriter>();
+        if (interrupts is not null)
+        {
+            builder.Services.AddSingleton(interrupts);
+        }
 
         var workingDirectory = new DirectoryInfo(Environment.CurrentDirectory);
         var localSettingsProvider = new LocalSettingsProvider();
