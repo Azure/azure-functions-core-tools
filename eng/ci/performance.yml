@@ -1,0 +1,57 @@
+schedules:
+- cron: '0 8 * * *'
+  displayName: Nightly CLI performance
+  branches:
+    include:
+    - vnext
+  always: true
+
+trigger: none
+pr: none
+
+resources:
+  repositories:
+  - repository: 1es
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Unofficial.PipelineTemplate.yml@1es
+  parameters:
+    pool:
+      name: 1es-pool-azfunc-public
+      image: 1es-ubuntu-24.04-min
+      os: linux
+    sdl:
+      sourceAnalysisPool:
+        name: 1es-pool-azfunc-public
+        image: 1es-windows-2022
+        os: windows
+      codeql:
+        runSourceLanguagesInSourceAnalysis: true
+    settings:
+      networkIsolationPolicy: Preferred, NuGet
+    stages:
+    - stage: Performance
+      jobs:
+      - job: commands_linux_x64
+        displayName: CLI command latency (linux-x64)
+        timeoutInMinutes: 45
+        variables:
+        - template: /eng/ci/templates/variables/build.yml@self
+        templateContext:
+          outputParentDirectory: $(Build.ArtifactStagingDirectory)
+          outputs:
+          - output: pipelineArtifact
+            displayName: Publish performance results and diagnostics
+            path: $(Build.ArtifactStagingDirectory)/perf/results
+            artifact: perf_linux_x64
+            condition: always()
+        steps:
+        - template: /eng/ci/templates/steps/setup-dependencies.yml@self
+          parameters:
+            sign: false
+        - pwsh: |
+            & ./perf/run.ps1 -Runtime linux-x64 -OutputDirectory "$(Build.ArtifactStagingDirectory)/perf"
+          displayName: Benchmark self-contained func commands with Crank
